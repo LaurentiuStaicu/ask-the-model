@@ -1,83 +1,89 @@
 /* Ask the Model palette.
  *
- * Source of truth: the GitHub social-preview identity.
+ * Source of truth: the uploaded owl artwork.
  * Geometry, typography and layout remain unchanged in this pass.
  *
- * Warm Stone      #6F685F
- * Warm Ivory      #F4F0E7
- * Champagne Gold  #B99A58
- * Warm Silver     #AAA39A
- * Soft Surface    #FAF8F3
+ * Charcoal         #3A3A37
+ * Header Gray      #60605D
+ * Mid Gray         #777774
+ * Soft Gray        #A3A3A0
+ * Pale Gray        #E1E1DE
+ * Off White        #FAFAF9
+ * Bright White     #FDFEFC
+ * Owl Eye Yellow   #EAC60D
  */
-@define-color atm_warm_stone #6F685F;
-@define-color atm_warm_stone_backdrop #71695F;
-@define-color atm_ivory #F4F0E7;
-@define-color atm_surface #FAF8F3;
-@define-color atm_surface_alt #F7F3EA;
-@define-color atm_gold #B99A58;
-@define-color atm_silver #AAA39A;
-@define-color atm_silver_backdrop #C6C0B6;
-@define-color atm_text #26282B;
+@define-color atm_charcoal #3A3A37;
+@define-color atm_header #60605D;
+@define-color atm_header_backdrop #777774;
+@define-color atm_mid_gray #777774;
+@define-color atm_soft_gray #A3A3A0;
+@define-color atm_pale_gray #E1E1DE;
+@define-color atm_surface #FAFAF9;
+@define-color atm_surface_alt #F2F3F1;
+@define-color atm_white #FDFEFC;
+@define-color atm_eye_yellow #EAC60D;
 
 window.atm-window {
     background-color: @atm_surface;
     border-width: 2px;
     border-style: ridge;
-    border-color: @atm_silver;
+    border-color: @atm_soft_gray;
     border-radius: 10px;
     box-shadow: none;
 }
 
 window.atm-window:backdrop {
-    border-color: @atm_silver_backdrop;
+    border-color: @atm_pale_gray;
     box-shadow: none;
 }
 
-/* The titlebar uses the warmer metallic/taupe family from the social preview,
- * avoiding the funeral-black contrast of the previous graphite treatment.
+/* The titlebar follows the owl's graphite/gray plumage rather than black.
+ * Yellow is reserved for the thin identity accent.
  */
 window.atm-window headerbar {
     background-image: none;
-    background-color: @atm_warm_stone;
-    color: @atm_ivory;
-    border-bottom: 1px solid @atm_gold;
+    background-color: @atm_header;
+    color: @atm_white;
+    border-bottom: 1px solid @atm_eye_yellow;
     box-shadow: none;
 }
 
 window.atm-window headerbar:backdrop {
     background-image: none;
-    background-color: @atm_warm_stone_backdrop;
-    color: @atm_ivory;
-    border-bottom-color: @atm_silver;
+    background-color: @atm_header_backdrop;
+    color: @atm_white;
+    border-bottom-color: @atm_soft_gray;
     box-shadow: none;
 }
 
 window.atm-window headerbar button {
-    color: @atm_ivory;
+    color: @atm_white;
 }
 
 window.atm-window headerbar button:hover {
-    background-color: rgba(244, 240, 231, 0.12);
+    background-color: rgba(253, 254, 252, 0.12);
 }
 
 window.atm-window headerbar button:active {
-    background-color: rgba(185, 154, 88, 0.22);
+    background-color: rgba(234, 198, 13, 0.20);
 }
 
-/* Conversation surface: warm rather than stark white. */
+/* Conversation surface echoes the paper-white background of the artwork. */
 window.atm-window scrolledwindow,
 window.atm-window textview,
 window.atm-window textview text {
     background-color: @atm_surface;
-    color: @atm_text;
+    color: @atm_charcoal;
 }
 
-/* Composer repeats the palette quietly; gold appears only on interaction. */
+/* Composer uses a slightly cooler paper-gray surface.
+ * The owl-eye yellow appears only when the field is active.
+ */
 frame.atm-input-frame {
     background-color: @atm_surface_alt;
     border-width: 2px;
     border-style: ridge;
-    border-color: @atm_silver;
+    border-color: @atm_soft_gray;
     border-radius: 12px;
     box-shadow: none;
     background-clip: padding-box;
@@ -86,15 +92,15 @@ frame.atm-input-frame {
 frame.atm-input-frame textview,
 frame.atm-input-frame textview text {
     background-color: @atm_surface_alt;
-    color: @atm_text;
+    color: @atm_charcoal;
 }
 
 frame.atm-input-frame:focus-within {
-    border-color: @atm_gold;
+    border-color: @atm_eye_yellow;
     box-shadow: none;
 }
 
 frame.atm-input-frame:backdrop {
-    border-color: @atm_silver_backdrop;
+    border-color: @atm_pale_gray;
     box-shadow: none;
 }
