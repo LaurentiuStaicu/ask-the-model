@@ -46,6 +46,7 @@
 <small>You also need Internet access for the initial AtM/provider/model downloads. Once a genuinely local model is installed, the current AtM chat path itself talks to the provider through the local loopback interface.</small>
 
 <small>If any of these terms are unfamiliar, continue in order rather than skipping ahead. Each step below includes the result you should expect before moving to the next one.</small>
+
 ### Start here: first-time setup
 
 <small>The steps below are written for someone installing AtM for the first time. The recommended reference setup uses <a href="https://ollama.com/">Ollama</a> as the local provider because its model library and command-line tools make model installation and management comparatively straightforward. Other providers may work only if they expose the Ollama-compatible API behavior documented in <a href="docs/DEPENDENCIES_AND_COMPATIBILITY.md">Dependencies and compatibility</a>.</small>
