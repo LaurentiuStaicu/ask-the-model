@@ -8,10 +8,21 @@ project(
 
 gtk_dep = dependency('gtk4')
 granite_dep = dependency('granite-7')
+gnome = import('gnome')
+
+resources = gnome.compile_resources(
+  'ask-the-model-resources',
+  'data/io.github.laurentiustaicu.ask_the_model.gresource.xml',
+  source_dir: 'data',
+  c_name: 'ask_the_model'
+)
 
 executable(
   meson.project_name(),
-  'src/Application.vala',
+  [
+    'src/Application.vala',
+    resources
+  ],
   dependencies: [
     gtk_dep,
     granite_dep

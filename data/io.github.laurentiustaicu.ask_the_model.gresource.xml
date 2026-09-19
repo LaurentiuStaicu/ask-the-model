@@ -1,0 +1,6 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<gresources>
+  <gresource prefix="/io/github/laurentiustaicu/ask_the_model">
+    <file alias="identity-icon.png">icons/64.png</file>
+  </gresource>
+</gresources>
