@@ -2,7 +2,7 @@
 
 ## Release status
 
-Ask the Model (AtM) v0.1.0 established the initial public application baseline. The current 0.1.1 development state extends that baseline with local message composition, theme following, local Ollama discovery and basic in-session AI chat.
+Ask the Model (AtM) v0.1.0 established the initial public application baseline. The current 0.1.1 development state extends that baseline with local message composition, theme following, local Ollama discovery, completion-capable model selection and streamed in-session AI chat.
 
 Version numbers identify frozen software snapshots. They do not imply that planned repository-access or full model-aware functionality is already implemented.
 
@@ -30,7 +30,8 @@ The current development state establishes:
 - discovery of a local Ollama-compatible API through `GET /api/tags`;
 - capability inspection of installed models through `POST /api/show`;
 - automatic selection of the first installed model advertising the `completion` capability, skipping embedding-only models;
-- basic in-session conversational requests through `POST /api/chat`;
+- streamed in-session conversational requests through `POST /api/chat`;
+- progressive display of assistant response chunks while generation is running;
 - in-memory user/assistant history supplied to later chat turns;
 - Flatpak packaging for the elementary OS 8 runtime;
 - continuous Flatpak build verification through GitHub Actions;
@@ -38,7 +39,7 @@ The current development state establishes:
 
 The Flatpak requests network sharing because a sandboxed application must use the network subsystem to communicate with a local HTTP provider. This permission is broader than loopback at the sandbox layer. The current AtM implementation itself only addresses `127.0.0.1:11434` and `127.0.0.1:11435`.
 
-User prompt content is transmitted only when **Send** is activated. Requests are sent to the locally discovered provider, and `stream: false` is used so each completed local response can be parsed as one JSON object.
+User prompt content is transmitted only when **Send** is activated. Requests are sent to the locally discovered provider. Ollama streaming is enabled and AtM parses each newline-delimited JSON response object as it arrives.
 
 The current development state does not yet implement:
 

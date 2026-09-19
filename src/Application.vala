@@ -7,6 +7,8 @@ namespace AskTheModel {
         private Granite.Settings granite_settings;
         private Gtk.Settings gtk_settings;
         private OllamaProvider ollama_provider;
+        private Gtk.TextView? transcript_view;
+        private bool assistant_stream_started = false;
 
         public Application () {
             Object (
@@ -40,6 +42,25 @@ namespace AskTheModel {
             apply_system_style ();
 
             ollama_provider = new OllamaProvider ();
+            ollama_provider.response_chunk.connect ((chunk) => {
+                if (transcript_view == null) {
+                    return;
+                }
+
+                if (!assistant_stream_started) {
+                    append_transcript (
+                        transcript_view,
+                        "Assistant: " + chunk
+                    );
+                    assistant_stream_started = true;
+                } else {
+                    append_transcript_raw (
+                        transcript_view,
+                        chunk
+                    );
+                }
+            });
+
             discover_local_provider.begin ();
         }
 
@@ -125,6 +146,14 @@ namespace AskTheModel {
             transcript.buffer.text = current + separator + entry;
         }
 
+        private void append_transcript_raw (
+            Gtk.TextView transcript,
+            string text
+        ) {
+            transcript.buffer.text =
+                transcript.buffer.text + text;
+        }
+
         private async void send_prompt (
             string prompt,
             Gtk.TextView transcript,
@@ -133,10 +162,14 @@ namespace AskTheModel {
         ) {
             try {
                 string answer = yield ollama_provider.chat (prompt);
-                append_transcript (
-                    transcript,
-                    "Assistant: " + answer
-                );
+
+                if (!assistant_stream_started && answer.length > 0) {
+                    append_transcript (
+                        transcript,
+                        "Assistant: " + answer
+                    );
+                    assistant_stream_started = true;
+                }
             } catch (GLib.Error error) {
                 append_transcript (
                     transcript,
@@ -162,6 +195,7 @@ namespace AskTheModel {
                 bottom_margin = 12,
                 vexpand = true
             };
+            transcript_view = transcript;
 
             var transcript_scroll = new Gtk.ScrolledWindow () {
                 child = transcript,
@@ -228,6 +262,7 @@ namespace AskTheModel {
                     "You: " + prompt
                 );
 
+                assistant_stream_started = false;
                 prompt_view.buffer.text = "";
                 prompt_view.sensitive = false;
                 send_button.sensitive = false;

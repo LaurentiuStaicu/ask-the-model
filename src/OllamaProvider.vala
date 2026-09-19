@@ -10,6 +10,8 @@ namespace AskTheModel {
         private string[] roles = {};
         private string[] contents = {};
 
+        public signal void response_chunk (string chunk);
+
         public string? base_url { get; private set; default = null; }
         public string? model_name { get; private set; default = null; }
         public uint model_count { get; private set; default = 0; }
@@ -164,6 +166,38 @@ namespace AskTheModel {
             }
         }
 
+        private async string read_http_error (
+            GLib.InputStream input_stream,
+            uint status
+        ) {
+            string detail = "";
+
+            try {
+                var data_stream = new GLib.DataInputStream (input_stream);
+                string? line = yield data_stream.read_line_utf8_async (
+                    GLib.Priority.DEFAULT,
+                    null
+                );
+
+                if (line != null && line.strip ().length > 0) {
+                    var parser = new Json.Parser ();
+                    parser.load_from_data (line, -1);
+                    Json.Object root = parser.get_root ().get_object ();
+
+                    if (root.has_member ("error")) {
+                        detail = " " + root.get_string_member ("error");
+                    }
+                }
+            } catch (GLib.Error error) {
+                detail = "";
+            }
+
+            return "Ollama returned HTTP %u.%s".printf (
+                status,
+                detail
+            );
+        }
+
         public async string chat (string prompt) throws GLib.Error {
             yield ensure_ready ();
 
@@ -195,7 +229,7 @@ namespace AskTheModel {
             builder.end_array ();
 
             builder.set_member_name ("stream");
-            builder.add_boolean_value (false);
+            builder.add_boolean_value (true);
 
             builder.end_object ();
 
@@ -212,64 +246,76 @@ namespace AskTheModel {
                 new GLib.Bytes (request_body.data)
             );
 
-            GLib.Bytes response_body = yield session.send_and_read_async (
+            GLib.InputStream input_stream = yield session.send_async (
                 message,
                 GLib.Priority.DEFAULT,
                 null
             );
 
             if (message.get_status () != Soup.Status.OK) {
-                string detail = "";
+                string error_message = yield read_http_error (
+                    input_stream,
+                    message.get_status ()
+                );
+                throw new ProviderError.HTTP (error_message);
+            }
 
-                try {
-                    var error_parser = new Json.Parser ();
-                    error_parser.load_from_data (
-                        (string) response_body.get_data (),
-                        -1
-                    );
-                    Json.Object error_root =
-                        error_parser.get_root ().get_object ();
+            var data_stream = new GLib.DataInputStream (input_stream);
+            string answer = "";
+            bool saw_response = false;
 
-                    if (error_root.has_member ("error")) {
-                        detail = " " +
-                            error_root.get_string_member ("error");
-                    }
-                } catch (GLib.Error parse_error) {
-                    detail = "";
+            while (true) {
+                string? line = yield data_stream.read_line_utf8_async (
+                    GLib.Priority.DEFAULT,
+                    null
+                );
+
+                if (line == null) {
+                    break;
                 }
 
-                throw new ProviderError.HTTP (
-                    "Ollama returned HTTP %u.%s".printf (
-                        message.get_status (),
-                        detail
-                    )
-                );
+                line = line.strip ();
+                if (line.length == 0) {
+                    continue;
+                }
+
+                var parser = new Json.Parser ();
+                parser.load_from_data (line, -1);
+                Json.Object root = parser.get_root ().get_object ();
+                saw_response = true;
+
+                if (root.has_member ("error")) {
+                    throw new ProviderError.HTTP (
+                        root.get_string_member ("error")
+                    );
+                }
+
+                if (root.has_member ("message")) {
+                    Json.Object response_message =
+                        root.get_object_member ("message");
+
+                    if (response_message.has_member ("content")) {
+                        string chunk =
+                            response_message.get_string_member ("content");
+
+                        if (chunk.length > 0) {
+                            answer += chunk;
+                            response_chunk (chunk);
+                        }
+                    }
+                }
+
+                if (root.has_member ("done") &&
+                    root.get_boolean_member ("done")) {
+                    break;
+                }
             }
 
-            var parser = new Json.Parser ();
-            parser.load_from_data (
-                (string) response_body.get_data (),
-                -1
-            );
-
-            Json.Object root = parser.get_root ().get_object ();
-            if (!root.has_member ("message")) {
+            if (!saw_response) {
                 throw new ProviderError.INVALID_RESPONSE (
-                    "Ollama response did not contain a message."
+                    "Ollama returned an empty response stream."
                 );
             }
-
-            Json.Object response_message =
-                root.get_object_member ("message");
-
-            if (!response_message.has_member ("content")) {
-                throw new ProviderError.INVALID_RESPONSE (
-                    "Ollama response did not contain message content."
-                );
-            }
-
-            string answer =
-                response_message.get_string_member ("content").strip ();
 
             roles += "user";
             contents += prompt;
