@@ -136,11 +136,6 @@ namespace AskTheModel {
             prompt_placeholder.add_css_class ("monospace");
             prompt_overlay.add_overlay (prompt_placeholder);
 
-            prompt_view.buffer.changed.connect (() => {
-                prompt_placeholder.visible =
-                    prompt_view.buffer.get_char_count () == 0;
-            });
-
             var prompt_frame = new Gtk.Frame (null) {
                 child = prompt_overlay,
                 hexpand = true
@@ -148,8 +143,32 @@ namespace AskTheModel {
             prompt_frame.add_css_class ("atm-input-frame");
 
             var send_button = new Gtk.Button.with_label ("Send") {
-                valign = Gtk.Align.END
+                valign = Gtk.Align.END,
+                sensitive = false
             };
+
+            prompt_view.buffer.changed.connect (() => {
+                prompt_placeholder.visible =
+                    prompt_view.buffer.get_char_count () == 0;
+
+                send_button.sensitive =
+                    prompt_view.buffer.text.strip ().length > 0;
+            });
+
+            send_button.clicked.connect (() => {
+                string prompt = prompt_view.buffer.text.strip ();
+                if (prompt.length == 0) {
+                    return;
+                }
+
+                string current = transcript.buffer.text;
+                string separator = current.length > 0 ? "\n\n" : "";
+                transcript.buffer.text =
+                    current + separator + "You: " + prompt;
+
+                prompt_view.buffer.text = "";
+                prompt_view.grab_focus ();
+            });
 
             var composer = new Gtk.Box (Gtk.Orientation.HORIZONTAL, 8) {
                 margin_top = 12,
