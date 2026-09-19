@@ -1,19 +1,17 @@
 /* Ask the Model frame language.
  *
- * The medallion itself is artwork and keeps its own genuine relief.
- * GTK only supplies the matching raised contour for the window and composer.
- * No blurred black drop shadows are used.
+ * The application icon is intentionally not used inside the window UI.
+ * It remains installed as the launcher icon for the application menu.
  */
 @define-color atm_bevel_light #f4f0e7;
 @define-color atm_bevel_mid #c9c3b8;
-@define-color atm_bevel_dark #817b72;
 @define-color atm_bevel_backdrop #aaa49a;
 
 window.atm-window {
     border-width: 2px;
     border-style: ridge;
     border-color: @atm_bevel_mid;
-    border-radius: 34px 10px 10px 10px;
+    border-radius: 10px;
     box-shadow: none;
 }
 
@@ -22,25 +20,6 @@ window.atm-window:backdrop {
     box-shadow: none;
 }
 
-headerbar.atm-headerbar {
-    border-top-left-radius: 34px;
-}
-
-/* The circular relief is baked into the approved identity artwork.
- * Keeping GTK styling neutral prevents a second black rim or a flattened
- * oval from being drawn around it.
- */
-.atm-identity-mark {
-    background: transparent;
-    border: 0;
-    box-shadow: none;
-    padding: 0;
-    margin: 0;
-}
-
-/* The input field repeats the same raised, metallic border vocabulary
- * without the heavy black lower edge from the previous attempt.
- */
 frame.atm-input-frame {
     border-width: 2px;
     border-style: ridge;
