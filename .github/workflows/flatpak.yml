@@ -47,6 +47,8 @@ jobs:
         run: |
           set -euo pipefail
 
+          mkdir -p repo/refs/remotes
+
           flatpak build-update-repo repo \
             --generate-static-deltas \
             --title="AtM Development" \
