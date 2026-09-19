@@ -26,12 +26,14 @@ The current development state establishes:
 - desktop launcher and AppStream metadata;
 - elementary-compatible application icons;
 - native desktop integration and automatic system color-scheme following;
+- an X11-only Cairo renderer fallback when no explicit `GSK_RENDERER` override is present and no Wayland display is available;
 - local prompt composition with a functional Send action;
 - discovery of a local Ollama-compatible API through `GET /api/tags`;
 - capability inspection of installed models through `POST /api/show`;
 - automatic selection of the first installed model advertising the `completion` capability, skipping embedding-only models;
 - streamed in-session conversational requests through `POST /api/chat`;
-- progressive display of assistant response chunks while generation is running;\n- explicit `think: false` on the default chat path to avoid long hidden reasoning traces on supported reasoning models;
+- progressive display of assistant response chunks while generation is running;
+- explicit `think: false` on the default chat path to avoid long hidden reasoning traces on supported reasoning models;
 - in-memory user/assistant history supplied to later chat turns;
 - Flatpak packaging for the elementary OS 8 runtime;
 - continuous Flatpak build verification through GitHub Actions;
