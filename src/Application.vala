@@ -79,10 +79,23 @@ namespace AskTheModel {
         }
 
         private async void discover_local_provider () {
+            begin_model_scan_status ();
+
             bool found = yield ollama_provider.discover ();
             update_model_selector ();
 
             if (found && ollama_provider.model_name != null) {
+                string[] chat_models =
+                    ollama_provider.get_completion_models ();
+
+                show_model_scan_result (
+                    chat_models.length == 1
+                        ? "1 model found"
+                        : "%d models found".printf (
+                            chat_models.length
+                        )
+                );
+
                 stdout.printf (
                     "AtM: Ollama detected at %s; using %s (%u model%s available)\n",
                     ollama_provider.base_url,
@@ -91,11 +104,15 @@ namespace AskTheModel {
                     ollama_provider.model_count == 1 ? "" : "s"
                 );
             } else if (found) {
+                show_model_scan_result ("No chat models");
+
                 stderr.printf (
                     "AtM: Ollama detected at %s, but no completion-capable model was found.\n",
                     ollama_provider.base_url
                 );
             } else {
+                show_model_scan_result ("Ollama not found");
+
                 stderr.printf (
                     "AtM: local Ollama provider not detected on 127.0.0.1 ports 11434 or 11435.\n"
                 );
