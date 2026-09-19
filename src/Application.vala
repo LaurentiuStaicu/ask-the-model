@@ -56,54 +56,43 @@ namespace AskTheModel {
             };
             headerbar.add_css_class ("atm-headerbar");
 
-            // The AtM identity disc occupies the top-left corner, so standard
-            // window controls remain native but are placed on the right.
+            // The identity mark owns the top-left corner. Native window
+            // controls stay on the right.
             headerbar.set_decoration_layout (":minimize,maximize,close");
 
-            // The overlay keeps the HeaderBar at its normal theme-driven
-            // height while the identity disc can continue into the content.
             var titlebar_overlay = new Gtk.Overlay () {
-                child = headerbar
+                child = headerbar,
+                overflow = Gtk.Overflow.VISIBLE
             };
 
+            // Use the prepared AtM artwork itself for the medallion relief.
+            // Do not rebuild the disc with CSS shadows: that produced the
+            // flattened/oval "blob" seen in the previous visual test.
             var identity_picture = new Gtk.Picture.for_resource (
                 IDENTITY_RESOURCE
             ) {
                 alternative_text = "Ask the Model",
                 can_shrink = true,
                 content_fit = Gtk.ContentFit.CONTAIN,
-                width_request = 54,
-                height_request = 54,
-                margin_top = 7,
-                margin_bottom = 7,
-                margin_start = 7,
-                margin_end = 7,
-                can_target = false
-            };
-
-            var identity_disc = new Gtk.Overlay () {
-                child = identity_picture,
                 width_request = 68,
                 height_request = 68,
                 halign = Gtk.Align.START,
                 valign = Gtk.Align.START,
                 margin_start = 0,
                 margin_top = 0,
-                can_target = false
+                can_target = false,
+                overflow = Gtk.Overflow.VISIBLE
             };
-            identity_disc.add_css_class ("atm-identity-disc");
+            identity_picture.add_css_class ("atm-identity-mark");
 
-            titlebar_overlay.add_overlay (identity_disc);
-            titlebar_overlay.set_measure_overlay (identity_disc, false);
-            titlebar_overlay.set_clip_overlay (identity_disc, false);
+            titlebar_overlay.add_overlay (identity_picture);
+            titlebar_overlay.set_measure_overlay (identity_picture, false);
+            titlebar_overlay.set_clip_overlay (identity_picture, false);
 
             return titlebar_overlay;
         }
 
         private Gtk.Widget build_main_content () {
-            // General interface chrome inherits the elementary theme font.
-            // TextView.monospace requests the system monospace style instead
-            // of hard-coding Roboto Mono or a point size.
             var transcript = new Gtk.TextView () {
                 editable = false,
                 cursor_visible = false,

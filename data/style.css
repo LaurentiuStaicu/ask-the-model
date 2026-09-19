@@ -1,124 +1,61 @@
-/* Ask the Model identity frame.
+/* Ask the Model frame language.
  *
- * The visual reference is the original owl medallion: graphite outer edge,
- * raised ivory-metallic band, dark inner edge, and restrained gold only as
- * an identity accent. The contour is intentionally dimensional rather than
- * a flat pair of CSS lines.
+ * The medallion itself is artwork and keeps its own genuine relief.
+ * GTK only supplies the matching raised contour for the window and composer.
+ * No blurred black drop shadows are used.
  */
-@define-color atm_graphite #17191c;
-@define-color atm_graphite_mid #34373b;
-@define-color atm_metal_high #f6f2e8;
-@define-color atm_metal_mid #c8c1b4;
-@define-color atm_metal_low #777169;
-@define-color atm_gold #b89a58;
+@define-color atm_bevel_light #f4f0e7;
+@define-color atm_bevel_mid #c9c3b8;
+@define-color atm_bevel_dark #817b72;
+@define-color atm_bevel_backdrop #aaa49a;
 
-/*
- * The top-left radius is exactly half the 68 px identity disc. The outer
- * window contour and the medallion therefore share the same circular origin.
- *
- * Relief model:
- *   outside dark edge -> raised metallic highlight -> inner dark return.
- */
 window.atm-window {
-    border: 1px solid @atm_graphite;
+    border-width: 2px;
+    border-style: ridge;
+    border-color: @atm_bevel_mid;
     border-radius: 34px 10px 10px 10px;
-    box-shadow:
-        0 2px 5px rgba(0, 0, 0, 0.38),
-        inset 0 0 0 1px @atm_metal_mid,
-        inset 0 1px 0 rgba(255, 255, 255, 0.62),
-        inset 0 -1px 0 rgba(0, 0, 0, 0.46),
-        inset 0 0 0 3px rgba(30, 32, 35, 0.72);
+    box-shadow: none;
 }
 
 window.atm-window:backdrop {
-    box-shadow:
-        0 2px 4px rgba(0, 0, 0, 0.24),
-        inset 0 0 0 1px rgba(200, 193, 180, 0.52),
-        inset 0 1px 0 rgba(255, 255, 255, 0.32),
-        inset 0 -1px 0 rgba(0, 0, 0, 0.30),
-        inset 0 0 0 3px rgba(30, 32, 35, 0.48);
+    border-color: @atm_bevel_backdrop;
+    box-shadow: none;
 }
 
 headerbar.atm-headerbar {
     border-top-left-radius: 34px;
 }
 
-/*
- * Raised owl medallion.
- *
- * The diagonal metallic gradient simulates the original directional light.
- * Outer and inset shadows create a physically readable lip rather than a
- * flat outline. The picture itself remains centred inside the recessed well.
+/* The circular relief is baked into the approved identity artwork.
+ * Keeping GTK styling neutral prevents a second black rim or a flattened
+ * oval from being drawn around it.
  */
-.atm-identity-disc {
-    border: 1px solid #0d0f11;
-    border-radius: 34px;
-    background-color: @atm_metal_mid;
-    background-image: linear-gradient(
-        to bottom right,
-        #fffdf7 0%,
-        @atm_metal_high 18%,
-        #d9d2c5 38%,
-        @atm_metal_mid 54%,
-        #eee8dc 70%,
-        @atm_metal_low 100%
-    );
-    box-shadow:
-        0 3px 6px rgba(0, 0, 0, 0.58),
-        0 -1px 1px rgba(255, 255, 255, 0.40),
-        inset 0 2px 2px rgba(255, 255, 255, 0.88),
-        inset 0 -3px 3px rgba(0, 0, 0, 0.50),
-        inset 0 0 0 2px @atm_graphite_mid,
-        inset 0 0 0 4px rgba(246, 242, 232, 0.72),
-        inset 0 0 0 5px rgba(23, 25, 28, 0.92);
+.atm-identity-mark {
+    background: transparent;
+    border: 0;
+    box-shadow: none;
+    padding: 0;
+    margin: 0;
 }
 
-.atm-identity-disc:backdrop {
-    background-image: linear-gradient(
-        to bottom right,
-        #e6e1d7 0%,
-        #c7c0b4 44%,
-        #aaa398 70%,
-        #6f6b65 100%
-    );
-    box-shadow:
-        0 2px 4px rgba(0, 0, 0, 0.36),
-        inset 0 2px 2px rgba(255, 255, 255, 0.48),
-        inset 0 -2px 3px rgba(0, 0, 0, 0.38),
-        inset 0 0 0 2px rgba(52, 55, 59, 0.78),
-        inset 0 0 0 4px rgba(230, 225, 215, 0.50),
-        inset 0 0 0 5px rgba(23, 25, 28, 0.72);
-}
-
-/*
- * Composer contour uses the same embossed vocabulary at a smaller scale:
- * dark outside edge, metallic raised band, dark inner return.
+/* The input field repeats the same raised, metallic border vocabulary
+ * without the heavy black lower edge from the previous attempt.
  */
 frame.atm-input-frame {
-    border: 1px solid @atm_graphite;
+    border-width: 2px;
+    border-style: ridge;
+    border-color: @atm_bevel_mid;
     border-radius: 12px;
+    box-shadow: none;
     background-clip: padding-box;
-    box-shadow:
-        0 1px 2px rgba(0, 0, 0, 0.26),
-        inset 0 0 0 1px @atm_metal_mid,
-        inset 0 1px 0 rgba(255, 255, 255, 0.60),
-        inset 0 -1px 0 rgba(0, 0, 0, 0.42),
-        inset 0 0 0 3px rgba(30, 32, 35, 0.66);
 }
 
 frame.atm-input-frame:focus-within {
-    box-shadow:
-        0 1px 3px rgba(0, 0, 0, 0.34),
-        inset 0 0 0 1px @atm_metal_high,
-        inset 0 1px 0 rgba(255, 255, 255, 0.72),
-        inset 0 -1px 0 rgba(0, 0, 0, 0.48),
-        inset 0 0 0 3px rgba(30, 32, 35, 0.74);
+    border-color: @atm_bevel_light;
+    box-shadow: none;
 }
 
 frame.atm-input-frame:backdrop {
-    box-shadow:
-        inset 0 0 0 1px rgba(200, 193, 180, 0.50),
-        inset 0 1px 0 rgba(255, 255, 255, 0.30),
-        inset 0 -1px 0 rgba(0, 0, 0, 0.28),
-        inset 0 0 0 3px rgba(30, 32, 35, 0.46);
+    border-color: @atm_bevel_backdrop;
+    box-shadow: none;
 }
