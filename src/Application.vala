@@ -11,6 +11,8 @@ namespace AskTheModel {
         private Gtk.DropDown? model_dropdown;
         private Gtk.StringList? model_list;
         private Gtk.Button? refresh_models_button;
+        private Gtk.Label? model_scan_status;
+        private uint model_status_generation = 0;
         private bool assistant_stream_started = false;
         private bool updating_model_selector = false;
 
@@ -46,6 +48,14 @@ namespace AskTheModel {
             apply_system_style ();
 
             ollama_provider = new OllamaProvider ();
+            ollama_provider.discovery_progress.connect ((percent) => {
+                if (model_scan_status != null) {
+                    model_scan_status.label =
+                        "%u%%".printf (percent);
+                    model_scan_status.visible = true;
+                }
+            });
+
             ollama_provider.response_chunk.connect ((chunk) => {
                 if (transcript_view == null) {
                     return;
@@ -92,7 +102,40 @@ namespace AskTheModel {
             }
         }
 
+        private void begin_model_scan_status () {
+            model_status_generation++;
+
+            if (model_scan_status != null) {
+                model_scan_status.label = "0%";
+                model_scan_status.visible = true;
+            }
+        }
+
+        private void show_model_scan_result (string message) {
+            model_status_generation++;
+            uint generation = model_status_generation;
+
+            if (model_scan_status == null) {
+                return;
+            }
+
+            model_scan_status.label = message;
+            model_scan_status.visible = true;
+
+            Timeout.add_seconds (3, () => {
+                if (generation == model_status_generation &&
+                    model_scan_status != null) {
+                    model_scan_status.label = "";
+                    model_scan_status.visible = false;
+                }
+
+                return false;
+            });
+        }
+
         private async void refresh_local_models () {
+            begin_model_scan_status ();
+
             if (refresh_models_button != null) {
                 refresh_models_button.sensitive = false;
             }
@@ -109,6 +152,17 @@ namespace AskTheModel {
             }
 
             if (found && ollama_provider.model_name != null) {
+                string[] chat_models =
+                    ollama_provider.get_completion_models ();
+
+                show_model_scan_result (
+                    chat_models.length == 1
+                        ? "1 model found"
+                        : "%d models found".printf (
+                            chat_models.length
+                        )
+                );
+
                 stdout.printf (
                     "AtM: model list refreshed; using %s (%u installed model%s)\n",
                     ollama_provider.model_name,
@@ -116,10 +170,13 @@ namespace AskTheModel {
                     ollama_provider.model_count == 1 ? "" : "s"
                 );
             } else if (found) {
+                show_model_scan_result ("No chat models");
                 stderr.printf (
                     "AtM: model list refreshed, but no completion-capable model was found.\n"
                 );
             } else {
+                show_model_scan_result ("Ollama not found");
+
                 stderr.printf (
                     "AtM: refresh could not reach local Ollama on ports 11434 or 11435.\n"
                 );
@@ -252,12 +309,19 @@ namespace AskTheModel {
                 refresh_local_models.begin ();
             });
 
+            model_scan_status = new Gtk.Label ("") {
+                valign = Gtk.Align.CENTER,
+                visible = false
+            };
+            model_scan_status.add_css_class ("dim-label");
+
             var model_controls = new Gtk.Box (
                 Gtk.Orientation.HORIZONTAL,
                 6
             );
             model_controls.append (model_dropdown);
             model_controls.append (refresh_models_button);
+            model_controls.append (model_scan_status);
 
             headerbar.pack_start (model_controls);
 

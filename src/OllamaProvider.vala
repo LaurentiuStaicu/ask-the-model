@@ -12,6 +12,7 @@ namespace AskTheModel {
         private string[] completion_models = {};
 
         public signal void response_chunk (string chunk);
+        public signal void discovery_progress (uint percent);
 
         public string? base_url { get; private set; default = null; }
         public string? model_name { get; private set; default = null; }
@@ -131,6 +132,11 @@ namespace AskTheModel {
 
                     model_count = models.get_length ();
                     base_url = candidate;
+                    discovery_progress (0);
+
+                    if (model_count == 0) {
+                        discovery_progress (100);
+                    }
 
                     for (uint i = 0; i < model_count; i++) {
                         Json.Object model = models.get_object_element (i);
@@ -142,16 +148,18 @@ namespace AskTheModel {
                             candidate_model = model.get_string_member ("name");
                         }
 
-                        if (candidate_model == null) {
-                            continue;
+                        if (candidate_model != null) {
+                            if (yield supports_completion (
+                                candidate,
+                                candidate_model
+                            )) {
+                                detected_completion_models += candidate_model;
+                            }
                         }
 
-                        if (yield supports_completion (
-                            candidate,
-                            candidate_model
-                        )) {
-                            detected_completion_models += candidate_model;
-                        }
+                        uint percent =
+                            ((i + 1) * 100) / model_count;
+                        discovery_progress (percent);
                     }
 
                     completion_models = detected_completion_models;
