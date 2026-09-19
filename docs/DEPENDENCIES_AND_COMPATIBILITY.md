@@ -1,21 +1,32 @@
 # Dependencies and compatibility
 
-This document defines the compatibility contract for Ask the Model (AtM) v0.2.0.
+This document defines the compatibility contract for Ask the Model (AtM) v0.2.1.
 
 ## Supported application baseline
 
 The packaged desktop baseline is elementary OS 8 using the Flatpak package built against:
 
 - `io.elementary.Platform//8`;
-- `io.elementary.Sdk//8`.
+- `io.elementary.Sdk//8` for development builds.
 
 The native application is written in Vala and uses GTK 4 and Granite 7.
 
-Other Linux environments may work if the required libraries and display stack are available, but they are not part of the documented packaged baseline.
+Other Linux environments may work if Flatpak and the required display stack are available, but they are not part of the documented packaged baseline.
+
+## Normal-user dependency order
+
+For a normal release installation, the required pieces are deliberately separated:
+
+1. **Flatpak on the host** — required to install and run the release bundle.
+2. **A local Ollama-compatible provider** — external to AtM and already running.
+3. **At least one completion-capable AI model** — installed through that provider.
+4. **The AtM Flatpak bundle** — installed from the GitHub release.
+
+The elementary runtime is resolved by Flatpak. Meson, Vala, GTK/Granite development headers, libsoup development headers, json-glib development headers and the elementary SDK are not normal-user prerequisites.
 
 ## Local AI provider requirement
 
-AtM v0.2.0 requires an already-running local Ollama-compatible HTTP provider.
+AtM v0.2.1 requires an already-running local Ollama-compatible HTTP provider.
 
 Endpoint order is fixed in this release:
 
@@ -23,6 +34,8 @@ Endpoint order is fixed in this release:
 2. `http://127.0.0.1:11435` — compatibility fallback for managed local-provider setups.
 
 AtM does not install, launch, stop, update or supervise the provider.
+
+If both endpoints are active, `11434` is selected first. Running two providers is not prohibited, but users should do so intentionally because the fixed probe order determines which provider AtM uses.
 
 Compatibility is API-based. A provider is compatible only if it implements the behavior required below.
 
@@ -55,15 +68,33 @@ AtM submits:
 
 AtM expects newline-delimited JSON response objects containing assistant `message.content` chunks and a final `done` state.
 
-Providers that do not accept these fields or response semantics are not compatible with v0.2.0.
+Providers that do not accept these fields or response semantics are not compatible with v0.2.1.
 
 ## Model requirements
 
 A chat model must advertise the `completion` capability.
 
-Capabilities such as `vision`, `tools`, `thinking` or `embedding` may be present, but v0.2.0 does not expose those capabilities as separate application features.
+Capabilities such as `vision`, `tools`, `thinking` or `embedding` may be present, but v0.2.1 does not expose those capabilities as separate application features.
 
 The default chat path requests `think: false` to prioritize interactive latency. This does not imply that a selected model lacks reasoning capability.
+
+## Release Flatpak installation
+
+The supported direct-download bundle is published as:
+
+`AskTheModel.flatpak`
+
+The stable latest-release download path is:
+
+`https://github.com/LaurentiuStaicu/ask-the-model/releases/latest/download/AskTheModel.flatpak`
+
+Install a downloaded bundle with:
+
+```bash
+flatpak install --user ./AskTheModel.flatpak
+```
+
+A single-file bundle is provided for convenient direct installation. The separately generated `AtM Development` Flatpak repository remains a development update source rather than the primary public installation channel.
 
 ## GPU and compute compatibility
 
@@ -75,11 +106,11 @@ No particular GPU model, vendor or acceleration backend is required by AtM. Hard
 
 AtM does not own or manage the provider's model store.
 
-The provider may use its default model directory or another provider-configured model location. Moving, downloading, deleting and deduplicating model files are outside the v0.2.0 application boundary.
+The provider may use its default model directory or another provider-configured model location. Moving, downloading, deleting and deduplicating model files are outside the v0.2.1 application boundary.
 
 ## Flatpak sandbox requirements
 
-The v0.2.0 Flatpak requests:
+The v0.2.1 Flatpak requests:
 
 - `--share=ipc`;
 - `--share=network`;
@@ -93,7 +124,7 @@ Network sharing is required so the sandbox can reach the host-local HTTP provide
 
 ### X11
 
-AtM v0.2.0 selects `GSK_RENDERER=cairo` automatically only when:
+AtM v0.2.1 selects `GSK_RENDERER=cairo` automatically only when:
 
 - `XDG_SESSION_TYPE=x11`;
 - no Wayland display is present;
@@ -107,22 +138,28 @@ AtM does not force the Cairo renderer on Wayland. The normal GTK renderer select
 
 Wayland behavior is supported by the Flatpak manifest. The release does not claim exhaustive validation across all Linux graphics-driver combinations.
 
-## Native build dependencies
+## Native development build dependencies
 
-Required build/runtime libraries:
+These packages are required only when building the native application from source:
 
-- GTK 4;
-- Granite 7;
-- libsoup 3.0;
-- json-glib 1.0;
+- GTK 4 development files;
+- Granite 7 development files;
+- libsoup 3.0 development files;
+- json-glib development files;
 - Vala;
 - Meson >= 1.0.0.
 
-The project is licensed under MIT.
+On elementary OS 8 / Ubuntu-compatible systems:
+
+```bash
+sudo apt install meson valac libgtk-4-dev libgranite-7-dev libsoup-3.0-dev libjson-glib-dev
+```
+
+For a Flatpak **development build**, `flatpak-builder` and `io.elementary.Sdk//8` are also required. The SDK is a build-time dependency, not a normal end-user prerequisite.
 
 ## Privacy and network boundary
 
-v0.2.0 has no cloud-provider integration.
+v0.2.1 has no cloud-provider integration.
 
 The implemented provider addresses loopback only. Prompt text is sent when the user activates **Send**.
 
@@ -130,7 +167,7 @@ Conversation history is stored only in memory for the current application proces
 
 ## Known compatibility limitations
 
-v0.2.0 does not provide:
+v0.2.1 does not provide:
 
 - configurable provider host/port;
 - provider authentication;

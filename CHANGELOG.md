@@ -2,6 +2,28 @@
 
 All notable public releases of Ask the Model are recorded here.
 
+## 0.2.1 - 2026-09-19
+
+Installation and release-distribution correction.
+
+### Included
+
+- automatic publication of `AskTheModel.flatpak` as a GitHub Release asset;
+- stable latest-release direct-download path for the Flatpak bundle;
+- clear normal-user installation order for Flatpak, provider, model and AtM;
+- explicit separation of end-user requirements from native/Flatpak development dependencies;
+- documented elementary OS / Ubuntu development package names;
+- Node 24-compatible `actions/github-script@v9` in the release workflow;
+- integrity guard that refuses to attach a missing release asset if the release tag does not point to the workflow commit.
+
+### Application status
+
+The local-chat behavior is unchanged from v0.2.0. This patch corrects installation and distribution plumbing and documentation without introducing new chat or scientific-repository functionality.
+
+### Scope boundary
+
+The external provider/model boundary, loopback-only provider behavior and scientific-model boundary remain unchanged.
+
 ## 0.2.0 - 2026-09-19
 
 Local Chat Baseline.

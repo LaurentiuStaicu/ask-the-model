@@ -2,9 +2,9 @@
 
 ## Release status
 
-**Current release: Ask the Model (AtM) v0.2.0 — Local Chat Baseline, released 2026-09-19.**
+**Current release: Ask the Model (AtM) v0.2.1 — Installation and release-distribution correction, released 2026-09-19.**
 
-v0.2.0 is the first AtM release with functional local AI conversation. It adds provider discovery, completion-capable AI-model selection, streamed responses and in-session conversation history on top of the v0.1.x application/documentation baseline.
+v0.2.1 preserves the v0.2.0 Local Chat Baseline and corrects the public installation/distribution path: the versioned GitHub release publishes the built Flatpak bundle as a release asset, while the README separates normal-user requirements from developer-only build dependencies.
 
 The project remains in the `0.x` initial-development series. Repository-aware retrieval and scientific provenance are not implemented in this release.
 
@@ -18,7 +18,7 @@ Each scientific model remains authoritative in its own repository. AtM is an acc
 
 ## Current functional boundary
 
-v0.2.0 establishes:
+v0.2.1 preserves the v0.2.0 functional baseline:
 
 - the GTK 4 and Granite application shell;
 - stable application ID and Meson build;
@@ -56,7 +56,7 @@ Scientific model repositories remain external sources. Their documentation, code
 
 AtM must not present an AI-generated explanation as if it were a canonical model result unless that result is explicitly supported by a future repository/provenance layer or by an actual model execution whose provenance is identified.
 
-## Not implemented in v0.2.0
+## Not implemented in v0.2.1
 
 - repository ingestion or retrieval;
 - repository-aware context selection for EWD, CBD or RMD;
@@ -68,7 +68,7 @@ AtM must not present an AI-generated explanation as if it were a canonical model
 - execution or simulation of scientific models;
 - autonomous changes to scientific repositories.
 
-## What v0.2.0 does not claim
+## What v0.2.1 does not claim
 
 - repository-grounded scientific answers;
 - embedded scientific models;
@@ -77,4 +77,4 @@ AtM must not present an AI-generated explanation as if it were a canonical model
 - authoritative replacement of repository documentation;
 - a production-ready scientific decision system.
 
-See `releases/v0.2.0.md` for the frozen release description and `docs/DEPENDENCIES_AND_COMPATIBILITY.md` for compatibility requirements.
+See `releases/v0.2.1.md` for the frozen patch-release description, `releases/v0.2.0.md` for the Local Chat Baseline, and `docs/DEPENDENCIES_AND_COMPATIBILITY.md` for compatibility requirements.
