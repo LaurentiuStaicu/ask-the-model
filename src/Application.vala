@@ -291,7 +291,39 @@ namespace AskTheModel {
             return content;
         }
 
+        private static void configure_renderer_fallback () {
+            string? explicit_renderer =
+                Environment.get_variable ("GSK_RENDERER");
+
+            if (explicit_renderer != null &&
+                explicit_renderer.strip ().length > 0) {
+                return;
+            }
+
+            string? session_type =
+                Environment.get_variable ("XDG_SESSION_TYPE");
+            string? wayland_display =
+                Environment.get_variable ("WAYLAND_DISPLAY");
+
+            bool is_x11_session =
+                session_type != null &&
+                session_type.down () == "x11";
+
+            bool has_wayland_display =
+                wayland_display != null &&
+                wayland_display.strip ().length > 0;
+
+            if (is_x11_session && !has_wayland_display) {
+                Environment.set_variable (
+                    "GSK_RENDERER",
+                    "cairo",
+                    false
+                );
+            }
+        }
+
         public static int main (string[] args) {
+            configure_renderer_fallback ();
             return new Application ().run (args);
         }
     }
