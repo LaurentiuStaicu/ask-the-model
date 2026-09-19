@@ -121,7 +121,15 @@ Sources:
 
 The listed download size is not the same as total RAM or VRAM required at runtime. Runtime memory also depends on context, cache allocation, provider settings and how much of the model is placed on CPU versus GPU.
 
-## 7. A practical model-selection process
+## 7. Capabilities beyond text chat
+
+A provider may report capabilities such as vision, tool use, embeddings or reasoning/thinking. AtM v0.2.1 does not expose all provider/model capabilities simply because the selected model supports them.
+
+The current AtM interface sends text chat messages only. It does not provide image input or tool-calling controls, and its default `/api/chat` request sets `think: false` to prioritize interactive latency.
+
+Therefore a multimodal or reasoning-capable model can still be useful for text chat, but its additional capabilities should not be interpreted as current AtM features.
+
+## 8. A practical model-selection process
 
 For a new machine or provider configuration, use a conservative progression rather than downloading many large models at once.
 
@@ -132,7 +140,7 @@ For a new machine or provider configuration, use a conservative progression rath
 5. Compare models using the tasks that matter to you rather than relying only on public rankings.
 6. Remove models that are not useful so they do not consume storage indefinitely.
 
-## 8. Check whether the model is using CPU or GPU
+## 9. Check whether the model is using CPU or GPU
 
 Run:
 
@@ -148,7 +156,7 @@ Ollama documents the `PROCESSOR` column as indicating where a model is loaded. E
 
 A model that relies heavily on CPU/system memory can still work, but may respond much more slowly than a model that fits efficiently on the available GPU.
 
-## 9. Stop a model versus delete a model
+## 10. Stop a model versus delete a model
 
 These are different operations.
 
@@ -170,7 +178,7 @@ ollama rm MODEL
 
 After removal, press **Refresh models** in AtM. The removed model should no longer appear in the selector.
 
-## 10. List installed and loaded models
+## 11. List installed and loaded models
 
 Installed models:
 
@@ -186,7 +194,7 @@ ollama ps
 
 This distinction is useful when diagnosing both disk-space and memory problems.
 
-## 11. Where Ollama stores model data
+## 12. Where Ollama stores model data
 
 Ollama currently documents these default model locations:
 
@@ -200,7 +208,7 @@ AtM v0.2.1 is packaged primarily for Linux/elementary OS, but the other paths ar
 
 Do not normally delete individual files or blobs directly from the provider model store. Use `ollama rm MODEL` so the provider remains aware of the change.
 
-## 12. Move the model store to another drive
+## 13. Move the model store to another drive
 
 Large model collections can consume substantial SSD space. Ollama allows the model directory to be changed with the `OLLAMA_MODELS` environment variable.
 
@@ -218,7 +226,7 @@ Before deleting the old model store, confirm that `ollama ls` sees the expected 
 
 Official reference: [Ollama FAQ — model storage](https://docs.ollama.com/faq).
 
-## 13. Model licenses are separate from the AtM license
+## 14. Model licenses are separate from the AtM license
 
 AtM is distributed under the MIT License. That license applies to AtM, not to every model that can be used with it.
 
@@ -233,7 +241,7 @@ Before using or redistributing a model:
 
 Hugging Face model pages can expose license metadata, but you should still read the model documentation and license text where relevant.
 
-## 14. Local model versus cloud-backed model
+## 15. Local model versus cloud-backed model
 
 AtM connects only to loopback provider addresses in v0.2.1. This means AtM talks to software on the same machine. It does not guarantee that every model exposed by that software performs inference locally.
 
@@ -254,7 +262,7 @@ OLLAMA_NO_CLOUD=1
 
 or `disable_ollama_cloud` in its server configuration. See the [Ollama FAQ](https://docs.ollama.com/faq).
 
-## 15. When AtM does not show a model
+## 16. When AtM does not show a model
 
 Work through these checks in order:
 
