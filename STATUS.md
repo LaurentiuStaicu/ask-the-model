@@ -31,6 +31,8 @@ The current development state establishes:
 - discovery of a local Ollama-compatible API through `GET /api/tags`;
 - capability inspection of installed models through `POST /api/show`;
 - automatic selection of the first installed model advertising the `completion` capability, skipping embedding-only models;
+- a refreshable model selector populated only with completion-capable local models;
+- real model-scan progress and a short-lived scan-result status in the header bar;
 - streamed in-session conversational requests through `POST /api/chat`;
 - progressive display of assistant response chunks while generation is running;
 - explicit `think: false` on the default chat path to avoid long hidden reasoning traces on supported reasoning models;
@@ -39,7 +41,7 @@ The current development state establishes:
 - continuous Flatpak build verification through GitHub Actions;
 - standardized project identity, application-boundary and citation metadata.
 
-The Flatpak requests network sharing because a sandboxed application must use the network subsystem to communicate with a local HTTP provider. This permission is broader than loopback at the sandbox layer. The current AtM implementation itself only addresses `127.0.0.1:11434` and `127.0.0.1:11435`.
+The Flatpak requests network sharing because a sandboxed application must use the network subsystem to communicate with a local HTTP provider. This permission is broader than loopback at the sandbox layer. The current AtM implementation itself only addresses loopback: it prefers standalone Ollama on `127.0.0.1:11434` and retains `127.0.0.1:11435` as a compatibility fallback.
 
 User prompt content is transmitted only when **Send** is activated. Requests are sent to the locally discovered provider. Ollama streaming is enabled and AtM parses each newline-delimited JSON response object as it arrives. The default request also sets `think: false`; this is a latency choice for the ordinary chat path, not a claim that the underlying model lacks reasoning capability.
 
@@ -47,7 +49,6 @@ The current development state does not yet implement:
 
 - repository ingestion or retrieval;
 - model-aware repository context selection;
-- a model selection UI;
 - conversation persistence across application restarts;
 - application settings;
 - execution or simulation of scientific models.
