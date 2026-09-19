@@ -1,0 +1,32 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<component type="desktop-application">
+  <id>io.github.laurentiustaicu.ask_the_model</id>
+
+  <name>Ask the Model</name>
+  <summary>Chat naturally with locally hosted AI models</summary>
+
+  <metadata_license>CC0-1.0</metadata_license>
+  <project_license>MIT</project_license>
+
+  <developer id="io.github.laurentiustaicu">
+    <name>Laurentiu Staicu</name>
+  </developer>
+
+  <description>
+    <p>
+      Ask the Model is a local AI chat interface for natural-language
+      conversation with locally hosted AI models while keeping user data
+      on-device.
+    </p>
+  </description>
+
+  <launchable type="desktop-id">
+    io.github.laurentiustaicu.ask_the_model.desktop
+  </launchable>
+
+  <url type="homepage">
+    https://github.com/LaurentiuStaicu/ask-the-model
+  </url>
+
+  <content_rating type="oars-1.1"/>
+</component>

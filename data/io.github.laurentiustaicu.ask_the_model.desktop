@@ -1,0 +1,12 @@
+[Desktop Entry]
+Version=1.0
+Type=Application
+Name=Ask the Model
+GenericName=Local AI Chat
+Comment=Chat with locally hosted AI models
+Exec=io.github.laurentiustaicu.ask_the_model
+Icon=io.github.laurentiustaicu.ask_the_model
+Terminal=false
+Categories=Utility;
+Keywords=AI;Chat;Local;Assistant;
+StartupNotify=true
