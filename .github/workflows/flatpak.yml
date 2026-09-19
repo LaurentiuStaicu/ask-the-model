@@ -8,6 +8,8 @@ on:
 
 permissions:
   contents: read
+  pages: write
+  id-token: write
 
 jobs:
   flatpak:
@@ -27,4 +29,62 @@ jobs:
           manifest-path: io.github.laurentiustaicu.ask_the_model.yml
           repository-name: appcenter
           repository-url: https://flatpak.elementary.io/repo.flatpakrepo
+          repo-dir: repo
           cache-key: flatpak-builder-${{ github.sha }}
+
+      - name: Prepare AtM Development repository
+        if: github.event_name == 'push' && github.ref == 'refs/heads/main'
+        shell: bash
+        run: |
+          set -euo pipefail
+
+          flatpak build-update-repo repo \
+            --generate-static-deltas \
+            --title="AtM Development" \
+            --comment="Development builds of Ask the Model" \
+            --description="Automatically published development builds from the main branch of Ask the Model." \
+            --homepage="https://github.com/LaurentiuStaicu/ask-the-model" \
+            --icon="https://raw.githubusercontent.com/LaurentiuStaicu/ask-the-model/main/data/icons/64.png" \
+            --default-branch=master
+
+          rm -rf site
+          mkdir -p site/repo
+          cp -RL repo/. site/repo/
+
+          cat > site/index.html <<'EOF'
+          <!doctype html>
+          <html lang="en">
+          <head>
+            <meta charset="utf-8">
+            <meta name="viewport" content="width=device-width, initial-scale=1">
+            <title>AtM Development Flatpak Repository</title>
+          </head>
+          <body>
+            <h1>AtM Development</h1>
+            <p>Development Flatpak repository for Ask the Model.</p>
+            <p>Repository URL: <code>https://laurentiustaicu.github.io/ask-the-model/repo/</code></p>
+            <p>This repository is intended for development and visual testing builds from the main branch.</p>
+          </body>
+          </html>
+          EOF
+
+          touch site/.nojekyll
+
+      - name: Upload Pages artifact
+        if: github.event_name == 'push' && github.ref == 'refs/heads/main'
+        uses: actions/upload-pages-artifact@v4
+        with:
+          path: site
+
+  deploy-development-repository:
+    if: github.event_name == 'push' && github.ref == 'refs/heads/main'
+    needs: flatpak
+    runs-on: ubuntu-latest
+    environment:
+      name: github-pages
+      url: ${{ steps.deployment.outputs.page_url }}
+
+    steps:
+      - name: Deploy AtM Development repository
+        id: deployment
+        uses: actions/deploy-pages@v4
