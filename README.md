@@ -258,11 +258,14 @@ ollama pull SMALLER_MODEL
 
 <small>These boundaries are intentional and are tracked in <a href="STATUS.md">Application status</a>.</small>
 
-### Scientific-model roadmap and boundary
+<details>
+<summary><strong>Scientific-model roadmap and boundary</strong></summary>
 
 <small>AtM is intended to work with scientific dynamical-model repositories without replacing them. The planned initial suite includes EWD, CBD and RMD. Each source repository remains canonical for its documentation, code, data, assumptions, provenance, validation and release boundaries.</small>
 
 <small>Future repository-aware functionality must keep repository evidence, actual model outputs and AI-generated interpretation distinguishable from one another. Ordinary local chat in v0.2.1 should not be interpreted as repository-grounded scientific analysis.</small>
+
+</details>
 
 ### Supported platform and compatibility
 
@@ -270,7 +273,8 @@ ollama pull SMALLER_MODEL
 
 <small>AtM currently expects the Ollama API behavior required for <code>/api/tags</code>, <code>/api/show</code> and <code>/api/chat</code>. GPU/CPU execution belongs to the provider; AtM itself contains no inference engine and no vendor-specific GPU inference code. See <a href="docs/DEPENDENCIES_AND_COMPATIBILITY.md">Dependencies and compatibility</a> for the precise contract.</small>
 
-### Development build
+<details>
+<summary><strong>Development build</strong></summary>
 
 <small>The dependencies below are for contributors building AtM from source. They are <strong>not</strong> prerequisites for installing the release Flatpak.</small>
 
@@ -294,11 +298,16 @@ flatpak run io.github.laurentiustaicu.ask_the_model
 
 <small>The elementary SDK is a build-time dependency. It is not a manually installed prerequisite for someone installing the published release bundle.</small>
 
-### Project status and build health
+</details>
+
+<details>
+<summary><strong>Project status and build health</strong></summary>
 
 <p><a href="https://github.com/LaurentiuStaicu/ask-the-model/actions/workflows/flatpak.yml"><img alt="Flatpak build status" src="https://img.shields.io/github/actions/workflow/status/LaurentiuStaicu/ask-the-model/flatpak.yml?branch=main&event=push&style=flat-square&label=Flatpak%20build&color=707070"></a></p>
 
 <small>This badge is a continuous-integration indicator: it shows whether the current Flatpak workflow on <code>main</code> is passing. It is placed here rather than in the project header because build health is developer/project-maintenance information, not a requirement for understanding how to use AtM.</small>
+
+</details>
 
 ### Documentation
 
@@ -319,6 +328,7 @@ flatpak run io.github.laurentiustaicu.ask_the_model
 <small>If the problem remains reproducible, open a <a href="https://github.com/LaurentiuStaicu/ask-the-model/issues">GitHub issue</a> and include the AtM version, Linux distribution/session, provider version, model name and the exact steps needed to reproduce the problem. Do not include private prompts or sensitive local information unless it is necessary and you intentionally want to share it.</small>
 
 <small>Ask the Model is maintained in this repository by <a href="https://github.com/LaurentiuStaicu">LaurentiuStaicu</a>. Release history, current boundaries and planned scientific-repository integration are documented in <a href="CHANGELOG.md">CHANGELOG.md</a>, <a href="STATUS.md">STATUS.md</a> and the <a href="releases/">release notes</a>.</small>
+
 ### License
 
 <small>Ask the Model is released under the <a href="LICENSE"><strong>MIT License</strong></a>. See the repository <a href="LICENSE">LICENSE</a> file for the complete terms.</small>
