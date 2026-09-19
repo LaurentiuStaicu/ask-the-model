@@ -34,6 +34,19 @@
 
 <small>The longer-term purpose of AtM is broader than ordinary local chat. It is intended to become a natural-language access layer for scientific dynamical-model repositories such as Empirical World3 Dynamics (EWD), Cognitive Belief Dynamics (CBD) and Romanian Monetary Dynamics (RMD), without replacing those repositories as the authoritative source for their code, data, assumptions, provenance or validation.</small>
 
+### Before you begin
+
+<small>You need four things for a normal first run:</small>
+
+- <small><strong>Linux with Flatpak</strong> — used to install and run AtM.</small>
+- <small><strong>A local Ollama-compatible provider</strong> — the software that actually loads and runs AI models.</small>
+- <small><strong>At least one chat-capable AI model</strong> — downloaded separately through the provider; AtM does not currently download it for you.</small>
+- <small><strong>Enough free disk space and runtime memory</strong> — model downloads commonly occupy gigabytes, and running a model also requires RAM and, where available, GPU memory.</small>
+
+<small>You also need Internet access for the initial AtM/provider/model downloads. Once a genuinely local model is installed, the current AtM chat path itself talks to the provider through the local loopback interface.</small>
+
+<small>If any of these terms are unfamiliar, continue in order rather than skipping ahead. Each step below includes the result you should expect before moving to the next one.</small>
+
 ### Start here: first-time setup
 
 <small>The steps below are written for someone installing AtM for the first time. The recommended reference setup uses <a href="https://ollama.com/">Ollama</a> as the local provider because its model library and command-line tools make model installation and management comparatively straightforward. Other providers may work only if they expose the Ollama-compatible API behavior documented in <a href="docs/DEPENDENCIES_AND_COMPATIBILITY.md">Dependencies and compatibility</a>.</small>
@@ -46,6 +59,8 @@ flatpak --version
 
 <small>If this command is not available, install Flatpak using the instructions for your Linux distribution before installing AtM. AtM is distributed as a Flatpak bundle; normal users do not need to install Meson, Vala, GTK development packages or the elementary SDK.</small>
 
+<small><strong>Expected result:</strong> the command prints a Flatpak version number and returns without an error.</small>
+
 #### 2. Install and start a local AI provider
 
 <small>For a new setup, install Ollama from the <a href="https://ollama.com/download/linux">official Linux download page</a>. AtM first checks the standard Ollama endpoint at <code>127.0.0.1:11434</code> and then a compatibility fallback at <code>127.0.0.1:11435</code>.</small>
@@ -57,6 +72,8 @@ ollama ls
 ```
 
 <small>If Ollama is running, this command returns the models currently installed in its local model store. An empty list is valid; it simply means that you still need to download a model.</small>
+
+<small><strong>Expected result:</strong> <code>ollama ls</code> responds normally. It may show zero models at this stage; a connection error means the provider is not ready yet.</small>
 
 #### 3. Choose and download your first AI model
 
@@ -76,6 +93,8 @@ ollama pull qwen3.5:2b-q4_K_M
 ollama ls
 ```
 
+<small><strong>Expected result:</strong> the model name appears in the list. This is the point at which AtM can discover it through the provider.</small>
+
 #### 4. Download and install Ask the Model
 
 <small>Download the latest release bundle from <a href="https://github.com/LaurentiuStaicu/ask-the-model/releases/latest/download/AskTheModel.flatpak">AskTheModel.flatpak</a>, then install it for your user account:</small>
@@ -86,6 +105,8 @@ flatpak install --user ./AskTheModel.flatpak
 
 <small>Flatpak resolves the application runtime separately. You do not need to install GTK, Granite, libsoup or json-glib development packages manually just to use the release bundle.</small>
 
+<small><strong>Expected result:</strong> Flatpak finishes installation without an error and registers <code>io.github.laurentiustaicu.ask_the_model</code> for your user account.</small>
+
 #### 5. Start AtM
 
 ```bash
@@ -94,9 +115,13 @@ flatpak run io.github.laurentiustaicu.ask_the_model
 
 <small>When AtM starts, it automatically probes the supported local provider endpoints, asks the provider which models are installed, checks which of those models are chat/completion-capable, and fills the model selector with the compatible models it finds. If at least one compatible model is available, AtM selects one automatically.</small>
 
+<small><strong>Expected result:</strong> the title bar shows a compatible AI model instead of <code>No chat models detected</code>, and you can send a prompt. A brief scan status such as <code>1 model found</code> may appear while discovery finishes.</small>
+
 #### 6. Download more models later and use Refresh
 
 <small>You can install another model at any time with your provider. If AtM is already open when the download finishes, click the circular <strong>Refresh models</strong> button in the title bar. AtM repeats model discovery and updates the selector; you do not need to add the model to AtM manually.</small>
+
+<small><strong>Expected result:</strong> compatible newly installed models appear in the selector; models removed from the provider disappear after the refresh.</small>
 
 ### How AtM discovers models
 
@@ -287,6 +312,13 @@ flatpak run io.github.laurentiustaicu.ask_the_model
 - <small><a href="CHANGELOG.md">Changelog</a> and <a href="releases/">release notes</a>.</small>
 - <small><a href="CITATION.cff">Citation metadata</a>.</small>
 
+### Help and project maintenance
+
+<small>If something does not work, start with <a href="docs/TROUBLESHOOTING.md">Troubleshooting</a>. It covers provider detection, missing models, raw GGUF imports, slow inference, memory use, disk-space problems and Flatpak startup checks.</small>
+
+<small>If the problem remains reproducible, open a <a href="https://github.com/LaurentiuStaicu/ask-the-model/issues">GitHub issue</a> and include the AtM version, Linux distribution/session, provider version, model name and the exact steps needed to reproduce the problem. Do not include private prompts or sensitive local information unless it is necessary and you intentionally want to share it.</small>
+
+<small>Ask the Model is maintained in this repository by <a href="https://github.com/LaurentiuStaicu">LaurentiuStaicu</a>. Release history, current boundaries and planned scientific-repository integration are documented in <a href="CHANGELOG.md">CHANGELOG.md</a>, <a href="STATUS.md">STATUS.md</a> and the <a href="releases/">release notes</a>.</small>
 ### License
 
 <small>Ask the Model is released under the <a href="LICENSE"><strong>MIT License</strong></a>. See the repository <a href="LICENSE">LICENSE</a> file for the complete terms.</small>
