@@ -2,9 +2,9 @@
 
 ## Release status
 
-Ask the Model (AtM) v0.1.0 established the initial public application baseline. The current 0.1.1 development state extends that baseline with local message composition, theme following and a minimal local Ollama discovery probe.
+Ask the Model (AtM) v0.1.0 established the initial public application baseline. The current 0.1.1 development state extends that baseline with local message composition, theme following, local Ollama discovery and basic in-session AI chat.
 
-Version numbers identify frozen software snapshots. They do not imply that planned AI chat, repository-access or full model-integration functionality is already implemented.
+Version numbers identify frozen software snapshots. They do not imply that planned repository-access or full model-aware functionality is already implemented.
 
 ## Canonical application role
 
@@ -27,20 +27,24 @@ The current development state establishes:
 - elementary-compatible application icons;
 - native desktop integration and automatic system color-scheme following;
 - local prompt composition with a functional Send action;
-- minimal discovery of a local Ollama-compatible API through `GET /api/tags`;
+- discovery of a local Ollama-compatible API through `GET /api/tags`;
+- automatic use of the first installed model returned by that local provider;
+- basic in-session conversational requests through `POST /api/chat`;
+- in-memory user/assistant history supplied to later chat turns;
 - Flatpak packaging for the elementary OS 8 runtime;
 - continuous Flatpak build verification through GitHub Actions;
 - standardized project identity, application-boundary and citation metadata.
 
-The Flatpak now requests network sharing because a sandboxed application must use the network subsystem to communicate with a local HTTP provider. This permission is broader than loopback at the sandbox layer. The current AtM implementation itself only probes `127.0.0.1:11434` and `127.0.0.1:11435`, and the discovery request does not include user prompt content.
+The Flatpak requests network sharing because a sandboxed application must use the network subsystem to communicate with a local HTTP provider. This permission is broader than loopback at the sandbox layer. The current AtM implementation itself only addresses `127.0.0.1:11434` and `127.0.0.1:11435`.
+
+User prompt content is transmitted only when **Send** is activated. Requests are sent to the locally discovered provider, and `stream: false` is used so each completed local response can be parsed as one JSON object.
 
 The current development state does not yet implement:
 
-- AI response generation;
-- sending user prompts to a local AI provider;
 - repository ingestion or retrieval;
-- model-aware context selection;
-- conversation persistence;
+- model-aware repository context selection;
+- a model selection UI;
+- conversation persistence across application restarts;
 - application settings;
 - execution or simulation of scientific models.
 
@@ -54,7 +58,6 @@ AtM must not present an AI-generated explanation as if it were a canonical model
 
 ## What the current baseline does not claim
 
-- a completed AI chat product;
 - embedded scientific models;
 - validated scientific inference;
 - model execution or simulation;

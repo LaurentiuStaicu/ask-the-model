@@ -13,7 +13,7 @@ Ask the Model (AtM) is a local AI chat interface designed to query, explore and 
 
 AtM is an application interface. It does not contain, redefine or replace the scientific models themselves; each model remains canonical in its own repository.
 
-**Current status:** application baseline, current development version 0.1.1. The development branch now includes the native GTK 4 / Granite shell, local message composition, automatic elementary OS color-scheme following, and a minimal local Ollama discovery probe. The probe checks the loopback API for available models but does not yet send user prompts to a model. Repository access, AI response generation, conversation management and settings are not yet implemented. See [STATUS.md](STATUS.md) for the maintained application boundary and [CITATION.cff](CITATION.cff) for citation metadata.
+**Current status:** application baseline, current development version 0.1.1. The development branch now includes the native GTK 4 / Granite shell, local message composition, automatic elementary OS color-scheme following, local Ollama discovery, and basic in-session chat through Ollama's `/api/chat` endpoint. AtM automatically uses the first installed model returned by the local provider. Repository access, model selection UI, conversation persistence and settings are not yet implemented. See [STATUS.md](STATUS.md) for the maintained application boundary and [CITATION.cff](CITATION.cff) for citation metadata.
 
 ## Build and package
 
@@ -38,4 +38,4 @@ flatpak-builder flatpak-build io.github.laurentiustaicu.ask_the_model.yml --user
 flatpak run io.github.laurentiustaicu.ask_the_model
 ```
 
-The development Flatpak now shares the network subsystem because local Ollama discovery uses its HTTP API. The current AtM code only probes loopback addresses (`127.0.0.1`) on ports `11434` and `11435`; no prompt content is transmitted during discovery.
+The development Flatpak shares the network subsystem because local Ollama communication uses its HTTP API. Current provider code is restricted by implementation to loopback addresses (`127.0.0.1`) on ports `11434` and `11435`. User prompts are sent only after the user presses **Send**, and the current in-session conversation history is included in subsequent local `/api/chat` requests.

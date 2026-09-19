@@ -46,12 +46,18 @@ namespace AskTheModel {
         private async void discover_local_provider () {
             bool found = yield ollama_provider.discover ();
 
-            if (found && ollama_provider.base_url != null) {
+            if (found && ollama_provider.model_name != null) {
                 stdout.printf (
-                    "AtM: Ollama detected at %s (%u model%s available)\n",
+                    "AtM: Ollama detected at %s; using %s (%u model%s available)\n",
                     ollama_provider.base_url,
+                    ollama_provider.model_name,
                     ollama_provider.model_count,
                     ollama_provider.model_count == 1 ? "" : "s"
+                );
+            } else if (found) {
+                stderr.printf (
+                    "AtM: Ollama detected at %s, but no installed model was found.\n",
+                    ollama_provider.base_url
                 );
             } else {
                 stderr.printf (
@@ -108,6 +114,40 @@ namespace AskTheModel {
             headerbar.set_decoration_layout (":minimize,maximize,close");
 
             return headerbar;
+        }
+
+        private void append_transcript (
+            Gtk.TextView transcript,
+            string entry
+        ) {
+            string current = transcript.buffer.text;
+            string separator = current.length > 0 ? "\n\n" : "";
+            transcript.buffer.text = current + separator + entry;
+        }
+
+        private async void send_prompt (
+            string prompt,
+            Gtk.TextView transcript,
+            Gtk.TextView prompt_view,
+            Gtk.Button send_button
+        ) {
+            try {
+                string answer = yield ollama_provider.chat (prompt);
+                append_transcript (
+                    transcript,
+                    "Assistant: " + answer
+                );
+            } catch (GLib.Error error) {
+                append_transcript (
+                    transcript,
+                    "System: " + error.message
+                );
+            }
+
+            prompt_view.sensitive = true;
+            send_button.sensitive =
+                prompt_view.buffer.text.strip ().length > 0;
+            prompt_view.grab_focus ();
         }
 
         private Gtk.Widget build_main_content () {
@@ -173,6 +213,7 @@ namespace AskTheModel {
                     prompt_view.buffer.get_char_count () == 0;
 
                 send_button.sensitive =
+                    prompt_view.sensitive &&
                     prompt_view.buffer.text.strip ().length > 0;
             });
 
@@ -182,13 +223,21 @@ namespace AskTheModel {
                     return;
                 }
 
-                string current = transcript.buffer.text;
-                string separator = current.length > 0 ? "\n\n" : "";
-                transcript.buffer.text =
-                    current + separator + "You: " + prompt;
+                append_transcript (
+                    transcript,
+                    "You: " + prompt
+                );
 
                 prompt_view.buffer.text = "";
-                prompt_view.grab_focus ();
+                prompt_view.sensitive = false;
+                send_button.sensitive = false;
+
+                send_prompt.begin (
+                    prompt,
+                    transcript,
+                    prompt_view,
+                    send_button
+                );
             });
 
             var composer = new Gtk.Box (Gtk.Orientation.HORIZONTAL, 8) {
