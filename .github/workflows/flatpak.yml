@@ -7,9 +7,7 @@ on:
   pull_request:
 
 permissions:
-  contents: read
-  pages: write
-  id-token: write
+  contents: write
 
 jobs:
   flatpak:
@@ -22,6 +20,17 @@ jobs:
       - name: Checkout
         uses: actions/checkout@v4
 
+      - name: Restore development repository history
+        if: github.event_name == 'push' && github.ref == 'refs/heads/main'
+        shell: bash
+        run: |
+          set -euo pipefail
+          git config --global --add safe.directory "$GITHUB_WORKSPACE"
+
+          if git fetch origin flatpak-repo:refs/remotes/origin/flatpak-repo 2>/dev/null; then
+            git archive origin/flatpak-repo repo | tar -x
+          fi
+
       - name: Build Flatpak
         uses: flatpak/flatpak-github-actions/flatpak-builder@v6
         with:
@@ -32,7 +41,7 @@ jobs:
           repo-dir: repo
           cache-key: flatpak-builder-${{ github.sha }}
 
-      - name: Prepare AtM Development repository
+      - name: Finalize AtM development repository
         if: github.event_name == 'push' && github.ref == 'refs/heads/main'
         shell: bash
         run: |
@@ -41,50 +50,51 @@ jobs:
           flatpak build-update-repo repo \
             --generate-static-deltas \
             --title="AtM Development" \
-            --comment="Development builds of Ask the Model" \
-            --description="Automatically published development builds from the main branch of Ask the Model." \
+            --comment="Development updates for Ask the Model" \
+            --description="Automatically published development builds of Ask the Model from the main branch." \
             --homepage="https://github.com/LaurentiuStaicu/ask-the-model" \
             --icon="https://raw.githubusercontent.com/LaurentiuStaicu/ask-the-model/main/data/icons/64.png" \
             --default-branch=master
 
-          rm -rf site
-          mkdir -p site/repo
-          cp -RL repo/. site/repo/
+      - name: Publish AtM development repository
+        if: github.event_name == 'push' && github.ref == 'refs/heads/main'
+        shell: bash
+        run: |
+          set -euo pipefail
 
-          cat > site/index.html <<'EOF'
-          <!doctype html>
-          <html lang="en">
-          <head>
-            <meta charset="utf-8">
-            <meta name="viewport" content="width=device-width, initial-scale=1">
-            <title>AtM Development Flatpak Repository</title>
-          </head>
-          <body>
-            <h1>AtM Development</h1>
-            <p>Development Flatpak repository for Ask the Model.</p>
-            <p>Repository URL: <code>https://laurentiustaicu.github.io/ask-the-model/repo/</code></p>
-            <p>This repository is intended for development and visual testing builds from the main branch.</p>
-          </body>
-          </html>
+          PUBLISH_DIR="$(mktemp -d)"
+          cp -a repo "$PUBLISH_DIR/repo"
+
+          cat > "$PUBLISH_DIR/atm-development.flatpakrepo" <<'EOF'
+          [Flatpak Repo]
+          Title=AtM Development
+          Url=https://raw.githubusercontent.com/LaurentiuStaicu/ask-the-model/flatpak-repo/repo/
+          Homepage=https://github.com/LaurentiuStaicu/ask-the-model
+          Comment=Development updates for Ask the Model
+          Description=Automatically published development builds of Ask the Model.
+          Icon=https://raw.githubusercontent.com/LaurentiuStaicu/ask-the-model/main/data/icons/64.png
           EOF
 
-          touch site/.nojekyll
+          cat > "$PUBLISH_DIR/README.md" <<'EOF'
+          # Ask the Model — development Flatpak repository
 
-      - name: Upload Pages artifact
-        if: github.event_name == 'push' && github.ref == 'refs/heads/main'
-        uses: actions/upload-pages-artifact@v4
-        with:
-          path: site
+          This branch is generated automatically from `main`.
 
-  deploy-development-repository:
-    if: github.event_name == 'push' && github.ref == 'refs/heads/main'
-    needs: flatpak
-    runs-on: ubuntu-latest
-    environment:
-      name: github-pages
-      url: ${{ steps.deployment.outputs.page_url }}
+          Application name: **Ask the Model**
 
-    steps:
-      - name: Deploy AtM Development repository
-        id: deployment
-        uses: actions/deploy-pages@v4
+          Application ID: `io.github.laurentiustaicu.ask_the_model`
+
+          The label **AtM Development** identifies only the Flatpak update source.
+          EOF
+
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+
+          git checkout --orphan flatpak-repo-publish
+          git rm -rf .
+          git clean -fdx
+
+          cp -a "$PUBLISH_DIR"/. .
+          git add -A
+          git commit -m "Publish Ask the Model development Flatpak"
+          git push --force origin HEAD:flatpak-repo
