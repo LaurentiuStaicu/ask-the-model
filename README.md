@@ -9,11 +9,9 @@
   <img alt="License: MIT" src="https://img.shields.io/badge/license-MIT-lightgrey?style=flat-square">
 </p>
 
-Ask the Model (AtM) is a local desktop chat application for working with locally hosted AI models through a simple native interface.
+Ask the Model (AtM) is a local AI chat application for working with locally hosted language models and, progressively, for querying, exploring and comparing repositories of scientific dynamical models through natural language. It is maintained as an application interface rather than a scientific model core; repositories such as Empirical World3 Dynamics (EWD), Cognitive Belief Dynamics (CBD) and Romanian Monetary Dynamics (RMD) remain independent and authoritative for their own code, data, assumptions, provenance and validation.
 
-The project is being developed as a natural-language access layer for repositories of scientific dynamical models, including Empirical World3 Dynamics (EWD), Cognitive Belief Dynamics (CBD) and Romanian Monetary Dynamics (RMD).
-
-AtM is an application interface, not a scientific model. EWD, CBD, RMD and other compatible repositories remain independent and authoritative for their own code, data, assumptions, provenance and validation.
+**Current status:** local-chat baseline with local provider discovery, chat-capable AI-model selection, refreshable model detection, streamed responses and in-session conversation context. Repository-aware retrieval, source provenance and scientific-model execution are not yet implemented. See [STATUS.md](STATUS.md) for the current application boundary and [CITATION.cff](CITATION.cff) for citation metadata.
 
 ## What AtM does
 
