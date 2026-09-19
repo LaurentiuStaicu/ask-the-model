@@ -2,9 +2,11 @@
 
 ## Release status
 
-Ask the Model (AtM) v0.1.0 established the initial public application baseline. The current 0.1.1 development state extends that baseline with local message composition, theme following, local Ollama discovery, completion-capable model selection and streamed in-session AI chat.
+**Current release: Ask the Model (AtM) v0.2.0 — Local Chat Baseline, released 2026-09-19.**
 
-Version numbers identify frozen software snapshots. They do not imply that planned repository-access or full model-aware functionality is already implemented.
+v0.2.0 is the first AtM release with functional local AI conversation. It adds provider discovery, completion-capable AI-model selection, streamed responses and in-session conversation history on top of the v0.1.x application/documentation baseline.
+
+The project remains in the `0.x` initial-development series. Repository-aware retrieval and scientific provenance are not implemented in this release.
 
 ## Canonical application role
 
@@ -14,59 +16,67 @@ The intended dynamical-model repository suite currently includes Empirical World
 
 Each scientific model remains authoritative in its own repository. AtM is an access and interaction layer over those external project sources.
 
-This role is canonical for the project. Future development must not silently turn AtM into a replacement model implementation or make application-level AI output authoritative over the scientific status, structure, provenance, assumptions or validation boundaries maintained by the source repositories.
-
 ## Current functional boundary
 
-The current development state establishes:
+v0.2.0 establishes:
 
 - the GTK 4 and Granite application shell;
-- the stable application ID;
-- the Meson build and installation configuration;
-- desktop launcher and AppStream metadata;
-- elementary-compatible application icons;
+- stable application ID and Meson build;
+- desktop launcher, AppStream metadata and elementary-compatible icons;
+- elementary OS 8 Flatpak packaging and GitHub Actions build verification;
 - native desktop integration and automatic system color-scheme following;
 - an X11-only Cairo renderer fallback when no explicit `GSK_RENDERER` override is present and no Wayland display is available;
-- local prompt composition with a functional Send action;
+- a functional prompt composer and Send action;
 - discovery of a local Ollama-compatible API through `GET /api/tags`;
-- capability inspection of installed models through `POST /api/show`;
-- automatic selection of the first installed model advertising the `completion` capability, skipping embedding-only models;
-- a refreshable model selector populated only with completion-capable local models;
-- real model-scan progress and a short-lived scan-result status in the header bar;
-- streamed in-session conversational requests through `POST /api/chat`;
-- progressive display of assistant response chunks while generation is running;
-- explicit `think: false` on the default chat path to avoid long hidden reasoning traces on supported reasoning models;
-- in-memory user/assistant history supplied to later chat turns;
-- Flatpak packaging for the elementary OS 8 runtime;
-- continuous Flatpak build verification through GitHub Actions;
-- standardized project identity, application-boundary and citation metadata.
+- preference for standalone Ollama on `127.0.0.1:11434`, with `127.0.0.1:11435` as compatibility fallback;
+- capability inspection through `POST /api/show`;
+- automatic exclusion of embedding-only models;
+- a refreshable AI-model selector populated with completion-capable models;
+- real model-scan progress and a short-lived scan-result status;
+- streamed conversational requests through `POST /api/chat`;
+- progressive assistant text display;
+- explicit `think: false` on the default chat path;
+- in-memory user/assistant history for the current application session.
 
-The Flatpak requests network sharing because a sandboxed application must use the network subsystem to communicate with a local HTTP provider. This permission is broader than loopback at the sandbox layer. The current AtM implementation itself only addresses loopback: it prefers standalone Ollama on `127.0.0.1:11434` and retains `127.0.0.1:11435` as a compatibility fallback.
+## Provider and dependency boundary
 
-User prompt content is transmitted only when **Send** is activated. Requests are sent to the locally discovered provider. Ollama streaming is enabled and AtM parses each newline-delimited JSON response object as it arrives. The default request also sets `think: false`; this is a latency choice for the ordinary chat path, not a claim that the underlying model lacks reasoning capability.
+AtM does not bundle, install, start, stop or update Ollama. The local provider is an external dependency.
 
-The current development state does not yet implement:
+The validated reference provider for v0.2.0 is Ollama 0.34.2. Compatibility is defined by the API behavior documented in `docs/DEPENDENCIES_AND_COMPATIBILITY.md`, not by an intentional hard pin to that exact provider version.
 
-- repository ingestion or retrieval;
-- model-aware repository context selection;
-- conversation persistence across application restarts;
-- application settings;
-- execution or simulation of scientific models.
+Alpaca is optional and is not an application dependency.
+
+GPU acceleration is also provider-owned. The validated reference configuration includes an AMD Radeon RX 6700 using Ollama's Vulkan backend; AtM itself does not contain GPU inference code.
 
 ## Data and model boundary
 
-The application is intended to use locally hosted AI and to keep user interaction data on-device wherever the selected local workflow permits.
+User prompt content is transmitted only when **Send** is activated. The current provider implementation addresses loopback only.
 
-Scientific model repositories remain external sources. Their own documentation, code, data, provenance, validation status and release boundaries remain authoritative.
+Conversation history is stored in application memory for the current session and is not persisted across restarts.
 
-AtM must not present an AI-generated explanation as if it were a canonical model result unless that result is explicitly supported by the corresponding source repository or by an actual model execution whose provenance is identified.
+Scientific model repositories remain external sources. Their documentation, code, data, provenance, validation status and release boundaries remain authoritative.
 
-## What the current baseline does not claim
+AtM must not present an AI-generated explanation as if it were a canonical model result unless that result is explicitly supported by a future repository/provenance layer or by an actual model execution whose provenance is identified.
 
+## Not implemented in v0.2.0
+
+- repository ingestion or retrieval;
+- repository-aware context selection for EWD, CBD or RMD;
+- source/provenance presentation;
+- conversation persistence across application restarts;
+- application/provider settings;
+- model installation, download or deletion;
+- cloud AI providers;
+- execution or simulation of scientific models;
+- autonomous changes to scientific repositories.
+
+## What v0.2.0 does not claim
+
+- repository-grounded scientific answers;
 - embedded scientific models;
 - validated scientific inference;
 - model execution or simulation;
 - authoritative replacement of repository documentation;
 - a production-ready scientific decision system.
 
-Future releases should update this file whenever the application's functional boundary, repository integration or model-access architecture changes.
+See `releases/v0.2.0.md` for the frozen release description and `docs/DEPENDENCIES_AND_COMPATIBILITY.md` for compatibility requirements.

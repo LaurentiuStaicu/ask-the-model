@@ -4,15 +4,48 @@ All notable public releases of Ask the Model are recorded here.
 
 ## Unreleased
 
+No unreleased changes recorded yet.
+
+## 0.2.0 - 2026-09-19
+
+Local Chat Baseline.
+
 ### Added
 
-- elementary OS 8 Flatpak manifest using the elementary Platform and SDK;
-- GitHub Actions Flatpak build verification;
-- documented native and Flatpak development workflows.
+- functional local chat through an Ollama-compatible `/api/chat` provider;
+- provider discovery on `127.0.0.1:11434` with `11435` compatibility fallback;
+- capability inspection through `/api/show`;
+- automatic exclusion of embedding-only models;
+- refreshable AI-model selector;
+- real model-scan progress and temporary scan-result feedback;
+- streamed assistant responses;
+- in-memory multi-turn conversation history;
+- elementary OS color-scheme following;
+- X11-specific Cairo renderer fallback for the validated GTK/GSK compatibility case;
+- elementary OS 8 Flatpak network access required for host-local provider communication;
+- documented provider, dependency and compatibility requirements.
 
-### Sandbox boundary
+### Changed
 
-The current Flatpak manifest is intentionally limited to display/IPC permissions. Network access is not requested until local AI-provider integration is implemented and tested.
+- standalone Ollama is now the preferred provider architecture;
+- Alpaca is optional rather than an application dependency;
+- the default chat request sets `think: false` to reduce hidden-reasoning latency on supported models;
+- README, STATUS, architecture, AppStream and citation metadata now describe the functional local-chat baseline.
+
+### Compatibility
+
+- validated with Ollama 0.34.2;
+- validated with AMD Radeon RX 6700 through Ollama's Vulkan backend;
+- provider compatibility is based on the required Ollama-compatible API behavior rather than an exact version pin.
+
+### Still not implemented
+
+- scientific-repository ingestion/retrieval;
+- repository context selection and provenance;
+- conversation persistence;
+- application/provider settings;
+- model management;
+- scientific model execution.
 
 ## 0.1.1 - 2026-09-19
 
@@ -51,10 +84,8 @@ Initial application baseline.
 
 This release establishes the native application shell and desktop integration baseline.
 
-AI chat functionality, local model-provider integration, conversation management,
-settings, and other end-user features are not yet implemented.
+AI chat functionality, local model-provider integration, conversation management, settings, and other end-user features are not yet implemented.
 
 ### Scope boundary
 
-Ask the Model is an application interface. It does not contain or constitute an
-AI model itself.
+Ask the Model is an application interface. It does not contain or constitute an AI model itself.

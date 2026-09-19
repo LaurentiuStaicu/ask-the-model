@@ -2,7 +2,7 @@ cff-version: 1.2.0
 message: "If you use Ask the Model, please cite this version."
 type: software
 title: "Ask the Model"
-version: 0.1.1
+version: 0.2.0
 date-released: 2026-09-19
 authors:
   - family-names: "Staicu"
@@ -10,11 +10,12 @@ authors:
 repository-code: "https://github.com/LaurentiuStaicu/ask-the-model"
 url: "https://github.com/LaurentiuStaicu/ask-the-model"
 license: MIT
-abstract: "A local AI chat interface designed as a conversational access layer for repositories of scientific dynamical models such as Empirical World3 Dynamics, Cognitive Belief Dynamics and Romanian Monetary Dynamics, using locally hosted AI while keeping user data on-device."
+abstract: "A local AI chat interface and conversational access layer for repositories of scientific dynamical models, with local Ollama-compatible inference, dynamic AI-model discovery and streamed in-session chat."
 keywords:
   - local AI
   - scientific models
   - dynamical models
   - model repositories
+  - Ollama
   - natural-language interface
   - research software
