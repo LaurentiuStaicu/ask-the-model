@@ -2,6 +2,18 @@
 
 All notable public releases of Ask the Model are recorded here.
 
+## Unreleased
+
+### Added
+
+- elementary OS 8 Flatpak manifest using the elementary Platform and SDK;
+- GitHub Actions Flatpak build verification;
+- documented native and Flatpak development workflows.
+
+### Sandbox boundary
+
+The current Flatpak manifest is intentionally limited to display/IPC permissions. Network access is not requested until local AI-provider integration is implemented and tested.
+
 ## 0.1.1 - 2026-09-19
 
 Application-scope and documentation correction.

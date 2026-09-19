@@ -1,1 +1,4 @@
 build/
+flatpak-build/
+.flatpak-builder/
+*.flatpak

@@ -26,7 +26,11 @@ The current baseline establishes:
 - desktop launcher and AppStream metadata;
 - elementary-compatible application icons;
 - native desktop integration;
+- Flatpak packaging for the elementary OS 8 runtime;
+- continuous Flatpak build verification through GitHub Actions;
 - standardized project identity, application-boundary and citation metadata.
+
+The Flatpak baseline is intentionally least-privilege: it exposes the Wayland/fallback-X11 display interfaces and IPC required by the GTK application, but does not currently request network access. Network permission will be introduced only when local AI-provider communication is implemented and its sandbox boundary is explicitly documented.
 
 The current baseline does not yet implement:
 

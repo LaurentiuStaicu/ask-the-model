@@ -1,0 +1,19 @@
+id: io.github.laurentiustaicu.ask_the_model
+runtime: io.elementary.Platform
+runtime-version: '8'
+sdk: io.elementary.Sdk
+command: io.github.laurentiustaicu.ask_the_model
+
+finish-args:
+  - '--share=ipc'
+  - '--socket=fallback-x11'
+  - '--socket=wayland'
+
+modules:
+  - name: ask-the-model
+    buildsystem: meson
+    config-opts:
+      - '--buildtype=release'
+    sources:
+      - type: dir
+        path: .

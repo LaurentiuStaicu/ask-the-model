@@ -14,3 +14,28 @@ Ask the Model (AtM) is a local AI chat interface designed to query, explore and 
 AtM is an application interface. It does not contain, redefine or replace the scientific models themselves; each model remains canonical in its own repository.
 
 **Current status:** application baseline, current development version 0.1.1. Version 0.1.0 established the native GTK 4 / Granite application shell, build system and desktop integration. Version 0.1.1 clarifies and standardizes the application scope and repository relationship; AI chat functionality, repository access, local model-provider integration, conversation management and settings are not yet implemented. See [STATUS.md](STATUS.md) for the maintained application boundary and [CITATION.cff](CITATION.cff) for citation metadata.
+
+## Build and package
+
+### Native development build
+
+```bash
+meson setup build --prefix=/usr
+meson compile -C build
+./build/io.github.laurentiustaicu.ask_the_model
+```
+
+### Flatpak build for elementary OS
+
+AtM includes an elementary OS 8 Flatpak manifest using `io.elementary.Platform//8` and `io.elementary.Sdk//8`.
+
+On elementary OS, install Flatpak Builder if needed and build the application with:
+
+```bash
+sudo apt install flatpak-builder
+flatpak install -y appcenter io.elementary.Platform//8 io.elementary.Sdk//8
+flatpak-builder flatpak-build io.github.laurentiustaicu.ask_the_model.yml --user --install --force-clean
+flatpak run io.github.laurentiustaicu.ask_the_model
+```
+
+The current baseline requests only the display-related sandbox permissions required to show the native GTK interface. Network access is intentionally not granted until local AI-provider integration is implemented and tested.
