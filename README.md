@@ -5,51 +5,64 @@
 <h1 align="center">Ask the Model (AtM)</h1>
 
 <p align="center">
-  <img alt="Version: 0.2.0" src="https://img.shields.io/badge/version-0.2.0-blue?style=flat-square">
-  <img alt="Platform: elementary OS 8" src="https://img.shields.io/badge/platform-elementary%20OS%208-lightgrey?style=flat-square">
   <img alt="License: MIT" src="https://img.shields.io/badge/license-MIT-lightgrey?style=flat-square">
 </p>
 
-Ask the Model (AtM) is a local desktop chat application for working with locally hosted AI models.
+Ask the Model (AtM) is a local desktop chat application for working with locally hosted AI models through a simple native interface.
 
-The project is being developed as a natural-language interface for scientific dynamical-model repositories such as Empirical World3 Dynamics (EWD), Cognitive Belief Dynamics (CBD) and Romanian Monetary Dynamics (RMD). Those repositories remain independent and authoritative for their own code, data, assumptions and validation.
+The project is being developed as a natural-language access layer for repositories of scientific dynamical models, including Empirical World3 Dynamics (EWD), Cognitive Belief Dynamics (CBD) and Romanian Monetary Dynamics (RMD).
 
-**Current release: v0.2.0 — Local Chat Baseline.**  
-This release provides functional local AI chat and local AI-model discovery/selection. Repository-aware retrieval, provenance and scientific-model context are planned but are not implemented yet.
+AtM is an application interface, not a scientific model. EWD, CBD, RMD and other compatible repositories remain independent and authoritative for their own code, data, assumptions, provenance and validation.
 
-## Current capabilities
+## What AtM does
 
-- local Ollama-compatible chat;
-- automatic discovery of installed chat-capable models;
-- AI-model selection from the header bar;
-- manual model refresh with scan progress and result feedback;
-- streamed assistant responses;
-- in-memory multi-turn conversation for the current session;
-- automatic light/dark appearance following the desktop;
-- elementary OS 8 Flatpak packaging;
-- compatibility handling for the current X11/GTK renderer path.
+AtM provides a local conversational interface that can:
 
-AtM does not require Alpaca. Any compatible local Ollama service can provide inference.
+- discover locally available AI models through an Ollama-compatible provider;
+- present chat-capable models for selection;
+- refresh the local model list while the application is running;
+- stream assistant responses as they are generated;
+- maintain multi-turn conversation context during the current application session;
+- follow the desktop light/dark appearance;
+- run as a native GTK 4 / Granite application packaged for elementary OS.
+
+The long-term goal is to let users query and compare scientific-model repositories through natural language while preserving a clear distinction between repository evidence and AI-generated interpretation.
+
+Repository-aware retrieval, source provenance and scientific-model execution are separate capabilities and are not implied by ordinary local chat.
+
+## Local-first architecture
+
+AtM is designed around locally hosted inference.
+
+It connects to a local Ollama-compatible service and does not require Alpaca or another graphical AI frontend. AtM does not install, start, update or manage the inference provider itself, and it does not download or delete AI models.
+
+The application currently uses loopback-only provider connections, keeping the inference path on the local machine.
 
 ## Requirements
 
 For normal use, AtM requires:
 
-- elementary OS 8 or a compatible Linux environment;
+- a compatible Linux desktop environment;
 - a running local Ollama-compatible service;
-- at least one installed model that advertises the `completion` capability.
+- at least one installed AI model with chat/completion capability.
 
-The preferred local provider endpoint is `127.0.0.1:11434`. A secondary loopback endpoint is retained for compatibility with managed local-provider setups.
+The primary packaged target is elementary OS using GTK 4, Granite and Flatpak.
 
-AtM does not install or manage Ollama and does not download or delete AI models.
+Detailed provider API requirements, sandbox permissions, display compatibility and build dependencies are documented in [Dependencies and compatibility](docs/DEPENDENCIES_AND_COMPATIBILITY.md).
 
-See [Dependencies and compatibility](docs/DEPENDENCIES_AND_COMPATIBILITY.md) for the complete technical requirements.
+## Scientific-model boundary
 
-## Project scope
+AtM is intended to work with scientific dynamical-model repositories without replacing them.
 
-AtM is the application interface, not a scientific model.
+When repository-aware functionality is available, the source repository remains canonical. AI-generated text must remain distinguishable from repository content, model outputs and validated scientific results.
 
-In v0.2.0, EWD, CBD and RMD are part of the intended future repository context, but AtM does not yet ingest or query their repository contents. AI responses in this release must therefore not be treated as repository-grounded or canonical scientific results.
+The initial repository suite is intended to include:
+
+- Empirical World3 Dynamics (EWD);
+- Cognitive Belief Dynamics (CBD);
+- Romanian Monetary Dynamics (RMD).
+
+The architecture is intended to support additional compatible repositories later.
 
 ## Build
 
@@ -78,7 +91,7 @@ flatpak run io.github.laurentiustaicu.ask_the_model
 - [Interface design requirements](docs/INTERFACE_DESIGN_REQUIREMENTS.md)
 - [Terminology](docs/TERMINOLOGY.md)
 - [Changelog](CHANGELOG.md)
-- [v0.2.0 release notes](releases/v0.2.0.md)
+- [Release notes](releases/)
 - [Citation metadata](CITATION.cff)
 
 ## License
