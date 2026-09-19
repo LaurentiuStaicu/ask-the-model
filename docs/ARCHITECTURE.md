@@ -57,3 +57,23 @@ The selected repository set is conversation context, not AI-provider configurati
 For multi-model discussions, the future context/provenance layer must preserve source attribution per repository rather than flattening all retrieved material into an unidentified combined context.
 
 The local AI model remains a separate single active inference model for a request unless a future provider architecture explicitly supports another mode.
+
+### Localization service
+
+All user-visible interface strings are localizable. English is the default application language and Romanian is the second supported language.
+
+Implementation should use the standard gettext/PO workflow supported by Vala/Meson so UI copy is not duplicated in application logic.
+
+Canonical terminology is defined in `docs/TERMINOLOGY.md`.
+
+### Typography integration
+
+For the conversation transcript and composer, AtM should read the desktop's `org.gnome.desktop.interface` `monospace-font-name` setting, matching the system monospace behavior used by elementary Code.
+
+UI chrome continues to inherit the elementary GTK theme font.
+
+### Header identity overlay
+
+The normal header geometry should remain theme-driven. If the approved visual design uses the larger owl identity disc, implement it as an overlay/custom titlebar composition whose overlay child does not determine the header's requested height.
+
+The overlay must not obscure native window controls or interfere with titlebar dragging.

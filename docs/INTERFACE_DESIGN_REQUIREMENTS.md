@@ -116,3 +116,48 @@ The closed control must summarize the active scope clearly, for example:
 At least one dynamical model must be selected before a repository-grounded question can be sent.
 
 The scientific dynamical-model selector and the local AI-model selector are separate concepts and must never be merged into one control.
+
+## Language and terminology
+
+AtM must support English and Romanian, with English as the default interface language.
+
+Terminology is normative and defined in `docs/TERMINOLOGY.md`. In the UI:
+
+- **Repository / Repositories** identifies EWD, CBD, RMD and other scientific dynamical-model repositories selected for discussion.
+- **AI model** identifies the local language model that generates the response.
+- The bare word **model** must be avoided wherever it could be ambiguous.
+
+The repository selector supports multiple selections; the AI-model selector represents the active local inference model.
+
+## Minimal chat-window rule
+
+The main chat window must remain visually minimal.
+
+The persistent layout should contain only elements needed during ordinary conversation. Secondary functions such as history, provenance detail and preferences should stay out of the primary reading/composing path unless the user opens them.
+
+The first visual prototype should therefore focus on:
+
+1. a standard-height elementary-style header;
+2. compact Repository and AI-model controls;
+3. the conversation area;
+4. the prompt composer.
+
+No permanent sidebar or secondary inspector is part of the first prototype.
+
+## Typography baseline
+
+The conversation transcript and prompt composer should follow the typography used by elementary Code's editor: the system monospace font and its configured size.
+
+On the current elementary OS defaults this is `Roboto Mono 10`, but AtM should read the system monospace setting rather than hard-code a font family or point size. This preserves the Code-like appearance while respecting the user's system configuration.
+
+General interface chrome—header labels, buttons, menus and settings—should continue to use the normal elementary system UI font instead of forcing monospace everywhere.
+
+## Header and identity mark
+
+The header should use the normal theme-driven `Gtk.HeaderBar` height; AtM should not enlarge the real header solely to accommodate branding.
+
+The AtM owl mark may appear inside a circular identity disc near the upper-left area as an overlay. The disc may visually overlap the header/content boundary toward the right and bottom without contributing to the header's measured height.
+
+The prototype must preserve native window controls and draggable titlebar behavior. If the active decoration layout places native controls in the same corner, the disc must be offset inward rather than cover those controls.
+
+A custom oversized disc is an AtM identity feature, not a replacement for standard header behavior.
