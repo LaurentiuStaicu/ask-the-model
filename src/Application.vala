@@ -1,8 +1,6 @@
 namespace AskTheModel {
     public class Application : Gtk.Application {
         private const string APP_ID = "io.github.laurentiustaicu.ask_the_model";
-        private const string IDENTITY_RESOURCE =
-            "/io/github/laurentiustaicu/ask_the_model/identity-icon.png";
         private const string STYLE_RESOURCE =
             "/io/github/laurentiustaicu/ask_the_model/style.css";
 
@@ -47,49 +45,15 @@ namespace AskTheModel {
         }
 
         private Gtk.Widget build_titlebar () {
-            var title_label = new Gtk.Label ("Ask the Model");
-            title_label.add_css_class ("title");
-
+            // Deliberately minimal: only the application name plus native
+            // window controls. GtkHeaderBar uses the GtkWindow title by default.
             var headerbar = new Gtk.HeaderBar () {
-                show_title_buttons = true,
-                title_widget = title_label
+                show_title_buttons = true
             };
-            headerbar.add_css_class ("atm-headerbar");
 
-            // The identity mark owns the top-left corner. Native window
-            // controls stay on the right.
             headerbar.set_decoration_layout (":minimize,maximize,close");
 
-            var titlebar_overlay = new Gtk.Overlay () {
-                child = headerbar,
-                overflow = Gtk.Overflow.VISIBLE
-            };
-
-            // Use the prepared AtM artwork itself for the medallion relief.
-            // Do not rebuild the disc with CSS shadows: that produced the
-            // flattened/oval "blob" seen in the previous visual test.
-            var identity_picture = new Gtk.Picture.for_resource (
-                IDENTITY_RESOURCE
-            ) {
-                alternative_text = "Ask the Model",
-                can_shrink = true,
-                content_fit = Gtk.ContentFit.CONTAIN,
-                width_request = 68,
-                height_request = 68,
-                halign = Gtk.Align.START,
-                valign = Gtk.Align.START,
-                margin_start = 0,
-                margin_top = 0,
-                can_target = false,
-                overflow = Gtk.Overflow.VISIBLE
-            };
-            identity_picture.add_css_class ("atm-identity-mark");
-
-            titlebar_overlay.add_overlay (identity_picture);
-            titlebar_overlay.set_measure_overlay (identity_picture, false);
-            titlebar_overlay.set_clip_overlay (identity_picture, false);
-
-            return titlebar_overlay;
+            return headerbar;
         }
 
         private Gtk.Widget build_main_content () {
