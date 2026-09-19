@@ -3,7 +3,7 @@
   <id>io.github.laurentiustaicu.ask_the_model</id>
 
   <name>Ask the Model</name>
-  <summary>Explore scientific model repositories through local AI chat</summary>
+  <summary>Explore scientific dynamical models through local AI chat</summary>
 
   <metadata_license>CC0-1.0</metadata_license>
   <project_license>MIT</project_license>
@@ -15,7 +15,7 @@
   <description>
     <p>
       Ask the Model is a local AI chat interface designed to query, explore
-      and discuss scientific model repositories such as Empirical World3
+      and discuss repositories of scientific dynamical models such as Empirical World3
       Dynamics, Cognitive Belief Dynamics and Romanian Monetary Dynamics
       through natural language while keeping user data on-device. The
       scientific models remain canonical in their own repositories and are
@@ -32,4 +32,9 @@
   </url>
 
   <content_rating type="oars-1.1"/>
+
+  <releases>
+    <release version="0.1.1" date="2026-09-19"/>
+    <release version="0.1.0" date="2026-09-19"/>
+  </releases>
 </component>

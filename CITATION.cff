@@ -10,7 +10,7 @@ authors:
 repository-code: "https://github.com/LaurentiuStaicu/ask-the-model"
 url: "https://github.com/LaurentiuStaicu/ask-the-model"
 license: MIT
-abstract: "A local AI chat interface designed as a conversational access layer for scientific model repositories such as Empirical World3 Dynamics, Cognitive Belief Dynamics and Romanian Monetary Dynamics, using locally hosted AI while keeping user data on-device."
+abstract: "A local AI chat interface designed as a conversational access layer for repositories of scientific dynamical models such as Empirical World3 Dynamics, Cognitive Belief Dynamics and Romanian Monetary Dynamics, using locally hosted AI while keeping user data on-device."
 keywords:
   - local AI
   - scientific models

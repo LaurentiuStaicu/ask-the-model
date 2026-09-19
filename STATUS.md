@@ -8,9 +8,9 @@ Version numbers identify frozen software snapshots. They do not imply that plann
 
 ## Canonical application role
 
-**Ask the Model (AtM) is a local conversational interface designed for querying, exploring and discussing scientific model repositories through natural language. It is not itself a scientific model and does not embed, redefine or replace the canonical models maintained in those repositories.**
+**Ask the Model (AtM) is a local conversational interface designed for querying, exploring and discussing repositories of scientific dynamical models through natural language. It is not itself a scientific model and does not embed, redefine or replace the canonical models maintained in those repositories.**
 
-The intended model-repository suite currently includes Empirical World3 Dynamics (EWD), Cognitive Belief Dynamics (CBD) and Romanian Monetary Dynamics (RMD), with scope for future compatible repositories.
+The intended dynamical-model repository suite currently includes Empirical World3 Dynamics (EWD), Cognitive Belief Dynamics (CBD) and Romanian Monetary Dynamics (RMD), with scope for future compatible repositories.
 
 Each scientific model remains authoritative in its own repository. AtM is an access and interaction layer over those external project sources.
 
