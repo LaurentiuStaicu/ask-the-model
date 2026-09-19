@@ -10,69 +10,50 @@
   <img alt="License: MIT" src="https://img.shields.io/badge/license-MIT-lightgrey?style=flat-square">
 </p>
 
-Ask the Model (AtM) is a local AI chat interface designed to query, explore and discuss repositories of scientific dynamical models through natural language. Its intended repository suite includes Empirical World3 Dynamics (EWD), Cognitive Belief Dynamics (CBD) and Romanian Monetary Dynamics (RMD).
+Ask the Model (AtM) is a local desktop chat application for working with locally hosted AI models.
 
-AtM is the conversational application layer. It does not contain, redefine or replace those scientific models; each scientific repository remains canonical for its own code, data, assumptions, provenance and validation state.
+The project is being developed as a natural-language interface for scientific dynamical-model repositories such as Empirical World3 Dynamics (EWD), Cognitive Belief Dynamics (CBD) and Romanian Monetary Dynamics (RMD). Those repositories remain independent and authoritative for their own code, data, assumptions and validation.
 
-> **Current release: v0.2.0 — Local Chat Baseline.**  
-> Local AI chat is functional. Repository ingestion, repository-grounded retrieval and provenance-aware answers are not implemented yet, so v0.2.0 should not be described as repository-aware scientific chat.
+**Current release: v0.2.0 — Local Chat Baseline.**  
+This release provides functional local AI chat and local AI-model discovery/selection. Repository-aware retrieval, provenance and scientific-model context are planned but are not implemented yet.
 
-## What v0.2.0 provides
+## Current capabilities
 
-- native GTK 4 / Granite desktop application for elementary OS;
+- local Ollama-compatible chat;
+- automatic discovery of installed chat-capable models;
+- AI-model selection from the header bar;
+- manual model refresh with scan progress and result feedback;
+- streamed assistant responses;
+- in-memory multi-turn conversation for the current session;
 - automatic light/dark appearance following the desktop;
-- local Ollama-compatible provider discovery on loopback;
-- preferred standalone Ollama endpoint at `127.0.0.1:11434`, with `11435` retained as a compatibility fallback;
-- automatic capability inspection and exclusion of embedding-only models;
-- a refreshable AI-model selector in the header bar;
-- real model-scan progress and a short-lived scan result;
-- streamed assistant responses through `/api/chat`;
-- in-memory multi-turn conversation history for the current application session;
-- `think: false` on the default chat path to avoid long hidden reasoning latency on supported reasoning models;
-- an X11-only Cairo renderer fallback for the tested GTK/GSK compatibility case;
-- elementary OS 8 Flatpak packaging and GitHub Actions build verification.
+- elementary OS 8 Flatpak packaging;
+- compatibility handling for the current X11/GTK renderer path.
 
-## Requirements and compatibility
+AtM does not require Alpaca. Any compatible local Ollama service can provide inference.
 
-The recommended runtime is the elementary OS 8 Flatpak build. AtM does **not** bundle or manage an inference engine. A local Ollama-compatible service must already be running.
+## Requirements
 
-For v0.2.0:
+For normal use, AtM requires:
 
-- standalone Ollama on `127.0.0.1:11434` is the preferred provider;
-- `127.0.0.1:11435` is a compatibility fallback for managed local frontends;
-- Alpaca is optional and is **not** an AtM dependency;
-- AtM requires the provider operations used by `GET /api/tags`, `POST /api/show` and `POST /api/chat`;
-- only models advertising the `completion` capability are presented as chat models;
-- Ollama 0.34.2 is the validated reference provider for this release, but the application is not intentionally pinned to that exact version;
-- GPU acceleration is owned by the provider, not by AtM. The validated reference configuration includes an AMD Radeon RX 6700 using Ollama's Vulkan backend. CPU inference remains a provider concern and may be substantially slower.
+- elementary OS 8 or a compatible Linux environment;
+- a running local Ollama-compatible service;
+- at least one installed model that advertises the `completion` capability.
 
-See [Dependencies and compatibility](docs/DEPENDENCIES_AND_COMPATIBILITY.md) for the complete runtime, API, sandbox and build requirements.
+The preferred local provider endpoint is `127.0.0.1:11434`. A secondary loopback endpoint is retained for compatibility with managed local-provider setups.
 
-## Data and architecture boundary
+AtM does not install or manage Ollama and does not download or delete AI models.
 
-AtM v0.2.0 sends prompts only to the selected loopback provider implemented by the application. Conversations are kept in memory and are not persisted across application restarts.
+See [Dependencies and compatibility](docs/DEPENDENCIES_AND_COMPATIBILITY.md) for the complete technical requirements.
 
-The Flatpak requires network sharing so it can reach the host-local HTTP provider. This Flatpak permission is broader than loopback at the sandbox level, while the current AtM provider implementation itself only addresses `127.0.0.1`.
+## Project scope
 
-Scientific repositories remain external and authoritative. AtM must not present an AI-generated explanation as a canonical scientific-model result unless a future repository/provenance layer can support that claim.
+AtM is the application interface, not a scientific model.
 
-## Not implemented in v0.2.0
+In v0.2.0, EWD, CBD and RMD are part of the intended future repository context, but AtM does not yet ingest or query their repository contents. AI responses in this release must therefore not be treated as repository-grounded or canonical scientific results.
 
-- repository ingestion or retrieval;
-- EWD/CBD/RMD context selection;
-- source citation or provenance tracing;
-- conversation persistence;
-- provider/settings UI;
-- model download or deletion;
-- cloud-provider integration;
-- execution or simulation of scientific models;
-- autonomous modification of scientific repositories.
-
-## Build and package
+## Build
 
 ### Native development build
-
-Build dependencies are GTK 4, Granite 7, libsoup 3, json-glib 1.0, Vala and Meson 1.0 or newer.
 
 ```bash
 meson setup build --prefix=/usr
@@ -80,9 +61,7 @@ meson compile -C build
 ./build/io.github.laurentiustaicu.ask_the_model
 ```
 
-### Flatpak build for elementary OS
-
-AtM uses `io.elementary.Platform//8` and `io.elementary.Sdk//8`.
+### Flatpak build
 
 ```bash
 sudo apt install flatpak-builder
@@ -91,7 +70,7 @@ flatpak-builder flatpak-build io.github.laurentiustaicu.ask_the_model.yml --user
 flatpak run io.github.laurentiustaicu.ask_the_model
 ```
 
-## Project documentation
+## Documentation
 
 - [Application status](STATUS.md)
 - [Architecture boundary](docs/ARCHITECTURE.md)

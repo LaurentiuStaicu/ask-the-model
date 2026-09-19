@@ -46,7 +46,7 @@ The validated reference provider for v0.2.0 is Ollama 0.34.2. Compatibility is d
 
 Alpaca is optional and is not an application dependency.
 
-GPU acceleration is also provider-owned. The validated reference configuration includes an AMD Radeon RX 6700 using Ollama's Vulkan backend; AtM itself does not contain GPU inference code.
+GPU acceleration is provider-owned. AtM itself does not contain vendor-specific GPU inference code and does not require a particular GPU model.
 
 ## Data and model boundary
 

@@ -73,15 +73,9 @@ The default chat path requests `think: false` to prioritize interactive latency.
 
 ## GPU and compute compatibility
 
-AtM contains no inference engine and no vendor-specific GPU compute code. GPU/CPU selection belongs to the external provider.
+AtM contains no inference engine and no vendor-specific GPU compute code. GPU/CPU selection belongs entirely to the external provider.
 
-Validated reference configuration:
-
-- AMD Radeon RX 6700;
-- RADV Vulkan driver;
-- Ollama Vulkan inference backend.
-
-GPU acceleration is not an AtM requirement. CPU inference may work through the provider but can be substantially slower.
+No particular GPU model, vendor or acceleration backend is required by AtM. Hardware acceleration may be used when supported and configured by the local provider. CPU inference may also work, although performance depends on the selected model and provider configuration.
 
 ## Model storage
 
@@ -105,17 +99,19 @@ Network sharing is required so the sandbox can reach the host-local HTTP provide
 
 ### X11
 
-The validated elementary OS X11 configuration encountered EGL/Vulkan GSK initialization failures. AtM v0.2.0 therefore selects `GSK_RENDERER=cairo` automatically only when:
+AtM v0.2.0 selects `GSK_RENDERER=cairo` automatically only when:
 
 - `XDG_SESSION_TYPE=x11`;
 - no Wayland display is present;
 - the user has not explicitly set `GSK_RENDERER`.
 
+This is an application compatibility fallback for the current GTK/GSK path, not a hardware-specific requirement.
+
 ### Wayland
 
 AtM does not force the Cairo renderer on Wayland. The normal GTK renderer selection remains active.
 
-Wayland behavior is supported by the Flatpak manifest but is not the primary validated desktop path for this release.
+Wayland behavior is supported by the Flatpak manifest. The release does not claim exhaustive validation across all Linux graphics-driver combinations.
 
 ## Native build dependencies
 

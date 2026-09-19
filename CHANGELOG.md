@@ -35,7 +35,7 @@ Local Chat Baseline.
 ### Compatibility
 
 - validated with Ollama 0.34.2;
-- validated with AMD Radeon RX 6700 through Ollama's Vulkan backend;
+- validated with hardware-accelerated local Ollama inference;
 - provider compatibility is based on the required Ollama-compatible API behavior rather than an exact version pin.
 
 ### Still not implemented
