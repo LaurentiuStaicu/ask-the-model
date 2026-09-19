@@ -13,7 +13,7 @@ Ask the Model (AtM) is a local AI chat interface designed to query, explore and 
 
 AtM is an application interface. It does not contain, redefine or replace the scientific models themselves; each model remains canonical in its own repository.
 
-**Current status:** application baseline, current development version 0.1.1. Version 0.1.0 established the native GTK 4 / Granite application shell, build system and desktop integration. Version 0.1.1 clarifies and standardizes the application scope and repository relationship; AI chat functionality, repository access, local model-provider integration, conversation management and settings are not yet implemented. See [STATUS.md](STATUS.md) for the maintained application boundary and [CITATION.cff](CITATION.cff) for citation metadata.
+**Current status:** application baseline, current development version 0.1.1. The development branch now includes the native GTK 4 / Granite shell, local message composition, automatic elementary OS color-scheme following, and a minimal local Ollama discovery probe. The probe checks the loopback API for available models but does not yet send user prompts to a model. Repository access, AI response generation, conversation management and settings are not yet implemented. See [STATUS.md](STATUS.md) for the maintained application boundary and [CITATION.cff](CITATION.cff) for citation metadata.
 
 ## Build and package
 
@@ -38,4 +38,4 @@ flatpak-builder flatpak-build io.github.laurentiustaicu.ask_the_model.yml --user
 flatpak run io.github.laurentiustaicu.ask_the_model
 ```
 
-The current baseline requests only the display-related sandbox permissions required to show the native GTK interface. Network access is intentionally not granted until local AI-provider integration is implemented and tested.
+The development Flatpak now shares the network subsystem because local Ollama discovery uses its HTTP API. The current AtM code only probes loopback addresses (`127.0.0.1`) on ports `11434` and `11435`; no prompt content is transmitted during discovery.

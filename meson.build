@@ -8,6 +8,8 @@ project(
 
 gtk_dep = dependency('gtk4')
 granite_dep = dependency('granite-7')
+soup_dep = dependency('libsoup-3.0')
+json_glib_dep = dependency('json-glib-1.0')
 gnome = import('gnome')
 
 resources = gnome.compile_resources(
@@ -21,11 +23,14 @@ executable(
   meson.project_name(),
   [
     'src/Application.vala',
+    'src/OllamaProvider.vala',
     resources
   ],
   dependencies: [
     gtk_dep,
-    granite_dep
+    granite_dep,
+    soup_dep,
+    json_glib_dep
   ],
   install: true
 )

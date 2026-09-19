@@ -2,9 +2,9 @@
 
 ## Release status
 
-Ask the Model (AtM) v0.1.0 established the initial public application baseline. The current 0.1.1 development state clarifies and standardizes the application's purpose, repository relationship and metadata without adding AI chat functionality.
+Ask the Model (AtM) v0.1.0 established the initial public application baseline. The current 0.1.1 development state extends that baseline with local message composition, theme following and a minimal local Ollama discovery probe.
 
-Version numbers identify frozen software snapshots. They do not imply that planned AI chat, repository-access or model-integration functionality is already implemented.
+Version numbers identify frozen software snapshots. They do not imply that planned AI chat, repository-access or full model-integration functionality is already implemented.
 
 ## Canonical application role
 
@@ -18,25 +18,27 @@ This role is canonical for the project. Future development must not silently tur
 
 ## Current functional boundary
 
-The current baseline establishes:
+The current development state establishes:
 
 - the GTK 4 and Granite application shell;
 - the stable application ID;
 - the Meson build and installation configuration;
 - desktop launcher and AppStream metadata;
 - elementary-compatible application icons;
-- native desktop integration;
+- native desktop integration and automatic system color-scheme following;
+- local prompt composition with a functional Send action;
+- minimal discovery of a local Ollama-compatible API through `GET /api/tags`;
 - Flatpak packaging for the elementary OS 8 runtime;
 - continuous Flatpak build verification through GitHub Actions;
 - standardized project identity, application-boundary and citation metadata.
 
-The Flatpak baseline is intentionally least-privilege: it exposes the Wayland/fallback-X11 display interfaces and IPC required by the GTK application, but does not currently request network access. Network permission will be introduced only when local AI-provider communication is implemented and its sandbox boundary is explicitly documented.
+The Flatpak now requests network sharing because a sandboxed application must use the network subsystem to communicate with a local HTTP provider. This permission is broader than loopback at the sandbox layer. The current AtM implementation itself only probes `127.0.0.1:11434` and `127.0.0.1:11435`, and the discovery request does not include user prompt content.
 
-The current baseline does not yet implement:
+The current development state does not yet implement:
 
-- AI chat functionality;
+- AI response generation;
+- sending user prompts to a local AI provider;
 - repository ingestion or retrieval;
-- integration with a local AI model provider;
 - model-aware context selection;
 - conversation persistence;
 - application settings;

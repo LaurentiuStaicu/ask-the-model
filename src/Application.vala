@@ -6,6 +6,7 @@ namespace AskTheModel {
 
         private Granite.Settings granite_settings;
         private Gtk.Settings gtk_settings;
+        private OllamaProvider ollama_provider;
 
         public Application () {
             Object (
@@ -37,6 +38,26 @@ namespace AskTheModel {
             });
 
             apply_system_style ();
+
+            ollama_provider = new OllamaProvider ();
+            discover_local_provider.begin ();
+        }
+
+        private async void discover_local_provider () {
+            bool found = yield ollama_provider.discover ();
+
+            if (found && ollama_provider.base_url != null) {
+                stdout.printf (
+                    "AtM: Ollama detected at %s (%u model%s available)\n",
+                    ollama_provider.base_url,
+                    ollama_provider.model_count,
+                    ollama_provider.model_count == 1 ? "" : "s"
+                );
+            } else {
+                stderr.printf (
+                    "AtM: local Ollama provider not detected on 127.0.0.1 ports 11434 or 11435.\n"
+                );
+            }
         }
 
         private bool system_prefers_dark () {

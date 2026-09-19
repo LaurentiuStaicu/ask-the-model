@@ -6,6 +6,7 @@ command: io.github.laurentiustaicu.ask_the_model
 
 finish-args:
   - '--share=ipc'
+  - '--share=network'
   - '--socket=fallback-x11'
   - '--socket=wayland'
   - '--device=dri'
