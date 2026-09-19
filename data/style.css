@@ -3,14 +3,14 @@
  * Source of truth: the GitHub social-preview identity.
  * Geometry, typography and layout remain unchanged in this pass.
  *
- * Graphite       #1B1D20
- * Warm Ivory     #F4F0E7
- * Champagne Gold #B99A58
- * Warm Silver    #AAA39A
- * Soft Surface   #FAF8F3
+ * Warm Stone      #6F685F
+ * Warm Ivory      #F4F0E7
+ * Champagne Gold  #B99A58
+ * Warm Silver     #AAA39A
+ * Soft Surface    #FAF8F3
  */
-@define-color atm_graphite #1B1D20;
-@define-color atm_graphite_backdrop #2B2E32;
+@define-color atm_warm_stone #6F685F;
+@define-color atm_warm_stone_backdrop #71695F;
 @define-color atm_ivory #F4F0E7;
 @define-color atm_surface #FAF8F3;
 @define-color atm_surface_alt #F7F3EA;
@@ -33,10 +33,12 @@ window.atm-window:backdrop {
     box-shadow: none;
 }
 
-/* Strong identity stays in the titlebar, not in extra ornaments. */
+/* The titlebar uses the warmer metallic/taupe family from the social preview,
+ * avoiding the funeral-black contrast of the previous graphite treatment.
+ */
 window.atm-window headerbar {
     background-image: none;
-    background-color: @atm_graphite;
+    background-color: @atm_warm_stone;
     color: @atm_ivory;
     border-bottom: 1px solid @atm_gold;
     box-shadow: none;
@@ -44,23 +46,22 @@ window.atm-window headerbar {
 
 window.atm-window headerbar:backdrop {
     background-image: none;
-    background-color: @atm_graphite_backdrop;
+    background-color: @atm_warm_stone_backdrop;
     color: @atm_ivory;
     border-bottom-color: @atm_silver;
     box-shadow: none;
 }
 
-/* Keep native titlebar controls but let symbolic icons inherit the palette. */
 window.atm-window headerbar button {
     color: @atm_ivory;
 }
 
 window.atm-window headerbar button:hover {
-    background-color: rgba(244, 240, 231, 0.10);
+    background-color: rgba(244, 240, 231, 0.12);
 }
 
 window.atm-window headerbar button:active {
-    background-color: rgba(185, 154, 88, 0.18);
+    background-color: rgba(185, 154, 88, 0.22);
 }
 
 /* Conversation surface: warm rather than stark white. */
