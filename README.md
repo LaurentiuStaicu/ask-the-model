@@ -141,7 +141,7 @@ flatpak run io.github.laurentiustaicu.ask_the_model
 | [Phi-4 Mini 3.8B Q4_K_M](https://ollama.com/library/phi4-mini/tags) | 2.5 GB | `ollama pull phi4-mini:3.8b-q4_K_M` | Alternative compact model family for comparison. |
 | [Qwen 3.5 4B Q4_K_M](https://ollama.com/library/qwen3.5/tags) | 3.4 GB | `ollama pull qwen3.5:4b-q4_K_M` | Larger small-model option when the machine has more memory available. |
 
-<small>For more detail on GGUF, quantization, importing models, hardware considerations and model licensing, see <a href="docs/MODEL_GUIDE.md">Choosing, installing and managing AI models</a>.</small>
+<small><strong>Model capability does not automatically become AtM capability.</strong> A model may advertise vision, tool use or reasoning features, but AtM v0.2.1 currently provides text chat only and requests <code>think: false</code> on its default chat path. For more detail on GGUF, quantization, importing models, hardware considerations and model licensing, see <a href="docs/MODEL_GUIDE.md">Choosing, installing and managing AI models</a>.</small>
 
 ### Managing models, disk space and memory
 
