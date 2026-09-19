@@ -8,7 +8,11 @@ namespace AskTheModel {
         private Gtk.Settings gtk_settings;
         private OllamaProvider ollama_provider;
         private Gtk.TextView? transcript_view;
+        private Gtk.DropDown? model_dropdown;
+        private Gtk.StringList? model_list;
+        private Gtk.Button? refresh_models_button;
         private bool assistant_stream_started = false;
+        private bool updating_model_selector = false;
 
         public Application () {
             Object (
@@ -66,6 +70,7 @@ namespace AskTheModel {
 
         private async void discover_local_provider () {
             bool found = yield ollama_provider.discover ();
+            update_model_selector ();
 
             if (found && ollama_provider.model_name != null) {
                 stdout.printf (
@@ -85,6 +90,79 @@ namespace AskTheModel {
                     "AtM: local Ollama provider not detected on 127.0.0.1 ports 11434 or 11435.\n"
                 );
             }
+        }
+
+        private async void refresh_local_models () {
+            if (refresh_models_button != null) {
+                refresh_models_button.sensitive = false;
+            }
+
+            if (model_dropdown != null) {
+                model_dropdown.sensitive = false;
+            }
+
+            bool found = yield ollama_provider.discover ();
+            update_model_selector ();
+
+            if (refresh_models_button != null) {
+                refresh_models_button.sensitive = true;
+            }
+
+            if (found && ollama_provider.model_name != null) {
+                stdout.printf (
+                    "AtM: model list refreshed; using %s (%u installed model%s)\n",
+                    ollama_provider.model_name,
+                    ollama_provider.model_count,
+                    ollama_provider.model_count == 1 ? "" : "s"
+                );
+            } else if (found) {
+                stderr.printf (
+                    "AtM: model list refreshed, but no completion-capable model was found.\n"
+                );
+            } else {
+                stderr.printf (
+                    "AtM: refresh could not reach local Ollama on ports 11434 or 11435.\n"
+                );
+            }
+        }
+
+        private void update_model_selector () {
+            if (model_list == null || model_dropdown == null) {
+                return;
+            }
+
+            updating_model_selector = true;
+
+            string[] models = ollama_provider.get_completion_models ();
+            string[] displayed_models;
+
+            if (models.length > 0) {
+                displayed_models = models;
+            } else {
+                displayed_models = { "No chat models detected" };
+            }
+
+            model_list.splice (
+                0,
+                model_list.n_items,
+                displayed_models
+            );
+
+            uint selected_index = 0;
+            if (ollama_provider.model_name != null) {
+                for (uint i = 0; i < model_list.n_items; i++) {
+                    string? listed_model = model_list.get_string (i);
+                    if (listed_model == ollama_provider.model_name) {
+                        selected_index = i;
+                        break;
+                    }
+                }
+            }
+
+            model_dropdown.set_selected (selected_index);
+            model_dropdown.sensitive = models.length > 0;
+
+            updating_model_selector = false;
         }
 
         private bool system_prefers_dark () {
@@ -122,6 +200,8 @@ namespace AskTheModel {
                 if (system_prefers_dark ()) {
                     main_window.add_css_class ("atm-dark");
                 }
+
+                update_model_selector ();
             }
 
             main_window.present ();
@@ -133,6 +213,53 @@ namespace AskTheModel {
             };
 
             headerbar.set_decoration_layout (":minimize,maximize,close");
+
+            string[] initial_items = { "Detecting models…" };
+            model_list = new Gtk.StringList (initial_items);
+
+            model_dropdown = new Gtk.DropDown (null, null) {
+                sensitive = false
+            };
+            model_dropdown.set_model (model_list);
+            model_dropdown.notify["selected"].connect (() => {
+                if (updating_model_selector ||
+                    model_list == null ||
+                    model_dropdown == null) {
+                    return;
+                }
+
+                uint position = model_dropdown.get_selected ();
+                string? selected_model = model_list.get_string (position);
+
+                if (selected_model == null) {
+                    return;
+                }
+
+                if (ollama_provider.select_model (selected_model)) {
+                    stdout.printf (
+                        "AtM: selected model %s\n",
+                        selected_model
+                    );
+                }
+            });
+
+            refresh_models_button =
+                new Gtk.Button.from_icon_name ("view-refresh-symbolic") {
+                    tooltip_text = "Refresh models"
+                };
+            refresh_models_button.add_css_class ("circular");
+            refresh_models_button.clicked.connect (() => {
+                refresh_local_models.begin ();
+            });
+
+            var model_controls = new Gtk.Box (
+                Gtk.Orientation.HORIZONTAL,
+                6
+            );
+            model_controls.append (model_dropdown);
+            model_controls.append (refresh_models_button);
+
+            headerbar.pack_start (model_controls);
 
             return headerbar;
         }

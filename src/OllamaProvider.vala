@@ -9,6 +9,7 @@ namespace AskTheModel {
         private Soup.Session session;
         private string[] roles = {};
         private string[] contents = {};
+        private string[] completion_models = {};
 
         public signal void response_chunk (string chunk);
 
@@ -19,6 +20,21 @@ namespace AskTheModel {
         public OllamaProvider () {
             session = new Soup.Session ();
             session.timeout = 300;
+        }
+
+        public string[] get_completion_models () {
+            return completion_models;
+        }
+
+        public bool select_model (string requested_model) {
+            foreach (string available_model in completion_models) {
+                if (available_model == requested_model) {
+                    model_name = requested_model;
+                    return true;
+                }
+            }
+
+            return false;
         }
 
         private async bool supports_completion (
@@ -79,6 +95,7 @@ namespace AskTheModel {
         }
 
         public async bool discover () {
+            string? previous_model = model_name;
             string[] candidates = {
                 "http://127.0.0.1:11434",
                 "http://127.0.0.1:11435"
@@ -110,9 +127,10 @@ namespace AskTheModel {
                     }
 
                     Json.Array models = root.get_array_member ("models");
+                    string[] detected_completion_models = {};
+
                     model_count = models.get_length ();
                     base_url = candidate;
-                    model_name = null;
 
                     for (uint i = 0; i < model_count; i++) {
                         Json.Object model = models.get_object_element (i);
@@ -132,9 +150,24 @@ namespace AskTheModel {
                             candidate,
                             candidate_model
                         )) {
-                            model_name = candidate_model;
-                            return true;
+                            detected_completion_models += candidate_model;
                         }
+                    }
+
+                    completion_models = detected_completion_models;
+                    model_name = null;
+
+                    if (previous_model != null) {
+                        foreach (string detected_model in completion_models) {
+                            if (detected_model == previous_model) {
+                                model_name = previous_model;
+                                break;
+                            }
+                        }
+                    }
+
+                    if (model_name == null && completion_models.length > 0) {
+                        model_name = completion_models[0];
                     }
 
                     return true;
@@ -146,6 +179,7 @@ namespace AskTheModel {
             base_url = null;
             model_name = null;
             model_count = 0;
+            completion_models = {};
             return false;
         }
 
