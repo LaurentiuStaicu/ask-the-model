@@ -56,7 +56,7 @@ namespace AskTheModel {
                 );
             } else if (found) {
                 stderr.printf (
-                    "AtM: Ollama detected at %s, but no installed model was found.\n",
+                    "AtM: Ollama detected at %s, but no completion-capable model was found.\n",
                     ollama_provider.base_url
                 );
             } else {

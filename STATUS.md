@@ -28,7 +28,8 @@ The current development state establishes:
 - native desktop integration and automatic system color-scheme following;
 - local prompt composition with a functional Send action;
 - discovery of a local Ollama-compatible API through `GET /api/tags`;
-- automatic use of the first installed model returned by that local provider;
+- capability inspection of installed models through `POST /api/show`;
+- automatic selection of the first installed model advertising the `completion` capability, skipping embedding-only models;
 - basic in-session conversational requests through `POST /api/chat`;
 - in-memory user/assistant history supplied to later chat turns;
 - Flatpak packaging for the elementary OS 8 runtime;
