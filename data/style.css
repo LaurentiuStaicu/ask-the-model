@@ -1,40 +1,99 @@
-/* Ask the Model frame language.
+/* Ask the Model palette.
  *
- * The application icon is intentionally not used inside the window UI.
- * It remains installed as the launcher icon for the application menu.
+ * Source of truth: the GitHub social-preview identity.
+ * Geometry, typography and layout remain unchanged in this pass.
+ *
+ * Graphite       #1B1D20
+ * Warm Ivory     #F4F0E7
+ * Champagne Gold #B99A58
+ * Warm Silver    #AAA39A
+ * Soft Surface   #FAF8F3
  */
-@define-color atm_bevel_light #f4f0e7;
-@define-color atm_bevel_mid #c9c3b8;
-@define-color atm_bevel_backdrop #aaa49a;
+@define-color atm_graphite #1B1D20;
+@define-color atm_graphite_backdrop #2B2E32;
+@define-color atm_ivory #F4F0E7;
+@define-color atm_surface #FAF8F3;
+@define-color atm_surface_alt #F7F3EA;
+@define-color atm_gold #B99A58;
+@define-color atm_silver #AAA39A;
+@define-color atm_silver_backdrop #C6C0B6;
+@define-color atm_text #26282B;
 
 window.atm-window {
+    background-color: @atm_surface;
     border-width: 2px;
     border-style: ridge;
-    border-color: @atm_bevel_mid;
+    border-color: @atm_silver;
     border-radius: 10px;
     box-shadow: none;
 }
 
 window.atm-window:backdrop {
-    border-color: @atm_bevel_backdrop;
+    border-color: @atm_silver_backdrop;
     box-shadow: none;
 }
 
+/* Strong identity stays in the titlebar, not in extra ornaments. */
+window.atm-window headerbar {
+    background-image: none;
+    background-color: @atm_graphite;
+    color: @atm_ivory;
+    border-bottom: 1px solid @atm_gold;
+    box-shadow: none;
+}
+
+window.atm-window headerbar:backdrop {
+    background-image: none;
+    background-color: @atm_graphite_backdrop;
+    color: @atm_ivory;
+    border-bottom-color: @atm_silver;
+    box-shadow: none;
+}
+
+/* Keep native titlebar controls but let symbolic icons inherit the palette. */
+window.atm-window headerbar button {
+    color: @atm_ivory;
+}
+
+window.atm-window headerbar button:hover {
+    background-color: rgba(244, 240, 231, 0.10);
+}
+
+window.atm-window headerbar button:active {
+    background-color: rgba(185, 154, 88, 0.18);
+}
+
+/* Conversation surface: warm rather than stark white. */
+window.atm-window scrolledwindow,
+window.atm-window textview,
+window.atm-window textview text {
+    background-color: @atm_surface;
+    color: @atm_text;
+}
+
+/* Composer repeats the palette quietly; gold appears only on interaction. */
 frame.atm-input-frame {
+    background-color: @atm_surface_alt;
     border-width: 2px;
     border-style: ridge;
-    border-color: @atm_bevel_mid;
+    border-color: @atm_silver;
     border-radius: 12px;
     box-shadow: none;
     background-clip: padding-box;
 }
 
+frame.atm-input-frame textview,
+frame.atm-input-frame textview text {
+    background-color: @atm_surface_alt;
+    color: @atm_text;
+}
+
 frame.atm-input-frame:focus-within {
-    border-color: @atm_bevel_light;
+    border-color: @atm_gold;
     box-shadow: none;
 }
 
 frame.atm-input-frame:backdrop {
-    border-color: @atm_bevel_backdrop;
+    border-color: @atm_silver_backdrop;
     box-shadow: none;
 }
