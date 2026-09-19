@@ -2,6 +2,25 @@
 
 All notable public releases of Ask the Model are recorded here.
 
+## 0.1.1 - 2026-09-19
+
+Application-scope and documentation correction.
+
+### Included
+
+- clarified AtM as a local conversational access layer for scientific model repositories;
+- explicitly documented EWD, CBD and RMD as the initial repository suite;
+- added canonical application-boundary documentation in `STATUS.md`;
+- added citation metadata in `CITATION.cff`;
+- added standardized repository identity and release documentation;
+- aligned desktop and AppStream metadata with the application's actual purpose.
+
+### Application status
+
+This release does not add AI chat functionality. It corrects and formalizes the application's documented purpose, repository relationship and metadata.
+
+AtM does not contain, redefine or replace EWD, CBD, RMD or other scientific models. Each model remains canonical in its own repository.
+
 ## 0.1.0 - 2026-09-19
 
 Initial application baseline.
