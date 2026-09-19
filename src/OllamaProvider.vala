@@ -81,12 +81,21 @@ namespace AskTheModel {
             return base_url != null && model_name != null;
         }
 
-        public async string chat (string prompt) throws GLib.Error {
-            if (!is_ready ()) {
+        private async void ensure_ready () throws GLib.Error {
+            if (is_ready ()) {
+                return;
+            }
+
+            bool found = yield discover ();
+            if (!found || !is_ready ()) {
                 throw new ProviderError.NOT_READY (
-                    "No local Ollama model is ready."
+                    "No local Ollama model is ready. Start Ollama or Alpaca and try again."
                 );
             }
+        }
+
+        public async string chat (string prompt) throws GLib.Error {
+            yield ensure_ready ();
 
             var builder = new Json.Builder ();
             builder.begin_object ();
