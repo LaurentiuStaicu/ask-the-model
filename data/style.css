@@ -1,27 +1,27 @@
 /* Ask the Model palette.
  *
  * Source of truth: the uploaded owl artwork.
+ * Colors below were matched to dominant tones in that image.
  * Geometry, typography and layout remain unchanged in this pass.
  *
- * Charcoal         #3A3A37
- * Header Gray      #60605D
- * Mid Gray         #777774
- * Soft Gray        #A3A3A0
- * Pale Gray        #E1E1DE
- * Off White        #FAFAF9
- * Bright White     #FDFEFC
- * Owl Eye Yellow   #EAC60D
+ * Charcoal         #44433F
+ * Header Gray      #646460
+ * Mid Gray         #7F807D
+ * Soft Gray        #9A9A95
+ * Pale Gray        #E2E3E1
+ * Off White        #FAFBF9
+ * Owl Eye Yellow   #F4D419
  */
-@define-color atm_charcoal #3A3A37;
-@define-color atm_header #60605D;
-@define-color atm_header_backdrop #777774;
-@define-color atm_mid_gray #777774;
-@define-color atm_soft_gray #A3A3A0;
-@define-color atm_pale_gray #E1E1DE;
-@define-color atm_surface #FAFAF9;
+@define-color atm_charcoal #44433F;
+@define-color atm_header #646460;
+@define-color atm_header_backdrop #7F807D;
+@define-color atm_mid_gray #7F807D;
+@define-color atm_soft_gray #9A9A95;
+@define-color atm_pale_gray #E2E3E1;
+@define-color atm_surface #FAFBF9;
 @define-color atm_surface_alt #F2F3F1;
-@define-color atm_white #FDFEFC;
-@define-color atm_eye_yellow #EAC60D;
+@define-color atm_white #FAFBF9;
+@define-color atm_eye_yellow #F4D419;
 
 window.atm-window {
     background-color: @atm_surface;
@@ -37,9 +37,6 @@ window.atm-window:backdrop {
     box-shadow: none;
 }
 
-/* The titlebar follows the owl's graphite/gray plumage rather than black.
- * Yellow is reserved for the thin identity accent.
- */
 window.atm-window headerbar {
     background-image: none;
     background-color: @atm_header;
@@ -61,14 +58,13 @@ window.atm-window headerbar button {
 }
 
 window.atm-window headerbar button:hover {
-    background-color: rgba(253, 254, 252, 0.12);
+    background-color: rgba(250, 251, 249, 0.12);
 }
 
 window.atm-window headerbar button:active {
-    background-color: rgba(234, 198, 13, 0.20);
+    background-color: rgba(244, 212, 25, 0.20);
 }
 
-/* Conversation surface echoes the paper-white background of the artwork. */
 window.atm-window scrolledwindow,
 window.atm-window textview,
 window.atm-window textview text {
@@ -76,9 +72,6 @@ window.atm-window textview text {
     color: @atm_charcoal;
 }
 
-/* Composer uses a slightly cooler paper-gray surface.
- * The owl-eye yellow appears only when the field is active.
- */
 frame.atm-input-frame {
     background-color: @atm_surface_alt;
     border-width: 2px;
