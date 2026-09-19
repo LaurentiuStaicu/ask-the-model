@@ -41,6 +41,63 @@ jobs:
           repo-dir: repo
           cache-key: flatpak-builder-${{ github.sha }}
 
+      - name: Publish versioned GitHub release when needed
+        if: github.event_name == 'push' && github.ref == 'refs/heads/main'
+        uses: actions/github-script@v7
+        with:
+          github-token: ${{ secrets.GITHUB_TOKEN }}
+          script: |
+            const fs = require('fs');
+
+            const meson = fs.readFileSync('meson.build', 'utf8');
+            const match = meson.match(/version:\\s*'([^']+)'/);
+            if (!match) {
+              core.setFailed('Could not read the project version from meson.build');
+              return;
+            }
+
+            const version = match[1];
+            const tag = `v${version}`;
+            const releasePath = `releases/${tag}.md`;
+
+            if (!fs.existsSync(releasePath)) {
+              core.info(`No release notes found at ${releasePath}; skipping GitHub Release creation.`);
+              return;
+            }
+
+            try {
+              await github.rest.repos.getReleaseByTag({
+                owner: context.repo.owner,
+                repo: context.repo.repo,
+                tag,
+              });
+              core.info(`GitHub Release ${tag} already exists.`);
+              return;
+            } catch (error) {
+              if (error.status !== 404) {
+                throw error;
+              }
+            }
+
+            const body = fs.readFileSync(releasePath, 'utf8');
+            const subtitleMatch = body.match(/\\*\\*([^*]+)\\*\\*/);
+            let subtitle = subtitleMatch ? subtitleMatch[1].trim() : 'Release';
+            subtitle = subtitle.replace(/\\s+—\\s+\\d{4}-\\d{2}-\\d{2}$/, '');
+
+            await github.rest.repos.createRelease({
+              owner: context.repo.owner,
+              repo: context.repo.repo,
+              tag_name: tag,
+              target_commitish: context.sha,
+              name: `${tag} — ${subtitle}`,
+              body,
+              draft: false,
+              prerelease: false,
+              make_latest: 'true',
+            });
+
+            core.info(`Published GitHub Release ${tag}.`);
+
       - name: Finalize AtM development repository
         if: github.event_name == 'push' && github.ref == 'refs/heads/main'
         shell: bash

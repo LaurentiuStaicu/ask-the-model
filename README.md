@@ -5,6 +5,7 @@
 <h1 align="center">Ask the Model (AtM)</h1>
 
 <p align="center">
+  <img alt="Version: 0.2.0" src="https://img.shields.io/badge/version-0.2.0-blue?style=flat-square">
   <img alt="License: MIT" src="https://img.shields.io/badge/license-MIT-lightgrey?style=flat-square">
 </p>
 
