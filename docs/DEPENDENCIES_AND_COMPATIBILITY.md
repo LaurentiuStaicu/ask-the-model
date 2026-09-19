@@ -106,7 +106,9 @@ No particular GPU model, vendor or acceleration backend is required by AtM. Hard
 
 AtM does not own or manage the provider's model store.
 
-The provider may use its default model directory or another provider-configured model location. Moving, downloading, deleting and deduplicating model files are outside the v0.2.1 application boundary.
+The provider may use its default model directory or another provider-configured model location. Moving, downloading, importing, deleting and deduplicating model files are outside the v0.2.1 application boundary.
+
+For practical instructions covering model sources, Ollama storage paths, `OLLAMA_MODELS`, GGUF import, model removal and disk/memory management, see [`MODEL_GUIDE.md`](MODEL_GUIDE.md).
 
 ## Flatpak sandbox requirements
 
@@ -159,9 +161,13 @@ For a Flatpak **development build**, `flatpak-builder` and `io.elementary.Sdk//8
 
 ## Privacy and network boundary
 
-v0.2.1 has no cloud-provider integration.
+v0.2.1 contains no direct cloud-provider integration.
 
-The implemented provider addresses loopback only. Prompt text is sent when the user activates **Send**.
+The implemented AtM provider addresses loopback only (`127.0.0.1`). Prompt text is sent to that provider when the user activates **Send**.
+
+A loopback AtM connection does not guarantee that the external provider will execute every selected model locally. Provider software can have capabilities outside AtM's control, including cloud-backed models or services. Users who require strict local-only inference must choose a locally installed model and configure the provider accordingly.
+
+For example, current Ollama documentation describes a local-only mode using `OLLAMA_NO_CLOUD=1` or `disable_ollama_cloud` in its server configuration. See the [Ollama FAQ](https://docs.ollama.com/faq) and [`MODEL_GUIDE.md`](MODEL_GUIDE.md).
 
 Conversation history is stored only in memory for the current application process and is not persisted by AtM across restarts.
 
@@ -180,3 +186,8 @@ v0.2.1 does not provide:
 - persistent conversations.
 
 Any of these additions changes the compatibility/security boundary and must be documented in the release that introduces it.
+
+## User-facing setup guides
+
+- [Choosing, installing and managing AI models](MODEL_GUIDE.md)
+- [Troubleshooting](TROUBLESHOOTING.md)
