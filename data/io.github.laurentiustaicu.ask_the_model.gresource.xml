@@ -2,5 +2,6 @@
 <gresources>
   <gresource prefix="/io/github/laurentiustaicu/ask_the_model">
     <file alias="identity-icon.png">icons/64.png</file>
+    <file alias="style.css">style.css</file>
   </gresource>
 </gresources>
