@@ -31,7 +31,7 @@ The current development state establishes:
 - capability inspection of installed models through `POST /api/show`;
 - automatic selection of the first installed model advertising the `completion` capability, skipping embedding-only models;
 - streamed in-session conversational requests through `POST /api/chat`;
-- progressive display of assistant response chunks while generation is running;
+- progressive display of assistant response chunks while generation is running;\n- explicit `think: false` on the default chat path to avoid long hidden reasoning traces on supported reasoning models;
 - in-memory user/assistant history supplied to later chat turns;
 - Flatpak packaging for the elementary OS 8 runtime;
 - continuous Flatpak build verification through GitHub Actions;
@@ -39,7 +39,7 @@ The current development state establishes:
 
 The Flatpak requests network sharing because a sandboxed application must use the network subsystem to communicate with a local HTTP provider. This permission is broader than loopback at the sandbox layer. The current AtM implementation itself only addresses `127.0.0.1:11434` and `127.0.0.1:11435`.
 
-User prompt content is transmitted only when **Send** is activated. Requests are sent to the locally discovered provider. Ollama streaming is enabled and AtM parses each newline-delimited JSON response object as it arrives.
+User prompt content is transmitted only when **Send** is activated. Requests are sent to the locally discovered provider. Ollama streaming is enabled and AtM parses each newline-delimited JSON response object as it arrives. The default request also sets `think: false`; this is a latency choice for the ordinary chat path, not a claim that the underlying model lacks reasoning capability.
 
 The current development state does not yet implement:
 

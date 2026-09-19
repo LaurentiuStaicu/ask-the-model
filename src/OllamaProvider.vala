@@ -228,6 +228,12 @@ namespace AskTheModel {
 
             builder.end_array ();
 
+            // Qwen 3.x models can spend most of their latency in an
+            // invisible reasoning trace. AtM keeps the default local-chat
+            // path responsive by requesting the final answer directly.
+            builder.set_member_name ("think");
+            builder.add_boolean_value (false);
+
             builder.set_member_name ("stream");
             builder.add_boolean_value (true);
 
