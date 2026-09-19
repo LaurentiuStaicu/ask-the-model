@@ -18,7 +18,7 @@ jobs:
 
     steps:
       - name: Checkout
-        uses: actions/checkout@v4
+        uses: actions/checkout@v6
 
       - name: Restore development repository history
         if: github.event_name == 'push' && github.ref == 'refs/heads/main'
@@ -94,7 +94,9 @@ jobs:
           git rm -rf .
           git clean -fdx
 
-          cp -a "$PUBLISH_DIR"/. .
+          cp -a "$PUBLISH_DIR/repo" .
+          cp -a "$PUBLISH_DIR/atm-development.flatpakrepo" .
+          cp -a "$PUBLISH_DIR/README.md" .
           git add -A
           git commit -m "Publish Ask the Model development Flatpak"
           git push --force origin HEAD:flatpak-repo
