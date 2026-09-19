@@ -4,6 +4,9 @@ namespace AskTheModel {
         private const string STYLE_RESOURCE =
             "/io/github/laurentiustaicu/ask_the_model/style.css";
 
+        private Granite.Settings granite_settings;
+        private Gtk.Settings gtk_settings;
+
         public Application () {
             Object (
                 application_id: APP_ID,
@@ -25,6 +28,34 @@ namespace AskTheModel {
                     Gtk.STYLE_PROVIDER_PRIORITY_APPLICATION
                 );
             }
+
+            granite_settings = Granite.Settings.get_default ();
+            gtk_settings = Gtk.Settings.get_default ();
+
+            granite_settings.notify["prefers-color-scheme"].connect (() => {
+                apply_system_style ();
+            });
+
+            apply_system_style ();
+        }
+
+        private bool system_prefers_dark () {
+            return granite_settings.prefers_color_scheme ==
+                Granite.Settings.ColorScheme.DARK;
+        }
+
+        private void apply_system_style () {
+            bool use_dark = system_prefers_dark ();
+            gtk_settings.gtk_application_prefer_dark_theme = use_dark;
+
+            var main_window = this.active_window as Gtk.ApplicationWindow;
+            if (main_window != null) {
+                if (use_dark) {
+                    main_window.add_css_class ("atm-dark");
+                } else {
+                    main_window.remove_css_class ("atm-dark");
+                }
+            }
         }
 
         protected override void activate () {
@@ -39,14 +70,16 @@ namespace AskTheModel {
                     child = build_main_content ()
                 };
                 main_window.add_css_class ("atm-window");
+
+                if (system_prefers_dark ()) {
+                    main_window.add_css_class ("atm-dark");
+                }
             }
 
             main_window.present ();
         }
 
         private Gtk.Widget build_titlebar () {
-            // Deliberately minimal: only the application name plus native
-            // window controls. GtkHeaderBar uses the GtkWindow title by default.
             var headerbar = new Gtk.HeaderBar () {
                 show_title_buttons = true
             };
