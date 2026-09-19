@@ -51,7 +51,7 @@ jobs:
             const fs = require('fs');
 
             const meson = fs.readFileSync('meson.build', 'utf8');
-            const match = meson.match(/version:\\s*'([^']+)'/);
+            const match = meson.match(/version:\s*'([^']+)'/);
             if (!match) {
               core.setFailed('Could not read the project version from meson.build');
               return;
@@ -90,9 +90,9 @@ jobs:
               }
 
               const body = fs.readFileSync(releasePath, 'utf8');
-              const subtitleMatch = body.match(/\\*\\*([^*]+)\\*\\*/);
+              const subtitleMatch = body.match(/\*\*([^*]+)\*\*/);
               let subtitle = subtitleMatch ? subtitleMatch[1].trim() : 'Release';
-              subtitle = subtitle.replace(/\\s+—\\s+\\d{4}-\\d{2}-\\d{2}$/, '');
+              subtitle = subtitle.replace(/\s+—\s+\d{4}-\d{2}-\d{2}$/, '');
 
               const response = await github.rest.repos.createRelease({
                 owner: context.repo.owner,
