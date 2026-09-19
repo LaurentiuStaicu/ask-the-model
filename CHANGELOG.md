@@ -21,22 +21,20 @@ Local Chat Baseline.
 - streamed assistant responses;
 - in-memory multi-turn conversation history;
 - elementary OS color-scheme following;
-- X11-specific Cairo renderer fallback for the validated GTK/GSK compatibility case;
+- X11-specific Cairo renderer fallback for the GTK/GSK compatibility path;
 - elementary OS 8 Flatpak network access required for host-local provider communication;
 - documented provider, dependency and compatibility requirements.
 
 ### Changed
 
-- standalone Ollama is now the preferred provider architecture;
-- Alpaca is optional rather than an application dependency;
+- standalone local Ollama-compatible service is the preferred provider architecture;
 - the default chat request sets `think: false` to reduce hidden-reasoning latency on supported models;
 - README, STATUS, architecture, AppStream and citation metadata now describe the functional local-chat baseline.
 
 ### Compatibility
 
-- validated with Ollama 0.34.2;
-- validated with hardware-accelerated local Ollama inference;
-- provider compatibility is based on the required Ollama-compatible API behavior rather than an exact version pin.
+- provider compatibility is based on the required Ollama-compatible API behavior rather than a particular locally tested provider version;
+- hardware acceleration is handled by the external provider and is not part of AtM's hardware requirements.
 
 ### Still not implemented
 

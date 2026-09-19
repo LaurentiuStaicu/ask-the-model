@@ -40,13 +40,11 @@ v0.2.0 establishes:
 
 ## Provider and dependency boundary
 
-AtM does not bundle, install, start, stop or update Ollama. The local provider is an external dependency.
+AtM does not bundle, install, start, stop or update the local provider. The provider is an external dependency.
 
-The validated reference provider for v0.2.0 is Ollama 0.34.2. Compatibility is defined by the API behavior documented in `docs/DEPENDENCIES_AND_COMPATIBILITY.md`, not by an intentional hard pin to that exact provider version.
+Compatibility is defined by the API behavior documented in `docs/DEPENDENCIES_AND_COMPATIBILITY.md`, not by a particular locally tested software version.
 
-Alpaca is optional and is not an application dependency.
-
-GPU acceleration is provider-owned. AtM itself does not contain vendor-specific GPU inference code and does not require a particular GPU model.
+GPU acceleration is provider-owned. AtM itself does not contain vendor-specific GPU inference code and does not require a particular GPU model, vendor or acceleration backend.
 
 ## Data and model boundary
 

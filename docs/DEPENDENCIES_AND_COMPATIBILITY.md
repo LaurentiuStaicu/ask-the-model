@@ -4,14 +4,14 @@ This document defines the compatibility contract for Ask the Model (AtM) v0.2.0.
 
 ## Supported application baseline
 
-The validated desktop baseline is elementary OS 8 using the Flatpak package built against:
+The packaged desktop baseline is elementary OS 8 using the Flatpak package built against:
 
 - `io.elementary.Platform//8`;
 - `io.elementary.Sdk//8`.
 
 The native application is written in Vala and uses GTK 4 and Granite 7.
 
-Other Linux environments may work if the required libraries and display stack are available, but they are not part of the validated v0.2.0 baseline.
+Other Linux environments may work if the required libraries and display stack are available, but they are not part of the documented packaged baseline.
 
 ## Local AI provider requirement
 
@@ -19,18 +19,12 @@ AtM v0.2.0 requires an already-running local Ollama-compatible HTTP provider.
 
 Endpoint order is fixed in this release:
 
-1. `http://127.0.0.1:11434` — preferred standalone Ollama endpoint;
+1. `http://127.0.0.1:11434` — preferred standalone local-provider endpoint;
 2. `http://127.0.0.1:11435` — compatibility fallback for managed local-provider setups.
 
 AtM does not install, launch, stop, update or supervise the provider.
 
-Alpaca is optional and is not a dependency.
-
-### Validated provider
-
-- Ollama 0.34.2.
-
-This is a validated reference version, not an intentional exact-version pin. A different provider/version is compatible only if it implements the API behavior required below.
+Compatibility is API-based. A provider is compatible only if it implements the behavior required below.
 
 ## Required provider API behavior
 
@@ -75,13 +69,13 @@ The default chat path requests `think: false` to prioritize interactive latency.
 
 AtM contains no inference engine and no vendor-specific GPU compute code. GPU/CPU selection belongs entirely to the external provider.
 
-No particular GPU model, vendor or acceleration backend is required by AtM. Hardware acceleration may be used when supported and configured by the local provider. CPU inference may also work, although performance depends on the selected model and provider configuration.
+No particular GPU model, vendor or acceleration backend is required by AtM. Hardware acceleration may be used when supported and configured by the provider. CPU inference may also work, although performance depends on the selected model and provider configuration.
 
 ## Model storage
 
 AtM does not own or manage the provider's model store.
 
-The provider may use its default model directory or an externally configured `OLLAMA_MODELS` location. Moving, downloading, deleting and deduplicating model files are outside the v0.2.0 application boundary.
+The provider may use its default model directory or another provider-configured model location. Moving, downloading, deleting and deduplicating model files are outside the v0.2.0 application boundary.
 
 ## Flatpak sandbox requirements
 
@@ -105,7 +99,7 @@ AtM v0.2.0 selects `GSK_RENDERER=cairo` automatically only when:
 - no Wayland display is present;
 - the user has not explicitly set `GSK_RENDERER`.
 
-This is an application compatibility fallback for the current GTK/GSK path, not a hardware-specific requirement.
+This is an application compatibility fallback, not a hardware-specific requirement.
 
 ### Wayland
 
@@ -144,7 +138,7 @@ v0.2.0 does not provide:
 - non-loopback or remote providers;
 - cloud AI providers;
 - model download/deletion;
-- automatic Ollama installation or service management;
+- automatic provider installation or service management;
 - repository ingestion or retrieval;
 - persistent conversations.
 

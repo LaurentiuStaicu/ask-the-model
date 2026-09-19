@@ -203,7 +203,7 @@ namespace AskTheModel {
             bool found = yield discover ();
             if (!found || !is_ready ()) {
                 throw new ProviderError.NOT_READY (
-                    "No completion-capable local Ollama model is ready. Start Ollama or Alpaca and make sure a chat model is installed."
+                    "No completion-capable local model is ready. Start the local Ollama-compatible provider and make sure a chat model is installed."
                 );
             }
         }
@@ -234,7 +234,7 @@ namespace AskTheModel {
                 detail = "";
             }
 
-            return "Ollama returned HTTP %u.%s".printf (
+            return "Local provider returned HTTP %u.%s".printf (
                 status,
                 detail
             );
@@ -270,9 +270,9 @@ namespace AskTheModel {
 
             builder.end_array ();
 
-            // Qwen 3.x models can spend most of their latency in an
-            // invisible reasoning trace. AtM keeps the default local-chat
-            // path responsive by requesting the final answer directly.
+            // Some reasoning-capable models can spend significant latency
+            // on a hidden reasoning trace. The default chat path requests
+            // the final answer directly for a more responsive interface.
             builder.set_member_name ("think");
             builder.add_boolean_value (false);
 
@@ -361,7 +361,7 @@ namespace AskTheModel {
 
             if (!saw_response) {
                 throw new ProviderError.INVALID_RESPONSE (
-                    "Ollama returned an empty response stream."
+                    "Local provider returned an empty response stream."
                 );
             }
 

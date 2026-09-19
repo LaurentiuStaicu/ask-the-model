@@ -34,7 +34,7 @@ Repository-aware retrieval, source provenance and scientific-model execution are
 
 AtM is designed around locally hosted inference.
 
-It connects to a local Ollama-compatible service and does not require Alpaca or another graphical AI frontend. AtM does not install, start, update or manage the inference provider itself, and it does not download or delete AI models.
+It connects to a local Ollama-compatible service. AtM does not install, start, update or manage the inference provider itself, and it does not download or delete AI models.
 
 The application currently uses loopback-only provider connections, keeping the inference path on the local machine.
 
