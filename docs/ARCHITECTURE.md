@@ -47,3 +47,13 @@ The following are not implied by this architecture:
 - autonomous changes to scientific models.
 
 Any future model-execution or write-back capability requires a separate architecture and safety review before implementation.
+
+### Multi-model context selection
+
+A conversation may be grounded in one or more scientific dynamical-model repositories at the same time.
+
+The selected repository set is conversation context, not AI-provider configuration. A conversation should record the selected repository identifiers so that later answers remain interpretable.
+
+For multi-model discussions, the future context/provenance layer must preserve source attribution per repository rather than flattening all retrieved material into an unidentified combined context.
+
+The local AI model remains a separate single active inference model for a request unless a future provider architecture explicitly supports another mode.
