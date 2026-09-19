@@ -141,6 +141,10 @@ jobs:
               release_id: release.id,
               name: assetName,
               data,
+              headers: {
+                'content-type': 'application/octet-stream',
+                'content-length': data.length,
+              },
             });
 
             core.info(`Uploaded ${assetName} to GitHub Release ${tag}.`);
