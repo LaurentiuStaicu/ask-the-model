@@ -2,48 +2,43 @@
 
 All notable public releases of Ask the Model are recorded here.
 
-## Unreleased
-
-No unreleased changes recorded yet.
-
 ## 0.2.0 - 2026-09-19
 
 Local Chat Baseline.
 
-### Added
+### Included
 
 - functional local chat through an Ollama-compatible `/api/chat` provider;
-- provider discovery on `127.0.0.1:11434` with `11435` compatibility fallback;
+- local provider discovery on `127.0.0.1:11434` with `11435` compatibility fallback;
+- installed-model enumeration through `/api/tags`;
 - capability inspection through `/api/show`;
 - automatic exclusion of embedding-only models;
 - refreshable AI-model selector;
 - real model-scan progress and temporary scan-result feedback;
 - streamed assistant responses;
 - in-memory multi-turn conversation history;
-- elementary OS color-scheme following;
+- automatic elementary OS color-scheme following;
 - X11-specific Cairo renderer fallback for the GTK/GSK compatibility path;
-- elementary OS 8 Flatpak network access required for host-local provider communication;
+- elementary OS 8 Flatpak packaging and continuous Flatpak build verification;
 - documented provider, dependency and compatibility requirements.
 
-### Changed
+### Application status
 
-- standalone local Ollama-compatible service is the preferred provider architecture;
-- the default chat request sets `think: false` to reduce hidden-reasoning latency on supported models;
-- README, STATUS, architecture, AppStream and citation metadata now describe the functional local-chat baseline.
+v0.2.0 is the first functional local-chat baseline. The application can discover compatible local AI models, select a chat-capable model and maintain a streamed in-session conversation.
+
+The preferred architecture uses a standalone local Ollama-compatible service. The inference provider remains external to AtM.
 
 ### Compatibility
 
-- provider compatibility is based on the required Ollama-compatible API behavior rather than a particular locally tested provider version;
-- hardware acceleration is handled by the external provider and is not part of AtM's hardware requirements.
+- provider compatibility is defined by the required Ollama-compatible API behavior rather than a particular locally tested provider version;
+- hardware acceleration is handled by the external provider and is not part of AtM's hardware requirements;
+- the default chat request sets `think: false` to reduce hidden-reasoning latency on supported models.
 
-### Still not implemented
+### Scope boundary
 
-- scientific-repository ingestion/retrieval;
-- repository context selection and provenance;
-- conversation persistence;
-- application/provider settings;
-- model management;
-- scientific model execution.
+This release does not implement scientific-repository ingestion or retrieval, repository context selection, source provenance, persistent conversations, provider settings, AI-model management or scientific-model execution.
+
+AtM remains an application interface. EWD, CBD, RMD and other scientific repositories remain canonical for their own model content and scientific status.
 
 ## 0.1.1 - 2026-09-19
 
@@ -64,6 +59,10 @@ This release does not add AI chat functionality. It corrects and formalizes the 
 
 AtM does not contain, redefine or replace EWD, CBD, RMD or other scientific models. Each model remains canonical in its own repository.
 
+### Scope boundary
+
+AI chat functionality, repository access, local provider integration, conversation management and settings are not part of this release.
+
 ## 0.1.0 - 2026-09-19
 
 Initial application baseline.
@@ -82,8 +81,8 @@ Initial application baseline.
 
 This release establishes the native application shell and desktop integration baseline.
 
-AI chat functionality, local model-provider integration, conversation management, settings, and other end-user features are not yet implemented.
-
 ### Scope boundary
+
+AI chat functionality, local model-provider integration, conversation management and settings are not implemented in this release.
 
 Ask the Model is an application interface. It does not contain or constitute an AI model itself.
