@@ -37,11 +37,105 @@ namespace AskTheModel.Tests {
         );
 
         string sha = "0123456789abcdef0123456789abcdef01234567";
+
         assert (
             repositories[2].archive_api_url (sha) ==
             "https://api.github.com/repos/LaurentiuStaicu/" +
             "romanian-monetary-dynamics/tarball/" + sha
         );
+
+        try {
+            assert (
+                repositories[0].immutable_file_permalink (
+                    sha,
+                    "STATUS.md",
+                    "lines:3-8"
+                ) ==
+                "https://github.com/LaurentiuStaicu/" +
+                "empirical-world3-dynamics/blob/" + sha +
+                "/STATUS.md?plain=1#L3-L8"
+            );
+
+            assert (
+                repositories[1].immutable_file_permalink (
+                    sha,
+                    "model/variables.json",
+                    "json:/3"
+                ) ==
+                "https://github.com/LaurentiuStaicu/" +
+                "cognitive-belief-dynamics/blob/" + sha +
+                "/model/variables.json"
+            );
+
+            assert (
+                repositories[2].immutable_file_permalink (
+                    sha,
+                    "model/a file #1.json",
+                    "json:/value"
+                ) ==
+                "https://github.com/LaurentiuStaicu/" +
+                "romanian-monetary-dynamics/blob/" + sha +
+                "/model/a%20file%20%231.json"
+            );
+
+            assert (
+                repositories[2].immutable_file_permalink (
+                    sha,
+                    "data/example.csv",
+                    "lines:42-42"
+                ).has_suffix (
+                    "/data/example.csv#L42"
+                )
+            );
+        } catch (CitationError error) {
+            assert_not_reached ();
+        }
+
+        bool rejected = false;
+
+        try {
+            repositories[0].immutable_file_permalink (
+                sha.up (),
+                "STATUS.md",
+                "lines:1-1"
+            );
+        } catch (CitationError.INVALID_SHA error) {
+            rejected = true;
+        } catch (CitationError error) {
+            assert_not_reached ();
+        }
+
+        assert (rejected);
+        rejected = false;
+
+        try {
+            repositories[0].immutable_file_permalink (
+                sha,
+                "../STATUS.md",
+                "lines:1-1"
+            );
+        } catch (CitationError.INVALID_SOURCE error) {
+            rejected = true;
+        } catch (CitationError error) {
+            assert_not_reached ();
+        }
+
+        assert (rejected);
+        rejected = false;
+
+        try {
+            repositories[0].immutable_file_permalink (
+                sha,
+                "STATUS.md",
+                "lines:8-3"
+            );
+        } catch (CitationError.INVALID_LOCATOR error) {
+            rejected = true;
+        } catch (CitationError error) {
+            assert_not_reached ();
+        }
+
+        assert (rejected);
 
         assert (
             RepositoryClient.MAX_ARCHIVE_BYTES ==
