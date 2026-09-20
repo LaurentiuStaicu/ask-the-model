@@ -12,6 +12,10 @@ namespace AskTheModel {
         private Gtk.StringList? model_list;
         private Gtk.Button? refresh_models_button;
         private Gtk.Label? model_scan_status;
+        private Gtk.MenuButton? repository_menu_button;
+        private Gtk.CheckButton? repository_ewd_check;
+        private Gtk.CheckButton? repository_cbd_check;
+        private Gtk.CheckButton? repository_rmd_check;
         private uint model_status_generation = 0;
         private bool assistant_stream_started = false;
         private bool updating_model_selector = false;
@@ -281,6 +285,105 @@ namespace AskTheModel {
             main_window.present ();
         }
 
+        private bool repository_selected (string repository_id) {
+            switch (repository_id) {
+                case "ewd":
+                    return repository_ewd_check != null &&
+                        repository_ewd_check.active;
+                case "cbd":
+                    return repository_cbd_check != null &&
+                        repository_cbd_check.active;
+                case "rmd":
+                    return repository_rmd_check != null &&
+                        repository_rmd_check.active;
+                default:
+                    return false;
+            }
+        }
+
+        private void update_repository_selector_summary () {
+            if (repository_menu_button == null) {
+                return;
+            }
+
+            var summary = new StringBuilder ();
+
+            foreach (
+                RepositoryDescriptor descriptor in RepositoryCatalog.all ()
+            ) {
+                if (!repository_selected (descriptor.id)) {
+                    continue;
+                }
+
+                if (summary.len > 0) {
+                    summary.append (" + ");
+                }
+
+                summary.append (descriptor.acronym);
+            }
+
+            repository_menu_button.label =
+                summary.len == 0
+                    ? "Repositories"
+                    : summary.str;
+        }
+
+        private Gtk.Widget build_repository_selector () {
+            repository_menu_button = new Gtk.MenuButton () {
+                label = "Repositories",
+                direction = Gtk.ArrowType.DOWN
+            };
+
+            var options = new Gtk.Box (
+                Gtk.Orientation.VERTICAL,
+                0
+            ) {
+                margin_top = 6,
+                margin_bottom = 6,
+                margin_start = 8,
+                margin_end = 8
+            };
+
+            foreach (
+                RepositoryDescriptor descriptor in RepositoryCatalog.all ()
+            ) {
+                var check =
+                    new Gtk.CheckButton.with_label (
+                        descriptor.selector_label ()
+                    ) {
+                        margin_top = 2,
+                        margin_bottom = 2
+                    };
+
+                check.toggled.connect (() => {
+                    update_repository_selector_summary ();
+                });
+
+                switch (descriptor.id) {
+                    case "ewd":
+                        repository_ewd_check = check;
+                        break;
+                    case "cbd":
+                        repository_cbd_check = check;
+                        break;
+                    case "rmd":
+                        repository_rmd_check = check;
+                        break;
+                }
+
+                options.append (check);
+            }
+
+            var popover = new Gtk.Popover () {
+                child = options
+            };
+
+            repository_menu_button.set_popover (popover);
+            update_repository_selector_summary ();
+
+            return repository_menu_button;
+        }
+
         private Gtk.Widget build_titlebar () {
             var headerbar = new Gtk.HeaderBar () {
                 show_title_buttons = true
@@ -340,7 +443,14 @@ namespace AskTheModel {
             model_controls.append (refresh_models_button);
             model_controls.append (model_scan_status);
 
-            headerbar.pack_start (model_controls);
+            var header_controls = new Gtk.Box (
+                Gtk.Orientation.HORIZONTAL,
+                6
+            );
+            header_controls.append (build_repository_selector ());
+            header_controls.append (model_controls);
+
+            headerbar.pack_start (header_controls);
 
             return headerbar;
         }
