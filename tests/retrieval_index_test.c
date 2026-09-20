@@ -1,6 +1,7 @@
 #include "retrieval_index.h"
 #include "markdown_sections.h"
 #include "csv_table.h"
+#include "structured_json.h"
 
 #include <glib.h>
 #include <glib/gstdio.h>
@@ -121,7 +122,33 @@ new_source_snapshot (void)
         "## Boundary\n"
         "Model core only.\n"
     );
-    write_text (root, "model/core.json", "{}\n");
+    write_text (
+        root,
+        "model/core.json",
+        "{"
+        "\"variables\":["
+            "{\"id\":\"food_per_capita\","
+             "\"label\":{\"en\":\"Food per capita\"}},"
+            "{\"id\":\"population\","
+             "\"label\":{\"en\":\"Population\"}}"
+        "],"
+        "\"links\":[{"
+            "\"id\":\"LINK.FOOD.POP\","
+            "\"source\":\"food_per_capita\","
+            "\"target\":\"population\","
+            "\"relation_type\":\"INFLUENCE\""
+        "}],"
+        "\"loops\":[{"
+            "\"id\":\"government_refinancing_interest_loop\","
+            "\"label\":{\"en\":\"Government refinancing loop\"},"
+            "\"path\":[{"
+                "\"from\":\"food_per_capita\","
+                "\"to\":\"population\","
+                "\"sign\":\"+\""
+            "}]"
+        "}]"
+        "}\n"
+    );
     write_text (root, "data/series.csv", "year,value\n2025,1\n");
 
     return root;
@@ -731,6 +758,311 @@ test_invalid_csv_never_promotes_content_index (void)
 }
 
 static void
+test_structured_json_entities_relations_and_fts_are_committed (void)
+{
+    char *cache_root = new_cache_root ();
+    char *snapshot_root = new_source_snapshot ();
+    AtmSourceCatalog *catalog = NULL;
+    AtmRetrievalIndexMetadata metadata = valid_metadata ();
+    char *index_path = NULL;
+    sqlite3 *db = NULL;
+    GError *error = NULL;
+
+    g_assert_true (
+        atm_repository_source_catalog_build (
+            snapshot_root,
+            "ewd",
+            &catalog,
+            &error
+        )
+    );
+    g_assert_no_error (error);
+
+    metadata.manifest_sha256 = catalog->manifest_sha256;
+
+    g_assert_true (
+        atm_retrieval_index_create_with_content (
+            cache_root,
+            snapshot_root,
+            &metadata,
+            catalog,
+            &index_path,
+            &error
+        )
+    );
+    g_assert_no_error (error);
+    g_assert_nonnull (index_path);
+
+    g_assert_cmpint (
+        sqlite3_open_v2 (
+            index_path,
+            &db,
+            SQLITE_OPEN_READONLY,
+            NULL
+        ),
+        ==,
+        SQLITE_OK
+    );
+
+    g_assert_cmpint (
+        query_int (
+            db,
+            "SELECT count(*) FROM structured_entities;"
+        ),
+        ==,
+        3
+    );
+    g_assert_cmpint (
+        query_int (
+            db,
+            "SELECT count(*) FROM structured_relations;"
+        ),
+        ==,
+        2
+    );
+    g_assert_cmpint (
+        query_int (
+            db,
+            "SELECT count(*) FROM structured_entities "
+            "WHERE native_id = 'food_per_capita' "
+            "AND entity_type = 'variable' "
+            "AND logical_source_id = "
+            "'ewd:entity:variable:food_per_capita' "
+            "AND locator = 'json:/variables/0';"
+        ),
+        ==,
+        1
+    );
+    g_assert_cmpint (
+        query_int (
+            db,
+            "SELECT count(*) FROM structured_relations "
+            "WHERE native_id = 'LINK.FOOD.POP' "
+            "AND relation_type = 'INFLUENCE' "
+            "AND logical_source_id = "
+            "'ewd:entity:relation:LINK.FOOD.POP' "
+            "AND from_logical_source_id = "
+            "'ewd:entity:variable:food_per_capita' "
+            "AND to_logical_source_id = "
+            "'ewd:entity:variable:population';"
+        ),
+        ==,
+        1
+    );
+    g_assert_cmpint (
+        query_int (
+            db,
+            "SELECT count(*) FROM structured_relations "
+            "WHERE native_id IS NULL "
+            "AND relation_type = 'path_edge' "
+            "AND locator = 'json:/loops/0/path/0';"
+        ),
+        ==,
+        1
+    );
+    g_assert_cmpint (
+        query_int (
+            db,
+            "SELECT count(*) FROM search_fts "
+            "WHERE evidence_kind = 'entity' "
+            "AND search_fts MATCH 'refinancing';"
+        ),
+        ==,
+        1
+    );
+    g_assert_cmpint (
+        query_int (
+            db,
+            "SELECT count(*) FROM search_fts "
+            "WHERE evidence_kind = 'relation' "
+            "AND search_fts MATCH 'LINK';"
+        ),
+        ==,
+        1
+    );
+
+    g_assert_cmpint (sqlite3_close (db), ==, SQLITE_OK);
+    db = NULL;
+
+    atm_source_catalog_free (catalog);
+    g_free (index_path);
+    remove_tree_best_effort (snapshot_root);
+    g_free (snapshot_root);
+    remove_tree_best_effort (cache_root);
+    g_free (cache_root);
+}
+
+static void
+test_ambiguous_native_entity_does_not_create_false_relation_link (void)
+{
+    char *cache_root = new_cache_root ();
+    char *snapshot_root = new_source_snapshot ();
+    AtmSourceCatalog *catalog = NULL;
+    AtmRetrievalIndexMetadata metadata = valid_metadata ();
+    char *index_path = NULL;
+    sqlite3 *db = NULL;
+    GError *error = NULL;
+
+    write_text (
+        snapshot_root,
+        "model/duplicate.json",
+        "[{\"id\":\"food_per_capita\","
+        "\"label\":\"Duplicate\"}]\n"
+    );
+
+    g_assert_true (
+        atm_repository_source_catalog_build (
+            snapshot_root,
+            "ewd",
+            &catalog,
+            &error
+        )
+    );
+    g_assert_no_error (error);
+
+    metadata.manifest_sha256 = catalog->manifest_sha256;
+
+    g_assert_true (
+        atm_retrieval_index_create_with_content (
+            cache_root,
+            snapshot_root,
+            &metadata,
+            catalog,
+            &index_path,
+            &error
+        )
+    );
+    g_assert_no_error (error);
+
+    g_assert_cmpint (
+        sqlite3_open_v2 (
+            index_path,
+            &db,
+            SQLITE_OPEN_READONLY,
+            NULL
+        ),
+        ==,
+        SQLITE_OK
+    );
+
+    g_assert_cmpint (
+        query_int (
+            db,
+            "SELECT count(*) FROM structured_entities "
+            "WHERE native_id = 'food_per_capita';"
+        ),
+        ==,
+        2
+    );
+    g_assert_cmpint (
+        query_int (
+            db,
+            "SELECT count(*) FROM structured_relations "
+            "WHERE native_id = 'LINK.FOOD.POP' "
+            "AND from_logical_source_id IS NULL "
+            "AND to_logical_source_id = "
+            "'ewd:entity:variable:population';"
+        ),
+        ==,
+        1
+    );
+
+    g_assert_cmpint (sqlite3_close (db), ==, SQLITE_OK);
+    db = NULL;
+
+    atm_source_catalog_free (catalog);
+    g_free (index_path);
+    remove_tree_best_effort (snapshot_root);
+    g_free (snapshot_root);
+    remove_tree_best_effort (cache_root);
+    g_free (cache_root);
+}
+
+static void
+test_invalid_structured_json_never_promotes_content_index (void)
+{
+    char *cache_root = new_cache_root ();
+    char *snapshot_root = new_source_snapshot ();
+    char *json_path = g_build_filename (
+        snapshot_root,
+        "model",
+        "core.json",
+        NULL
+    );
+    AtmSourceCatalog *catalog = NULL;
+    AtmRetrievalIndexMetadata metadata = valid_metadata ();
+    char *index_path = NULL;
+    GError *error = NULL;
+
+    g_assert_true (
+        g_file_set_contents (
+            json_path,
+            "{\"id\":",
+            -1,
+            &error
+        )
+    );
+    g_assert_no_error (error);
+
+    g_assert_true (
+        atm_repository_source_catalog_build (
+            snapshot_root,
+            "ewd",
+            &catalog,
+            &error
+        )
+    );
+    g_assert_no_error (error);
+
+    metadata.manifest_sha256 = catalog->manifest_sha256;
+
+    g_assert_false (
+        atm_retrieval_index_create_with_content (
+            cache_root,
+            snapshot_root,
+            &metadata,
+            catalog,
+            &index_path,
+            &error
+        )
+    );
+    g_assert_error (
+        error,
+        ATM_STRUCTURED_JSON_ERROR,
+        ATM_STRUCTURED_JSON_ERROR_PARSE
+    );
+    g_assert_null (index_path);
+
+    char *final_path = atm_retrieval_index_path (
+        cache_root,
+        metadata.repository_id,
+        metadata.snapshot_sha
+    );
+    char *staging_path = atm_retrieval_index_staging_path (
+        cache_root,
+        metadata.repository_id,
+        metadata.snapshot_sha
+    );
+
+    g_assert_false (
+        g_file_test (final_path, G_FILE_TEST_EXISTS)
+    );
+    g_assert_false (
+        g_file_test (staging_path, G_FILE_TEST_EXISTS)
+    );
+
+    g_free (staging_path);
+    g_free (final_path);
+    g_clear_error (&error);
+    atm_source_catalog_free (catalog);
+    g_free (json_path);
+    remove_tree_best_effort (snapshot_root);
+    g_free (snapshot_root);
+    remove_tree_best_effort (cache_root);
+    g_free (cache_root);
+}
+
+static void
 test_manifest_hash_mismatch_never_promotes (void)
 {
     char *cache_root = new_cache_root ();
@@ -886,6 +1218,18 @@ main (int argc, char **argv)
     g_test_add_func (
         "/retrieval-index/invalid-csv-rollback",
         test_invalid_csv_never_promotes_content_index
+    );
+    g_test_add_func (
+        "/retrieval-index/structured-json-content",
+        test_structured_json_entities_relations_and_fts_are_committed
+    );
+    g_test_add_func (
+        "/retrieval-index/structured-json-ambiguous-native-id",
+        test_ambiguous_native_entity_does_not_create_false_relation_link
+    );
+    g_test_add_func (
+        "/retrieval-index/invalid-structured-json-rollback",
+        test_invalid_structured_json_never_promotes_content_index
     );
     g_test_add_func (
         "/retrieval-index/manifest-hash-mismatch",
