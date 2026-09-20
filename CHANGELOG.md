@@ -4,40 +4,53 @@ All notable public releases of Ask the Model are recorded here.
 
 ## Unreleased
 
-### Repository and retrieval backend
+No unreleased changes are documented yet.
 
-- expanded conservative Romanian→English runtime query aliases for paradigm/modeling/comparison and human-validation terminology using only R5 development-split needs; benchmark qrels and provisional targets remain unchanged;
-- implemented the fixed-catalog R1 repository lifecycle with SHA resolution, bounded safe extraction, strict manifest/version validation and immutable snapshot promotion;
-- implemented deterministic R2 per-snapshot SQLite/FTS5 indexing with source roles, structured entities/relations, Markdown sections, tabular datasets, integrity/provenance checks and rebuild-from-snapshot behavior;
-- added deterministic R3 exact technical-ID, structured, lexical BM25 and tabular row-key retrieval;
-- added intent-aware source authority, logical-source deduplication, conversation-pinned repository scoping and conservative Romanian/English query normalization;
-- promoted each repository manifest's declared `status_source` into retrieval-index schema v2 as a distinct authority role, keeping current-status and model-level structure questions anchored to the canonical status document while retaining BM25 title/body relevance within that boundary;
-- attached repository ID, repository version and exact snapshot SHA to retrieval evidence records;
-- integrated the R3 retrieval router with fail-closed outside-scope behavior and index/scope provenance matching;
-- added R4 immutable per-conversation repository pinning with validated snapshot/index identity, zero-repository local-chat support and rejection of post-freeze scope mutation;
-- added R4 current-turn grounded Ollama request construction that keeps repository evidence transient and strips stale temporary source labels from replayed assistant history;
-- added R4 current-turn citation-label resolution into persistent provenance objects without fabricating metadata for unknown labels;
-- added real-repository R4 grounding traceability tests across EWD, CBD and RMD;
-- wired the fixed repository selector and validated snapshots into per-chat `ConversationSession` grounding on the GTK Send path;
-- added real independent chat tabs with per-tab Ollama history, frozen repository/model identity, automatic short titles, New-tab creation and per-tab close controls;
-- added compact user-visible grounded source references that resolve temporary `[S#]` labels before commit and expose repository/version/SHA/logical-source/locator/excerpt provenance plus immutable source permalinks on demand;
-- kept ordinary zero-repository local chat as a separate streaming path;
-- aligned the AI-model and repository selectors to the same compact disclosure-triangle geometry and the same neutral surface palette as the chat tabs;
-- added R5 deterministic multi-turn retrieval state with inherited scope/intent/exact-anchor context, bounded effective follow-up queries and explicit clarification outcomes;
-- added versioned R5 benchmark/run schemas, a reviewed frozen EWD/CBD/RMD corpus, deterministic metric evaluation and a real-corpus CI runner; the fixed deterministic baseline now passes all provisional R5 gates without changing benchmark qrels or thresholds;
-- kept all repository-aware development functionality unreleased and separate from the current public v0.2.2 capability boundary.
+## 0.3.0 - 2026-09-20
 
-### Repository governance
+Repository-Grounded Multi-Chat.
 
-- added an atomic release-metadata contract and pre-build validator requiring application version/date consistency across Meson, CITATION, README, STATUS, CHANGELOG, release notes and the current AppStream release entry; the Desktop Entry `Version=1.0` field is explicitly excluded because it is the desktop-file specification version;
-- clarified the public README so unreleased repository/retrieval backend work on development `main` is distinguished from capabilities actually exposed by the current v0.2.2 application;
-- aligned the primary release badge alternative text with the explicit project version so assistive technologies receive the same release information as the visual badge;
-- added a machine-checked README design/capability contract that verifies release-version consistency, suite visual identity, application/provider/model boundaries and essential documentation routes before every Flatpak build;
-- added PR-only workflow concurrency so superseded Flatpak builds on the same pull-request branch are canceled without canceling main-branch publication/release workflows;
-- added contribution and support guidance;
-- added structured application and provider/model compatibility issue forms;
-- added a pull-request checklist that preserves the application/provider/model and scientific-repository boundaries;
-- deferred security-policy and code-of-conduct adoption until private reporting and enforcement routes are explicitly configured.
+### Repository lifecycle and deterministic retrieval
+
+- implemented the fixed EWD/CBD/RMD repository lifecycle with tracked-branch SHA resolution, bounded safe extraction, strict manifest/CITATION validation and immutable snapshot promotion;
+- implemented deterministic per-snapshot SQLite/FTS5 indexing with source roles, structured entities/relations, Markdown sections, tabular datasets, integrity checks and rebuild-from-snapshot behavior;
+- added exact technical-ID, structured entity/relation, lexical BM25 and tabular row-key retrieval;
+- added intent-aware source authority, logical-source deduplication, conversation-pinned scope and conservative Romanian/English query normalization;
+- promoted manifest-declared status sources into retrieval authority;
+- carried repository ID, repository version and exact snapshot SHA on evidence records;
+- added deterministic multi-turn retrieval with inherited scope/intent/exact anchors and explicit clarification outcomes;
+- retained embeddings as optional future scope rather than a requirement for v0.3.0.
+
+### Grounded chat and provenance
+
+- froze validated repository snapshots/index identity and selected local-AI model identity on the first Send of each chat;
+- added current-turn grounded Ollama requests without persisting evidence blocks as normal chat-history context;
+- made grounded provider-history commit transactional with retrieval-turn commit;
+- resolved temporary `[S#]` labels against current-turn evidence before commit and rejected unknown labels;
+- preserved deep-copied per-turn citation provenance;
+- rendered compact user-visible numbered source references with repository/version/SHA/logical-source/locator/excerpt metadata and immutable source permalinks;
+- retained ordinary zero-repository local chat as a separate streaming path.
+
+### Multi-chat and interface
+
+- added real independent chat tabs with separate Ollama history and ConversationSession state;
+- added the compact New mini-tab, automatic semantic titles capped at three words and per-tab close controls;
+- kept repository and AI-model selectors visible but insensitive after a conversation is pinned;
+- restored each tab's pinned selector state when switching conversations;
+- added the embedded status LCD and repository lifecycle annunciators;
+- aligned AI-model and repository selectors to the same compact disclosure triangle and neutral tab-surface palette.
+
+### Validation and governance
+
+- added real-repository R4 citation-traceability CI across EWD, CBD and RMD;
+- added versioned R5 benchmark/run schemas, a reviewed frozen corpus and deterministic real-corpus runner;
+- the current frozen R5 baseline passes the provisional gates without changing qrels or thresholds: exact-ID Success@1 1.00, MRR 1.00, nDCG@5 0.9069, required Recall@5 0.9833, wrong-repository contamination@5 0.0207, RO–EN nDCG gap 0.0333, evidence traceability 1.00 and clarification-outcome accuracy 1.00;
+- added atomic release-metadata and README capability/design contracts;
+- added PR-only workflow concurrency, contribution/support guidance and structured issue forms.
+
+### Scope boundary
+
+v0.3.0 does not persist conversations across restarts, manage AI-model files or provider installation/settings, support arbitrary repositories outside EWD/CBD/RMD, execute scientific models or autonomously modify scientific repositories.
 
 ## 0.2.2 - 2026-09-20
 
