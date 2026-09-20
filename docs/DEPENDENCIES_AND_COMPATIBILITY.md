@@ -1,6 +1,6 @@
 # Dependencies and compatibility
 
-This document defines the compatibility contract for Ask the Model (AtM) v0.2.1.
+This document defines the compatibility contract for Ask the Model (AtM) v0.2.2.
 
 ## Supported application baseline
 
@@ -26,7 +26,7 @@ The elementary runtime is resolved by Flatpak. Meson, Vala, GTK/Granite developm
 
 ## Local AI provider requirement
 
-AtM v0.2.1 requires an already-running local Ollama-compatible HTTP provider.
+AtM v0.2.2 requires an already-running local Ollama-compatible HTTP provider.
 
 Endpoint order is fixed in this release:
 
@@ -68,13 +68,13 @@ AtM submits:
 
 AtM expects newline-delimited JSON response objects containing assistant `message.content` chunks and a final `done` state.
 
-Providers that do not accept these fields or response semantics are not compatible with v0.2.1.
+Providers that do not accept these fields or response semantics are not compatible with v0.2.2.
 
 ## Model requirements
 
 A chat model must advertise the `completion` capability.
 
-Capabilities such as `vision`, `tools`, `thinking` or `embedding` may be present, but v0.2.1 does not expose those capabilities as separate application features.
+Capabilities such as `vision`, `tools`, `thinking` or `embedding` may be present, but v0.2.2 does not expose those capabilities as separate application features.
 
 The default chat path requests `think: false` to prioritize interactive latency. This does not imply that a selected model lacks reasoning capability.
 
@@ -106,13 +106,13 @@ No particular GPU model, vendor or acceleration backend is required by AtM. Hard
 
 AtM does not own or manage the provider's model store.
 
-The provider may use its default model directory or another provider-configured model location. Moving, downloading, importing, deleting and deduplicating model files are outside the v0.2.1 application boundary.
+The provider may use its default model directory or another provider-configured model location. Moving, downloading, importing, deleting and deduplicating model files are outside the v0.2.2 application boundary.
 
 For practical instructions covering model sources, Ollama storage paths, `OLLAMA_MODELS`, GGUF import, model removal and disk/memory management, see [`MODEL_GUIDE.md`](MODEL_GUIDE.md).
 
 ## Flatpak sandbox requirements
 
-The v0.2.1 Flatpak requests:
+The v0.2.2 Flatpak requests:
 
 - `--share=ipc`;
 - `--share=network`;
@@ -126,7 +126,7 @@ Network sharing is required so the sandbox can reach the host-local HTTP provide
 
 ### X11
 
-AtM v0.2.1 selects `GSK_RENDERER=cairo` automatically only when:
+AtM v0.2.2 selects `GSK_RENDERER=cairo` automatically only when:
 
 - `XDG_SESSION_TYPE=x11`;
 - no Wayland display is present;
@@ -161,7 +161,7 @@ For a Flatpak **development build**, `flatpak-builder` and `io.elementary.Sdk//8
 
 ## Privacy and network boundary
 
-v0.2.1 contains no direct cloud-provider integration.
+v0.2.2 contains no direct cloud-provider integration.
 
 The implemented AtM provider addresses loopback only (`127.0.0.1`). Prompt text is sent to that provider when the user activates **Send**.
 
@@ -173,7 +173,7 @@ Conversation history is stored only in memory for the current application proces
 
 ## Known compatibility limitations
 
-v0.2.1 does not provide:
+v0.2.2 does not provide:
 
 - configurable provider host/port;
 - provider authentication;
