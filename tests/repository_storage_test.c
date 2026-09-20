@@ -74,7 +74,7 @@ test_storage_paths (void)
     );
 
     char *snapshot_suffix = g_build_filename (
-        "repositories",
+        "Repositories",
         "ewd",
         "snapshots",
         valid_sha (),
@@ -85,7 +85,8 @@ test_storage_paths (void)
         valid_sha ()
     );
     char *staging_suffix = g_build_filename (
-        "repository-staging",
+        "Repositories",
+        ".staging",
         "ewd",
         staging_name,
         NULL
