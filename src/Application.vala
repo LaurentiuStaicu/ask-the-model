@@ -46,6 +46,8 @@ namespace AskTheModel {
         private Gtk.Button? new_chat_button;
         private Gtk.TextView? prompt_input_view;
         private Gtk.Button? send_prompt_button;
+        private Gtk.Label? current_chat_tab_label;
+        private uint conversation_serial = 0;
         private bool conversation_ui_locked = false;
         private bool generation_active = false;
         private bool ai_scanning = false;
@@ -592,8 +594,13 @@ namespace AskTheModel {
             }
 
             ollama_provider.reset_conversation ();
+            conversation_serial++;
             conversation_ui_locked = false;
             assistant_stream_started = false;
+
+            if (current_chat_tab_label != null) {
+                current_chat_tab_label.label = "New Chat";
+            }
 
             if (transcript_view != null) {
                 transcript_view.buffer.text = "";
@@ -1297,6 +1304,88 @@ namespace AskTheModel {
                 transcript.buffer.text + text;
         }
 
+        private string normalize_conversation_title (
+            string generated
+        ) {
+            string cleaned = generated
+                .replace ("\n", " ")
+                .replace ("\r", " ")
+                .replace ("\t", " ")
+                .strip ();
+
+            while (
+                cleaned.length >= 2 &&
+                (
+                    (cleaned.has_prefix ("\"") &&
+                     cleaned.has_suffix ("\"")) ||
+                    (cleaned.has_prefix ("'") &&
+                     cleaned.has_suffix ("'"))
+                )
+            ) {
+                cleaned = cleaned.substring (
+                    1,
+                    cleaned.length - 2
+                ).strip ();
+            }
+
+            string[] parts = cleaned.split (" ");
+            string[] words = {};
+
+            foreach (string part in parts) {
+                string word = part.strip ();
+                if (word.length == 0) {
+                    continue;
+                }
+
+                words += word;
+                if (words.length == 3) {
+                    break;
+                }
+            }
+
+            if (words.length == 0) {
+                return "New Chat";
+            }
+
+            return string.joinv (" ", words);
+        }
+
+        private async void update_conversation_title (
+            string first_prompt,
+            string first_answer,
+            uint serial
+        ) {
+            try {
+                string answer_excerpt = first_answer;
+                if (answer_excerpt.length > 1200) {
+                    answer_excerpt =
+                        answer_excerpt.substring (0, 1200);
+                }
+
+                string topic_text =
+                    "User: " + first_prompt +
+                    "\nAssistant: " + answer_excerpt;
+
+                string generated =
+                    yield ollama_provider.generate_conversation_title (
+                        topic_text
+                    );
+
+                if (serial != conversation_serial ||
+                    current_chat_tab_label == null) {
+                    return;
+                }
+
+                string title =
+                    normalize_conversation_title (generated);
+
+                current_chat_tab_label.label = title;
+                current_chat_tab_label.tooltip_text = title;
+            } catch (GLib.Error error) {
+                /* Title generation is cosmetic; keep New Chat on failure. */
+            }
+        }
+
         private async void send_prompt (
             string prompt,
             Gtk.TextView transcript,
@@ -1306,8 +1395,22 @@ namespace AskTheModel {
             generation_active = true;
             update_conversation_ui_state ();
 
+            uint serial = conversation_serial;
+            bool should_generate_title =
+                current_chat_tab_label != null &&
+                current_chat_tab_label.label == "New Chat";
+
             try {
                 string answer = yield ollama_provider.chat (prompt);
+
+                if (should_generate_title &&
+                    answer.length > 0) {
+                    update_conversation_title.begin (
+                        prompt,
+                        answer,
+                        serial
+                    );
+                }
 
                 if (!assistant_stream_started && answer.length > 0) {
                     append_transcript (
@@ -1562,9 +1665,12 @@ namespace AskTheModel {
                 tab_pos = Gtk.PositionType.TOP
             };
 
-            var current_tab_label = new Gtk.Label ("Chat 1") {
-                single_line_mode = true
+            var current_tab_label = new Gtk.Label ("New Chat") {
+                single_line_mode = true,
+                ellipsize = Pango.EllipsizeMode.END,
+                max_width_chars = 18
             };
+            current_chat_tab_label = current_tab_label;
 
             chat_tabs.append_page (
                 chat_page,
@@ -1577,8 +1683,12 @@ namespace AskTheModel {
                 ) {
                     tooltip_text = "New Chat (Ctrl+N)",
                     sensitive = false,
-                    valign = Gtk.Align.CENTER
+                    valign = Gtk.Align.FILL,
+                    halign = Gtk.Align.START
                 };
+            new_chat_button.add_css_class (
+                "atm-new-chat-tab"
+            );
             new_chat_button.update_property (
                 Gtk.AccessibleProperty.LABEL,
                 "New Chat"
@@ -1591,7 +1701,7 @@ namespace AskTheModel {
 
             chat_tabs.set_action_widget (
                 new_chat_button,
-                Gtk.PackType.END
+                Gtk.PackType.START
             );
 
             var content = new Gtk.Box (
