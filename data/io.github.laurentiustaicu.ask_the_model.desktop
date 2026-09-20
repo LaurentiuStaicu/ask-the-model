@@ -2,11 +2,11 @@
 Version=1.0
 Type=Application
 Name=Ask the Model
-GenericName=Local AI Chat
-Comment=Chat with locally managed AI models
+GenericName=Local AI and Repository Chat
+Comment=Chat with local AI models and grounded scientific repositories
 Exec=io.github.laurentiustaicu.ask_the_model
 Icon=io.github.laurentiustaicu.ask_the_model
 Terminal=false
 Categories=Utility;
-Keywords=AI;Chat;Local;Assistant;Ollama;LLM;
+Keywords=AI;Chat;Local;Assistant;Ollama;LLM;Scientific;Repository;EWD;CBD;RMD;
 StartupNotify=true
