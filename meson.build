@@ -12,6 +12,7 @@ granite_dep = dependency('granite-7')
 soup_dep = dependency('libsoup-3.0')
 json_glib_dep = dependency('json-glib-1.0')
 glib_dep = dependency('glib-2.0')
+gio_dep = dependency('gio-2.0')
 sqlite_dep = dependency('sqlite3')
 archive_dep = dependency('libarchive')
 yaml_dep = dependency('yaml-0.1')
@@ -43,7 +44,8 @@ executable(
     soup_dep,
     json_glib_dep,
     archive_dep,
-    yaml_dep
+    yaml_dep,
+    gio_dep
   ],
   install: true
 )
@@ -136,6 +138,7 @@ archive_extract_test = executable(
   include_directories: include_directories('src'),
   dependencies: [
     glib_dep,
+    gio_dep,
     archive_dep
   ],
   install: false
@@ -177,6 +180,7 @@ repository_ingest_test = executable(
   include_directories: include_directories('src'),
   dependencies: [
     glib_dep,
+    gio_dep,
     json_glib_dep,
     archive_dep,
     yaml_dep
