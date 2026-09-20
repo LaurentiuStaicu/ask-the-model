@@ -43,6 +43,30 @@ namespace AskTheModel.Tests {
             "romanian-monetary-dynamics/tarball/" + sha
         );
 
+        assert (
+            RepositoryClient.MAX_ARCHIVE_BYTES ==
+            128 * 1024 * 1024
+        );
+
+        assert (
+            RepositoryClient.staging_archive_path (
+                repositories[0],
+                sha,
+                true
+            ).has_suffix (
+                "/repository-staging/ewd/" + sha + ".tar.gz.part"
+            )
+        );
+
+        assert (
+            RepositoryClient.staging_archive_path (
+                repositories[2],
+                sha
+            ).has_suffix (
+                "/repository-staging/rmd/" + sha + ".tar.gz"
+            )
+        );
+
         return 0;
     }
 }
