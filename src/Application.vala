@@ -1381,7 +1381,7 @@ namespace AskTheModel {
 
             model_dropdown = new Gtk.DropDown (null, null) {
                 sensitive = false,
-                show_arrow = false,
+                show_arrow = true,
                 tooltip_text = "Select local AI model"
             };
             model_dropdown.add_css_class (
@@ -1443,9 +1443,7 @@ namespace AskTheModel {
             refresh_models_ring = new ActivityRing ();
 
             model_controls.append (
-                build_selector_triangle_overlay (
-                    model_dropdown
-                )
+                model_dropdown
             );
             model_controls.append (
                 build_activity_overlay (
