@@ -309,7 +309,8 @@ namespace AskTheModel {
                     );
                 }
 
-                if (info.local.current_sha ==
+                if (!info.download_required () &&
+                    info.local.current_sha ==
                     info.remote_sha) {
                     continue;
                 }
