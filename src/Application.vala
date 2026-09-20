@@ -1668,9 +1668,7 @@ namespace AskTheModel {
 
             var current_tab_label = new Gtk.Label ("New") {
                 single_line_mode = true,
-                ellipsize = Pango.EllipsizeMode.END,
-                width_chars = 3,
-                max_width_chars = 24
+                ellipsize = Pango.EllipsizeMode.NONE
             };
             current_chat_tab_label = current_tab_label;
 
