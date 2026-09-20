@@ -58,6 +58,7 @@ executable(
     'src/structured_json.c',
     resources
   ],
+  include_directories: include_directories('src'),
   dependencies: [
     gtk_dep,
     granite_dep,
@@ -100,6 +101,7 @@ repository_catalog_test = executable(
     'src/cff_version.c',
     'tests/repository_catalog_test.vala'
   ],
+  include_directories: include_directories('src'),
   dependencies: [
     glib_dep,
     soup_dep,
@@ -123,6 +125,7 @@ repository_selection_test = executable(
     'src/cff_version.c',
     'tests/repository_selection_test.vala'
   ],
+  include_directories: include_directories('src'),
   dependencies: [
     glib_dep,
     soup_dep,
@@ -146,6 +149,7 @@ repository_state_test = executable(
     'src/cff_version.c',
     'tests/repository_state_test.vala'
   ],
+  include_directories: include_directories('src'),
   dependencies: [
     glib_dep,
     soup_dep,
