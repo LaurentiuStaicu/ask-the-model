@@ -819,6 +819,17 @@ atm_retrieval_conversation_run (
     }
 
 retrieve:
+    if (effective_query->len >
+        ATM_RETRIEVAL_ROUTER_MAX_QUERY_BYTES) {
+        g_set_error_literal (
+            error,
+            ATM_RETRIEVAL_CONVERSATION_ERROR,
+            ATM_RETRIEVAL_CONVERSATION_ERROR_ARGUMENT,
+            "Effective retrieval follow-up query exceeds the configured limit."
+        );
+        goto out;
+    }
+
     turn->effective_query = g_strdup (
         effective_query->str
     );
