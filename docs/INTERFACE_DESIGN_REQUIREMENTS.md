@@ -24,7 +24,7 @@ The first functional application should support the following user flow:
 4. Select an available local AI model.
 5. Start or continue a conversation.
 6. Ask a natural-language question.
-7. Read the streamed answer.
+7. Read the answer. Ordinary local chat may stream; repository-grounded answers are displayed only after current-turn citation validation succeeds.
 8. Inspect which repository sources/context were used when repository-aware retrieval is enabled.
 9. Start a new conversation or switch to another existing conversation.
 10. Change application/provider settings when needed.
@@ -144,6 +144,40 @@ The first visual prototype should therefore focus on:
 4. the prompt composer.
 
 No permanent sidebar or secondary inspector is part of the first prototype.
+
+### Approved conversation-tab interaction
+
+Conversation navigation sits immediately below the embedded LCD and above the transcript. The native notebook-strip background is visually transparent so only the tabs themselves are visible.
+
+- A compact mini-tab containing only `+` is anchored at the far left and creates a real independent conversation.
+- A fresh conversation is titled `New`.
+- After the first completed exchange, the title is replaced locally with a semantic title of at most three words.
+- Conversation tabs visually hang from the upper edge: square upper corners and rounded lower corners only.
+- Every conversation tab has a compact close control on its right.
+- Closing one tab removes only that conversation; closing the final tab creates a fresh `New` conversation.
+- Each tab owns independent transcript, composer, Ollama history, repository scope and AI-model identity.
+- The repository and AI-model selectors remain visible but become insensitive after the first Send in that tab.
+
+### Approved selector treatment
+
+The AI-model selector uses the native internal `Gtk.DropDown` disclosure arrow so the downward indicator remains inside the selector allocation. The repository selector retains the approved compact custom triangle because its placement is already correct.
+
+The closed AI-model and repository selector surfaces use the same neutral surface color as the conversation tabs in both light and dark variants. Hover state follows the selected-tab surface rather than introducing a separate accent color.
+
+### Approved source/provenance presentation
+
+Grounded answers do not expose temporary model-facing labels such as `[S1]`. AtM validates those labels against the current-turn evidence map before committing the turn.
+
+After a successful grounded answer, the transcript shows only a compact line such as `Sources: [1] [2]`. Each numbered reference opens a contextual popover containing:
+
+- repository and repository version;
+- exact snapshot SHA;
+- logical source ID;
+- repository-relative source path and physical locator;
+- evidence title/excerpt when available;
+- immutable source permalink when it can be constructed safely.
+
+Provenance detail is on demand rather than permanently occupying a sidebar or secondary pane.
 
 ## Typography baseline
 
