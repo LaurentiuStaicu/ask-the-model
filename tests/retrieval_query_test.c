@@ -428,7 +428,7 @@ test_fts_romanian_diacritic_search (void)
     g_assert_true (
         atm_retrieval_search_fts (
             index_path,
-            "stare curenta",
+            "care este starea curenta a modelului",
             10,
             &results,
             &error
