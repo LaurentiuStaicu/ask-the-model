@@ -1,9 +1,9 @@
 /* Ask the Model — two monochrome system variants.
  *
  * Palette source: the owl artwork.
- * The persistent chrome uses no yellow, beige, or gold. A muted gold is
- * reserved only for the transient activity ring around controls that are
- * actively checking, downloading, or updating.
+ * The persistent chrome uses no yellow, beige, or gold. Active status
+ * feedback uses a controlled gold shared by the LCD annunciators and the
+ * transient activity ring around controls that are working.
  * "System" is behavior, not a third palette: elementary OS chooses the
  * light or dark variant automatically.
  */
@@ -61,23 +61,25 @@ window.atm-window .atm-selector-triangle {
     color: #5F605C;
 }
 
-/* Fixed status LCD below the header.
- * The panel itself stays passive; only the text emits a faint gold glow.
+/* Fixed one-line status LCD below the header.
+ * The panel stays passive and uses the same neutral contour language as
+ * the rest of the application. Only active text is luminous.
  * #E6BD66 matches the moving highlight in ActivityRing.
  */
 window.atm-window frame.atm-status-lcd {
-    min-height: 34px;
-    padding: 1px 0;
-    background-color: rgba(43, 35, 20, 0.76);
-    border: 1px solid rgba(135, 107, 55, 0.42);
-    border-radius: 6px;
+    min-height: 22px;
+    padding: 0;
+    background-color: rgba(43, 35, 20, 0.82);
+    border: 2px ridge #A4A5A1;
+    border-radius: 8px;
     box-shadow: none;
     background-clip: padding-box;
 }
 
 window.atm-window label.atm-annunciator {
-    color: rgba(230, 189, 102, 0.16);
-    font-size: 0.70em;
+    color: rgba(230, 189, 102, 0.06);
+    font-family: monospace;
+    font-size: 0.74em;
     font-weight: 500;
     text-shadow: none;
 }
@@ -88,12 +90,16 @@ window.atm-window label.atm-annunciator.active {
     text-shadow: 0 0 2px rgba(230, 189, 102, 0.44);
 }
 
-window.atm-window label.atm-annunciator-title.active {
-    text-shadow: 0 0 2px rgba(230, 189, 102, 0.30);
+window.atm-window label.atm-annunciator-critical.active {
+    color: #FF625C;
+    text-shadow: 0 0 2px rgba(255, 98, 92, 0.50);
 }
 
-window.atm-window label.atm-annunciator-model {
-    min-width: 7em;
+window.atm-window label.atm-annunciator-separator {
+    color: rgba(230, 189, 102, 0.20);
+    font-family: monospace;
+    font-size: 0.72em;
+    text-shadow: none;
 }
 
 window.atm-window frame.atm-input-frame {
@@ -151,19 +157,29 @@ window.atm-window.atm-dark textview text {
 }
 
 window.atm-window.atm-dark frame.atm-status-lcd {
-    background-color: rgba(24, 20, 13, 0.76);
-    border-color: rgba(135, 107, 55, 0.38);
+    background-color: rgba(24, 20, 13, 0.84);
+    border-color: #6F706C;
     box-shadow: none;
 }
 
 window.atm-window.atm-dark label.atm-annunciator {
-    color: rgba(230, 189, 102, 0.14);
+    color: rgba(230, 189, 102, 0.055);
     text-shadow: none;
 }
 
 window.atm-window.atm-dark label.atm-annunciator.active {
     color: #E6BD66;
     text-shadow: 0 0 2px rgba(230, 189, 102, 0.46);
+}
+
+window.atm-window.atm-dark label.atm-annunciator-critical.active {
+    color: #FF625C;
+    text-shadow: 0 0 2px rgba(255, 98, 92, 0.52);
+}
+
+window.atm-window.atm-dark label.atm-annunciator-separator {
+    color: rgba(230, 189, 102, 0.18);
+    text-shadow: none;
 }
 
 window.atm-window.atm-dark frame.atm-input-frame {
