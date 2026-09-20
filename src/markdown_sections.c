@@ -228,6 +228,7 @@ atm_markdown_extract_sections (
     gboolean in_fence = FALSE;
     char fence_char = '\0';
     guint fence_length = 0;
+    guint line_count = 0;
     gboolean ok = FALSE;
 
     g_return_val_if_fail (path != NULL, FALSE);
@@ -268,9 +269,18 @@ atm_markdown_extract_sections (
         (GDestroyNotify) atm_document_section_free
     );
     lines = g_strsplit (contents, "\n", -1);
+    line_count = g_strv_length (lines);
+
+    if (length > 0 &&
+        contents[length - 1] == '\n' &&
+        line_count > 0 &&
+        lines[line_count - 1][0] == '\0') {
+        line_count--;
+    }
+
     current_body = g_string_new (NULL);
 
-    for (guint index = 0; lines[index] != NULL; index++) {
+    for (guint index = 0; index < line_count; index++) {
         const char *line = lines[index];
         guint line_number = index + 1;
         guint heading_level = 0;
@@ -283,7 +293,8 @@ atm_markdown_extract_sections (
                 &in_fence
             )) {
             g_string_append (current_body, line);
-            if (lines[index + 1] != NULL) {
+            if (index + 1 < line_count ||
+                (length > 0 && contents[length - 1] == '\n')) {
                 g_string_append_c (current_body, '\n');
             }
             continue;
@@ -335,18 +346,13 @@ atm_markdown_extract_sections (
         }
 
         g_string_append (current_body, line);
-        if (lines[index + 1] != NULL) {
+        if (index + 1 < line_count ||
+            (length > 0 && contents[length - 1] == '\n')) {
             g_string_append_c (current_body, '\n');
         }
     }
 
-    if (lines[0] != NULL) {
-        guint line_count = 0;
-
-        while (lines[line_count] != NULL) {
-            line_count++;
-        }
-
+    if (line_count > 0) {
         append_section (
             sections,
             current_start_line,
