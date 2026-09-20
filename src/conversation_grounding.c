@@ -10,6 +10,7 @@
 struct AtmConversationGroundingState {
     GPtrArray *repositories;
     AtmRetrievalConversationState *retrieval_conversation;
+    AtmGroundingContext *current_grounding_context;
     gboolean frozen;
 };
 
@@ -60,6 +61,10 @@ atm_conversation_grounding_state_free (
         return;
     }
 
+    g_clear_pointer (
+        &state->current_grounding_context,
+        atm_grounding_context_free
+    );
     g_clear_pointer (
         &state->retrieval_conversation,
         atm_retrieval_conversation_state_free
@@ -510,6 +515,11 @@ atm_conversation_grounding_prepare_turn (
     *out_has_grounding = FALSE;
     *out_needs_clarification = FALSE;
 
+    g_clear_pointer (
+        &state->current_grounding_context,
+        atm_grounding_context_free
+    );
+
     if (!state->frozen) {
         g_set_error_literal (
             error,
@@ -570,11 +580,14 @@ atm_conversation_grounding_prepare_turn (
         goto out;
     }
 
+    state->current_grounding_context =
+        g_steal_pointer (&context);
+
     *out_system_instructions = g_strdup (
         atm_grounding_system_instructions ()
     );
     *out_evidence_text = g_strdup (
-        context->evidence_text
+        state->current_grounding_context->evidence_text
     );
     *out_post_evidence_reminder = g_strdup (
         atm_grounding_post_evidence_reminder ()
@@ -598,4 +611,36 @@ out:
         atm_retrieval_conversation_turn_free
     );
     return ok;
+}
+
+
+gboolean
+atm_conversation_grounding_resolve_turn_citations (
+    AtmConversationGroundingState *state,
+    const char *model_output,
+    AtmCitationResolution **out_resolution,
+    GError **error
+)
+{
+    g_return_val_if_fail (state != NULL, FALSE);
+    g_return_val_if_fail (model_output != NULL, FALSE);
+    g_return_val_if_fail (out_resolution != NULL, FALSE);
+    g_return_val_if_fail (*out_resolution == NULL, FALSE);
+
+    if (state->current_grounding_context == NULL) {
+        g_set_error_literal (
+            error,
+            ATM_CONVERSATION_GROUNDING_ERROR,
+            ATM_CONVERSATION_GROUNDING_ERROR_VALIDATION,
+            "No grounded conversation turn is available for citation resolution."
+        );
+        return FALSE;
+    }
+
+    return atm_citation_resolve_labels (
+        model_output,
+        state->current_grounding_context,
+        out_resolution,
+        error
+    );
 }
