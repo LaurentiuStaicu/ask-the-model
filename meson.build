@@ -43,6 +43,7 @@ executable(
     'src/retrieval_rank.c',
     'src/retrieval_scope.c',
     'src/retrieval_router.c',
+    'src/retrieval_conversation.c',
     'src/grounding_context.c',
     'src/citation_labels.c',
     'src/conversation_grounding.c',
@@ -413,6 +414,38 @@ retrieval_router_test = executable(
 test(
   'retrieval-router',
   retrieval_router_test
+)
+
+retrieval_conversation_test = executable(
+  'retrieval-conversation-test',
+  [
+    'src/repository_sources.c',
+    'src/markdown_sections.c',
+    'src/csv_table.c',
+    'src/structured_json.c',
+    'src/retrieval_index.c',
+    'src/retrieval_query.c',
+    'src/retrieval_rank.c',
+    'src/retrieval_scope.c',
+    'src/retrieval_normalize.c',
+    'src/retrieval_router.c',
+    'src/retrieval_conversation.c',
+    'tests/retrieval_conversation_test.c',
+    resources
+  ],
+  include_directories: include_directories('src'),
+  dependencies: [
+    glib_dep,
+    gio_dep,
+    json_glib_dep,
+    sqlite_dep
+  ],
+  install: false
+)
+
+test(
+  'retrieval-conversation',
+  retrieval_conversation_test
 )
 
 grounding_context_test = executable(
