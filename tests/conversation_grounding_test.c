@@ -250,6 +250,31 @@ test_zero_repository_scope_can_freeze (void)
     g_assert_no_error (error);
     g_assert_cmpuint (scopes->len, ==, 0);
 
+    gboolean has_grounding = TRUE;
+    gboolean needs_clarification = TRUE;
+    char *system_instructions = NULL;
+    char *evidence_text = NULL;
+    char *post_evidence_reminder = NULL;
+
+    g_assert_true (
+        atm_conversation_grounding_prepare_turn (
+            state,
+            "ordinary local chat",
+            &has_grounding,
+            &needs_clarification,
+            &system_instructions,
+            &evidence_text,
+            &post_evidence_reminder,
+            &error
+        )
+    );
+    g_assert_no_error (error);
+    g_assert_false (has_grounding);
+    g_assert_false (needs_clarification);
+    g_assert_null (system_instructions);
+    g_assert_null (evidence_text);
+    g_assert_null (post_evidence_reminder);
+
     g_ptr_array_unref (scopes);
     atm_conversation_grounding_state_free (state);
 }
@@ -394,6 +419,49 @@ test_valid_pins_are_canonical_and_frozen (void)
         ATM_CONVERSATION_GROUNDING_ERROR_FROZEN
     );
     g_clear_error (&error);
+
+    gboolean has_grounding = FALSE;
+    gboolean needs_clarification = FALSE;
+    char *system_instructions = NULL;
+    char *evidence_text = NULL;
+    char *post_evidence_reminder = NULL;
+
+    g_assert_true (
+        atm_conversation_grounding_prepare_turn (
+            state,
+            "What is the current fixture status in EWD?",
+            &has_grounding,
+            &needs_clarification,
+            &system_instructions,
+            &evidence_text,
+            &post_evidence_reminder,
+            &error
+        )
+    );
+    g_assert_no_error (error);
+    g_assert_true (has_grounding);
+    g_assert_false (needs_clarification);
+    g_assert_nonnull (system_instructions);
+    g_assert_nonnull (evidence_text);
+    g_assert_nonnull (post_evidence_reminder);
+    g_assert_nonnull (
+        g_strstr_len (
+            evidence_text,
+            -1,
+            "Current fixture status."
+        )
+    );
+    g_assert_nonnull (
+        g_strstr_len (
+            evidence_text,
+            -1,
+            "repository_id=ewd"
+        )
+    );
+
+    g_free (post_evidence_reminder);
+    g_free (evidence_text);
+    g_free (system_instructions);
 
     g_ptr_array_unref (scopes);
     atm_conversation_grounding_state_free (state);
