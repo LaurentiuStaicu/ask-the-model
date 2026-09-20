@@ -271,7 +271,7 @@ namespace AskTheModel {
                     "Checking repositories";
             } else if (!any_ready) {
                 repository_summary =
-                    "No local repository snapshot ready";
+                    "No selected repository snapshot ready";
             } else if (all_ready && update_available) {
                 repository_summary =
                     "Repositories %s ready; update available".printf (
@@ -1218,7 +1218,7 @@ namespace AskTheModel {
             no_ai_annunciator.tooltip_text =
                 "No usable local AI available";
             no_repos_annunciator.tooltip_text =
-                "No local repository snapshot loaded";
+                "No selected repository snapshot ready";
             ai_scan_annunciator.tooltip_text =
                 "Scan local AI models";
             repo_check_annunciator.tooltip_text =
