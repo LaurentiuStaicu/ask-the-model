@@ -791,6 +791,31 @@ add_context_sources (
     json_builder_end_array (builder);
 }
 
+static guint
+retrieval_result_count (
+    const AtmRetrievalResultSet *retrieval
+)
+{
+    guint total = 0;
+
+    if (retrieval == NULL) {
+        return 0;
+    }
+
+    for (guint i = 0;
+         i < retrieval->repositories->len;
+         i++) {
+        const AtmRepositoryEvidenceSet *set =
+            g_ptr_array_index (
+                retrieval->repositories,
+                i
+            );
+        total += set->evidence->len;
+    }
+
+    return total;
+}
+
 static gboolean
 append_topic_run (
     JsonBuilder *builder,
@@ -1110,20 +1135,9 @@ append_topic_run (
         latency_ms,
         turn->needs_clarification
             ? 0
-            : ({
-                guint total = 0;
-                for (guint i = 0;
-                     i < turn->retrieval->repositories->len;
-                     i++) {
-                    const AtmRepositoryEvidenceSet *set =
-                        g_ptr_array_index (
-                            turn->retrieval->repositories,
-                            i
-                        );
-                    total += set->evidence->len;
-                }
-                total;
-            }),
+            : retrieval_result_count (
+                turn->retrieval
+            ),
         context != NULL
             ? context->sources->len
             : 0,
@@ -1140,31 +1154,6 @@ append_topic_run (
     g_ptr_array_unref (active);
 
     return TRUE;
-}
-
-static guint
-retrieval_result_count (
-    const AtmRetrievalResultSet *retrieval
-)
-{
-    guint total = 0;
-
-    if (retrieval == NULL) {
-        return 0;
-    }
-
-    for (guint i = 0;
-         i < retrieval->repositories->len;
-         i++) {
-        const AtmRepositoryEvidenceSet *set =
-            g_ptr_array_index (
-                retrieval->repositories,
-                i
-            );
-        total += set->evidence->len;
-    }
-
-    return total;
 }
 
 int
