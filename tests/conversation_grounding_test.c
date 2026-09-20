@@ -455,7 +455,7 @@ test_valid_pins_are_canonical_and_frozen (void)
         g_strstr_len (
             evidence_text,
             -1,
-            "repository_id=ewd"
+            "repository_id: ewd"
         )
     );
 
