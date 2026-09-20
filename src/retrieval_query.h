@@ -48,6 +48,15 @@ gboolean atm_retrieval_search_fts (
     GError **error
 );
 
+gboolean atm_retrieval_lookup_dataset_rows (
+    const char *index_path,
+    const char *dataset_identifier,
+    const char *row_key,
+    guint max_results,
+    GPtrArray **out_results,
+    GError **error
+);
+
 void atm_evidence_record_free (AtmEvidenceRecord *record);
 
 G_END_DECLS
