@@ -1664,6 +1664,7 @@ namespace AskTheModel {
                 show_border = false,
                 tab_pos = Gtk.PositionType.TOP
             };
+            chat_tabs.add_css_class ("atm-chat-tabs");
 
             var current_tab_label = new Gtk.Label ("New Chat") {
                 single_line_mode = true,
