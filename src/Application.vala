@@ -22,6 +22,8 @@ namespace AskTheModel {
         public string? model_name = null;
         public string? model_digest = null;
         public string[] repository_ids = {};
+        public string[] grounded_answers = {};
+        public CitationResolution[] grounded_citations = {};
 
         public ChatTabState (
             Gtk.Box page,
@@ -1709,12 +1711,20 @@ namespace AskTheModel {
                             state.conversation
                         );
 
+                        CitationResolution citation_resolution =
+                            state.session.resolve_turn_citations (
+                                answer
+                            );
+
                         if (!state.session.commit_turn ()) {
                             throw new ConversationSessionError.INVALID_GROUNDING (
                                 "Grounded conversation turn could not be committed."
                             );
                         }
 
+                        state.grounded_answers += answer;
+                        state.grounded_citations +=
+                            citation_resolution;
                         grounded_turn_prepared = false;
                     } else {
                         answer = yield ollama_provider.chat (
