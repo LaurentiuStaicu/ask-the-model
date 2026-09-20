@@ -54,4 +54,58 @@ void atm_citation_resolution_free (
     AtmCitationResolution *resolution
 );
 
+guint atm_citation_resolution_count (
+    const AtmCitationResolution *resolution
+);
+
+guint atm_citation_resolution_unknown_count (
+    const AtmCitationResolution *resolution
+);
+
+const AtmCitationReference *atm_citation_resolution_get (
+    const AtmCitationResolution *resolution,
+    guint index
+);
+
+const char *atm_citation_resolution_unknown_get (
+    const AtmCitationResolution *resolution,
+    guint index
+);
+
+const char *atm_citation_reference_label (
+    const AtmCitationReference *citation
+);
+
+const char *atm_citation_reference_repository_id (
+    const AtmCitationReference *citation
+);
+
+const char *atm_citation_reference_repository_version (
+    const AtmCitationReference *citation
+);
+
+const char *atm_citation_reference_snapshot_sha (
+    const AtmCitationReference *citation
+);
+
+const char *atm_citation_reference_logical_source_id (
+    const AtmCitationReference *citation
+);
+
+const char *atm_citation_reference_source_path (
+    const AtmCitationReference *citation
+);
+
+const char *atm_citation_reference_locator (
+    const AtmCitationReference *citation
+);
+
+const char *atm_citation_reference_title (
+    const AtmCitationReference *citation
+);
+
+const char *atm_citation_reference_excerpt (
+    const AtmCitationReference *citation
+);
+
 G_END_DECLS
