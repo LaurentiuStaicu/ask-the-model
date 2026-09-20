@@ -1,4 +1,14 @@
 namespace AskTheModel {
+    public class OllamaConversation : Object {
+        internal string[] roles = {};
+        internal string[] contents = {};
+
+        public void reset () {
+            roles = {};
+            contents = {};
+        }
+    }
+
     public errordomain ProviderError {
         NOT_READY,
         HTTP,
@@ -7,8 +17,8 @@ namespace AskTheModel {
 
     public class OllamaProvider : Object {
         private Soup.Session session;
-        private string[] roles = {};
-        private string[] contents = {};
+        private OllamaConversation default_conversation =
+            new OllamaConversation ();
         private string[] completion_models = {};
         private string[] completion_model_digests = {};
 
@@ -217,9 +227,18 @@ namespace AskTheModel {
             return base_url != null && model_name != null;
         }
 
-        public void reset_conversation () {
-            roles = {};
-            contents = {};
+        public OllamaConversation create_conversation () {
+            return new OllamaConversation ();
+        }
+
+        public void reset_conversation (
+            OllamaConversation? conversation = null
+        ) {
+            if (conversation != null) {
+                conversation.reset ();
+            } else {
+                default_conversation.reset ();
+            }
         }
 
         private async void ensure_ready () throws GLib.Error {
@@ -330,12 +349,16 @@ namespace AskTheModel {
             return root.get_string_member ("response").strip ();
         }
 
-        public async string chat (string prompt) throws GLib.Error {
+        public async string chat (
+            string prompt,
+            OllamaConversation? conversation = null
+        ) throws GLib.Error {
             return yield chat_internal (
                 prompt,
                 null,
                 null,
-                null
+                null,
+                conversation
             );
         }
 
@@ -343,13 +366,15 @@ namespace AskTheModel {
             string prompt,
             string grounding_system,
             string evidence_text,
-            string post_evidence_reminder
+            string post_evidence_reminder,
+            OllamaConversation? conversation = null
         ) throws GLib.Error {
             return yield chat_internal (
                 prompt,
                 grounding_system,
                 evidence_text,
-                post_evidence_reminder
+                post_evidence_reminder,
+                conversation
             );
         }
 
@@ -357,14 +382,18 @@ namespace AskTheModel {
             string prompt,
             string? grounding_system,
             string? evidence_text,
-            string? post_evidence_reminder
+            string? post_evidence_reminder,
+            OllamaConversation? conversation
         ) throws GLib.Error {
             yield ensure_ready ();
 
+            OllamaConversation target =
+                conversation ?? default_conversation;
+
             string request_body = ChatRequestBuilder.build (
                 model_name,
-                roles,
-                contents,
+                target.roles,
+                target.contents,
                 prompt,
                 grounding_system,
                 evidence_text,
@@ -451,10 +480,10 @@ namespace AskTheModel {
                 );
             }
 
-            roles += "user";
-            contents += prompt;
-            roles += "assistant";
-            contents += answer;
+            target.roles += "user";
+            target.contents += prompt;
+            target.roles += "assistant";
+            target.contents += answer;
 
             return answer;
         }
