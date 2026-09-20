@@ -5,6 +5,45 @@ namespace AskTheModel {
         ERROR
     }
 
+    private class ChatTabState : Object {
+        public Gtk.Box page;
+        public Gtk.TextView transcript;
+        public Gtk.TextView prompt;
+        public Gtk.Button send_button;
+        public Gtk.Label placeholder;
+        public Gtk.Label title_label;
+        public Gtk.Button close_button;
+        public OllamaConversation conversation;
+        public uint serial;
+        public bool locked = false;
+        public bool generating = false;
+        public string? model_name = null;
+        public string[] repository_ids = {};
+
+        public ChatTabState (
+            Gtk.Box page,
+            Gtk.TextView transcript,
+            Gtk.TextView prompt,
+            Gtk.Button send_button,
+            Gtk.Label placeholder,
+            Gtk.Label title_label,
+            Gtk.Button close_button,
+            OllamaConversation conversation,
+            uint serial
+        ) {
+            Object ();
+            this.page = page;
+            this.transcript = transcript;
+            this.prompt = prompt;
+            this.send_button = send_button;
+            this.placeholder = placeholder;
+            this.title_label = title_label;
+            this.close_button = close_button;
+            this.conversation = conversation;
+            this.serial = serial;
+        }
+    }
+
     public class Application : Gtk.Application {
         private const string APP_ID = "io.github.laurentiustaicu.ask_the_model";
         private const string STYLE_RESOURCE =
@@ -13,7 +52,7 @@ namespace AskTheModel {
         private Granite.Settings granite_settings;
         private Gtk.Settings gtk_settings;
         private OllamaProvider ollama_provider;
-        private Gtk.TextView? transcript_view;
+        private Gtk.TextView? streaming_transcript;
         private Gtk.Frame? status_lcd;
         private Gtk.DropDown? model_dropdown;
         private Gtk.StringList? model_list;
@@ -44,12 +83,12 @@ namespace AskTheModel {
             new RepositoryLifecycleService ();
         private GLib.SimpleAction? new_chat_action;
         private Gtk.Button? new_chat_button;
-        private Gtk.TextView? prompt_input_view;
-        private Gtk.Button? send_prompt_button;
-        private Gtk.Label? current_chat_tab_label;
+        private Gtk.Notebook? chat_notebook;
+        private ChatTabState[] chat_states = {};
+        private ChatTabState? active_chat;
         private uint conversation_serial = 0;
-        private bool conversation_ui_locked = false;
         private bool generation_active = false;
+        private bool restoring_chat_controls = false;
         private bool ai_scanning = false;
         private bool repository_checking = false;
         private bool repository_downloading = false;
@@ -99,7 +138,7 @@ namespace AskTheModel {
                 null
             );
             new_chat_action.activate.connect (() => {
-                reset_preview_conversation ();
+                create_chat_tab ();
             });
             add_action (new_chat_action);
             set_accels_for_action (
@@ -125,19 +164,19 @@ namespace AskTheModel {
             });
 
             ollama_provider.response_chunk.connect ((chunk) => {
-                if (transcript_view == null) {
+                if (streaming_transcript == null) {
                     return;
                 }
 
                 if (!assistant_stream_started) {
                     append_transcript (
-                        transcript_view,
+                        streaming_transcript,
                         "Assistant: " + chunk
                     );
                     assistant_stream_started = true;
                 } else {
                     append_transcript_raw (
-                        transcript_view,
+                        streaming_transcript,
                         chunk
                     );
                 }
