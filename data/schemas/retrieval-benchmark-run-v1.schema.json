@@ -43,7 +43,11 @@
   },
   "$defs": {
     "repositoryId": {
-      "enum": ["ewd", "cbd", "rmd"]
+      "enum": [
+        "ewd",
+        "cbd",
+        "rmd"
+      ]
     },
     "sha": {
       "type": "string",
@@ -104,6 +108,7 @@
       "additionalProperties": false,
       "required": [
         "topic_id",
+        "outcome",
         "latency_ms",
         "results",
         "context_sources",
@@ -136,8 +141,17 @@
           "minimum": 0
         },
         "evidence_token_count": {
-          "type": ["integer", "null"],
+          "type": [
+            "integer",
+            "null"
+          ],
           "minimum": 0
+        },
+        "outcome": {
+          "enum": [
+            "retrieval",
+            "needs_clarification"
+          ]
         }
       }
     }
