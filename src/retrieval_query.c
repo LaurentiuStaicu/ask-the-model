@@ -129,6 +129,10 @@ source_role_bit_from_name (const char *role)
         return ATM_SOURCE_ROLE_CANONICAL;
     }
 
+    if (g_strcmp0 (role, "status") == 0) {
+        return ATM_SOURCE_ROLE_STATUS;
+    }
+
     if (g_strcmp0 (role, "structural") == 0) {
         return ATM_SOURCE_ROLE_STRUCTURAL;
     }
