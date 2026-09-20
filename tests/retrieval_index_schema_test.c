@@ -174,7 +174,7 @@ test_schema_and_integrity (void)
             "WHERE source_id = 1;"
         ),
         ==,
-        2
+        3
     );
 
     g_assert_true (
