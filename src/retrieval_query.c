@@ -427,3 +427,536 @@ out:
 
     return ok;
 }
+
+
+#define ATM_RETRIEVAL_MAX_FTS_TERMS 16
+#define ATM_RETRIEVAL_MAX_FTS_QUERY_BYTES 4096
+
+static void
+flush_fts_term (
+    GString *token,
+    GHashTable *seen,
+    GPtrArray *terms
+)
+{
+    if (token->len == 0 ||
+        terms->len >= ATM_RETRIEVAL_MAX_FTS_TERMS) {
+        g_string_set_size (token, 0);
+        return;
+    }
+
+    char *folded = g_utf8_casefold (
+        token->str,
+        token->len
+    );
+
+    if (!g_hash_table_contains (seen, folded)) {
+        g_hash_table_add (seen, folded);
+        g_ptr_array_add (
+            terms,
+            g_strdup (token->str)
+        );
+    } else {
+        g_free (folded);
+    }
+
+    g_string_set_size (token, 0);
+}
+
+static char *
+safe_fts_query (
+    const char *query,
+    GError **error
+)
+{
+    gsize length = strlen (query);
+
+    if (length == 0 ||
+        length > ATM_RETRIEVAL_MAX_FTS_QUERY_BYTES ||
+        !g_utf8_validate (query, length, NULL)) {
+        g_set_error_literal (
+            error,
+            ATM_RETRIEVAL_QUERY_ERROR,
+            ATM_RETRIEVAL_QUERY_ERROR_ARGUMENT,
+            "FTS retrieval query is invalid."
+        );
+        return NULL;
+    }
+
+    GPtrArray *terms = g_ptr_array_new_with_free_func (g_free);
+    GHashTable *seen = g_hash_table_new_full (
+        g_str_hash,
+        g_str_equal,
+        g_free,
+        NULL
+    );
+    GString *token = g_string_new (NULL);
+
+    for (const char *cursor = query;
+         *cursor != '\0';) {
+        gunichar character = g_utf8_get_char (cursor);
+
+        if (g_unichar_isalnum (character) ||
+            character == '_') {
+            gchar encoded[7] = { 0 };
+            gint count = g_unichar_to_utf8 (
+                character,
+                encoded
+            );
+            g_string_append_len (
+                token,
+                encoded,
+                count
+            );
+        } else {
+            flush_fts_term (
+                token,
+                seen,
+                terms
+            );
+
+            if (terms->len >= ATM_RETRIEVAL_MAX_FTS_TERMS) {
+                break;
+            }
+        }
+
+        cursor = g_utf8_next_char (cursor);
+    }
+
+    flush_fts_term (token, seen, terms);
+    g_string_free (token, TRUE);
+    g_hash_table_unref (seen);
+
+    if (terms->len == 0) {
+        g_ptr_array_unref (terms);
+        g_set_error_literal (
+            error,
+            ATM_RETRIEVAL_QUERY_ERROR,
+            ATM_RETRIEVAL_QUERY_ERROR_ARGUMENT,
+            "FTS retrieval query contains no searchable terms."
+        );
+        return NULL;
+    }
+
+    GString *fts = g_string_new (NULL);
+
+    for (guint i = 0; i < terms->len; i++) {
+        if (i > 0) {
+            g_string_append (fts, " OR ");
+        }
+
+        g_string_append_c (fts, '"');
+        g_string_append (
+            fts,
+            g_ptr_array_index (terms, i)
+        );
+        g_string_append_c (fts, '"');
+    }
+
+    g_ptr_array_unref (terms);
+    return g_string_free (fts, FALSE);
+}
+
+static gboolean
+prepare_provenance_statement (
+    sqlite3 *db,
+    const char *sql,
+    sqlite3_stmt **out_statement,
+    GError **error
+)
+{
+    if (sqlite3_prepare_v2 (
+            db,
+            sql,
+            -1,
+            out_statement,
+            NULL
+        ) != SQLITE_OK) {
+        g_set_error (
+            error,
+            ATM_RETRIEVAL_QUERY_ERROR,
+            ATM_RETRIEVAL_QUERY_ERROR_SQLITE,
+            "Could not prepare evidence provenance query: %s",
+            sqlite3_errmsg (db)
+        );
+        return FALSE;
+    }
+
+    return TRUE;
+}
+
+static gboolean
+load_fts_provenance (
+    sqlite3 *db,
+    sqlite3_stmt *section_statement,
+    sqlite3_stmt *entity_statement,
+    sqlite3_stmt *relation_statement,
+    sqlite3_stmt *row_statement,
+    const char *kind,
+    sqlite3_int64 evidence_id,
+    char **out_source_path,
+    char **out_locator,
+    sqlite3_int64 *out_source_id,
+    GError **error
+)
+{
+    sqlite3_stmt *statement = NULL;
+
+    if (g_strcmp0 (kind, "section") == 0) {
+        statement = section_statement;
+    } else if (g_strcmp0 (kind, "entity") == 0) {
+        statement = entity_statement;
+    } else if (g_strcmp0 (kind, "relation") == 0) {
+        statement = relation_statement;
+    } else if (g_strcmp0 (kind, "dataset_row") == 0) {
+        statement = row_statement;
+    } else {
+        g_set_error (
+            error,
+            ATM_RETRIEVAL_QUERY_ERROR,
+            ATM_RETRIEVAL_QUERY_ERROR_SQLITE,
+            "FTS row has unsupported evidence kind '%s'.",
+            kind != NULL ? kind : "(null)"
+        );
+        return FALSE;
+    }
+
+    sqlite3_reset (statement);
+    sqlite3_clear_bindings (statement);
+    sqlite3_bind_int64 (
+        statement,
+        1,
+        evidence_id
+    );
+
+    if (sqlite3_step (statement) != SQLITE_ROW) {
+        g_set_error (
+            error,
+            ATM_RETRIEVAL_QUERY_ERROR,
+            ATM_RETRIEVAL_QUERY_ERROR_SQLITE,
+            "FTS evidence row '%s:%" G_GINT64_FORMAT "' has no canonical provenance.",
+            kind,
+            (gint64) evidence_id
+        );
+        return FALSE;
+    }
+
+    *out_source_path = g_strdup (
+        (const char *) sqlite3_column_text (
+            statement,
+            0
+        )
+    );
+    *out_locator = g_strdup (
+        (const char *) sqlite3_column_text (
+            statement,
+            1
+        )
+    );
+    *out_source_id = sqlite3_column_int64 (
+        statement,
+        2
+    );
+
+    return TRUE;
+}
+
+gboolean
+atm_retrieval_search_fts (
+    const char *index_path,
+    const char *query,
+    guint max_results,
+    GPtrArray **out_results,
+    GError **error
+)
+{
+    sqlite3 *db = NULL;
+    sqlite3_stmt *search_statement = NULL;
+    sqlite3_stmt *role_statement = NULL;
+    sqlite3_stmt *section_statement = NULL;
+    sqlite3_stmt *entity_statement = NULL;
+    sqlite3_stmt *relation_statement = NULL;
+    sqlite3_stmt *row_statement = NULL;
+    GPtrArray *results = NULL;
+    char *fts_query = NULL;
+    gboolean ok = FALSE;
+    int rc;
+
+    g_return_val_if_fail (index_path != NULL, FALSE);
+    g_return_val_if_fail (query != NULL, FALSE);
+    g_return_val_if_fail (out_results != NULL, FALSE);
+    g_return_val_if_fail (*out_results == NULL, FALSE);
+
+    if (max_results == 0 ||
+        max_results > ATM_RETRIEVAL_MAX_EXACT_RESULTS) {
+        g_set_error_literal (
+            error,
+            ATM_RETRIEVAL_QUERY_ERROR,
+            ATM_RETRIEVAL_QUERY_ERROR_ARGUMENT,
+            "FTS result limit is invalid."
+        );
+        return FALSE;
+    }
+
+    fts_query = safe_fts_query (
+        query,
+        error
+    );
+
+    if (fts_query == NULL) {
+        return FALSE;
+    }
+
+    rc = sqlite3_open_v2 (
+        index_path,
+        &db,
+        SQLITE_OPEN_READONLY,
+        NULL
+    );
+
+    if (rc != SQLITE_OK) {
+        g_set_error (
+            error,
+            ATM_RETRIEVAL_QUERY_ERROR,
+            ATM_RETRIEVAL_QUERY_ERROR_SQLITE,
+            "Could not open retrieval index read-only: %s",
+            db != NULL ? sqlite3_errmsg (db) : "unknown SQLite error"
+        );
+        goto out;
+    }
+
+    if (sqlite3_exec (
+            db,
+            "PRAGMA trusted_schema = OFF;"
+            "PRAGMA query_only = ON;"
+            "PRAGMA foreign_keys = ON;",
+            NULL,
+            NULL,
+            NULL
+        ) != SQLITE_OK) {
+        g_set_error (
+            error,
+            ATM_RETRIEVAL_QUERY_ERROR,
+            ATM_RETRIEVAL_QUERY_ERROR_SQLITE,
+            "Could not configure read-only FTS connection: %s",
+            sqlite3_errmsg (db)
+        );
+        goto out;
+    }
+
+    if (sqlite3_prepare_v2 (
+            db,
+            "SELECT evidence_kind, evidence_id, logical_source_id, "
+            "title, body, bm25(search_fts) "
+            "FROM search_fts "
+            "WHERE search_fts MATCH ?1 "
+            "ORDER BY bm25(search_fts), rowid "
+            "LIMIT ?2;",
+            -1,
+            &search_statement,
+            NULL
+        ) != SQLITE_OK ||
+        sqlite3_prepare_v2 (
+            db,
+            "SELECT role FROM source_roles "
+            "WHERE source_id = ?1 ORDER BY role COLLATE BINARY;",
+            -1,
+            &role_statement,
+            NULL
+        ) != SQLITE_OK ||
+        !prepare_provenance_statement (
+            db,
+            "SELECT s.path, d.locator, s.id "
+            "FROM document_sections d "
+            "JOIN source_files s ON s.id = d.source_id "
+            "WHERE d.id = ?1;",
+            &section_statement,
+            error
+        ) ||
+        !prepare_provenance_statement (
+            db,
+            "SELECT s.path, e.locator, s.id "
+            "FROM structured_entities e "
+            "JOIN source_files s ON s.id = e.source_id "
+            "WHERE e.id = ?1;",
+            &entity_statement,
+            error
+        ) ||
+        !prepare_provenance_statement (
+            db,
+            "SELECT s.path, r.locator, s.id "
+            "FROM structured_relations r "
+            "JOIN source_files s ON s.id = r.source_id "
+            "WHERE r.id = ?1;",
+            &relation_statement,
+            error
+        ) ||
+        !prepare_provenance_statement (
+            db,
+            "SELECT s.path, r.locator, s.id "
+            "FROM dataset_rows r "
+            "JOIN datasets d ON d.id = r.dataset_id "
+            "JOIN source_files s ON s.id = d.source_id "
+            "WHERE r.id = ?1;",
+            &row_statement,
+            error
+        )) {
+        if (error != NULL && *error == NULL) {
+            g_set_error (
+                error,
+                ATM_RETRIEVAL_QUERY_ERROR,
+                ATM_RETRIEVAL_QUERY_ERROR_SQLITE,
+                "Could not prepare FTS retrieval query: %s",
+                sqlite3_errmsg (db)
+            );
+        }
+        goto out;
+    }
+
+    sqlite3_bind_text (
+        search_statement,
+        1,
+        fts_query,
+        -1,
+        SQLITE_STATIC
+    );
+    sqlite3_bind_int (
+        search_statement,
+        2,
+        (int) max_results
+    );
+
+    results = g_ptr_array_new_with_free_func (
+        (GDestroyNotify) atm_evidence_record_free
+    );
+
+    while ((rc = sqlite3_step (search_statement)) == SQLITE_ROW) {
+        const char *kind =
+            (const char *) sqlite3_column_text (
+                search_statement,
+                0
+            );
+        sqlite3_int64 evidence_id = sqlite3_column_int64 (
+            search_statement,
+            1
+        );
+        AtmEvidenceRecord *record = g_new0 (
+            AtmEvidenceRecord,
+            1
+        );
+        sqlite3_int64 source_id = 0;
+
+        record->evidence_kind = g_strdup (kind);
+        record->evidence_id = evidence_id;
+        record->logical_source_id = g_strdup (
+            (const char *) sqlite3_column_text (
+                search_statement,
+                2
+            )
+        );
+
+        if (sqlite3_column_type (
+                search_statement,
+                3
+            ) != SQLITE_NULL) {
+            record->title = g_strdup (
+                (const char *) sqlite3_column_text (
+                    search_statement,
+                    3
+                )
+            );
+        }
+
+        if (sqlite3_column_type (
+                search_statement,
+                4
+            ) != SQLITE_NULL) {
+            record->body = g_strdup (
+                (const char *) sqlite3_column_text (
+                    search_statement,
+                    4
+                )
+            );
+        }
+
+        record->has_lexical_score = TRUE;
+        record->lexical_score = sqlite3_column_double (
+            search_statement,
+            5
+        );
+
+        if (!load_fts_provenance (
+                db,
+                section_statement,
+                entity_statement,
+                relation_statement,
+                row_statement,
+                kind,
+                evidence_id,
+                &record->source_path,
+                &record->locator,
+                &source_id,
+                error
+            ) ||
+            !load_source_roles (
+                db,
+                role_statement,
+                source_id,
+                &record->source_roles,
+                error
+            )) {
+            atm_evidence_record_free (record);
+            goto out;
+        }
+
+        g_ptr_array_add (results, record);
+    }
+
+    if (rc != SQLITE_DONE) {
+        g_set_error (
+            error,
+            ATM_RETRIEVAL_QUERY_ERROR,
+            ATM_RETRIEVAL_QUERY_ERROR_SQLITE,
+            "Could not finish FTS retrieval query: %s",
+            sqlite3_errmsg (db)
+        );
+        goto out;
+    }
+
+    *out_results = g_steal_pointer (&results);
+    ok = TRUE;
+
+out:
+    g_clear_pointer (&results, g_ptr_array_unref);
+    g_clear_pointer (&fts_query, g_free);
+
+    if (row_statement != NULL) {
+        sqlite3_finalize (row_statement);
+    }
+
+    if (relation_statement != NULL) {
+        sqlite3_finalize (relation_statement);
+    }
+
+    if (entity_statement != NULL) {
+        sqlite3_finalize (entity_statement);
+    }
+
+    if (section_statement != NULL) {
+        sqlite3_finalize (section_statement);
+    }
+
+    if (role_statement != NULL) {
+        sqlite3_finalize (role_statement);
+    }
+
+    if (search_statement != NULL) {
+        sqlite3_finalize (search_statement);
+    }
+
+    if (db != NULL) {
+        sqlite3_close (db);
+    }
+
+    return ok;
+}

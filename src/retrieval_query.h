@@ -26,6 +26,8 @@ typedef struct {
     char *title;
     char *body;
     guint source_roles;
+    gboolean has_lexical_score;
+    double lexical_score;
 } AtmEvidenceRecord;
 
 GQuark atm_retrieval_query_error_quark (void);
@@ -33,6 +35,14 @@ GQuark atm_retrieval_query_error_quark (void);
 gboolean atm_retrieval_lookup_exact (
     const char *index_path,
     const char *identifier,
+    guint max_results,
+    GPtrArray **out_results,
+    GError **error
+);
+
+gboolean atm_retrieval_search_fts (
+    const char *index_path,
+    const char *query,
     guint max_results,
     GPtrArray **out_results,
     GError **error

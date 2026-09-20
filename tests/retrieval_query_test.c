@@ -6,6 +6,7 @@
 #include <glib/gstdio.h>
 
 #include <sys/stat.h>
+#include <math.h>
 
 static void
 remove_tree_best_effort (const char *path)
@@ -115,7 +116,7 @@ new_snapshot (void)
         root,
         "STATUS.md",
         "# Scientific status\n"
-        "Current baseline.\n"
+        "Stare curentă verificată. Current baseline.\n"
     );
 
     write_text (
@@ -411,6 +412,161 @@ test_exact_lookup_is_case_sensitive (void)
 }
 
 static void
+test_fts_romanian_diacritic_search (void)
+{
+    char *snapshot_root = new_snapshot ();
+    char *cache_root = new_temp_root (
+        "atm-fts-retrieval-cache-XXXXXX"
+    );
+    char *index_path = build_index (
+        snapshot_root,
+        cache_root
+    );
+    GPtrArray *results = NULL;
+    GError *error = NULL;
+
+    g_assert_true (
+        atm_retrieval_search_fts (
+            index_path,
+            "care este starea curenta a modelului",
+            10,
+            &results,
+            &error
+        )
+    );
+    g_assert_no_error (error);
+    g_assert_cmpuint (results->len, ==, 1);
+
+    AtmEvidenceRecord *record = result_at (results, 0);
+
+    g_assert_cmpstr (record->evidence_kind, ==, "section");
+    g_assert_cmpstr (record->source_path, ==, "STATUS.md");
+    g_assert_true (
+        (record->source_roles & ATM_SOURCE_ROLE_CANONICAL) != 0
+    );
+    g_assert_true (record->has_lexical_score);
+    g_assert_true (isfinite (record->lexical_score));
+    g_assert_nonnull (
+        strstr (record->body, "curentă")
+    );
+
+    g_ptr_array_unref (results);
+    g_free (index_path);
+    remove_tree_best_effort (snapshot_root);
+    g_free (snapshot_root);
+    remove_tree_best_effort (cache_root);
+    g_free (cache_root);
+}
+
+static void
+test_fts_dataset_row_provenance (void)
+{
+    char *snapshot_root = new_snapshot ();
+    char *cache_root = new_temp_root (
+        "atm-fts-retrieval-cache-XXXXXX"
+    );
+    char *index_path = build_index (
+        snapshot_root,
+        cache_root
+    );
+    GPtrArray *results = NULL;
+    GError *error = NULL;
+
+    g_assert_true (
+        atm_retrieval_search_fts (
+            index_path,
+            "2025 value",
+            10,
+            &results,
+            &error
+        )
+    );
+    g_assert_no_error (error);
+    g_assert_cmpuint (results->len, ==, 1);
+
+    AtmEvidenceRecord *record = result_at (results, 0);
+
+    g_assert_cmpstr (
+        record->evidence_kind,
+        ==,
+        "dataset_row"
+    );
+    g_assert_cmpstr (
+        record->source_path,
+        ==,
+        "data/series.csv"
+    );
+    g_assert_cmpstr (record->locator, ==, "lines:2-2");
+    g_assert_true (
+        (record->source_roles & ATM_SOURCE_ROLE_EVIDENCE) != 0
+    );
+    g_assert_true (
+        (record->source_roles & ATM_SOURCE_ROLE_TABULAR) != 0
+    );
+    g_assert_true (record->has_lexical_score);
+
+    g_ptr_array_unref (results);
+    g_free (index_path);
+    remove_tree_best_effort (snapshot_root);
+    g_free (snapshot_root);
+    remove_tree_best_effort (cache_root);
+    g_free (cache_root);
+}
+
+static void
+test_fts_syntax_is_not_passed_through (void)
+{
+    char *snapshot_root = new_snapshot ();
+    char *cache_root = new_temp_root (
+        "atm-fts-retrieval-cache-XXXXXX"
+    );
+    char *index_path = build_index (
+        snapshot_root,
+        cache_root
+    );
+    GPtrArray *results = NULL;
+    GError *error = NULL;
+
+    g_assert_true (
+        atm_retrieval_search_fts (
+            index_path,
+            "current\" OR * baseline",
+            10,
+            &results,
+            &error
+        )
+    );
+    g_assert_no_error (error);
+    g_assert_nonnull (results);
+
+    g_ptr_array_unref (results);
+    results = NULL;
+
+    g_assert_false (
+        atm_retrieval_search_fts (
+            index_path,
+            "\"\"***",
+            10,
+            &results,
+            &error
+        )
+    );
+    g_assert_error (
+        error,
+        ATM_RETRIEVAL_QUERY_ERROR,
+        ATM_RETRIEVAL_QUERY_ERROR_ARGUMENT
+    );
+    g_assert_null (results);
+
+    g_clear_error (&error);
+    g_free (index_path);
+    remove_tree_best_effort (snapshot_root);
+    g_free (snapshot_root);
+    remove_tree_best_effort (cache_root);
+    g_free (cache_root);
+}
+
+static void
 test_invalid_arguments_rejected (void)
 {
     GPtrArray *results = NULL;
@@ -473,6 +629,18 @@ main (int argc, char **argv)
     g_test_add_func (
         "/retrieval-query/case-sensitive",
         test_exact_lookup_is_case_sensitive
+    );
+    g_test_add_func (
+        "/retrieval-query/fts-romanian-diacritics",
+        test_fts_romanian_diacritic_search
+    );
+    g_test_add_func (
+        "/retrieval-query/fts-dataset-row",
+        test_fts_dataset_row_provenance
+    );
+    g_test_add_func (
+        "/retrieval-query/fts-syntax-safety",
+        test_fts_syntax_is_not_passed_through
     );
     g_test_add_func (
         "/retrieval-query/invalid-arguments",
