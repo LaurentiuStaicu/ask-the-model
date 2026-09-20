@@ -358,6 +358,12 @@ namespace AskTheModel {
                         archive_path
                     );
 
+                if (result.version != info.remote_version) {
+                    throw new RepositoryError.INVALID_RESPONSE (
+                        "Validated repository version does not match the exact-SHA remote metadata."
+                    );
+                }
+
                 state_store.set_current (
                     descriptor.id,
                     sha,
