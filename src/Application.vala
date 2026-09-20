@@ -173,15 +173,13 @@ namespace AskTheModel {
         }
 
         private void update_ai_annunciators () {
-            bool connected = ollama_provider.is_ready ();
-            bool provider_seen = ollama_provider.base_url != null;
-            bool no_chat_model =
-                provider_seen && ollama_provider.model_name == null;
+            bool provider_seen =
+                ollama_provider.base_url != null;
 
             set_annunciator (ai_title_annunciator, true);
             set_annunciator (
                 ai_connected_annunciator,
-                connected
+                provider_seen
             );
             set_annunciator (
                 ai_scan_annunciator,
@@ -193,7 +191,7 @@ namespace AskTheModel {
             );
             set_annunciator (
                 ai_error_annunciator,
-                !ai_scanning && no_chat_model
+                false
             );
 
             if (ai_model_annunciator != null) {
@@ -201,7 +199,7 @@ namespace AskTheModel {
                     ollama_provider.model_name ??
                     "NO MODEL";
                 ai_model_annunciator.set_active (
-                    ollama_provider.model_name != null
+                    provider_seen
                 );
             }
         }
