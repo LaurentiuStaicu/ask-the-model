@@ -60,6 +60,22 @@ namespace AskTheModel {
             );
         }
 
+        public bool commit_turn () throws GLib.Error {
+            if (grounding == null) {
+                throw new ConversationSessionError.NOT_ACTIVE (
+                    "Conversation session has not started."
+                );
+            }
+
+            return grounding.commit_turn ();
+        }
+
+        public void abort_turn () {
+            if (grounding != null) {
+                grounding.abort_turn ();
+            }
+        }
+
         public void reset () {
             grounding = null;
         }
