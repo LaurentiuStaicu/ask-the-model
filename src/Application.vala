@@ -546,8 +546,16 @@ namespace AskTheModel {
         private Gtk.CheckButton build_repository_check_button (
             RepositoryDescriptor descriptor
         ) {
+            RepositoryRuntimeInfo info =
+                repository_lifecycle.info_for (
+                    descriptor.id
+                );
+            string version =
+                info.local.version ??
+                descriptor.supported_version;
+
             var check = new Gtk.CheckButton.with_label (
-                descriptor.selector_label ()
+                descriptor.selector_label (version)
             ) {
                 active = repository_selection.is_selected (
                     descriptor.id
