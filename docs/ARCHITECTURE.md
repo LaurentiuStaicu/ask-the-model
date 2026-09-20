@@ -26,9 +26,9 @@ Implemented and tested backend layers include:
 - current-turn citation-label resolution into persistent provenance objects, including fail-closed handling of invalid provenance and no fabricated metadata for unknown labels;
 - real-repository R4 traceability tests spanning EWD, CBD and RMD;
 - deterministic multi-turn retrieval state with inherited repository intent/exact anchors, bounded effective follow-up queries and explicit clarification outcomes;
-- versioned R5 benchmark/run schemas, a deterministic evaluator, provisional metric gates and CI for the benchmark contract.
+- versioned R5 benchmark/run schemas, a reviewed frozen EWD/CBD/RMD corpus, a deterministic real-corpus runner, provisional metric gates and CI that now passes the fixed deterministic baseline.
 
-These backend components are still not connected end-to-end to the current GTK repository-selection and conversation flow. Grounded-request and citation-provenance building blocks exist and are tested, but the public application does not yet invoke them from the released UI or render user-visible citations. The R5 benchmark framework exists, but a reviewed fixed benchmark corpus and a real gate-passing benchmark run are not yet claimed. Their presence on development `main` therefore does not make repository-grounded chat a released v0.2.2 feature.
+These backend components are still not connected end-to-end to the current GTK repository-selection and conversation flow. Grounded-request and citation-provenance building blocks exist and are tested, but the public application does not yet invoke them from the released UI or render user-visible citations. The reviewed frozen R5 corpus, deterministic real-corpus runner and gate-passing retrieval baseline now exist on development `main`; this validates the backend retrieval stage but does not make repository-grounded chat a released v0.2.2 feature.
 
 ## Implemented logical components
 
@@ -90,7 +90,7 @@ These are backend capabilities. The current GTK application still sends ordinary
 
 The retrieval-conversation backend can preserve relevant repository scope, intent and exact anchors across deterministic follow-up turns, while returning an explicit clarification outcome when a follow-up is too ambiguous to retrieve safely.
 
-R5 also defines versioned benchmark/run schemas, deterministic metric evaluation, provisional gates and CI for the benchmark contract. The framework does not itself constitute a passed R5 benchmark: the fixed reviewed corpus and a real benchmark run meeting the gates remain separate work.
+R5 defines versioned benchmark/run schemas, deterministic metric evaluation, provisional gates and CI for the benchmark contract. The reviewed corpus is pinned to exact EWD/CBD/RMD v0.1.0 SHAs, and the real-corpus runner executes the same R3 retrieval-conversation and R4 bounded-grounding primitives against those snapshots. The frozen deterministic baseline now meets every provisional R5 gate.
 
 ## Remaining / not yet user-facing components
 
