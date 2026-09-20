@@ -58,14 +58,6 @@ atm_retrieval_conversation_state_free (
     g_free (state);
 }
 
-static gboolean
-known_repository_id (const char *repository_id)
-{
-    return g_strcmp0 (repository_id, "ewd") == 0 ||
-        g_strcmp0 (repository_id, "cbd") == 0 ||
-        g_strcmp0 (repository_id, "rmd") == 0;
-}
-
 AtmRetrievalConversationState *
 atm_retrieval_conversation_state_new (
     const GPtrArray *frozen_repositories,
@@ -99,21 +91,6 @@ atm_retrieval_conversation_state_new (
 
     atm_retrieval_scope_selection_free (validation);
     return state;
-}
-
-static gboolean
-tokens_contain (
-    gchar **tokens,
-    const char *value
-)
-{
-    for (guint i = 0; tokens[i] != NULL; i++) {
-        if (g_strcmp0 (tokens[i], value) == 0) {
-            return TRUE;
-        }
-    }
-
-    return FALSE;
 }
 
 static gboolean
@@ -480,6 +457,17 @@ union_previous_and_explicit (
     return scopes;
 }
 
+static gboolean
+should_inherit_previous_intent (guint current_intents)
+{
+    guint substantive_intents =
+        ATM_RETRIEVAL_INTENT_CURRENT_STATE |
+        ATM_RETRIEVAL_INTENT_STRUCTURE |
+        ATM_RETRIEVAL_INTENT_IMPLEMENTATION;
+
+    return (current_intents & substantive_intents) == 0;
+}
+
 static void
 append_intent_keywords (
     GString *query,
@@ -790,12 +778,22 @@ atm_retrieval_conversation_run (
 
     if (contextual && state->has_previous_turn) {
         if (state->last_intents !=
-            ATM_RETRIEVAL_INTENT_GENERAL) {
-            append_intent_keywords (
-                effective_query,
-                state->last_intents
-            );
-            turn->used_previous_intent = TRUE;
+                ATM_RETRIEVAL_INTENT_GENERAL &&
+            should_inherit_previous_intent (
+                current_normalized->intents
+            )) {
+            guint inherited_intents =
+                state->last_intents &
+                ~current_normalized->intents;
+
+            if (inherited_intents !=
+                ATM_RETRIEVAL_INTENT_GENERAL) {
+                append_intent_keywords (
+                    effective_query,
+                    inherited_intents
+                );
+                turn->used_previous_intent = TRUE;
+            }
         }
 
         if (single_scope_matches_anchor (
