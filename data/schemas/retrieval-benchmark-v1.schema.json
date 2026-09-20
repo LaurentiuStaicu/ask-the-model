@@ -36,7 +36,11 @@
   },
   "$defs": {
     "repositoryId": {
-      "enum": ["ewd", "cbd", "rmd"]
+      "enum": [
+        "ewd",
+        "cbd",
+        "rmd"
+      ]
     },
     "sha": {
       "type": "string",
@@ -123,6 +127,7 @@
         "query",
         "active_repositories",
         "explicit_repositories",
+        "expected_outcome",
         "judgments",
         "expect_unsupported"
       ],
@@ -136,7 +141,10 @@
           "pattern": "^[A-Za-z0-9][A-Za-z0-9._-]{2,100}$"
         },
         "split": {
-          "enum": ["development", "validation"]
+          "enum": [
+            "development",
+            "validation"
+          ]
         },
         "topic_type": {
           "enum": [
@@ -152,7 +160,11 @@
           ]
         },
         "language": {
-          "enum": ["en", "ro", "mixed"]
+          "enum": [
+            "en",
+            "ro",
+            "mixed"
+          ]
         },
         "query": {
           "type": "string",
@@ -196,17 +208,29 @@
           "type": "boolean"
         },
         "conversation_id": {
-          "type": ["string", "null"],
+          "type": [
+            "string",
+            "null"
+          ],
           "minLength": 1,
           "maxLength": 100
         },
         "turn_index": {
-          "type": ["integer", "null"],
+          "type": [
+            "integer",
+            "null"
+          ],
           "minimum": 1
         },
         "notes": {
           "type": "string",
           "maxLength": 1000
+        },
+        "expected_outcome": {
+          "enum": [
+            "retrieval",
+            "needs_clarification"
+          ]
         }
       }
     }
