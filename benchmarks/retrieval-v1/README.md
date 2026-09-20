@@ -1,14 +1,20 @@
 # Retrieval benchmark v1
 
-This directory is reserved for the frozen Ask the Model (AtM) deterministic
-retrieval benchmark defined by
-`docs/REPOSITORY_RETRIEVAL_ACCEPTANCE.md` R5.
+This directory contains the frozen Ask the Model (AtM) deterministic retrieval
+benchmark defined by `docs/REPOSITORY_RETRIEVAL_ACCEPTANCE.md` R5.
 
 The benchmark is deliberately separate from the moving real-repository
 integration smoke tests. R3/R4 integration workflows follow the current
 repository `main` branches to detect compatibility drift. R5 instead pins
 exact repository versions and full commit SHAs so the same information needs,
 relevance judgments and retrieval system can be compared reproducibly.
+
+The reviewed seed corpus is `benchmark.json`. It pins EWD, CBD and RMD
+v0.1.0 to exact commit SHAs and contains development/validation topics covering
+all R5 topic classes, English/Romanian/mixed-language retrieval, unsupported
+premises and deterministic multi-turn clarification. The corpus is an
+evaluation fixture, not a claim that the current retrieval implementation has
+already met the R5 gates.
 
 ## Relevance scale
 
@@ -28,9 +34,8 @@ The evaluator treats grades 1–3 as relevant for reciprocal rank and context
 precision. nDCG@5 retains the graded values and uses linear gain equal to the
 judgment grade with logarithmic rank discount `gain / log2(rank + 1)`.
 
-This follows the established information-retrieval practice of using nDCG for
-graded relevance. NIST TREC evaluation tooling likewise supports graded nDCG
-with relevance levels as gains by default.
+This follows established information-retrieval practice for graded relevance.
+The benchmark's numerical gates remain project-specific engineering targets.
 
 ## Benchmark and run contracts
 
@@ -113,17 +118,32 @@ In addition, R5 has a deterministic conversation-protocol gate:
 - clarification-outcome accuracy = 1.00.
 
 The evaluator reports missing required metrics as failed gates. Targets are not
-relaxed merely to make a run pass. A benchmark with no clarification topic
-therefore cannot satisfy the clarification gate.
+relaxed merely to make a run pass.
+
+## Corpus integrity
+
+`tests/retrieval_benchmark_corpus_test.py` validates the semantic corpus
+invariants in addition to the evaluator's own input checks. In particular it
+freezes the reviewed repository SHAs, requires all R5 topic types and all three
+language classes, preserves paired Romanian/English information needs, requires
+unsupported and clarification cases, checks qrel repository identity and
+requires contiguous multi-turn conversations with an unchanged active
+repository scope.
+
+Judgments are tied to logical source IDs produced by the AtM indexer. Exact
+technical entities use structured-entity IDs, numeric topics use deterministic
+CSV row IDs, and canonical status/limitation topics use Markdown section IDs
+with line locators from the same section parser used by the index.
 
 ## Stage boundary
 
-This contract/evaluator does not itself constitute the R5 benchmark.
+The frozen seed corpus and evaluator now exist, but **R5 is not yet passed**.
 
-The next R5 step is to pin the exact corpus, author reviewed topic variants and
-qrels against those snapshots, then build a deterministic run generator over
-the R3 router/R4 context builder. Multi-turn topics remain in the benchmark
-contract but require the conversation retrieval-state implementation before
-they can be scored honestly.
+The next R5 gate is a deterministic run generator that checks out these exact
+EWD/CBD/RMD snapshots, builds the per-SHA indexes, executes topics in split- and
+conversation-correct order through the R3 router / retrieval-conversation
+state, constructs bounded R4 context, records the run contract and evaluates
+the resulting metrics. Only that real run can establish whether the current
+deterministic pipeline meets the provisional gates.
 
 No embeddings or reranker are introduced by R5.
