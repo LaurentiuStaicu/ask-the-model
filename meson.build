@@ -96,12 +96,15 @@ repository_catalog_test = executable(
   'repository-catalog-test',
   [
     'src/RepositoryService.vala',
+    'src/RepositoryNative.vala',
+    'src/cff_version.c',
     'tests/repository_catalog_test.vala'
   ],
   dependencies: [
     glib_dep,
     soup_dep,
-    json_glib_dep
+    json_glib_dep,
+    yaml_dep
   ],
   install: false
 )
@@ -115,13 +118,16 @@ repository_selection_test = executable(
   'repository-selection-test',
   [
     'src/RepositoryService.vala',
+    'src/RepositoryNative.vala',
     'src/RepositorySelection.vala',
+    'src/cff_version.c',
     'tests/repository_selection_test.vala'
   ],
   dependencies: [
     glib_dep,
     soup_dep,
-    json_glib_dep
+    json_glib_dep,
+    yaml_dep
   ],
   install: false
 )
@@ -135,13 +141,16 @@ repository_state_test = executable(
   'repository-state-test',
   [
     'src/RepositoryService.vala',
+    'src/RepositoryNative.vala',
     'src/RepositoryState.vala',
+    'src/cff_version.c',
     'tests/repository_state_test.vala'
   ],
   dependencies: [
     glib_dep,
     soup_dep,
-    json_glib_dep
+    json_glib_dep,
+    yaml_dep
   ],
   install: false
 )
