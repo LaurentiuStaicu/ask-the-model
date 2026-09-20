@@ -30,13 +30,20 @@ executable(
     'src/Application.vala',
     'src/OllamaProvider.vala',
     'src/RepositoryService.vala',
+    'src/cff_version.c',
+    'src/archive_extract.c',
+    'src/repository_manifest.c',
+    'src/repository_storage.c',
+    'src/repository_ingest.c',
     resources
   ],
   dependencies: [
     gtk_dep,
     granite_dep,
     soup_dep,
-    json_glib_dep
+    json_glib_dep,
+    archive_dep,
+    yaml_dep
   ],
   install: true
 )
@@ -155,6 +162,31 @@ repository_storage_test = executable(
 test(
   'repository-storage',
   repository_storage_test
+)
+
+repository_ingest_test = executable(
+  'repository-ingest-test',
+  [
+    'src/cff_version.c',
+    'src/archive_extract.c',
+    'src/repository_manifest.c',
+    'src/repository_storage.c',
+    'src/repository_ingest.c',
+    'tests/repository_ingest_test.c'
+  ],
+  include_directories: include_directories('src'),
+  dependencies: [
+    glib_dep,
+    json_glib_dep,
+    archive_dep,
+    yaml_dep
+  ],
+  install: false
+)
+
+test(
+  'repository-ingest',
+  repository_ingest_test
 )
 
 subdir('data')
