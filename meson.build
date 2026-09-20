@@ -40,6 +40,7 @@ executable(
     'src/repository_sources.c',
     'src/markdown_sections.c',
     'src/csv_table.c',
+    'src/structured_json.c',
     resources
   ],
   dependencies: [
@@ -294,6 +295,25 @@ csv_table_test = executable(
 test(
   'csv-table',
   csv_table_test
+)
+
+structured_json_test = executable(
+  'structured-json-test',
+  [
+    'src/structured_json.c',
+    'tests/structured_json_test.c'
+  ],
+  include_directories: include_directories('src'),
+  dependencies: [
+    glib_dep,
+    json_glib_dep
+  ],
+  install: false
+)
+
+test(
+  'structured-json',
+  structured_json_test
 )
 
 subdir('data')
