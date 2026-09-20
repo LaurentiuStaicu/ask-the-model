@@ -172,6 +172,7 @@ append_exact_rows (
         );
 
         record->evidence_kind = g_strdup (evidence_kind);
+        record->match_kind = ATM_EVIDENCE_MATCH_EXACT;
         record->evidence_id = sqlite3_column_int64 (
             statement,
             0
@@ -847,6 +848,7 @@ atm_retrieval_search_fts (
         sqlite3_int64 source_id = 0;
 
         record->evidence_kind = g_strdup (kind);
+        record->match_kind = ATM_EVIDENCE_MATCH_LEXICAL;
         record->evidence_id = evidence_id;
         record->logical_source_id = g_strdup (
             (const char *) sqlite3_column_text (
@@ -1150,6 +1152,7 @@ atm_retrieval_lookup_dataset_rows (
         );
 
         record->evidence_kind = g_strdup ("dataset_row");
+        record->match_kind = ATM_EVIDENCE_MATCH_TABULAR;
         record->evidence_id = sqlite3_column_int64 (
             statement,
             0
