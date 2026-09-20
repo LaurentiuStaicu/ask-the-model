@@ -1,6 +1,7 @@
 #pragma once
 
 #include <glib.h>
+#include <gio/gio.h>
 
 G_BEGIN_DECLS
 
@@ -23,6 +24,16 @@ typedef struct {
 } AtmArchiveLimits;
 
 GQuark atm_archive_error_quark (void);
+
+gboolean atm_archive_extract_snapshot_cancellable (
+    const char *archive_path,
+    const char *destination,
+    const AtmArchiveLimits *limits,
+    GCancellable *cancellable,
+    guint64 *out_entries,
+    guint64 *out_total_bytes,
+    GError **error
+);
 
 gboolean atm_archive_extract_snapshot (
     const char *archive_path,
