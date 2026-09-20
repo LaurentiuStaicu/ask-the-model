@@ -16,6 +16,7 @@ namespace AskTheModel {
         public string id { get; construct; }
         public string acronym { get; construct; }
         public string display_name { get; construct; }
+        public string declared_version { get; construct; }
         public string owner { get; construct; }
         public string repository { get; construct; }
         public string tracked_branch { get; construct; }
@@ -24,6 +25,7 @@ namespace AskTheModel {
             string id,
             string acronym,
             string display_name,
+            string declared_version,
             string owner,
             string repository,
             string tracked_branch
@@ -32,9 +34,18 @@ namespace AskTheModel {
                 id: id,
                 acronym: acronym,
                 display_name: display_name,
+                declared_version: declared_version,
                 owner: owner,
                 repository: repository,
                 tracked_branch: tracked_branch
+            );
+        }
+
+        public string selector_label () {
+            return "%s (%s) v%s".printf (
+                acronym,
+                display_name,
+                declared_version
             );
         }
 
@@ -166,6 +177,7 @@ namespace AskTheModel {
                     "ewd",
                     "EWD",
                     "Empirical World3 Dynamics",
+                    "0.1.0",
                     "LaurentiuStaicu",
                     "empirical-world3-dynamics",
                     "main"
@@ -174,6 +186,7 @@ namespace AskTheModel {
                     "cbd",
                     "CBD",
                     "Cognitive Belief Dynamics",
+                    "0.1.0",
                     "LaurentiuStaicu",
                     "cognitive-belief-dynamics",
                     "main"
@@ -182,6 +195,7 @@ namespace AskTheModel {
                     "rmd",
                     "RMD",
                     "Romanian Monetary Dynamics",
+                    "0.1.0",
                     "LaurentiuStaicu",
                     "romanian-monetary-dynamics",
                     "main"
