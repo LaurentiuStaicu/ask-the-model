@@ -960,3 +960,268 @@ out:
 
     return ok;
 }
+
+
+gboolean
+atm_retrieval_lookup_dataset_rows (
+    const char *index_path,
+    const char *dataset_identifier,
+    const char *row_key,
+    guint max_results,
+    GPtrArray **out_results,
+    GError **error
+)
+{
+    sqlite3 *db = NULL;
+    sqlite3_stmt *statement = NULL;
+    sqlite3_stmt *role_statement = NULL;
+    GPtrArray *results = NULL;
+    gboolean ok = FALSE;
+    int rc;
+
+    g_return_val_if_fail (index_path != NULL, FALSE);
+    g_return_val_if_fail (row_key != NULL, FALSE);
+    g_return_val_if_fail (out_results != NULL, FALSE);
+    g_return_val_if_fail (*out_results == NULL, FALSE);
+
+    gsize row_key_length = strlen (row_key);
+
+    if (row_key_length == 0 ||
+        row_key_length > ATM_RETRIEVAL_MAX_IDENTIFIER_BYTES ||
+        !g_utf8_validate (row_key, row_key_length, NULL) ||
+        max_results == 0 ||
+        max_results > ATM_RETRIEVAL_MAX_EXACT_RESULTS) {
+        g_set_error_literal (
+            error,
+            ATM_RETRIEVAL_QUERY_ERROR,
+            ATM_RETRIEVAL_QUERY_ERROR_ARGUMENT,
+            "Tabular row lookup arguments are invalid."
+        );
+        return FALSE;
+    }
+
+    if (dataset_identifier != NULL) {
+        gsize dataset_length = strlen (dataset_identifier);
+
+        if (dataset_length == 0 ||
+            dataset_length > ATM_RETRIEVAL_MAX_IDENTIFIER_BYTES ||
+            !g_utf8_validate (
+                dataset_identifier,
+                dataset_length,
+                NULL
+            )) {
+            g_set_error_literal (
+                error,
+                ATM_RETRIEVAL_QUERY_ERROR,
+                ATM_RETRIEVAL_QUERY_ERROR_ARGUMENT,
+                "Dataset identifier is invalid."
+            );
+            return FALSE;
+        }
+    }
+
+    rc = sqlite3_open_v2 (
+        index_path,
+        &db,
+        SQLITE_OPEN_READONLY,
+        NULL
+    );
+
+    if (rc != SQLITE_OK) {
+        g_set_error (
+            error,
+            ATM_RETRIEVAL_QUERY_ERROR,
+            ATM_RETRIEVAL_QUERY_ERROR_SQLITE,
+            "Could not open retrieval index read-only: %s",
+            db != NULL ? sqlite3_errmsg (db) : "unknown SQLite error"
+        );
+        goto out;
+    }
+
+    if (sqlite3_exec (
+            db,
+            "PRAGMA trusted_schema = OFF;"
+            "PRAGMA query_only = ON;"
+            "PRAGMA foreign_keys = ON;",
+            NULL,
+            NULL,
+            NULL
+        ) != SQLITE_OK) {
+        g_set_error (
+            error,
+            ATM_RETRIEVAL_QUERY_ERROR,
+            ATM_RETRIEVAL_QUERY_ERROR_SQLITE,
+            "Could not configure read-only tabular retrieval: %s",
+            sqlite3_errmsg (db)
+        );
+        goto out;
+    }
+
+    if (sqlite3_prepare_v2 (
+            db,
+            "SELECT r.id, m.repository_id, s.path, r.ordinal, "
+            "r.locator, r.row_key, r.payload_json, s.id "
+            "FROM dataset_rows r "
+            "JOIN datasets d ON d.id = r.dataset_id "
+            "JOIN source_files s ON s.id = d.source_id "
+            "JOIN snapshot_metadata m ON m.id = 1 "
+            "WHERE r.row_key = ?1 COLLATE BINARY "
+            "AND (?2 IS NULL "
+                 "OR d.native_id = ?2 COLLATE BINARY "
+                 "OR d.logical_source_id = ?2 COLLATE BINARY "
+                 "OR s.path = ?2 COLLATE BINARY) "
+            "ORDER BY s.path COLLATE BINARY, "
+            "d.logical_source_id COLLATE BINARY, r.ordinal "
+            "LIMIT ?3;",
+            -1,
+            &statement,
+            NULL
+        ) != SQLITE_OK ||
+        sqlite3_prepare_v2 (
+            db,
+            "SELECT role FROM source_roles "
+            "WHERE source_id = ?1 ORDER BY role COLLATE BINARY;",
+            -1,
+            &role_statement,
+            NULL
+        ) != SQLITE_OK) {
+        g_set_error (
+            error,
+            ATM_RETRIEVAL_QUERY_ERROR,
+            ATM_RETRIEVAL_QUERY_ERROR_SQLITE,
+            "Could not prepare tabular row lookup: %s",
+            sqlite3_errmsg (db)
+        );
+        goto out;
+    }
+
+    sqlite3_bind_text (
+        statement,
+        1,
+        row_key,
+        -1,
+        SQLITE_STATIC
+    );
+
+    if (dataset_identifier != NULL) {
+        sqlite3_bind_text (
+            statement,
+            2,
+            dataset_identifier,
+            -1,
+            SQLITE_STATIC
+        );
+    } else {
+        sqlite3_bind_null (statement, 2);
+    }
+
+    sqlite3_bind_int (
+        statement,
+        3,
+        (int) max_results
+    );
+
+    results = g_ptr_array_new_with_free_func (
+        (GDestroyNotify) atm_evidence_record_free
+    );
+
+    while ((rc = sqlite3_step (statement)) == SQLITE_ROW) {
+        const char *repository_id =
+            (const char *) sqlite3_column_text (
+                statement,
+                1
+            );
+        const char *source_path =
+            (const char *) sqlite3_column_text (
+                statement,
+                2
+            );
+        guint ordinal = (guint) sqlite3_column_int (
+            statement,
+            3
+        );
+        sqlite3_int64 source_id = sqlite3_column_int64 (
+            statement,
+            7
+        );
+        AtmEvidenceRecord *record = g_new0 (
+            AtmEvidenceRecord,
+            1
+        );
+
+        record->evidence_kind = g_strdup ("dataset_row");
+        record->evidence_id = sqlite3_column_int64 (
+            statement,
+            0
+        );
+        record->logical_source_id = g_strdup_printf (
+            "%s:dataset-row:%s:%u",
+            repository_id,
+            source_path,
+            ordinal
+        );
+        record->source_path = g_strdup (source_path);
+        record->locator = g_strdup (
+            (const char *) sqlite3_column_text (
+                statement,
+                4
+            )
+        );
+        record->title = g_strdup (
+            (const char *) sqlite3_column_text (
+                statement,
+                5
+            )
+        );
+        record->body = g_strdup (
+            (const char *) sqlite3_column_text (
+                statement,
+                6
+            )
+        );
+
+        if (!load_source_roles (
+                db,
+                role_statement,
+                source_id,
+                &record->source_roles,
+                error
+            )) {
+            atm_evidence_record_free (record);
+            goto out;
+        }
+
+        g_ptr_array_add (results, record);
+    }
+
+    if (rc != SQLITE_DONE) {
+        g_set_error (
+            error,
+            ATM_RETRIEVAL_QUERY_ERROR,
+            ATM_RETRIEVAL_QUERY_ERROR_SQLITE,
+            "Could not finish tabular row lookup: %s",
+            sqlite3_errmsg (db)
+        );
+        goto out;
+    }
+
+    *out_results = g_steal_pointer (&results);
+    ok = TRUE;
+
+out:
+    g_clear_pointer (&results, g_ptr_array_unref);
+
+    if (role_statement != NULL) {
+        sqlite3_finalize (role_statement);
+    }
+
+    if (statement != NULL) {
+        sqlite3_finalize (statement);
+    }
+
+    if (db != NULL) {
+        sqlite3_close (db);
+    }
+
+    return ok;
+}
