@@ -1,0 +1,5 @@
+blank_issues_enabled: true
+contact_links:
+  - name: AtM support guidance
+    url: https://github.com/LaurentiuStaicu/ask-the-model/blob/main/.github/SUPPORT.md
+    about: Check the support and troubleshooting routes first.
