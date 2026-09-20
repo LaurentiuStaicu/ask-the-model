@@ -29,9 +29,10 @@ The current backend includes:
 - current-turn citation-label resolution into persistent provenance objects without fabricating metadata for unknown labels;
 - real-repository R4 traceability checks across EWD, CBD and RMD;
 - deterministic multi-turn retrieval state that can inherit repository scope, intent and exact anchors across follow-ups and return an explicit clarification outcome where needed;
-- versioned R5 benchmark/run schemas, deterministic metric evaluation, provisional gates and CI for the benchmark contract, including clarification-outcome semantics.
+- versioned R5 benchmark/run schemas, deterministic metric evaluation, provisional gates and CI for the benchmark contract, including clarification-outcome semantics;
+- a reviewed frozen R5 seed corpus pinned to exact EWD/CBD/RMD v0.1.0 snapshots, with all required topic classes, Romanian/English/mixed coverage, unsupported cases and deterministic multi-turn cases.
 
-The current GTK application still uses the ordinary local-chat path and does not expose repository selection, end-to-end grounded chat or user-visible citation rendering. R4 backend building blocks are implemented and tested, but they are not yet wired into the released conversation UI. R5 now has a benchmark framework and evaluator, but the exact reviewed benchmark corpus and a real gate-passing benchmark run are not yet claimed. Therefore **v0.2.2 remains the current public release** and its user-facing capability boundary is unchanged.
+The current GTK application still uses the ordinary local-chat path and does not expose repository selection, end-to-end grounded chat or user-visible citation rendering. R4 backend building blocks are implemented and tested, but they are not yet wired into the released conversation UI. R5 now has a benchmark framework, evaluator and frozen seed corpus, but a deterministic real-corpus run generator and a gate-passing benchmark run are not yet claimed. Therefore **v0.2.2 remains the current public release** and its user-facing capability boundary is unchanged.
 
 ## Canonical application role
 

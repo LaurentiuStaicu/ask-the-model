@@ -9,6 +9,7 @@ on:
       - 'benchmarks/retrieval-v1/**'
       - 'scripts/evaluate_retrieval_benchmark.py'
       - 'tests/retrieval_benchmark_metrics_test.py'
+      - 'tests/retrieval_benchmark_corpus_test.py'
       - '.github/workflows/retrieval-benchmark-contract.yml'
   push:
     branches:
@@ -19,6 +20,7 @@ on:
       - 'benchmarks/retrieval-v1/**'
       - 'scripts/evaluate_retrieval_benchmark.py'
       - 'tests/retrieval_benchmark_metrics_test.py'
+      - 'tests/retrieval_benchmark_corpus_test.py'
       - '.github/workflows/retrieval-benchmark-contract.yml'
 
 permissions:
@@ -33,7 +35,7 @@ jobs:
       - name: Checkout AtM
         uses: actions/checkout@v6
 
-      - name: Parse benchmark schemas
+      - name: Parse benchmark schemas and corpus
         shell: bash
         run: |
           set -euo pipefail
@@ -43,9 +45,18 @@ jobs:
           python3 -m json.tool \
             data/schemas/retrieval-benchmark-run-v1.schema.json \
             >/dev/null
+          python3 -m json.tool \
+            benchmarks/retrieval-v1/benchmark.json \
+            >/dev/null
 
       - name: Test benchmark evaluator
         shell: bash
         run: |
           set -euo pipefail
           python3 tests/retrieval_benchmark_metrics_test.py
+
+      - name: Validate frozen benchmark corpus
+        shell: bash
+        run: |
+          set -euo pipefail
+          python3 tests/retrieval_benchmark_corpus_test.py
