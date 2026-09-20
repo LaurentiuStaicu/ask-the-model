@@ -265,7 +265,7 @@ ollama pull SMALLER_MODEL
 
 <small>AtM is intended to work with scientific dynamical-model repositories without replacing them. The planned initial suite includes EWD, CBD and RMD. Each source repository remains canonical for its documentation, code, data, assumptions, provenance, validation and release boundaries.</small>
 
-<small>Development `main` already contains unreleased repository/retrieval backend foundations, but they are not yet wired into the released GTK repository-selection, grounded-chat and citation path. Future user-facing repository functionality must keep repository evidence, actual model outputs and AI-generated interpretation distinguishable from one another. Ordinary local chat in v0.2.2 should not be interpreted as repository-grounded scientific analysis.</small>
+<small>Development `main` now contains an unreleased repository-aware GTK path for the fixed EWD/CBD/RMD suite: repository lifecycle controls, per-chat frozen repository/model context, deterministic retrieval, grounded generation, multi-chat navigation and on-demand citation provenance. This development functionality is not part of the public v0.2.2 release. Repository evidence, actual scientific-model outputs and AI-generated interpretation remain distinct concepts, and ordinary local chat in v0.2.2 must not be interpreted as repository-grounded scientific analysis.</small>
 
 </details>
 
