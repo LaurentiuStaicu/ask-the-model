@@ -151,19 +151,20 @@ These packages are required only when building the native application and its re
 - GLib development files;
 - SQLite 3 development files;
 - libarchive development files;
-- a C compiler for the non-installed platform probe;
+- libyaml development files for `CITATION.cff` parsing;
+- a C compiler for the non-installed platform probe and repository-validation helpers;
 - Vala;
 - Meson >= 1.0.0.
 
 On elementary OS 8 / Ubuntu-compatible systems:
 
 ```bash
-sudo apt install meson valac build-essential libgtk-4-dev libgranite-7-dev libsoup-3.0-dev libjson-glib-dev libglib2.0-dev libsqlite3-dev libarchive-dev
+sudo apt install meson valac build-essential libgtk-4-dev libgranite-7-dev libsoup-3.0-dev libjson-glib-dev libglib2.0-dev libsqlite3-dev libarchive-dev libyaml-dev
 ```
 
 For a Flatpak **development build**, `flatpak-builder` and `io.elementary.Sdk//8` are also required. CI builds against that same elementary SDK baseline and runs the Meson test suite inside the Flatpak build environment.
 
-The SQLite/libarchive probe is an implementation prerequisite for the planned repository-aware layer. It does not mean that v0.2.2 already performs repository ingestion or retrieval, and the probe executable is not installed in the application bundle.
+The SQLite/libarchive/libyaml platform probe verifies implementation prerequisites for the repository-aware layer. The current development tree also contains non-UI R1 repository-ingestion primitives, but v0.2.2 still does not expose repository management or retrieval as a user-facing feature. Test executables are not installed in the application bundle.
 
 ## Privacy and network boundary
 
