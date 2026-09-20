@@ -10,6 +10,11 @@ namespace AskTheModel.Tests {
             repositories[0].display_name ==
             "Empirical World3 Dynamics"
         );
+        assert (repositories[0].declared_version == "0.1.0");
+        assert (
+            repositories[0].selector_label () ==
+            "EWD (Empirical World3 Dynamics) v0.1.0"
+        );
 
         assert (repositories[1].id == "cbd");
         assert (repositories[1].acronym == "CBD");
@@ -17,12 +22,22 @@ namespace AskTheModel.Tests {
             repositories[1].display_name ==
             "Cognitive Belief Dynamics"
         );
+        assert (repositories[1].declared_version == "0.1.0");
+        assert (
+            repositories[1].selector_label () ==
+            "CBD (Cognitive Belief Dynamics) v0.1.0"
+        );
 
         assert (repositories[2].id == "rmd");
         assert (repositories[2].acronym == "RMD");
         assert (
             repositories[2].display_name ==
             "Romanian Monetary Dynamics"
+        );
+        assert (repositories[2].declared_version == "0.1.0");
+        assert (
+            repositories[2].selector_label () ==
+            "RMD (Romanian Monetary Dynamics) v0.1.0"
         );
 
         foreach (RepositoryDescriptor descriptor in repositories) {
