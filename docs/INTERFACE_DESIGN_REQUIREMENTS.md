@@ -36,7 +36,7 @@ Execution or simulation of EWD, CBD or RMD is outside the current application bo
 The interface must make these four levels visually distinguishable:
 
 - **Application:** Ask the Model.
-- **Repository context:** one or more selected dynamical-model repositories such as EWD, CBD, RMD or another compatible repository.
+- **Repository context:** zero to three selected repository contexts from the v1 catalog: EWD, CBD and RMD.
 - **AI model:** the locally hosted LLM selected from the configured provider.
 - **Conversation:** the current question/answer history.
 
@@ -95,7 +95,7 @@ The first visual decision is the overall window topology. Subsequent elements sh
 
 ## Multi-model discussion requirement
 
-AtM must allow the user to select **one or more** scientific dynamical-model repositories for the same conversation.
+AtM must allow the user to select **zero, one or more** scientific dynamical-model repositories for a conversation. Zero repositories preserves ordinary local AI chat; one or more repositories enables repository-grounded chat.
 
 The initial selectable set is:
 
@@ -109,11 +109,12 @@ The preferred GTK interaction pattern for the first visual prototype is a compac
 
 The closed control must summarize the active scope clearly, for example:
 
+- `Repositories` when none is selected
 - `EWD`
 - `EWD + RMD`
-- `3 models`
+- `EWD + CBD + RMD`
 
-At least one dynamical model must be selected before a repository-grounded question can be sent.
+At least one repository must be selected before a repository-grounded question can be sent. Ordinary local AI chat remains valid with zero selected repositories.
 
 The scientific dynamical-model selector and the local AI-model selector are separate concepts and must never be merged into one control.
 
@@ -123,7 +124,7 @@ AtM must support English and Romanian, with English as the default interface lan
 
 Terminology is normative and defined in `docs/TERMINOLOGY.md`. In the UI:
 
-- **Repository / Repositories** identifies EWD, CBD, RMD and other scientific dynamical-model repositories selected for discussion.
+- **Repository / Repositories** identifies EWD, CBD and RMD in the v1 repository-aware scope. Arbitrary repositories are future scope.
 - **AI model** identifies the local language model that generates the response.
 - The bare word **model** must be avoided wherever it could be ambiguous.
 
@@ -161,3 +162,19 @@ The AtM owl mark may appear inside a circular identity disc near the upper-left 
 The prototype must preserve native window controls and draggable titlebar behavior. If the active decoration layout places native controls in the same corner, the disc must be offset inward rather than cover those controls.
 
 A custom oversized disc is an AtM identity feature, not a replacement for standard header behavior.
+
+## Repository selector detail and conversation pinning
+
+When the selector is expanded, each repository is shown in long form with the repository-declared version, for example:
+
+- `EWD (Empirical World3 Dynamics) v0.1.0`;
+- `CBD (Cognitive Belief Dynamics) v0.1.0`;
+- `RMD (Romanian Monetary Dynamics) v0.1.0`.
+
+After selection, only active acronyms are shown in the compact control. SHA values, branch names and commit counts are not part of the normal selector UI.
+
+Repository lifecycle management (Download, Update, Remove Local Copy, progress and errors) belongs in a separate `Manage Repositories…` surface rather than in the compact selection popover.
+
+The repository scope is editable before the first user message. Once the first message is sent, the scope is pinned for that conversation, including the valid zero-repository case. A later repository-scope change must start a new chat rather than silently changing the scientific basis of an existing conversation.
+
+The preferred v1 behavior applies the same new-chat boundary when the active AI model changes after the first user message.
