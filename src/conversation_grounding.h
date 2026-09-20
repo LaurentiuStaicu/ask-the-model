@@ -73,4 +73,15 @@ gboolean atm_conversation_grounding_create_retrieval_scopes (
     GError **error
 );
 
+gboolean atm_conversation_grounding_prepare_turn (
+    AtmConversationGroundingState *state,
+    const char *query,
+    gboolean *out_has_grounding,
+    gboolean *out_needs_clarification,
+    char **out_system_instructions,
+    char **out_evidence_text,
+    char **out_post_evidence_reminder,
+    GError **error
+);
+
 G_END_DECLS
