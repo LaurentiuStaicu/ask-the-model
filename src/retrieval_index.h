@@ -84,4 +84,12 @@ gboolean atm_retrieval_index_validate_identity (
     GError **error
 );
 
+gboolean atm_retrieval_index_validate_snapshot_sources (
+    const char *index_path,
+    const char *snapshot_root,
+    const char *expected_repository_id,
+    const char *expected_snapshot_sha,
+    GError **error
+);
+
 G_END_DECLS
