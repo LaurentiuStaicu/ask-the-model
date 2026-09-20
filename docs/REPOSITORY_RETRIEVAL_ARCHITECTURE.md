@@ -68,7 +68,7 @@ The selector presents the long form at selection time:
 
 The displayed version is the repository-declared model version for the snapshot available to the conversation.
 
-The selector supports independent multi-selection. A repository that is known but not locally ready remains visible but cannot be selected until it is ready.
+The selector supports independent multi-selection. A repository that is known but not locally ready remains selectable so the user can include it in the desired set and activate Download. Repository-grounded Send must not use that repository until its validated snapshot and retrieval index reach READY.
 
 ### Zero-repository scope
 
