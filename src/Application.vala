@@ -1154,11 +1154,7 @@ namespace AskTheModel {
 
             var status_lcd = new Gtk.Frame (null) {
                 child = lcd_row,
-                hexpand = true,
-                margin_top = 4,
-                margin_bottom = 6,
-                margin_start = 12,
-                margin_end = 12
+                hexpand = true
             };
             status_lcd.add_css_class ("atm-status-lcd");
 
