@@ -121,6 +121,75 @@ window.atm-window frame.atm-input-frame:focus-within {
     border-color: #5F605C;
 }
 
+
+/* Conversation tabs hang from the strip above the chat.
+ * Their upper edge is flush with the strip; only the lower corners are
+ * rounded, so the tabs visually descend from the bar instead of sitting on it.
+ */
+window.atm-window notebook.atm-chat-tabs > header.top {
+    padding: 0;
+    background-color: rgba(255, 255, 255, 0);
+    border: none;
+    box-shadow: none;
+}
+
+window.atm-window notebook.atm-chat-tabs > header.top > tabs {
+    margin: 0;
+    padding: 0;
+    background-color: rgba(255, 255, 255, 0);
+    border: none;
+    box-shadow: none;
+}
+
+window.atm-window notebook.atm-chat-tabs > header.top > tabs > tab {
+    margin: 0 2px 2px 0;
+    padding: 5px 10px 6px 10px;
+    background-image: none;
+    background-color: #EFF0ED;
+    border: 1px solid #A4A5A1;
+    border-top: none;
+    border-radius: 0 0 7px 7px;
+    box-shadow: none;
+}
+
+window.atm-window notebook.atm-chat-tabs > header.top > tabs > tab:checked {
+    background-color: #FAFBF9;
+    border-bottom-color: #5F605C;
+}
+
+window.atm-window notebook.atm-chat-tabs > header.top button.atm-new-chat-tab {
+    min-width: 18px;
+    min-height: 18px;
+    padding: 3px 5px 4px 5px;
+    margin: 0 3px 2px 0;
+    background-image: none;
+    background-color: #EFF0ED;
+    border: 1px solid #A4A5A1;
+    border-top: none;
+    border-radius: 0 0 6px 6px;
+    box-shadow: none;
+}
+
+window.atm-window notebook.atm-chat-tabs > header.top button.atm-new-chat-tab:hover {
+    background-color: #FAFBF9;
+}
+
+window.atm-window notebook.atm-chat-tabs > header.top button.atm-tab-close {
+    min-width: 12px;
+    min-height: 12px;
+    padding: 0;
+    margin: 0 0 0 2px;
+    background-image: none;
+    background-color: rgba(255, 255, 255, 0);
+    border: none;
+    border-radius: 3px;
+    box-shadow: none;
+}
+
+window.atm-window notebook.atm-chat-tabs > header.top button.atm-tab-close:hover {
+    background-color: rgba(27, 27, 24, 0.10);
+}
+
 /* Dark variant */
 window.atm-window.atm-dark {
     background-color: #1B1B18;
@@ -181,6 +250,44 @@ window.atm-window.atm-dark label.atm-annunciator-critical.active {
 window.atm-window.atm-dark label.atm-annunciator-separator {
     color: rgba(199, 154, 82, 0.13);
     text-shadow: none;
+}
+
+window.atm-window.atm-dark notebook.atm-chat-tabs > header.top {
+    background-color: rgba(0, 0, 0, 0);
+    border: none;
+    box-shadow: none;
+}
+
+window.atm-window.atm-dark notebook.atm-chat-tabs > header.top > tabs > tab {
+    background-color: #2D2D2A;
+    color: #FAFBF9;
+    border-color: #6F706C;
+    border-top: none;
+}
+
+window.atm-window.atm-dark notebook.atm-chat-tabs > header.top > tabs > tab:checked {
+    background-color: #1B1B18;
+    border-bottom-color: #C9CAC7;
+}
+
+window.atm-window.atm-dark notebook.atm-chat-tabs > header.top button.atm-new-chat-tab {
+    background-color: #2D2D2A;
+    color: #FAFBF9;
+    border-color: #6F706C;
+    border-top: none;
+}
+
+window.atm-window.atm-dark notebook.atm-chat-tabs > header.top button.atm-new-chat-tab:hover {
+    background-color: #1B1B18;
+}
+
+window.atm-window.atm-dark notebook.atm-chat-tabs > header.top button.atm-tab-close {
+    color: #FAFBF9;
+    background-color: rgba(0, 0, 0, 0);
+}
+
+window.atm-window.atm-dark notebook.atm-chat-tabs > header.top button.atm-tab-close:hover {
+    background-color: rgba(250, 251, 249, 0.12);
 }
 
 window.atm-window.atm-dark frame.atm-input-frame {
