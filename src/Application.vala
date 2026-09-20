@@ -12,23 +12,18 @@ namespace AskTheModel {
         private Gtk.StringList? model_list;
         private Gtk.Button? refresh_models_button;
         private ActivityRing? refresh_models_ring;
-        private Gtk.Label? ai_title_annunciator;
-        private Gtk.Label? ai_model_annunciator;
-        private Gtk.Label? ai_connected_annunciator;
+        private Gtk.Label? no_ai_annunciator;
         private Gtk.Label? ai_scan_annunciator;
-        private Gtk.Label? ai_offline_annunciator;
-        private Gtk.Label? ai_error_annunciator;
         private Gtk.MenuButton? repository_menu_button;
         private Gtk.CheckButton[] repository_check_buttons = {};
         private Gtk.Button? refresh_repositories_button;
         private ActivityRing? refresh_repositories_ring;
         private Gtk.Button? repository_action_button;
         private ActivityRing? repository_action_ring;
-        private Gtk.Label? repos_title_annunciator;
+        private Gtk.Label? no_repos_annunciator;
         private Gtk.Label? repo_ewd_annunciator;
         private Gtk.Label? repo_cbd_annunciator;
         private Gtk.Label? repo_rmd_annunciator;
-        private Gtk.Label? repo_none_annunciator;
         private Gtk.Label? repo_check_annunciator;
         private Gtk.Label? repo_download_annunciator;
         private Gtk.Label? repo_update_annunciator;
@@ -180,6 +175,17 @@ namespace AskTheModel {
             return label;
         }
 
+        private Gtk.Label build_annunciator_separator () {
+            var separator = new Gtk.Label ("·") {
+                valign = Gtk.Align.CENTER,
+                single_line_mode = true
+            };
+            separator.add_css_class (
+                "atm-annunciator-separator"
+            );
+            return separator;
+        }
+
         private void set_annunciator (
             Gtk.Label? annunciator,
             bool active
@@ -196,48 +202,30 @@ namespace AskTheModel {
         }
 
         private void update_ai_annunciators () {
-            bool provider_seen =
-                ollama_provider.base_url != null;
+            bool ai_missing =
+                !ai_scanning &&
+                !ollama_provider.is_ready ();
 
-            set_annunciator (ai_title_annunciator, true);
             set_annunciator (
-                ai_connected_annunciator,
-                provider_seen
+                no_ai_annunciator,
+                ai_missing
             );
             set_annunciator (
                 ai_scan_annunciator,
                 ai_scanning
             );
-            set_annunciator (
-                ai_offline_annunciator,
-                !ai_scanning && !provider_seen
-            );
-            set_annunciator (
-                ai_error_annunciator,
-                false
-            );
-
-            if (ai_model_annunciator != null) {
-                ai_model_annunciator.label =
-                    ollama_provider.model_name ??
-                    "NO MODEL";
-                set_annunciator (
-                    ai_model_annunciator,
-                    provider_seen
-                );
-            }
         }
 
         private void update_repository_annunciators () {
             RepositoryDescriptor[] selected =
                 repository_selection.selected_repositories ();
-            bool has_selection = selected.length > 0;
             bool ewd_selected = false;
             bool cbd_selected = false;
             bool rmd_selected = false;
             bool needs_download = false;
             bool update_available = false;
-            bool all_ready = has_selection;
+            bool any_ready = false;
+            bool all_ready = selected.length > 0;
 
             foreach (RepositoryDescriptor descriptor in selected) {
                 if (descriptor.id == "ewd") {
@@ -256,8 +244,12 @@ namespace AskTheModel {
                 if (info.download_required ()) {
                     needs_download = true;
                     all_ready = false;
-                } else if (info.update_available ()) {
-                    update_available = true;
+                } else {
+                    any_ready = true;
+
+                    if (info.update_available ()) {
+                        update_available = true;
+                    }
                 }
             }
 
@@ -267,13 +259,21 @@ namespace AskTheModel {
                 repository_updating ||
                 repository_validating;
 
-            set_annunciator (repos_title_annunciator, true);
-            set_annunciator (repo_ewd_annunciator, ewd_selected);
-            set_annunciator (repo_cbd_annunciator, cbd_selected);
-            set_annunciator (repo_rmd_annunciator, rmd_selected);
             set_annunciator (
-                repo_none_annunciator,
-                !has_selection
+                no_repos_annunciator,
+                !any_ready
+            );
+            set_annunciator (
+                repo_ewd_annunciator,
+                ewd_selected
+            );
+            set_annunciator (
+                repo_cbd_annunciator,
+                cbd_selected
+            );
+            set_annunciator (
+                repo_rmd_annunciator,
+                rmd_selected
             );
             set_annunciator (
                 repo_check_annunciator,
@@ -1057,33 +1057,15 @@ namespace AskTheModel {
         }
 
         private Gtk.Widget build_main_content () {
-            ai_title_annunciator =
+            no_ai_annunciator =
                 build_annunciator_label (
-                    "AI",
-                    "atm-annunciator-title"
+                    "NO AI",
+                    "atm-annunciator-critical"
                 );
-            ai_model_annunciator =
+            no_repos_annunciator =
                 build_annunciator_label (
-                    "NO MODEL",
-                    "atm-annunciator-model"
-                );
-            ai_model_annunciator.ellipsize =
-                Pango.EllipsizeMode.END;
-            ai_model_annunciator.max_width_chars = 18;
-
-            ai_connected_annunciator =
-                build_annunciator_label ("CONNECTED");
-            ai_scan_annunciator =
-                build_annunciator_label ("SCAN");
-            ai_offline_annunciator =
-                build_annunciator_label ("OFFLINE");
-            ai_error_annunciator =
-                build_annunciator_label ("ERROR");
-
-            repos_title_annunciator =
-                build_annunciator_label (
-                    "REPOS",
-                    "atm-annunciator-title"
+                    "NO REPOS",
+                    "atm-annunciator-critical"
                 );
             repo_ewd_annunciator =
                 build_annunciator_label ("EWD");
@@ -1091,71 +1073,66 @@ namespace AskTheModel {
                 build_annunciator_label ("CBD");
             repo_rmd_annunciator =
                 build_annunciator_label ("RMD");
-            repo_none_annunciator =
-                build_annunciator_label ("NONE");
+            ai_scan_annunciator =
+                build_annunciator_label ("SCAN");
             repo_check_annunciator =
                 build_annunciator_label ("CHECK");
             repo_download_annunciator =
-                build_annunciator_label ("DOWNLOAD");
+                build_annunciator_label ("DL");
             repo_update_annunciator =
-                build_annunciator_label ("UPDATE");
+                build_annunciator_label ("UPD");
             repo_validate_annunciator =
-                build_annunciator_label ("VALIDATE");
+                build_annunciator_label ("VAL");
             repo_ready_annunciator =
                 build_annunciator_label ("READY");
             repo_offline_annunciator =
                 build_annunciator_label ("OFFLINE");
             repo_error_annunciator =
-                build_annunciator_label ("ERROR");
+                build_annunciator_label (
+                    "ERR",
+                    "atm-annunciator-critical"
+                );
 
-            var ai_lcd_row = new Gtk.Box (
+            var lcd_row = new Gtk.Box (
                 Gtk.Orientation.HORIZONTAL,
-                10
+                5
             ) {
                 hexpand = true,
-                margin_start = 9,
-                margin_end = 9
-            };
-            ai_lcd_row.append (ai_title_annunciator);
-            ai_lcd_row.append (ai_model_annunciator);
-            ai_lcd_row.append (ai_connected_annunciator);
-            ai_lcd_row.append (ai_scan_annunciator);
-            ai_lcd_row.append (ai_offline_annunciator);
-            ai_lcd_row.append (ai_error_annunciator);
-
-            var repo_lcd_row = new Gtk.Box (
-                Gtk.Orientation.HORIZONTAL,
-                10
-            ) {
-                hexpand = true,
-                margin_start = 9,
-                margin_end = 9
-            };
-            repo_lcd_row.append (repos_title_annunciator);
-            repo_lcd_row.append (repo_ewd_annunciator);
-            repo_lcd_row.append (repo_cbd_annunciator);
-            repo_lcd_row.append (repo_rmd_annunciator);
-            repo_lcd_row.append (repo_none_annunciator);
-            repo_lcd_row.append (repo_check_annunciator);
-            repo_lcd_row.append (repo_download_annunciator);
-            repo_lcd_row.append (repo_update_annunciator);
-            repo_lcd_row.append (repo_validate_annunciator);
-            repo_lcd_row.append (repo_ready_annunciator);
-            repo_lcd_row.append (repo_offline_annunciator);
-            repo_lcd_row.append (repo_error_annunciator);
-
-            var lcd_contents = new Gtk.Box (
-                Gtk.Orientation.VERTICAL,
-                1
-            ) {
+                halign = Gtk.Align.CENTER,
+                margin_start = 10,
+                margin_end = 10,
                 margin_top = 2,
                 margin_bottom = 2
             };
-            lcd_contents.append (ai_lcd_row);
-            lcd_contents.append (repo_lcd_row);
+
+            Gtk.Widget[] lcd_segments = {
+                no_ai_annunciator,
+                no_repos_annunciator,
+                repo_ewd_annunciator,
+                repo_cbd_annunciator,
+                repo_rmd_annunciator,
+                ai_scan_annunciator,
+                repo_check_annunciator,
+                repo_download_annunciator,
+                repo_update_annunciator,
+                repo_validate_annunciator,
+                repo_ready_annunciator,
+                repo_offline_annunciator,
+                repo_error_annunciator
+            };
+
+            for (int i = 0; i < lcd_segments.length; i++) {
+                if (i > 0) {
+                    lcd_row.append (
+                        build_annunciator_separator ()
+                    );
+                }
+
+                lcd_row.append (lcd_segments[i]);
+            }
 
             var status_lcd = new Gtk.Frame (null) {
-                child = lcd_contents,
+                child = lcd_row,
                 hexpand = true,
                 margin_top = 4,
                 margin_bottom = 6,
