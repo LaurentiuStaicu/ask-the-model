@@ -254,6 +254,60 @@ test_structure_intent_keeps_canonical_and_structural_peers (void)
 }
 
 static void
+test_structure_intent_prefers_declared_status_source (void)
+{
+    AtmEvidenceRecord *status = new_record (
+        "cbd:file:STATUS.md",
+        ATM_SOURCE_ROLE_STATUS |
+            ATM_SOURCE_ROLE_CANONICAL,
+        ATM_EVIDENCE_MATCH_LEXICAL,
+        TRUE,
+        -1.0
+    );
+    AtmEvidenceRecord *canonical = new_record (
+        "cbd:file:README.md",
+        ATM_SOURCE_ROLE_CANONICAL,
+        ATM_EVIDENCE_MATCH_LEXICAL,
+        TRUE,
+        -100.0
+    );
+    AtmEvidenceRecord *structural = new_record (
+        "cbd:entity:module:x",
+        ATM_SOURCE_ROLE_STRUCTURAL,
+        ATM_EVIDENCE_MATCH_LEXICAL,
+        TRUE,
+        -100.0
+    );
+
+    g_assert_cmpuint (
+        atm_evidence_authority_rank (
+            status,
+            ATM_RETRIEVAL_INTENT_STRUCTURE
+        ),
+        <,
+        atm_evidence_authority_rank (
+            canonical,
+            ATM_RETRIEVAL_INTENT_STRUCTURE
+        )
+    );
+    g_assert_cmpuint (
+        atm_evidence_authority_rank (
+            status,
+            ATM_RETRIEVAL_INTENT_STRUCTURE
+        ),
+        <,
+        atm_evidence_authority_rank (
+            structural,
+            ATM_RETRIEVAL_INTENT_STRUCTURE
+        )
+    );
+
+    atm_evidence_record_free (structural);
+    atm_evidence_record_free (canonical);
+    atm_evidence_record_free (status);
+}
+
+static void
 test_exact_duplicate_wins_over_lexical_duplicate (void)
 {
     GPtrArray *results = new_results ();
@@ -444,6 +498,10 @@ main (int argc, char **argv)
     g_test_add_func (
         "/retrieval-rank/structure-canonical-peer",
         test_structure_intent_keeps_canonical_and_structural_peers
+    );
+    g_test_add_func (
+        "/retrieval-rank/structure-status-source",
+        test_structure_intent_prefers_declared_status_source
     );
     g_test_add_func (
         "/retrieval-rank/exact-dedup-wins",
