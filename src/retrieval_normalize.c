@@ -100,13 +100,13 @@ atm_retrieval_normalize_query (
         "structura", "structură", "structuri"
     };
     static const char *mechanism_ro[] = {
-        "mecanism", "mecanisme"
+        "mecanism", "mecanismul", "mecanisme"
     };
     static const char *loop_ro[] = {
         "bucla", "buclă", "bucle"
     };
     static const char *source_ro[] = {
-        "sursa", "sursă", "surse"
+        "sursa", "sursă", "surse", "sursele"
     };
     static const char *evidence_ro[] = {
         "evidenta", "evidență", "dovada", "dovadă", "dovezi"
