@@ -36,6 +36,7 @@ executable(
     'src/repository_manifest.c',
     'src/repository_storage.c',
     'src/repository_ingest.c',
+    'src/retrieval_index.c',
     resources
   ],
   dependencies: [
@@ -46,7 +47,8 @@ executable(
   ],
   link_args: [
     '-larchive',
-    '-lyaml'
+    '-lyaml',
+    '-lsqlite3'
   ],
   install: true
 )
@@ -192,6 +194,45 @@ repository_ingest_test = executable(
 test(
   'repository-ingest',
   repository_ingest_test
+)
+
+retrieval_index_schema_test = executable(
+  'retrieval-index-schema-test',
+  'tests/retrieval_index_schema_test.c',
+  dependencies: [
+    glib_dep,
+    sqlite_dep
+  ],
+  install: false
+)
+
+test(
+  'retrieval-index-schema',
+  retrieval_index_schema_test,
+  env: {
+    'ATM_RETRIEVAL_SCHEMA': meson.project_source_root() / 'data/schemas/retrieval-index-v1.sql'
+  }
+)
+
+retrieval_index_test = executable(
+  'retrieval-index-test',
+  [
+    'src/retrieval_index.c',
+    'tests/retrieval_index_test.c',
+    resources
+  ],
+  include_directories: include_directories('src'),
+  dependencies: [
+    glib_dep,
+    gio_dep,
+    sqlite_dep
+  ],
+  install: false
+)
+
+test(
+  'retrieval-index',
+  retrieval_index_test
 )
 
 subdir('data')
