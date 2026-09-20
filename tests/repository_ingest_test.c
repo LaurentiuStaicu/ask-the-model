@@ -453,6 +453,150 @@ test_cancelled_ingest_does_not_create_staging (void)
     g_free (root);
 }
 
+typedef struct {
+    GMainLoop *loop;
+    gboolean success;
+    char *version;
+    char *snapshot_path;
+    guint64 entries;
+    guint64 total_bytes;
+    GError *error;
+} AsyncIngestState;
+
+static void
+async_ingest_complete (
+    GObject *source_object,
+    GAsyncResult *result,
+    gpointer user_data
+)
+{
+    AsyncIngestState *state = user_data;
+
+    (void) source_object;
+
+    state->success = atm_repository_ingest_archive_finish (
+        result,
+        &state->version,
+        &state->snapshot_path,
+        &state->entries,
+        &state->total_bytes,
+        &state->error
+    );
+
+    g_main_loop_quit (state->loop);
+}
+
+static void
+test_async_ingest_success (void)
+{
+    char *root = new_temp_root ();
+    char *data_root = g_build_filename (root, "data", NULL);
+    char *archive_path = g_build_filename (
+        root,
+        "snapshot.tar.gz",
+        NULL
+    );
+    char *manifest = valid_manifest ("ewd");
+    AsyncIngestState state = { 0 };
+
+    write_archive (archive_path, manifest);
+    state.loop = g_main_loop_new (NULL, FALSE);
+
+    atm_repository_ingest_archive_async (
+        data_root,
+        archive_path,
+        "ewd",
+        "EWD",
+        "Empirical World3 Dynamics",
+        test_sha (),
+        NULL,
+        async_ingest_complete,
+        &state
+    );
+
+    g_main_loop_run (state.loop);
+
+    g_assert_true (state.success);
+    g_assert_no_error (state.error);
+    g_assert_cmpstr (state.version, ==, "0.1.0");
+    g_assert_nonnull (state.snapshot_path);
+    g_assert_cmpuint (state.entries, ==, 8);
+    g_assert_cmpuint (state.total_bytes, >, 0);
+    g_assert_true (
+        g_file_test (state.snapshot_path, G_FILE_TEST_IS_DIR)
+    );
+
+    g_main_loop_unref (state.loop);
+    g_free (state.version);
+    g_free (state.snapshot_path);
+    g_free (manifest);
+    g_free (archive_path);
+    g_free (data_root);
+    remove_tree_best_effort (root);
+    g_free (root);
+}
+
+static void
+test_async_ingest_cancelled (void)
+{
+    char *root = new_temp_root ();
+    char *data_root = g_build_filename (root, "data", NULL);
+    char *archive_path = g_build_filename (
+        root,
+        "snapshot.tar.gz",
+        NULL
+    );
+    char *manifest = valid_manifest ("ewd");
+    GCancellable *cancellable = g_cancellable_new ();
+    AsyncIngestState state = { 0 };
+
+    write_archive (archive_path, manifest);
+    state.loop = g_main_loop_new (NULL, FALSE);
+    g_cancellable_cancel (cancellable);
+
+    atm_repository_ingest_archive_async (
+        data_root,
+        archive_path,
+        "ewd",
+        "EWD",
+        "Empirical World3 Dynamics",
+        test_sha (),
+        cancellable,
+        async_ingest_complete,
+        &state
+    );
+
+    g_main_loop_run (state.loop);
+
+    g_assert_false (state.success);
+    g_assert_error (
+        state.error,
+        G_IO_ERROR,
+        G_IO_ERROR_CANCELLED
+    );
+    g_assert_null (state.version);
+    g_assert_null (state.snapshot_path);
+
+    char *final_path = atm_repository_snapshot_path (
+        data_root,
+        "ewd",
+        test_sha ()
+    );
+    g_assert_false (
+        g_file_test (final_path, G_FILE_TEST_EXISTS)
+    );
+
+    g_free (final_path);
+    g_clear_error (&state.error);
+    g_main_loop_unref (state.loop);
+    g_object_unref (cancellable);
+    g_free (manifest);
+    g_free (archive_path);
+    g_free (data_root);
+    remove_tree_best_effort (root);
+    g_free (root);
+}
+
 static void
 test_production_limits (void)
 {
@@ -489,6 +633,14 @@ main (int argc, char **argv)
     g_test_add_func (
         "/ingest/cancelled-before-start",
         test_cancelled_ingest_does_not_create_staging
+    );
+    g_test_add_func (
+        "/ingest/async-success",
+        test_async_ingest_success
+    );
+    g_test_add_func (
+        "/ingest/async-cancelled",
+        test_async_ingest_cancelled
     );
     g_test_add_func (
         "/ingest/production-limits",
