@@ -41,6 +41,7 @@ executable(
     'src/retrieval_query.c',
     'src/retrieval_rank.c',
     'src/retrieval_scope.c',
+    'src/retrieval_normalize.c',
     'src/repository_sources.c',
     'src/markdown_sections.c',
     'src/csv_table.c',
@@ -340,6 +341,24 @@ retrieval_scope_test = executable(
 test(
   'retrieval-scope',
   retrieval_scope_test
+)
+
+retrieval_normalize_test = executable(
+  'retrieval-normalize-test',
+  [
+    'src/retrieval_normalize.c',
+    'tests/retrieval_normalize_test.c'
+  ],
+  include_directories: include_directories('src'),
+  dependencies: [
+    glib_dep
+  ],
+  install: false
+)
+
+test(
+  'retrieval-normalize',
+  retrieval_normalize_test
 )
 
 repository_sources_test = executable(
