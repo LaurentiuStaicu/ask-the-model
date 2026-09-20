@@ -213,7 +213,7 @@ namespace AskTheModel.Tests {
                 "assistant"
             };
             string[] second_contents = {
-                "First user question",
+                "First user question [S7]",
                 "First assistant answer [S1]."
             };
 
@@ -231,11 +231,16 @@ namespace AskTheModel.Tests {
             assert (second_request.contains ("EVIDENCE_TWO"));
             assert (
                 second_request.contains (
-                    "First user question"
+                    "First user question [S7]"
                 )
             );
             assert (
                 second_request.contains (
+                    "First assistant answer ."
+                )
+            );
+            assert (
+                !second_request.contains (
                     "First assistant answer [S1]."
                 )
             );
