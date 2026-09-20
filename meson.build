@@ -42,6 +42,7 @@ executable(
     'src/retrieval_rank.c',
     'src/retrieval_scope.c',
     'src/retrieval_router.c',
+    'src/grounding_context.c',
     'src/retrieval_normalize.c',
     'src/repository_sources.c',
     'src/markdown_sections.c',
@@ -391,6 +392,24 @@ retrieval_router_test = executable(
 test(
   'retrieval-router',
   retrieval_router_test
+)
+
+grounding_context_test = executable(
+  'grounding-context-test',
+  [
+    'src/grounding_context.c',
+    'tests/grounding_context_test.c'
+  ],
+  include_directories: include_directories('src'),
+  dependencies: [
+    glib_dep
+  ],
+  install: false
+)
+
+test(
+  'grounding-context',
+  grounding_context_test
 )
 
 repository_sources_test = executable(
