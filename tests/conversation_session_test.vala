@@ -111,6 +111,54 @@ test_rejects_second_begin_until_reset ()
     assert (session.is_active ());
 }
 
+private static void
+test_zero_scope_has_no_committable_grounded_turn ()
+{
+    var grounding = new AskTheModel.ConversationGrounding ();
+    var session = new AskTheModel.ConversationSession ();
+
+    try {
+        assert (grounding.freeze ());
+        session.begin (grounding);
+
+        bool needs_clarification;
+        string? system_instructions;
+        string? evidence_text;
+        string? post_evidence_reminder;
+
+        bool has_grounding = session.prepare_turn (
+            "ordinary local chat",
+            out needs_clarification,
+            out system_instructions,
+            out evidence_text,
+            out post_evidence_reminder
+        );
+
+        assert (!has_grounding);
+        assert (!needs_clarification);
+    } catch (Error error) {
+        critical ("%s", error.message);
+        assert_not_reached ();
+    }
+
+    bool commit_rejected = false;
+
+    try {
+        session.commit_turn ();
+    } catch (Error error) {
+        commit_rejected = true;
+        assert (
+            error.message ==
+            "No prepared grounded turn is available to commit."
+        );
+    }
+
+    assert (commit_rejected);
+
+    session.abort_turn ();
+    assert (session.is_active ());
+}
+
 public static int
 main (string[] args)
 {
@@ -127,6 +175,10 @@ main (string[] args)
     Test.add_func (
         "/conversation-session/rejects-second-begin-until-reset",
         test_rejects_second_begin_until_reset
+    );
+    Test.add_func (
+        "/conversation-session/zero-scope-no-grounded-commit",
+        test_zero_scope_has_no_committable_grounded_turn
     );
 
     return Test.run ();
