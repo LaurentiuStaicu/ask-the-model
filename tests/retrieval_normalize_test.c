@@ -329,6 +329,32 @@ test_development_human_validation_aliases (void)
 }
 
 static void
+test_validation_boundary_does_not_become_evidence_without_human_context (void)
+{
+    AtmNormalizedQuery *normalized = NULL;
+    GError *error = NULL;
+
+    g_assert_true (
+        atm_retrieval_normalize_query (
+            "What is the current validation boundary?",
+            &normalized,
+            &error
+        )
+    );
+    g_assert_no_error (error);
+    g_assert_true (
+        (normalized->intents &
+         ATM_RETRIEVAL_INTENT_CURRENT_STATE) != 0
+    );
+    g_assert_false (
+        (normalized->intents &
+         ATM_RETRIEVAL_INTENT_EVIDENCE) != 0
+    );
+
+    atm_normalized_query_free (normalized);
+}
+
+static void
 test_invalid_normalization_input_is_rejected (void)
 {
     AtmNormalizedQuery *normalized = NULL;
@@ -393,6 +419,10 @@ main (int argc, char **argv)
     g_test_add_func (
         "/retrieval-normalize/development-human-validation",
         test_development_human_validation_aliases
+    );
+    g_test_add_func (
+        "/retrieval-normalize/validation-boundary-not-evidence",
+        test_validation_boundary_does_not_become_evidence_without_human_context
     );
     g_test_add_func (
         "/retrieval-normalize/invalid-input",
