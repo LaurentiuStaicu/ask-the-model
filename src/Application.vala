@@ -11,11 +11,14 @@ namespace AskTheModel {
         private Gtk.DropDown? model_dropdown;
         private Gtk.StringList? model_list;
         private Gtk.Button? refresh_models_button;
+        private ActivityRing? refresh_models_ring;
         private Gtk.Label? model_scan_status;
         private Gtk.MenuButton? repository_menu_button;
         private Gtk.CheckButton[] repository_check_buttons = {};
         private Gtk.Button? refresh_repositories_button;
+        private ActivityRing? refresh_repositories_ring;
         private Gtk.Button? repository_action_button;
+        private ActivityRing? repository_action_ring;
         private Gtk.Label? repository_scan_status;
         private RepositorySelection repository_selection =
             new RepositorySelection ();
@@ -171,7 +174,7 @@ namespace AskTheModel {
 
         private async void refresh_local_models () {
             begin_model_scan_status ();
-            set_button_working (refresh_models_button, true);
+            set_activity_working (refresh_models_ring, true);
 
             if (refresh_models_button != null) {
                 refresh_models_button.sensitive = false;
@@ -219,7 +222,7 @@ namespace AskTheModel {
                 );
             }
 
-            set_button_working (refresh_models_button, false);
+            set_activity_working (refresh_models_ring, false);
         }
 
         private void update_model_selector () {
@@ -261,26 +264,29 @@ namespace AskTheModel {
             updating_model_selector = false;
         }
 
-        private void set_button_working (
-            Gtk.Button? button,
+        private void set_activity_working (
+            ActivityRing? ring,
             bool working
         ) {
-            if (button == null) {
+            if (ring == null) {
                 return;
             }
 
-            if (working) {
-                button.add_css_class ("atm-working-ring");
+            ring.set_working (
+                working,
+                gtk_settings.gtk_enable_animations
+            );
+        }
 
-                if (gtk_settings.gtk_enable_animations) {
-                    button.add_css_class ("atm-working-ring-animated");
-                } else {
-                    button.remove_css_class ("atm-working-ring-animated");
-                }
-            } else {
-                button.remove_css_class ("atm-working-ring-animated");
-                button.remove_css_class ("atm-working-ring");
-            }
+        private Gtk.Widget build_activity_overlay (
+            Gtk.Button button,
+            ActivityRing ring
+        ) {
+            var overlay = new Gtk.Overlay () {
+                child = button
+            };
+            overlay.add_overlay (ring);
+            return overlay;
         }
 
         private void update_repository_selector_label () {
@@ -410,7 +416,7 @@ namespace AskTheModel {
             }
 
             begin_repository_scan_status ();
-            set_button_working (refresh_repositories_button, true);
+            set_activity_working (refresh_repositories_ring, true);
 
             if (refresh_repositories_button != null) {
                 refresh_repositories_button.sensitive = false;
@@ -531,7 +537,7 @@ namespace AskTheModel {
                 refresh_repositories_button.sensitive = true;
             }
 
-            set_button_working (refresh_repositories_button, false);
+            set_activity_working (refresh_repositories_ring, false);
             update_repository_option_labels ();
             update_repository_selector_label ();
         }
@@ -546,7 +552,7 @@ namespace AskTheModel {
             }
 
             repository_status_generation++;
-            set_button_working (repository_action_button, true);
+            set_activity_working (repository_action_ring, true);
             if (repository_scan_status != null) {
                 repository_scan_status.label = "Preparing repositories…";
                 repository_scan_status.visible = true;
@@ -595,7 +601,7 @@ namespace AskTheModel {
                 refresh_repositories_button.sensitive = true;
             }
 
-            set_button_working (repository_action_button, false);
+            set_activity_working (repository_action_ring, false);
             update_repository_option_labels ();
             update_repository_selector_label ();
         }
@@ -766,8 +772,15 @@ namespace AskTheModel {
                 Gtk.Orientation.HORIZONTAL,
                 6
             );
+            refresh_models_ring = new ActivityRing ();
+
             model_controls.append (model_dropdown);
-            model_controls.append (refresh_models_button);
+            model_controls.append (
+                build_activity_overlay (
+                    refresh_models_button,
+                    refresh_models_ring
+                )
+            );
             model_controls.append (model_scan_status);
 
             refresh_repositories_button =
@@ -802,9 +815,22 @@ namespace AskTheModel {
                 Gtk.Orientation.HORIZONTAL,
                 6
             );
+            refresh_repositories_ring = new ActivityRing ();
+            repository_action_ring = new ActivityRing ();
+
             repository_controls.append (build_repository_selector ());
-            repository_controls.append (refresh_repositories_button);
-            repository_controls.append (repository_action_button);
+            repository_controls.append (
+                build_activity_overlay (
+                    refresh_repositories_button,
+                    refresh_repositories_ring
+                )
+            );
+            repository_controls.append (
+                build_activity_overlay (
+                    repository_action_button,
+                    repository_action_ring
+                )
+            );
             repository_controls.append (repository_scan_status);
 
             var header_controls = new Gtk.Box (
