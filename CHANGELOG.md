@@ -6,6 +6,7 @@ All notable public releases of Ask the Model are recorded here.
 
 ### Repository governance
 
+- added PR-only workflow concurrency so superseded Flatpak builds on the same pull-request branch are canceled without canceling main-branch publication/release workflows;
 - added contribution and support guidance;
 - added structured application and provider/model compatibility issue forms;
 - added a pull-request checklist that preserves the application/provider/model and scientific-repository boundaries;
