@@ -927,7 +927,12 @@ namespace AskTheModel {
             var overlay = new Gtk.Overlay () {
                 child = selector
             };
-            overlay.add_overlay (new SelectorTriangle ());
+            var triangle = new SelectorTriangle ();
+            overlay.add_overlay (triangle);
+            overlay.set_clip_overlay (
+                triangle,
+                true
+            );
             return overlay;
         }
 
@@ -1397,7 +1402,7 @@ namespace AskTheModel {
 
             model_dropdown = new Gtk.DropDown (null, null) {
                 sensitive = false,
-                show_arrow = true,
+                show_arrow = false,
                 tooltip_text = "Select local AI model"
             };
             model_dropdown.add_css_class (
@@ -1459,7 +1464,9 @@ namespace AskTheModel {
             refresh_models_ring = new ActivityRing ();
 
             model_controls.append (
-                model_dropdown
+                build_selector_triangle_overlay (
+                    model_dropdown
+                )
             );
             model_controls.append (
                 build_activity_overlay (
