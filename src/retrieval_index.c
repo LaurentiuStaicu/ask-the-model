@@ -2497,3 +2497,346 @@ out:
 
     return ok;
 }
+
+
+static guint
+source_role_bit_from_name (const char *role)
+{
+    if (g_strcmp0 (role, "canonical") == 0) {
+        return ATM_SOURCE_ROLE_CANONICAL;
+    }
+
+    if (g_strcmp0 (role, "structural") == 0) {
+        return ATM_SOURCE_ROLE_STRUCTURAL;
+    }
+
+    if (g_strcmp0 (role, "evidence") == 0) {
+        return ATM_SOURCE_ROLE_EVIDENCE;
+    }
+
+    if (g_strcmp0 (role, "tabular") == 0) {
+        return ATM_SOURCE_ROLE_TABULAR;
+    }
+
+    if (g_strcmp0 (role, "implementation") == 0) {
+        return ATM_SOURCE_ROLE_IMPLEMENTATION;
+    }
+
+    return 0;
+}
+
+static gboolean
+validate_indexed_source_roles (
+    sqlite3 *db,
+    sqlite3_int64 source_id,
+    guint expected_roles,
+    GError **error
+)
+{
+    sqlite3_stmt *statement = NULL;
+    guint actual_roles = 0;
+    int rc;
+
+    rc = sqlite3_prepare_v2 (
+        db,
+        "SELECT role FROM source_roles "
+        "WHERE source_id = ?1 ORDER BY role;",
+        -1,
+        &statement,
+        NULL
+    );
+
+    if (rc != SQLITE_OK) {
+        g_set_error (
+            error,
+            ATM_RETRIEVAL_INDEX_ERROR,
+            ATM_RETRIEVAL_INDEX_ERROR_SQLITE,
+            "Could not prepare source-role validation query: %s",
+            sqlite3_errmsg (db)
+        );
+        return FALSE;
+    }
+
+    sqlite3_bind_int64 (statement, 1, source_id);
+
+    while ((rc = sqlite3_step (statement)) == SQLITE_ROW) {
+        const char *role = (const char *) sqlite3_column_text (
+            statement,
+            0
+        );
+        guint bit = source_role_bit_from_name (role);
+
+        if (bit == 0 || (actual_roles & bit) != 0) {
+            sqlite3_finalize (statement);
+            g_set_error_literal (
+                error,
+                ATM_RETRIEVAL_INDEX_ERROR,
+                ATM_RETRIEVAL_INDEX_ERROR_INTEGRITY,
+                "Retrieval index contains an invalid or duplicate source role."
+            );
+            return FALSE;
+        }
+
+        actual_roles |= bit;
+    }
+
+    sqlite3_finalize (statement);
+
+    if (rc != SQLITE_DONE) {
+        g_set_error (
+            error,
+            ATM_RETRIEVAL_INDEX_ERROR,
+            ATM_RETRIEVAL_INDEX_ERROR_SQLITE,
+            "Could not finish source-role validation: %s",
+            sqlite3_errmsg (db)
+        );
+        return FALSE;
+    }
+
+    if (actual_roles != expected_roles) {
+        g_set_error_literal (
+            error,
+            ATM_RETRIEVAL_INDEX_ERROR,
+            ATM_RETRIEVAL_INDEX_ERROR_INTEGRITY,
+            "Retrieval-index source roles do not match the pinned snapshot manifest."
+        );
+        return FALSE;
+    }
+
+    return TRUE;
+}
+
+gboolean
+atm_retrieval_index_validate_snapshot_sources (
+    const char *index_path,
+    const char *snapshot_root,
+    const char *expected_repository_id,
+    const char *expected_snapshot_sha,
+    GError **error
+)
+{
+    AtmSourceCatalog *catalog = NULL;
+    sqlite3 *db = NULL;
+    sqlite3_stmt *metadata_statement = NULL;
+    sqlite3_stmt *source_statement = NULL;
+    gboolean ok = FALSE;
+    int rc;
+
+    g_return_val_if_fail (index_path != NULL, FALSE);
+    g_return_val_if_fail (snapshot_root != NULL, FALSE);
+    g_return_val_if_fail (expected_repository_id != NULL, FALSE);
+    g_return_val_if_fail (expected_snapshot_sha != NULL, FALSE);
+
+    if (!atm_retrieval_index_validate_identity (
+            index_path,
+            expected_repository_id,
+            expected_snapshot_sha,
+            error
+        )) {
+        return FALSE;
+    }
+
+    if (!atm_repository_source_catalog_build (
+            snapshot_root,
+            expected_repository_id,
+            &catalog,
+            error
+        )) {
+        return FALSE;
+    }
+
+    rc = sqlite3_open_v2 (
+        index_path,
+        &db,
+        SQLITE_OPEN_READONLY,
+        NULL
+    );
+
+    if (rc != SQLITE_OK) {
+        g_set_error (
+            error,
+            ATM_RETRIEVAL_INDEX_ERROR,
+            ATM_RETRIEVAL_INDEX_ERROR_SQLITE,
+            "Could not reopen retrieval index for source validation: %s",
+            db != NULL ? sqlite3_errmsg (db) : "unknown SQLite error"
+        );
+        goto out;
+    }
+
+    if (!sqlite_exec_checked (
+            db,
+            "PRAGMA trusted_schema = OFF;"
+            "PRAGMA query_only = ON;"
+            "PRAGMA foreign_keys = ON;",
+            error
+        )) {
+        goto out;
+    }
+
+    if (sqlite3_prepare_v2 (
+            db,
+            "SELECT manifest_sha256 FROM snapshot_metadata "
+            "WHERE id = 1;",
+            -1,
+            &metadata_statement,
+            NULL
+        ) != SQLITE_OK ||
+        sqlite3_step (metadata_statement) != SQLITE_ROW) {
+        g_set_error_literal (
+            error,
+            ATM_RETRIEVAL_INDEX_ERROR,
+            ATM_RETRIEVAL_INDEX_ERROR_INTEGRITY,
+            "Retrieval-index manifest identity is missing."
+        );
+        goto out;
+    }
+
+    if (g_strcmp0 (
+            (const char *) sqlite3_column_text (
+                metadata_statement,
+                0
+            ),
+            catalog->manifest_sha256
+        ) != 0 ||
+        sqlite3_step (metadata_statement) != SQLITE_DONE) {
+        g_set_error_literal (
+            error,
+            ATM_RETRIEVAL_INDEX_ERROR,
+            ATM_RETRIEVAL_INDEX_ERROR_INTEGRITY,
+            "Retrieval-index manifest hash does not match the pinned snapshot."
+        );
+        goto out;
+    }
+
+    sqlite3_finalize (metadata_statement);
+    metadata_statement = NULL;
+
+    if (sqlite3_prepare_v2 (
+            db,
+            "SELECT id, path, sha256, byte_size, media_type, "
+            "logical_source_id "
+            "FROM source_files ORDER BY path;",
+            -1,
+            &source_statement,
+            NULL
+        ) != SQLITE_OK) {
+        g_set_error (
+            error,
+            ATM_RETRIEVAL_INDEX_ERROR,
+            ATM_RETRIEVAL_INDEX_ERROR_SQLITE,
+            "Could not prepare source provenance validation query: %s",
+            sqlite3_errmsg (db)
+        );
+        goto out;
+    }
+
+    for (guint i = 0; i < catalog->files->len; i++) {
+        const AtmSourceRecord *expected = g_ptr_array_index (
+            catalog->files,
+            i
+        );
+
+        if (sqlite3_step (source_statement) != SQLITE_ROW) {
+            g_set_error (
+                error,
+                ATM_RETRIEVAL_INDEX_ERROR,
+                ATM_RETRIEVAL_INDEX_ERROR_INTEGRITY,
+                "Retrieval index is missing expected source '%s'.",
+                expected->path
+            );
+            goto out;
+        }
+
+        sqlite3_int64 source_id = sqlite3_column_int64 (
+            source_statement,
+            0
+        );
+        const char *path = (const char *) sqlite3_column_text (
+            source_statement,
+            1
+        );
+        const char *sha256 = (const char *) sqlite3_column_text (
+            source_statement,
+            2
+        );
+        sqlite3_int64 byte_size = sqlite3_column_int64 (
+            source_statement,
+            3
+        );
+        const char *media_type =
+            (const char *) sqlite3_column_text (
+                source_statement,
+                4
+            );
+        const char *logical_source_id =
+            (const char *) sqlite3_column_text (
+                source_statement,
+                5
+            );
+        char *expected_logical_source_id = g_strdup_printf (
+            "%s:file:%s",
+            expected_repository_id,
+            expected->path
+        );
+
+        gboolean row_matches =
+            g_strcmp0 (path, expected->path) == 0 &&
+            g_strcmp0 (sha256, expected->sha256) == 0 &&
+            byte_size == (sqlite3_int64) expected->byte_size &&
+            g_strcmp0 (media_type, expected->media_type) == 0 &&
+            g_strcmp0 (
+                logical_source_id,
+                expected_logical_source_id
+            ) == 0;
+
+        g_free (expected_logical_source_id);
+
+        if (!row_matches) {
+            g_set_error (
+                error,
+                ATM_RETRIEVAL_INDEX_ERROR,
+                ATM_RETRIEVAL_INDEX_ERROR_INTEGRITY,
+                "Retrieval-index provenance differs from pinned snapshot source '%s'.",
+                expected->path
+            );
+            goto out;
+        }
+
+        if (!validate_indexed_source_roles (
+                db,
+                source_id,
+                expected->roles,
+                error
+            )) {
+            goto out;
+        }
+    }
+
+    if (sqlite3_step (source_statement) != SQLITE_DONE) {
+        g_set_error_literal (
+            error,
+            ATM_RETRIEVAL_INDEX_ERROR,
+            ATM_RETRIEVAL_INDEX_ERROR_INTEGRITY,
+            "Retrieval index contains source files not selected by the pinned snapshot manifest."
+        );
+        goto out;
+    }
+
+    ok = TRUE;
+
+out:
+    if (source_statement != NULL) {
+        sqlite3_finalize (source_statement);
+    }
+
+    if (metadata_statement != NULL) {
+        sqlite3_finalize (metadata_statement);
+    }
+
+    if (db != NULL) {
+        sqlite3_close (db);
+    }
+
+    g_clear_pointer (&catalog, atm_source_catalog_free);
+    return ok;
+}
