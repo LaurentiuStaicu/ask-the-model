@@ -14,6 +14,13 @@ namespace AskTheModel.Tests {
         assert (selection.set_selected ("cbd", true));
         assert (selection.summary () == "EWD + CBD + RMD");
 
+        RepositoryDescriptor[] selected =
+            selection.selected_repositories ();
+        assert (selected.length == 3);
+        assert (selected[0].id == "ewd");
+        assert (selected[1].id == "cbd");
+        assert (selected[2].id == "rmd");
+
         assert (selection.set_selected ("rmd", false));
         assert (selection.summary () == "EWD + CBD");
 
