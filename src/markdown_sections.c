@@ -346,7 +346,12 @@ out:
 
     g_clear_pointer (&current_title, g_free);
     g_clear_pointer (&current_heading_path, g_free);
-    g_clear_pointer (&current_body, g_string_free);
+
+    if (current_body != NULL) {
+        g_string_free (current_body, TRUE);
+        current_body = NULL;
+    }
+
     g_clear_pointer (&sections, g_ptr_array_unref);
     g_strfreev (lines);
     g_free (contents);
