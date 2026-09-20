@@ -5,8 +5,8 @@ test_zero_scope_freeze ()
 {
     var grounding = new AskTheModel.ConversationGrounding ();
 
-    assert (!grounding.is_frozen);
-    assert (grounding.repository_count == 0);
+    assert (!grounding.is_frozen ());
+    assert (grounding.repository_count () == 0);
 
     try {
         assert (grounding.freeze ());
@@ -15,8 +15,8 @@ test_zero_scope_freeze ()
         assert_not_reached ();
     }
 
-    assert (grounding.is_frozen);
-    assert (grounding.repository_count == 0);
+    assert (grounding.is_frozen ());
+    assert (grounding.repository_count () == 0);
 }
 
 private static void
@@ -50,7 +50,7 @@ test_frozen_scope_rejects_late_repository ()
     }
 
     assert (rejected);
-    assert (grounding.repository_count == 0);
+    assert (grounding.repository_count () == 0);
 }
 
 public static int
