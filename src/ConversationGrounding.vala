@@ -58,6 +58,20 @@ namespace AskTheModel {
             out string? evidence_text,
             out string? post_evidence_reminder
         ) throws GLib.Error;
+
+        [CCode (
+            cname = "atm_conversation_grounding_commit_turn",
+            cheader_filename = "conversation_grounding.h"
+        )]
+        public static extern bool commit_turn (
+            void* state
+        ) throws GLib.Error;
+
+        [CCode (
+            cname = "atm_conversation_grounding_abort_turn",
+            cheader_filename = "conversation_grounding.h"
+        )]
+        public static extern void abort_turn (void* state);
     }
 
     public class ConversationGrounding : Object {
@@ -127,6 +141,14 @@ namespace AskTheModel {
             }
 
             return has_grounding;
+        }
+
+        public bool commit_turn () throws GLib.Error {
+            return ConversationGroundingNative.commit_turn (state);
+        }
+
+        public void abort_turn () {
+            ConversationGroundingNative.abort_turn (state);
         }
     }
 }
