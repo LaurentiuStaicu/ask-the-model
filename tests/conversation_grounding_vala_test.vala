@@ -77,6 +77,35 @@ test_frozen_scope_rejects_late_repository ()
     assert (grounding.repository_count () == 0);
 }
 
+private static void
+test_zero_scope_has_no_citation_map ()
+{
+    var grounding = new AskTheModel.ConversationGrounding ();
+
+    try {
+        assert (grounding.freeze ());
+    } catch (Error error) {
+        critical ("%s", error.message);
+        assert_not_reached ();
+    }
+
+    bool rejected = false;
+
+    try {
+        grounding.resolve_turn_citations (
+            "No grounded turn [S1]."
+        );
+    } catch (Error error) {
+        rejected = true;
+        assert (
+            error.message ==
+            "No grounded conversation turn is available for citation resolution."
+        );
+    }
+
+    assert (rejected);
+}
+
 public static int
 main (string[] args)
 {
@@ -89,6 +118,10 @@ main (string[] args)
     Test.add_func (
         "/conversation-grounding-vala/frozen-rejects-late-repository",
         test_frozen_scope_rejects_late_repository
+    );
+    Test.add_func (
+        "/conversation-grounding-vala/zero-scope-no-citation-map",
+        test_zero_scope_has_no_citation_map
     );
 
     return Test.run ();
