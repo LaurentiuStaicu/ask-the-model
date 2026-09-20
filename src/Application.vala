@@ -294,7 +294,7 @@ namespace AskTheModel {
                     );
             }
 
-            if (repository_offline && any_ready) {
+            if (repository_offline) {
                 repository_summary +=
                     "; remote check offline";
             }
@@ -434,6 +434,8 @@ namespace AskTheModel {
             repository_downloading = false;
             repository_updating = false;
             repository_validating = false;
+            repository_offline = false;
+            repository_error = false;
             update_repository_annunciators ();
         }
 
