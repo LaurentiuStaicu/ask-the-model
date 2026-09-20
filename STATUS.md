@@ -2,109 +2,93 @@
 
 ## Release status
 
-**Current release: Ask the Model (AtM) v0.2.2 — Documentation and public-metadata consistency, released 2026-09-20.**
+**Current release: Ask the Model (AtM) v0.3.0 — Repository-Grounded Multi-Chat, released 2026-09-20.**
 
-v0.2.2 preserves the v0.2.0 Local Chat Baseline and the v0.2.1 release-distribution correction while aligning first-time user documentation, model-management and troubleshooting guidance, citation metadata, AppStream metadata and desktop-launcher wording with the implemented capability boundary. It does not change local-chat behavior.
+v0.3.0 is the first public repository-aware release for the fixed EWD/CBD/RMD scientific dynamical-model suite. It preserves the local Ollama-compatible chat baseline while adding validated repository lifecycle management, deterministic retrieval, independent multi-chat state, frozen per-conversation repository/model identity and exact on-demand citation provenance.
 
-The project remains in the `0.x` initial-development series. Repository-aware retrieval and scientific provenance are not implemented in this release.
-
-## Development main — unreleased repository-aware application
-
-Development `main` has advanced beyond the public v0.2.2 UI boundary with repository/retrieval work and a repository-aware GTK conversation path that remain unreleased.
-
-The current development implementation includes:
-
-- SHA-pinned, validated and immutable local snapshots for the fixed EWD/CBD/RMD catalog;
-- deterministic per-snapshot index schema v2 validated against real EWD, CBD and RMD snapshots, including the manifest-declared `status_source` as a distinct authority role;
-- exact technical-ID and structured entity/relation retrieval;
-- safe FTS5/BM25 lexical retrieval;
-- deterministic tabular row-key retrieval;
-- intent-aware source authority and deduplication;
-- conversation-pinned repository scoping;
-- conservative Romanian/English query normalization;
-- evidence records carrying repository ID, repository version and snapshot SHA;
-- a deterministic repository router combining those primitives without embeddings;
-- immutable per-conversation repository pinning that validates repository/index identity, supports valid zero-repository local chat and rejects post-freeze scope mutation;
-- current-turn grounded Ollama request construction that keeps repository evidence transient rather than persisting grounding blocks into ordinary chat history;
-- current-turn citation-label resolution into persistent provenance objects without fabricating metadata for unknown labels;
-- real-repository R4 traceability checks across EWD, CBD and RMD;
-- deterministic multi-turn retrieval state that can inherit repository scope, intent and exact anchors across follow-ups and return an explicit clarification outcome where needed;
-- versioned R5 benchmark/run schemas, deterministic metric evaluation, provisional gates and CI for the benchmark contract, including clarification-outcome semantics;
-- a reviewed frozen R5 seed corpus pinned to exact EWD/CBD/RMD v0.1.0 snapshots, with all required topic classes, Romanian/English/mixed coverage, unsupported cases and deterministic multi-turn cases;
-- a deterministic real-corpus R5 runner that checks out the pinned SHAs, rebuilds the real indexes, executes the R3/R4 conversation/grounding path and evaluates the versioned run contract;
-- a passing frozen R5 retrieval benchmark under the provisional gates; the current verified baseline on 2026-09-20 records exact-ID Success@1 1.00, MRR 1.00, nDCG@5 0.9069, required Recall@5 0.9833, RO–EN nDCG gap 0.0333, wrong-repository contamination@5 0.0207, evidence traceability 1.00 and clarification-outcome accuracy 1.00.
-
-The unreleased development GTK path now exposes the fixed EWD/CBD/RMD repository selector and lifecycle controls, real multi-chat tabs with independent in-memory provider/session state, first-Send repository/model pinning, end-to-end grounded message generation and compact user-visible source references. Grounded turns validate temporary source labels before commit and preserve exact repository/version/SHA/logical-source/locator provenance for on-demand inspection. Ordinary zero-repository chat remains available and continues to stream normally.
-
-The frozen R5 deterministic retrieval benchmark passes its provisional engineering gates on the pinned EWD/CBD/RMD corpus, and the real-repository R4 integration gate continues to exercise citation traceability independently of the GTK UI. This validates the unreleased development implementation against the current engineering contracts; it does not establish scientific validity of the underlying models. Therefore **v0.2.2 remains the current public release** and its user-facing capability boundary is unchanged.
+The project remains in the `0.x` initial-development series.
 
 ## Canonical application role
 
 **Ask the Model (AtM) is a local conversational interface designed for querying, exploring and discussing repositories of scientific dynamical models through natural language. It is not itself a scientific model and does not embed, redefine or replace the canonical models maintained in those repositories.**
 
-The intended dynamical-model repository suite currently includes Empirical World3 Dynamics (EWD), Cognitive Belief Dynamics (CBD) and Romanian Monetary Dynamics (RMD), with scope for future compatible repositories.
+The v0.3.0 repository catalog is fixed to:
+
+- Empirical World3 Dynamics (EWD);
+- Cognitive Belief Dynamics (CBD);
+- Romanian Monetary Dynamics (RMD).
 
 Each scientific model remains authoritative in its own repository. AtM is an access and interaction layer over those external project sources.
 
 ## Current functional boundary
 
-v0.2.2 preserves the v0.2.0 functional baseline:
+v0.3.0 includes:
 
-- the GTK 4 and Granite application shell;
-- stable application ID and Meson build;
-- desktop launcher, AppStream metadata and elementary-compatible icons;
-- elementary OS 8 Flatpak packaging and GitHub Actions build verification;
-- native desktop integration and automatic system color-scheme following;
-- an X11-only Cairo renderer fallback when no explicit `GSK_RENDERER` override is present and no Wayland display is available;
-- a functional prompt composer and Send action;
-- discovery of a local Ollama-compatible API through `GET /api/tags`;
-- preference for standalone Ollama on `127.0.0.1:11434`, with `127.0.0.1:11435` as compatibility fallback;
-- capability inspection through `POST /api/show`;
-- automatic exclusion of embedding-only models;
-- a refreshable AI-model selector populated with completion-capable models;
-- real model-scan progress and a short-lived scan-result status;
-- streamed conversational requests through `POST /api/chat`;
-- progressive assistant text display;
-- explicit `think: false` on the default chat path;
-- in-memory user/assistant history for the current application session.
+- the GTK 4 / Granite application shell and elementary OS 8 Flatpak packaging;
+- automatic system light/dark appearance following;
+- local Ollama-compatible discovery on `127.0.0.1:11434` with `127.0.0.1:11435` compatibility fallback;
+- `GET /api/tags` model enumeration and `POST /api/show` capability inspection;
+- completion-capable AI-model filtering and manual refresh;
+- ordinary zero-repository local chat with streamed responses;
+- independent in-memory chat tabs with New, automatic semantic titles of at most three words and per-tab close controls;
+- a fixed multi-select EWD/CBD/RMD repository selector;
+- repository Refresh plus explicit Download/Update lifecycle actions;
+- validated immutable repository source snapshots stored under `~/Ask the Model/Repositories/<id>/snapshots/<sha>/`;
+- bounded safe extraction and strict repository manifest/CITATION validation;
+- deterministic per-snapshot SQLite/FTS5 indexes with source-role and provenance checks;
+- deterministic exact technical-ID, structured entity/relation, lexical BM25 and tabular retrieval;
+- conservative Romanian/English query normalization with protected technical identifiers;
+- repository ID, repository version and exact snapshot SHA carried on evidence records;
+- repository and local-AI model identity frozen on the first Send for each chat;
+- current-turn repository grounding that does not persist transient evidence blocks as ordinary chat history;
+- transactional grounded turns so failed model calls or invalid citations do not advance retrieval-conversation state;
+- current-turn temporary `[S#]` source-label resolution before commit;
+- fail-closed handling of unknown source labels;
+- compact user-visible numbered sources with repository/version/SHA/logical-source/locator/excerpt provenance and immutable GitHub permalinks when available;
+- deterministic multi-turn retrieval state with explicit clarification outcomes;
+- real-repository R4 traceability CI and a frozen R5 retrieval benchmark that passes the current provisional engineering gates.
+
+## Conversation scope
+
+Repository selection is optional. Zero selected repositories preserves ordinary local chat.
+
+Before the first Send in a conversation, the repository set and AI model are editable. The first Send pins the validated repository snapshots/index identity and local-AI model identity for that tab. A different scientific scope or AI model belongs in a new chat rather than silently changing the basis of an existing conversation.
+
+Conversation and grounding state are held in memory for the current application process and are not persisted across application restarts.
 
 ## Provider and dependency boundary
 
-AtM does not bundle, install, start, stop or update the local provider. The provider is an external dependency.
+AtM does not bundle, install, start, stop or update the local AI provider. The provider is an external dependency.
 
-Compatibility is defined by the API behavior documented in `docs/DEPENDENCIES_AND_COMPATIBILITY.md`, not by a particular locally tested software version.
+AI models remain provider-managed artifacts. AtM does not download, import, move, update or delete AI model files.
 
-GPU acceleration is provider-owned. AtM itself does not contain vendor-specific GPU inference code and does not require a particular GPU model, vendor or acceleration backend.
+Compatibility is defined by the API behavior documented in `docs/DEPENDENCIES_AND_COMPATIBILITY.md`, not by a particular locally tested provider version. GPU acceleration is provider-owned; AtM contains no vendor-specific inference engine.
 
-## Data and model boundary
+## Repository and scientific boundary
 
-User prompt content is transmitted only when **Send** is activated. The current provider implementation addresses loopback only.
+Scientific repositories remain external canonical sources. Their documentation, code, data, assumptions, provenance, validation status and release boundaries remain authoritative.
 
-Conversation history is stored in application memory for the current session and is not persisted across restarts.
+Repository evidence can ground an AI response, but AtM does not present AI-generated interpretation as a canonical model result. v0.3.0 does not execute EWD, CBD or RMD simulations.
 
-Scientific model repositories remain external sources. Their documentation, code, data, provenance, validation status and release boundaries remain authoritative.
+The R4/R5 gates are engineering validation of repository retrieval, traceability and conversation behavior against pinned test corpora. They are not scientific-validity certifications of EWD, CBD or RMD.
 
-AtM must not present an AI-generated explanation as if it were a canonical model result unless that result is explicitly supported by a future repository/provenance layer or by an actual model execution whose provenance is identified.
+## Not implemented in v0.3.0
 
-## Not implemented in v0.2.2
-
-- repository ingestion or retrieval;
-- repository-aware context selection for EWD, CBD or RMD;
-- source/provenance presentation;
 - conversation persistence across application restarts;
-- application/provider settings;
-- model installation, download or deletion;
+- arbitrary repository support beyond EWD/CBD/RMD;
+- application/provider host, port, authentication or TLS settings;
+- provider installation/start/stop/update management;
+- AI-model installation, download, import, update or deletion inside AtM;
 - cloud AI providers;
 - execution or simulation of scientific models;
 - autonomous changes to scientific repositories.
 
-## What v0.2.2 does not claim
+## What v0.3.0 does not claim
 
-- repository-grounded scientific answers;
-- embedded scientific models;
-- validated scientific inference;
+- that an AI-generated explanation is a canonical scientific-model result;
+- validated scientific inference merely because repository evidence was retrieved;
 - model execution or simulation;
 - authoritative replacement of repository documentation;
 - a production-ready scientific decision system.
 
-See `releases/v0.2.2.md` for the current patch-release description, `releases/v0.2.1.md` for the release-distribution correction, `releases/v0.2.0.md` for the Local Chat Baseline, and `docs/DEPENDENCIES_AND_COMPATIBILITY.md` for compatibility requirements.
+See `releases/v0.3.0.md` for the current release description, `CHANGELOG.md` for release history and `docs/DEPENDENCIES_AND_COMPATIBILITY.md` for compatibility requirements.
