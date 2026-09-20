@@ -149,8 +149,8 @@ atm_retrieval_normalize_query (
         "probabilistică", "probabilistice"
     };
     static const char *numeric_terms[] = {
-        "probability", "probabilistic", "mape", "percent",
-        "percentage", "rate", "ratio", "coefficient"
+        "mape", "percent", "percentage",
+        "rate", "ratio", "coefficient"
     };
     gchar **tokens = NULL;
     GHashTable *aliases = NULL;
@@ -222,7 +222,8 @@ atm_retrieval_normalize_query (
         }
 
         if (g_strcmp0 (token, "status") == 0 ||
-            g_strcmp0 (token, "current") == 0) {
+            g_strcmp0 (token, "current") == 0 ||
+            g_strcmp0 (token, "currently") == 0) {
             normalized->intents |=
                 ATM_RETRIEVAL_INTENT_CURRENT_STATE;
         }
@@ -334,7 +335,8 @@ atm_retrieval_normalize_query (
                 "paradigm"
             );
             normalized->intents |=
-                ATM_RETRIEVAL_INTENT_STRUCTURE;
+                ATM_RETRIEVAL_INTENT_STRUCTURE |
+                ATM_RETRIEVAL_INTENT_CURRENT_STATE;
         }
 
         if (token_is_any (
@@ -348,7 +350,8 @@ atm_retrieval_normalize_query (
                 "modeling"
             );
             normalized->intents |=
-                ATM_RETRIEVAL_INTENT_STRUCTURE;
+                ATM_RETRIEVAL_INTENT_STRUCTURE |
+                ATM_RETRIEVAL_INTENT_CURRENT_STATE;
         }
 
         if (token_is_any (
@@ -368,7 +371,8 @@ atm_retrieval_normalize_query (
             g_strcmp0 (token, "modeling") == 0 ||
             g_strcmp0 (token, "modelling") == 0) {
             normalized->intents |=
-                ATM_RETRIEVAL_INTENT_STRUCTURE;
+                ATM_RETRIEVAL_INTENT_STRUCTURE |
+                ATM_RETRIEVAL_INTENT_CURRENT_STATE;
         }
 
         if (token_is_any (
@@ -400,8 +404,15 @@ atm_retrieval_normalize_query (
                 aliases,
                 "probabilistic"
             );
+        }
+
+        if (g_strcmp0 (token, "claim") == 0 ||
+            g_strcmp0 (token, "claims") == 0 ||
+            g_strcmp0 (token, "forecast") == 0 ||
+            g_strcmp0 (token, "forecasts") == 0 ||
+            g_strcmp0 (token, "probabilistic") == 0) {
             normalized->intents |=
-                ATM_RETRIEVAL_INTENT_NUMERIC;
+                ATM_RETRIEVAL_INTENT_CURRENT_STATE;
         }
 
         if (token_is_any (
