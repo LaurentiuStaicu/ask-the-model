@@ -459,6 +459,122 @@ test_valid_pins_are_canonical_and_frozen (void)
         )
     );
 
+    AtmCitationResolution *ewd_resolution = NULL;
+
+    g_assert_true (
+        atm_conversation_grounding_resolve_turn_citations (
+            state,
+            "EWD is supported [S1]. Unknown [S9].",
+            &ewd_resolution,
+            &error
+        )
+    );
+    g_assert_no_error (error);
+    g_assert_cmpuint (
+        ewd_resolution->citations->len,
+        ==,
+        1
+    );
+    g_assert_cmpuint (
+        ewd_resolution->unknown_labels->len,
+        ==,
+        1
+    );
+
+    AtmCitationReference *ewd_citation =
+        g_ptr_array_index (
+            ewd_resolution->citations,
+            0
+        );
+
+    g_assert_cmpstr (
+        ewd_citation->repository_id,
+        ==,
+        "ewd"
+    );
+    g_assert_cmpstr (
+        ewd_citation->snapshot_sha,
+        ==,
+        ewd_sha
+    );
+
+    g_clear_pointer (
+        &post_evidence_reminder,
+        g_free
+    );
+    g_clear_pointer (&evidence_text, g_free);
+    g_clear_pointer (&system_instructions, g_free);
+
+    has_grounding = FALSE;
+    needs_clarification = FALSE;
+
+    g_assert_true (
+        atm_conversation_grounding_prepare_turn (
+            state,
+            "What is the current fixture status in RMD?",
+            &has_grounding,
+            &needs_clarification,
+            &system_instructions,
+            &evidence_text,
+            &post_evidence_reminder,
+            &error
+        )
+    );
+    g_assert_no_error (error);
+    g_assert_true (has_grounding);
+    g_assert_false (needs_clarification);
+
+    AtmCitationResolution *rmd_resolution = NULL;
+
+    g_assert_true (
+        atm_conversation_grounding_resolve_turn_citations (
+            state,
+            "RMD is supported [S1].",
+            &rmd_resolution,
+            &error
+        )
+    );
+    g_assert_no_error (error);
+    g_assert_cmpuint (
+        rmd_resolution->citations->len,
+        ==,
+        1
+    );
+
+    AtmCitationReference *rmd_citation =
+        g_ptr_array_index (
+            rmd_resolution->citations,
+            0
+        );
+
+    g_assert_cmpstr (
+        rmd_citation->repository_id,
+        ==,
+        "rmd"
+    );
+    g_assert_cmpstr (
+        rmd_citation->snapshot_sha,
+        ==,
+        rmd_sha
+    );
+
+    /*
+     * The first resolution is a deep copy. Preparing a later turn must
+     * not rebind its [S1] provenance to the new RMD context.
+     */
+    g_assert_cmpstr (
+        ewd_citation->repository_id,
+        ==,
+        "ewd"
+    );
+    g_assert_cmpstr (
+        ewd_citation->snapshot_sha,
+        ==,
+        ewd_sha
+    );
+
+    atm_citation_resolution_free (rmd_resolution);
+    atm_citation_resolution_free (ewd_resolution);
     g_free (post_evidence_reminder);
     g_free (evidence_text);
     g_free (system_instructions);
