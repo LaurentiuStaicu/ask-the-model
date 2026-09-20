@@ -20,106 +20,12 @@ atm_evidence_record_free (AtmEvidenceRecord *record)
     }
 
     g_free (record->evidence_kind);
-    g_free (record->repository_id);
-    g_free (record->repository_version);
-    g_free (record->snapshot_sha);
     g_free (record->logical_source_id);
     g_free (record->source_path);
     g_free (record->locator);
     g_free (record->title);
     g_free (record->body);
     g_free (record);
-}
-
-typedef struct {
-    char *repository_id;
-    char *repository_version;
-    char *snapshot_sha;
-} AtmSnapshotProvenance;
-
-static void
-snapshot_provenance_clear (AtmSnapshotProvenance *provenance)
-{
-    if (provenance == NULL) {
-        return;
-    }
-
-    g_clear_pointer (&provenance->repository_id, g_free);
-    g_clear_pointer (&provenance->repository_version, g_free);
-    g_clear_pointer (&provenance->snapshot_sha, g_free);
-}
-
-static gboolean
-load_snapshot_provenance (
-    sqlite3 *db,
-    AtmSnapshotProvenance *out_provenance,
-    GError **error
-)
-{
-    sqlite3_stmt *statement = NULL;
-    int rc;
-
-    if (sqlite3_prepare_v2 (
-            db,
-            "SELECT repository_id, repository_version, snapshot_sha "
-            "FROM snapshot_metadata WHERE id = 1;",
-            -1,
-            &statement,
-            NULL
-        ) != SQLITE_OK) {
-        g_set_error (
-            error,
-            ATM_RETRIEVAL_QUERY_ERROR,
-            ATM_RETRIEVAL_QUERY_ERROR_SQLITE,
-            "Could not prepare snapshot provenance query: %s",
-            sqlite3_errmsg (db)
-        );
-        return FALSE;
-    }
-
-    rc = sqlite3_step (statement);
-
-    if (rc != SQLITE_ROW) {
-        g_set_error (
-            error,
-            ATM_RETRIEVAL_QUERY_ERROR,
-            ATM_RETRIEVAL_QUERY_ERROR_SQLITE,
-            "Retrieval index has no snapshot provenance: %s",
-            sqlite3_errmsg (db)
-        );
-        sqlite3_finalize (statement);
-        return FALSE;
-    }
-
-    out_provenance->repository_id = g_strdup (
-        (const char *) sqlite3_column_text (statement, 0)
-    );
-    out_provenance->repository_version = g_strdup (
-        (const char *) sqlite3_column_text (statement, 1)
-    );
-    out_provenance->snapshot_sha = g_strdup (
-        (const char *) sqlite3_column_text (statement, 2)
-    );
-
-    sqlite3_finalize (statement);
-    return TRUE;
-}
-
-static void
-apply_snapshot_provenance (
-    AtmEvidenceRecord *record,
-    const AtmSnapshotProvenance *provenance
-)
-{
-    record->repository_id = g_strdup (
-        provenance->repository_id
-    );
-    record->repository_version = g_strdup (
-        provenance->repository_version
-    );
-    record->snapshot_sha = g_strdup (
-        provenance->snapshot_sha
-    );
 }
 
 static guint
@@ -211,7 +117,6 @@ append_exact_rows (
     const char *sql,
     const char *identifier,
     const char *evidence_kind,
-    const AtmSnapshotProvenance *provenance,
     guint maximum_rows,
     GPtrArray *results,
     GError **error
@@ -267,8 +172,6 @@ append_exact_rows (
         );
 
         record->evidence_kind = g_strdup (evidence_kind);
-        record->match_kind = ATM_EVIDENCE_MATCH_EXACT;
-        apply_snapshot_provenance (record, provenance);
         record->evidence_id = sqlite3_column_int64 (
             statement,
             0
@@ -394,7 +297,6 @@ atm_retrieval_lookup_exact (
     sqlite3 *db = NULL;
     sqlite3_stmt *role_statement = NULL;
     GPtrArray *results = NULL;
-    AtmSnapshotProvenance provenance = { 0 };
     gboolean ok = FALSE;
     int rc;
 
@@ -456,14 +358,6 @@ atm_retrieval_lookup_exact (
         goto out;
     }
 
-    if (!load_snapshot_provenance (
-            db,
-            &provenance,
-            error
-        )) {
-        goto out;
-    }
-
     if (sqlite3_prepare_v2 (
             db,
             "SELECT role FROM source_roles "
@@ -509,7 +403,6 @@ atm_retrieval_lookup_exact (
                 queries[i].sql,
                 identifier,
                 queries[i].kind,
-                &provenance,
                 remaining,
                 results,
                 error
@@ -523,7 +416,6 @@ atm_retrieval_lookup_exact (
 
 out:
     g_clear_pointer (&results, g_ptr_array_unref);
-    snapshot_provenance_clear (&provenance);
 
     if (role_statement != NULL) {
         sqlite3_finalize (role_statement);
@@ -787,7 +679,6 @@ atm_retrieval_search_fts (
     sqlite3_stmt *row_statement = NULL;
     GPtrArray *results = NULL;
     char *fts_query = NULL;
-    AtmSnapshotProvenance provenance = { 0 };
     gboolean ok = FALSE;
     int rc;
 
@@ -850,14 +741,6 @@ atm_retrieval_search_fts (
             "Could not configure read-only FTS connection: %s",
             sqlite3_errmsg (db)
         );
-        goto out;
-    }
-
-    if (!load_snapshot_provenance (
-            db,
-            &provenance,
-            error
-        )) {
         goto out;
     }
 
@@ -964,8 +847,6 @@ atm_retrieval_search_fts (
         sqlite3_int64 source_id = 0;
 
         record->evidence_kind = g_strdup (kind);
-        record->match_kind = ATM_EVIDENCE_MATCH_LEXICAL;
-        apply_snapshot_provenance (record, &provenance);
         record->evidence_id = evidence_id;
         record->logical_source_id = g_strdup (
             (const char *) sqlite3_column_text (
@@ -1048,7 +929,6 @@ atm_retrieval_search_fts (
 out:
     g_clear_pointer (&results, g_ptr_array_unref);
     g_clear_pointer (&fts_query, g_free);
-    snapshot_provenance_clear (&provenance);
 
     if (row_statement != NULL) {
         sqlite3_finalize (row_statement);
@@ -1072,283 +952,6 @@ out:
 
     if (search_statement != NULL) {
         sqlite3_finalize (search_statement);
-    }
-
-    if (db != NULL) {
-        sqlite3_close (db);
-    }
-
-    return ok;
-}
-
-
-gboolean
-atm_retrieval_lookup_dataset_rows (
-    const char *index_path,
-    const char *dataset_identifier,
-    const char *row_key,
-    guint max_results,
-    GPtrArray **out_results,
-    GError **error
-)
-{
-    sqlite3 *db = NULL;
-    sqlite3_stmt *statement = NULL;
-    sqlite3_stmt *role_statement = NULL;
-    GPtrArray *results = NULL;
-    AtmSnapshotProvenance provenance = { 0 };
-    gboolean ok = FALSE;
-    int rc;
-
-    g_return_val_if_fail (index_path != NULL, FALSE);
-    g_return_val_if_fail (row_key != NULL, FALSE);
-    g_return_val_if_fail (out_results != NULL, FALSE);
-    g_return_val_if_fail (*out_results == NULL, FALSE);
-
-    gsize row_key_length = strlen (row_key);
-
-    if (row_key_length == 0 ||
-        row_key_length > ATM_RETRIEVAL_MAX_IDENTIFIER_BYTES ||
-        !g_utf8_validate (row_key, row_key_length, NULL) ||
-        max_results == 0 ||
-        max_results > ATM_RETRIEVAL_MAX_EXACT_RESULTS) {
-        g_set_error_literal (
-            error,
-            ATM_RETRIEVAL_QUERY_ERROR,
-            ATM_RETRIEVAL_QUERY_ERROR_ARGUMENT,
-            "Tabular row lookup arguments are invalid."
-        );
-        return FALSE;
-    }
-
-    if (dataset_identifier != NULL) {
-        gsize dataset_length = strlen (dataset_identifier);
-
-        if (dataset_length == 0 ||
-            dataset_length > ATM_RETRIEVAL_MAX_IDENTIFIER_BYTES ||
-            !g_utf8_validate (
-                dataset_identifier,
-                dataset_length,
-                NULL
-            )) {
-            g_set_error_literal (
-                error,
-                ATM_RETRIEVAL_QUERY_ERROR,
-                ATM_RETRIEVAL_QUERY_ERROR_ARGUMENT,
-                "Dataset identifier is invalid."
-            );
-            return FALSE;
-        }
-    }
-
-    rc = sqlite3_open_v2 (
-        index_path,
-        &db,
-        SQLITE_OPEN_READONLY,
-        NULL
-    );
-
-    if (rc != SQLITE_OK) {
-        g_set_error (
-            error,
-            ATM_RETRIEVAL_QUERY_ERROR,
-            ATM_RETRIEVAL_QUERY_ERROR_SQLITE,
-            "Could not open retrieval index read-only: %s",
-            db != NULL ? sqlite3_errmsg (db) : "unknown SQLite error"
-        );
-        goto out;
-    }
-
-    if (sqlite3_exec (
-            db,
-            "PRAGMA trusted_schema = OFF;"
-            "PRAGMA query_only = ON;"
-            "PRAGMA foreign_keys = ON;",
-            NULL,
-            NULL,
-            NULL
-        ) != SQLITE_OK) {
-        g_set_error (
-            error,
-            ATM_RETRIEVAL_QUERY_ERROR,
-            ATM_RETRIEVAL_QUERY_ERROR_SQLITE,
-            "Could not configure read-only tabular retrieval: %s",
-            sqlite3_errmsg (db)
-        );
-        goto out;
-    }
-
-    if (!load_snapshot_provenance (
-            db,
-            &provenance,
-            error
-        )) {
-        goto out;
-    }
-
-    if (sqlite3_prepare_v2 (
-            db,
-            "SELECT r.id, m.repository_id, s.path, r.ordinal, "
-            "r.locator, r.row_key, r.payload_json, s.id "
-            "FROM dataset_rows r "
-            "JOIN datasets d ON d.id = r.dataset_id "
-            "JOIN source_files s ON s.id = d.source_id "
-            "JOIN snapshot_metadata m ON m.id = 1 "
-            "WHERE r.row_key = ?1 COLLATE BINARY "
-            "AND (?2 IS NULL "
-                 "OR d.native_id = ?2 COLLATE BINARY "
-                 "OR d.logical_source_id = ?2 COLLATE BINARY "
-                 "OR s.path = ?2 COLLATE BINARY) "
-            "ORDER BY s.path COLLATE BINARY, "
-            "d.logical_source_id COLLATE BINARY, r.ordinal "
-            "LIMIT ?3;",
-            -1,
-            &statement,
-            NULL
-        ) != SQLITE_OK ||
-        sqlite3_prepare_v2 (
-            db,
-            "SELECT role FROM source_roles "
-            "WHERE source_id = ?1 ORDER BY role COLLATE BINARY;",
-            -1,
-            &role_statement,
-            NULL
-        ) != SQLITE_OK) {
-        g_set_error (
-            error,
-            ATM_RETRIEVAL_QUERY_ERROR,
-            ATM_RETRIEVAL_QUERY_ERROR_SQLITE,
-            "Could not prepare tabular row lookup: %s",
-            sqlite3_errmsg (db)
-        );
-        goto out;
-    }
-
-    sqlite3_bind_text (
-        statement,
-        1,
-        row_key,
-        -1,
-        SQLITE_STATIC
-    );
-
-    if (dataset_identifier != NULL) {
-        sqlite3_bind_text (
-            statement,
-            2,
-            dataset_identifier,
-            -1,
-            SQLITE_STATIC
-        );
-    } else {
-        sqlite3_bind_null (statement, 2);
-    }
-
-    sqlite3_bind_int (
-        statement,
-        3,
-        (int) max_results
-    );
-
-    results = g_ptr_array_new_with_free_func (
-        (GDestroyNotify) atm_evidence_record_free
-    );
-
-    while ((rc = sqlite3_step (statement)) == SQLITE_ROW) {
-        const char *repository_id =
-            (const char *) sqlite3_column_text (
-                statement,
-                1
-            );
-        const char *source_path =
-            (const char *) sqlite3_column_text (
-                statement,
-                2
-            );
-        guint ordinal = (guint) sqlite3_column_int (
-            statement,
-            3
-        );
-        sqlite3_int64 source_id = sqlite3_column_int64 (
-            statement,
-            7
-        );
-        AtmEvidenceRecord *record = g_new0 (
-            AtmEvidenceRecord,
-            1
-        );
-
-        record->evidence_kind = g_strdup ("dataset_row");
-        record->match_kind = ATM_EVIDENCE_MATCH_TABULAR;
-        apply_snapshot_provenance (record, &provenance);
-        record->evidence_id = sqlite3_column_int64 (
-            statement,
-            0
-        );
-        record->logical_source_id = g_strdup_printf (
-            "%s:dataset-row:%s:%u",
-            repository_id,
-            source_path,
-            ordinal
-        );
-        record->source_path = g_strdup (source_path);
-        record->locator = g_strdup (
-            (const char *) sqlite3_column_text (
-                statement,
-                4
-            )
-        );
-        record->title = g_strdup (
-            (const char *) sqlite3_column_text (
-                statement,
-                5
-            )
-        );
-        record->body = g_strdup (
-            (const char *) sqlite3_column_text (
-                statement,
-                6
-            )
-        );
-
-        if (!load_source_roles (
-                db,
-                role_statement,
-                source_id,
-                &record->source_roles,
-                error
-            )) {
-            atm_evidence_record_free (record);
-            goto out;
-        }
-
-        g_ptr_array_add (results, record);
-    }
-
-    if (rc != SQLITE_DONE) {
-        g_set_error (
-            error,
-            ATM_RETRIEVAL_QUERY_ERROR,
-            ATM_RETRIEVAL_QUERY_ERROR_SQLITE,
-            "Could not finish tabular row lookup: %s",
-            sqlite3_errmsg (db)
-        );
-        goto out;
-    }
-
-    *out_results = g_steal_pointer (&results);
-    ok = TRUE;
-
-out:
-    g_clear_pointer (&results, g_ptr_array_unref);
-    snapshot_provenance_clear (&provenance);
-
-    if (role_statement != NULL) {
-        sqlite3_finalize (role_statement);
-    }
-
-    if (statement != NULL) {
-        sqlite3_finalize (statement);
     }
 
     if (db != NULL) {
