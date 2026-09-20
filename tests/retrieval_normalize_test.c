@@ -220,6 +220,32 @@ test_romanian_scientific_aliases_and_numeric_scope (void)
 }
 
 static void
+test_probabilistic_claim_is_current_boundary_not_numeric_by_itself (void)
+{
+    AtmNormalizedQuery *normalized = NULL;
+    GError *error = NULL;
+
+    g_assert_true (
+        atm_retrieval_normalize_query (
+            "Does the model claim probabilistic forecasts?",
+            &normalized,
+            &error
+        )
+    );
+    g_assert_no_error (error);
+    g_assert_true (
+        (normalized->intents &
+         ATM_RETRIEVAL_INTENT_CURRENT_STATE) != 0
+    );
+    g_assert_false (
+        (normalized->intents &
+         ATM_RETRIEVAL_INTENT_NUMERIC) != 0
+    );
+
+    atm_normalized_query_free (normalized);
+}
+
+static void
 test_invalid_normalization_input_is_rejected (void)
 {
     AtmNormalizedQuery *normalized = NULL;
@@ -272,6 +298,10 @@ main (int argc, char **argv)
     g_test_add_func (
         "/retrieval-normalize/scientific-aliases",
         test_romanian_scientific_aliases_and_numeric_scope
+    );
+    g_test_add_func (
+        "/retrieval-normalize/probabilistic-boundary",
+        test_probabilistic_claim_is_current_boundary_not_numeric_by_itself
     );
     g_test_add_func (
         "/retrieval-normalize/invalid-input",
