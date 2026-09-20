@@ -1,4 +1,6 @@
 #include "repository_ingest.h"
+#include "archive_extract.h"
+#include "repository_manifest.h"
 #include "repository_storage.h"
 
 #include <archive.h>
