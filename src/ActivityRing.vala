@@ -3,8 +3,8 @@ namespace AskTheModel {
         private const double ROTATION_SECONDS = 1.8;
         private const double ARC_SPAN = 0.95;
 
-        // Shared active-gold hue: #E6BD66.
-        // The status LCD text uses the same RGB value.
+        // Clear activity gold. The steady LCD uses a dimmer,
+        // warmer lamp-amber so motion remains easy to notice.
         private const double ACTIVE_GOLD_R = 0.902;
         private const double ACTIVE_GOLD_G = 0.741;
         private const double ACTIVE_GOLD_B = 0.400;
@@ -16,6 +16,8 @@ namespace AskTheModel {
         private double phase = 0.0;
 
         public ActivityRing () {
+            accessible_role =
+                Gtk.AccessibleRole.PRESENTATION;
             can_target = false;
             focusable = false;
             hexpand = true;
