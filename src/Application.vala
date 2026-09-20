@@ -1,4 +1,10 @@
 namespace AskTheModel {
+    private enum RepositoryOperationOutcome {
+        NORMAL,
+        OFFLINE,
+        ERROR
+    }
+
     public class Application : Gtk.Application {
         private const string APP_ID = "io.github.laurentiustaicu.ask_the_model";
         private const string STYLE_RESOURCE =
@@ -128,13 +134,7 @@ namespace AskTheModel {
                 string[] chat_models =
                     ollama_provider.get_completion_models ();
 
-                show_model_scan_result (
-                    chat_models.length == 1
-                        ? "1 model found"
-                        : "%d models found".printf (
-                            chat_models.length
-                        )
-                );
+                finish_model_scan_status ();
 
                 stdout.printf (
                     "AtM: Ollama detected at %s; using %s (%u model%s available)\n",
@@ -144,14 +144,14 @@ namespace AskTheModel {
                     ollama_provider.model_count == 1 ? "" : "s"
                 );
             } else if (found) {
-                show_model_scan_result ("No chat models");
+                finish_model_scan_status ();
 
                 stderr.printf (
                     "AtM: Ollama detected at %s, but no completion-capable model was found.\n",
                     ollama_provider.base_url
                 );
             } else {
-                show_model_scan_result ("Ollama not found");
+                finish_model_scan_status ();
 
                 stderr.printf (
                     "AtM: local Ollama provider not detected on 127.0.0.1 ports 11434 or 11435.\n"
@@ -442,7 +442,7 @@ namespace AskTheModel {
             update_ai_annunciators ();
         }
 
-        private void show_model_scan_result (string message) {
+        private void finish_model_scan_status () {
             ai_scanning = false;
             update_ai_annunciators ();
         }
@@ -680,26 +680,17 @@ namespace AskTheModel {
             update_repository_annunciators ();
         }
 
-        private void show_repository_scan_result (
-            string message,
-            bool persistent = false
+        private void finish_repository_operation (
+            RepositoryOperationOutcome outcome
         ) {
             repository_checking = false;
             repository_downloading = false;
             repository_updating = false;
             repository_validating = false;
-
-            if (message.has_prefix ("Offline")) {
-                repository_offline = true;
-                repository_error = false;
-            } else if (message.has_suffix ("failed")) {
-                repository_error = true;
-                repository_offline = false;
-            } else {
-                repository_offline = false;
-                repository_error = false;
-            }
-
+            repository_offline =
+                outcome == RepositoryOperationOutcome.OFFLINE;
+            repository_error =
+                outcome == RepositoryOperationOutcome.ERROR;
             update_repository_annunciators ();
         }
 
@@ -708,7 +699,9 @@ namespace AskTheModel {
                 repository_selection.selected_repositories ();
 
             if (selected.length == 0) {
-                show_repository_scan_result ("Select repositories");
+                finish_repository_operation (
+                    RepositoryOperationOutcome.NORMAL
+                );
                 return;
             }
 
@@ -731,48 +724,12 @@ namespace AskTheModel {
                 repository_menu_button.sensitive = false;
             }
 
-            uint updates = 0;
-            uint downloads = 0;
-            string? single_report = null;
-
             try {
                 foreach (RepositoryDescriptor descriptor in selected) {
                     RepositoryRuntimeInfo info =
                         yield repository_lifecycle.refresh (
                             descriptor
                         );
-
-                    if (info.download_required ()) {
-                        downloads++;
-                    } else if (info.update_available ()) {
-                        updates++;
-                    }
-
-                    if (selected.length == 1) {
-                        string version =
-                            info.remote_version ??
-                            descriptor.supported_version;
-
-                        if (info.download_required ()) {
-                            single_report =
-                                "%s v%s available".printf (
-                                    descriptor.acronym,
-                                    version
-                                );
-                        } else if (info.update_available ()) {
-                            single_report =
-                                "%s v%s update available".printf (
-                                    descriptor.acronym,
-                                    version
-                                );
-                        } else {
-                            single_report =
-                                "%s v%s current".printf (
-                                    descriptor.acronym,
-                                    info.local.version ?? version
-                                );
-                        }
-                    }
 
                     stdout.printf (
                         "AtM: repository %s remote version=%s sha=%s\n",
@@ -782,57 +739,18 @@ namespace AskTheModel {
                     );
                 }
 
-                uint actions = updates + downloads;
-
-                if (selected.length == 1 && single_report != null) {
-                    show_repository_scan_result (
-                        single_report,
-                        actions > 0
-                    );
-                } else if (actions > 0) {
-                    show_repository_scan_result (
-                        actions == 1
-                            ? "1 repository action available"
-                            : "%u repository actions available".printf (
-                                actions
-                            ),
-                        true
-                    );
-                } else {
-                    show_repository_scan_result (
-                        "%u repositories current".printf (
-                            selected.length
-                        )
-                    );
-                }
+                finish_repository_operation (
+                    RepositoryOperationOutcome.NORMAL
+                );
             } catch (GLib.Error error) {
-                bool all_local_ready = true;
-
-                foreach (RepositoryDescriptor descriptor in selected) {
-                    if (!repository_lifecycle.info_for (
-                            descriptor.id
-                        ).local.is_ready ()) {
-                        all_local_ready = false;
-                        break;
-                    }
-                }
-
                 bool transport_failure =
                     error.domain != RepositoryError.quark ();
 
-                if (transport_failure) {
-                    show_repository_scan_result (
-                        all_local_ready
-                            ? "Offline — local repositories ready"
-                            : "Offline — repository check unavailable",
-                        true
-                    );
-                } else {
-                    show_repository_scan_result (
-                        "Repository check failed",
-                        true
-                    );
-                }
+                finish_repository_operation (
+                    transport_failure
+                        ? RepositoryOperationOutcome.OFFLINE
+                        : RepositoryOperationOutcome.ERROR
+                );
 
                 stderr.printf (
                     "AtM: repository refresh failed: %s\n",
@@ -862,7 +780,9 @@ namespace AskTheModel {
                 repository_selection.selected_repositories ();
 
             if (selected.length == 0) {
-                show_repository_scan_result ("Select repositories");
+                finish_repository_operation (
+                    RepositoryOperationOutcome.NORMAL
+                );
                 return;
             }
 
@@ -906,20 +826,26 @@ namespace AskTheModel {
                         selected
                     );
 
-                show_repository_scan_result (
-                    changed == 0
-                        ? "Repositories current"
-                        : changed == 1
-                            ? "1 repository ready"
-                            : "%u repositories ready".printf (
-                                changed
-                            )
+                finish_repository_operation (
+                    RepositoryOperationOutcome.NORMAL
+                );
+
+                stdout.printf (
+                    changed == 1
+                        ? "AtM: repository action completed; 1 repository changed\n"
+                        : "AtM: repository action completed; %u repositories changed\n",
+                    changed
                 );
             } catch (GLib.Error error) {
-                show_repository_scan_result (
-                    "Repository update failed",
-                    true
+                bool transport_failure =
+                    error.domain != RepositoryError.quark ();
+
+                finish_repository_operation (
+                    transport_failure
+                        ? RepositoryOperationOutcome.OFFLINE
+                        : RepositoryOperationOutcome.ERROR
                 );
+
                 stderr.printf (
                     "AtM: repository download/update failed: %s\n",
                     error.message
