@@ -496,6 +496,79 @@ test_exact_entity_precedes_lexical_and_year_row (void)
 }
 
 static void
+test_sentence_punctuation_does_not_break_exact_identifiers (void)
+{
+    RouterFixture *fixture = router_fixture_new ();
+    AtmRetrievalResultSet *results = NULL;
+    GError *error = NULL;
+
+    g_assert_true (
+        atm_retrieval_run (
+            "EWD: find the exact entity food_per_capita.",
+            fixture->active,
+            8,
+            &results,
+            &error
+        )
+    );
+    g_assert_no_error (error);
+    g_assert_cmpuint (results->repositories->len, ==, 1);
+
+    AtmRepositoryEvidenceSet *ewd = repository_set_at (
+        results,
+        0
+    );
+
+    g_assert_cmpuint (ewd->evidence->len, >, 0);
+    g_assert_cmpint (
+        evidence_at (ewd, 0)->match_kind,
+        ==,
+        ATM_EVIDENCE_MATCH_EXACT
+    );
+    g_assert_cmpstr (
+        evidence_at (ewd, 0)->logical_source_id,
+        ==,
+        "ewd:entity:variable:food_per_capita"
+    );
+
+    atm_retrieval_result_set_free (results);
+    results = NULL;
+
+    g_assert_true (
+        atm_retrieval_run (
+            "RMD: retrieve government_refinancing_interest_loop.",
+            fixture->active,
+            8,
+            &results,
+            &error
+        )
+    );
+    g_assert_no_error (error);
+    g_assert_cmpuint (results->repositories->len, ==, 1);
+
+    AtmRepositoryEvidenceSet *rmd = repository_set_at (
+        results,
+        0
+    );
+
+    g_assert_cmpuint (rmd->evidence->len, >, 0);
+    g_assert_cmpint (
+        evidence_at (rmd, 0)->match_kind,
+        ==,
+        ATM_EVIDENCE_MATCH_EXACT
+    );
+    g_assert_cmpstr (
+        evidence_at (rmd, 0)->logical_source_id,
+        ==,
+        "rmd:entity:feedback_loop:"
+        "government_refinancing_interest_loop"
+    );
+
+    atm_retrieval_result_set_free (results);
+    router_fixture_free (fixture);
+}
+
+static void
 test_explicit_cross_repository_query_keeps_sets_separate (void)
 {
     RouterFixture *fixture = router_fixture_new ();
@@ -684,6 +757,10 @@ main (int argc, char **argv)
     g_test_add_func (
         "/retrieval-router/exact-plus-tabular",
         test_exact_entity_precedes_lexical_and_year_row
+    );
+    g_test_add_func (
+        "/retrieval-router/sentence-punctuation-exact",
+        test_sentence_punctuation_does_not_break_exact_identifiers
     );
     g_test_add_func (
         "/retrieval-router/cross-repository",
