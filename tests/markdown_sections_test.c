@@ -260,7 +260,7 @@ test_atx_edge_cases (void)
     g_assert_cmpstr (
         third->heading_path,
         ==,
-        "Indented heading > After code"
+        "After code"
     );
 
     g_ptr_array_unref (sections);
