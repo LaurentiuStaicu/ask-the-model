@@ -122,6 +122,12 @@ The v0.2.2 Flatpak requests:
 
 Network sharing is required so the sandbox can reach the host-local HTTP provider. This permission is broader than loopback at the Flatpak sandbox layer; the current AtM provider implementation itself only addresses `127.0.0.1`.
 
+The unreleased repository-aware development build additionally requests only:
+
+- `--filesystem=~/Ask the Model:create`.
+
+This narrowly exposes the dedicated user-visible repository directory so AtM can create and maintain `~/Ask the Model/Repositories`. It does not grant access to the rest of Home. Repository retrieval indexes and application state remain in the Flatpak-private XDG cache/state directories.
+
 ## Display compatibility
 
 ### X11
@@ -164,7 +170,7 @@ sudo apt install meson valac build-essential libgtk-4-dev libgranite-7-dev libso
 
 For a Flatpak **development build**, `flatpak-builder` and `io.elementary.Sdk//8` are also required. CI builds against that same elementary SDK baseline and runs the Meson test suite inside the Flatpak build environment.
 
-The SQLite/libarchive/libyaml platform probe verifies implementation prerequisites for the repository-aware layer. The current development tree also contains non-UI R1 repository-ingestion primitives, but v0.2.2 still does not expose repository management or retrieval as a user-facing feature. Test executables are not installed in the application bundle.
+The SQLite/libarchive/libyaml platform probe verifies implementation prerequisites for the repository-aware layer and enforces that the only development filesystem grant is the dedicated `~/Ask the Model:create` path rather than Home/host access. The development tree contains repository-selection and lifecycle UI work, but v0.2.2 still does not expose repository management or retrieval as a released user-facing feature. Test executables are not installed in the application bundle.
 
 ## Privacy and network boundary
 

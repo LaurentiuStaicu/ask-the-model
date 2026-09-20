@@ -24,7 +24,7 @@ The first functional application should support the following user flow:
 4. Select an available local AI model.
 5. Start or continue a conversation.
 6. Ask a natural-language question.
-7. Read the streamed answer.
+7. Read the answer. Ordinary local chat may stream; repository-grounded answers are displayed only after current-turn citation validation succeeds.
 8. Inspect which repository sources/context were used when repository-aware retrieval is enabled.
 9. Start a new conversation or switch to another existing conversation.
 10. Change application/provider settings when needed.
@@ -145,6 +145,40 @@ The first visual prototype should therefore focus on:
 
 No permanent sidebar or secondary inspector is part of the first prototype.
 
+### Approved conversation-tab interaction
+
+Conversation navigation sits immediately below the embedded LCD and above the transcript. The native notebook-strip background is visually transparent so only the tabs themselves are visible.
+
+- A compact mini-tab containing only `+` is anchored at the far left and creates a real independent conversation.
+- A fresh conversation is titled `New`.
+- After the first completed exchange, the title is replaced locally with a semantic title of at most three words.
+- Conversation tabs visually hang from the upper edge: square upper corners and rounded lower corners only.
+- Every conversation tab has a compact close control on its right.
+- Closing one tab removes only that conversation; closing the final tab creates a fresh `New` conversation.
+- Each tab owns independent transcript, composer, Ollama history, repository scope and AI-model identity.
+- The repository and AI-model selectors remain visible but become insensitive after the first Send in that tab.
+
+### Approved selector treatment
+
+The AI-model and repository selectors use the same compact custom downward triangle. For the AI `Gtk.DropDown`, the native arrow is hidden; the custom triangle is overlaid inside the selector allocation, clipped to that allocation, and the button reserves its triangle space internally so the indicator cannot sit outside the visible selector boundary.
+
+The closed AI-model and repository selector surfaces use the same neutral surface color as the conversation tabs in both light and dark variants. Hover state follows the selected-tab surface rather than introducing a separate accent color.
+
+### Approved source/provenance presentation
+
+Grounded answers do not expose temporary model-facing labels such as `[S1]`. AtM validates those labels against the current-turn evidence map before committing the turn.
+
+After a successful grounded answer, the transcript shows only a compact line such as `Sources: [1] [2]`. Each numbered reference opens a contextual popover containing:
+
+- repository and repository version;
+- exact snapshot SHA;
+- logical source ID;
+- repository-relative source path and physical locator;
+- evidence title/excerpt when available;
+- immutable source permalink when it can be constructed safely.
+
+Provenance detail is on demand rather than permanently occupying a sidebar or secondary pane.
+
 ## Typography baseline
 
 The conversation transcript and prompt composer should follow the typography used by elementary Code's editor: the system monospace font and its configured size.
@@ -173,7 +207,39 @@ When the selector is expanded, each repository is shown in long form with the re
 
 After selection, only active acronyms are shown in the compact control. SHA values, branch names and commit counts are not part of the normal selector UI.
 
-Repository lifecycle management (Download, Update, Remove Local Copy, progress and errors) belongs in a separate `Manage Repositories…` surface rather than in the compact selection popover.
+Both the local-AI dropdown and repository selector use the same compact clock-style disclosure indicator: a small filled geometric downward triangle. Native theme arrows/chevrons are hidden so the indicator shape remains consistent across icon themes. The triangle is monochrome and follows the light/dark interface palette; gold remains reserved for active-operation and LCD status feedback.
+
+The header presents repository controls as a distinct group immediately after the local AI-model group. The intended left-to-right relationship is:
+
+`[AI model] [Refresh AI]    [Repositories] [Refresh repositories] [Download/Update]`
+
+Transient model and repository status text is not placed in this horizontal control row. A fixed, compact status LCD sits immediately below the header in the upper edge of the conversation area, so status changes never cause header controls to shift.
+
+The repository selector remains a selection control only. Its popover contains the EWD/CBD/RMD multi-selection controls and does not become a repository-management dialog.
+
+The repository Refresh tool button checks the configured GitHub origins for the currently selected repository set without modifying local repository files. The contextual repository action occupies a permanent fixed slot: it shows a Download icon when a selected repository is missing locally, remains fully transparent and non-interactive when there is no available repository action, and shows an Update icon only when a refresh has identified an available update. The widget must remain allocated while transparent so the selector and Refresh control do not shift horizontally as its state changes. Visible action states are icon-only and use descriptive tooltips.
+
+The repository group must distinguish at least: checking, no update available, update available, downloading/updating, ready/offline-local, and failure. An actionable update-available status remains visible until acted on or refreshed; short scan-completion messages may expire.
+
+While a header action is actively working, its circular button uses a thin activity sleeve: a short muted-gold highlight travels around the button perimeter with a soft low-opacity trail. The effect applies consistently to local-model Refresh, repository Refresh and repository Download/Update. It is an overlay only and must not alter button allocation, icon position or neighboring layout. When system animations are disabled, the sleeve remains static rather than rotating.
+
+The fixed status LCD immediately below the header provides the textual counterpart to that activity cue. It is a passive smoky-gold translucent panel with no panel glow. The LCD itself never lights up. Its active normal-status text is intentionally styled as a dim warm incandescent-lamp amber rather than a saturated LED: approximately `#C79A52`, with only a very small soft bloom. Lighting a segment changes luminance only; it does not increase the glyph weight, preserving the behavior of a backlit lamp legend rather than a bold LED-style indicator. The orbiting activity sleeve remains a clearer related gold because it communicates motion rather than steady-state status.
+
+The LCD follows a compact clock/instrument-panel model rather than free-form status sentences. It uses one permanent horizontal row of predefined segments separated by centered dots:
+
+`NO AI · NO REPOS · EWD · CBD · RMD · SCAN · CHECK · DL · UPD · VAL · READY · OFFLINE · ERR`
+
+The active local AI model name and a normal `CONNECTED` state are deliberately omitted. Normal availability should be visually quiet. `NO AI` lights only when no usable local AI is available after scanning. `NO REPOS` lights when no local selected repository snapshot is ready. These two absence warnings, together with `ERR`, use a static warm lamp-red treatment rather than a saturated LED red; they never blink. All normal/action states use the warm lamp-amber treatment. Inactive segments remain only as extremely faint, non-glowing LCD ghosts so state changes alter luminance rather than geometry.
+
+Repository acronyms light when selected. `SCAN` marks local-AI discovery. `CHECK` marks a repository remote check. `DL`, `UPD` and `VAL` are compact forms of Download, Update and Validate; their full meanings remain available through tooltips. `DL` may remain lit when a selected repository still needs a local snapshot, and `UPD` may remain lit when a usable local snapshot has a newer remote version. During active work, the corresponding button's orbiting activity sleeve distinguishes an operation in progress from a merely available action. `READY` means all selected local repository snapshots are usable and may remain lit together with `UPD` or `OFFLINE`. `ERR` marks a failed repository operation.
+
+Repository status semantics are state-driven rather than inferred from display strings. Normal completion, transport/offline failure and repository/protocol failure are represented explicitly in code; changing a log or tooltip sentence must not alter which annunciator lights. A repository selection change invalidates the prior remote-check outcome, clearing stale `OFFLINE`/`ERR` state until the new selection is checked. The one-line LCD stays terse, but the `OFFLINE` and `ERR` segments and the LCD accessible description retain the concrete underlying error detail for diagnosis.
+
+The LCD is a structural strip of the application shell, not an inset card. It sits flush immediately below the header and spans the full inner width of the window. Its upper boundary is the header bar's existing lower border; its left and right boundaries are the application's outer frame, so the LCD draws no independent top, left or right border and has no rounded corners. Only its lower edge draws a neutral 2 px ridge-style border matching the application's frame language. Color belongs to status text only. The conversation transcript begins below this lower divider with a small fixed separation. The panel remains permanently allocated, so neither header controls nor the transcript origin shift when status changes.
+
+Accessibility follows the semantic meaning rather than the LCD's visual construction. Individual annunciator words, centered-dot separators, the custom selector triangles and the orbiting activity rings keep their native widget roles but are permanently marked with GTK's accessibility-hidden state so they do not appear as separate items to assistive technologies. The LCD frame already has GTK's native GROUP role and exposes an explicit accessible label plus a concise dynamic description derived from the same underlying AI/repository state, for example `Local AI ready. Repositories EWD, RMD ready; update available.` Standard GTK selectors and buttons retain their native accessible roles and receive explicit accessible labels in addition to descriptive tooltips. The permanent repository-action slot is marked accessibility-hidden while it is visually transparent and has no action, then exposed again when Download/Update becomes actionable. Refresh and Download/Update controls expose the GTK BUSY state while their corresponding activity ring is running.
+
+Repository files are stored visibly under `~/Ask the Model/Repositories`, while derived retrieval indexes remain application-private cache data. The UI should make this distinction understandable without exposing SHA values in the normal header.
 
 The repository scope is editable before the first user message. Once the first message is sent, the scope is pinned for that conversation, including the valid zero-repository case. A later repository-scope change must start a new chat rather than silently changing the scientific basis of an existing conversation.
 

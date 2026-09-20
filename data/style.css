@@ -1,8 +1,11 @@
 /* Ask the Model — two monochrome system variants.
  *
  * Palette source: the owl artwork.
- * No yellow, beige, or gold. "System" is behavior, not a third palette:
- * elementary OS chooses the light or dark variant automatically.
+ * The persistent chrome uses no yellow, beige, or gold. Active status
+ * feedback uses warm lamp-like amber on the LCD and a clearer related gold
+ * for the transient activity ring around controls that are working.
+ * "System" is behavior, not a third palette: elementary OS chooses the
+ * light or dark variant automatically.
  */
 
 /* Light variant */
@@ -40,6 +43,79 @@ window.atm-window textview text {
     color: #1B1B18;
 }
 
+
+
+/* Selector surfaces use the same neutral surface as chat tabs.
+ * The AI GtkDropDown uses its native internal arrow. The repository
+ * GtkMenuButton keeps the approved custom geometric triangle.
+ */
+window.atm-window dropdown.atm-triangle-selector > button,
+window.atm-window menubutton.atm-triangle-selector > button {
+    background-image: none;
+    background-color: #EFF0ED;
+    color: #1B1B18;
+    border: 1px solid #A4A5A1;
+    box-shadow: none;
+    padding-right: 20px;
+}
+
+window.atm-window dropdown.atm-triangle-selector > button:hover,
+window.atm-window menubutton.atm-triangle-selector > button:hover {
+    background-color: #FAFBF9;
+}
+
+window.atm-window dropdown.atm-triangle-selector > popover > contents,
+window.atm-window dropdown.atm-triangle-selector > popover listview {
+    background-color: #EFF0ED;
+    color: #1B1B18;
+}
+
+window.atm-window .atm-selector-triangle {
+    color: #5F605C;
+}
+
+/* Fixed one-line status LCD below the header.
+ * The panel stays passive and uses the same neutral contour language as
+ * the rest of the application. Only active text is luminous.
+ * #C79A52 is a deliberately dim, warm lamp-amber for the LCD.
+ */
+window.atm-window frame.atm-status-lcd {
+    min-height: 22px;
+    padding: 0;
+    background-color: rgba(43, 35, 20, 0.82);
+    border: none;
+    border-bottom: 2px ridge #A4A5A1;
+    border-radius: 0;
+    box-shadow: none;
+    background-clip: padding-box;
+}
+
+window.atm-window label.atm-annunciator {
+    color: rgba(199, 154, 82, 0.045);
+    font-family: monospace;
+    font-size: 0.74em;
+    font-weight: 500;
+    text-shadow: none;
+}
+
+window.atm-window label.atm-annunciator.active {
+    color: #C79A52;
+    font-weight: 500;
+    text-shadow: 0 0 1px rgba(199, 154, 82, 0.20);
+}
+
+window.atm-window label.atm-annunciator-critical.active {
+    color: #C86458;
+    text-shadow: 0 0 1px rgba(200, 100, 88, 0.22);
+}
+
+window.atm-window label.atm-annunciator-separator {
+    color: rgba(199, 154, 82, 0.14);
+    font-family: monospace;
+    font-size: 0.72em;
+    text-shadow: none;
+}
+
 window.atm-window frame.atm-input-frame {
     background-color: #EFF0ED;
     border: 2px ridge #A4A5A1;
@@ -56,6 +132,106 @@ window.atm-window frame.atm-input-frame textview text {
 
 window.atm-window frame.atm-input-frame:focus-within {
     border-color: #5F605C;
+}
+
+
+/* Conversation tabs hang from the strip above the chat.
+ * Their upper edge is flush with the strip; only the lower corners are
+ * rounded, so the tabs visually descend from the bar instead of sitting on it.
+ */
+window.atm-window notebook.atm-chat-tabs > header.top {
+    padding: 0;
+    background-color: rgba(255, 255, 255, 0);
+    border: none;
+    box-shadow: none;
+}
+
+window.atm-window notebook.atm-chat-tabs > header.top > tabs {
+    margin: 0;
+    padding: 0;
+    background-color: rgba(255, 255, 255, 0);
+    border: none;
+    box-shadow: none;
+}
+
+window.atm-window notebook.atm-chat-tabs > header.top > tabs > tab {
+    margin: 0 2px 2px 0;
+    padding: 5px 10px 6px 10px;
+    background-image: none;
+    background-color: #EFF0ED;
+    border: 1px solid #A4A5A1;
+    border-top: none;
+    border-radius: 0 0 7px 7px;
+    box-shadow: none;
+}
+
+window.atm-window notebook.atm-chat-tabs > header.top > tabs > tab:checked {
+    background-color: #FAFBF9;
+    border-bottom-color: #5F605C;
+}
+
+window.atm-window notebook.atm-chat-tabs > header.top button.atm-new-chat-tab {
+    min-width: 18px;
+    min-height: 18px;
+    padding: 3px 5px 4px 5px;
+    margin: 0 3px 2px 0;
+    background-image: none;
+    background-color: #EFF0ED;
+    border: 1px solid #A4A5A1;
+    border-top: none;
+    border-radius: 0 0 6px 6px;
+    box-shadow: none;
+}
+
+window.atm-window notebook.atm-chat-tabs > header.top button.atm-new-chat-tab:hover {
+    background-color: #FAFBF9;
+}
+
+window.atm-window notebook.atm-chat-tabs > header.top button.atm-tab-close {
+    min-width: 12px;
+    min-height: 12px;
+    padding: 0;
+    margin: 0 0 0 2px;
+    background-image: none;
+    background-color: rgba(255, 255, 255, 0);
+    border: none;
+    border-radius: 3px;
+    box-shadow: none;
+}
+
+window.atm-window notebook.atm-chat-tabs > header.top button.atm-tab-close:hover {
+    background-color: rgba(27, 27, 24, 0.10);
+}
+
+/* Compact source references embedded below grounded answers. */
+window.atm-window textview menubutton.atm-source-ref > button {
+    min-width: 0;
+    min-height: 0;
+    padding: 0 2px;
+    margin: 0;
+    background-image: none;
+    background-color: rgba(255, 255, 255, 0);
+    color: #5F605C;
+    border: none;
+    box-shadow: none;
+}
+
+window.atm-window textview menubutton.atm-source-ref > button:hover,
+window.atm-window textview menubutton.atm-source-ref > button:checked {
+    background-color: rgba(27, 27, 24, 0.08);
+    color: #1B1B18;
+}
+
+window.atm-window label.atm-source-excerpt {
+    padding: 6px 8px;
+    background-color: #EFF0ED;
+    color: #1B1B18;
+    border: 1px solid #A4A5A1;
+    border-radius: 6px;
+}
+
+window.atm-window button.atm-source-link {
+    padding: 2px 0;
 }
 
 /* Dark variant */
@@ -83,11 +259,114 @@ window.atm-window.atm-dark headerbar button:active {
     background-color: rgba(250, 251, 249, 0.15);
 }
 
+window.atm-window.atm-dark .atm-selector-triangle {
+    color: #C9CAC7;
+}
+
+window.atm-window.atm-dark dropdown.atm-triangle-selector > button,
+window.atm-window.atm-dark menubutton.atm-triangle-selector > button {
+    background-color: #2D2D2A;
+    color: #FAFBF9;
+    border-color: #6F706C;
+}
+
+window.atm-window.atm-dark dropdown.atm-triangle-selector > button:hover,
+window.atm-window.atm-dark menubutton.atm-triangle-selector > button:hover {
+    background-color: #1B1B18;
+}
+
+window.atm-window.atm-dark dropdown.atm-triangle-selector > popover > contents,
+window.atm-window.atm-dark dropdown.atm-triangle-selector > popover listview {
+    background-color: #2D2D2A;
+    color: #FAFBF9;
+}
+
 window.atm-window.atm-dark scrolledwindow,
 window.atm-window.atm-dark textview,
 window.atm-window.atm-dark textview text {
     background-color: #1B1B18;
     color: #FAFBF9;
+}
+
+window.atm-window.atm-dark frame.atm-status-lcd {
+    background-color: rgba(24, 20, 13, 0.84);
+    border-bottom-color: #6F706C;
+    box-shadow: none;
+}
+
+window.atm-window.atm-dark label.atm-annunciator {
+    color: rgba(199, 154, 82, 0.042);
+    text-shadow: none;
+}
+
+window.atm-window.atm-dark label.atm-annunciator.active {
+    color: #C79A52;
+    text-shadow: 0 0 1px rgba(199, 154, 82, 0.22);
+}
+
+window.atm-window.atm-dark label.atm-annunciator-critical.active {
+    color: #C86458;
+    text-shadow: 0 0 1px rgba(200, 100, 88, 0.24);
+}
+
+window.atm-window.atm-dark label.atm-annunciator-separator {
+    color: rgba(199, 154, 82, 0.13);
+    text-shadow: none;
+}
+
+window.atm-window.atm-dark notebook.atm-chat-tabs > header.top {
+    background-color: rgba(0, 0, 0, 0);
+    border: none;
+    box-shadow: none;
+}
+
+window.atm-window.atm-dark notebook.atm-chat-tabs > header.top > tabs > tab {
+    background-color: #2D2D2A;
+    color: #FAFBF9;
+    border-color: #6F706C;
+    border-top: none;
+}
+
+window.atm-window.atm-dark notebook.atm-chat-tabs > header.top > tabs > tab:checked {
+    background-color: #1B1B18;
+    border-bottom-color: #C9CAC7;
+}
+
+window.atm-window.atm-dark notebook.atm-chat-tabs > header.top button.atm-new-chat-tab {
+    background-color: #2D2D2A;
+    color: #FAFBF9;
+    border-color: #6F706C;
+    border-top: none;
+}
+
+window.atm-window.atm-dark notebook.atm-chat-tabs > header.top button.atm-new-chat-tab:hover {
+    background-color: #1B1B18;
+}
+
+window.atm-window.atm-dark notebook.atm-chat-tabs > header.top button.atm-tab-close {
+    color: #FAFBF9;
+    background-color: rgba(0, 0, 0, 0);
+}
+
+window.atm-window.atm-dark notebook.atm-chat-tabs > header.top button.atm-tab-close:hover {
+    background-color: rgba(250, 251, 249, 0.12);
+}
+
+window.atm-window.atm-dark textview menubutton.atm-source-ref > button {
+    background-color: rgba(0, 0, 0, 0);
+    color: #C9CAC7;
+}
+
+window.atm-window.atm-dark textview menubutton.atm-source-ref > button:hover,
+window.atm-window.atm-dark textview menubutton.atm-source-ref > button:checked {
+    background-color: rgba(250, 251, 249, 0.10);
+    color: #FAFBF9;
+}
+
+window.atm-window.atm-dark label.atm-source-excerpt {
+    background-color: #2D2D2A;
+    color: #FAFBF9;
+    border-color: #6F706C;
 }
 
 window.atm-window.atm-dark frame.atm-input-frame {

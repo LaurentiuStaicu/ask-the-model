@@ -128,6 +128,90 @@ test_known_unknown_and_duplicate_labels (void)
         "[S9]"
     );
 
+    g_assert_cmpuint (
+        atm_citation_resolution_count (resolution),
+        ==,
+        2
+    );
+    g_assert_cmpuint (
+        atm_citation_resolution_unknown_count (resolution),
+        ==,
+        1
+    );
+
+    const AtmCitationReference *accessed =
+        atm_citation_resolution_get (
+            resolution,
+            0
+        );
+
+    g_assert_nonnull (accessed);
+    g_assert_cmpstr (
+        atm_citation_reference_label (accessed),
+        ==,
+        "[S2]"
+    );
+    g_assert_cmpstr (
+        atm_citation_reference_repository_id (accessed),
+        ==,
+        "rmd"
+    );
+    g_assert_cmpstr (
+        atm_citation_reference_repository_version (accessed),
+        ==,
+        "0.1.0"
+    );
+    g_assert_cmpstr (
+        atm_citation_reference_snapshot_sha (accessed),
+        ==,
+        "2222222222222222222222222222222222222222"
+    );
+    g_assert_cmpstr (
+        atm_citation_reference_logical_source_id (accessed),
+        ==,
+        "rmd:section:STATUS.md:Scientific status"
+    );
+    g_assert_cmpstr (
+        atm_citation_reference_source_path (accessed),
+        ==,
+        "STATUS.md"
+    );
+    g_assert_cmpstr (
+        atm_citation_reference_locator (accessed),
+        ==,
+        "lines:1-5"
+    );
+    g_assert_cmpstr (
+        atm_citation_reference_title (accessed),
+        ==,
+        "Scientific status"
+    );
+    g_assert_cmpstr (
+        atm_citation_reference_excerpt (accessed),
+        ==,
+        "RMD current status."
+    );
+    g_assert_cmpstr (
+        atm_citation_resolution_unknown_get (
+            resolution,
+            0
+        ),
+        ==,
+        "[S9]"
+    );
+    g_assert_null (
+        atm_citation_resolution_get (
+            resolution,
+            99
+        )
+    );
+    g_assert_null (
+        atm_citation_resolution_unknown_get (
+            resolution,
+            99
+        )
+    );
+
     atm_citation_resolution_free (resolution);
     atm_grounding_context_free (context);
 }

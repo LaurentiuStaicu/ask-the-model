@@ -42,6 +42,20 @@ void atm_retrieval_conversation_turn_free (
     AtmRetrievalConversationTurn *turn
 );
 
+gboolean atm_retrieval_conversation_prepare (
+    AtmRetrievalConversationState *state,
+    const char *query,
+    guint max_results_per_repository,
+    AtmRetrievalConversationTurn **out_turn,
+    GError **error
+);
+
+gboolean atm_retrieval_conversation_commit (
+    AtmRetrievalConversationState *state,
+    const AtmRetrievalConversationTurn *turn,
+    GError **error
+);
+
 gboolean atm_retrieval_conversation_run (
     AtmRetrievalConversationState *state,
     const char *query,

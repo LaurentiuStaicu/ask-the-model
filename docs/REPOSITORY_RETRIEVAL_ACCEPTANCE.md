@@ -77,7 +77,8 @@ Before repository feature implementation depends on SQLite/libarchive, CI on the
 - XDG data directory is writable.
 - XDG cache directory is writable.
 - XDG state directory is writable.
-- no additional general filesystem permission is required.
+- the Flatpak manifest grants exactly the dedicated `~/Ask the Model:create` repository-storage permission;
+- `--filesystem=home`, `--filesystem=host` and any additional broad filesystem permission remain absent.
 
 ### Pass condition
 
@@ -110,6 +111,12 @@ After selection, the closed control uses only acronyms:
 Generic labels such as `3 models` are not accepted.
 
 Zero repositories is a valid ordinary-chat state.
+
+The header contains two distinct control groups in this order:
+
+`[AI model] [Refresh AI] [AI status]    [Repositories] [Refresh repositories] [Download/Update] [Repository status]`
+
+Repository Refresh performs a read-only remote check. Download/Update is a separate explicit mutation action. Repository status is not displayed in the AI-provider status area.
 
 A `New Chat` action exists and clears the current provider/conversation state.
 
@@ -144,8 +151,10 @@ For each repository:
 - AtM resolves the tracked branch to an exact SHA;
 - downloads an archive for that SHA;
 - follows required HTTP redirects;
-- writes to application-owned staging;
+- writes the downloaded archive to application-owned staging;
 - supports cancellation;
+- extracts/validates under `~/Ask the Model/Repositories/.staging`;
+- promotes only validated immutable snapshots into `~/Ask the Model/Repositories/<id>/snapshots/<sha>`;
 - never extracts directly into the final snapshot directory.
 
 ### Validation
@@ -177,6 +186,8 @@ A decompression-bomb fixture and fixtures that exceed each configured limit must
 ### Promotion
 
 Only a validated snapshot is promoted to final persistent storage.
+
+Persistent repository source snapshots are user-visible under `~/Ask the Model/Repositories`. Derived retrieval indexes remain in the application-private XDG cache. The lifecycle must remain usable offline from an already validated local snapshot.
 
 ### Update
 
@@ -335,6 +346,16 @@ When selected repositories do not provide enough support, the system must permit
 ### Pass condition
 
 A repository-grounded answer can be traced back to its exact snapshot evidence and citations remain associated with the turn that produced them.
+
+**Current development implementation status (2026-09-20): implemented.** The
+GTK path freezes repository/model identity per chat tab, supplies only
+current-turn evidence, resolves model-facing `[S#]` labels before committing a
+grounded turn, rejects unknown labels, preserves the deep-copied provenance
+mapping with the answer, removes temporary labels from user-visible text, and
+renders compact numbered source references whose popovers recover the required
+repository/version/SHA/logical-source/locator/excerpt metadata and immutable
+GitHub permalink when it can be constructed safely. Real-repository R4 CI
+continues to exercise traceability independently of the UI.
 
 ## R5 — Retrieval benchmark
 

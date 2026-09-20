@@ -3,7 +3,8 @@ namespace AskTheModel {
         HTTP,
         INVALID_RESPONSE,
         TOO_LARGE,
-        STORAGE
+        STORAGE,
+        NOT_READY
     }
 
     public errordomain CitationError {
@@ -19,6 +20,7 @@ namespace AskTheModel {
         public string owner { get; construct; }
         public string repository { get; construct; }
         public string tracked_branch { get; construct; }
+        public string supported_version { get; construct; }
 
         public RepositoryDescriptor (
             string id,
@@ -26,7 +28,8 @@ namespace AskTheModel {
             string display_name,
             string owner,
             string repository,
-            string tracked_branch
+            string tracked_branch,
+            string supported_version = "0.1.0"
         ) {
             Object (
                 id: id,
@@ -34,7 +37,18 @@ namespace AskTheModel {
                 display_name: display_name,
                 owner: owner,
                 repository: repository,
-                tracked_branch: tracked_branch
+                tracked_branch: tracked_branch,
+                supported_version: supported_version
+            );
+        }
+
+        public string selector_label (
+            string? version = null
+        ) {
+            return "%s (%s) v%s".printf (
+                acronym,
+                display_name,
+                version ?? supported_version
             );
         }
 
@@ -48,6 +62,14 @@ namespace AskTheModel {
 
         public string archive_api_url (string sha) {
             return "https://api.github.com/repos/%s/%s/tarball/%s".printf (
+                owner,
+                repository,
+                sha
+            );
+        }
+
+        public string citation_api_url (string sha) {
+            return "https://api.github.com/repos/%s/%s/contents/CITATION.cff?ref=%s".printf (
                 owner,
                 repository,
                 sha
@@ -168,7 +190,8 @@ namespace AskTheModel {
                     "Empirical World3 Dynamics",
                     "LaurentiuStaicu",
                     "empirical-world3-dynamics",
-                    "main"
+                    "main",
+                    "0.1.0"
                 ),
                 new RepositoryDescriptor (
                     "cbd",
@@ -176,7 +199,8 @@ namespace AskTheModel {
                     "Cognitive Belief Dynamics",
                     "LaurentiuStaicu",
                     "cognitive-belief-dynamics",
-                    "main"
+                    "main",
+                    "0.1.0"
                 ),
                 new RepositoryDescriptor (
                     "rmd",
@@ -184,7 +208,8 @@ namespace AskTheModel {
                     "Romanian Monetary Dynamics",
                     "LaurentiuStaicu",
                     "romanian-monetary-dynamics",
-                    "main"
+                    "main",
+                    "0.1.0"
                 )
             };
         }
@@ -239,7 +264,18 @@ namespace AskTheModel {
             }
 
             var parser = new Json.Parser ();
-            parser.load_from_data ((string) body.get_data (), -1);
+            try {
+                parser.load_from_data (
+                    (string) body.get_data (),
+                    (ssize_t) body.get_size ()
+                );
+            } catch (GLib.Error error) {
+                throw new RepositoryError.INVALID_RESPONSE (
+                    "GitHub branch response is not valid JSON: %s".printf (
+                        error.message
+                    )
+                );
+            }
 
             Json.Node root_node = parser.get_root ();
             if (root_node.get_node_type () != Json.NodeType.OBJECT) {
@@ -270,6 +306,70 @@ namespace AskTheModel {
             }
 
             return sha.down ();
+        }
+
+        public async string resolve_remote_version (
+            RepositoryDescriptor descriptor,
+            string sha,
+            GLib.Cancellable? cancellable = null
+        ) throws GLib.Error {
+            if (!GLib.Regex.match_simple ("^[0-9a-f]{40}$", sha)) {
+                throw new RepositoryError.INVALID_RESPONSE (
+                    "Refusing to inspect CITATION.cff for an invalid commit SHA."
+                );
+            }
+
+            var message = new Soup.Message (
+                "GET",
+                descriptor.citation_api_url (sha)
+            );
+            message.request_headers.append (
+                "Accept",
+                "application/vnd.github.raw+json"
+            );
+            message.request_headers.append (
+                "X-GitHub-Api-Version",
+                "2022-11-28"
+            );
+
+            GLib.Bytes body = yield session.send_and_read_async (
+                message,
+                GLib.Priority.DEFAULT,
+                cancellable
+            );
+
+            if (message.get_status () != Soup.Status.OK) {
+                throw new RepositoryError.HTTP (
+                    "GitHub CITATION.cff lookup failed with HTTP %u.".printf (
+                        message.get_status ()
+                    )
+                );
+            }
+
+            unowned uint8[] bytes = body.get_data ();
+            string version;
+
+            try {
+                if (!RepositoryNative.cff_extract_version (
+                        bytes,
+                        body.get_size (),
+                        out version
+                    )) {
+                    throw new RepositoryError.INVALID_RESPONSE (
+                        "GitHub CITATION.cff contains invalid version metadata."
+                    );
+                }
+            } catch (RepositoryError error) {
+                throw error;
+            } catch (GLib.Error error) {
+                throw new RepositoryError.INVALID_RESPONSE (
+                    "GitHub CITATION.cff contains invalid version metadata: %s".printf (
+                        error.message
+                    )
+                );
+            }
+
+            return version;
         }
 
         public static string staging_archive_path (

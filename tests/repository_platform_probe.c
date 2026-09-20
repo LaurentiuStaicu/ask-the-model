@@ -432,12 +432,40 @@ probe_xdg_and_manifest (void)
         goto out;
     }
 
-    if (!require_true (strstr (manifest, "--filesystem=") == NULL,
-                       "general host filesystem access was added to the Flatpak manifest")) {
+    const char *repository_permission =
+        "--filesystem=~/Ask the Model:create";
+
+    if (!require_true (
+            strstr (manifest, repository_permission) != NULL,
+            "Flatpak manifest does not expose the dedicated Ask the Model repository directory")) {
         goto out;
     }
 
-    g_print ("PASS: Flatpak manifest keeps the elementary OS 8 baseline without general filesystem access\n");
+    if (!require_true (
+            strstr (manifest, "--filesystem=home") == NULL &&
+            strstr (manifest, "--filesystem=host") == NULL,
+            "Flatpak manifest grants broader host filesystem access than the repository design requires")) {
+        goto out;
+    }
+
+    const char *first_filesystem = strstr (manifest, "--filesystem=");
+    const char *second_filesystem =
+        first_filesystem != NULL
+            ? strstr (
+                first_filesystem + strlen ("--filesystem="),
+                "--filesystem="
+            )
+            : NULL;
+
+    if (!require_true (
+            second_filesystem == NULL,
+            "Flatpak manifest declares unexpected additional filesystem permissions")) {
+        goto out;
+    }
+
+    g_print (
+        "PASS: Flatpak manifest exposes only ~/Ask the Model for visible repository storage\n"
+    );
     ok = TRUE;
 
 out:

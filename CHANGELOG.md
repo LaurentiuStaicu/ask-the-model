@@ -18,9 +18,14 @@ All notable public releases of Ask the Model are recorded here.
 - added R4 current-turn grounded Ollama request construction that keeps repository evidence transient and strips stale temporary source labels from replayed assistant history;
 - added R4 current-turn citation-label resolution into persistent provenance objects without fabricating metadata for unknown labels;
 - added real-repository R4 grounding traceability tests across EWD, CBD and RMD;
+- wired the fixed repository selector and validated snapshots into per-chat `ConversationSession` grounding on the GTK Send path;
+- added real independent chat tabs with per-tab Ollama history, frozen repository/model identity, automatic short titles, New-tab creation and per-tab close controls;
+- added compact user-visible grounded source references that resolve temporary `[S#]` labels before commit and expose repository/version/SHA/logical-source/locator/excerpt provenance plus immutable source permalinks on demand;
+- kept ordinary zero-repository local chat as a separate streaming path;
+- aligned the AI-model and repository selectors to the same compact disclosure-triangle geometry and the same neutral surface palette as the chat tabs;
 - added R5 deterministic multi-turn retrieval state with inherited scope/intent/exact-anchor context, bounded effective follow-up queries and explicit clarification outcomes;
 - added versioned R5 benchmark/run schemas, a reviewed frozen EWD/CBD/RMD corpus, deterministic metric evaluation and a real-corpus CI runner; the fixed deterministic baseline now passes all provisional R5 gates without changing benchmark qrels or thresholds;
-- kept all repository/retrieval backend work unreleased and separate from the current v0.2.2 GTK/chat capability boundary.
+- kept all repository-aware development functionality unreleased and separate from the current public v0.2.2 capability boundary.
 
 ### Repository governance
 
