@@ -70,6 +70,7 @@ def benchmark_fixture():
                         "required": False,
                     },
                 ],
+                "expected_outcome": "retrieval",
                 "expect_unsupported": False,
             },
             {
@@ -99,6 +100,7 @@ def benchmark_fixture():
                         "required": False,
                     },
                 ],
+                "expected_outcome": "retrieval",
                 "expect_unsupported": False,
             },
             {
@@ -119,6 +121,7 @@ def benchmark_fixture():
                         "required": True,
                     }
                 ],
+                "expected_outcome": "retrieval",
                 "expect_unsupported": False,
             },
             {
@@ -139,7 +142,24 @@ def benchmark_fixture():
                         "required": False,
                     }
                 ],
+                "expected_outcome": "retrieval",
                 "expect_unsupported": True,
+            },
+            {
+                "topic_id": "clarify-cross-repo-ro",
+                "information_need_id": "cross-repo-exact-ambiguity",
+                "split": "validation",
+                "topic_type": "multi_turn_follow_up",
+                "language": "ro",
+                "query": "Și în RMD?",
+                "active_repositories": ["ewd", "rmd"],
+                "explicit_repositories": ["rmd"],
+                "expected_exact": None,
+                "judgments": [],
+                "expected_outcome": "needs_clarification",
+                "expect_unsupported": False,
+                "conversation_id": "exact-anchor-cross-repo",
+                "turn_index": 2,
             },
         ],
     }
@@ -165,6 +185,7 @@ def run_fixture():
         "topics": [
             {
                 "topic_id": "exact-food-en",
+                "outcome": "retrieval",
                 "latency_ms": 10,
                 "results": [
                     evidence(
@@ -187,6 +208,7 @@ def run_fixture():
             },
             {
                 "topic_id": "exact-food-ro",
+                "outcome": "retrieval",
                 "latency_ms": 20,
                 "results": [
                     evidence("rmd", "rmd:section:README.md:lines:1-3"),
@@ -211,6 +233,7 @@ def run_fixture():
             },
             {
                 "topic_id": "rmd-status-mixed",
+                "outcome": "retrieval",
                 "latency_ms": 15,
                 "results": [
                     evidence(
@@ -229,7 +252,17 @@ def run_fixture():
             },
             {
                 "topic_id": "unsupported-ewd",
+                "outcome": "retrieval",
                 "latency_ms": 5,
+                "results": [],
+                "context_sources": [],
+                "evidence_bytes": 0,
+                "evidence_token_count": 0,
+            },
+            {
+                "topic_id": "clarify-cross-repo-ro",
+                "outcome": "needs_clarification",
+                "latency_ms": 7,
                 "results": [],
                 "context_sources": [],
                 "evidence_bytes": 0,
@@ -301,7 +334,7 @@ class RetrievalBenchmarkEvaluatorTest(unittest.TestCase):
         )
         self.assertEqual(
             metrics["retrieval_latency_ms_median"],
-            12.5,
+            10.0,
         )
         self.assertEqual(
             metrics["retrieval_latency_ms_p95"],
@@ -309,7 +342,7 @@ class RetrievalBenchmarkEvaluatorTest(unittest.TestCase):
         )
         self.assertEqual(
             metrics["evidence_bytes_mean"],
-            300.0,
+            240.0,
         )
         self.assertEqual(
             metrics["evidence_bytes_max"],
@@ -325,7 +358,7 @@ class RetrievalBenchmarkEvaluatorTest(unittest.TestCase):
         )
         self.assertAlmostEqual(
             metrics["evidence_token_budget_coverage"],
-            0.75,
+            0.8,
         )
         self.assertEqual(
             metrics["unsupported_empty_context_rate"],
@@ -334,6 +367,14 @@ class RetrievalBenchmarkEvaluatorTest(unittest.TestCase):
         self.assertEqual(
             metrics["duplicate_result_rate"],
             0.0,
+        )
+        self.assertEqual(
+            metrics["expected_outcome_accuracy"],
+            1.0,
+        )
+        self.assertEqual(
+            metrics["clarification_outcome_accuracy"],
+            1.0,
         )
 
         self.assertFalse(result["gates"]["exact_id_success_at_1"])
@@ -346,6 +387,9 @@ class RetrievalBenchmarkEvaluatorTest(unittest.TestCase):
         )
         self.assertFalse(result["gates"]["ro_en_ndcg_gap"])
         self.assertTrue(result["gates"]["evidence_traceability"])
+        self.assertTrue(
+            result["gates"]["clarification_outcome_accuracy"]
+        )
         self.assertFalse(result["passes_provisional_targets"])
 
     def test_cross_language_variants_must_share_split(self):
@@ -384,6 +428,38 @@ class RetrievalBenchmarkEvaluatorTest(unittest.TestCase):
         self.assertFalse(
             result["gates"]["evidence_traceability"]
         )
+
+    def test_clarification_outcome_is_scored(self):
+        benchmark = benchmark_fixture()
+        run = run_fixture()
+        run["topics"][-1]["outcome"] = "retrieval"
+
+        result = evaluator.evaluate(benchmark, run)
+
+        self.assertEqual(
+            result["metrics"]["clarification_outcome_accuracy"],
+            0.0,
+        )
+        self.assertFalse(
+            result["gates"]["clarification_outcome_accuracy"]
+        )
+
+    def test_clarification_is_not_unsupported_evidence(self):
+        benchmark = benchmark_fixture()
+        benchmark["topics"][-1]["expect_unsupported"] = True
+
+        with self.assertRaises(evaluator.BenchmarkError):
+            evaluator.validate_benchmark(benchmark)
+
+    def test_clarification_run_cannot_carry_retrieval_evidence(self):
+        benchmark = benchmark_fixture()
+        run = run_fixture()
+        run["topics"][-1]["results"] = [
+            evidence("rmd", "rmd:section:STATUS.md:lines:1-3")
+        ]
+
+        with self.assertRaises(evaluator.BenchmarkError):
+            evaluator.validate_run(benchmark, run)
 
 
 if __name__ == "__main__":
