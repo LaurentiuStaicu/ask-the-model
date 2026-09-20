@@ -37,6 +37,7 @@ executable(
     'src/repository_storage.c',
     'src/repository_ingest.c',
     'src/retrieval_index.c',
+    'src/repository_sources.c',
     resources
   ],
   dependencies: [
@@ -233,6 +234,25 @@ retrieval_index_test = executable(
 test(
   'retrieval-index',
   retrieval_index_test
+)
+
+repository_sources_test = executable(
+  'repository-sources-test',
+  [
+    'src/repository_sources.c',
+    'tests/repository_sources_test.c'
+  ],
+  include_directories: include_directories('src'),
+  dependencies: [
+    glib_dep,
+    json_glib_dep
+  ],
+  install: false
+)
+
+test(
+  'repository-sources',
+  repository_sources_test
 )
 
 subdir('data')
