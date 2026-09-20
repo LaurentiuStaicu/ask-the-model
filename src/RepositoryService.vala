@@ -41,11 +41,13 @@ namespace AskTheModel {
             );
         }
 
-        public string selector_label () {
+        public string selector_label (
+            string? version = null
+        ) {
             return "%s (%s) v%s".printf (
                 acronym,
                 display_name,
-                supported_version
+                version ?? supported_version
             );
         }
 
