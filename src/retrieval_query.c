@@ -540,6 +540,29 @@ out:
 #define ATM_RETRIEVAL_MAX_FTS_TERMS 16
 #define ATM_RETRIEVAL_MAX_FTS_QUERY_BYTES 4096
 
+static gboolean
+fts_term_is_stopword (const char *folded)
+{
+    static const char *stopwords[] = {
+        "a", "an", "and", "are", "as", "at",
+        "be", "by", "does", "for", "from",
+        "how", "in", "is", "of", "on", "or",
+        "the", "to", "what", "which", "with",
+        "și", "si", "în", "in", "de", "din",
+        "este", "sunt", "ce", "care", "cu",
+        "la", "pe", "pentru", "sau", "un",
+        "o", "ale", "al", "a"
+    };
+
+    for (gsize i = 0; i < G_N_ELEMENTS (stopwords); i++) {
+        if (g_strcmp0 (folded, stopwords[i]) == 0) {
+            return TRUE;
+        }
+    }
+
+    return FALSE;
+}
+
 static void
 flush_fts_term (
     GString *token,
@@ -557,6 +580,12 @@ flush_fts_term (
         token->str,
         token->len
     );
+
+    if (fts_term_is_stopword (folded)) {
+        g_free (folded);
+        g_string_set_size (token, 0);
+        return;
+    }
 
     if (!g_hash_table_contains (seen, folded)) {
         g_hash_table_add (seen, folded);
