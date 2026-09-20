@@ -1312,21 +1312,11 @@ structured_relation_logical_id (
     const AtmStructuredRelation *relation
 )
 {
-    if (relation->native_id != NULL &&
-        relation->native_id[0] != '\0') {
-        return g_strdup_printf (
-            "%s:relation:%s:%s:%s",
-            repository_id,
-            relation->relation_type,
-            relation->native_id,
-            source->path
-        );
-    }
-
     return g_strdup_printf (
-        "%s:relation:%s:%s",
+        "%s:relation:%s:%s:%s",
         repository_id,
         source->path,
+        relation->relation_type,
         relation->locator
     );
 }
