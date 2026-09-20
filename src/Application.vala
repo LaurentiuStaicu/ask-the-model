@@ -1552,6 +1552,7 @@ namespace AskTheModel {
         }
 
         private async void update_conversation_title (
+            ChatTabState state,
             string first_prompt,
             string first_answer,
             uint serial
@@ -1569,70 +1570,296 @@ namespace AskTheModel {
 
                 string generated =
                     yield ollama_provider.generate_conversation_title (
-                        topic_text
+                        topic_text,
+                        state.model_name
                     );
 
-                if (serial != conversation_serial ||
-                    current_chat_tab_label == null) {
+                if (!chat_state_is_open (state) ||
+                    state.serial != serial) {
                     return;
                 }
 
                 string title =
                     normalize_conversation_title (generated);
 
-                current_chat_tab_label.label = title;
-                current_chat_tab_label.tooltip_text = title;
+                state.title_label.label = title;
+                state.title_label.tooltip_text = title;
             } catch (GLib.Error error) {
-                /* Title generation is cosmetic; keep New Chat on failure. */
+                /* Title generation is cosmetic; keep New on failure. */
             }
         }
 
         private async void send_prompt (
-            string prompt,
-            Gtk.TextView transcript,
-            Gtk.TextView prompt_view,
-            Gtk.Button send_button
+            ChatTabState state,
+            string prompt
         ) {
             generation_active = true;
+            state.generating = true;
+            streaming_transcript = state.transcript;
+            assistant_stream_started = false;
             update_conversation_ui_state ();
 
-            uint serial = conversation_serial;
+            uint serial = state.serial;
             bool should_generate_title =
-                current_chat_tab_label != null &&
-                current_chat_tab_label.label == "New";
+                state.title_label.label == "New";
 
             try {
-                string answer = yield ollama_provider.chat (prompt);
+                if (state.model_name != null) {
+                    ollama_provider.select_model (
+                        state.model_name
+                    );
+                }
+
+                string answer = yield ollama_provider.chat (
+                    prompt,
+                    state.conversation
+                );
 
                 if (should_generate_title &&
                     answer.length > 0) {
                     update_conversation_title.begin (
+                        state,
                         prompt,
                         answer,
                         serial
                     );
                 }
 
-                if (!assistant_stream_started && answer.length > 0) {
+                if (!assistant_stream_started &&
+                    answer.length > 0) {
                     append_transcript (
-                        transcript,
+                        state.transcript,
                         "Assistant: " + answer
                     );
                     assistant_stream_started = true;
                 }
             } catch (GLib.Error error) {
                 append_transcript (
-                    transcript,
+                    state.transcript,
                     "System: " + error.message
                 );
             }
 
+            if (streaming_transcript == state.transcript) {
+                streaming_transcript = null;
+            }
+
+            state.generating = false;
             generation_active = false;
-            prompt_view.sensitive = true;
-            send_button.sensitive =
-                prompt_view.buffer.text.strip ().length > 0;
+
+            if (active_chat != null) {
+                restore_chat_controls (active_chat);
+            }
+
             update_conversation_ui_state ();
-            prompt_view.grab_focus ();
+
+            if (chat_state_is_open (state) &&
+                active_chat == state) {
+                state.prompt.grab_focus ();
+            }
+        }
+
+        private Gtk.Widget build_chat_tab_label (
+            Gtk.Label title_label,
+            Gtk.Button close_button
+        ) {
+            var box = new Gtk.Box (
+                Gtk.Orientation.HORIZONTAL,
+                4
+            ) {
+                valign = Gtk.Align.CENTER
+            };
+
+            box.append (title_label);
+            box.append (close_button);
+            return box;
+        }
+
+        private void create_chat_tab () {
+            if (chat_notebook == null ||
+                generation_active) {
+                return;
+            }
+
+            var transcript = new Gtk.TextView () {
+                editable = false,
+                cursor_visible = false,
+                monospace = true,
+                wrap_mode = Gtk.WrapMode.WORD_CHAR,
+                left_margin = 12,
+                right_margin = 12,
+                top_margin = 8,
+                bottom_margin = 12,
+                vexpand = true
+            };
+
+            var transcript_scroll = new Gtk.ScrolledWindow () {
+                child = transcript,
+                hscrollbar_policy = Gtk.PolicyType.NEVER,
+                vscrollbar_policy = Gtk.PolicyType.AUTOMATIC,
+                vexpand = true
+            };
+
+            var prompt_view = new Gtk.TextView () {
+                monospace = true,
+                wrap_mode = Gtk.WrapMode.WORD_CHAR,
+                accepts_tab = false,
+                left_margin = 10,
+                right_margin = 10,
+                top_margin = 10,
+                bottom_margin = 10,
+                height_request = 72,
+                hexpand = true
+            };
+
+            var prompt_overlay = new Gtk.Overlay () {
+                child = prompt_view
+            };
+
+            var prompt_placeholder = new Gtk.Label (
+                "Ask something…"
+            ) {
+                halign = Gtk.Align.START,
+                valign = Gtk.Align.START,
+                margin_start = 14,
+                margin_top = 12,
+                can_target = false
+            };
+            prompt_placeholder.add_css_class ("dim-label");
+            prompt_placeholder.add_css_class ("monospace");
+            prompt_overlay.add_overlay (prompt_placeholder);
+
+            var prompt_frame = new Gtk.Frame (null) {
+                child = prompt_overlay,
+                hexpand = true
+            };
+            prompt_frame.add_css_class ("atm-input-frame");
+
+            var send_button = new Gtk.Button.with_label (
+                "Send"
+            ) {
+                valign = Gtk.Align.END,
+                sensitive = false
+            };
+
+            var composer = new Gtk.Box (
+                Gtk.Orientation.HORIZONTAL,
+                8
+            ) {
+                margin_top = 12,
+                margin_bottom = 12,
+                margin_start = 12,
+                margin_end = 12
+            };
+            composer.append (prompt_frame);
+            composer.append (send_button);
+
+            var chat_page = new Gtk.Box (
+                Gtk.Orientation.VERTICAL,
+                0
+            ) {
+                hexpand = true,
+                vexpand = true
+            };
+            chat_page.append (transcript_scroll);
+            chat_page.append (composer);
+
+            var title_label = new Gtk.Label ("New") {
+                single_line_mode = true,
+                ellipsize = Pango.EllipsizeMode.NONE
+            };
+
+            var close_button =
+                new Gtk.Button.from_icon_name (
+                    "window-close-symbolic"
+                ) {
+                    tooltip_text = "Close Chat",
+                    valign = Gtk.Align.CENTER
+                };
+            close_button.add_css_class ("flat");
+            close_button.add_css_class ("atm-tab-close");
+            close_button.update_property (
+                Gtk.AccessibleProperty.LABEL,
+                "Close Chat"
+            );
+
+            conversation_serial++;
+            var state = new ChatTabState (
+                chat_page,
+                transcript,
+                prompt_view,
+                send_button,
+                prompt_placeholder,
+                title_label,
+                close_button,
+                ollama_provider.create_conversation (),
+                conversation_serial
+            );
+            state.model_name = ollama_provider.model_name;
+            state.repository_ids =
+                selected_repository_ids ();
+
+            prompt_view.buffer.changed.connect (() => {
+                prompt_placeholder.visible =
+                    prompt_view.buffer.get_char_count () == 0;
+
+                send_button.sensitive =
+                    !generation_active &&
+                    prompt_view.sensitive &&
+                    prompt_view.buffer.text.strip ().length > 0;
+            });
+
+            send_button.clicked.connect (() => {
+                if (generation_active) {
+                    return;
+                }
+
+                string prompt =
+                    prompt_view.buffer.text.strip ();
+                if (prompt.length == 0) {
+                    return;
+                }
+
+                if (!state.locked) {
+                    state.model_name =
+                        ollama_provider.model_name;
+                    state.repository_ids =
+                        selected_repository_ids ();
+                    state.locked = true;
+                    update_conversation_ui_state ();
+                }
+
+                append_transcript (
+                    transcript,
+                    "You: " + prompt
+                );
+
+                prompt_view.buffer.text = "";
+                send_button.sensitive = false;
+
+                send_prompt.begin (
+                    state,
+                    prompt
+                );
+            });
+
+            close_button.clicked.connect (() => {
+                close_chat_tab (state);
+            });
+
+            Gtk.Widget tab_label =
+                build_chat_tab_label (
+                    title_label,
+                    close_button
+                );
+
+            int page_num = chat_notebook.append_page (
+                chat_page,
+                tab_label
+            );
+            chat_states += state;
+            chat_notebook.set_current_page (page_num);
+            activate_chat_state (state);
         }
 
         private Gtk.Widget build_main_content () {
