@@ -437,7 +437,11 @@ namespace AskTheModel {
 
         private async void refresh_local_models () {
             begin_model_scan_status ();
-            set_activity_working (refresh_models_ring, true);
+            set_activity_working (
+                refresh_models_button,
+                refresh_models_ring,
+                true
+            );
 
             if (refresh_models_button != null) {
                 refresh_models_button.sensitive = false;
@@ -474,7 +478,11 @@ namespace AskTheModel {
                 );
             }
 
-            set_activity_working (refresh_models_ring, false);
+            set_activity_working (
+                refresh_models_button,
+                refresh_models_ring,
+                false
+            );
         }
 
         private void update_model_selector () {
@@ -518,9 +526,17 @@ namespace AskTheModel {
         }
 
         private void set_activity_working (
+            Gtk.Button? button,
             ActivityRing? ring,
             bool working
         ) {
+            if (button != null) {
+                button.update_state (
+                    Gtk.AccessibleState.BUSY,
+                    working
+                );
+            }
+
             if (ring == null) {
                 return;
             }
@@ -675,7 +691,11 @@ namespace AskTheModel {
             }
 
             begin_repository_scan_status ();
-            set_activity_working (refresh_repositories_ring, true);
+            set_activity_working (
+                refresh_repositories_button,
+                refresh_repositories_ring,
+                true
+            );
 
             if (refresh_repositories_button != null) {
                 refresh_repositories_button.sensitive = false;
@@ -796,7 +816,11 @@ namespace AskTheModel {
                 refresh_repositories_button.sensitive = true;
             }
 
-            set_activity_working (refresh_repositories_ring, false);
+            set_activity_working (
+                refresh_repositories_button,
+                refresh_repositories_ring,
+                false
+            );
             update_repository_option_labels ();
             update_repository_selector_label ();
         }
@@ -828,7 +852,11 @@ namespace AskTheModel {
             repository_downloading = needs_download;
             repository_updating = !needs_download;
             update_repository_annunciators ();
-            set_activity_working (repository_action_ring, true);
+            set_activity_working (
+                repository_action_button,
+                repository_action_ring,
+                true
+            );
 
             if (repository_menu_button != null) {
                 repository_menu_button.sensitive = false;
@@ -873,7 +901,11 @@ namespace AskTheModel {
                 refresh_repositories_button.sensitive = true;
             }
 
-            set_activity_working (repository_action_ring, false);
+            set_activity_working (
+                repository_action_button,
+                repository_action_ring,
+                false
+            );
             update_repository_option_labels ();
             update_repository_selector_label ();
         }
