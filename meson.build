@@ -32,6 +32,7 @@ executable(
     'src/ChatRequestBuilder.vala',
     'src/OllamaProvider.vala',
     'src/RepositoryService.vala',
+    'src/RepositorySelection.vala',
     'src/cff_version.c',
     'src/archive_extract.c',
     'src/repository_manifest.c',
@@ -105,6 +106,26 @@ repository_catalog_test = executable(
 test(
   'repository-catalog',
   repository_catalog_test
+)
+
+repository_selection_test = executable(
+  'repository-selection-test',
+  [
+    'src/RepositoryService.vala',
+    'src/RepositorySelection.vala',
+    'tests/repository_selection_test.vala'
+  ],
+  dependencies: [
+    glib_dep,
+    soup_dep,
+    json_glib_dep
+  ],
+  install: false
+)
+
+test(
+  'repository-selection',
+  repository_selection_test
 )
 
 chat_request_builder_test = executable(
