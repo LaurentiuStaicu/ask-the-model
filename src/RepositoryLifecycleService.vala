@@ -131,22 +131,25 @@ namespace AskTheModel {
                 cancellable
             );
 
-            info.remote_sha = sha;
+            string version;
 
             if (!info.download_required () &&
                 info.local.current_sha == sha &&
                 info.local.version != null) {
-                info.remote_version = info.local.version;
-                return info;
+                version = info.local.version;
+            } else {
+                version =
+                    yield client.resolve_remote_version (
+                        descriptor,
+                        sha,
+                        cancellable
+                    );
             }
 
-            info.remote_version =
-                yield client.resolve_remote_version (
-                    descriptor,
-                    sha,
-                    cancellable
-                );
-
+            // Publish the remote identity as one coherent pair only after
+            // both values have been resolved successfully.
+            info.remote_sha = sha;
+            info.remote_version = version;
             return info;
         }
 
