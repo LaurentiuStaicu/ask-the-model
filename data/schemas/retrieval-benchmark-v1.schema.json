@@ -1,0 +1,214 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "resource:///io/github/laurentiustaicu/ask_the_model/schemas/retrieval-benchmark-v1.schema.json",
+  "title": "Ask the Model retrieval benchmark v1",
+  "type": "object",
+  "additionalProperties": false,
+  "required": [
+    "schema_version",
+    "benchmark_id",
+    "corpus",
+    "topics"
+  ],
+  "properties": {
+    "schema_version": {
+      "const": 1
+    },
+    "benchmark_id": {
+      "type": "string",
+      "pattern": "^[a-z0-9][a-z0-9._-]{2,80}$"
+    },
+    "corpus": {
+      "type": "array",
+      "minItems": 1,
+      "maxItems": 3,
+      "items": {
+        "$ref": "#/$defs/corpusRepository"
+      }
+    },
+    "topics": {
+      "type": "array",
+      "minItems": 1,
+      "items": {
+        "$ref": "#/$defs/topic"
+      }
+    }
+  },
+  "$defs": {
+    "repositoryId": {
+      "enum": ["ewd", "cbd", "rmd"]
+    },
+    "sha": {
+      "type": "string",
+      "pattern": "^[0-9a-f]{40}$"
+    },
+    "logicalSourceId": {
+      "type": "string",
+      "minLength": 1,
+      "maxLength": 1024
+    },
+    "corpusRepository": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "repository_id",
+        "repository_version",
+        "snapshot_sha"
+      ],
+      "properties": {
+        "repository_id": {
+          "$ref": "#/$defs/repositoryId"
+        },
+        "repository_version": {
+          "type": "string",
+          "minLength": 1,
+          "maxLength": 80
+        },
+        "snapshot_sha": {
+          "$ref": "#/$defs/sha"
+        }
+      }
+    },
+    "sourceRef": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "repository_id",
+        "logical_source_id"
+      ],
+      "properties": {
+        "repository_id": {
+          "$ref": "#/$defs/repositoryId"
+        },
+        "logical_source_id": {
+          "$ref": "#/$defs/logicalSourceId"
+        }
+      }
+    },
+    "judgment": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "repository_id",
+        "logical_source_id",
+        "grade",
+        "required"
+      ],
+      "properties": {
+        "repository_id": {
+          "$ref": "#/$defs/repositoryId"
+        },
+        "logical_source_id": {
+          "$ref": "#/$defs/logicalSourceId"
+        },
+        "grade": {
+          "type": "integer",
+          "minimum": 0,
+          "maximum": 3
+        },
+        "required": {
+          "type": "boolean"
+        }
+      }
+    },
+    "topic": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "topic_id",
+        "information_need_id",
+        "split",
+        "topic_type",
+        "language",
+        "query",
+        "active_repositories",
+        "explicit_repositories",
+        "judgments",
+        "expect_unsupported"
+      ],
+      "properties": {
+        "topic_id": {
+          "type": "string",
+          "pattern": "^[A-Za-z0-9][A-Za-z0-9._-]{2,100}$"
+        },
+        "information_need_id": {
+          "type": "string",
+          "pattern": "^[A-Za-z0-9][A-Za-z0-9._-]{2,100}$"
+        },
+        "split": {
+          "enum": ["development", "validation"]
+        },
+        "topic_type": {
+          "enum": [
+            "exact_entity_lookup",
+            "current_status_boundary",
+            "structure_mechanism",
+            "evidence_provenance",
+            "numeric_tabular",
+            "negative_limitation",
+            "unsupported_premise",
+            "cross_repository_comparison",
+            "multi_turn_follow_up"
+          ]
+        },
+        "language": {
+          "enum": ["en", "ro", "mixed"]
+        },
+        "query": {
+          "type": "string",
+          "minLength": 1,
+          "maxLength": 4096
+        },
+        "active_repositories": {
+          "type": "array",
+          "minItems": 1,
+          "maxItems": 3,
+          "uniqueItems": true,
+          "items": {
+            "$ref": "#/$defs/repositoryId"
+          }
+        },
+        "explicit_repositories": {
+          "type": "array",
+          "maxItems": 3,
+          "uniqueItems": true,
+          "items": {
+            "$ref": "#/$defs/repositoryId"
+          }
+        },
+        "expected_exact": {
+          "oneOf": [
+            {
+              "$ref": "#/$defs/sourceRef"
+            },
+            {
+              "type": "null"
+            }
+          ]
+        },
+        "judgments": {
+          "type": "array",
+          "items": {
+            "$ref": "#/$defs/judgment"
+          }
+        },
+        "expect_unsupported": {
+          "type": "boolean"
+        },
+        "conversation_id": {
+          "type": ["string", "null"],
+          "minLength": 1,
+          "maxLength": 100
+        },
+        "turn_index": {
+          "type": ["integer", "null"],
+          "minimum": 1
+        },
+        "notes": {
+          "type": "string",
+          "maxLength": 1000
+        }
+      }
+    }
+  }
+}
