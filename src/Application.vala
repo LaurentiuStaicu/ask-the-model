@@ -1628,38 +1628,121 @@ namespace AskTheModel {
             uint serial = state.serial;
             bool should_generate_title =
                 state.title_label.label == "New";
+            bool grounded_turn_prepared = false;
 
             try {
-                if (state.model_name != null) {
-                    ollama_provider.select_model (
+                if (state.model_name == null ||
+                    state.model_name.strip ().length == 0) {
+                    throw new ConversationSessionError.INVALID_MODEL (
+                        "No local AI model is selected for this conversation."
+                    );
+                }
+
+                if (!ollama_provider.select_model (
                         state.model_name
+                    )) {
+                    throw new ConversationSessionError.INVALID_MODEL (
+                        "The AI model pinned to this conversation is not currently available."
                     );
                 }
 
-                string answer = yield ollama_provider.chat (
-                    prompt,
-                    state.conversation
-                );
+                if (!state.session.is_active ()) {
+                    RepositoryDescriptor[] selected =
+                        repository_descriptors_for_ids (
+                            state.repository_ids
+                        );
 
-                if (should_generate_title &&
-                    answer.length > 0) {
-                    update_conversation_title.begin (
-                        state,
+                    ConversationGrounding grounding =
+                        yield repository_lifecycle.prepare_conversation_grounding (
+                            selected
+                        );
+
+                    state.session.begin (
+                        grounding,
+                        state.model_name,
+                        state.model_digest
+                    );
+                } else {
+                    state.session.require_model (
+                        state.model_name,
+                        state.model_digest
+                    );
+                }
+
+                bool needs_clarification;
+                string? system_instructions;
+                string? evidence_text;
+                string? post_evidence_reminder;
+
+                bool has_grounding =
+                    state.session.prepare_turn (
                         prompt,
-                        answer,
-                        serial
+                        out needs_clarification,
+                        out system_instructions,
+                        out evidence_text,
+                        out post_evidence_reminder
                     );
-                }
 
-                if (!assistant_stream_started &&
-                    answer.length > 0) {
+                if (needs_clarification) {
                     append_transcript (
                         state.transcript,
-                        "Assistant: " + answer
+                        "Assistant: Please restate the question with the repository, variable, source, or topic you mean."
                     );
-                    assistant_stream_started = true;
+                } else {
+                    string answer;
+
+                    if (has_grounding) {
+                        grounded_turn_prepared = true;
+                        answer = yield ollama_provider.chat_grounded (
+                            prompt,
+                            system_instructions ?? "",
+                            evidence_text ?? "",
+                            post_evidence_reminder ?? "",
+                            state.conversation
+                        );
+
+                        if (!state.session.commit_turn ()) {
+                            throw new ConversationSessionError.INVALID_GROUNDING (
+                                "Grounded conversation turn could not be committed."
+                            );
+                        }
+
+                        grounded_turn_prepared = false;
+                    } else {
+                        answer = yield ollama_provider.chat (
+                            prompt,
+                            state.conversation
+                        );
+                    }
+
+                    if (should_generate_title &&
+                        answer.length > 0) {
+                        update_conversation_title.begin (
+                            state,
+                            prompt,
+                            answer,
+                            serial
+                        );
+                    }
+
+                    if (!assistant_stream_started &&
+                        answer.length > 0) {
+                        append_transcript (
+                            state.transcript,
+                            "Assistant: " + answer
+                        );
+                        assistant_stream_started = true;
+                    }
                 }
             } catch (GLib.Error error) {
+                if (grounded_turn_prepared) {
+                    state.session.abort_turn ();
+                }
+
+                if (!state.session.is_active ()) {
+                    state.locked = false;
+                }
+
                 append_transcript (
                     state.transcript,
                     "System: " + error.message
