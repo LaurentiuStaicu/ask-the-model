@@ -7,6 +7,16 @@ namespace AskTheModel {
             roles = {};
             contents = {};
         }
+
+        public void commit_exchange (
+            string prompt,
+            string answer
+        ) {
+            roles += "user";
+            contents += prompt;
+            roles += "assistant";
+            contents += answer;
+        }
     }
 
     public errordomain ProviderError {
@@ -362,7 +372,8 @@ namespace AskTheModel {
                 null,
                 null,
                 null,
-                conversation
+                conversation,
+                true
             );
         }
 
@@ -371,14 +382,16 @@ namespace AskTheModel {
             string grounding_system,
             string evidence_text,
             string post_evidence_reminder,
-            OllamaConversation? conversation = null
+            OllamaConversation? conversation = null,
+            bool persist_history = true
         ) throws GLib.Error {
             return yield chat_internal (
                 prompt,
                 grounding_system,
                 evidence_text,
                 post_evidence_reminder,
-                conversation
+                conversation,
+                persist_history
             );
         }
 
@@ -387,7 +400,8 @@ namespace AskTheModel {
             string? grounding_system,
             string? evidence_text,
             string? post_evidence_reminder,
-            OllamaConversation? conversation
+            OllamaConversation? conversation,
+            bool persist_history
         ) throws GLib.Error {
             yield ensure_ready ();
 
@@ -484,10 +498,12 @@ namespace AskTheModel {
                 );
             }
 
-            target.roles += "user";
-            target.contents += prompt;
-            target.roles += "assistant";
-            target.contents += answer;
+            if (persist_history) {
+                target.commit_exchange (
+                    prompt,
+                    answer
+                );
+            }
 
             return answer;
         }
