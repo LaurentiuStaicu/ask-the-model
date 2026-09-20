@@ -1,6 +1,7 @@
 #pragma once
 
 #include <glib.h>
+#include "repository_sources.h"
 
 G_BEGIN_DECLS
 
@@ -46,6 +47,14 @@ char *atm_retrieval_index_staging_path (
 gboolean atm_retrieval_index_create_empty (
     const char *cache_root,
     const AtmRetrievalIndexMetadata *metadata,
+    char **out_index_path,
+    GError **error
+);
+
+gboolean atm_retrieval_index_create_with_sources (
+    const char *cache_root,
+    const AtmRetrievalIndexMetadata *metadata,
+    const AtmSourceCatalog *source_catalog,
     char **out_index_path,
     GError **error
 );
