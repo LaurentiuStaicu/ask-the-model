@@ -86,37 +86,30 @@
       }
     },
     "judgment": {
-      "allOf": [
-        {
-          "$ref": "#/$defs/sourceRef"
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "repository_id",
+        "logical_source_id",
+        "grade",
+        "required"
+      ],
+      "properties": {
+        "repository_id": {
+          "$ref": "#/$defs/repositoryId"
         },
-        {
-          "type": "object",
-          "additionalProperties": false,
-          "required": [
-            "repository_id",
-            "logical_source_id",
-            "grade",
-            "required"
-          ],
-          "properties": {
-            "repository_id": {
-              "$ref": "#/$defs/repositoryId"
-            },
-            "logical_source_id": {
-              "$ref": "#/$defs/logicalSourceId"
-            },
-            "grade": {
-              "type": "integer",
-              "minimum": 0,
-              "maximum": 3
-            },
-            "required": {
-              "type": "boolean"
-            }
-          }
+        "logical_source_id": {
+          "$ref": "#/$defs/logicalSourceId"
+        },
+        "grade": {
+          "type": "integer",
+          "minimum": 0,
+          "maximum": 3
+        },
+        "required": {
+          "type": "boolean"
         }
-      ]
+      }
     },
     "topic": {
       "type": "object",
