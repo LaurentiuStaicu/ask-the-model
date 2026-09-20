@@ -13,6 +13,7 @@ namespace AskTheModel {
         private Gtk.Button? refresh_models_button;
         private Gtk.Label? model_scan_status;
         private Gtk.MenuButton? repository_menu_button;
+        private Gtk.CheckButton[] repository_check_buttons = {};
         private Gtk.Button? refresh_repositories_button;
         private Gtk.Button? repository_action_button;
         private Gtk.Label? repository_scan_status;
@@ -284,6 +285,30 @@ namespace AskTheModel {
             }
         }
 
+        private void update_repository_option_labels () {
+            RepositoryDescriptor[] catalog =
+                RepositoryCatalog.all ();
+
+            for (
+                int i = 0;
+                i < repository_check_buttons.length &&
+                i < catalog.length;
+                i++
+            ) {
+                RepositoryRuntimeInfo info =
+                    repository_lifecycle.info_for (
+                        catalog[i].id
+                    );
+                string version =
+                    info.local.version ??
+                    info.remote_version ??
+                    catalog[i].supported_version;
+
+                repository_check_buttons[i].label =
+                    catalog[i].selector_label (version);
+            }
+        }
+
         private void begin_repository_scan_status () {
             repository_status_generation++;
 
@@ -452,6 +477,7 @@ namespace AskTheModel {
                 refresh_repositories_button.sensitive = true;
             }
 
+            update_repository_option_labels ();
             update_repository_selector_label ();
         }
 
@@ -513,6 +539,7 @@ namespace AskTheModel {
                 refresh_repositories_button.sensitive = true;
             }
 
+            update_repository_option_labels ();
             update_repository_selector_label ();
         }
 
@@ -535,6 +562,7 @@ namespace AskTheModel {
                 update_repository_selector_label ();
             });
 
+            repository_check_buttons += check;
             return check;
         }
 
