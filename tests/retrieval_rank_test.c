@@ -171,6 +171,40 @@ test_numeric_intent_prefers_tabular_role (void)
 }
 
 static void
+test_structure_intent_keeps_canonical_and_structural_peers (void)
+{
+    AtmEvidenceRecord *canonical = new_record (
+        "ewd:file:canonical-paradigm",
+        ATM_SOURCE_ROLE_CANONICAL,
+        ATM_EVIDENCE_MATCH_LEXICAL,
+        TRUE,
+        -8.0
+    );
+    AtmEvidenceRecord *structural = new_record (
+        "ewd:file:structural-detail",
+        ATM_SOURCE_ROLE_STRUCTURAL,
+        ATM_EVIDENCE_MATCH_LEXICAL,
+        TRUE,
+        -2.0
+    );
+
+    g_assert_cmpuint (
+        atm_evidence_authority_rank (
+            canonical,
+            ATM_RETRIEVAL_INTENT_STRUCTURE
+        ),
+        ==,
+        atm_evidence_authority_rank (
+            structural,
+            ATM_RETRIEVAL_INTENT_STRUCTURE
+        )
+    );
+
+    atm_evidence_record_free (structural);
+    atm_evidence_record_free (canonical);
+}
+
+static void
 test_exact_duplicate_wins_over_lexical_duplicate (void)
 {
     GPtrArray *results = new_results ();
@@ -353,6 +387,10 @@ main (int argc, char **argv)
     g_test_add_func (
         "/retrieval-rank/numeric-tabular-authority",
         test_numeric_intent_prefers_tabular_role
+    );
+    g_test_add_func (
+        "/retrieval-rank/structure-canonical-peer",
+        test_structure_intent_keeps_canonical_and_structural_peers
     );
     g_test_add_func (
         "/retrieval-rank/exact-dedup-wins",
