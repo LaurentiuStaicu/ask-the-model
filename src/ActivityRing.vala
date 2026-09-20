@@ -16,8 +16,10 @@ namespace AskTheModel {
         private double phase = 0.0;
 
         public ActivityRing () {
-            accessible_role =
-                Gtk.AccessibleRole.PRESENTATION;
+            update_state (
+                Gtk.AccessibleState.HIDDEN,
+                true
+            );
             can_target = false;
             focusable = false;
             hexpand = true;
