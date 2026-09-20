@@ -84,6 +84,20 @@ nonempty (const char *value)
 }
 
 static gboolean
+valid_utf8_nonempty (const char *value)
+{
+    return nonempty (value) &&
+        g_utf8_validate (value, -1, NULL);
+}
+
+static gboolean
+valid_utf8_optional (const char *value)
+{
+    return value == NULL ||
+        g_utf8_validate (value, -1, NULL);
+}
+
+static gboolean
 lower_hex_sha_is_valid (const char *sha)
 {
     if (sha == NULL || strlen (sha) != 40) {
@@ -108,18 +122,22 @@ evidence_provenance_is_valid (
 {
     return set != NULL &&
         record != NULL &&
-        nonempty (set->repository_id) &&
-        nonempty (record->repository_id) &&
+        valid_utf8_nonempty (set->repository_id) &&
+        valid_utf8_nonempty (record->repository_id) &&
         g_strcmp0 (
             set->repository_id,
             record->repository_id
         ) == 0 &&
-        nonempty (record->repository_version) &&
+        valid_utf8_nonempty (record->repository_version) &&
         lower_hex_sha_is_valid (record->snapshot_sha) &&
-        nonempty (record->logical_source_id) &&
-        nonempty (record->source_path) &&
-        nonempty (record->locator) &&
-        nonempty (record->evidence_kind);
+        valid_utf8_nonempty (record->logical_source_id) &&
+        valid_utf8_nonempty (record->source_path) &&
+        valid_utf8_nonempty (record->locator) &&
+        valid_utf8_nonempty (record->evidence_kind) &&
+        valid_utf8_optional (record->title) &&
+        valid_utf8_optional (record->body) &&
+        record->match_kind >= ATM_EVIDENCE_MATCH_EXACT &&
+        record->match_kind <= ATM_EVIDENCE_MATCH_LEXICAL;
 }
 
 static const char *
@@ -588,6 +606,16 @@ atm_grounding_context_build (
     if (selected < total_candidates ||
         budget_exhausted) {
         context->truncated = TRUE;
+    }
+
+    if (total_candidates > 0 && selected == 0) {
+        g_set_error_literal (
+            error,
+            ATM_GROUNDING_ERROR,
+            ATM_GROUNDING_ERROR_BUDGET,
+            "Grounding context budget cannot fit any retrieved evidence."
+        );
+        goto out;
     }
 
     if (evidence->len + strlen (ATM_EVIDENCE_FOOTER) >
