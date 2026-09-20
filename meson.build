@@ -222,6 +222,7 @@ retrieval_index_test = executable(
   [
     'src/repository_sources.c',
     'src/markdown_sections.c',
+    'src/csv_table.c',
     'src/retrieval_index.c',
     'tests/retrieval_index_test.c',
     resources
