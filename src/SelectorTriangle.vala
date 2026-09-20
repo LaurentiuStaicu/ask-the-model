@@ -19,8 +19,7 @@ namespace AskTheModel {
             int width,
             int height
         ) {
-            Gdk.RGBA color = {};
-            area.get_style_context ().get_color (out color);
+            Gdk.RGBA color = area.get_color ();
 
             double center_x = width / 2.0;
             double top = 1.0;
