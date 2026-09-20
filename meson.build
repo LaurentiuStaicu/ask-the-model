@@ -80,6 +80,25 @@ test(
   repository_catalog_test
 )
 
+cff_version_test = executable(
+  'cff-version-test',
+  [
+    'src/cff_version.c',
+    'tests/cff_version_test.c'
+  ],
+  include_directories: include_directories('src'),
+  dependencies: [
+    glib_dep,
+    yaml_dep
+  ],
+  install: false
+)
+
+test(
+  'cff-version-parser',
+  cff_version_test
+)
+
 subdir('data')
 
 icon_sizes = ['16', '24', '32', '48', '64', '128']
