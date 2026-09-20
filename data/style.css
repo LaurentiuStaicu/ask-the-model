@@ -1,8 +1,11 @@
 /* Ask the Model — two monochrome system variants.
  *
  * Palette source: the owl artwork.
- * No yellow, beige, or gold. "System" is behavior, not a third palette:
- * elementary OS chooses the light or dark variant automatically.
+ * The persistent chrome uses no yellow, beige, or gold. A muted gold is
+ * reserved only for the transient activity ring around controls that are
+ * actively checking, downloading, or updating.
+ * "System" is behavior, not a third palette: elementary OS chooses the
+ * light or dark variant automatically.
  */
 
 /* Light variant */
