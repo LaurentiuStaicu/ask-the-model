@@ -1,6 +1,7 @@
 project(
   'io.github.laurentiustaicu.ask_the_model',
   'vala',
+  'c',
   version: '0.2.2',
   meson_version: '>= 1.0.0',
   license: 'MIT'
@@ -10,6 +11,9 @@ gtk_dep = dependency('gtk4')
 granite_dep = dependency('granite-7')
 soup_dep = dependency('libsoup-3.0')
 json_glib_dep = dependency('json-glib-1.0')
+glib_dep = dependency('glib-2.0')
+sqlite_dep = dependency('sqlite3')
+archive_dep = dependency('libarchive')
 gnome = import('gnome')
 
 resources = gnome.compile_resources(
@@ -33,6 +37,25 @@ executable(
     json_glib_dep
   ],
   install: true
+)
+
+repository_platform_probe = executable(
+  'repository-platform-probe',
+  'tests/repository_platform_probe.c',
+  dependencies: [
+    glib_dep,
+    sqlite_dep,
+    archive_dep
+  ],
+  install: false
+)
+
+test(
+  'repository-platform-probe',
+  repository_platform_probe,
+  env: {
+    'ATM_FLATPAK_MANIFEST': meson.project_source_root() / 'io.github.laurentiustaicu.ask_the_model.yml'
+  }
 )
 
 subdir('data')
