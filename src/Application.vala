@@ -49,6 +49,7 @@ namespace AskTheModel {
         private bool repository_validating = false;
         private bool repository_offline = false;
         private bool repository_error = false;
+        private string? repository_status_detail = null;
         private bool assistant_stream_started = false;
         private bool updating_model_selector = false;
 
@@ -256,7 +257,11 @@ namespace AskTheModel {
 
             if (repository_error) {
                 repository_summary =
-                    "Repository operation failed";
+                    repository_status_detail != null
+                        ? "Repository operation failed: %s".printf (
+                            repository_status_detail
+                        )
+                        : "Repository operation failed";
             } else if (repository_validating) {
                 repository_summary =
                     "Validating repositories";
@@ -296,7 +301,11 @@ namespace AskTheModel {
 
             if (repository_offline) {
                 repository_summary +=
-                    "; remote check offline";
+                    repository_status_detail != null
+                        ? "; remote check offline: %s".printf (
+                            repository_status_detail
+                        )
+                        : "; remote check offline";
             }
 
             string summary =
@@ -421,6 +430,25 @@ namespace AskTheModel {
                 repo_error_annunciator,
                 repository_error
             );
+
+            if (repo_offline_annunciator != null) {
+                repo_offline_annunciator.tooltip_text =
+                    repository_offline &&
+                    repository_status_detail != null
+                        ? "Remote check unavailable: %s".printf (
+                            repository_status_detail
+                        )
+                        : "Remote check unavailable; local repositories may remain usable";
+            }
+
+            if (repo_error_annunciator != null) {
+                repo_error_annunciator.tooltip_text =
+                    repository_error &&
+                    repository_status_detail != null
+                        ? repository_status_detail
+                        : "Repository operation failed";
+            }
+
             update_status_lcd_accessibility ();
         }
 
@@ -436,6 +464,7 @@ namespace AskTheModel {
             repository_validating = false;
             repository_offline = false;
             repository_error = false;
+            repository_status_detail = null;
             update_repository_annunciators ();
         }
 
@@ -679,11 +708,13 @@ namespace AskTheModel {
             repository_checking = true;
             repository_offline = false;
             repository_error = false;
+            repository_status_detail = null;
             update_repository_annunciators ();
         }
 
         private void finish_repository_operation (
-            RepositoryOperationOutcome outcome
+            RepositoryOperationOutcome outcome,
+            string? detail = null
         ) {
             repository_checking = false;
             repository_downloading = false;
@@ -693,6 +724,10 @@ namespace AskTheModel {
                 outcome == RepositoryOperationOutcome.OFFLINE;
             repository_error =
                 outcome == RepositoryOperationOutcome.ERROR;
+            repository_status_detail =
+                outcome == RepositoryOperationOutcome.NORMAL
+                    ? null
+                    : detail;
             update_repository_annunciators ();
         }
 
@@ -751,7 +786,8 @@ namespace AskTheModel {
                 finish_repository_operation (
                     transport_failure
                         ? RepositoryOperationOutcome.OFFLINE
-                        : RepositoryOperationOutcome.ERROR
+                        : RepositoryOperationOutcome.ERROR,
+                    error.message
                 );
 
                 stderr.printf (
@@ -802,6 +838,7 @@ namespace AskTheModel {
             repository_checking = false;
             repository_offline = false;
             repository_error = false;
+            repository_status_detail = null;
             repository_validating = false;
             repository_downloading = needs_download;
             repository_updating = !needs_download;
@@ -849,7 +886,8 @@ namespace AskTheModel {
                 finish_repository_operation (
                     transport_failure
                         ? RepositoryOperationOutcome.OFFLINE
-                        : RepositoryOperationOutcome.ERROR
+                        : RepositoryOperationOutcome.ERROR,
+                    error.message
                 );
 
                 stderr.printf (
