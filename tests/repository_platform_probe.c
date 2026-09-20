@@ -186,9 +186,9 @@ probe_libarchive (void)
     GError *error = NULL;
     char *old_cwd = g_get_current_dir ();
     char *temp_dir = g_dir_make_tmp ("atm-platform-probe-XXXXXX", &error);
-    char absolute_path[256];
-    char escaped_path[256];
-    char symlink_escape_path[256];
+    char absolute_path[256] = { 0 };
+    char escaped_path[256] = { 0 };
+    char symlink_escape_path[256] = { 0 };
     gboolean ok = FALSE;
     struct archive_entry *metadata_entry = NULL;
 
@@ -291,9 +291,15 @@ out:
         g_chdir (old_cwd);
     }
 
-    g_remove (absolute_path);
-    g_remove (escaped_path);
-    g_remove (symlink_escape_path);
+    if (absolute_path[0] != '\0') {
+        g_remove (absolute_path);
+    }
+    if (escaped_path[0] != '\0') {
+        g_remove (escaped_path);
+    }
+    if (symlink_escape_path[0] != '\0') {
+        g_remove (symlink_escape_path);
+    }
     g_rmdir (temp_dir);
 
     g_clear_error (&error);
