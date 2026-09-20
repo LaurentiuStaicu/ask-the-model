@@ -44,6 +44,20 @@ namespace AskTheModel {
             cheader_filename = "conversation_grounding.h"
         )]
         public static extern uint repository_count (void* state);
+
+        [CCode (
+            cname = "atm_conversation_grounding_prepare_turn",
+            cheader_filename = "conversation_grounding.h"
+        )]
+        public static extern bool prepare_turn (
+            void* state,
+            string query,
+            out bool has_grounding,
+            out bool needs_clarification,
+            out string? system_instructions,
+            out string? evidence_text,
+            out string? post_evidence_reminder
+        ) throws GLib.Error;
     }
 
     public class ConversationGrounding : Object {
@@ -89,6 +103,30 @@ namespace AskTheModel {
             return ConversationGroundingNative.repository_count (
                 state
             );
+        }
+
+        public bool prepare_turn (
+            string query,
+            out bool needs_clarification,
+            out string? system_instructions,
+            out string? evidence_text,
+            out string? post_evidence_reminder
+        ) throws GLib.Error {
+            bool has_grounding;
+
+            if (!ConversationGroundingNative.prepare_turn (
+                    state,
+                    query,
+                    out has_grounding,
+                    out needs_clarification,
+                    out system_instructions,
+                    out evidence_text,
+                    out post_evidence_reminder
+                )) {
+                return false;
+            }
+
+            return has_grounding;
         }
     }
 }
