@@ -430,7 +430,7 @@ rmd/<sha>.sqlite
 
 The index is derived cache data. Schema changes cause a rebuild from the immutable snapshot rather than an in-place migration.
 
-`PRAGMA user_version` is the authoritative retrieval-index schema version.
+`PRAGMA user_version` is the authoritative retrieval-index schema version. The current implementation uses **user_version 2** from `data/schemas/retrieval-index-v2.sql`; schema v2 adds an explicit `status` source role derived from each repository manifest's `status_source`. A cached index with an older or unsupported user version is invalidated and rebuilt from the immutable snapshot rather than migrated in place.
 
 A final validated index is opened read-only for retrieval and should use defensive SQLite settings such as:
 
@@ -526,17 +526,27 @@ If no repository is named, retrieval uses the repositories pinned to the convers
 
 Retrieved material is not ranked solely by lexical similarity.
 
-AtM records a source role such as:
+AtM records the implemented source roles explicitly:
 
-- canonical;
-- structural;
-- evidence;
-- validated result;
-- supporting;
-- implementation;
-- development.
+- `status` — the manifest-declared `status_source`;
+- `canonical`;
+- `structural`;
+- `evidence`;
+- `tabular`;
+- `implementation`.
 
-For current-state questions, canonical current-state material normally outranks historical or implementation artifacts.
+A source may carry more than one role. For current-state questions, the declared
+`status_source` has the highest authority. For structure questions, declared
+status/canonical structure and structural sources remain comparable so lexical
+relevance can distinguish model-level paradigm statements from lower-level
+implementation detail.
+
+Within the same authority class, FTS5 BM25 uses a stronger title weight than
+body text. Final deterministic ranking also prevents a single non-exact source
+file from saturating the primary result set: exact matches and declared status
+evidence are preserved, while excess results from the same other source are
+deferred and used as backfill when needed. This preserves precise lookup while
+allowing complementary canonical evidence into bounded context.
 
 Conflicting evidence is retained and surfaced rather than silently rewritten into a false consensus.
 
