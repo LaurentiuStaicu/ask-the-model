@@ -4,6 +4,16 @@ All notable public releases of Ask the Model are recorded here.
 
 ## Unreleased
 
+### Repository and retrieval backend
+
+- implemented the fixed-catalog R1 repository lifecycle with SHA resolution, bounded safe extraction, strict manifest/version validation and immutable snapshot promotion;
+- implemented deterministic R2 per-snapshot SQLite/FTS5 indexing with source roles, structured entities/relations, Markdown sections, tabular datasets, integrity/provenance checks and rebuild-from-snapshot behavior;
+- added deterministic R3 exact technical-ID, structured, lexical BM25 and tabular row-key retrieval;
+- added intent-aware source authority, logical-source deduplication, conversation-pinned repository scoping and conservative Romanian/English query normalization;
+- attached repository ID, repository version and exact snapshot SHA to retrieval evidence records;
+- integrated the R3 retrieval router with fail-closed outside-scope behavior and index/scope provenance matching;
+- kept all repository/retrieval backend work unreleased and separate from the current v0.2.2 GTK/chat capability boundary.
+
 ### Repository governance
 
 - added a machine-checked README design/capability contract that verifies release-version consistency, suite visual identity, application/provider/model boundaries and essential documentation routes before every Flatpak build;
