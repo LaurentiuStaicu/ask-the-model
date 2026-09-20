@@ -273,7 +273,6 @@ namespace AskTheModel {
                 repo_ready_annunciator,
                 !operation_active &&
                 all_ready &&
-                !update_available &&
                 !repository_error
             );
             set_annunciator (
