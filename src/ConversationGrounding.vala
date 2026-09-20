@@ -1,5 +1,5 @@
 namespace AskTheModel {
-    private namespace ConversationGroundingNative {
+    namespace ConversationGroundingNative {
         [CCode (
             cname = "atm_conversation_grounding_state_new",
             cheader_filename = "conversation_grounding.h"
