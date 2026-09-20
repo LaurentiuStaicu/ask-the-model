@@ -46,16 +46,20 @@ parse_atx_heading (
 
     cursor = line;
 
+    for (guint indent = 0; indent < 3 && *cursor == ' '; indent++) {
+        cursor++;
+    }
+
     while (*cursor == '#' && level < 6) {
         level++;
         cursor++;
     }
 
-    if (level == 0 || *cursor != ' ') {
+    if (level == 0 || (*cursor != ' ' && *cursor != '\t')) {
         return FALSE;
     }
 
-    while (*cursor == ' ') {
+    while (*cursor == ' ' || *cursor == '\t') {
         cursor++;
     }
 
@@ -63,10 +67,19 @@ parse_atx_heading (
     g_strstrip (title);
     length = strlen (title);
 
-    while (length > 0 && title[length - 1] == '#') {
-        title[length - 1] = '\0';
-        g_strchomp (title);
-        length = strlen (title);
+    if (length > 0 && title[length - 1] == '#') {
+        gsize hash_start = length;
+
+        while (hash_start > 0 && title[hash_start - 1] == '#') {
+            hash_start--;
+        }
+
+        if (hash_start > 0 &&
+            g_ascii_isspace (title[hash_start - 1])) {
+            title[hash_start] = '\0';
+            g_strchomp (title);
+            length = strlen (title);
+        }
     }
 
     if (title[0] == '\0') {
@@ -91,7 +104,7 @@ line_opens_or_closes_fence (
     char marker;
     guint length = 0;
 
-    while (*cursor == ' ' && cursor - line < 4) {
+    while (*cursor == ' ' && cursor - line < 3) {
         cursor++;
     }
 
@@ -118,10 +131,18 @@ line_opens_or_closes_fence (
     }
 
     if (marker == *fence_char && length >= *fence_length) {
-        *in_fence = FALSE;
-        *fence_char = '\0';
-        *fence_length = 0;
-        return TRUE;
+        const char *remainder = cursor;
+
+        while (*remainder == ' ' || *remainder == '\t') {
+            remainder++;
+        }
+
+        if (*remainder == '\0') {
+            *in_fence = FALSE;
+            *fence_char = '\0';
+            *fence_length = 0;
+            return TRUE;
+        }
     }
 
     return FALSE;
