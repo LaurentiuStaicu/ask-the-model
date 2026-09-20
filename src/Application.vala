@@ -905,6 +905,7 @@ namespace AskTheModel {
                 Gtk.Orientation.HORIZONTAL,
                 12
             ) {
+                homogeneous = true,
                 margin_start = 9,
                 margin_end = 9
             };
