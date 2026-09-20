@@ -79,27 +79,27 @@ No repository selection is a valid state.
 
 Repository-aware functionality must not make ordinary local chat depend on repository installation.
 
-## Repository manager
+## Repository control group
 
-Selection and repository lifecycle management are separate UI responsibilities.
+Repository selection and repository lifecycle are distinct responsibilities but are presented as one visually coherent header group.
 
 The compact selector answers:
 
 > Which repositories are active for this conversation?
 
-A separate `Manage Repositories…` surface handles:
+Immediately after the selector, the repository group provides:
 
-- Download;
-- Cancel;
-- Check for updates;
-- Update;
-- Retry;
-- Remove Local Copy;
-- installed version;
-- update status;
-- lifecycle errors.
+- `Refresh repositories` — checks the configured GitHub origins and remote SHAs/versions without changing local files;
+- `Download/Update` — explicitly downloads missing selected repositories or updates selected repositories for which a newer tracked SHA is available;
+- a dedicated repository-status area for checking, ready, offline-local, update-available, download/update progress and errors.
 
-The manager must not imply that removing a local copy deletes or modifies the upstream GitHub repository.
+The repository group appears after the local AI-model group:
+
+`[AI model] [Refresh AI] [AI status]    [Repositories] [Refresh repositories] [Download/Update] [Repository status]`
+
+Refresh never silently replaces a local snapshot. Download/Update is the explicit mutation action. A future detailed repository-management surface may add removal/history controls, but it is not required for the compact v1 header workflow.
+
+The UI must not imply that removing a local copy deletes or modifies the upstream GitHub repository.
 
 ## Repository catalog
 
@@ -213,18 +213,26 @@ A repository is ready only when all applicable checks pass:
 
 ## Storage model
 
-The Flatpak-local XDG directories are used.
-
-Persistent repository snapshots:
+Validated scientific repository snapshots are intentionally visible to the user in a dedicated AtM directory under Home:
 
 ```text
-$XDG_DATA_HOME/repositories/
-    ewd/snapshots/<sha>/
-    cbd/snapshots/<sha>/
-    rmd/snapshots/<sha>/
+~/Ask the Model/
+└── Repositories/
+    ├── ewd/
+    │   └── snapshots/<sha>/
+    ├── cbd/
+    │   └── snapshots/<sha>/
+    ├── rmd/
+    │   └── snapshots/<sha>/
+    └── .staging/
+        └── <repository-id>/<sha>.part/
 ```
 
-Regenerable retrieval indexes:
+The Flatpak receives read/write access only to `~/Ask the Model` with directory creation permitted. It must not request `--filesystem=home`, `--filesystem=host` or another broad host-filesystem grant.
+
+Repository snapshots are immutable once validated. The visible folder therefore contains canonical local source copies that remain usable offline and may also be inspected by the user or other tools with their own filesystem permissions.
+
+Regenerable retrieval indexes remain application-private cache data:
 
 ```text
 $XDG_CACHE_HOME/retrieval/
@@ -233,18 +241,16 @@ $XDG_CACHE_HOME/retrieval/
     rmd/<sha>.sqlite
 ```
 
-Application state:
+Application state remains private:
 
 ```text
 $XDG_STATE_HOME/
     repository-state.json
 ```
 
-Temporary downloads and extraction occur under an application-owned staging directory.
+Archive downloads may use XDG cache staging, while extraction/validation staging is kept beneath `~/Ask the Model/Repositories/.staging` so atomic promotion into the final snapshot tree remains on the same filesystem.
 
-The v1 design must not require `--filesystem=home` or unrestricted host filesystem access.
-
-If an index cache disappears while a valid snapshot remains, AtM rebuilds the index rather than redownloading the repository.
+If an index cache disappears while a valid snapshot remains, AtM rebuilds the index from the visible immutable snapshot rather than redownloading the repository.
 
 ## Snapshot immutability and retention
 
