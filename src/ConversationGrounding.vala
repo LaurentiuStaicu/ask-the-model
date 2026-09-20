@@ -60,6 +60,130 @@ namespace AskTheModel {
         ) throws GLib.Error;
 
         [CCode (
+            cname = "atm_conversation_grounding_resolve_turn_citations",
+            cheader_filename = "conversation_grounding.h"
+        )]
+        public static extern bool resolve_turn_citations (
+            void* state,
+            string model_output,
+            out void* resolution
+        ) throws GLib.Error;
+
+        [CCode (
+            cname = "atm_citation_resolution_free",
+            cheader_filename = "citation_labels.h"
+        )]
+        public static extern void citation_resolution_free (
+            void* resolution
+        );
+
+        [CCode (
+            cname = "atm_citation_resolution_count",
+            cheader_filename = "citation_labels.h"
+        )]
+        public static extern uint citation_resolution_count (
+            void* resolution
+        );
+
+        [CCode (
+            cname = "atm_citation_resolution_unknown_count",
+            cheader_filename = "citation_labels.h"
+        )]
+        public static extern uint citation_resolution_unknown_count (
+            void* resolution
+        );
+
+        [CCode (
+            cname = "atm_citation_resolution_get",
+            cheader_filename = "citation_labels.h"
+        )]
+        public static extern void* citation_resolution_get (
+            void* resolution,
+            uint index
+        );
+
+        [CCode (
+            cname = "atm_citation_resolution_unknown_get",
+            cheader_filename = "citation_labels.h"
+        )]
+        public static extern unowned string? citation_resolution_unknown_get (
+            void* resolution,
+            uint index
+        );
+
+        [CCode (
+            cname = "atm_citation_reference_label",
+            cheader_filename = "citation_labels.h"
+        )]
+        public static extern unowned string? citation_reference_label (
+            void* citation
+        );
+
+        [CCode (
+            cname = "atm_citation_reference_repository_id",
+            cheader_filename = "citation_labels.h"
+        )]
+        public static extern unowned string? citation_reference_repository_id (
+            void* citation
+        );
+
+        [CCode (
+            cname = "atm_citation_reference_repository_version",
+            cheader_filename = "citation_labels.h"
+        )]
+        public static extern unowned string? citation_reference_repository_version (
+            void* citation
+        );
+
+        [CCode (
+            cname = "atm_citation_reference_snapshot_sha",
+            cheader_filename = "citation_labels.h"
+        )]
+        public static extern unowned string? citation_reference_snapshot_sha (
+            void* citation
+        );
+
+        [CCode (
+            cname = "atm_citation_reference_logical_source_id",
+            cheader_filename = "citation_labels.h"
+        )]
+        public static extern unowned string? citation_reference_logical_source_id (
+            void* citation
+        );
+
+        [CCode (
+            cname = "atm_citation_reference_source_path",
+            cheader_filename = "citation_labels.h"
+        )]
+        public static extern unowned string? citation_reference_source_path (
+            void* citation
+        );
+
+        [CCode (
+            cname = "atm_citation_reference_locator",
+            cheader_filename = "citation_labels.h"
+        )]
+        public static extern unowned string? citation_reference_locator (
+            void* citation
+        );
+
+        [CCode (
+            cname = "atm_citation_reference_title",
+            cheader_filename = "citation_labels.h"
+        )]
+        public static extern unowned string? citation_reference_title (
+            void* citation
+        );
+
+        [CCode (
+            cname = "atm_citation_reference_excerpt",
+            cheader_filename = "citation_labels.h"
+        )]
+        public static extern unowned string? citation_reference_excerpt (
+            void* citation
+        );
+
+        [CCode (
             cname = "atm_conversation_grounding_commit_turn",
             cheader_filename = "conversation_grounding.h"
         )]
@@ -72,6 +196,46 @@ namespace AskTheModel {
             cheader_filename = "conversation_grounding.h"
         )]
         public static extern void abort_turn (void* state);
+    }
+
+    public class CitationReference : Object {
+        public string label;
+        public string repository_id;
+        public string repository_version;
+        public string snapshot_sha;
+        public string logical_source_id;
+        public string source_path;
+        public string locator;
+        public string? title;
+        public string? excerpt;
+
+        public CitationReference (
+            string label,
+            string repository_id,
+            string repository_version,
+            string snapshot_sha,
+            string logical_source_id,
+            string source_path,
+            string locator,
+            string? title,
+            string? excerpt
+        ) {
+            Object ();
+            this.label = label;
+            this.repository_id = repository_id;
+            this.repository_version = repository_version;
+            this.snapshot_sha = snapshot_sha;
+            this.logical_source_id = logical_source_id;
+            this.source_path = source_path;
+            this.locator = locator;
+            this.title = title;
+            this.excerpt = excerpt;
+        }
+    }
+
+    public class CitationResolution : Object {
+        public CitationReference[] citations = {};
+        public string[] unknown_labels = {};
     }
 
     public class ConversationGrounding : Object {
@@ -141,6 +305,129 @@ namespace AskTheModel {
             }
 
             return has_grounding;
+        }
+
+        public CitationResolution resolve_turn_citations (
+            string model_output
+        ) throws GLib.Error {
+            void* native_resolution = null;
+
+            if (!ConversationGroundingNative.resolve_turn_citations (
+                    state,
+                    model_output,
+                    out native_resolution
+                )) {
+                throw new GLib.IOError.FAILED (
+                    "Citation resolution failed."
+                );
+            }
+
+            var result = new CitationResolution ();
+
+            try {
+                uint count =
+                    ConversationGroundingNative.citation_resolution_count (
+                        native_resolution
+                    );
+
+                for (uint i = 0; i < count; i++) {
+                    void* native_citation =
+                        ConversationGroundingNative.citation_resolution_get (
+                            native_resolution,
+                            i
+                        );
+
+                    if (native_citation == null) {
+                        continue;
+                    }
+
+                    unowned string? label =
+                        ConversationGroundingNative.citation_reference_label (
+                            native_citation
+                        );
+                    unowned string? repository_id =
+                        ConversationGroundingNative.citation_reference_repository_id (
+                            native_citation
+                        );
+                    unowned string? repository_version =
+                        ConversationGroundingNative.citation_reference_repository_version (
+                            native_citation
+                        );
+                    unowned string? snapshot_sha =
+                        ConversationGroundingNative.citation_reference_snapshot_sha (
+                            native_citation
+                        );
+                    unowned string? logical_source_id =
+                        ConversationGroundingNative.citation_reference_logical_source_id (
+                            native_citation
+                        );
+                    unowned string? source_path =
+                        ConversationGroundingNative.citation_reference_source_path (
+                            native_citation
+                        );
+                    unowned string? locator =
+                        ConversationGroundingNative.citation_reference_locator (
+                            native_citation
+                        );
+                    unowned string? title =
+                        ConversationGroundingNative.citation_reference_title (
+                            native_citation
+                        );
+                    unowned string? excerpt =
+                        ConversationGroundingNative.citation_reference_excerpt (
+                            native_citation
+                        );
+
+                    if (label == null ||
+                        repository_id == null ||
+                        repository_version == null ||
+                        snapshot_sha == null ||
+                        logical_source_id == null ||
+                        source_path == null ||
+                        locator == null) {
+                        throw new GLib.IOError.INVALID_DATA (
+                            "Resolved citation provenance is incomplete."
+                        );
+                    }
+
+                    result.citations += new CitationReference (
+                        label,
+                        repository_id,
+                        repository_version,
+                        snapshot_sha,
+                        logical_source_id,
+                        source_path,
+                        locator,
+                        title,
+                        excerpt
+                    );
+                }
+
+                uint unknown_count =
+                    ConversationGroundingNative.citation_resolution_unknown_count (
+                        native_resolution
+                    );
+
+                for (uint i = 0; i < unknown_count; i++) {
+                    unowned string? unknown =
+                        ConversationGroundingNative.citation_resolution_unknown_get (
+                            native_resolution,
+                            i
+                        );
+
+                    if (unknown != null) {
+                        result.unknown_labels += unknown;
+                    }
+                }
+            } finally {
+                if (native_resolution != null) {
+                    ConversationGroundingNative.citation_resolution_free (
+                        native_resolution
+                    );
+                }
+            }
+
+            return result;
         }
 
         public bool commit_turn () throws GLib.Error {
