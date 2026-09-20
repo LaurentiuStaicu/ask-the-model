@@ -264,13 +264,13 @@ Because v1 conversation history is not persisted across application restarts, lo
 
 ## Repository manifest
 
-Each repository may contain:
+Each repository in the v1 catalog must contain:
 
 `.atm/repository.json`
 
 The manifest describes how AtM may consume the repository. It does not define repository origin, execute code or duplicate general citation metadata.
 
-The v1 manifest uses a strict application-controlled JSON Schema.
+The v1 manifest uses the strict application-controlled JSON Schema embedded at `data/schemas/repository-manifest-v1.schema.json`. Repository manifests are data contracts; they cannot expand the built-in repository catalog.
 
 Conceptual fields:
 
@@ -296,6 +296,8 @@ Conceptual fields:
   }
 }
 ```
+
+Manifest path arrays contain repository-relative exact paths or directory prefixes. They are not shell globs and are never executed. Runtime validation additionally rejects absolute paths, traversal components and paths that resolve outside the validated snapshot.
 
 The manifest cannot provide executable parser code. Extractors are application-defined and selected only from an AtM allowlist.
 
