@@ -12,30 +12,30 @@ namespace AskTheModel {
         private Gtk.StringList? model_list;
         private Gtk.Button? refresh_models_button;
         private ActivityRing? refresh_models_ring;
-        private AnnunciatorLabel? ai_title_annunciator;
-        private AnnunciatorLabel? ai_model_annunciator;
-        private AnnunciatorLabel? ai_connected_annunciator;
-        private AnnunciatorLabel? ai_scan_annunciator;
-        private AnnunciatorLabel? ai_offline_annunciator;
-        private AnnunciatorLabel? ai_error_annunciator;
+        private Gtk.Label? ai_title_annunciator;
+        private Gtk.Label? ai_model_annunciator;
+        private Gtk.Label? ai_connected_annunciator;
+        private Gtk.Label? ai_scan_annunciator;
+        private Gtk.Label? ai_offline_annunciator;
+        private Gtk.Label? ai_error_annunciator;
         private Gtk.MenuButton? repository_menu_button;
         private Gtk.CheckButton[] repository_check_buttons = {};
         private Gtk.Button? refresh_repositories_button;
         private ActivityRing? refresh_repositories_ring;
         private Gtk.Button? repository_action_button;
         private ActivityRing? repository_action_ring;
-        private AnnunciatorLabel? repos_title_annunciator;
-        private AnnunciatorLabel? repo_ewd_annunciator;
-        private AnnunciatorLabel? repo_cbd_annunciator;
-        private AnnunciatorLabel? repo_rmd_annunciator;
-        private AnnunciatorLabel? repo_none_annunciator;
-        private AnnunciatorLabel? repo_check_annunciator;
-        private AnnunciatorLabel? repo_download_annunciator;
-        private AnnunciatorLabel? repo_update_annunciator;
-        private AnnunciatorLabel? repo_validate_annunciator;
-        private AnnunciatorLabel? repo_ready_annunciator;
-        private AnnunciatorLabel? repo_offline_annunciator;
-        private AnnunciatorLabel? repo_error_annunciator;
+        private Gtk.Label? repos_title_annunciator;
+        private Gtk.Label? repo_ewd_annunciator;
+        private Gtk.Label? repo_cbd_annunciator;
+        private Gtk.Label? repo_rmd_annunciator;
+        private Gtk.Label? repo_none_annunciator;
+        private Gtk.Label? repo_check_annunciator;
+        private Gtk.Label? repo_download_annunciator;
+        private Gtk.Label? repo_update_annunciator;
+        private Gtk.Label? repo_validate_annunciator;
+        private Gtk.Label? repo_ready_annunciator;
+        private Gtk.Label? repo_offline_annunciator;
+        private Gtk.Label? repo_error_annunciator;
         private RepositorySelection repository_selection =
             new RepositorySelection ();
         private RepositoryLifecycleService repository_lifecycle =
@@ -163,12 +163,35 @@ namespace AskTheModel {
             }
         }
 
+        private Gtk.Label build_annunciator_label (
+            string text,
+            string? extra_class = null
+        ) {
+            var label = new Gtk.Label (text) {
+                valign = Gtk.Align.CENTER,
+                single_line_mode = true
+            };
+            label.add_css_class ("atm-annunciator");
+
+            if (extra_class != null) {
+                label.add_css_class (extra_class);
+            }
+
+            return label;
+        }
+
         private void set_annunciator (
-            AnnunciatorLabel? annunciator,
+            Gtk.Label? annunciator,
             bool active
         ) {
-            if (annunciator != null) {
-                annunciator.set_active (active);
+            if (annunciator == null) {
+                return;
+            }
+
+            if (active) {
+                annunciator.add_css_class ("active");
+            } else {
+                annunciator.remove_css_class ("active");
             }
         }
 
@@ -198,7 +221,8 @@ namespace AskTheModel {
                 ai_model_annunciator.label =
                     ollama_provider.model_name ??
                     "NO MODEL";
-                ai_model_annunciator.set_active (
+                set_annunciator (
+                    ai_model_annunciator,
                     provider_seen
                 );
             }
@@ -1034,12 +1058,12 @@ namespace AskTheModel {
 
         private Gtk.Widget build_main_content () {
             ai_title_annunciator =
-                new AnnunciatorLabel (
+                build_annunciator_label (
                     "AI",
                     "atm-annunciator-title"
                 );
             ai_model_annunciator =
-                new AnnunciatorLabel (
+                build_annunciator_label (
                     "NO MODEL",
                     "atm-annunciator-model"
                 );
@@ -1048,41 +1072,41 @@ namespace AskTheModel {
             ai_model_annunciator.max_width_chars = 18;
 
             ai_connected_annunciator =
-                new AnnunciatorLabel ("CONNECTED");
+                build_annunciator_label ("CONNECTED");
             ai_scan_annunciator =
-                new AnnunciatorLabel ("SCAN");
+                build_annunciator_label ("SCAN");
             ai_offline_annunciator =
-                new AnnunciatorLabel ("OFFLINE");
+                build_annunciator_label ("OFFLINE");
             ai_error_annunciator =
-                new AnnunciatorLabel ("ERROR");
+                build_annunciator_label ("ERROR");
 
             repos_title_annunciator =
-                new AnnunciatorLabel (
+                build_annunciator_label (
                     "REPOS",
                     "atm-annunciator-title"
                 );
             repo_ewd_annunciator =
-                new AnnunciatorLabel ("EWD");
+                build_annunciator_label ("EWD");
             repo_cbd_annunciator =
-                new AnnunciatorLabel ("CBD");
+                build_annunciator_label ("CBD");
             repo_rmd_annunciator =
-                new AnnunciatorLabel ("RMD");
+                build_annunciator_label ("RMD");
             repo_none_annunciator =
-                new AnnunciatorLabel ("NONE");
+                build_annunciator_label ("NONE");
             repo_check_annunciator =
-                new AnnunciatorLabel ("CHECK");
+                build_annunciator_label ("CHECK");
             repo_download_annunciator =
-                new AnnunciatorLabel ("DOWNLOAD");
+                build_annunciator_label ("DOWNLOAD");
             repo_update_annunciator =
-                new AnnunciatorLabel ("UPDATE");
+                build_annunciator_label ("UPDATE");
             repo_validate_annunciator =
-                new AnnunciatorLabel ("VALIDATE");
+                build_annunciator_label ("VALIDATE");
             repo_ready_annunciator =
-                new AnnunciatorLabel ("READY");
+                build_annunciator_label ("READY");
             repo_offline_annunciator =
-                new AnnunciatorLabel ("OFFLINE");
+                build_annunciator_label ("OFFLINE");
             repo_error_annunciator =
-                new AnnunciatorLabel ("ERROR");
+                build_annunciator_label ("ERROR");
 
             var ai_lcd_row = new Gtk.Box (
                 Gtk.Orientation.HORIZONTAL,
