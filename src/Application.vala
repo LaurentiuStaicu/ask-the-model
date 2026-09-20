@@ -817,12 +817,22 @@ namespace AskTheModel {
                     }
                 }
 
-                show_repository_scan_result (
-                    all_local_ready
-                        ? "Offline — local repositories ready"
-                        : "Repository check failed",
-                    true
-                );
+                bool transport_failure =
+                    error.domain != RepositoryError.quark ();
+
+                if (transport_failure) {
+                    show_repository_scan_result (
+                        all_local_ready
+                            ? "Offline — local repositories ready"
+                            : "Offline — repository check unavailable",
+                        true
+                    );
+                } else {
+                    show_repository_scan_result (
+                        "Repository check failed",
+                        true
+                    );
+                }
 
                 stderr.printf (
                     "AtM: repository refresh failed: %s\n",
