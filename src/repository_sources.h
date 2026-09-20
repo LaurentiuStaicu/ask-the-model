@@ -9,7 +9,8 @@ typedef enum {
     ATM_SOURCE_ROLE_STRUCTURAL = 1u << 1,
     ATM_SOURCE_ROLE_EVIDENCE = 1u << 2,
     ATM_SOURCE_ROLE_TABULAR = 1u << 3,
-    ATM_SOURCE_ROLE_IMPLEMENTATION = 1u << 4
+    ATM_SOURCE_ROLE_IMPLEMENTATION = 1u << 4,
+    ATM_SOURCE_ROLE_STATUS = 1u << 5
 } AtmSourceRole;
 
 typedef enum {
