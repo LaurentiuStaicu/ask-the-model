@@ -29,6 +29,7 @@ executable(
   meson.project_name(),
   [
     'src/Application.vala',
+    'src/ChatRequestBuilder.vala',
     'src/OllamaProvider.vala',
     'src/RepositoryService.vala',
     'src/cff_version.c',
@@ -101,6 +102,24 @@ repository_catalog_test = executable(
 test(
   'repository-catalog',
   repository_catalog_test
+)
+
+chat_request_builder_test = executable(
+  'chat-request-builder-test',
+  [
+    'src/ChatRequestBuilder.vala',
+    'tests/chat_request_builder_test.vala'
+  ],
+  dependencies: [
+    glib_dep,
+    json_glib_dep
+  ],
+  install: false
+)
+
+test(
+  'chat-request-builder',
+  chat_request_builder_test
 )
 
 cff_version_test = executable(
