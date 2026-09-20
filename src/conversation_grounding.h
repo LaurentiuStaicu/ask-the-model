@@ -92,4 +92,13 @@ gboolean atm_conversation_grounding_resolve_turn_citations (
     GError **error
 );
 
+gboolean atm_conversation_grounding_commit_turn (
+    AtmConversationGroundingState *state,
+    GError **error
+);
+
+void atm_conversation_grounding_abort_turn (
+    AtmConversationGroundingState *state
+);
+
 G_END_DECLS
