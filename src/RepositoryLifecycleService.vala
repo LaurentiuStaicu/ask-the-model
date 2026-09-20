@@ -297,10 +297,14 @@ namespace AskTheModel {
 
             foreach (RepositoryDescriptor descriptor in selected) {
                 RepositoryRuntimeInfo info =
-                    yield refresh (
-                        descriptor,
-                        cancellable
-                    );
+                    info_for (descriptor.id);
+                bool updating_existing =
+                    !info.download_required ();
+
+                info = yield refresh (
+                    descriptor,
+                    cancellable
+                );
 
                 if (info.remote_sha == null ||
                     info.remote_version == null) {
@@ -325,9 +329,13 @@ namespace AskTheModel {
                         GLib.FileTest.IS_DIR
                     )) {
                     progress (
-                        "Downloading %s…".printf (
-                            descriptor.acronym
-                        )
+                        updating_existing
+                            ? "Updating %s…".printf (
+                                descriptor.acronym
+                            )
+                            : "Downloading %s…".printf (
+                                descriptor.acronym
+                            )
                     );
                     archive_path =
                         yield client.download_archive_to_staging (
