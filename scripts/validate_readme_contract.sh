@@ -50,7 +50,7 @@ if grep -Fq 'blue?style=' <<<"$header"; then
   fail "header uses a non-suite blue badge"
 fi
 for colour in 333333 707070 a0a0a0; do
-  grep -Fqi "color=$colour" <<<"$header" || grep -Fqi "-$colour?style=flat-square" <<<"$header" ||     fail "header is missing suite grayscale token $colour"
+  grep -Fqi -- "color=$colour" <<<"$header" || grep -Fqi -- "-$colour?style=flat-square" <<<"$header" || fail "header is missing suite grayscale token $colour"
 done
 
 require_text README.md 'It is deliberately separate from the software that actually runs the model and from the model files themselves.'
