@@ -830,12 +830,16 @@ namespace AskTheModel {
                     RepositoryOperationOutcome.NORMAL
                 );
 
-                stdout.printf (
-                    changed == 1
-                        ? "AtM: repository action completed; 1 repository changed\n"
-                        : "AtM: repository action completed; %u repositories changed\n",
-                    changed
-                );
+                if (changed == 1) {
+                    stdout.printf (
+                        "AtM: repository action completed; 1 repository changed\n"
+                    );
+                } else {
+                    stdout.printf (
+                        "AtM: repository action completed; %u repositories changed\n",
+                        changed
+                    );
+                }
             } catch (GLib.Error error) {
                 bool transport_failure =
                     error.domain != RepositoryError.quark ();
