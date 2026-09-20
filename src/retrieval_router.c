@@ -52,6 +52,29 @@ technical_identifier_character (char character)
         character == '-';
 }
 
+static void
+trim_terminal_identifier_punctuation (char *candidate)
+{
+    if (candidate == NULL) {
+        return;
+    }
+
+    gsize length = strlen (candidate);
+
+    while (length > 0) {
+        char terminal = candidate[length - 1];
+
+        if (terminal != '.' &&
+            terminal != ':' &&
+            terminal != '/' &&
+            terminal != '-') {
+            break;
+        }
+
+        candidate[--length] = '\0';
+    }
+}
+
 static gboolean
 technical_identifier_shape (const char *candidate)
 {
@@ -118,6 +141,10 @@ extract_technical_candidates (const char *query)
             char *candidate = g_strndup (
                 start,
                 cursor - start
+            );
+
+            trim_terminal_identifier_punctuation (
+                candidate
             );
 
             if (technical_identifier_shape (candidate)) {
