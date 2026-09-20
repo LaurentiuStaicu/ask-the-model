@@ -174,6 +174,22 @@ window.atm-window notebook.atm-chat-tabs > header.top button.atm-new-chat-tab:ho
     background-color: #FAFBF9;
 }
 
+window.atm-window notebook.atm-chat-tabs > header.top button.atm-tab-close {
+    min-width: 12px;
+    min-height: 12px;
+    padding: 0;
+    margin: 0 0 0 2px;
+    background-image: none;
+    background-color: rgba(255, 255, 255, 0);
+    border: none;
+    border-radius: 3px;
+    box-shadow: none;
+}
+
+window.atm-window notebook.atm-chat-tabs > header.top button.atm-tab-close:hover {
+    background-color: rgba(27, 27, 24, 0.10);
+}
+
 /* Dark variant */
 window.atm-window.atm-dark {
     background-color: #1B1B18;
@@ -263,6 +279,15 @@ window.atm-window.atm-dark notebook.atm-chat-tabs > header.top button.atm-new-ch
 
 window.atm-window.atm-dark notebook.atm-chat-tabs > header.top button.atm-new-chat-tab:hover {
     background-color: #1B1B18;
+}
+
+window.atm-window.atm-dark notebook.atm-chat-tabs > header.top button.atm-tab-close {
+    color: #FAFBF9;
+    background-color: rgba(0, 0, 0, 0);
+}
+
+window.atm-window.atm-dark notebook.atm-chat-tabs > header.top button.atm-tab-close:hover {
+    background-color: rgba(250, 251, 249, 0.12);
 }
 
 window.atm-window.atm-dark frame.atm-input-frame {
