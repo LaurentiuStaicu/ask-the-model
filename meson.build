@@ -12,6 +12,7 @@ granite_dep = dependency('granite-7')
 soup_dep = dependency('libsoup-3.0')
 json_glib_dep = dependency('json-glib-1.0')
 glib_dep = dependency('glib-2.0')
+gio_dep = dependency('gio-2.0')
 sqlite_dep = dependency('sqlite3')
 archive_dep = dependency('libarchive')
 yaml_dep = dependency('yaml-0.1')
@@ -30,6 +31,12 @@ executable(
     'src/Application.vala',
     'src/OllamaProvider.vala',
     'src/RepositoryService.vala',
+    'src/cff_version.c',
+    'src/archive_extract.c',
+    'src/repository_manifest.c',
+    'src/repository_storage.c',
+    'src/repository_ingest.c',
+    'src/retrieval_index.c',
     resources
   ],
   dependencies: [
@@ -37,6 +44,11 @@ executable(
     granite_dep,
     soup_dep,
     json_glib_dep
+  ],
+  link_args: [
+    '-larchive',
+    '-lyaml',
+    '-lsqlite3'
   ],
   install: true
 )
@@ -129,6 +141,7 @@ archive_extract_test = executable(
   include_directories: include_directories('src'),
   dependencies: [
     glib_dep,
+    gio_dep,
     archive_dep
   ],
   install: false
@@ -155,6 +168,71 @@ repository_storage_test = executable(
 test(
   'repository-storage',
   repository_storage_test
+)
+
+repository_ingest_test = executable(
+  'repository-ingest-test',
+  [
+    'src/cff_version.c',
+    'src/archive_extract.c',
+    'src/repository_manifest.c',
+    'src/repository_storage.c',
+    'src/repository_ingest.c',
+    'tests/repository_ingest_test.c'
+  ],
+  include_directories: include_directories('src'),
+  dependencies: [
+    glib_dep,
+    gio_dep,
+    json_glib_dep,
+    archive_dep,
+    yaml_dep
+  ],
+  install: false
+)
+
+test(
+  'repository-ingest',
+  repository_ingest_test
+)
+
+retrieval_index_schema_test = executable(
+  'retrieval-index-schema-test',
+  'tests/retrieval_index_schema_test.c',
+  dependencies: [
+    glib_dep,
+    sqlite_dep
+  ],
+  install: false
+)
+
+test(
+  'retrieval-index-schema',
+  retrieval_index_schema_test,
+  env: {
+    'ATM_RETRIEVAL_SCHEMA': meson.project_source_root() / 'data/schemas/retrieval-index-v1.sql'
+  }
+)
+
+retrieval_index_test = executable(
+  'retrieval-index-test',
+  [
+    'src/retrieval_index.c',
+    'tests/retrieval_index_test.c',
+    resources
+  ],
+  include_directories: include_directories('src'),
+  dependencies: [
+    glib_dep,
+    gio_dep,
+    sqlite_dep
+  ],
+  install: false
+)
+
+test(
+  'retrieval-index',
+  retrieval_index_test
 )
 
 subdir('data')
