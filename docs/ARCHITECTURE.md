@@ -1,8 +1,8 @@
 # Application architecture boundary
 
-## Current state — v0.2.0
+## Current state — v0.2.2
 
-AtM v0.2.0 provides a functional GTK 4 / Granite local-chat application, desktop integration, AppStream metadata, elementary OS 8 Flatpak packaging and an implemented local AI-provider layer.
+AtM v0.2.2 provides a functional GTK 4 / Granite local-chat application, desktop integration, AppStream metadata, elementary OS 8 Flatpak packaging and an implemented local AI-provider layer.
 
 The conversational layer is implemented for the current application session. The repository-aware retrieval/provenance layer is not yet implemented.
 
@@ -52,7 +52,7 @@ On X11 sessions with no explicit `GSK_RENDERER` and no Wayland display, AtM sele
 
 ### Repository context service
 
-Responsible for representing configured scientific-model repositories and exposing repository documents to the future retrieval/context layer.
+Responsible for representing the fixed v1 scientific-repository catalog (EWD, CBD and RMD), managing validated local snapshots and exposing repository evidence to the future retrieval/context layer.
 
 The repository itself remains canonical. AtM must not silently rewrite repository state or convert generated text into canonical project data.
 
@@ -66,9 +66,9 @@ Responsible for future durable local conversation storage, conversation navigati
 
 ### Application settings
 
-Responsible for future provider endpoint configuration, preferred AI model, repository locations and application-level preferences.
+Responsible for future provider endpoint configuration, preferred AI model and application-level preferences. Repository snapshots in the v1 architecture are application-managed inside AtM's Flatpak-local XDG storage rather than configured as arbitrary host filesystem locations.
 
-## Explicitly outside the v0.2.0 boundary
+## Explicitly outside the v0.2.2 boundary
 
 - repository ingestion or retrieval;
 - EWD/CBD/RMD context selection;
@@ -83,7 +83,7 @@ Any future model-execution or write-back capability requires a separate architec
 
 ## Multi-repository future boundary
 
-A future conversation may be grounded in one or more scientific dynamical-model repositories at the same time.
+A future repository-aware conversation may be grounded in zero to three repository contexts. Zero repositories preserves ordinary local AI chat; repository-grounded v1 scope is limited to EWD, CBD and RMD.
 
 The selected repository set is conversation context, not AI-provider configuration. Repository context and the active local AI model remain separate concepts.
 
@@ -98,3 +98,12 @@ Canonical terminology is defined in `docs/TERMINOLOGY.md`.
 ## Compatibility contract
 
 Runtime, provider API, model capability, sandbox and build requirements are maintained in `docs/DEPENDENCIES_AND_COMPATIBILITY.md`.
+
+## Repository/retrieval design baseline
+
+The planned repository-aware architecture and staged acceptance gates are defined in:
+
+- `docs/REPOSITORY_RETRIEVAL_ARCHITECTURE.md`;
+- `docs/REPOSITORY_RETRIEVAL_ACCEPTANCE.md`.
+
+Those documents are design contracts for future implementation. Their presence does not imply that repository ingestion, retrieval or citation functionality is already implemented in v0.2.2.
