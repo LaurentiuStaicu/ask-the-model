@@ -49,7 +49,7 @@ atm_repository_snapshot_path (
 
     return g_build_filename (
         data_root,
-        "repositories",
+        "Repositories",
         repository_id,
         "snapshots",
         sha,
@@ -74,7 +74,8 @@ atm_repository_extraction_staging_path (
 
     char *path = g_build_filename (
         data_root,
-        "repository-staging",
+        "Repositories",
+        ".staging",
         repository_id,
         name,
         NULL
