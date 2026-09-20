@@ -1968,123 +1968,6 @@ namespace AskTheModel {
             update_ai_annunciators ();
             update_repository_annunciators ();
 
-            var transcript = new Gtk.TextView () {
-                editable = false,
-                cursor_visible = false,
-                monospace = true,
-                wrap_mode = Gtk.WrapMode.WORD_CHAR,
-                left_margin = 12,
-                right_margin = 12,
-                top_margin = 8,
-                bottom_margin = 12,
-                vexpand = true
-            };
-            transcript_view = transcript;
-
-            var transcript_scroll = new Gtk.ScrolledWindow () {
-                child = transcript,
-                hscrollbar_policy = Gtk.PolicyType.NEVER,
-                vscrollbar_policy = Gtk.PolicyType.AUTOMATIC,
-                vexpand = true
-            };
-
-            var prompt_view = new Gtk.TextView () {
-                monospace = true,
-                wrap_mode = Gtk.WrapMode.WORD_CHAR,
-                accepts_tab = false,
-                left_margin = 10,
-                right_margin = 10,
-                top_margin = 10,
-                bottom_margin = 10,
-                height_request = 72,
-                hexpand = true
-            };
-            prompt_input_view = prompt_view;
-
-            var prompt_overlay = new Gtk.Overlay () {
-                child = prompt_view
-            };
-
-            var prompt_placeholder = new Gtk.Label ("Ask something…") {
-                halign = Gtk.Align.START,
-                valign = Gtk.Align.START,
-                margin_start = 14,
-                margin_top = 12,
-                can_target = false
-            };
-            prompt_placeholder.add_css_class ("dim-label");
-            prompt_placeholder.add_css_class ("monospace");
-            prompt_overlay.add_overlay (prompt_placeholder);
-
-            var prompt_frame = new Gtk.Frame (null) {
-                child = prompt_overlay,
-                hexpand = true
-            };
-            prompt_frame.add_css_class ("atm-input-frame");
-
-            var send_button = new Gtk.Button.with_label ("Send") {
-                valign = Gtk.Align.END,
-                sensitive = false
-            };
-            send_prompt_button = send_button;
-
-            prompt_view.buffer.changed.connect (() => {
-                prompt_placeholder.visible =
-                    prompt_view.buffer.get_char_count () == 0;
-
-                send_button.sensitive =
-                    prompt_view.sensitive &&
-                    prompt_view.buffer.text.strip ().length > 0;
-            });
-
-            send_button.clicked.connect (() => {
-                string prompt = prompt_view.buffer.text.strip ();
-                if (prompt.length == 0) {
-                    return;
-                }
-
-                if (!conversation_ui_locked) {
-                    conversation_ui_locked = true;
-                    update_conversation_ui_state ();
-                }
-
-                append_transcript (
-                    transcript,
-                    "You: " + prompt
-                );
-
-                assistant_stream_started = false;
-                prompt_view.buffer.text = "";
-                prompt_view.sensitive = false;
-                send_button.sensitive = false;
-
-                send_prompt.begin (
-                    prompt,
-                    transcript,
-                    prompt_view,
-                    send_button
-                );
-            });
-
-            var composer = new Gtk.Box (Gtk.Orientation.HORIZONTAL, 8) {
-                margin_top = 12,
-                margin_bottom = 12,
-                margin_start = 12,
-                margin_end = 12
-            };
-            composer.append (prompt_frame);
-            composer.append (send_button);
-
-            var chat_page = new Gtk.Box (
-                Gtk.Orientation.VERTICAL,
-                0
-            ) {
-                hexpand = true,
-                vexpand = true
-            };
-            chat_page.append (transcript_scroll);
-            chat_page.append (composer);
-
             var chat_tabs = new Gtk.Notebook () {
                 hexpand = true,
                 vexpand = true,
@@ -2093,16 +1976,17 @@ namespace AskTheModel {
                 tab_pos = Gtk.PositionType.TOP
             };
             chat_tabs.add_css_class ("atm-chat-tabs");
+            chat_notebook = chat_tabs;
 
-            var current_tab_label = new Gtk.Label ("New") {
-                single_line_mode = true,
-                ellipsize = Pango.EllipsizeMode.NONE
-            };
-            current_chat_tab_label = current_tab_label;
+            chat_tabs.switch_page.connect (
+                (page, page_num) => {
+                    ChatTabState? state =
+                        chat_state_for_page (page);
 
-            chat_tabs.append_page (
-                chat_page,
-                current_tab_label
+                    if (state != null) {
+                        activate_chat_state (state);
+                    }
+                }
             );
 
             new_chat_button =
@@ -2110,7 +1994,7 @@ namespace AskTheModel {
                     "list-add-symbolic"
                 ) {
                     tooltip_text = "New Chat (Ctrl+N)",
-                    sensitive = false,
+                    sensitive = true,
                     valign = Gtk.Align.FILL,
                     halign = Gtk.Align.START
                 };
@@ -2138,6 +2022,8 @@ namespace AskTheModel {
             );
             content.append (lcd_frame);
             content.append (chat_tabs);
+
+            create_chat_tab ();
 
             return content;
         }
