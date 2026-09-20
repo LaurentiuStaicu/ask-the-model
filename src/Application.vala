@@ -12,6 +12,9 @@ namespace AskTheModel {
         private Gtk.StringList? model_list;
         private Gtk.Button? refresh_models_button;
         private Gtk.Label? model_scan_status;
+        private Gtk.MenuButton? repository_menu_button;
+        private RepositorySelection repository_selection =
+            new RepositorySelection ();
         private uint model_status_generation = 0;
         private bool assistant_stream_started = false;
         private bool updating_model_selector = false;
@@ -239,6 +242,67 @@ namespace AskTheModel {
             updating_model_selector = false;
         }
 
+        private void update_repository_selector_label () {
+            if (repository_menu_button == null) {
+                return;
+            }
+
+            repository_menu_button.label =
+                repository_selection.summary ();
+        }
+
+        private Gtk.Widget build_repository_selector () {
+            var content = new Gtk.Box (
+                Gtk.Orientation.VERTICAL,
+                6
+            ) {
+                margin_top = 10,
+                margin_bottom = 10,
+                margin_start = 10,
+                margin_end = 10
+            };
+
+            foreach (
+                RepositoryDescriptor descriptor
+                in RepositoryCatalog.all ()
+            ) {
+                var check = new Gtk.CheckButton.with_label (
+                    descriptor.selector_label ()
+                ) {
+                    active = repository_selection.is_selected (
+                        descriptor.id
+                    )
+                };
+
+                string repository_id = descriptor.id;
+                check.toggled.connect (() => {
+                    repository_selection.set_selected (
+                        repository_id,
+                        check.active
+                    );
+                    update_repository_selector_label ();
+                });
+
+                content.append (check);
+            }
+
+            var popover = new Gtk.Popover () {
+                child = content,
+                has_arrow = true,
+                position = Gtk.PositionType.BOTTOM
+            };
+
+            repository_menu_button = new Gtk.MenuButton () {
+                label = repository_selection.summary (),
+                tooltip_text = "Select repository context",
+                direction = Gtk.ArrowType.DOWN,
+                always_show_arrow = true
+            };
+            repository_menu_button.set_popover (popover);
+
+            return repository_menu_button;
+        }
+
         private bool system_prefers_dark () {
             return granite_settings.prefers_color_scheme ==
                 Granite.Settings.ColorScheme.DARK;
@@ -340,7 +404,14 @@ namespace AskTheModel {
             model_controls.append (refresh_models_button);
             model_controls.append (model_scan_status);
 
-            headerbar.pack_start (model_controls);
+            var header_controls = new Gtk.Box (
+                Gtk.Orientation.HORIZONTAL,
+                12
+            );
+            header_controls.append (build_repository_selector ());
+            header_controls.append (model_controls);
+
+            headerbar.pack_start (header_controls);
 
             return headerbar;
         }
