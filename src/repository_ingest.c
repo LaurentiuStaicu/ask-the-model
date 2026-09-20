@@ -49,13 +49,14 @@ remove_tree_best_effort (const char *path)
 }
 
 gboolean
-atm_repository_ingest_archive (
+atm_repository_ingest_archive_cancellable (
     const char *data_root,
     const char *archive_path,
     const char *repository_id,
     const char *repository_acronym,
     const char *repository_display_name,
     const char *sha,
+    GCancellable *cancellable,
     char **out_version,
     char **out_snapshot_path,
     guint64 *out_entries,
@@ -96,6 +97,11 @@ atm_repository_ingest_archive (
 
     if (out_total_bytes != NULL) {
         *out_total_bytes = 0;
+    }
+
+    if (cancellable != NULL &&
+        g_cancellable_set_error_if_cancelled (cancellable, error)) {
+        goto out;
     }
 
     if (g_lstat (archive_path, &archive_stat) != 0 ||
@@ -159,10 +165,11 @@ atm_repository_ingest_archive (
         goto out;
     }
 
-    if (!atm_archive_extract_snapshot (
+    if (!atm_archive_extract_snapshot_cancellable (
             archive_path,
             staging_path,
             &limits,
+            cancellable,
             &entries,
             &total_bytes,
             error
@@ -172,6 +179,11 @@ atm_repository_ingest_archive (
 
     staging_created = TRUE;
 
+    if (cancellable != NULL &&
+        g_cancellable_set_error_if_cancelled (cancellable, error)) {
+        goto out;
+    }
+
     if (!atm_repository_validate_snapshot (
             staging_path,
             repository_id,
@@ -180,6 +192,11 @@ atm_repository_ingest_archive (
             &version,
             error
         )) {
+        goto out;
+    }
+
+    if (cancellable != NULL &&
+        g_cancellable_set_error_if_cancelled (cancellable, error)) {
         goto out;
     }
 
@@ -219,4 +236,35 @@ out:
     g_clear_pointer (&staging_parent, g_free);
     g_clear_pointer (&staging_path, g_free);
     return ok;
+}
+
+gboolean
+atm_repository_ingest_archive (
+    const char *data_root,
+    const char *archive_path,
+    const char *repository_id,
+    const char *repository_acronym,
+    const char *repository_display_name,
+    const char *sha,
+    char **out_version,
+    char **out_snapshot_path,
+    guint64 *out_entries,
+    guint64 *out_total_bytes,
+    GError **error
+)
+{
+    return atm_repository_ingest_archive_cancellable (
+        data_root,
+        archive_path,
+        repository_id,
+        repository_acronym,
+        repository_display_name,
+        sha,
+        NULL,
+        out_version,
+        out_snapshot_path,
+        out_entries,
+        out_total_bytes,
+        error
+    );
 }
