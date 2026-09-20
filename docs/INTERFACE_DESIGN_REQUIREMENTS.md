@@ -173,7 +173,17 @@ When the selector is expanded, each repository is shown in long form with the re
 
 After selection, only active acronyms are shown in the compact control. SHA values, branch names and commit counts are not part of the normal selector UI.
 
-Repository lifecycle management (Download, Update, Remove Local Copy, progress and errors) belongs in a separate `Manage Repositories…` surface rather than in the compact selection popover.
+The header presents repository controls as a distinct group immediately after the local AI-model group. The intended left-to-right relationship is:
+
+`[AI model] [Refresh AI] [AI status]    [Repositories] [Refresh repositories] [Download/Update] [Repository status]`
+
+The repository selector remains a selection control only. Its popover contains the EWD/CBD/RMD multi-selection controls and does not become a repository-management dialog.
+
+The repository Refresh tool button checks the configured GitHub origins for the currently selected repository set without modifying local repository files. The Download/Update tool button performs the explicit local lifecycle action. Both are icon-only tool buttons with descriptive tooltips. Repository lifecycle status is shown in a dedicated repository-status area rather than reusing AI-provider status text.
+
+The repository group must distinguish at least: checking, no update available, update available, downloading/updating, ready/offline-local, and failure. An actionable update-available status remains visible until acted on or refreshed; short scan-completion messages may expire.
+
+Repository files are stored visibly under `~/Ask the Model/Repositories`, while derived retrieval indexes remain application-private cache data. The UI should make this distinction understandable without exposing SHA values in the normal header.
 
 The repository scope is editable before the first user message. Once the first message is sent, the scope is pinned for that conversation, including the valid zero-repository case. A later repository-scope change must start a new chat rather than silently changing the scientific basis of an existing conversation.
 
