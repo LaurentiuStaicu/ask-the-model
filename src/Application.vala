@@ -1601,7 +1601,10 @@ namespace AskTheModel {
                 );
             string repository_name =
                 descriptor != null
-                    ? descriptor.acronym
+                    ? "%s (%s)".printf (
+                        descriptor.acronym,
+                        descriptor.display_name
+                    )
                     : citation.repository_id;
 
             var heading = new Gtk.Label (
@@ -1644,6 +1647,18 @@ namespace AskTheModel {
             };
             sha.add_css_class ("dim-label");
             content.append (sha);
+
+            var logical_source = new Gtk.Label (
+                "Source ID: " + citation.logical_source_id
+            ) {
+                halign = Gtk.Align.START,
+                xalign = 0.0f,
+                selectable = true,
+                wrap = true,
+                max_width_chars = 72
+            };
+            logical_source.add_css_class ("dim-label");
+            content.append (logical_source);
 
             if (citation.title != null &&
                 citation.title.strip ().length > 0) {
