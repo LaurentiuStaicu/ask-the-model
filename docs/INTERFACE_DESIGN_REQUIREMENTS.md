@@ -173,6 +173,8 @@ When the selector is expanded, each repository is shown in long form with the re
 
 After selection, only active acronyms are shown in the compact control. SHA values, branch names and commit counts are not part of the normal selector UI.
 
+Both the local-AI dropdown and repository selector use the same compact clock-style disclosure indicator: a small filled geometric downward triangle. Native theme arrows/chevrons are hidden so the indicator shape remains consistent across icon themes. The triangle is monochrome and follows the light/dark interface palette; gold remains reserved for active-operation and LCD status feedback.
+
 The header presents repository controls as a distinct group immediately after the local AI-model group. The intended left-to-right relationship is:
 
 `[AI model] [Refresh AI]    [Repositories] [Refresh repositories] [Download/Update]`
