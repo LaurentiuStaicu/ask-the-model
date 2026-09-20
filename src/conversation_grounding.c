@@ -10,6 +10,7 @@
 struct AtmConversationGroundingState {
     GPtrArray *repositories;
     AtmRetrievalConversationState *retrieval_conversation;
+    AtmRetrievalConversationTurn *pending_retrieval_turn;
     AtmGroundingContext *current_grounding_context;
     gboolean frozen;
 };
@@ -61,6 +62,10 @@ atm_conversation_grounding_state_free (
         return;
     }
 
+    g_clear_pointer (
+        &state->pending_retrieval_turn,
+        atm_retrieval_conversation_turn_free
+    );
     g_clear_pointer (
         &state->current_grounding_context,
         atm_grounding_context_free
@@ -515,6 +520,16 @@ atm_conversation_grounding_prepare_turn (
     *out_has_grounding = FALSE;
     *out_needs_clarification = FALSE;
 
+    if (state->pending_retrieval_turn != NULL) {
+        g_set_error_literal (
+            error,
+            ATM_CONVERSATION_GROUNDING_ERROR,
+            ATM_CONVERSATION_GROUNDING_ERROR_VALIDATION,
+            "The previous grounded turn must be committed or aborted before preparing another turn."
+        );
+        return FALSE;
+    }
+
     g_clear_pointer (
         &state->current_grounding_context,
         atm_grounding_context_free
@@ -544,7 +559,7 @@ atm_conversation_grounding_prepare_turn (
         return FALSE;
     }
 
-    if (!atm_retrieval_conversation_run (
+    if (!atm_retrieval_conversation_prepare (
             state->retrieval_conversation,
             query,
             6,
@@ -582,6 +597,8 @@ atm_conversation_grounding_prepare_turn (
 
     state->current_grounding_context =
         g_steal_pointer (&context);
+    state->pending_retrieval_turn =
+        g_steal_pointer (&turn);
 
     *out_system_instructions = g_strdup (
         atm_grounding_system_instructions ()
@@ -615,6 +632,64 @@ out:
 
 
 gboolean
+atm_conversation_grounding_commit_turn (
+    AtmConversationGroundingState *state,
+    GError **error
+)
+{
+    g_return_val_if_fail (state != NULL, FALSE);
+
+    if (state->pending_retrieval_turn == NULL ||
+        state->current_grounding_context == NULL) {
+        g_set_error_literal (
+            error,
+            ATM_CONVERSATION_GROUNDING_ERROR,
+            ATM_CONVERSATION_GROUNDING_ERROR_VALIDATION,
+            "No prepared grounded turn is available to commit."
+        );
+        return FALSE;
+    }
+
+    if (!atm_retrieval_conversation_commit (
+            state->retrieval_conversation,
+            state->pending_retrieval_turn,
+            error
+        )) {
+        return FALSE;
+    }
+
+    g_clear_pointer (
+        &state->pending_retrieval_turn,
+        atm_retrieval_conversation_turn_free
+    );
+    g_clear_pointer (
+        &state->current_grounding_context,
+        atm_grounding_context_free
+    );
+    return TRUE;
+}
+
+void
+atm_conversation_grounding_abort_turn (
+    AtmConversationGroundingState *state
+)
+{
+    if (state == NULL) {
+        return;
+    }
+
+    g_clear_pointer (
+        &state->pending_retrieval_turn,
+        atm_retrieval_conversation_turn_free
+    );
+    g_clear_pointer (
+        &state->current_grounding_context,
+        atm_grounding_context_free
+    );
+}
+
+
+gboolean
 atm_conversation_grounding_resolve_turn_citations (
     AtmConversationGroundingState *state,
     const char *model_output,
@@ -627,7 +702,8 @@ atm_conversation_grounding_resolve_turn_citations (
     g_return_val_if_fail (out_resolution != NULL, FALSE);
     g_return_val_if_fail (*out_resolution == NULL, FALSE);
 
-    if (state->current_grounding_context == NULL) {
+    if (state->pending_retrieval_turn == NULL ||
+        state->current_grounding_context == NULL) {
         g_set_error_literal (
             error,
             ATM_CONVERSATION_GROUNDING_ERROR,
