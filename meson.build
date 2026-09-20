@@ -29,6 +29,7 @@ executable(
   meson.project_name(),
   [
     'src/Application.vala',
+    'src/ActivityRing.vala',
     'src/ChatRequestBuilder.vala',
     'src/OllamaProvider.vala',
     'src/RepositoryService.vala',
