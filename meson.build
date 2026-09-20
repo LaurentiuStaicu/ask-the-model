@@ -120,6 +120,24 @@ test(
   repository_manifest_test
 )
 
+repository_storage_test = executable(
+  'repository-storage-test',
+  [
+    'src/repository_storage.c',
+    'tests/repository_storage_test.c'
+  ],
+  include_directories: include_directories('src'),
+  dependencies: [
+    glib_dep
+  ],
+  install: false
+)
+
+test(
+  'repository-storage',
+  repository_storage_test
+)
+
 subdir('data')
 
 icon_sizes = ['16', '24', '32', '48', '64', '128']
