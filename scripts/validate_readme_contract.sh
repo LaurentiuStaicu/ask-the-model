@@ -60,10 +60,10 @@ require_text README.md 'AtM does <strong>not</strong> search every SSD, HDD or f
 require_text README.md 'AtM asks the provider for the installed model list through <code>GET /api/tags</code>.'
 require_text README.md 'Only models advertising the <code>completion</code> capability are placed in the AtM model selector.'
 require_text README.md "AtM v$version currently provides text chat only"
-require_text README.md "The public v$version application does not yet expose the repository-aware backend work that is being developed on \`main\`."
+require_text README.md "The public v$version application does not yet expose the repository-aware development work on \`main\`."
 require_text README.md 'select, ingest or retrieve scientific repositories through the released GTK conversation flow;'
 require_text README.md 'receive repository-grounded citations or provenance in the released chat UI;'
-require_text README.md 'These are release boundaries, not claims that no development backend exists.'
+require_text README.md 'These are release boundaries, not claims that no development implementation exists.'
 require_text README.md 'Development `main` now contains an unreleased repository-aware GTK path for the fixed EWD/CBD/RMD suite'
 require_text README.md 'turn ordinary AI chat output into an authoritative scientific-model result.'
 require_text README.md 'Each source repository remains canonical for its documentation, code, data, assumptions, provenance, validation and release boundaries.'
