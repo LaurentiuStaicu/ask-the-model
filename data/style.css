@@ -43,6 +43,27 @@ window.atm-window textview text {
     color: #1B1B18;
 }
 
+
+/* Fixed status LCD below the header.
+ * The panel itself stays passive; only the text emits a faint gold glow.
+ * #E6BD66 matches the moving highlight in ActivityRing.
+ */
+window.atm-window frame.atm-status-lcd {
+    min-height: 20px;
+    padding: 1px 0;
+    background-color: rgba(43, 35, 20, 0.76);
+    border: 1px solid rgba(135, 107, 55, 0.42);
+    border-radius: 6px;
+    box-shadow: none;
+    background-clip: padding-box;
+}
+
+window.atm-window label.atm-lcd-text {
+    color: #E6BD66;
+    font-size: 0.82em;
+    text-shadow: 0 0 2px rgba(230, 189, 102, 0.42);
+}
+
 window.atm-window frame.atm-input-frame {
     background-color: #EFF0ED;
     border: 2px ridge #A4A5A1;
@@ -91,6 +112,17 @@ window.atm-window.atm-dark textview,
 window.atm-window.atm-dark textview text {
     background-color: #1B1B18;
     color: #FAFBF9;
+}
+
+window.atm-window.atm-dark frame.atm-status-lcd {
+    background-color: rgba(24, 20, 13, 0.76);
+    border-color: rgba(135, 107, 55, 0.38);
+    box-shadow: none;
+}
+
+window.atm-window.atm-dark label.atm-lcd-text {
+    color: #E6BD66;
+    text-shadow: 0 0 2px rgba(230, 189, 102, 0.46);
 }
 
 window.atm-window.atm-dark frame.atm-input-frame {
