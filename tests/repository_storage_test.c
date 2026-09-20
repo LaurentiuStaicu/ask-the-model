@@ -58,6 +58,12 @@ valid_sha (void)
     return "0123456789abcdef0123456789abcdef01234567";
 }
 
+static const char *
+second_valid_sha (void)
+{
+    return "89abcdef0123456789abcdef0123456789abcdef";
+}
+
 static void
 test_storage_paths (void)
 {
@@ -340,6 +346,153 @@ test_invalid_identity_inputs_rejected (void)
     g_free (root);
 }
 
+static void
+test_distinct_snapshots_coexist (void)
+{
+    char *root = new_data_root ();
+    char *first_staging = atm_repository_extraction_staging_path (
+        root,
+        "ewd",
+        valid_sha ()
+    );
+    char *second_staging = atm_repository_extraction_staging_path (
+        root,
+        "ewd",
+        second_valid_sha ()
+    );
+    char *first_file = g_build_filename (
+        first_staging,
+        "STATUS.md",
+        NULL
+    );
+    char *second_file = g_build_filename (
+        second_staging,
+        "STATUS.md",
+        NULL
+    );
+    char *first_snapshot = NULL;
+    char *second_snapshot = NULL;
+    GError *error = NULL;
+
+    g_assert_cmpint (
+        g_mkdir_with_parents (first_staging, 0700),
+        ==,
+        0
+    );
+    g_assert_cmpint (
+        g_mkdir_with_parents (second_staging, 0700),
+        ==,
+        0
+    );
+
+    g_assert_true (
+        g_file_set_contents (
+            first_file,
+            "old snapshot\n",
+            -1,
+            &error
+        )
+    );
+    g_assert_no_error (error);
+
+    g_assert_true (
+        g_file_set_contents (
+            second_file,
+            "new snapshot\n",
+            -1,
+            &error
+        )
+    );
+    g_assert_no_error (error);
+
+    g_assert_true (
+        atm_repository_promote_snapshot (
+            root,
+            "ewd",
+            valid_sha (),
+            first_staging,
+            &first_snapshot,
+            &error
+        )
+    );
+    g_assert_no_error (error);
+
+    g_assert_true (
+        atm_repository_promote_snapshot (
+            root,
+            "ewd",
+            second_valid_sha (),
+            second_staging,
+            &second_snapshot,
+            &error
+        )
+    );
+    g_assert_no_error (error);
+
+    g_assert_cmpstr (first_snapshot, !=, second_snapshot);
+    g_assert_true (
+        g_file_test (
+            first_snapshot,
+            G_FILE_TEST_IS_DIR
+        )
+    );
+    g_assert_true (
+        g_file_test (
+            second_snapshot,
+            G_FILE_TEST_IS_DIR
+        )
+    );
+
+    char *first_promoted_file = g_build_filename (
+        first_snapshot,
+        "STATUS.md",
+        NULL
+    );
+    char *second_promoted_file = g_build_filename (
+        second_snapshot,
+        "STATUS.md",
+        NULL
+    );
+    char *first_contents = NULL;
+    char *second_contents = NULL;
+
+    g_assert_true (
+        g_file_get_contents (
+            first_promoted_file,
+            &first_contents,
+            NULL,
+            &error
+        )
+    );
+    g_assert_no_error (error);
+
+    g_assert_true (
+        g_file_get_contents (
+            second_promoted_file,
+            &second_contents,
+            NULL,
+            &error
+        )
+    );
+    g_assert_no_error (error);
+
+    g_assert_cmpstr (first_contents, ==, "old snapshot\n");
+    g_assert_cmpstr (second_contents, ==, "new snapshot\n");
+
+    g_free (second_contents);
+    g_free (first_contents);
+    g_free (second_promoted_file);
+    g_free (first_promoted_file);
+    g_free (second_snapshot);
+    g_free (first_snapshot);
+    g_free (second_file);
+    g_free (first_file);
+    g_free (second_staging);
+    g_free (first_staging);
+    remove_tree_best_effort (root);
+    g_free (root);
+}
+
 int
 main (int argc, char **argv)
 {
@@ -353,6 +506,10 @@ main (int argc, char **argv)
     g_test_add_func (
         "/storage/existing-not-overwritten",
         test_existing_snapshot_not_overwritten
+    );
+    g_test_add_func (
+        "/storage/distinct-snapshots-coexist",
+        test_distinct_snapshots_coexist
     );
     g_test_add_func (
         "/storage/wrong-staging-rejected",

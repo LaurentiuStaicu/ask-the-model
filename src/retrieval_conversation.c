@@ -595,11 +595,12 @@ update_last_state (
     state->has_previous_turn = TRUE;
 }
 
-gboolean
-atm_retrieval_conversation_run (
+static gboolean
+run_internal (
     AtmRetrievalConversationState *state,
     const char *query,
     guint max_results_per_repository,
+    gboolean commit_state,
     AtmRetrievalConversationTurn **out_turn,
     GError **error
 )
@@ -818,7 +819,8 @@ retrieve:
         goto out;
     }
 
-    if (!turn->retrieval->requested_outside_scope &&
+    if (commit_state &&
+        !turn->retrieval->requested_outside_scope &&
         turn->retrieval->repositories->len > 0) {
         update_last_state (
             state,
@@ -872,4 +874,75 @@ out:
         atm_retrieval_scope_selection_free
     );
     return FALSE;
+}
+
+
+gboolean
+atm_retrieval_conversation_prepare (
+    AtmRetrievalConversationState *state,
+    const char *query,
+    guint max_results_per_repository,
+    AtmRetrievalConversationTurn **out_turn,
+    GError **error
+)
+{
+    return run_internal (
+        state,
+        query,
+        max_results_per_repository,
+        FALSE,
+        out_turn,
+        error
+    );
+}
+
+gboolean
+atm_retrieval_conversation_commit (
+    AtmRetrievalConversationState *state,
+    const AtmRetrievalConversationTurn *turn,
+    GError **error
+)
+{
+    g_return_val_if_fail (state != NULL, FALSE);
+    g_return_val_if_fail (turn != NULL, FALSE);
+
+    if (turn->needs_clarification ||
+        turn->retrieval == NULL) {
+        g_set_error_literal (
+            error,
+            ATM_RETRIEVAL_CONVERSATION_ERROR,
+            ATM_RETRIEVAL_CONVERSATION_ERROR_ARGUMENT,
+            "Only a completed retrieval turn can be committed."
+        );
+        return FALSE;
+    }
+
+    if (!turn->retrieval->requested_outside_scope &&
+        turn->retrieval->repositories->len > 0) {
+        update_last_state (
+            state,
+            turn->retrieval
+        );
+    }
+
+    return TRUE;
+}
+
+gboolean
+atm_retrieval_conversation_run (
+    AtmRetrievalConversationState *state,
+    const char *query,
+    guint max_results_per_repository,
+    AtmRetrievalConversationTurn **out_turn,
+    GError **error
+)
+{
+    return run_internal (
+        state,
+        query,
+        max_results_per_repository,
+        TRUE,
+        out_turn,
+        error
+    );
 }

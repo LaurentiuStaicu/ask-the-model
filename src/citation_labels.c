@@ -46,6 +46,136 @@ atm_citation_resolution_free (
     g_free (resolution);
 }
 
+guint
+atm_citation_resolution_count (
+    const AtmCitationResolution *resolution
+)
+{
+    return resolution != NULL &&
+        resolution->citations != NULL
+            ? resolution->citations->len
+            : 0;
+}
+
+guint
+atm_citation_resolution_unknown_count (
+    const AtmCitationResolution *resolution
+)
+{
+    return resolution != NULL &&
+        resolution->unknown_labels != NULL
+            ? resolution->unknown_labels->len
+            : 0;
+}
+
+const AtmCitationReference *
+atm_citation_resolution_get (
+    const AtmCitationResolution *resolution,
+    guint index
+)
+{
+    if (resolution == NULL ||
+        resolution->citations == NULL ||
+        index >= resolution->citations->len) {
+        return NULL;
+    }
+
+    return g_ptr_array_index (
+        resolution->citations,
+        index
+    );
+}
+
+const char *
+atm_citation_resolution_unknown_get (
+    const AtmCitationResolution *resolution,
+    guint index
+)
+{
+    if (resolution == NULL ||
+        resolution->unknown_labels == NULL ||
+        index >= resolution->unknown_labels->len) {
+        return NULL;
+    }
+
+    return g_ptr_array_index (
+        resolution->unknown_labels,
+        index
+    );
+}
+
+const char *
+atm_citation_reference_label (
+    const AtmCitationReference *citation
+)
+{
+    return citation != NULL ? citation->label : NULL;
+}
+
+const char *
+atm_citation_reference_repository_id (
+    const AtmCitationReference *citation
+)
+{
+    return citation != NULL ? citation->repository_id : NULL;
+}
+
+const char *
+atm_citation_reference_repository_version (
+    const AtmCitationReference *citation
+)
+{
+    return citation != NULL ? citation->repository_version : NULL;
+}
+
+const char *
+atm_citation_reference_snapshot_sha (
+    const AtmCitationReference *citation
+)
+{
+    return citation != NULL ? citation->snapshot_sha : NULL;
+}
+
+const char *
+atm_citation_reference_logical_source_id (
+    const AtmCitationReference *citation
+)
+{
+    return citation != NULL ? citation->logical_source_id : NULL;
+}
+
+const char *
+atm_citation_reference_source_path (
+    const AtmCitationReference *citation
+)
+{
+    return citation != NULL ? citation->source_path : NULL;
+}
+
+const char *
+atm_citation_reference_locator (
+    const AtmCitationReference *citation
+)
+{
+    return citation != NULL ? citation->locator : NULL;
+}
+
+const char *
+atm_citation_reference_title (
+    const AtmCitationReference *citation
+)
+{
+    return citation != NULL ? citation->title : NULL;
+}
+
+const char *
+atm_citation_reference_excerpt (
+    const AtmCitationReference *citation
+)
+{
+    return citation != NULL ? citation->excerpt : NULL;
+}
+
 static gboolean
 source_has_required_provenance (
     const AtmGroundingSource *source

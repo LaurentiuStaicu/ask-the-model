@@ -3,7 +3,8 @@ namespace AskTheModel {
         HTTP,
         INVALID_RESPONSE,
         TOO_LARGE,
-        STORAGE
+        STORAGE,
+        NOT_READY
     }
 
     public errordomain CitationError {

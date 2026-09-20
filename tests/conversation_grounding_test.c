@@ -250,6 +250,49 @@ test_zero_repository_scope_can_freeze (void)
     g_assert_no_error (error);
     g_assert_cmpuint (scopes->len, ==, 0);
 
+    gboolean has_grounding = TRUE;
+    gboolean needs_clarification = TRUE;
+    char *system_instructions = NULL;
+    char *evidence_text = NULL;
+    char *post_evidence_reminder = NULL;
+
+    g_assert_true (
+        atm_conversation_grounding_prepare_turn (
+            state,
+            "ordinary local chat",
+            &has_grounding,
+            &needs_clarification,
+            &system_instructions,
+            &evidence_text,
+            &post_evidence_reminder,
+            &error
+        )
+    );
+    g_assert_no_error (error);
+    g_assert_false (has_grounding);
+    g_assert_false (needs_clarification);
+    g_assert_null (system_instructions);
+    g_assert_null (evidence_text);
+    g_assert_null (post_evidence_reminder);
+
+    AtmCitationResolution *resolution = NULL;
+
+    g_assert_false (
+        atm_conversation_grounding_resolve_turn_citations (
+            state,
+            "Unsupported label [S1].",
+            &resolution,
+            &error
+        )
+    );
+    g_assert_error (
+        error,
+        ATM_CONVERSATION_GROUNDING_ERROR,
+        ATM_CONVERSATION_GROUNDING_ERROR_VALIDATION
+    );
+    g_assert_null (resolution);
+    g_clear_error (&error);
+
     g_ptr_array_unref (scopes);
     atm_conversation_grounding_state_free (state);
 }
@@ -394,6 +437,240 @@ test_valid_pins_are_canonical_and_frozen (void)
         ATM_CONVERSATION_GROUNDING_ERROR_FROZEN
     );
     g_clear_error (&error);
+
+    gboolean has_grounding = FALSE;
+    gboolean needs_clarification = FALSE;
+    char *system_instructions = NULL;
+    char *evidence_text = NULL;
+    char *post_evidence_reminder = NULL;
+
+    g_assert_true (
+        atm_conversation_grounding_prepare_turn (
+            state,
+            "What is the current fixture status in EWD?",
+            &has_grounding,
+            &needs_clarification,
+            &system_instructions,
+            &evidence_text,
+            &post_evidence_reminder,
+            &error
+        )
+    );
+    g_assert_no_error (error);
+    g_assert_true (has_grounding);
+    g_assert_false (needs_clarification);
+    g_assert_nonnull (system_instructions);
+    g_assert_nonnull (evidence_text);
+    g_assert_nonnull (post_evidence_reminder);
+    g_assert_nonnull (
+        g_strstr_len (
+            evidence_text,
+            -1,
+            "Current fixture status."
+        )
+    );
+    g_assert_nonnull (
+        g_strstr_len (
+            evidence_text,
+            -1,
+            "repository_id: ewd"
+        )
+    );
+
+    atm_conversation_grounding_abort_turn (state);
+
+    AtmCitationResolution *aborted_resolution = NULL;
+
+    g_assert_false (
+        atm_conversation_grounding_resolve_turn_citations (
+            state,
+            "Aborted output [S1].",
+            &aborted_resolution,
+            &error
+        )
+    );
+    g_assert_error (
+        error,
+        ATM_CONVERSATION_GROUNDING_ERROR,
+        ATM_CONVERSATION_GROUNDING_ERROR_VALIDATION
+    );
+    g_assert_null (aborted_resolution);
+    g_clear_error (&error);
+
+    g_assert_false (
+        atm_conversation_grounding_commit_turn (
+            state,
+            &error
+        )
+    );
+    g_assert_error (
+        error,
+        ATM_CONVERSATION_GROUNDING_ERROR,
+        ATM_CONVERSATION_GROUNDING_ERROR_VALIDATION
+    );
+    g_clear_error (&error);
+
+    g_clear_pointer (
+        &post_evidence_reminder,
+        g_free
+    );
+    g_clear_pointer (&evidence_text, g_free);
+    g_clear_pointer (&system_instructions, g_free);
+
+    has_grounding = FALSE;
+    needs_clarification = FALSE;
+
+    g_assert_true (
+        atm_conversation_grounding_prepare_turn (
+            state,
+            "What is the current fixture status in EWD?",
+            &has_grounding,
+            &needs_clarification,
+            &system_instructions,
+            &evidence_text,
+            &post_evidence_reminder,
+            &error
+        )
+    );
+    g_assert_no_error (error);
+    g_assert_true (has_grounding);
+    g_assert_false (needs_clarification);
+
+    AtmCitationResolution *ewd_resolution = NULL;
+
+    g_assert_true (
+        atm_conversation_grounding_resolve_turn_citations (
+            state,
+            "EWD is supported [S1]. Unknown [S9].",
+            &ewd_resolution,
+            &error
+        )
+    );
+    g_assert_no_error (error);
+    g_assert_cmpuint (
+        ewd_resolution->citations->len,
+        ==,
+        1
+    );
+    g_assert_cmpuint (
+        ewd_resolution->unknown_labels->len,
+        ==,
+        1
+    );
+
+    AtmCitationReference *ewd_citation =
+        g_ptr_array_index (
+            ewd_resolution->citations,
+            0
+        );
+
+    g_assert_cmpstr (
+        ewd_citation->repository_id,
+        ==,
+        "ewd"
+    );
+    g_assert_cmpstr (
+        ewd_citation->snapshot_sha,
+        ==,
+        ewd_sha
+    );
+
+    g_assert_true (
+        atm_conversation_grounding_commit_turn (
+            state,
+            &error
+        )
+    );
+    g_assert_no_error (error);
+
+    g_clear_pointer (
+        &post_evidence_reminder,
+        g_free
+    );
+    g_clear_pointer (&evidence_text, g_free);
+    g_clear_pointer (&system_instructions, g_free);
+
+    has_grounding = FALSE;
+    needs_clarification = FALSE;
+
+    g_assert_true (
+        atm_conversation_grounding_prepare_turn (
+            state,
+            "What is the current fixture status in RMD?",
+            &has_grounding,
+            &needs_clarification,
+            &system_instructions,
+            &evidence_text,
+            &post_evidence_reminder,
+            &error
+        )
+    );
+    g_assert_no_error (error);
+    g_assert_true (has_grounding);
+    g_assert_false (needs_clarification);
+
+    AtmCitationResolution *rmd_resolution = NULL;
+
+    g_assert_true (
+        atm_conversation_grounding_resolve_turn_citations (
+            state,
+            "RMD is supported [S1].",
+            &rmd_resolution,
+            &error
+        )
+    );
+    g_assert_no_error (error);
+    g_assert_cmpuint (
+        rmd_resolution->citations->len,
+        ==,
+        1
+    );
+
+    AtmCitationReference *rmd_citation =
+        g_ptr_array_index (
+            rmd_resolution->citations,
+            0
+        );
+
+    g_assert_cmpstr (
+        rmd_citation->repository_id,
+        ==,
+        "rmd"
+    );
+    g_assert_cmpstr (
+        rmd_citation->snapshot_sha,
+        ==,
+        rmd_sha
+    );
+
+    g_assert_true (
+        atm_conversation_grounding_commit_turn (
+            state,
+            &error
+        )
+    );
+    g_assert_no_error (error);
+
+    /*
+     * The first resolution is a deep copy. Preparing a later turn must
+     * not rebind its [S1] provenance to the new RMD context.
+     */
+    g_assert_cmpstr (
+        ewd_citation->repository_id,
+        ==,
+        "ewd"
+    );
+    g_assert_cmpstr (
+        ewd_citation->snapshot_sha,
+        ==,
+        ewd_sha
+    );
+
+    atm_citation_resolution_free (rmd_resolution);
+    atm_citation_resolution_free (ewd_resolution);
+    g_free (post_evidence_reminder);
+    g_free (evidence_text);
+    g_free (system_instructions);
 
     g_ptr_array_unref (scopes);
     atm_conversation_grounding_state_free (state);
@@ -599,6 +876,156 @@ test_unknown_repository_and_uppercase_sha_are_rejected (void)
     atm_conversation_grounding_state_free (state);
 }
 
+static void
+test_pinned_snapshot_ignores_newer_snapshot (void)
+{
+    const char *old_sha =
+        "7777777777777777777777777777777777777777";
+    const char *new_sha =
+        "8888888888888888888888888888888888888888";
+    char *cache_root = new_temp_root (
+        "atm-conversation-update-cache-XXXXXX"
+    );
+    char *old_root = new_snapshot (
+        "ewd",
+        "EWD",
+        "Empirical World3 Dynamics"
+    );
+    char *new_root = new_snapshot (
+        "ewd",
+        "EWD",
+        "Empirical World3 Dynamics"
+    );
+    char *old_version = NULL;
+    char *new_version = NULL;
+    GError *error = NULL;
+
+    write_text (
+        old_root,
+        "STATUS.md",
+        "# Scientific status\n"
+        "Old pinned conversation status.\n"
+    );
+    write_text (
+        new_root,
+        "STATUS.md",
+        "# Scientific status\n"
+        "Newer repository status.\n"
+    );
+
+    char *old_index = ensure_index (
+        cache_root,
+        old_root,
+        "ewd",
+        old_sha,
+        &old_version
+    );
+
+    AtmConversationGroundingState *state =
+        atm_conversation_grounding_state_new ();
+
+    g_assert_true (
+        atm_conversation_grounding_add_ready_repository (
+            state,
+            "ewd",
+            old_version,
+            old_sha,
+            old_root,
+            old_index,
+            &error
+        )
+    );
+    g_assert_no_error (error);
+
+    g_assert_true (
+        atm_conversation_grounding_freeze (
+            state,
+            &error
+        )
+    );
+    g_assert_no_error (error);
+
+    /*
+     * Simulate a later repository update by building a distinct immutable
+     * snapshot/index after the conversation has already frozen old_sha.
+     * The new snapshot is deliberately not added to the frozen state.
+     */
+    char *new_index = ensure_index (
+        cache_root,
+        new_root,
+        "ewd",
+        new_sha,
+        &new_version
+    );
+
+    gboolean has_grounding = FALSE;
+    gboolean needs_clarification = FALSE;
+    char *system_instructions = NULL;
+    char *evidence_text = NULL;
+    char *post_evidence_reminder = NULL;
+
+    g_assert_true (
+        atm_conversation_grounding_prepare_turn (
+            state,
+            "What is the current fixture status in EWD?",
+            &has_grounding,
+            &needs_clarification,
+            &system_instructions,
+            &evidence_text,
+            &post_evidence_reminder,
+            &error
+        )
+    );
+    g_assert_no_error (error);
+    g_assert_true (has_grounding);
+    g_assert_false (needs_clarification);
+
+    g_assert_nonnull (
+        g_strstr_len (
+            evidence_text,
+            -1,
+            "Old pinned conversation status."
+        )
+    );
+    g_assert_null (
+        g_strstr_len (
+            evidence_text,
+            -1,
+            "Newer repository status."
+        )
+    );
+    g_assert_nonnull (
+        g_strstr_len (
+            evidence_text,
+            -1,
+            old_sha
+        )
+    );
+    g_assert_null (
+        g_strstr_len (
+            evidence_text,
+            -1,
+            new_sha
+        )
+    );
+
+    atm_conversation_grounding_abort_turn (state);
+    g_free (post_evidence_reminder);
+    g_free (evidence_text);
+    g_free (system_instructions);
+    atm_conversation_grounding_state_free (state);
+    g_free (new_index);
+    g_free (old_index);
+    g_free (new_version);
+    g_free (old_version);
+    remove_tree_best_effort (new_root);
+    remove_tree_best_effort (old_root);
+    remove_tree_best_effort (cache_root);
+    g_free (new_root);
+    g_free (old_root);
+    g_free (cache_root);
+}
+
 int
 main (int argc, char **argv)
 {
@@ -623,6 +1050,10 @@ main (int argc, char **argv)
     g_test_add_func (
         "/conversation-grounding/invalid-identity",
         test_unknown_repository_and_uppercase_sha_are_rejected
+    );
+    g_test_add_func (
+        "/conversation-grounding/pinned-snapshot-survives-update",
+        test_pinned_snapshot_ignores_newer_snapshot
     );
 
     return g_test_run ();

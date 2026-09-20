@@ -22,13 +22,14 @@ Implemented and tested backend layers include:
 - repository ID, repository-declared version and snapshot SHA carried on evidence records;
 - a deterministic repository router that combines scope, normalization, exact/tabular/lexical retrieval and ranking without requiring embeddings;
 - immutable per-conversation repository pinning with snapshot/index identity checks and post-freeze scope-mutation rejection;
+- a non-visual conversation-session boundary with explicit start/reset semantics, transactional grounded-turn prepare/commit/abort, and pinned local-AI model identity plus provider digest when available;
 - current-turn grounding context and Ollama request construction that keep repository evidence transient instead of persisting grounding blocks in normal chat history;
 - current-turn citation-label resolution into persistent provenance objects, including fail-closed handling of invalid provenance and no fabricated metadata for unknown labels;
 - real-repository R4 traceability tests spanning EWD, CBD and RMD;
 - deterministic multi-turn retrieval state with inherited repository intent/exact anchors, bounded effective follow-up queries and explicit clarification outcomes;
 - versioned R5 benchmark/run schemas, a reviewed frozen EWD/CBD/RMD corpus, a deterministic real-corpus runner, provisional metric gates and CI that now passes the fixed deterministic baseline.
 
-The development GTK application now has a repository-selection/lifecycle control group that can check GitHub and manage local immutable repository snapshots, but repository selection is not yet connected end-to-end to grounded message generation. Grounded-request and citation-provenance building blocks exist and are tested, but the released v0.2.2 UI does not invoke them or render user-visible citations. The reviewed frozen R5 corpus, deterministic real-corpus runner and gate-passing retrieval baseline now exist on development `main`; this validates the backend retrieval stage but does not make repository-grounded chat a released v0.2.2 feature.
+The unreleased development GTK application now connects repository selection end-to-end to per-conversation grounded message generation. Each chat tab owns independent provider history and a `ConversationSession`; the first Send freezes repository snapshots plus AI-model identity for that tab, and subsequent grounded turns use the pinned retrieval scope. Temporary model labels are resolved before a grounded turn is committed, unknown labels fail closed, and user-visible compact source references open provenance details including repository/version, exact snapshot SHA, logical source ID, physical locator, evidence excerpt and immutable permalink when available. The released v0.2.2 application remains outside this development capability boundary.
 
 ## Implemented logical components
 
@@ -51,22 +52,32 @@ AtM does not own the provider process. It does not install, start, stop, update 
 
 ### Conversation state
 
-The current conversation is an in-memory ordered sequence of user and assistant messages held by the provider layer.
+Each open chat tab keeps its own user/assistant provider history in memory and owns a separate `ConversationSession`:
 
-The state is not persisted across application restarts. Switching the active AI model does not yet create a separate persisted conversation.
+- the first Send prepares and freezes the selected repository snapshots for that tab;
+- the selected local AI model name is pinned at session start;
+- the provider model digest is also pinned when discovery exposes one;
+- later turns revalidate the pinned model identity before generation;
+- grounded retrieval turns use explicit prepare/resolve/commit/abort semantics, so failed model calls or invalid citation labels do not advance follow-up retrieval state;
+- grounded provider history is committed only after citation resolution and retrieval-turn commit succeed;
+- New creates another independent tab rather than resetting existing conversations;
+- closing a tab discards only that tab's in-memory provider/session state.
+
+Conversation state is not persisted across application restarts.
 
 ### User interface
 
-The current UI provides:
+The current unreleased development UI provides:
 
-- elementary-style GTK/Granite shell;
-- system color-scheme following;
-- AI-model selector;
-- manual local-model refresh;
-- real model-scan progress and temporary result feedback;
-- transcript;
-- prompt composer;
-- streamed assistant text.
+- elementary-style GTK/Granite shell and system color-scheme following;
+- separate AI-model and multi-repository selectors with explicit refresh/download/update lifecycle controls;
+- the embedded one-line status LCD;
+- real multi-chat notebook pages with a compact New mini-tab, independent tab state, automatic short titles and per-tab close controls;
+- selector locking after the first Send for each conversation;
+- transcript and prompt composer per tab;
+- streamed ordinary local-chat answers;
+- validated repository-grounded answers whose temporary `[S#]` labels are removed before display;
+- compact `Sources: [1] [2]…` references that open exact provenance details.
 
 ### Graphics compatibility layer
 
@@ -84,7 +95,7 @@ Implemented across the grounding-context, conversation-grounding, grounded reque
 
 The R4 backend can freeze validated repository snapshots for a conversation, build transient current-turn grounding context, construct grounded Ollama requests without persisting evidence blocks into ordinary chat history, resolve temporary `[S#]` labels only against current-turn evidence and retain citation provenance for later inspection. Real-repository integration tests exercise traceability across EWD, CBD and RMD.
 
-These are backend capabilities. The current GTK application still sends ordinary local-chat prompts through the released UI path and does not render repository citations.
+These capabilities are now wired into the unreleased GTK development path. Grounded answers are held until current-turn citation labels are resolved; unknown labels fail closed. Successful grounded answers retain turn-owned provenance and render compact source-reference controls in the transcript.
 
 ### R5 retrieval-conversation and benchmark framework
 
@@ -98,13 +109,13 @@ R5 defines versioned benchmark/run schemas, deterministic metric evaluation, pro
 
 The development UI exposes the fixed EWD/CBD/RMD selector together with separate repository refresh, Download/Update and repository-status controls. Refresh performs a read-only GitHub check; Download/Update uses the validated snapshot lifecycle. Persistent source snapshots are stored under `~/Ask the Model/Repositories`, while retrieval indexes remain private XDG cache data.
 
-The remaining conversation-context responsibility is to freeze the selected repository set and exact snapshot SHAs after the first user turn, require an explicit new-chat transition for scope changes, and feed the pinned retrieval/grounding path into message generation.
+The repository/snapshot freeze, transactional grounded-turn lifecycle and AI-model identity pinning are wired to each GTK chat tab. First Send starts the tab session atomically; repository and AI-model selectors remain visible but become insensitive for that conversation; New creates a fresh independently editable tab; switching tabs restores the pinned display state of the selected conversation.
 
 ### Grounded context and citation service
 
 Responsible for selecting retrieved evidence within a turn budget, recording exactly which repository sources were supplied to the AI, mapping temporary source labels to immutable provenance, and distinguishing retrieved source material from AI-generated interpretation.
 
-Backend building blocks are now implemented and tested for current-turn grounding context, grounded Ollama request construction, temporary source-label resolution, persistent citation provenance and real-repository traceability. The remaining work is end-to-end orchestration from the GTK repository/conversation lifecycle and user-visible citation rendering. These backend primitives are not yet a released repository-grounded chat feature.
+Current-turn grounding context, grounded Ollama request construction, temporary source-label resolution, persistent citation provenance and real-repository traceability are implemented and wired through the unreleased GTK path. User-visible references are intentionally compact; detailed provenance is disclosed only on demand in a popover. This remains unreleased development functionality until a later release boundary is explicitly approved.
 
 ### Conversation persistence service
 

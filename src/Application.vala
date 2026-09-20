@@ -5,6 +5,50 @@ namespace AskTheModel {
         ERROR
     }
 
+    private class ChatTabState : Object {
+        public Gtk.Box page;
+        public Gtk.TextView transcript;
+        public Gtk.TextView prompt;
+        public Gtk.Button send_button;
+        public Gtk.Label placeholder;
+        public Gtk.Label title_label;
+        public Gtk.Button close_button;
+        public OllamaConversation conversation;
+        public ConversationSession session =
+            new ConversationSession ();
+        public uint serial;
+        public bool locked = false;
+        public bool generating = false;
+        public string? model_name = null;
+        public string? model_digest = null;
+        public string[] repository_ids = {};
+        public string[] grounded_answers = {};
+        public CitationResolution[] grounded_citations = {};
+
+        public ChatTabState (
+            Gtk.Box page,
+            Gtk.TextView transcript,
+            Gtk.TextView prompt,
+            Gtk.Button send_button,
+            Gtk.Label placeholder,
+            Gtk.Label title_label,
+            Gtk.Button close_button,
+            OllamaConversation conversation,
+            uint serial
+        ) {
+            Object ();
+            this.page = page;
+            this.transcript = transcript;
+            this.prompt = prompt;
+            this.send_button = send_button;
+            this.placeholder = placeholder;
+            this.title_label = title_label;
+            this.close_button = close_button;
+            this.conversation = conversation;
+            this.serial = serial;
+        }
+    }
+
     public class Application : Gtk.Application {
         private const string APP_ID = "io.github.laurentiustaicu.ask_the_model";
         private const string STYLE_RESOURCE =
@@ -13,7 +57,7 @@ namespace AskTheModel {
         private Granite.Settings granite_settings;
         private Gtk.Settings gtk_settings;
         private OllamaProvider ollama_provider;
-        private Gtk.TextView? transcript_view;
+        private Gtk.TextView? streaming_transcript;
         private Gtk.Frame? status_lcd;
         private Gtk.DropDown? model_dropdown;
         private Gtk.StringList? model_list;
@@ -42,6 +86,14 @@ namespace AskTheModel {
             new RepositorySelection ();
         private RepositoryLifecycleService repository_lifecycle =
             new RepositoryLifecycleService ();
+        private GLib.SimpleAction? new_chat_action;
+        private Gtk.Button? new_chat_button;
+        private Gtk.Notebook? chat_notebook;
+        private ChatTabState[] chat_states = {};
+        private ChatTabState? active_chat;
+        private uint conversation_serial = 0;
+        private bool generation_active = false;
+        private bool restoring_chat_controls = false;
         private bool ai_scanning = false;
         private bool repository_checking = false;
         private bool repository_downloading = false;
@@ -86,6 +138,19 @@ namespace AskTheModel {
 
             ollama_provider = new OllamaProvider ();
 
+            new_chat_action = new GLib.SimpleAction (
+                "new-chat",
+                null
+            );
+            new_chat_action.activate.connect (() => {
+                create_chat_tab ();
+            });
+            add_action (new_chat_action);
+            set_accels_for_action (
+                "app.new-chat",
+                { "<Primary>n" }
+            );
+
             repository_lifecycle.progress.connect ((message) => {
                 repository_validating =
                     message.has_prefix ("Validating ");
@@ -104,19 +169,19 @@ namespace AskTheModel {
             });
 
             ollama_provider.response_chunk.connect ((chunk) => {
-                if (transcript_view == null) {
+                if (streaming_transcript == null) {
                     return;
                 }
 
                 if (!assistant_stream_started) {
                     append_transcript (
-                        transcript_view,
+                        streaming_transcript,
                         "Assistant: " + chunk
                     );
                     assistant_stream_started = true;
                 } else {
                     append_transcript_raw (
-                        transcript_view,
+                        streaming_transcript,
                         chunk
                     );
                 }
@@ -497,12 +562,9 @@ namespace AskTheModel {
             bool found = yield ollama_provider.discover ();
             update_model_selector ();
 
-            if (refresh_models_button != null) {
-                refresh_models_button.sensitive = true;
-            }
-
             ai_scanning = false;
             update_ai_annunciators ();
+            update_conversation_ui_state ();
 
             if (found && ollama_provider.model_name != null) {
                 stdout.printf (
@@ -526,6 +588,255 @@ namespace AskTheModel {
                 refresh_models_ring,
                 false
             );
+        }
+
+        private string[] selected_repository_ids () {
+            string[] ids = {};
+
+            foreach (
+                RepositoryDescriptor descriptor
+                in RepositoryCatalog.all ()
+            ) {
+                if (repository_selection.is_selected (descriptor.id)) {
+                    ids += descriptor.id;
+                }
+            }
+
+            return ids;
+        }
+
+        private RepositoryDescriptor[]
+        repository_descriptors_for_ids (
+            string[] ids
+        ) {
+            RepositoryDescriptor[] selected = {};
+
+            foreach (
+                RepositoryDescriptor descriptor
+                in RepositoryCatalog.all ()
+            ) {
+                if (repository_id_in (ids, descriptor.id)) {
+                    selected += descriptor;
+                }
+            }
+
+            return selected;
+        }
+
+        private RepositoryDescriptor?
+        repository_descriptor_for_id (
+            string repository_id
+        ) {
+            foreach (
+                RepositoryDescriptor descriptor
+                in RepositoryCatalog.all ()
+            ) {
+                if (descriptor.id == repository_id) {
+                    return descriptor;
+                }
+            }
+
+            return null;
+        }
+
+        private bool repository_id_in (
+            string[] ids,
+            string repository_id
+        ) {
+            foreach (string id in ids) {
+                if (id == repository_id) {
+                    return true;
+                }
+            }
+
+            return false;
+        }
+
+        private ChatTabState? chat_state_for_page (
+            Gtk.Widget page
+        ) {
+            foreach (ChatTabState state in chat_states) {
+                if (state.page == page) {
+                    return state;
+                }
+            }
+
+            return null;
+        }
+
+        private bool chat_state_is_open (
+            ChatTabState candidate
+        ) {
+            foreach (ChatTabState state in chat_states) {
+                if (state == candidate) {
+                    return true;
+                }
+            }
+
+            return false;
+        }
+
+        private void restore_chat_controls (
+            ChatTabState state
+        ) {
+            restoring_chat_controls = true;
+
+            if (state.model_name != null) {
+                ollama_provider.select_model (state.model_name);
+
+                if (model_list != null && model_dropdown != null) {
+                    for (uint i = 0; i < model_list.n_items; i++) {
+                        string? listed = model_list.get_string (i);
+                        if (listed == state.model_name) {
+                            updating_model_selector = true;
+                            model_dropdown.set_selected (i);
+                            updating_model_selector = false;
+                            break;
+                        }
+                    }
+                }
+            }
+
+            RepositoryDescriptor[] catalog = RepositoryCatalog.all ();
+            for (int i = 0; i < catalog.length; i++) {
+                bool selected = repository_id_in (
+                    state.repository_ids,
+                    catalog[i].id
+                );
+
+                repository_selection.set_selected (
+                    catalog[i].id,
+                    selected
+                );
+
+                if (i < repository_check_buttons.length) {
+                    repository_check_buttons[i].active = selected;
+                }
+            }
+
+            restoring_chat_controls = false;
+            update_repository_selector_label ();
+            update_ai_annunciators ();
+            update_repository_annunciators ();
+        }
+
+        private void activate_chat_state (
+            ChatTabState state
+        ) {
+            active_chat = state;
+            restore_chat_controls (state);
+            update_conversation_ui_state ();
+
+            if (!generation_active) {
+                state.prompt.grab_focus ();
+            }
+        }
+
+        private void remove_chat_state (
+            ChatTabState target
+        ) {
+            ChatTabState[] updated = {};
+
+            foreach (ChatTabState state in chat_states) {
+                if (state != target) {
+                    updated += state;
+                }
+            }
+
+            chat_states = updated;
+        }
+
+        private void close_chat_tab (
+            ChatTabState state
+        ) {
+            if (state.generating || chat_notebook == null) {
+                return;
+            }
+
+            int page_num = chat_notebook.page_num (state.page);
+            if (page_num < 0) {
+                return;
+            }
+
+            bool was_active = active_chat == state;
+            state.session.reset ();
+            chat_notebook.remove_page (page_num);
+            remove_chat_state (state);
+
+            if (was_active) {
+                active_chat = null;
+            }
+
+            if (chat_notebook.get_n_pages () == 0) {
+                create_chat_tab ();
+                return;
+            }
+
+            int current = chat_notebook.get_current_page ();
+            Gtk.Widget? current_page =
+                chat_notebook.get_nth_page (current);
+
+            if (current_page != null) {
+                ChatTabState? next =
+                    chat_state_for_page (current_page);
+
+                if (next != null) {
+                    activate_chat_state (next);
+                }
+            }
+        }
+
+        private void update_conversation_ui_state () {
+            bool editable =
+                active_chat != null &&
+                !active_chat.locked &&
+                !generation_active;
+            bool provider_ready =
+                ollama_provider.get_completion_models ().length > 0;
+
+            if (model_dropdown != null) {
+                model_dropdown.sensitive =
+                    editable && provider_ready;
+            }
+
+            if (refresh_models_button != null) {
+                refresh_models_button.sensitive =
+                    editable && !ai_scanning;
+            }
+
+            if (repository_menu_button != null) {
+                repository_menu_button.sensitive =
+                    editable &&
+                    !repository_checking &&
+                    !repository_downloading &&
+                    !repository_updating &&
+                    !repository_validating;
+            }
+
+            foreach (Gtk.CheckButton check in repository_check_buttons) {
+                check.sensitive = editable;
+            }
+
+            foreach (ChatTabState state in chat_states) {
+                state.prompt.sensitive = !generation_active;
+                state.send_button.sensitive =
+                    !generation_active &&
+                    state.prompt.buffer.text.strip ().length > 0;
+                state.close_button.sensitive =
+                    !state.generating;
+            }
+
+            update_repository_selector_label ();
+
+            bool can_start_new_chat = !generation_active;
+
+            if (new_chat_button != null) {
+                new_chat_button.sensitive = can_start_new_chat;
+            }
+
+            if (new_chat_action != null) {
+                new_chat_action.set_enabled (can_start_new_chat);
+            }
         }
 
         private void update_model_selector () {
@@ -562,10 +873,19 @@ namespace AskTheModel {
             }
 
             model_dropdown.set_selected (selected_index);
-            model_dropdown.sensitive = models.length > 0;
 
             updating_model_selector = false;
+
+            if (active_chat != null &&
+                !active_chat.locked &&
+                ollama_provider.model_name != null) {
+                active_chat.model_name =
+                    ollama_provider.model_name;
+                active_chat.model_digest =
+                    ollama_provider.model_digest;
+            }
             update_ai_annunciators ();
+            update_conversation_ui_state ();
         }
 
         private void set_activity_working (
@@ -607,21 +927,45 @@ namespace AskTheModel {
             var overlay = new Gtk.Overlay () {
                 child = selector
             };
-            overlay.add_overlay (new SelectorTriangle ());
+            var triangle = new SelectorTriangle ();
+            overlay.add_overlay (triangle);
+            overlay.set_clip_overlay (
+                triangle,
+                true
+            );
             return overlay;
         }
 
         private void update_repository_selector_label () {
+            bool editable =
+                active_chat != null &&
+                !active_chat.locked &&
+                !generation_active;
+            bool repository_busy =
+                repository_checking ||
+                repository_downloading ||
+                repository_updating ||
+                repository_validating;
+
             if (repository_menu_button != null) {
                 repository_menu_button.label =
                     repository_selection.summary ();
+                repository_menu_button.sensitive =
+                    editable && !repository_busy;
+            }
+
+            foreach (Gtk.CheckButton check in repository_check_buttons) {
+                check.sensitive = editable;
             }
 
             bool has_selection =
                 repository_selection.selected_repositories ().length > 0;
 
             if (refresh_repositories_button != null) {
-                refresh_repositories_button.sensitive = has_selection;
+                refresh_repositories_button.sensitive =
+                    editable &&
+                    !repository_busy &&
+                    has_selection;
             }
 
             if (repository_action_button != null) {
@@ -653,8 +997,14 @@ namespace AskTheModel {
                     );
                 }
 
-                repository_action_button.sensitive = has_action;
-                repository_action_button.can_target = has_action;
+                repository_action_button.sensitive =
+                    editable &&
+                    !repository_busy &&
+                    has_action;
+                repository_action_button.can_target =
+                    editable &&
+                    !repository_busy &&
+                    has_action;
                 repository_action_button.opacity =
                     has_action ? 1.0 : 0.0;
                 repository_action_button.update_state (
@@ -801,13 +1151,7 @@ namespace AskTheModel {
                 );
             }
 
-            if (repository_menu_button != null) {
-                repository_menu_button.sensitive = true;
-            }
-
-            if (refresh_repositories_button != null) {
-                refresh_repositories_button.sensitive = true;
-            }
+            update_conversation_ui_state ();
 
             set_activity_working (
                 refresh_repositories_button,
@@ -906,12 +1250,7 @@ namespace AskTheModel {
                 );
             }
 
-            if (repository_menu_button != null) {
-                repository_menu_button.sensitive = true;
-            }
-            if (refresh_repositories_button != null) {
-                refresh_repositories_button.sensitive = true;
-            }
+            update_conversation_ui_state ();
 
             set_activity_working (
                 repository_action_button,
@@ -946,6 +1285,14 @@ namespace AskTheModel {
                     descriptor.id,
                     check.active
                 );
+
+                if (active_chat != null &&
+                    !active_chat.locked &&
+                    !restoring_chat_controls) {
+                    active_chat.repository_ids =
+                        selected_repository_ids ();
+                }
+
                 update_repository_selector_label ();
                 show_repository_standby_status ();
             });
@@ -1081,6 +1428,14 @@ namespace AskTheModel {
                 }
 
                 if (ollama_provider.select_model (selected_model)) {
+                    if (active_chat != null &&
+                        !active_chat.locked &&
+                        !restoring_chat_controls) {
+                        active_chat.model_name = selected_model;
+                        active_chat.model_digest =
+                            ollama_provider.model_digest;
+                    }
+
                     show_model_standby_status ();
                     stdout.printf (
                         "AtM: selected model %s\n",
@@ -1186,46 +1541,766 @@ namespace AskTheModel {
             Gtk.TextView transcript,
             string entry
         ) {
-            string current = transcript.buffer.text;
-            string separator = current.length > 0 ? "\n\n" : "";
-            transcript.buffer.text = current + separator + entry;
+            Gtk.TextBuffer buffer = transcript.buffer;
+            Gtk.TextIter end;
+            buffer.get_end_iter (out end);
+
+            if (buffer.get_char_count () > 0) {
+                buffer.insert (
+                    ref end,
+                    "\n\n",
+                    -1
+                );
+            }
+
+            buffer.insert (
+                ref end,
+                entry,
+                -1
+            );
         }
 
         private void append_transcript_raw (
             Gtk.TextView transcript,
             string text
         ) {
-            transcript.buffer.text =
-                transcript.buffer.text + text;
+            Gtk.TextIter end;
+            transcript.buffer.get_end_iter (out end);
+            transcript.buffer.insert (
+                ref end,
+                text,
+                -1
+            );
+        }
+
+        private string strip_repository_source_labels (
+            string answer
+        ) throws GLib.Error {
+            var label_regex = new GLib.Regex (
+                "[ \\t]*\\[S[1-9][0-9]{0,3}\\]"
+            );
+
+            return label_regex.replace_literal (
+                answer,
+                -1,
+                0,
+                ""
+            ).strip ();
+        }
+
+        private Gtk.Widget build_source_popover_content (
+            CitationReference citation,
+            uint display_number
+        ) {
+            var content = new Gtk.Box (
+                Gtk.Orientation.VERTICAL,
+                6
+            ) {
+                margin_top = 10,
+                margin_bottom = 10,
+                margin_start = 12,
+                margin_end = 12
+            };
+
+            RepositoryDescriptor? descriptor =
+                repository_descriptor_for_id (
+                    citation.repository_id
+                );
+            string repository_name =
+                descriptor != null
+                    ? "%s (%s)".printf (
+                        descriptor.acronym,
+                        descriptor.display_name
+                    )
+                    : citation.repository_id;
+
+            var heading = new Gtk.Label (
+                "[%u] %s · v%s".printf (
+                    display_number,
+                    repository_name,
+                    citation.repository_version
+                )
+            ) {
+                halign = Gtk.Align.START,
+                xalign = 0.0f,
+                selectable = true
+            };
+            heading.add_css_class ("heading");
+            content.append (heading);
+
+            var source = new Gtk.Label (
+                "%s · %s".printf (
+                    citation.source_path,
+                    citation.locator
+                )
+            ) {
+                halign = Gtk.Align.START,
+                xalign = 0.0f,
+                selectable = true,
+                wrap = true,
+                max_width_chars = 72
+            };
+            source.add_css_class ("dim-label");
+            content.append (source);
+
+            var sha = new Gtk.Label (
+                "Snapshot: " + citation.snapshot_sha
+            ) {
+                halign = Gtk.Align.START,
+                xalign = 0.0f,
+                selectable = true,
+                wrap = true,
+                max_width_chars = 72
+            };
+            sha.add_css_class ("dim-label");
+            content.append (sha);
+
+            var logical_source = new Gtk.Label (
+                "Source ID: " + citation.logical_source_id
+            ) {
+                halign = Gtk.Align.START,
+                xalign = 0.0f,
+                selectable = true,
+                wrap = true,
+                max_width_chars = 72
+            };
+            logical_source.add_css_class ("dim-label");
+            content.append (logical_source);
+
+            if (citation.title != null &&
+                citation.title.strip ().length > 0) {
+                var title = new Gtk.Label (
+                    citation.title
+                ) {
+                    halign = Gtk.Align.START,
+                    xalign = 0.0f,
+                    selectable = true,
+                    wrap = true,
+                    max_width_chars = 72
+                };
+                content.append (title);
+            }
+
+            if (citation.excerpt != null &&
+                citation.excerpt.strip ().length > 0) {
+                var excerpt = new Gtk.Label (
+                    citation.excerpt
+                ) {
+                    halign = Gtk.Align.START,
+                    xalign = 0.0f,
+                    selectable = true,
+                    wrap = true,
+                    max_width_chars = 72
+                };
+                excerpt.add_css_class ("atm-source-excerpt");
+                content.append (excerpt);
+            }
+
+            if (descriptor != null) {
+                try {
+                    string permalink =
+                        descriptor.immutable_file_permalink (
+                            citation.snapshot_sha,
+                            citation.source_path,
+                            citation.locator
+                        );
+
+                    var link =
+                        new Gtk.LinkButton.with_label (
+                            permalink,
+                            "Open immutable source"
+                        ) {
+                            halign = Gtk.Align.START
+                        };
+                    link.add_css_class ("atm-source-link");
+                    content.append (link);
+                } catch (GLib.Error error) {
+                    /* Provenance remains visible even if a URL cannot be built. */
+                }
+            }
+
+            return content;
+        }
+
+        private Gtk.MenuButton build_source_reference_button (
+            CitationReference citation,
+            uint display_number
+        ) {
+            var popover = new Gtk.Popover () {
+                child = build_source_popover_content (
+                    citation,
+                    display_number
+                ),
+                has_arrow = true,
+                position = Gtk.PositionType.BOTTOM
+            };
+
+            var button = new Gtk.MenuButton () {
+                label = "[%u]".printf (display_number),
+                direction = Gtk.ArrowType.NONE,
+                always_show_arrow = false,
+                has_frame = false,
+                tooltip_text = "Show source %u".printf (
+                    display_number
+                )
+            };
+            button.add_css_class ("atm-source-ref");
+            button.update_property (
+                Gtk.AccessibleProperty.LABEL,
+                "Source %u".printf (display_number)
+            );
+            button.set_popover (popover);
+            return button;
+        }
+
+        private void append_grounded_answer (
+            Gtk.TextView transcript,
+            string visible_answer,
+            CitationResolution resolution
+        ) {
+            append_transcript (
+                transcript,
+                "Assistant: " + visible_answer
+            );
+
+            if (resolution.citation_count () == 0) {
+                return;
+            }
+
+            Gtk.TextBuffer buffer = transcript.buffer;
+            Gtk.TextIter end;
+            buffer.get_end_iter (out end);
+            buffer.insert (
+                ref end,
+                "\nSources: ",
+                -1
+            );
+
+            for (
+                uint i = 0;
+                i < resolution.citation_count ();
+                i++
+            ) {
+                CitationReference? citation =
+                    resolution.citation_at (i);
+
+                if (citation == null) {
+                    continue;
+                }
+
+                buffer.get_end_iter (out end);
+                unowned Gtk.TextChildAnchor anchor =
+                    buffer.create_child_anchor (end);
+
+                transcript.add_child_at_anchor (
+                    build_source_reference_button (
+                        citation,
+                        i + 1
+                    ),
+                    anchor
+                );
+
+                if (i + 1 < resolution.citation_count ()) {
+                    buffer.get_end_iter (out end);
+                    buffer.insert (
+                        ref end,
+                        " ",
+                        -1
+                    );
+                }
+            }
+        }
+
+        private string normalize_conversation_title (
+            string generated
+        ) {
+            string cleaned = generated
+                .replace ("\n", " ")
+                .replace ("\r", " ")
+                .replace ("\t", " ")
+                .strip ();
+
+            while (
+                cleaned.length >= 2 &&
+                (
+                    (cleaned.has_prefix ("\"") &&
+                     cleaned.has_suffix ("\"")) ||
+                    (cleaned.has_prefix ("'") &&
+                     cleaned.has_suffix ("'"))
+                )
+            ) {
+                cleaned = cleaned.substring (
+                    1,
+                    cleaned.length - 2
+                ).strip ();
+            }
+
+            string[] parts = cleaned.split (" ");
+            string[] words = {};
+
+            foreach (string part in parts) {
+                string word = part.strip ();
+                if (word.length == 0) {
+                    continue;
+                }
+
+                words += word;
+                if (words.length == 3) {
+                    break;
+                }
+            }
+
+            if (words.length == 0) {
+                return "New";
+            }
+
+            return string.joinv (" ", words);
+        }
+
+        private async void update_conversation_title (
+            ChatTabState state,
+            string first_prompt,
+            string first_answer,
+            uint serial
+        ) {
+            try {
+                string answer_excerpt = first_answer;
+                if (answer_excerpt.length > 1200) {
+                    answer_excerpt =
+                        answer_excerpt.substring (0, 1200);
+                }
+
+                string topic_text =
+                    "User: " + first_prompt +
+                    "\nAssistant: " + answer_excerpt;
+
+                string generated =
+                    yield ollama_provider.generate_conversation_title (
+                        topic_text,
+                        state.model_name
+                    );
+
+                if (!chat_state_is_open (state) ||
+                    state.serial != serial) {
+                    return;
+                }
+
+                string title =
+                    normalize_conversation_title (generated);
+
+                state.title_label.label = title;
+                state.title_label.tooltip_text = title;
+            } catch (GLib.Error error) {
+                /* Title generation is cosmetic; keep New on failure. */
+            }
         }
 
         private async void send_prompt (
-            string prompt,
-            Gtk.TextView transcript,
-            Gtk.TextView prompt_view,
-            Gtk.Button send_button
+            ChatTabState state,
+            string prompt
         ) {
-            try {
-                string answer = yield ollama_provider.chat (prompt);
+            generation_active = true;
+            state.generating = true;
+            streaming_transcript = null;
+            assistant_stream_started = false;
+            update_conversation_ui_state ();
 
-                if (!assistant_stream_started && answer.length > 0) {
-                    append_transcript (
-                        transcript,
-                        "Assistant: " + answer
+            uint serial = state.serial;
+            bool should_generate_title =
+                state.title_label.label == "New";
+            bool grounded_turn_prepared = false;
+
+            try {
+                if (state.model_name == null ||
+                    state.model_name.strip ().length == 0) {
+                    throw new ConversationSessionError.INVALID_MODEL (
+                        "No local AI model is selected for this conversation."
                     );
-                    assistant_stream_started = true;
+                }
+
+                if (!ollama_provider.select_model (
+                        state.model_name
+                    )) {
+                    throw new ConversationSessionError.INVALID_MODEL (
+                        "The AI model pinned to this conversation is not currently available."
+                    );
+                }
+
+                if (!state.session.is_active ()) {
+                    RepositoryDescriptor[] selected =
+                        repository_descriptors_for_ids (
+                            state.repository_ids
+                        );
+
+                    ConversationGrounding grounding =
+                        yield repository_lifecycle.prepare_conversation_grounding (
+                            selected
+                        );
+
+                    state.session.begin (
+                        grounding,
+                        state.model_name,
+                        state.model_digest
+                    );
+                }
+
+                if (!ollama_provider.select_model (
+                        state.model_name
+                    )) {
+                    throw new ConversationSessionError.INVALID_MODEL (
+                        "The AI model pinned to this conversation is not currently available."
+                    );
+                }
+
+                state.session.require_model (
+                    state.model_name,
+                    ollama_provider.model_digest
+                );
+
+                bool needs_clarification;
+                string? system_instructions;
+                string? evidence_text;
+                string? post_evidence_reminder;
+
+                bool has_grounding =
+                    state.session.prepare_turn (
+                        prompt,
+                        out needs_clarification,
+                        out system_instructions,
+                        out evidence_text,
+                        out post_evidence_reminder
+                    );
+
+                if (needs_clarification) {
+                    append_transcript (
+                        state.transcript,
+                        "Assistant: Please restate the question with the repository, variable, source, or topic you mean."
+                    );
+                } else {
+                    string answer;
+                    string title_answer;
+
+                    if (has_grounding) {
+                        grounded_turn_prepared = true;
+                        answer = yield ollama_provider.chat_grounded (
+                            prompt,
+                            system_instructions ?? "",
+                            evidence_text ?? "",
+                            post_evidence_reminder ?? "",
+                            state.conversation,
+                            false
+                        );
+
+                        CitationResolution citation_resolution =
+                            state.session.resolve_turn_citations (
+                                answer
+                            );
+
+                        if (citation_resolution.unknown_label_count () > 0) {
+                            string unknown =
+                                citation_resolution.unknown_label_at (0) ??
+                                "unknown";
+
+                            throw new ConversationSessionError.INVALID_GROUNDING (
+                                "Grounded response used an unknown source label: %s".printf (
+                                    unknown
+                                )
+                            );
+                        }
+
+                        string visible_answer =
+                            strip_repository_source_labels (
+                                answer
+                            );
+
+                        if (!state.session.commit_turn ()) {
+                            throw new ConversationSessionError.INVALID_GROUNDING (
+                                "Grounded conversation turn could not be committed."
+                            );
+                        }
+
+                        state.conversation.commit_exchange (
+                            prompt,
+                            answer
+                        );
+                        state.grounded_answers += answer;
+                        state.grounded_citations +=
+                            citation_resolution;
+                        grounded_turn_prepared = false;
+
+                        append_grounded_answer (
+                            state.transcript,
+                            visible_answer,
+                            citation_resolution
+                        );
+                        assistant_stream_started = true;
+                        title_answer = visible_answer;
+                    } else {
+                        streaming_transcript = state.transcript;
+                        answer = yield ollama_provider.chat (
+                            prompt,
+                            state.conversation
+                        );
+                        title_answer = answer;
+
+                        if (!assistant_stream_started &&
+                            answer.length > 0) {
+                            append_transcript (
+                                state.transcript,
+                                "Assistant: " + answer
+                            );
+                            assistant_stream_started = true;
+                        }
+                    }
+
+                    if (should_generate_title &&
+                        title_answer.length > 0) {
+                        update_conversation_title.begin (
+                            state,
+                            prompt,
+                            title_answer,
+                            serial
+                        );
+                    }
                 }
             } catch (GLib.Error error) {
+                if (grounded_turn_prepared) {
+                    state.session.abort_turn ();
+                }
+
+                if (!state.session.is_active ()) {
+                    state.locked = false;
+                }
+
                 append_transcript (
-                    transcript,
+                    state.transcript,
                     "System: " + error.message
                 );
             }
 
-            prompt_view.sensitive = true;
-            send_button.sensitive =
-                prompt_view.buffer.text.strip ().length > 0;
-            prompt_view.grab_focus ();
+            if (streaming_transcript == state.transcript) {
+                streaming_transcript = null;
+            }
+
+            state.generating = false;
+            generation_active = false;
+
+            if (active_chat != null) {
+                restore_chat_controls (active_chat);
+            }
+
+            update_conversation_ui_state ();
+
+            if (chat_state_is_open (state) &&
+                active_chat == state) {
+                state.prompt.grab_focus ();
+            }
+        }
+
+        private Gtk.Widget build_chat_tab_label (
+            Gtk.Label title_label,
+            Gtk.Button close_button
+        ) {
+            var box = new Gtk.Box (
+                Gtk.Orientation.HORIZONTAL,
+                4
+            ) {
+                valign = Gtk.Align.CENTER
+            };
+
+            box.append (title_label);
+            box.append (close_button);
+            return box;
+        }
+
+        private void create_chat_tab () {
+            if (chat_notebook == null ||
+                generation_active) {
+                return;
+            }
+
+            var transcript = new Gtk.TextView () {
+                editable = false,
+                cursor_visible = false,
+                monospace = true,
+                wrap_mode = Gtk.WrapMode.WORD_CHAR,
+                left_margin = 12,
+                right_margin = 12,
+                top_margin = 8,
+                bottom_margin = 12,
+                vexpand = true
+            };
+
+            var transcript_scroll = new Gtk.ScrolledWindow () {
+                child = transcript,
+                hscrollbar_policy = Gtk.PolicyType.NEVER,
+                vscrollbar_policy = Gtk.PolicyType.AUTOMATIC,
+                vexpand = true
+            };
+
+            var prompt_view = new Gtk.TextView () {
+                monospace = true,
+                wrap_mode = Gtk.WrapMode.WORD_CHAR,
+                accepts_tab = false,
+                left_margin = 10,
+                right_margin = 10,
+                top_margin = 10,
+                bottom_margin = 10,
+                height_request = 72,
+                hexpand = true
+            };
+
+            var prompt_overlay = new Gtk.Overlay () {
+                child = prompt_view
+            };
+
+            var prompt_placeholder = new Gtk.Label (
+                "Ask something…"
+            ) {
+                halign = Gtk.Align.START,
+                valign = Gtk.Align.START,
+                margin_start = 14,
+                margin_top = 12,
+                can_target = false
+            };
+            prompt_placeholder.add_css_class ("dim-label");
+            prompt_placeholder.add_css_class ("monospace");
+            prompt_overlay.add_overlay (prompt_placeholder);
+
+            var prompt_frame = new Gtk.Frame (null) {
+                child = prompt_overlay,
+                hexpand = true
+            };
+            prompt_frame.add_css_class ("atm-input-frame");
+
+            var send_button = new Gtk.Button.with_label (
+                "Send"
+            ) {
+                valign = Gtk.Align.END,
+                sensitive = false
+            };
+
+            var composer = new Gtk.Box (
+                Gtk.Orientation.HORIZONTAL,
+                8
+            ) {
+                margin_top = 12,
+                margin_bottom = 12,
+                margin_start = 12,
+                margin_end = 12
+            };
+            composer.append (prompt_frame);
+            composer.append (send_button);
+
+            var chat_page = new Gtk.Box (
+                Gtk.Orientation.VERTICAL,
+                0
+            ) {
+                hexpand = true,
+                vexpand = true
+            };
+            chat_page.append (transcript_scroll);
+            chat_page.append (composer);
+
+            var title_label = new Gtk.Label ("New") {
+                single_line_mode = true,
+                ellipsize = Pango.EllipsizeMode.NONE
+            };
+
+            var close_button =
+                new Gtk.Button.from_icon_name (
+                    "window-close-symbolic"
+                ) {
+                    tooltip_text = "Close Chat",
+                    valign = Gtk.Align.CENTER
+                };
+            close_button.add_css_class ("flat");
+            close_button.add_css_class ("atm-tab-close");
+            close_button.update_property (
+                Gtk.AccessibleProperty.LABEL,
+                "Close Chat"
+            );
+
+            conversation_serial++;
+            var state = new ChatTabState (
+                chat_page,
+                transcript,
+                prompt_view,
+                send_button,
+                prompt_placeholder,
+                title_label,
+                close_button,
+                ollama_provider.create_conversation (),
+                conversation_serial
+            );
+            state.model_name = ollama_provider.model_name;
+            state.model_digest = ollama_provider.model_digest;
+            state.repository_ids =
+                selected_repository_ids ();
+
+            prompt_view.buffer.changed.connect (() => {
+                prompt_placeholder.visible =
+                    prompt_view.buffer.get_char_count () == 0;
+
+                send_button.sensitive =
+                    !generation_active &&
+                    prompt_view.sensitive &&
+                    prompt_view.buffer.text.strip ().length > 0;
+            });
+
+            send_button.clicked.connect (() => {
+                if (generation_active) {
+                    return;
+                }
+
+                string prompt =
+                    prompt_view.buffer.text.strip ();
+                if (prompt.length == 0) {
+                    return;
+                }
+
+                if (!state.locked) {
+                    state.model_name =
+                        ollama_provider.model_name;
+                    state.model_digest =
+                        ollama_provider.model_digest;
+                    state.repository_ids =
+                        selected_repository_ids ();
+                    state.locked = true;
+                    update_conversation_ui_state ();
+                }
+
+                append_transcript (
+                    transcript,
+                    "You: " + prompt
+                );
+
+                prompt_view.buffer.text = "";
+                send_button.sensitive = false;
+
+                send_prompt.begin (
+                    state,
+                    prompt
+                );
+            });
+
+            close_button.clicked.connect (() => {
+                close_chat_tab (state);
+            });
+
+            Gtk.Widget tab_label =
+                build_chat_tab_label (
+                    title_label,
+                    close_button
+                );
+
+            int page_num = chat_notebook.append_page (
+                chat_page,
+                tab_label
+            );
+            chat_states += state;
+            chat_notebook.set_current_page (page_num);
+            activate_chat_state (state);
         }
 
         private Gtk.Widget build_main_content () {
@@ -1334,110 +2409,62 @@ namespace AskTheModel {
             update_ai_annunciators ();
             update_repository_annunciators ();
 
-            var transcript = new Gtk.TextView () {
-                editable = false,
-                cursor_visible = false,
-                monospace = true,
-                wrap_mode = Gtk.WrapMode.WORD_CHAR,
-                left_margin = 12,
-                right_margin = 12,
-                top_margin = 8,
-                bottom_margin = 12,
-                vexpand = true
+            var chat_tabs = new Gtk.Notebook () {
+                hexpand = true,
+                vexpand = true,
+                scrollable = true,
+                show_border = false,
+                tab_pos = Gtk.PositionType.TOP
             };
-            transcript_view = transcript;
+            chat_tabs.add_css_class ("atm-chat-tabs");
+            chat_notebook = chat_tabs;
 
-            var transcript_scroll = new Gtk.ScrolledWindow () {
-                child = transcript,
-                hscrollbar_policy = Gtk.PolicyType.NEVER,
-                vscrollbar_policy = Gtk.PolicyType.AUTOMATIC,
-                vexpand = true
-            };
+            chat_tabs.switch_page.connect (
+                (page, page_num) => {
+                    ChatTabState? state =
+                        chat_state_for_page (page);
 
-            var prompt_view = new Gtk.TextView () {
-                monospace = true,
-                wrap_mode = Gtk.WrapMode.WORD_CHAR,
-                accepts_tab = false,
-                left_margin = 10,
-                right_margin = 10,
-                top_margin = 10,
-                bottom_margin = 10,
-                height_request = 72,
-                hexpand = true
-            };
-
-            var prompt_overlay = new Gtk.Overlay () {
-                child = prompt_view
-            };
-
-            var prompt_placeholder = new Gtk.Label ("Ask something…") {
-                halign = Gtk.Align.START,
-                valign = Gtk.Align.START,
-                margin_start = 14,
-                margin_top = 12,
-                can_target = false
-            };
-            prompt_placeholder.add_css_class ("dim-label");
-            prompt_placeholder.add_css_class ("monospace");
-            prompt_overlay.add_overlay (prompt_placeholder);
-
-            var prompt_frame = new Gtk.Frame (null) {
-                child = prompt_overlay,
-                hexpand = true
-            };
-            prompt_frame.add_css_class ("atm-input-frame");
-
-            var send_button = new Gtk.Button.with_label ("Send") {
-                valign = Gtk.Align.END,
-                sensitive = false
-            };
-
-            prompt_view.buffer.changed.connect (() => {
-                prompt_placeholder.visible =
-                    prompt_view.buffer.get_char_count () == 0;
-
-                send_button.sensitive =
-                    prompt_view.sensitive &&
-                    prompt_view.buffer.text.strip ().length > 0;
-            });
-
-            send_button.clicked.connect (() => {
-                string prompt = prompt_view.buffer.text.strip ();
-                if (prompt.length == 0) {
-                    return;
+                    if (state != null) {
+                        activate_chat_state (state);
+                    }
                 }
+            );
 
-                append_transcript (
-                    transcript,
-                    "You: " + prompt
-                );
-
-                assistant_stream_started = false;
-                prompt_view.buffer.text = "";
-                prompt_view.sensitive = false;
-                send_button.sensitive = false;
-
-                send_prompt.begin (
-                    prompt,
-                    transcript,
-                    prompt_view,
-                    send_button
-                );
+            new_chat_button =
+                new Gtk.Button.from_icon_name (
+                    "list-add-symbolic"
+                ) {
+                    tooltip_text = "New Chat (Ctrl+N)",
+                    sensitive = true,
+                    valign = Gtk.Align.FILL,
+                    halign = Gtk.Align.START
+                };
+            new_chat_button.add_css_class (
+                "atm-new-chat-tab"
+            );
+            new_chat_button.update_property (
+                Gtk.AccessibleProperty.LABEL,
+                "New Chat"
+            );
+            new_chat_button.clicked.connect (() => {
+                if (new_chat_action != null) {
+                    new_chat_action.activate (null);
+                }
             });
 
-            var composer = new Gtk.Box (Gtk.Orientation.HORIZONTAL, 8) {
-                margin_top = 12,
-                margin_bottom = 12,
-                margin_start = 12,
-                margin_end = 12
-            };
-            composer.append (prompt_frame);
-            composer.append (send_button);
+            chat_tabs.set_action_widget (
+                new_chat_button,
+                Gtk.PackType.START
+            );
 
-            var content = new Gtk.Box (Gtk.Orientation.VERTICAL, 0);
+            var content = new Gtk.Box (
+                Gtk.Orientation.VERTICAL,
+                0
+            );
             content.append (lcd_frame);
-            content.append (transcript_scroll);
-            content.append (composer);
+            content.append (chat_tabs);
+
+            create_chat_tab ();
 
             return content;
         }

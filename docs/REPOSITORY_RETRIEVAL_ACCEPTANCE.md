@@ -347,6 +347,16 @@ When selected repositories do not provide enough support, the system must permit
 
 A repository-grounded answer can be traced back to its exact snapshot evidence and citations remain associated with the turn that produced them.
 
+**Current development implementation status (2026-09-20): implemented.** The
+GTK path freezes repository/model identity per chat tab, supplies only
+current-turn evidence, resolves model-facing `[S#]` labels before committing a
+grounded turn, rejects unknown labels, preserves the deep-copied provenance
+mapping with the answer, removes temporary labels from user-visible text, and
+renders compact numbered source references whose popovers recover the required
+repository/version/SHA/logical-source/locator/excerpt metadata and immutable
+GitHub permalink when it can be constructed safely. Real-repository R4 CI
+continues to exercise traceability independently of the UI.
+
 ## R5 — Retrieval benchmark
 
 ### Corpus pinning

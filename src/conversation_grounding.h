@@ -2,6 +2,7 @@
 
 #include <glib.h>
 
+#include "citation_labels.h"
 #include "retrieval_scope.h"
 
 G_BEGIN_DECLS
@@ -71,6 +72,33 @@ gboolean atm_conversation_grounding_create_retrieval_scopes (
     const AtmConversationGroundingState *state,
     GPtrArray **out_scopes,
     GError **error
+);
+
+gboolean atm_conversation_grounding_prepare_turn (
+    AtmConversationGroundingState *state,
+    const char *query,
+    gboolean *out_has_grounding,
+    gboolean *out_needs_clarification,
+    char **out_system_instructions,
+    char **out_evidence_text,
+    char **out_post_evidence_reminder,
+    GError **error
+);
+
+gboolean atm_conversation_grounding_resolve_turn_citations (
+    AtmConversationGroundingState *state,
+    const char *model_output,
+    AtmCitationResolution **out_resolution,
+    GError **error
+);
+
+gboolean atm_conversation_grounding_commit_turn (
+    AtmConversationGroundingState *state,
+    GError **error
+);
+
+void atm_conversation_grounding_abort_turn (
+    AtmConversationGroundingState *state
 );
 
 G_END_DECLS
