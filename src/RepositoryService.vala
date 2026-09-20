@@ -65,6 +65,14 @@ namespace AskTheModel {
             );
         }
 
+        public string citation_api_url (string sha) {
+            return "https://api.github.com/repos/%s/%s/contents/CITATION.cff?ref=%s".printf (
+                owner,
+                repository,
+                sha
+            );
+        }
+
         private static bool citation_source_path_is_safe (
             string source_path
         ) {
@@ -284,6 +292,60 @@ namespace AskTheModel {
             }
 
             return sha.down ();
+        }
+
+        public async string resolve_remote_version (
+            RepositoryDescriptor descriptor,
+            string sha,
+            GLib.Cancellable? cancellable = null
+        ) throws GLib.Error {
+            if (!GLib.Regex.match_simple ("^[0-9a-f]{40}$", sha)) {
+                throw new RepositoryError.INVALID_RESPONSE (
+                    "Refusing to inspect CITATION.cff for an invalid commit SHA."
+                );
+            }
+
+            var message = new Soup.Message (
+                "GET",
+                descriptor.citation_api_url (sha)
+            );
+            message.request_headers.append (
+                "Accept",
+                "application/vnd.github.raw+json"
+            );
+            message.request_headers.append (
+                "X-GitHub-Api-Version",
+                "2022-11-28"
+            );
+
+            GLib.Bytes body = yield session.send_and_read_async (
+                message,
+                GLib.Priority.DEFAULT,
+                cancellable
+            );
+
+            if (message.get_status () != Soup.Status.OK) {
+                throw new RepositoryError.HTTP (
+                    "GitHub CITATION.cff lookup failed with HTTP %u.".printf (
+                        message.get_status ()
+                    )
+                );
+            }
+
+            unowned uint8[] bytes = body.get_data ();
+            string version;
+
+            if (!RepositoryNative.cff_extract_version (
+                    bytes,
+                    body.get_size (),
+                    out version
+                )) {
+                throw new RepositoryError.INVALID_RESPONSE (
+                    "GitHub CITATION.cff contains invalid version metadata."
+                );
+            }
+
+            return version;
         }
 
         public static string staging_archive_path (
