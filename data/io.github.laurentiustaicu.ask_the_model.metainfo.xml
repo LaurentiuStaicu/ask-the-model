@@ -3,7 +3,7 @@
   <id>io.github.laurentiustaicu.ask_the_model</id>
 
   <name>Ask the Model</name>
-  <summary>Explore scientific dynamical models through local AI chat</summary>
+  <summary>Chat with locally managed AI models</summary>
 
   <metadata_license>CC0-1.0</metadata_license>
   <project_license>MIT</project_license>
@@ -14,12 +14,17 @@
 
   <description>
     <p>
-      Ask the Model is a local AI chat interface designed to query, explore
-      and discuss repositories of scientific dynamical models such as Empirical World3
-      Dynamics, Cognitive Belief Dynamics and Romanian Monetary Dynamics
-      through natural language while keeping user data on-device. The
-      scientific models remain canonical in their own repositories and are
-      not embedded in the application.
+      Ask the Model is a local-first desktop chat interface for locally managed
+      language models through an Ollama-compatible provider. The current release
+      discovers compatible provider-managed models, streams responses and keeps
+      conversation context in memory for the current session.
+    </p>
+    <p>
+      The project is being developed toward natural-language exploration of
+      scientific dynamical-model repositories such as Empirical World3 Dynamics,
+      Cognitive Belief Dynamics and Romanian Monetary Dynamics. Repository-aware
+      retrieval and scientific provenance are not yet implemented, and the source
+      repositories remain authoritative for their own scientific content.
     </p>
   </description>
 
