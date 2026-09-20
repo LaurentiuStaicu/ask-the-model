@@ -3,19 +3,20 @@
 static guint
 minimum_role_rank (
     guint roles,
-    const guint role_ranks[5]
+    const guint role_ranks[6]
 )
 {
-    static const guint role_bits[5] = {
+    static const guint role_bits[6] = {
+        ATM_SOURCE_ROLE_STATUS,
         ATM_SOURCE_ROLE_CANONICAL,
         ATM_SOURCE_ROLE_STRUCTURAL,
         ATM_SOURCE_ROLE_EVIDENCE,
         ATM_SOURCE_ROLE_TABULAR,
         ATM_SOURCE_ROLE_IMPLEMENTATION
     };
-    guint rank = 5;
+    guint rank = 6;
 
-    for (guint i = 0; i < 5; i++) {
+    for (guint i = 0; i < 6; i++) {
         if ((roles & role_bits[i]) != 0) {
             rank = MIN (rank, role_ranks[i]);
         }
@@ -30,23 +31,23 @@ authority_rank_for_intent (
     AtmRetrievalIntent intent
 )
 {
-    static const guint general[5] = {
-        0, 1, 2, 2, 3
+    static const guint general[6] = {
+        0, 0, 1, 2, 2, 3
     };
-    static const guint current_state[5] = {
-        0, 1, 1, 2, 3
+    static const guint current_state[6] = {
+        0, 1, 2, 2, 3, 4
     };
-    static const guint structure[5] = {
-        0, 0, 2, 3, 2
+    static const guint structure[6] = {
+        0, 0, 0, 2, 3, 2
     };
-    static const guint evidence[5] = {
-        1, 2, 0, 0, 3
+    static const guint evidence[6] = {
+        1, 1, 2, 0, 0, 3
     };
-    static const guint numeric[5] = {
-        2, 3, 1, 0, 4
+    static const guint numeric[6] = {
+        2, 2, 3, 1, 0, 4
     };
-    static const guint implementation[5] = {
-        2, 1, 2, 3, 0
+    static const guint implementation[6] = {
+        2, 2, 1, 2, 3, 0
     };
     const guint *ranks = general;
 
