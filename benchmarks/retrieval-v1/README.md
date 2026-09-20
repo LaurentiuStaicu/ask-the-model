@@ -51,7 +51,13 @@ A benchmark records:
 - optional exact-ID target;
 - graded relevance judgments;
 - unsupported-premise expectation;
-- optional conversation/turn identity for later multi-turn topics.
+- expected turn outcome: `retrieval` or `needs_clarification`;
+- optional conversation/turn identity for multi-turn topics.
+
+Clarification is deliberately separate from unsupported evidence. A
+`needs_clarification` topic means that the deterministic conversation state
+must refuse to guess from the available turn context. It is not scored as a
+successful empty retrieval and it must not carry retrieved context.
 
 All language variants of one information need must remain in the same split.
 
@@ -62,7 +68,12 @@ A run records, per topic:
 - repository ID, repository version and snapshot SHA for every evidence item;
 - retrieval latency;
 - evidence byte count;
-- evidence token count when an agreed tokenizer/counting method is available.
+- evidence token count when an agreed tokenizer/counting method is available;
+- actual turn outcome: `retrieval` or `needs_clarification`.
+
+A run that reports `needs_clarification` must contain no retrieval results or
+context evidence and must report zero evidence bytes. This keeps conversational
+control behavior auditable independently from retrieval relevance.
 
 The evaluator refuses a run whose corpus does not exactly match the benchmark
 corpus.
@@ -84,7 +95,9 @@ corpus.
 - mean/max evidence bytes;
 - mean/max evidence token count and token-count coverage;
 - unsupported-topic empty-context rate;
-- duplicate-result rate.
+- duplicate-result rate;
+- expected turn-outcome accuracy;
+- clarification-outcome accuracy.
 
 The provisional gates remain those in the R5 acceptance contract:
 
@@ -95,8 +108,13 @@ The provisional gates remain those in the R5 acceptance contract:
 - paired RO–EN nDCG gap <= 0.05;
 - evidence traceability = 1.00.
 
+In addition, R5 has a deterministic conversation-protocol gate:
+
+- clarification-outcome accuracy = 1.00.
+
 The evaluator reports missing required metrics as failed gates. Targets are not
-relaxed merely to make a run pass.
+relaxed merely to make a run pass. A benchmark with no clarification topic
+therefore cannot satisfy the clarification gate.
 
 ## Stage boundary
 
