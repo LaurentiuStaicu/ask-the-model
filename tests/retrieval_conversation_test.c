@@ -852,6 +852,89 @@ test_standalone_new_query_does_not_stick_to_previous_scope (void)
     fixture_free (fixture);
 }
 
+static void
+test_prepared_turn_requires_explicit_commit (void)
+{
+    Fixture *fixture = fixture_new ();
+    AtmRetrievalConversationState *state = new_state (
+        fixture
+    );
+    AtmRetrievalConversationTurn *first = NULL;
+    AtmRetrievalConversationTurn *followup = NULL;
+    GError *error = NULL;
+
+    g_assert_true (
+        atm_retrieval_conversation_prepare (
+            state,
+            "food_per_capita EWD",
+            10,
+            &first,
+            &error
+        )
+    );
+    g_assert_no_error (error);
+    g_assert_nonnull (first);
+    g_assert_false (first->needs_clarification);
+
+    atm_retrieval_conversation_turn_free (first);
+    first = NULL;
+
+    g_assert_true (
+        atm_retrieval_conversation_prepare (
+            state,
+            "Dar în 2025?",
+            10,
+            &followup,
+            &error
+        )
+    );
+    g_assert_no_error (error);
+    g_assert_nonnull (followup);
+    g_assert_true (followup->needs_clarification);
+
+    atm_retrieval_conversation_turn_free (followup);
+    followup = NULL;
+
+    g_assert_true (
+        atm_retrieval_conversation_prepare (
+            state,
+            "food_per_capita EWD",
+            10,
+            &first,
+            &error
+        )
+    );
+    g_assert_no_error (error);
+    g_assert_true (
+        atm_retrieval_conversation_commit (
+            state,
+            first,
+            &error
+        )
+    );
+    g_assert_no_error (error);
+    atm_retrieval_conversation_turn_free (first);
+    first = NULL;
+
+    g_assert_true (
+        atm_retrieval_conversation_prepare (
+            state,
+            "Dar în 2025?",
+            10,
+            &followup,
+            &error
+        )
+    );
+    g_assert_no_error (error);
+    g_assert_false (followup->needs_clarification);
+    g_assert_true (followup->used_previous_scope);
+    g_assert_true (followup->used_previous_anchor);
+
+    atm_retrieval_conversation_turn_free (followup);
+    atm_retrieval_conversation_state_free (state);
+    fixture_free (fixture);
+}
+
 int
 main (int argc, char **argv)
 {
@@ -892,6 +975,10 @@ main (int argc, char **argv)
     g_test_add_func (
         "/retrieval-conversation/new-query-not-sticky",
         test_standalone_new_query_does_not_stick_to_previous_scope
+    );
+    g_test_add_func (
+        "/retrieval-conversation/explicit-commit",
+        test_prepared_turn_requires_explicit_commit
     );
 
     return g_test_run ();
