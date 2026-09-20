@@ -160,7 +160,7 @@ Conversation navigation sits immediately below the embedded LCD and above the tr
 
 ### Approved selector treatment
 
-The AI-model selector uses the native internal `Gtk.DropDown` disclosure arrow so the downward indicator remains inside the selector allocation. The repository selector retains the approved compact custom triangle because its placement is already correct.
+The AI-model and repository selectors use the same compact custom downward triangle. For the AI `Gtk.DropDown`, the native arrow is hidden; the custom triangle is overlaid inside the selector allocation, clipped to that allocation, and the button reserves its triangle space internally so the indicator cannot sit outside the visible selector boundary.
 
 The closed AI-model and repository selector surfaces use the same neutral surface color as the conversation tabs in both light and dark variants. Hover state follows the selected-tab surface rather than introducing a separate accent color.
 
