@@ -246,6 +246,89 @@ test_probabilistic_claim_is_current_boundary_not_numeric_by_itself (void)
 }
 
 static void
+test_development_paradigm_aliases (void)
+{
+    const char *query =
+        "Compară paradigmele canonice de modelare pentru EWD, CBD și RMD.";
+    AtmNormalizedQuery *normalized = NULL;
+    GError *error = NULL;
+
+    g_assert_true (
+        atm_retrieval_normalize_query (
+            query,
+            &normalized,
+            &error
+        )
+    );
+    g_assert_no_error (error);
+
+    const char *required[] = {
+        "compare",
+        "paradigm",
+        "canonical",
+        "modeling",
+        "model"
+    };
+
+    for (guint i = 0; i < G_N_ELEMENTS (required); i++) {
+        g_assert_nonnull (
+            strstr (
+                normalized->expanded_text,
+                required[i]
+            )
+        );
+    }
+
+    g_assert_true (
+        (normalized->intents &
+         ATM_RETRIEVAL_INTENT_STRUCTURE) != 0
+    );
+
+    atm_normalized_query_free (normalized);
+}
+
+static void
+test_development_human_validation_aliases (void)
+{
+    const char *query =
+        "A stabilit CBD v0.1.0 validarea M1.E4 pe participanți umani?";
+    AtmNormalizedQuery *normalized = NULL;
+    GError *error = NULL;
+
+    g_assert_true (
+        atm_retrieval_normalize_query (
+            query,
+            &normalized,
+            &error
+        )
+    );
+    g_assert_no_error (error);
+
+    const char *required[] = {
+        "established",
+        "validation",
+        "participant",
+        "human"
+    };
+
+    for (guint i = 0; i < G_N_ELEMENTS (required); i++) {
+        g_assert_nonnull (
+            strstr (
+                normalized->expanded_text,
+                required[i]
+            )
+        );
+    }
+
+    g_assert_true (
+        (normalized->intents &
+         ATM_RETRIEVAL_INTENT_EVIDENCE) != 0
+    );
+
+    atm_normalized_query_free (normalized);
+}
+
+static void
 test_invalid_normalization_input_is_rejected (void)
 {
     AtmNormalizedQuery *normalized = NULL;
@@ -302,6 +385,14 @@ main (int argc, char **argv)
     g_test_add_func (
         "/retrieval-normalize/probabilistic-boundary",
         test_probabilistic_claim_is_current_boundary_not_numeric_by_itself
+    );
+    g_test_add_func (
+        "/retrieval-normalize/development-paradigm",
+        test_development_paradigm_aliases
+    );
+    g_test_add_func (
+        "/retrieval-normalize/development-human-validation",
+        test_development_human_validation_aliases
     );
     g_test_add_func (
         "/retrieval-normalize/invalid-input",
