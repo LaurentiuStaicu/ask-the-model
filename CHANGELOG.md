@@ -22,6 +22,7 @@ All notable public releases of Ask the Model are recorded here.
 
 ### Repository governance
 
+- added an atomic release-metadata contract and pre-build validator requiring application version/date consistency across Meson, CITATION, README, STATUS, CHANGELOG, release notes and the current AppStream release entry; the Desktop Entry `Version=1.0` field is explicitly excluded because it is the desktop-file specification version;
 - clarified the public README so unreleased repository/retrieval backend work on development `main` is distinguished from capabilities actually exposed by the current v0.2.2 application;
 - aligned the primary release badge alternative text with the explicit project version so assistive technologies receive the same release information as the visual badge;
 - added a machine-checked README design/capability contract that verifies release-version consistency, suite visual identity, application/provider/model boundaries and essential documentation routes before every Flatpak build;
