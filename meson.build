@@ -14,6 +14,7 @@ json_glib_dep = dependency('json-glib-1.0')
 glib_dep = dependency('glib-2.0')
 sqlite_dep = dependency('sqlite3')
 archive_dep = dependency('libarchive')
+yaml_dep = dependency('yaml-0.1')
 gnome = import('gnome')
 
 resources = gnome.compile_resources(
@@ -45,7 +46,8 @@ repository_platform_probe = executable(
   dependencies: [
     glib_dep,
     sqlite_dep,
-    archive_dep
+    archive_dep,
+    yaml_dep
   ],
   install: false
 )
