@@ -47,7 +47,7 @@
     "AI model files are separate artifacts and must currently be downloaded/managed outside AtM.",
     "AtM discovers models through the provider; it does not scan arbitrary disks for GGUF files.",
     "AtM does not currently download, import, move, update or delete AI models.",
-    "Repository-aware retrieval and scientific provenance are not implemented in v0.2.2.",
+    "Repository/retrieval backend work on development main remains unreleased and is not exposed through the public v0.2.2 GTK repository-selection, grounded-chat or citation flow.",
     "Scientific repositories remain authoritative for their code, data, assumptions, provenance and validation.",
     "AtM must not present AI-generated text as a canonical scientific-model result without repository-grounded provenance or actual model execution."
   ],
@@ -71,5 +71,10 @@
   "release_boundary": {
     "documentation_contract_change_is_unreleased": true,
     "version_bump_required": false
+  },
+  "release_vs_development_boundary": {
+    "public_release": "v0.2.2 remains local-chat only from an end-user perspective.",
+    "development_main": "Unreleased repository/retrieval backend work may exist on main without changing the current public release capability boundary.",
+    "readme_rule": "README statements about repository retrieval must distinguish released user-facing behavior from development-main backend implementation."
   }
 }
