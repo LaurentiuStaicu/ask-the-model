@@ -45,6 +45,7 @@ executable(
     'src/retrieval_router.c',
     'src/grounding_context.c',
     'src/citation_labels.c',
+    'src/conversation_grounding.c',
     'src/retrieval_normalize.c',
     'src/repository_sources.c',
     'src/markdown_sections.c',
@@ -449,6 +450,37 @@ citation_labels_test = executable(
 test(
   'citation-labels',
   citation_labels_test
+)
+
+conversation_grounding_test = executable(
+  'conversation-grounding-test',
+  [
+    'src/cff_version.c',
+    'src/repository_sources.c',
+    'src/markdown_sections.c',
+    'src/csv_table.c',
+    'src/structured_json.c',
+    'src/retrieval_index.c',
+    'src/retrieval_index_lifecycle.c',
+    'src/retrieval_scope.c',
+    'src/conversation_grounding.c',
+    'tests/conversation_grounding_test.c',
+    resources
+  ],
+  include_directories: include_directories('src'),
+  dependencies: [
+    glib_dep,
+    gio_dep,
+    json_glib_dep,
+    sqlite_dep,
+    yaml_dep
+  ],
+  install: false
+)
+
+test(
+  'conversation-grounding',
+  conversation_grounding_test
 )
 
 repository_sources_test = executable(
