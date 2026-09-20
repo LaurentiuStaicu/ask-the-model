@@ -117,15 +117,17 @@ new_snapshot (void)
         "STATUS.md",
         "# Scientific status\n"
         "Stare curentă verificată. Current baseline.\n"
+        "## Current validation boundary\n"
+        "Canonical validation boundary.\n"
     );
 
     write_text (
         root,
         "data/noise.csv",
         "id,text\n"
-        "1,ce este pentru și în de care\n"
-        "2,ce este pentru și în de care\n"
-        "3,ce este pentru și în de care\n"
+        "1,ce este pentru și în de care validation validation boundary\n"
+        "2,ce este pentru și în de care validation boundary\n"
+        "3,ce este pentru și în de care validation boundary\n"
     );
 
     write_text (
@@ -539,6 +541,50 @@ test_fts_common_function_words_do_not_swamp_technical_terms (void)
 }
 
 static void
+test_fts_title_match_outweighs_body_only_noise (void)
+{
+    char *snapshot_root = new_snapshot ();
+    char *cache_root = new_temp_root (
+        "atm-fts-retrieval-cache-XXXXXX"
+    );
+    char *index_path = build_index (
+        snapshot_root,
+        cache_root
+    );
+    GPtrArray *results = NULL;
+    GError *error = NULL;
+
+    g_assert_true (
+        atm_retrieval_search_fts (
+            index_path,
+            "current validation boundary",
+            10,
+            &results,
+            &error
+        )
+    );
+    g_assert_no_error (error);
+    g_assert_cmpuint (results->len, >, 0);
+    g_assert_cmpstr (
+        result_at (results, 0)->source_path,
+        ==,
+        "STATUS.md"
+    );
+    g_assert_cmpstr (
+        result_at (results, 0)->title,
+        ==,
+        "Current validation boundary"
+    );
+
+    g_ptr_array_unref (results);
+    g_free (index_path);
+    remove_tree_best_effort (snapshot_root);
+    g_free (snapshot_root);
+    remove_tree_best_effort (cache_root);
+    g_free (cache_root);
+}
+
+static void
 test_fts_dataset_row_provenance (void)
 {
     char *snapshot_root = new_snapshot ();
@@ -933,6 +979,10 @@ main (int argc, char **argv)
     g_test_add_func (
         "/retrieval-query/fts-stopwords",
         test_fts_common_function_words_do_not_swamp_technical_terms
+    );
+    g_test_add_func (
+        "/retrieval-query/fts-title-weight",
+        test_fts_title_match_outweighs_body_only_noise
     );
     g_test_add_func (
         "/retrieval-query/fts-dataset-row",
