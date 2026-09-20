@@ -32,10 +32,12 @@ parse_atx_heading (
     char **out_title
 )
 {
+    const char *cursor = line;
+    const char *content_start;
+    const char *content_end;
+    guint indent = 0;
     guint level = 0;
-    const char *cursor;
     char *title;
-    gsize length;
 
     *out_level = 0;
     *out_title = NULL;
@@ -44,10 +46,13 @@ parse_atx_heading (
         return FALSE;
     }
 
-    cursor = line;
-
-    for (guint indent = 0; indent < 3 && *cursor == ' '; indent++) {
+    while (*cursor == ' ' && indent < 3) {
         cursor++;
+        indent++;
+    }
+
+    if (*cursor == ' ') {
+        return FALSE;
     }
 
     while (*cursor == '#' && level < 6) {
@@ -55,7 +60,13 @@ parse_atx_heading (
         cursor++;
     }
 
-    if (level == 0 || (*cursor != ' ' && *cursor != '\t')) {
+    if (level == 0 || *cursor == '#') {
+        return FALSE;
+    }
+
+    if (*cursor != '\0' &&
+        *cursor != ' ' &&
+        *cursor != '\t') {
         return FALSE;
     }
 
@@ -63,29 +74,41 @@ parse_atx_heading (
         cursor++;
     }
 
-    title = g_strdup (cursor);
-    g_strstrip (title);
-    length = strlen (title);
+    content_start = cursor;
+    content_end = line + strlen (line);
 
-    if (length > 0 && title[length - 1] == '#') {
-        gsize hash_start = length;
+    while (content_end > content_start &&
+           (content_end[-1] == ' ' ||
+            content_end[-1] == '\t')) {
+        content_end--;
+    }
 
-        while (hash_start > 0 && title[hash_start - 1] == '#') {
+    if (content_end > content_start &&
+        content_end[-1] == '#') {
+        const char *hash_start = content_end;
+
+        while (hash_start > content_start &&
+               hash_start[-1] == '#') {
             hash_start--;
         }
 
-        if (hash_start > 0 &&
-            g_ascii_isspace (title[hash_start - 1])) {
-            title[hash_start] = '\0';
-            g_strchomp (title);
-            length = strlen (title);
+        if (hash_start > content_start &&
+            (hash_start[-1] == ' ' ||
+             hash_start[-1] == '\t')) {
+            content_end = hash_start - 1;
+
+            while (content_end > content_start &&
+                   (content_end[-1] == ' ' ||
+                    content_end[-1] == '\t')) {
+                content_end--;
+            }
         }
     }
 
-    if (title[0] == '\0') {
-        g_free (title);
-        return FALSE;
-    }
+    title = g_strndup (
+        content_start,
+        content_end - content_start
+    );
 
     *out_level = level;
     *out_title = title;
@@ -101,11 +124,18 @@ line_opens_or_closes_fence (
 )
 {
     const char *cursor = line;
+    const char *after_marker;
     char marker;
+    guint indent = 0;
     guint length = 0;
 
-    while (*cursor == ' ' && cursor - line < 3) {
+    while (*cursor == ' ' && indent < 3) {
         cursor++;
+        indent++;
+    }
+
+    if (*cursor == ' ') {
+        return FALSE;
     }
 
     marker = *cursor;
@@ -123,29 +153,37 @@ line_opens_or_closes_fence (
         return FALSE;
     }
 
+    after_marker = cursor;
+
     if (!*in_fence) {
+        if (marker == '`' &&
+            strchr (after_marker, '`') != NULL) {
+            return FALSE;
+        }
+
         *in_fence = TRUE;
         *fence_char = marker;
         *fence_length = length;
         return TRUE;
     }
 
-    if (marker == *fence_char && length >= *fence_length) {
-        const char *remainder = cursor;
-
-        while (*remainder == ' ' || *remainder == '\t') {
-            remainder++;
-        }
-
-        if (*remainder == '\0') {
-            *in_fence = FALSE;
-            *fence_char = '\0';
-            *fence_length = 0;
-            return TRUE;
-        }
+    if (marker != *fence_char ||
+        length < *fence_length) {
+        return FALSE;
     }
 
-    return FALSE;
+    while (*cursor == ' ' || *cursor == '\t') {
+        cursor++;
+    }
+
+    if (*cursor != '\0') {
+        return FALSE;
+    }
+
+    *in_fence = FALSE;
+    *fence_char = '\0';
+    *fence_length = 0;
+    return TRUE;
 }
 
 static char *
