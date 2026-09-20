@@ -41,6 +41,7 @@ executable(
     'src/repository_manifest.c',
     'src/repository_storage.c',
     'src/repository_ingest.c',
+    'src/repository_ui_bridge.c',
     'src/retrieval_index.c',
     'src/retrieval_index_lifecycle.c',
     'src/retrieval_query.c',
