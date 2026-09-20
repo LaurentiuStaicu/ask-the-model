@@ -275,6 +275,24 @@ test_zero_repository_scope_can_freeze (void)
     g_assert_null (evidence_text);
     g_assert_null (post_evidence_reminder);
 
+    AtmCitationResolution *resolution = NULL;
+
+    g_assert_false (
+        atm_conversation_grounding_resolve_turn_citations (
+            state,
+            "Unsupported label [S1].",
+            &resolution,
+            &error
+        )
+    );
+    g_assert_error (
+        error,
+        ATM_CONVERSATION_GROUNDING_ERROR,
+        ATM_CONVERSATION_GROUNDING_ERROR_VALIDATION
+    );
+    g_assert_null (resolution);
+    g_clear_error (&error);
+
     g_ptr_array_unref (scopes);
     atm_conversation_grounding_state_free (state);
 }
