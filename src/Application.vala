@@ -18,8 +18,8 @@ namespace AskTheModel {
         private Gtk.Label? repository_scan_status;
         private RepositorySelection repository_selection =
             new RepositorySelection ();
-        private RepositoryClient repository_client =
-            new RepositoryClient ();
+        private RepositoryLifecycleService repository_lifecycle =
+            new RepositoryLifecycleService ();
         private uint model_status_generation = 0;
         private uint repository_status_generation = 0;
         private bool assistant_stream_started = false;
@@ -57,6 +57,15 @@ namespace AskTheModel {
             apply_system_style ();
 
             ollama_provider = new OllamaProvider ();
+
+            repository_lifecycle.progress.connect ((message) => {
+                repository_status_generation++;
+                if (repository_scan_status != null) {
+                    repository_scan_status.label = message;
+                    repository_scan_status.visible = true;
+                }
+            });
+
             ollama_provider.discovery_progress.connect ((percent) => {
                 if (model_scan_status != null) {
                     model_scan_status.label =
@@ -262,7 +271,16 @@ namespace AskTheModel {
             }
 
             if (repository_action_button != null) {
-                repository_action_button.sensitive = false;
+                RepositoryDescriptor[] selected =
+                    repository_selection.selected_repositories ();
+                repository_action_button.sensitive =
+                    repository_lifecycle.selection_needs_action (
+                        selected
+                    );
+                repository_action_button.tooltip_text =
+                    repository_lifecycle.action_tooltip (
+                        selected
+                    );
             }
         }
 
@@ -319,60 +337,78 @@ namespace AskTheModel {
                 refresh_repositories_button.sensitive = false;
             }
 
+            if (repository_action_button != null) {
+                repository_action_button.sensitive = false;
+            }
+
             if (repository_menu_button != null) {
                 repository_menu_button.sensitive = false;
             }
 
-            uint changed_versions = 0;
+            uint updates = 0;
+            uint downloads = 0;
             string? single_report = null;
 
             try {
                 foreach (RepositoryDescriptor descriptor in selected) {
-                    string sha = yield repository_client.resolve_branch_sha (
-                        descriptor
-                    );
-                    string version =
-                        yield repository_client.resolve_remote_version (
-                            descriptor,
-                            sha
+                    RepositoryRuntimeInfo info =
+                        yield repository_lifecycle.refresh (
+                            descriptor
                         );
 
-                    if (version != descriptor.supported_version) {
-                        changed_versions++;
+                    if (info.download_required ()) {
+                        downloads++;
+                    } else if (info.update_available ()) {
+                        updates++;
                     }
 
                     if (selected.length == 1) {
-                        single_report =
-                            version != descriptor.supported_version
-                                ? "%s v%s available".printf (
-                                    descriptor.acronym,
-                                    version
-                                )
-                                : "%s v%s current".printf (
+                        string version =
+                            info.remote_version ??
+                            descriptor.supported_version;
+
+                        if (info.download_required ()) {
+                            single_report =
+                                "%s v%s available".printf (
                                     descriptor.acronym,
                                     version
                                 );
+                        } else if (info.update_available ()) {
+                            single_report =
+                                "%s v%s update available".printf (
+                                    descriptor.acronym,
+                                    version
+                                );
+                        } else {
+                            single_report =
+                                "%s v%s current".printf (
+                                    descriptor.acronym,
+                                    info.local.version ?? version
+                                );
+                        }
                     }
 
                     stdout.printf (
                         "AtM: repository %s remote version=%s sha=%s\n",
                         descriptor.acronym,
-                        version,
-                        sha
+                        info.remote_version ?? "unknown",
+                        info.remote_sha ?? "unknown"
                     );
                 }
+
+                uint actions = updates + downloads;
 
                 if (selected.length == 1 && single_report != null) {
                     show_repository_scan_result (
                         single_report,
-                        changed_versions > 0
+                        actions > 0
                     );
-                } else if (changed_versions > 0) {
+                } else if (actions > 0) {
                     show_repository_scan_result (
-                        changed_versions == 1
-                            ? "1 repository update available"
-                            : "%u repository updates available".printf (
-                                changed_versions
+                        actions == 1
+                            ? "1 repository action available"
+                            : "%u repository actions available".printf (
+                                actions
                             ),
                         true
                     );
@@ -384,8 +420,21 @@ namespace AskTheModel {
                     );
                 }
             } catch (GLib.Error error) {
+                bool all_local_ready = true;
+
+                foreach (RepositoryDescriptor descriptor in selected) {
+                    if (!repository_lifecycle.info_for (
+                            descriptor.id
+                        ).local.is_ready ()) {
+                        all_local_ready = false;
+                        break;
+                    }
+                }
+
                 show_repository_scan_result (
-                    "Repository check failed",
+                    all_local_ready
+                        ? "Offline — local repositories ready"
+                        : "Repository check failed",
                     true
                 );
 
@@ -402,6 +451,69 @@ namespace AskTheModel {
             if (refresh_repositories_button != null) {
                 refresh_repositories_button.sensitive = true;
             }
+
+            update_repository_selector_label ();
+        }
+
+        private async void download_or_update_selected_repositories () {
+            RepositoryDescriptor[] selected =
+                repository_selection.selected_repositories ();
+
+            if (selected.length == 0) {
+                show_repository_scan_result ("Select repositories");
+                return;
+            }
+
+            repository_status_generation++;
+            if (repository_scan_status != null) {
+                repository_scan_status.label = "Preparing repositories…";
+                repository_scan_status.visible = true;
+            }
+
+            if (repository_menu_button != null) {
+                repository_menu_button.sensitive = false;
+            }
+            if (refresh_repositories_button != null) {
+                refresh_repositories_button.sensitive = false;
+            }
+            if (repository_action_button != null) {
+                repository_action_button.sensitive = false;
+            }
+
+            try {
+                uint changed =
+                    yield repository_lifecycle.download_or_update (
+                        selected
+                    );
+
+                show_repository_scan_result (
+                    changed == 0
+                        ? "Repositories current"
+                        : changed == 1
+                            ? "1 repository ready"
+                            : "%u repositories ready".printf (
+                                changed
+                            )
+                );
+            } catch (GLib.Error error) {
+                show_repository_scan_result (
+                    "Repository update failed",
+                    true
+                );
+                stderr.printf (
+                    "AtM: repository download/update failed: %s\n",
+                    error.message
+                );
+            }
+
+            if (repository_menu_button != null) {
+                repository_menu_button.sensitive = true;
+            }
+            if (refresh_repositories_button != null) {
+                refresh_repositories_button.sensitive = true;
+            }
+
+            update_repository_selector_label ();
         }
 
         private Gtk.CheckButton build_repository_check_button (
@@ -577,10 +689,13 @@ namespace AskTheModel {
 
             repository_action_button =
                 new Gtk.Button.from_icon_name ("document-save-symbolic") {
-                    tooltip_text = "Download or update selected repositories",
+                    tooltip_text = "Download selected repositories",
                     sensitive = false
                 };
             repository_action_button.add_css_class ("circular");
+            repository_action_button.clicked.connect (() => {
+                download_or_update_selected_repositories.begin ();
+            });
 
             repository_scan_status = new Gtk.Label ("") {
                 valign = Gtk.Align.CENTER,
