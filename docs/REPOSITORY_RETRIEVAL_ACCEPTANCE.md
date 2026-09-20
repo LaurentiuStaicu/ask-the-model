@@ -425,6 +425,15 @@ evidence.
 
 The deterministic retrieval pipeline meets the agreed benchmark gates or its shortcomings are explicitly documented before semantic expansion.
 
+**Current implementation status (2026-09-20): PASS.** The frozen 33-topic
+EWD/CBD/RMD benchmark passes all provisional R5 gates on the current
+deterministic backend without changing qrels or thresholds. The verified
+post-diversification run records Success@1 1.00, MRR 1.00, nDCG@5 0.9069,
+required Recall@5 0.9833, wrong-repository contamination@5 0.0207, RO–EN
+nDCG gap 0.0333, evidence traceability 1.00 and clarification-outcome
+accuracy 1.00. This is an engineering acceptance result for the pinned
+retrieval corpus, not a scientific-validity claim for EWD, CBD or RMD.
+
 ## R6 — Optional semantic retrieval
 
 This stage is not required for repository-aware AtM v1.
