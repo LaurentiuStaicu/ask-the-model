@@ -39,6 +39,7 @@ executable(
     'src/RepositoryState.vala',
     'src/RepositoryLifecycleService.vala',
     'src/ConversationGrounding.vala',
+    'src/ConversationSession.vala',
     'src/cff_version.c',
     'src/archive_extract.c',
     'src/repository_manifest.c',
@@ -627,6 +628,47 @@ conversation_grounding_vala_test = executable(
 test(
   'conversation-grounding-vala',
   conversation_grounding_vala_test
+)
+
+conversation_session_test = executable(
+  'conversation-session-test',
+  [
+    'src/ConversationGrounding.vala',
+    'src/ConversationSession.vala',
+    'src/cff_version.c',
+    'src/repository_sources.c',
+    'src/markdown_sections.c',
+    'src/csv_table.c',
+    'src/structured_json.c',
+    'src/retrieval_index.c',
+    'src/retrieval_index_lifecycle.c',
+    'src/retrieval_query.c',
+    'src/retrieval_rank.c',
+    'src/retrieval_scope.c',
+    'src/retrieval_normalize.c',
+    'src/retrieval_router.c',
+    'src/retrieval_conversation.c',
+    'src/grounding_context.c',
+    'src/conversation_grounding.c',
+    'tests/conversation_session_test.vala',
+    resources
+  ],
+  include_directories: include_directories('src'),
+  dependencies: [
+    glib_dep,
+    gio_dep,
+    json_glib_dep,
+    sqlite_dep
+  ],
+  link_args: [
+    '-lyaml'
+  ],
+  install: false
+)
+
+test(
+  'conversation-session',
+  conversation_session_test
 )
 
 repository_sources_test = executable(
