@@ -325,7 +325,7 @@ flatpak run io.github.laurentiustaicu.ask_the_model
 
 <small>If something does not work, start with <a href="docs/TROUBLESHOOTING.md">Troubleshooting</a>. It covers provider detection, missing models, raw GGUF imports, slow inference, memory use, disk-space problems and Flatpak startup checks.</small>
 
-<small>If the problem remains reproducible, open a <a href="https://github.com/LaurentiuStaicu/ask-the-model/issues">GitHub issue</a> and include the AtM version, Linux distribution/session, provider version, model name and the exact steps needed to reproduce the problem. Do not include private prompts or sensitive local information unless it is necessary and you intentionally want to share it.</small>
+<small>If the problem remains reproducible, open a <a href="https://github.com/LaurentiuStaicu/ask-the-model/issues">GitHub issue</a> and include the AtM version, Linux distribution/session, provider version, model name and the exact steps needed to reproduce the problem. See <a href=".github/SUPPORT.md">Support</a> for the correct issue route and <a href=".github/CONTRIBUTING.md">Contributing</a> before proposing repository changes. Do not include private prompts, sensitive local information or vulnerability details in a public issue.</small>
 
 <small>Ask the Model is maintained in this repository by <a href="https://github.com/LaurentiuStaicu">LaurentiuStaicu</a>. Release history, current boundaries and planned scientific-repository integration are documented in <a href="CHANGELOG.md">CHANGELOG.md</a>, <a href="STATUS.md">STATUS.md</a> and the <a href="releases/">release notes</a>.</small>
 

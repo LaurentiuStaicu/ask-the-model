@@ -2,6 +2,15 @@
 
 All notable public releases of Ask the Model are recorded here.
 
+## Unreleased
+
+### Repository governance
+
+- added contribution and support guidance;
+- added structured application and provider/model compatibility issue forms;
+- added a pull-request checklist that preserves the application/provider/model and scientific-repository boundaries;
+- deferred security-policy and code-of-conduct adoption until private reporting and enforcement routes are explicitly configured.
+
 ## 0.2.2 - 2026-09-20
 
 Documentation and public-metadata consistency correction.
