@@ -167,8 +167,10 @@ namespace AskTheModel {
                 valign = Gtk.Align.CENTER,
                 single_line_mode = true
             };
-            label.accessible_role =
-                Gtk.AccessibleRole.PRESENTATION;
+            label.update_state (
+                Gtk.AccessibleState.HIDDEN,
+                true
+            );
             label.add_css_class ("atm-annunciator");
 
             if (extra_class != null) {
@@ -183,8 +185,10 @@ namespace AskTheModel {
                 valign = Gtk.Align.CENTER,
                 single_line_mode = true
             };
-            separator.accessible_role =
-                Gtk.AccessibleRole.PRESENTATION;
+            separator.update_state (
+                Gtk.AccessibleState.HIDDEN,
+                true
+            );
             separator.add_css_class (
                 "atm-annunciator-separator"
             );
@@ -1334,8 +1338,6 @@ namespace AskTheModel {
                 child = lcd_row,
                 hexpand = true
             };
-            lcd_frame.accessible_role =
-                Gtk.AccessibleRole.GROUP;
             lcd_frame.add_css_class ("atm-status-lcd");
             status_lcd = lcd_frame;
 
