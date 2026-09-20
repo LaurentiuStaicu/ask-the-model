@@ -142,6 +142,24 @@ exercise_repository (const RealRepository *repository)
     g_assert_cmpint (document_sections, >, 0);
     g_assert_cmpint (fts_rows, >, 0);
 
+    if (g_strcmp0 (repository->repository_id, "rmd") == 0) {
+        g_assert_cmpint (
+            query_count (
+                db,
+                "SELECT count(*) FROM structured_entities "
+                "WHERE native_id = "
+                "'government_refinancing_interest_loop' "
+                "AND entity_type = 'feedback_loop' "
+                "AND logical_source_id = "
+                "'rmd:entity:feedback_loop:"
+                "government_refinancing_interest_loop' "
+                "AND locator = 'json:/loops/0';"
+            ),
+            ==,
+            1
+        );
+    }
+
     g_print (
         "PASS: %s version=%s sha=%s "
         "sources=%d roles=%d sections=%d entities=%d "

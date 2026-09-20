@@ -195,6 +195,21 @@ infer_entity_type (
     const char *context
 )
 {
+    if (g_strcmp0 (context, "loops") == 0) {
+        char *basename = g_path_get_basename (source_path);
+        gboolean is_feedback_registry =
+            g_strcmp0 (
+                basename,
+                "feedback_registry.json"
+            ) == 0;
+
+        g_free (basename);
+
+        if (is_feedback_registry) {
+            return g_strdup ("feedback_loop");
+        }
+    }
+
     const char *known = known_context_type (context);
 
     if (known != NULL && context != NULL) {

@@ -217,6 +217,52 @@ test_suite_structural_patterns (void)
 }
 
 static void
+test_feedback_registry_loops_use_feedback_loop_type (void)
+{
+    const char *contents =
+        "{"
+        "\"loops\":[{"
+            "\"id\":\"government_refinancing_interest_loop\","
+            "\"label\":{\"en\":\"Government refinancing loop\"}"
+        "}]"
+        "}";
+    char *path = new_json_file (contents);
+    AtmStructuredJsonRecords *records = NULL;
+    GError *error = NULL;
+
+    g_assert_true (
+        atm_structured_json_extract (
+            path,
+            "model/dynamics/feedback_registry.json",
+            &records,
+            &error
+        )
+    );
+    g_assert_no_error (error);
+    g_assert_cmpuint (records->entities->len, ==, 1);
+
+    AtmStructuredEntity *loop = find_entity (
+        records,
+        "government_refinancing_interest_loop"
+    );
+
+    g_assert_nonnull (loop);
+    g_assert_cmpstr (
+        loop->entity_type,
+        ==,
+        "feedback_loop"
+    );
+    g_assert_cmpstr (
+        loop->locator,
+        ==,
+        "json:/loops/0"
+    );
+
+    atm_structured_json_records_free (records);
+    remove_json_file (path);
+}
+
+static void
 test_root_array_infers_type_from_source_path (void)
 {
     const char *contents =
@@ -329,6 +375,10 @@ main (int argc, char **argv)
     g_test_add_func (
         "/structured-json/suite-patterns",
         test_suite_structural_patterns
+    );
+    g_test_add_func (
+        "/structured-json/feedback-registry-loop-type",
+        test_feedback_registry_loops_use_feedback_loop_type
     );
     g_test_add_func (
         "/structured-json/root-array-type",
