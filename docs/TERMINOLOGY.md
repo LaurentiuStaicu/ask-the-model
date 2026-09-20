@@ -20,7 +20,7 @@ Do not use the bare word **model** in AtM interface copy or project documentatio
 
 Use:
 
-- **Repository** when referring to EWD, CBD, RMD or another scientific dynamical-model project selected for discussion.
+- **Repository** when referring to EWD, CBD or RMD in the v1 repository-aware scope.
 - **AI model** when referring to the local LLM that generates conversational responses.
 - The full scientific term **dynamical model** only when discussing the scientific nature of a repository rather than naming the UI control.
 
@@ -53,6 +53,6 @@ For the minimalist header:
 - Repository selector: **Repositories** / **Repository-uri**
 - AI selector: **AI model** / **Model AI**
 
-The repository selector may contain one or more selections. Its closed state should summarize values rather than repeat the label when space is limited, e.g. `EWD + RMD` or `3 repositories`.
+The repository selector may contain zero to three selections. With no selection, the closed state is `Repositories`. After selection, it shows only active acronyms, e.g. `EWD`, `EWD + RMD` or `EWD + CBD + RMD`; generic counts such as `3 repositories` are not used in the approved v1 selector.
 
-The AI-model selector represents one active local AI model for the current request.
+The AI-model selector represents one active local AI model. The preferred v1 repository-aware conversation contract pins that AI model after the first user message until a New Chat transition.
