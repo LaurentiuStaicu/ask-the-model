@@ -70,8 +70,9 @@ window.atm-window frame.atm-status-lcd {
     min-height: 22px;
     padding: 0;
     background-color: rgba(43, 35, 20, 0.82);
-    border: 2px ridge #A4A5A1;
-    border-radius: 8px;
+    border: none;
+    border-bottom: 2px ridge #A4A5A1;
+    border-radius: 0;
     box-shadow: none;
     background-clip: padding-box;
 }
@@ -158,7 +159,7 @@ window.atm-window.atm-dark textview text {
 
 window.atm-window.atm-dark frame.atm-status-lcd {
     background-color: rgba(24, 20, 13, 0.84);
-    border-color: #6F706C;
+    border-bottom-color: #6F706C;
     box-shadow: none;
 }
 
