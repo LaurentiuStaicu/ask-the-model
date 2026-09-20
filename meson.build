@@ -38,6 +38,7 @@ executable(
     'src/repository_ingest.c',
     'src/retrieval_index.c',
     'src/repository_sources.c',
+    'src/csv_table.c',
     resources
   ],
   dependencies: [
@@ -255,6 +256,24 @@ repository_sources_test = executable(
 test(
   'repository-sources',
   repository_sources_test
+)
+
+csv_table_test = executable(
+  'csv-table-test',
+  [
+    'src/csv_table.c',
+    'tests/csv_table_test.c'
+  ],
+  include_directories: include_directories('src'),
+  dependencies: [
+    glib_dep
+  ],
+  install: false
+)
+
+test(
+  'csv-table',
+  csv_table_test
 )
 
 subdir('data')
