@@ -195,6 +195,11 @@ namespace AskTheModel {
             return base_url != null && model_name != null;
         }
 
+        public void reset_conversation () {
+            roles = {};
+            contents = {};
+        }
+
         private async void ensure_ready () throws GLib.Error {
             if (is_ready ()) {
                 return;
