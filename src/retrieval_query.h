@@ -7,6 +7,7 @@
 G_BEGIN_DECLS
 
 #define ATM_RETRIEVAL_MAX_EXACT_RESULTS 100
+#define ATM_RETRIEVAL_MAX_TABULAR_RESULTS 100
 #define ATM_RETRIEVAL_MAX_IDENTIFIER_BYTES 1024
 
 typedef enum {
@@ -35,6 +36,15 @@ GQuark atm_retrieval_query_error_quark (void);
 gboolean atm_retrieval_lookup_exact (
     const char *index_path,
     const char *identifier,
+    guint max_results,
+    GPtrArray **out_results,
+    GError **error
+);
+
+gboolean atm_retrieval_lookup_dataset_rows (
+    const char *index_path,
+    const char *dataset_identifier,
+    const char *row_key,
     guint max_results,
     GPtrArray **out_results,
     GError **error
