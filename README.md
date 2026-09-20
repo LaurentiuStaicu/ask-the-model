@@ -5,7 +5,7 @@
 <h2 align="center">Ask the Model (AtM)</h2>
 
 <p align="center">
-  <a href="https://github.com/LaurentiuStaicu/ask-the-model/releases/latest"><img alt="Version: 0.2.2" src="https://img.shields.io/github/v/tag/LaurentiuStaicu/ask-the-model?sort=semver&style=flat-square&label=release&color=333333"></a>
+  <a href="https://github.com/LaurentiuStaicu/ask-the-model/releases/latest"><img alt="Version: 0.3.0" src="https://img.shields.io/github/v/tag/LaurentiuStaicu/ask-the-model?sort=semver&style=flat-square&label=release&color=333333"></a>
   <a href="LICENSE"><img alt="MIT License" src="https://img.shields.io/badge/license-MIT-707070?style=flat-square"></a>
   <a href="#supported-platform-and-compatibility"><img alt="Linux / Flatpak" src="https://img.shields.io/badge/platform-Linux%20%2F%20Flatpak-a0a0a0?style=flat-square"></a>
 </p>
@@ -16,7 +16,7 @@
   <a href="docs/MODEL_GUIDE.md"><img alt="Model guide" src="https://img.shields.io/badge/read-Model%20guide-a0a0a0?style=flat-square"></a>
 </p>
 
-<p align="center"><small><strong>A local-first desktop interface for chatting with locally managed AI models and, progressively, for querying and exploring repositories of scientific dynamical models.</strong></small></p>
+<p align="center"><small><strong>A local-first desktop interface for chatting with locally managed AI models and querying the EWD, CBD and RMD scientific dynamical-model repositories with exact source provenance.</strong></small></p>
 
 <p align="center"><small><a href="#start-here-first-time-setup">First-time setup</a> · <a href="#finding-and-choosing-an-ai-model">Choosing a model</a> · <a href="#managing-models-disk-space-and-memory">Managing models</a> · <a href="docs/TROUBLESHOOTING.md">Troubleshooting</a> · <a href="STATUS.md">Project status</a></small></p>
 
@@ -30,9 +30,9 @@
 
 <small><strong>Ask the Model</strong> provides the chat interface. A <strong>local provider</strong>, such as Ollama, loads and runs AI models and exposes a local API. The <strong>AI model</strong> is a separate set of files, often several gigabytes in size, that must currently be downloaded and managed outside AtM.</small>
 
-<small>This distinction matters in the current release: AtM can automatically discover compatible models that your provider already knows about, but AtM v0.2.2 does <strong>not</strong> download, import, move or delete AI models for you.</small>
+<small>This distinction matters in the current release: AtM can automatically discover compatible models that your provider already knows about, but AtM v0.3.0 does <strong>not</strong> download, import, move or delete AI models for you.</small>
 
-<small>The longer-term purpose of AtM is broader than ordinary local chat. It is intended to become a natural-language access layer for scientific dynamical-model repositories such as Empirical World3 Dynamics (EWD), Cognitive Belief Dynamics (CBD) and Romanian Monetary Dynamics (RMD), without replacing those repositories as the authoritative source for their code, data, assumptions, provenance or validation.</small>
+<small>AtM v0.3.0 also provides a natural-language access layer for the fixed Empirical World3 Dynamics (EWD), Cognitive Belief Dynamics (CBD) and Romanian Monetary Dynamics (RMD) repository suite. It can download and validate immutable local repository snapshots, retrieve evidence deterministically, ground a conversation to the selected repository scope and expose exact citation provenance. The scientific repositories remain authoritative for their own code, data, assumptions, provenance, validation and releases.</small>
 
 ### Before you begin
 
@@ -166,7 +166,7 @@ flatpak run io.github.laurentiustaicu.ask_the_model
 | [Phi-4 Mini 3.8B Q4_K_M](https://ollama.com/library/phi4-mini/tags) | 2.5 GB | `ollama pull phi4-mini:3.8b-q4_K_M` | Alternative compact model family for comparison. |
 | [Qwen 3.5 4B Q4_K_M](https://ollama.com/library/qwen3.5/tags) | 3.4 GB | `ollama pull qwen3.5:4b-q4_K_M` | Larger small-model option when the machine has more memory available. |
 
-<small><strong>Model capability does not automatically become AtM capability.</strong> A model may advertise vision, tool use or reasoning features, but AtM v0.2.2 currently provides text chat only and requests <code>think: false</code> on its default chat path. For more detail on GGUF, quantization, importing models, hardware considerations and model licensing, see <a href="docs/MODEL_GUIDE.md">Choosing, installing and managing AI models</a>.</small>
+<small><strong>Model capability does not automatically become AtM capability.</strong> A model may advertise vision, tool use or reasoning features, but AtM v0.3.0 currently provides text chat only and requests <code>think: false</code> on its default chat path. For more detail on GGUF, quantization, importing models, hardware considerations and model licensing, see <a href="docs/MODEL_GUIDE.md">Choosing, installing and managing AI models</a>.</small>
 
 ### Managing models, disk space and memory
 
@@ -216,7 +216,7 @@ ollama pull SMALLER_MODEL
 
 ### Privacy and the local-provider boundary
 
-<small>AtM v0.2.2 connects only to loopback provider addresses on the same machine and sends prompt content when you activate <strong>Send</strong>. Conversation history is held in AtM memory for the current application process and is not persisted by AtM across restarts.</small>
+<small>AtM v0.3.0 connects only to loopback provider addresses on the same machine and sends prompt content when you activate <strong>Send</strong>. Conversation history is held in AtM memory for the current application process and is not persisted by AtM across restarts.</small>
 
 <small>A loopback connection does not by itself prove that every model is local. The external provider decides how a selected model is executed. Modern Ollama versions can also expose cloud features. If strict local-only operation is required, choose a locally installed model and configure the provider accordingly; Ollama documents a local-only mode using <code>OLLAMA_NO_CLOUD=1</code> or <code>disable_ollama_cloud</code> in its server configuration.</small>
 
@@ -236,36 +236,49 @@ ollama pull SMALLER_MODEL
 ### What AtM does today
 
 - <small>discovers a supported local Ollama-compatible provider;</small>
-- <small>automatically enumerates provider-managed models;</small>
-- <small>filters the list to models advertising the <code>completion</code> capability;</small>
-- <small>lets you switch among compatible detected models;</small>
-- <small>refreshes model discovery without restarting the application;</small>
-- <small>streams assistant responses as they are generated;</small>
-- <small>keeps multi-turn conversation context in memory for the current session;</small>
+- <small>automatically enumerates provider-managed models and filters to models advertising the <code>completion</code> capability;</small>
+- <small>lets you switch among compatible detected AI models before a conversation is pinned;</small>
+- <small>refreshes local AI-model discovery without restarting the application;</small>
+- <small>supports ordinary zero-repository local chat with streamed assistant responses;</small>
+- <small>provides independent in-memory chat tabs with automatic short titles and per-tab close controls;</small>
+- <small>lets you select zero, one or more repositories from the fixed EWD/CBD/RMD catalog;</small>
+- <small>checks, downloads and updates validated immutable local repository snapshots;</small>
+- <small>uses deterministic structured, lexical and tabular retrieval without requiring embeddings;</small>
+- <small>pins the selected repository snapshots and AI-model identity at the first Send in each chat;</small>
+- <small>generates repository-grounded answers from current-turn evidence when repository context is selected;</small>
+- <small>shows compact numbered source references whose popovers expose exact repository/version/SHA/source provenance and immutable source links;</small>
 - <small>follows the desktop light/dark appearance;</small>
 - <small>runs as a GTK 4 / Granite application packaged for the elementary OS 8 Flatpak runtime.</small>
 
-### What the current public release does not yet expose
+### Using EWD, CBD and RMD repository context
 
-<small>The public v0.2.2 application does not yet expose the repository-aware development work on `main`. In the released application, users cannot yet:</small>
+<small>Repository context is optional. Leave <strong>Repositories</strong> empty for ordinary local AI chat, or select one or more of EWD, CBD and RMD when you want the answer grounded in those repository snapshots.</small>
+
+1. <small>Choose the repository or repositories from <strong>Repositories</strong>.</small>
+2. <small>If a selected repository is not available locally, use <strong>Download</strong>. Use repository <strong>Refresh</strong> to check whether a newer tracked snapshot exists; <strong>Update</strong> appears only when an update is available.</small>
+3. <small>Select the local AI model you want to use.</small>
+4. <small>Send the first question. At that point AtM freezes the selected repository snapshots and AI-model identity for that chat so later turns do not silently change scientific context.</small>
+5. <small>Use the <code>+</code> mini-tab for a new conversation when you need a different repository scope or AI model.</small>
+6. <small>For grounded answers, open <code>Sources: [1] [2]…</code> references to inspect the exact snapshot, source locator, excerpt and immutable repository permalink.</small>
+
+<small>Repository evidence is context for the AI response; it is not the same thing as executing the scientific model. AtM does not turn generated interpretation into a canonical EWD, CBD or RMD result.</small>
+
+### What v0.3.0 still does not do
 
 - <small>download, import, update or delete AI models through AtM;</small>
-- <small>install, start, stop or update the external provider through AtM;</small>
+- <small>install, start, stop or update the external AI provider through AtM;</small>
 - <small>configure provider host/port, authentication or TLS in the UI;</small>
-- <small>persist conversations across restarts;</small>
-- <small>select, ingest or retrieve scientific repositories through the released GTK conversation flow;</small>
-- <small>receive repository-grounded citations or provenance in the released chat UI;</small>
+- <small>persist conversations across application restarts;</small>
+- <small>support arbitrary repositories outside the fixed EWD/CBD/RMD catalog;</small>
 - <small>execute or simulate EWD, CBD or RMD;</small>
-- <small>turn ordinary AI chat output into an authoritative scientific-model result.</small>
-
-<small>These are release boundaries, not claims that no development implementation exists. See <a href="STATUS.md">Application status</a> for the separate development-`main` state.</small>
+- <small>treat an AI-generated answer as an authoritative scientific-model result.</small>
 
 <details>
-<summary><strong>Scientific-model roadmap and boundary</strong></summary>
+<summary><strong>Scientific-model boundary</strong></summary>
 
-<small>AtM is intended to work with scientific dynamical-model repositories without replacing them. The planned initial suite includes EWD, CBD and RMD. Each source repository remains canonical for its documentation, code, data, assumptions, provenance, validation and release boundaries.</small>
+<small>The supported v0.3.0 repository suite is Empirical World3 Dynamics (EWD), Cognitive Belief Dynamics (CBD) and Romanian Monetary Dynamics (RMD). Each source repository remains canonical for its documentation, code, data, assumptions, provenance, validation and release boundaries.</small>
 
-<small>Development `main` now contains an unreleased repository-aware GTK path for the fixed EWD/CBD/RMD suite: repository lifecycle controls, per-chat frozen repository/model context, deterministic retrieval, grounded generation, multi-chat navigation and on-demand citation provenance. This development functionality is not part of the public v0.2.2 release. Repository evidence, actual scientific-model outputs and AI-generated interpretation remain distinct concepts, and ordinary local chat in v0.2.2 must not be interpreted as repository-grounded scientific analysis.</small>
+<small>AtM can retrieve and cite repository evidence, but generated explanations remain AI-generated interpretation unless the cited repository itself establishes the claim. AtM v0.3.0 does not execute the scientific models or autonomously modify their repositories.</small>
 
 </details>
 
