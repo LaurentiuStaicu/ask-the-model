@@ -186,11 +186,11 @@ namespace AskTheModel {
                 );
                 builder.set_member_name ("sha");
                 builder.add_string_value (
-                    record.current_sha
+                    record.current_sha ?? ""
                 );
                 builder.set_member_name ("version");
                 builder.add_string_value (
-                    record.version
+                    record.version ?? ""
                 );
                 builder.end_object ();
             }
@@ -220,10 +220,7 @@ namespace AskTheModel {
                     );
                 }
             } catch (GLib.Error error) {
-                try {
-                    GLib.FileUtils.remove (temporary_path);
-                } catch (GLib.Error remove_error) {
-                }
+                GLib.FileUtils.remove (temporary_path);
 
                 throw new RepositoryError.STORAGE (
                     "Repository state could not be written: %s".printf (
