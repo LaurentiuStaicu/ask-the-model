@@ -337,32 +337,6 @@ ids_contain (
     return FALSE;
 }
 
-static const AtmRetrievalRepositoryScope *
-find_frozen_scope (
-    const AtmRetrievalConversationState *state,
-    const char *repository_id
-)
-{
-    for (guint i = 0;
-         i < state->frozen_repositories->len;
-         i++) {
-        const AtmRetrievalRepositoryScope *scope =
-            g_ptr_array_index (
-                state->frozen_repositories,
-                i
-            );
-
-        if (g_strcmp0 (
-                scope->repository_id,
-                repository_id
-            ) == 0) {
-            return scope;
-        }
-    }
-
-    return NULL;
-}
-
 static void
 add_scope_unique (
     GPtrArray *scopes,
