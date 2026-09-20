@@ -385,7 +385,13 @@ Downloaded archives are treated as untrusted input.
 
 AtM accepts only intended regular files and directories.
 
-The extractor rejects or safely handles at least:
+When libarchive is used, extraction must enable the available secure-write protections corresponding to at least:
+
+- `ARCHIVE_EXTRACT_SECURE_NOABSOLUTEPATHS`;
+- `ARCHIVE_EXTRACT_SECURE_NODOTDOT`;
+- `ARCHIVE_EXTRACT_SECURE_SYMLINKS`.
+
+The extractor also rejects or safely handles at least:
 
 - absolute paths;
 - path traversal using `..`;
@@ -394,6 +400,17 @@ The extractor rejects or safely handles at least:
 - block/character devices;
 - FIFOs;
 - sockets.
+
+Extraction is resource-bounded. Application-controlled limits cover at least:
+
+- downloaded archive bytes;
+- number of archive entries;
+- maximum individual extracted-file size;
+- maximum total uncompressed bytes written to staging.
+
+Nested archives may be stored as ordinary repository files when otherwise allowed, but AtM does not recursively unpack them during repository ingestion.
+
+Limit values are implementation constants validated against the known EWD/CBD/RMD repositories and may be raised deliberately when those repositories legitimately grow; archive metadata alone is not trusted to bypass the limits.
 
 Repository files are never executed as part of ingestion or retrieval.
 
@@ -549,7 +566,8 @@ The v1 design uses:
 
 - a fixed repository-origin allowlist;
 - provenance metadata;
-- snapshot and document hashes where appropriate;
+- SHA-256 content hashes for indexed source files and other snapshot/document hashes where appropriate;
+- verification that indexed source metadata still corresponds to the pinned immutable snapshot before evidence is exposed;
 - retrieval limits;
 - excluded operational paths by default;
 - source delimiters;
