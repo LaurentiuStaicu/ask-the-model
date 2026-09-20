@@ -300,6 +300,70 @@ namespace AskTheModel {
             return worker_result;
         }
 
+        public async ConversationGrounding
+        prepare_conversation_grounding (
+            RepositoryDescriptor[] selected,
+            GLib.Cancellable? cancellable = null
+        ) throws GLib.Error {
+            var grounding = new ConversationGrounding ();
+
+            foreach (RepositoryDescriptor descriptor in selected) {
+                RepositoryRuntimeInfo info =
+                    info_for (descriptor.id);
+
+                if (info.download_required () ||
+                    info.local.current_sha == null ||
+                    info.local.version == null) {
+                    throw new RepositoryError.NOT_READY (
+                        "Repository %s is not ready for this conversation.".printf (
+                            descriptor.acronym
+                        )
+                    );
+                }
+
+                string sha = info.local.current_sha ?? "";
+                string local_version =
+                    info.local.version ?? "";
+
+                RepositoryInstallResult result =
+                    yield prepare_snapshot (
+                        descriptor,
+                        sha,
+                        null
+                    );
+
+                if (result.version != local_version) {
+                    throw new RepositoryError.INVALID_RESPONSE (
+                        "Repository %s local state version does not match the validated snapshot.".printf (
+                            descriptor.acronym
+                        )
+                    );
+                }
+
+                if (!grounding.add_ready_repository (
+                        descriptor.id,
+                        result.version,
+                        sha,
+                        result.snapshot_path,
+                        result.index_path
+                    )) {
+                    throw new RepositoryError.INVALID_RESPONSE (
+                        "Repository %s could not be pinned for the conversation.".printf (
+                            descriptor.acronym
+                        )
+                    );
+                }
+            }
+
+            if (!grounding.freeze ()) {
+                throw new RepositoryError.INVALID_RESPONSE (
+                    "Conversation repository scope could not be frozen."
+                );
+            }
+
+            return grounding;
+        }
+
         public async uint download_or_update (
             RepositoryDescriptor[] selected,
             GLib.Cancellable? cancellable = null
