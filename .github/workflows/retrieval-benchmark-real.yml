@@ -1,0 +1,266 @@
+name: Frozen R5 retrieval benchmark
+
+on:
+  workflow_dispatch:
+  pull_request:
+    paths:
+      - 'benchmarks/retrieval-v1/**'
+      - 'scripts/evaluate_retrieval_benchmark.py'
+      - 'src/cff_version.c'
+      - 'src/cff_version.h'
+      - 'src/repository_sources.c'
+      - 'src/repository_sources.h'
+      - 'src/markdown_sections.c'
+      - 'src/markdown_sections.h'
+      - 'src/csv_table.c'
+      - 'src/csv_table.h'
+      - 'src/structured_json.c'
+      - 'src/structured_json.h'
+      - 'src/retrieval_index.c'
+      - 'src/retrieval_index.h'
+      - 'src/retrieval_index_lifecycle.c'
+      - 'src/retrieval_index_lifecycle.h'
+      - 'src/retrieval_query.c'
+      - 'src/retrieval_query.h'
+      - 'src/retrieval_rank.c'
+      - 'src/retrieval_rank.h'
+      - 'src/retrieval_scope.c'
+      - 'src/retrieval_scope.h'
+      - 'src/retrieval_normalize.c'
+      - 'src/retrieval_normalize.h'
+      - 'src/retrieval_router.c'
+      - 'src/retrieval_router.h'
+      - 'src/retrieval_conversation.c'
+      - 'src/retrieval_conversation.h'
+      - 'src/grounding_context.c'
+      - 'src/grounding_context.h'
+      - 'data/schemas/retrieval-index-v1.sql'
+      - 'data/schemas/retrieval-benchmark-v1.schema.json'
+      - 'data/schemas/retrieval-benchmark-run-v1.schema.json'
+      - 'data/io.github.laurentiustaicu.ask_the_model.gresource.xml'
+      - 'tests/retrieval_benchmark_runner.c'
+      - '.github/workflows/retrieval-benchmark-real.yml'
+  push:
+    branches:
+      - main
+    paths:
+      - 'benchmarks/retrieval-v1/**'
+      - 'scripts/evaluate_retrieval_benchmark.py'
+      - 'src/cff_version.c'
+      - 'src/repository_sources.c'
+      - 'src/markdown_sections.c'
+      - 'src/csv_table.c'
+      - 'src/structured_json.c'
+      - 'src/retrieval_index.c'
+      - 'src/retrieval_index_lifecycle.c'
+      - 'src/retrieval_query.c'
+      - 'src/retrieval_rank.c'
+      - 'src/retrieval_scope.c'
+      - 'src/retrieval_normalize.c'
+      - 'src/retrieval_router.c'
+      - 'src/retrieval_conversation.c'
+      - 'src/grounding_context.c'
+      - 'data/schemas/retrieval-index-v1.sql'
+      - 'data/schemas/retrieval-benchmark-v1.schema.json'
+      - 'data/schemas/retrieval-benchmark-run-v1.schema.json'
+      - 'data/io.github.laurentiustaicu.ask_the_model.gresource.xml'
+      - 'tests/retrieval_benchmark_runner.c'
+      - '.github/workflows/retrieval-benchmark-real.yml'
+
+permissions:
+  contents: read
+
+concurrency:
+  group: retrieval-benchmark-r5-${{ github.event.pull_request.number || github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  frozen-benchmark:
+    runs-on: ubuntu-24.04
+    timeout-minutes: 20
+
+    steps:
+      - name: Checkout AtM
+        uses: actions/checkout@v6
+
+      - name: Install backend build dependencies
+        shell: bash
+        run: |
+          set -euo pipefail
+          sudo apt-get update
+          sudo apt-get install -y --no-install-recommends \
+            build-essential \
+            git \
+            pkg-config \
+            libglib2.0-dev \
+            libglib2.0-bin \
+            libjson-glib-dev \
+            libsqlite3-dev \
+            libyaml-dev
+
+      - name: Checkout benchmark-pinned repository snapshots
+        shell: bash
+        run: |
+          set -euo pipefail
+
+          mkdir -p .integration
+
+          python3 - <<'PY' >/tmp/atm-r5-corpus.tsv
+          import json
+
+          with open(
+              "benchmarks/retrieval-v1/benchmark.json",
+              encoding="utf-8",
+          ) as handle:
+              benchmark = json.load(handle)
+
+          for item in benchmark["corpus"]:
+              print(
+                  item["repository_id"],
+                  item["snapshot_sha"],
+                  sep="\t",
+              )
+          PY
+
+          while IFS=$'\t' read -r repository_id snapshot_sha; do
+            case "$repository_id" in
+              ewd)
+                remote="https://github.com/LaurentiuStaicu/empirical-world3-dynamics.git"
+                root_env="ATM_BENCH_EWD_ROOT"
+                sha_env="ATM_BENCH_EWD_SHA"
+                ;;
+              cbd)
+                remote="https://github.com/LaurentiuStaicu/cognitive-belief-dynamics.git"
+                root_env="ATM_BENCH_CBD_ROOT"
+                sha_env="ATM_BENCH_CBD_SHA"
+                ;;
+              rmd)
+                remote="https://github.com/LaurentiuStaicu/romanian-monetary-dynamics.git"
+                root_env="ATM_BENCH_RMD_ROOT"
+                sha_env="ATM_BENCH_RMD_SHA"
+                ;;
+              *)
+                printf 'Unsupported benchmark repository: %s\n' "$repository_id" >&2
+                exit 1
+                ;;
+            esac
+
+            destination="$GITHUB_WORKSPACE/.integration/$repository_id"
+            git init -q "$destination"
+            git -C "$destination" remote add origin "$remote"
+            git -C "$destination" fetch --depth=1 origin "$snapshot_sha"
+            git -C "$destination" checkout -q --detach FETCH_HEAD
+
+            actual_sha="$(git -C "$destination" rev-parse HEAD)"
+            test "$actual_sha" = "$snapshot_sha"
+
+            rm -rf "$destination/.git"
+
+            {
+              echo "$root_env=$destination"
+              echo "$sha_env=$actual_sha"
+            } >> "$GITHUB_ENV"
+
+            printf 'Pinned %s %s\n' "$repository_id" "$actual_sha"
+          done </tmp/atm-r5-corpus.tsv
+
+      - name: Compile deterministic benchmark runner
+        shell: bash
+        run: |
+          set -euo pipefail
+
+          glib-compile-resources \
+            data/io.github.laurentiustaicu.ask_the_model.gresource.xml \
+            --sourcedir=data \
+            --generate-source \
+            --target=/tmp/atm-resources.c
+
+          cc \
+            -std=c11 \
+            -D_GNU_SOURCE \
+            -O2 \
+            -Wall \
+            -Wextra \
+            -Werror \
+            -Isrc \
+            src/cff_version.c \
+            src/repository_sources.c \
+            src/markdown_sections.c \
+            src/csv_table.c \
+            src/structured_json.c \
+            src/retrieval_index.c \
+            src/retrieval_index_lifecycle.c \
+            src/retrieval_query.c \
+            src/retrieval_rank.c \
+            src/retrieval_scope.c \
+            src/retrieval_normalize.c \
+            src/retrieval_router.c \
+            src/retrieval_conversation.c \
+            src/grounding_context.c \
+            tests/retrieval_benchmark_runner.c \
+            /tmp/atm-resources.c \
+            $(pkg-config --cflags --libs \
+              glib-2.0 \
+              gio-2.0 \
+              json-glib-1.0 \
+              sqlite3 \
+              yaml-0.1) \
+            -o /tmp/atm-retrieval-benchmark-runner
+
+      - name: Execute frozen benchmark
+        shell: bash
+        run: |
+          set -euo pipefail
+
+          /tmp/atm-retrieval-benchmark-runner \
+            benchmarks/retrieval-v1/benchmark.json \
+            /tmp/atm-retrieval-benchmark-run.json \
+            "github-${GITHUB_RUN_ID}-${GITHUB_RUN_ATTEMPT}"
+
+          python3 -m json.tool \
+            /tmp/atm-retrieval-benchmark-run.json \
+            >/dev/null
+
+          python3 scripts/evaluate_retrieval_benchmark.py \
+            benchmarks/retrieval-v1/benchmark.json \
+            /tmp/atm-retrieval-benchmark-run.json \
+            --pretty \
+            | tee /tmp/atm-retrieval-benchmark-evaluation.json
+
+      - name: Enforce provisional R5 gates
+        shell: bash
+        run: |
+          set -euo pipefail
+
+          python3 - <<'PY'
+          import json
+
+          with open(
+              "/tmp/atm-retrieval-benchmark-evaluation.json",
+              encoding="utf-8",
+          ) as handle:
+              evaluation = json.load(handle)
+
+          if not evaluation["passes_provisional_targets"]:
+              failed = [
+                  name
+                  for name, passed in evaluation["gates"].items()
+                  if not passed
+              ]
+              raise SystemExit(
+                  "R5 provisional gates failed: " + ", ".join(failed)
+              )
+
+          print("PASS: all provisional R5 retrieval gates are satisfied.")
+          PY
+
+      - name: Upload benchmark run and evaluation
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: atm-r5-retrieval-benchmark-${{ github.run_id }}-${{ github.run_attempt }}
+          path: |
+            /tmp/atm-retrieval-benchmark-run.json
+            /tmp/atm-retrieval-benchmark-evaluation.json
+          if-no-files-found: warn
+          retention-days: 14
