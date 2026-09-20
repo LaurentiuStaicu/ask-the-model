@@ -1063,6 +1063,310 @@ test_invalid_structured_json_never_promotes_content_index (void)
 }
 
 static void
+test_final_index_matches_pinned_snapshot_sources (void)
+{
+    char *cache_root = new_cache_root ();
+    char *snapshot_root = new_source_snapshot ();
+    AtmSourceCatalog *catalog = NULL;
+    AtmRetrievalIndexMetadata metadata = valid_metadata ();
+    char *index_path = NULL;
+    GError *error = NULL;
+
+    g_assert_true (
+        atm_repository_source_catalog_build (
+            snapshot_root,
+            "ewd",
+            &catalog,
+            &error
+        )
+    );
+    g_assert_no_error (error);
+
+    metadata.manifest_sha256 = catalog->manifest_sha256;
+
+    g_assert_true (
+        atm_retrieval_index_create_with_content (
+            cache_root,
+            snapshot_root,
+            &metadata,
+            catalog,
+            &index_path,
+            &error
+        )
+    );
+    g_assert_no_error (error);
+
+    g_assert_true (
+        atm_retrieval_index_validate_snapshot_sources (
+            index_path,
+            snapshot_root,
+            "ewd",
+            metadata.snapshot_sha,
+            &error
+        )
+    );
+    g_assert_no_error (error);
+
+    atm_source_catalog_free (catalog);
+    g_free (index_path);
+    remove_tree_best_effort (snapshot_root);
+    g_free (snapshot_root);
+    remove_tree_best_effort (cache_root);
+    g_free (cache_root);
+}
+
+static void
+test_snapshot_file_hash_mismatch_is_detected (void)
+{
+    char *cache_root = new_cache_root ();
+    char *snapshot_root = new_source_snapshot ();
+    AtmSourceCatalog *catalog = NULL;
+    AtmRetrievalIndexMetadata metadata = valid_metadata ();
+    char *index_path = NULL;
+    GError *error = NULL;
+
+    g_assert_true (
+        atm_repository_source_catalog_build (
+            snapshot_root,
+            "ewd",
+            &catalog,
+            &error
+        )
+    );
+    g_assert_no_error (error);
+
+    metadata.manifest_sha256 = catalog->manifest_sha256;
+
+    g_assert_true (
+        atm_retrieval_index_create_with_content (
+            cache_root,
+            snapshot_root,
+            &metadata,
+            catalog,
+            &index_path,
+            &error
+        )
+    );
+    g_assert_no_error (error);
+
+    write_text (
+        snapshot_root,
+        "STATUS.md",
+        "# Scientific status\n"
+        "Modified after indexing.\n"
+    );
+
+    g_assert_false (
+        atm_retrieval_index_validate_snapshot_sources (
+            index_path,
+            snapshot_root,
+            "ewd",
+            metadata.snapshot_sha,
+            &error
+        )
+    );
+    g_assert_error (
+        error,
+        ATM_RETRIEVAL_INDEX_ERROR,
+        ATM_RETRIEVAL_INDEX_ERROR_INTEGRITY
+    );
+
+    g_clear_error (&error);
+    atm_source_catalog_free (catalog);
+    g_free (index_path);
+    remove_tree_best_effort (snapshot_root);
+    g_free (snapshot_root);
+    remove_tree_best_effort (cache_root);
+    g_free (cache_root);
+}
+
+static void
+test_manifest_byte_change_is_detected (void)
+{
+    char *cache_root = new_cache_root ();
+    char *snapshot_root = new_source_snapshot ();
+    AtmSourceCatalog *catalog = NULL;
+    AtmRetrievalIndexMetadata metadata = valid_metadata ();
+    char *index_path = NULL;
+    char *manifest_path = NULL;
+    char *manifest_contents = NULL;
+    gsize manifest_length = 0;
+    GError *error = NULL;
+
+    g_assert_true (
+        atm_repository_source_catalog_build (
+            snapshot_root,
+            "ewd",
+            &catalog,
+            &error
+        )
+    );
+    g_assert_no_error (error);
+
+    metadata.manifest_sha256 = catalog->manifest_sha256;
+
+    g_assert_true (
+        atm_retrieval_index_create_with_content (
+            cache_root,
+            snapshot_root,
+            &metadata,
+            catalog,
+            &index_path,
+            &error
+        )
+    );
+    g_assert_no_error (error);
+
+    manifest_path = g_build_filename (
+        snapshot_root,
+        ".atm",
+        "repository.json",
+        NULL
+    );
+    g_assert_true (
+        g_file_get_contents (
+            manifest_path,
+            &manifest_contents,
+            &manifest_length,
+            &error
+        )
+    );
+    g_assert_no_error (error);
+
+    char *changed = g_strconcat (
+        manifest_contents,
+        "\n",
+        NULL
+    );
+    g_assert_true (
+        g_file_set_contents (
+            manifest_path,
+            changed,
+            -1,
+            &error
+        )
+    );
+    g_assert_no_error (error);
+
+    g_assert_false (
+        atm_retrieval_index_validate_snapshot_sources (
+            index_path,
+            snapshot_root,
+            "ewd",
+            metadata.snapshot_sha,
+            &error
+        )
+    );
+    g_assert_error (
+        error,
+        ATM_RETRIEVAL_INDEX_ERROR,
+        ATM_RETRIEVAL_INDEX_ERROR_INTEGRITY
+    );
+
+    g_clear_error (&error);
+    g_free (changed);
+    g_free (manifest_contents);
+    g_free (manifest_path);
+    atm_source_catalog_free (catalog);
+    g_free (index_path);
+    remove_tree_best_effort (snapshot_root);
+    g_free (snapshot_root);
+    remove_tree_best_effort (cache_root);
+    g_free (cache_root);
+}
+
+static void
+test_index_source_role_tamper_is_detected (void)
+{
+    char *cache_root = new_cache_root ();
+    char *snapshot_root = new_source_snapshot ();
+    AtmSourceCatalog *catalog = NULL;
+    AtmRetrievalIndexMetadata metadata = valid_metadata ();
+    char *index_path = NULL;
+    sqlite3 *db = NULL;
+    char *sqlite_error = NULL;
+    GError *error = NULL;
+
+    g_assert_true (
+        atm_repository_source_catalog_build (
+            snapshot_root,
+            "ewd",
+            &catalog,
+            &error
+        )
+    );
+    g_assert_no_error (error);
+
+    metadata.manifest_sha256 = catalog->manifest_sha256;
+
+    g_assert_true (
+        atm_retrieval_index_create_with_content (
+            cache_root,
+            snapshot_root,
+            &metadata,
+            catalog,
+            &index_path,
+            &error
+        )
+    );
+    g_assert_no_error (error);
+
+    g_assert_cmpint (
+        sqlite3_open_v2 (
+            index_path,
+            &db,
+            SQLITE_OPEN_READWRITE,
+            NULL
+        ),
+        ==,
+        SQLITE_OK
+    );
+    g_assert_cmpint (
+        sqlite3_exec (
+            db,
+            "PRAGMA foreign_keys = ON;"
+            "DELETE FROM source_roles "
+            "WHERE source_id = ("
+                "SELECT id FROM source_files "
+                "WHERE path = 'data/series.csv'"
+            ") AND role = 'tabular';",
+            NULL,
+            NULL,
+            &sqlite_error
+        ),
+        ==,
+        SQLITE_OK
+    );
+    sqlite3_free (sqlite_error);
+    sqlite_error = NULL;
+    g_assert_cmpint (sqlite3_close (db), ==, SQLITE_OK);
+    db = NULL;
+
+    g_assert_false (
+        atm_retrieval_index_validate_snapshot_sources (
+            index_path,
+            snapshot_root,
+            "ewd",
+            metadata.snapshot_sha,
+            &error
+        )
+    );
+    g_assert_error (
+        error,
+        ATM_RETRIEVAL_INDEX_ERROR,
+        ATM_RETRIEVAL_INDEX_ERROR_INTEGRITY
+    );
+
+    g_clear_error (&error);
+    atm_source_catalog_free (catalog);
+    g_free (index_path);
+    remove_tree_best_effort (snapshot_root);
+    g_free (snapshot_root);
+    remove_tree_best_effort (cache_root);
+    g_free (cache_root);
+}
+
+static void
 test_manifest_hash_mismatch_never_promotes (void)
 {
     char *cache_root = new_cache_root ();
@@ -1230,6 +1534,22 @@ main (int argc, char **argv)
     g_test_add_func (
         "/retrieval-index/invalid-structured-json-rollback",
         test_invalid_structured_json_never_promotes_content_index
+    );
+    g_test_add_func (
+        "/retrieval-index/final-snapshot-provenance",
+        test_final_index_matches_pinned_snapshot_sources
+    );
+    g_test_add_func (
+        "/retrieval-index/snapshot-hash-mismatch",
+        test_snapshot_file_hash_mismatch_is_detected
+    );
+    g_test_add_func (
+        "/retrieval-index/manifest-byte-mismatch",
+        test_manifest_byte_change_is_detected
+    );
+    g_test_add_func (
+        "/retrieval-index/source-role-tamper",
+        test_index_source_role_tamper_is_detected
     );
     g_test_add_func (
         "/retrieval-index/manifest-hash-mismatch",
