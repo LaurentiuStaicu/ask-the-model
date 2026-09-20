@@ -390,6 +390,70 @@ test_existing_staging_is_preserved (void)
 }
 
 static void
+test_cancelled_ingest_does_not_create_staging (void)
+{
+    char *root = new_temp_root ();
+    char *data_root = g_build_filename (root, "data", NULL);
+    char *archive_path = g_build_filename (
+        root,
+        "snapshot.tar.gz",
+        NULL
+    );
+    char *manifest = valid_manifest ("ewd");
+    char *version = NULL;
+    char *snapshot_path = NULL;
+    GCancellable *cancellable = g_cancellable_new ();
+    GError *error = NULL;
+
+    write_archive (archive_path, manifest);
+    g_cancellable_cancel (cancellable);
+
+    g_assert_false (
+        atm_repository_ingest_archive_cancellable (
+            data_root,
+            archive_path,
+            "ewd",
+            "EWD",
+            "Empirical World3 Dynamics",
+            test_sha (),
+            cancellable,
+            &version,
+            &snapshot_path,
+            NULL,
+            NULL,
+            &error
+        )
+    );
+    g_assert_error (error, G_IO_ERROR, G_IO_ERROR_CANCELLED);
+    g_assert_null (version);
+    g_assert_null (snapshot_path);
+
+    char *staging = atm_repository_extraction_staging_path (
+        data_root,
+        "ewd",
+        test_sha ()
+    );
+    char *final_path = atm_repository_snapshot_path (
+        data_root,
+        "ewd",
+        test_sha ()
+    );
+
+    g_assert_false (g_file_test (staging, G_FILE_TEST_EXISTS));
+    g_assert_false (g_file_test (final_path, G_FILE_TEST_EXISTS));
+
+    g_clear_error (&error);
+    g_object_unref (cancellable);
+    g_free (final_path);
+    g_free (staging);
+    g_free (manifest);
+    g_free (archive_path);
+    g_free (data_root);
+    remove_tree_best_effort (root);
+    g_free (root);
+}
+
+static void
 test_production_limits (void)
 {
     g_assert_cmpuint (ATM_INGEST_MAX_ENTRIES, ==, 10000);
@@ -421,6 +485,10 @@ main (int argc, char **argv)
     g_test_add_func (
         "/ingest/existing-staging-preserved",
         test_existing_staging_is_preserved
+    );
+    g_test_add_func (
+        "/ingest/cancelled-before-start",
+        test_cancelled_ingest_does_not_create_staging
     );
     g_test_add_func (
         "/ingest/production-limits",
