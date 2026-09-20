@@ -258,7 +258,7 @@ ollama pull SMALLER_MODEL
 - <small>execute or simulate EWD, CBD or RMD;</small>
 - <small>turn ordinary AI chat output into an authoritative scientific-model result.</small>
 
-<small>These are release boundaries, not claims that no development backend exists. See <a href="STATUS.md">Application status</a> for the separate development-`main` state.</small>
+<small>These are release boundaries, not claims that no development implementation exists. See <a href="STATUS.md">Application status</a> for the separate development-`main` state.</small>
 
 <details>
 <summary><strong>Scientific-model roadmap and boundary</strong></summary>
