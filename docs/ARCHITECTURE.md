@@ -17,12 +17,18 @@ Implemented and tested backend layers include:
 - deterministic per-snapshot SQLite/FTS5 indexes with source roles and snapshot identity;
 - exact technical-ID, structured entity/relation, FTS5/BM25 and tabular row-key retrieval;
 - intent-aware source authority, deterministic ordering and logical-source deduplication;
-- conversation-pinned repository scoping;
 - conservative Romanian/English query aliasing with protected identifiers preserved;
 - repository ID, repository-declared version and snapshot SHA carried on evidence records;
-- a deterministic repository router that combines scope, normalization, exact/tabular/lexical retrieval and ranking without requiring embeddings.
+- a deterministic repository router that combines scope, normalization, exact/tabular/lexical retrieval and ranking without requiring embeddings;
+- validated per-conversation repository/snapshot pinning and frozen retrieval scopes;
+- bounded current-turn grounding contexts with cross-repository balancing and application-owned temporary source labels;
+- citation-label resolution and independent citation provenance objects;
+- immutable GitHub file permalinks built only from the fixed repository catalog plus exact snapshot SHA;
+- a grounded Ollama request-construction path that keeps current-turn evidence transient and strips stale temporary source labels from replayed assistant history;
+- end-to-end R4 grounding/citation traceability tests against real EWD, CBD and RMD snapshots;
+- the R5 pinned-corpus benchmark/run schema, deterministic evaluator and metric-regression CI.
 
-These backend components are not yet connected to the current GTK conversation flow or Ollama request context. Their presence on development `main` therefore does not make repository-grounded chat a released v0.2.2 feature.
+These backend components are not yet connected to the current GTK repository-selection/Send lifecycle, and citations are not yet rendered to the user. The ordinary GTK Send action still uses the non-grounded chat path. Their presence on development `main` therefore does not make repository-grounded chat a released v0.2.2 feature.
 
 ## Implemented logical components
 
@@ -38,6 +44,8 @@ Responsibilities:
 - inspect capabilities through `POST /api/show`;
 - expose only completion-capable models to the chat selector;
 - send multi-turn requests through `POST /api/chat`;
+- provide both ordinary and grounded request-construction paths;
+- keep repository grounding instructions/evidence transient to the current grounded request rather than adding them to persistent chat history;
 - stream newline-delimited response objects to the UI;
 - keep current-session user/assistant history in memory.
 
@@ -45,9 +53,13 @@ AtM does not own the provider process. It does not install, start, stop, update 
 
 ### Conversation state
 
-The current conversation is an in-memory ordered sequence of user and assistant messages held by the provider layer.
+The visible/provider conversation remains an in-memory ordered sequence of user and assistant messages held by the provider layer.
 
-The state is not persisted across application restarts. Switching the active AI model does not yet create a separate persisted conversation.
+Development `main` also contains a separate repository-grounding state that validates and freezes the selected repository versions, exact snapshot SHAs, snapshot roots and retrieval indexes before repository retrieval can use them. Zero repositories remains a valid frozen state for ordinary local chat. This repository-grounding state is not yet created by the current GTK conversation flow.
+
+Retrieved evidence is deliberately not part of persistent provider history. Grounded requests can add system grounding rules and one current-turn evidence block to the outgoing request while the provider continues to retain only the original user prompt and assistant response. Temporary `[S#]` labels from prior assistant turns are removed only from replayed provider history so that a new turn cannot accidentally rebind an old label to a new source; the original answer/citation object is not rewritten.
+
+Conversation state is not persisted across application restarts. Switching the active AI model does not yet create a separate persisted conversation.
 
 ### User interface
 
@@ -74,17 +86,17 @@ The backend preserves immutable snapshot identity and returns evidence objects r
 
 ## Remaining / not yet user-facing components
 
-### Repository UI and conversation-context service
+### Repository UI and conversation controller
 
-Responsible for exposing the fixed EWD/CBD/RMD selection in the GTK interface, freezing the selected repository set and snapshot SHAs after the first user turn, and requiring an explicit new-chat transition for scope changes.
+Responsible for exposing the fixed EWD/CBD/RMD selection in the GTK interface, freezing the selected repository set and snapshot SHAs on the first user turn, invoking repository retrieval/grounding for later turns, and requiring an explicit New Chat transition for scope changes.
 
-The backend can already represent and route a pinned repository set, but this lifecycle is not yet wired into the current application UI.
+The backend already validates and freezes the selected repository snapshots and can derive retrieval scopes from that frozen state. The missing work is application-controller and GTK wiring.
 
-### Grounded context and citation service
+### Grounded context and citation presentation
 
-Responsible for selecting retrieved evidence within a turn budget, recording exactly which repository sources were supplied to the AI, mapping temporary source labels to immutable provenance, and distinguishing retrieved source material from AI-generated interpretation.
+The backend already selects retrieved evidence within explicit source/byte budgets, records exactly which repository sources were supplied to the AI, maps temporary `[S#]` labels to deep-copied immutable provenance, constructs trusted commit-pinned GitHub file links, and can compose a transient grounded provider request.
 
-The retrieval backend now supplies the required source identity and snapshot provenance, but the provider-context and user-visible citation layer is not yet implemented.
+Remaining work is to connect that path to the GTK Send lifecycle, retain citation objects with their originating visible answer, define the approved citation interaction/presentation, and render citation details without trusting the model to construct URLs or provenance.
 
 ### Conversation persistence service
 
