@@ -169,10 +169,15 @@ test_model_identity_is_pinned_until_reset ()
     try {
         assert (first.freeze ());
         assert (second.freeze ());
-        session.begin (first, "model-a");
+        session.begin (
+            first,
+            "model-a",
+            "digest-a"
+        );
 
         assert (session.model_name () == "model-a");
-        session.require_model ("model-a");
+        assert (session.model_digest () == "digest-a");
+        session.require_model ("model-a", "digest-a");
     } catch (Error error) {
         critical ("%s", error.message);
         assert_not_reached ();
@@ -192,12 +197,28 @@ test_model_identity_is_pinned_until_reset ()
 
     assert (mismatch_rejected);
 
+    bool digest_mismatch_rejected = false;
+
+    try {
+        session.require_model ("model-a", "digest-b");
+    } catch (Error error) {
+        digest_mismatch_rejected = true;
+        assert (
+            error.message ==
+            "The active AI model digest differs from the model pinned to this conversation."
+        );
+    }
+
+    assert (digest_mismatch_rejected);
+
     session.reset ();
     assert (session.model_name () == null);
+    assert (session.model_digest () == null);
 
     try {
         session.begin (second, "model-b");
         assert (session.model_name () == "model-b");
+        assert (session.model_digest () == null);
         session.require_model (" model-b ");
     } catch (Error error) {
         critical ("%s", error.message);
