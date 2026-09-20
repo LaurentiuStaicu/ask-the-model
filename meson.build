@@ -243,7 +243,7 @@ test(
   'retrieval-index-schema',
   retrieval_index_schema_test,
   env: {
-    'ATM_RETRIEVAL_SCHEMA': meson.project_source_root() / 'data/schemas/retrieval-index-v1.sql'
+    'ATM_RETRIEVAL_SCHEMA': meson.project_source_root() / 'data/schemas/retrieval-index-v2.sql'
   }
 )
 
