@@ -2,6 +2,7 @@
 
 #include <glib.h>
 #include <glib/gstdio.h>
+#include <sqlite3.h>
 
 #include <sys/stat.h>
 
@@ -50,6 +51,101 @@ new_cache_root (void)
     g_assert_no_error (error);
     g_assert_nonnull (root);
     return root;
+}
+
+static void
+write_text (
+    const char *root,
+    const char *relative,
+    const char *contents
+)
+{
+    GError *error = NULL;
+    char *path = g_build_filename (root, relative, NULL);
+    char *parent = g_path_get_dirname (path);
+
+    g_assert_cmpint (
+        g_mkdir_with_parents (parent, 0700),
+        ==,
+        0
+    );
+    g_assert_true (
+        g_file_set_contents (
+            path,
+            contents,
+            -1,
+            &error
+        )
+    );
+    g_assert_no_error (error);
+
+    g_free (parent);
+    g_free (path);
+}
+
+static char *
+new_source_snapshot (void)
+{
+    char *root = new_cache_root ();
+
+    write_text (
+        root,
+        ".atm/repository.json",
+        "{\n"
+        "  \"schema_version\": 1,\n"
+        "  \"repository_id\": \"ewd\",\n"
+        "  \"acronym\": \"EWD\",\n"
+        "  \"display_name\": \"Empirical World3 Dynamics\",\n"
+        "  \"version_source\": {"
+        "\"type\": \"cff\", \"path\": \"CITATION.cff\"},\n"
+        "  \"status_source\": \"STATUS.md\",\n"
+        "  \"required_paths\": [\"STATUS.md\"],\n"
+        "  \"retrieval\": {\n"
+        "    \"canonical\": [\"STATUS.md\"],\n"
+        "    \"structural\": [\"model\"],\n"
+        "    \"evidence\": [\"data\"],\n"
+        "    \"tabular\": [\"data\"],\n"
+        "    \"implementation\": [],\n"
+        "    \"exclude\": []\n"
+        "  }\n"
+        "}\n"
+    );
+    write_text (root, "STATUS.md", "# Status\n");
+    write_text (root, "model/core.json", "{}\n");
+    write_text (root, "data/series.csv", "year,value\n2025,1\n");
+
+    return root;
+}
+
+static int
+query_int (
+    sqlite3 *db,
+    const char *sql
+)
+{
+    sqlite3_stmt *statement = NULL;
+    int value;
+
+    g_assert_cmpint (
+        sqlite3_prepare_v2 (
+            db,
+            sql,
+            -1,
+            &statement,
+            NULL
+        ),
+        ==,
+        SQLITE_OK
+    );
+    g_assert_cmpint (
+        sqlite3_step (statement),
+        ==,
+        SQLITE_ROW
+    );
+
+    value = sqlite3_column_int (statement, 0);
+    sqlite3_finalize (statement);
+    return value;
 }
 
 static AtmRetrievalIndexMetadata
@@ -156,6 +252,169 @@ test_create_validate_and_refuse_overwrite (void)
 }
 
 static void
+test_source_catalog_is_committed_before_promotion (void)
+{
+    char *cache_root = new_cache_root ();
+    char *snapshot_root = new_source_snapshot ();
+    AtmSourceCatalog *catalog = NULL;
+    AtmRetrievalIndexMetadata metadata = valid_metadata ();
+    char *index_path = NULL;
+    sqlite3 *db = NULL;
+    GError *error = NULL;
+
+    g_assert_true (
+        atm_repository_source_catalog_build (
+            snapshot_root,
+            "ewd",
+            &catalog,
+            &error
+        )
+    );
+    g_assert_no_error (error);
+    g_assert_nonnull (catalog);
+
+    metadata.manifest_sha256 = catalog->manifest_sha256;
+
+    g_assert_true (
+        atm_retrieval_index_create_with_sources (
+            cache_root,
+            &metadata,
+            catalog,
+            &index_path,
+            &error
+        )
+    );
+    g_assert_no_error (error);
+    g_assert_nonnull (index_path);
+
+    g_assert_cmpint (
+        sqlite3_open_v2 (
+            index_path,
+            &db,
+            SQLITE_OPEN_READONLY,
+            NULL
+        ),
+        ==,
+        SQLITE_OK
+    );
+
+    g_assert_cmpint (
+        query_int (
+            db,
+            "SELECT count(*) FROM source_files;"
+        ),
+        ==,
+        3
+    );
+    g_assert_cmpint (
+        query_int (
+            db,
+            "SELECT count(*) FROM source_roles;"
+        ),
+        ==,
+        4
+    );
+    g_assert_cmpint (
+        query_int (
+            db,
+            "SELECT count(*) FROM source_roles "
+            "WHERE role = 'tabular';"
+        ),
+        ==,
+        1
+    );
+    g_assert_cmpint (
+        query_int (
+            db,
+            "SELECT count(*) FROM source_files "
+            "WHERE logical_source_id = "
+            "'ewd:file:data/series.csv' "
+            "AND length(sha256) = 64;"
+        ),
+        ==,
+        1
+    );
+
+    g_assert_cmpint (sqlite3_close (db), ==, SQLITE_OK);
+    db = NULL;
+
+    atm_source_catalog_free (catalog);
+    g_free (index_path);
+    remove_tree_best_effort (snapshot_root);
+    g_free (snapshot_root);
+    remove_tree_best_effort (cache_root);
+    g_free (cache_root);
+}
+
+static void
+test_manifest_hash_mismatch_never_promotes (void)
+{
+    char *cache_root = new_cache_root ();
+    char *snapshot_root = new_source_snapshot ();
+    AtmSourceCatalog *catalog = NULL;
+    AtmRetrievalIndexMetadata metadata = valid_metadata ();
+    char *index_path = NULL;
+    GError *error = NULL;
+
+    g_assert_true (
+        atm_repository_source_catalog_build (
+            snapshot_root,
+            "ewd",
+            &catalog,
+            &error
+        )
+    );
+    g_assert_no_error (error);
+
+    metadata.manifest_sha256 =
+        "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa"
+        "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa";
+
+    g_assert_false (
+        atm_retrieval_index_create_with_sources (
+            cache_root,
+            &metadata,
+            catalog,
+            &index_path,
+            &error
+        )
+    );
+    g_assert_error (
+        error,
+        ATM_RETRIEVAL_INDEX_ERROR,
+        ATM_RETRIEVAL_INDEX_ERROR_INTEGRITY
+    );
+    g_assert_null (index_path);
+
+    char *final_path = atm_retrieval_index_path (
+        cache_root,
+        metadata.repository_id,
+        metadata.snapshot_sha
+    );
+    char *staging_path = atm_retrieval_index_staging_path (
+        cache_root,
+        metadata.repository_id,
+        metadata.snapshot_sha
+    );
+
+    g_assert_false (
+        g_file_test (final_path, G_FILE_TEST_EXISTS)
+    );
+    g_assert_false (
+        g_file_test (staging_path, G_FILE_TEST_EXISTS)
+    );
+
+    g_free (staging_path);
+    g_free (final_path);
+    g_clear_error (&error);
+    atm_source_catalog_free (catalog);
+    remove_tree_best_effort (snapshot_root);
+    g_free (snapshot_root);
+    remove_tree_best_effort (cache_root);
+    g_free (cache_root);
+}
+
+static void
 test_invalid_identity_is_rejected_before_creation (void)
 {
     char *root = new_cache_root ();
@@ -223,6 +482,14 @@ main (int argc, char **argv)
     g_test_add_func (
         "/retrieval-index/create-validate",
         test_create_validate_and_refuse_overwrite
+    );
+    g_test_add_func (
+        "/retrieval-index/source-catalog-committed",
+        test_source_catalog_is_committed_before_promotion
+    );
+    g_test_add_func (
+        "/retrieval-index/manifest-hash-mismatch",
+        test_manifest_hash_mismatch_never_promotes
     );
     g_test_add_func (
         "/retrieval-index/invalid-id",
