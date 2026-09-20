@@ -170,6 +170,8 @@ atm_retrieval_normalize_query (
     GHashTable *aliases = NULL;
     GString *expanded = NULL;
     AtmNormalizedQuery *normalized = NULL;
+    gboolean saw_validation = FALSE;
+    gboolean saw_human_or_participant = FALSE;
     gsize query_length;
 
     g_return_val_if_fail (query != NULL, FALSE);
@@ -326,6 +328,7 @@ atm_retrieval_normalize_query (
                 aliases,
                 "validation"
             );
+            saw_validation = TRUE;
             normalized->intents |=
                 ATM_RETRIEVAL_INTENT_CURRENT_STATE;
         }
@@ -334,6 +337,11 @@ atm_retrieval_normalize_query (
             g_strcmp0 (token, "validated") == 0 ||
             g_strcmp0 (token, "limitation") == 0 ||
             g_strcmp0 (token, "limitations") == 0) {
+            if (g_strcmp0 (token, "validation") == 0 ||
+                g_strcmp0 (token, "validated") == 0) {
+                saw_validation = TRUE;
+            }
+
             normalized->intents |=
                 ATM_RETRIEVAL_INTENT_CURRENT_STATE;
         }
@@ -456,6 +464,7 @@ atm_retrieval_normalize_query (
                 aliases,
                 "participant"
             );
+            saw_human_or_participant = TRUE;
         }
 
         if (token_is_any (
@@ -468,6 +477,7 @@ atm_retrieval_normalize_query (
                 aliases,
                 "human"
             );
+            saw_human_or_participant = TRUE;
         }
 
         if (token_is_any (
@@ -612,6 +622,11 @@ atm_retrieval_normalize_query (
             normalized->intents |=
                 ATM_RETRIEVAL_INTENT_IMPLEMENTATION;
         }
+    }
+
+    if (saw_validation && saw_human_or_participant) {
+        normalized->intents |=
+            ATM_RETRIEVAL_INTENT_EVIDENCE;
     }
 
     normalized->expanded_text = g_string_free (
