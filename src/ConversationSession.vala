@@ -2,11 +2,14 @@ namespace AskTheModel {
     public errordomain ConversationSessionError {
         ALREADY_ACTIVE,
         NOT_ACTIVE,
-        INVALID_GROUNDING
+        INVALID_GROUNDING,
+        INVALID_MODEL,
+        MODEL_MISMATCH
     }
 
     public class ConversationSession : Object {
         private ConversationGrounding? grounding = null;
+        private string? pinned_model = null;
 
         public bool is_active () {
             return grounding != null;
@@ -21,7 +24,8 @@ namespace AskTheModel {
         }
 
         public void begin (
-            ConversationGrounding prepared_grounding
+            ConversationGrounding prepared_grounding,
+            string model_name
         ) throws GLib.Error {
             if (grounding != null) {
                 throw new ConversationSessionError.ALREADY_ACTIVE (
@@ -35,7 +39,36 @@ namespace AskTheModel {
                 );
             }
 
+            string normalized_model = model_name.strip ();
+
+            if (normalized_model.length == 0) {
+                throw new ConversationSessionError.INVALID_MODEL (
+                    "Conversation AI model must be known before the session starts."
+                );
+            }
+
             grounding = prepared_grounding;
+            pinned_model = normalized_model;
+        }
+
+        public string? model_name () {
+            return pinned_model;
+        }
+
+        public void require_model (
+            string current_model
+        ) throws GLib.Error {
+            if (grounding == null || pinned_model == null) {
+                throw new ConversationSessionError.NOT_ACTIVE (
+                    "Conversation session has not started."
+                );
+            }
+
+            if (current_model.strip () != pinned_model) {
+                throw new ConversationSessionError.MODEL_MISMATCH (
+                    "The active AI model differs from the model pinned to this conversation."
+                );
+            }
         }
 
         public bool prepare_turn (
@@ -81,6 +114,8 @@ namespace AskTheModel {
                 grounding.abort_turn ();
                 grounding = null;
             }
+
+            pinned_model = null;
         }
     }
 }
