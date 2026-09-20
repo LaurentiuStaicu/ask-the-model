@@ -121,6 +121,21 @@ window.atm-window frame.atm-input-frame:focus-within {
     border-color: #5F605C;
 }
 
+
+/* Compact conversation-tab action.
+ * GtkNotebook places this action widget immediately beside the tab list.
+ * Keep it only wide enough for the plus icon while matching the tab-strip
+ * geometry rather than the circular header controls.
+ */
+window.atm-window notebook > header button.atm-new-chat-tab {
+    min-width: 18px;
+    min-height: 18px;
+    padding: 3px 5px;
+    margin: 0;
+    border-radius: 4px 4px 0 0;
+    box-shadow: none;
+}
+
 /* Dark variant */
 window.atm-window.atm-dark {
     background-color: #1B1B18;
