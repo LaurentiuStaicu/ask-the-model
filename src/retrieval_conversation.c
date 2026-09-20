@@ -847,10 +847,10 @@ retrieve:
 
 success:
     g_strfreev (tokens);
-    g_clear_pointer (
-        &effective_query,
-        (GDestroyNotify) g_string_free
-    );
+    if (effective_query != NULL) {
+        g_string_free (effective_query, TRUE);
+        effective_query = NULL;
+    }
     g_clear_pointer (
         &effective_scopes,
         g_ptr_array_unref
