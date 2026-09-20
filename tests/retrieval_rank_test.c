@@ -88,6 +88,55 @@ test_current_state_authority_precedes_lexical_magnitude (void)
 }
 
 static void
+test_current_state_prefers_declared_status_role (void)
+{
+    GPtrArray *results = new_results ();
+    GError *error = NULL;
+
+    g_ptr_array_add (
+        results,
+        new_record (
+            "rmd:file:README.md",
+            ATM_SOURCE_ROLE_CANONICAL,
+            ATM_EVIDENCE_MATCH_LEXICAL,
+            TRUE,
+            -100.0
+        )
+    );
+    g_ptr_array_add (
+        results,
+        new_record (
+            "rmd:file:STATUS.md",
+            ATM_SOURCE_ROLE_CANONICAL |
+                ATM_SOURCE_ROLE_STATUS,
+            ATM_EVIDENCE_MATCH_LEXICAL,
+            TRUE,
+            -1.0
+        )
+    );
+
+    g_assert_true (
+        atm_retrieval_rank_and_deduplicate (
+            results,
+            ATM_RETRIEVAL_INTENT_CURRENT_STATE,
+            10,
+            &error
+        )
+    );
+    g_assert_no_error (error);
+    g_assert_cmpstr (
+        ((AtmEvidenceRecord *) g_ptr_array_index (
+            results,
+            0
+        ))->logical_source_id,
+        ==,
+        "rmd:file:STATUS.md"
+    );
+
+    g_ptr_array_unref (results);
+}
+
+static void
 test_implementation_intent_changes_authority_order (void)
 {
     GPtrArray *results = new_results ();
@@ -379,6 +428,10 @@ main (int argc, char **argv)
     g_test_add_func (
         "/retrieval-rank/current-state-authority",
         test_current_state_authority_precedes_lexical_magnitude
+    );
+    g_test_add_func (
+        "/retrieval-rank/current-state-status-source",
+        test_current_state_prefers_declared_status_role
     );
     g_test_add_func (
         "/retrieval-rank/implementation-authority",
