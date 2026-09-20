@@ -59,12 +59,12 @@ require_text README.md 'does <strong>not</strong> download, import, move or dele
 require_text README.md 'AtM does <strong>not</strong> search every SSD, HDD or folder'
 require_text README.md 'AtM asks the provider for the installed model list through <code>GET /api/tags</code>.'
 require_text README.md 'Only models advertising the <code>completion</code> capability are placed in the AtM model selector.'
-require_text README.md 'AtM v0.2.2 currently provides text chat only'
+require_text README.md "AtM v$version currently provides text chat only"
 require_text README.md 'ingest or retrieve scientific repositories;'
 require_text README.md 'show repository-grounded citations or provenance;'
 require_text README.md 'turn ordinary AI chat output into an authoritative scientific-model result.'
 require_text README.md 'Each source repository remains canonical for its documentation, code, data, assumptions, provenance, validation and release boundaries.'
-require_text README.md 'Ordinary local chat in v0.2.2 should not be interpreted as repository-grounded scientific analysis.'
+require_text README.md "Ordinary local chat in v$version should not be interpreted as repository-grounded scientific analysis."
 
 require_text README.md 'href="docs/MODEL_GUIDE.md"'
 require_text README.md 'href="docs/TROUBLESHOOTING.md"'
