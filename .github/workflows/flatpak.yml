@@ -37,6 +37,7 @@ jobs:
           bundle: AskTheModel.flatpak
           artifact-name: AskTheModel-x86_64.flatpak
           manifest-path: io.github.laurentiustaicu.ask_the_model.yml
+          run-tests: true
           repository-name: appcenter
           repository-url: https://flatpak.elementary.io/repo.flatpakrepo
           repo-dir: repo
