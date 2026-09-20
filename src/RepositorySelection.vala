@@ -54,6 +54,21 @@ namespace AskTheModel {
             return true;
         }
 
+        public RepositoryDescriptor[] selected_repositories () {
+            RepositoryDescriptor[] selected = {};
+
+            foreach (
+                RepositoryDescriptor descriptor
+                in RepositoryCatalog.all ()
+            ) {
+                if (is_selected (descriptor.id)) {
+                    selected += descriptor;
+                }
+            }
+
+            return selected;
+        }
+
         public string summary () {
             string[] acronyms = {};
 
