@@ -17,6 +17,21 @@ namespace AskTheModel {
             builder.end_object ();
         }
 
+        private static string assistant_history_content (
+            string content
+        ) throws GLib.Error {
+            var label_regex = new GLib.Regex (
+                "\\[S[1-9][0-9]{0,3}\\]"
+            );
+
+            return label_regex.replace_literal (
+                content,
+                -1,
+                0,
+                ""
+            );
+        }
+
         public static string build (
             string? model,
             string[] history_roles,
@@ -77,10 +92,17 @@ namespace AskTheModel {
                     );
                 }
 
+                string history_content =
+                    history_roles[i] == "assistant"
+                        ? assistant_history_content (
+                            history_contents[i]
+                        )
+                        : history_contents[i];
+
                 append_message (
                     builder,
                     history_roles[i],
-                    history_contents[i]
+                    history_content
                 );
             }
 
