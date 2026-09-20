@@ -42,6 +42,12 @@ namespace AskTheModel {
             new RepositorySelection ();
         private RepositoryLifecycleService repository_lifecycle =
             new RepositoryLifecycleService ();
+        private ConversationSession conversation_session =
+            new ConversationSession ();
+        private GLib.SimpleAction? new_chat_action;
+        private Gtk.TextView? prompt_input_view;
+        private Gtk.Button? send_prompt_button;
+        private bool repository_scope_starting = false;
         private bool ai_scanning = false;
         private bool repository_checking = false;
         private bool repository_downloading = false;
@@ -85,6 +91,19 @@ namespace AskTheModel {
             apply_system_style ();
 
             ollama_provider = new OllamaProvider ();
+
+            new_chat_action = new GLib.SimpleAction (
+                "new-chat",
+                null
+            );
+            new_chat_action.activate.connect (() => {
+                reset_conversation ();
+            });
+            add_action (new_chat_action);
+            set_accels_for_action (
+                "app.new-chat",
+                { "<Primary>n" }
+            );
 
             repository_lifecycle.progress.connect ((message) => {
                 repository_validating =
@@ -611,17 +630,68 @@ namespace AskTheModel {
             return overlay;
         }
 
+        private bool repository_operation_active () {
+            return repository_checking ||
+                repository_downloading ||
+                repository_updating ||
+                repository_validating;
+        }
+
+        private bool repository_scope_locked () {
+            return repository_scope_starting ||
+                conversation_session.is_active ();
+        }
+
+        private void reset_conversation () {
+            conversation_session.abort_turn ();
+            conversation_session.reset ();
+            ollama_provider.reset_conversation ();
+            assistant_stream_started = false;
+            repository_scope_starting = false;
+
+            if (transcript_view != null) {
+                transcript_view.buffer.text = "";
+            }
+
+            if (prompt_input_view != null) {
+                prompt_input_view.buffer.text = "";
+                prompt_input_view.sensitive = true;
+                prompt_input_view.grab_focus ();
+            }
+
+            if (send_prompt_button != null) {
+                send_prompt_button.sensitive = false;
+            }
+
+            update_repository_selector_label ();
+            update_repository_annunciators ();
+
+            stdout.printf (
+                "AtM: new conversation started; repository scope is editable again\n"
+            );
+        }
+
         private void update_repository_selector_label () {
+            bool locked = repository_scope_locked ();
+            bool operation_active = repository_operation_active ();
+            bool interactive = !locked && !operation_active;
+
             if (repository_menu_button != null) {
                 repository_menu_button.label =
                     repository_selection.summary ();
+                repository_menu_button.sensitive = interactive;
+            }
+
+            foreach (Gtk.CheckButton check in repository_check_buttons) {
+                check.sensitive = interactive;
             }
 
             bool has_selection =
                 repository_selection.selected_repositories ().length > 0;
 
             if (refresh_repositories_button != null) {
-                refresh_repositories_button.sensitive = has_selection;
+                refresh_repositories_button.sensitive =
+                    has_selection && interactive;
             }
 
             if (repository_action_button != null) {
@@ -653,8 +723,10 @@ namespace AskTheModel {
                     );
                 }
 
-                repository_action_button.sensitive = has_action;
-                repository_action_button.can_target = has_action;
+                repository_action_button.sensitive =
+                    has_action && interactive;
+                repository_action_button.can_target =
+                    has_action && interactive;
                 repository_action_button.opacity =
                     has_action ? 1.0 : 0.0;
                 repository_action_button.update_state (
@@ -802,11 +874,13 @@ namespace AskTheModel {
             }
 
             if (repository_menu_button != null) {
-                repository_menu_button.sensitive = true;
+                repository_menu_button.sensitive =
+                    !repository_scope_locked ();
             }
 
             if (refresh_repositories_button != null) {
-                refresh_repositories_button.sensitive = true;
+                refresh_repositories_button.sensitive =
+                    !repository_scope_locked ();
             }
 
             set_activity_working (
@@ -907,10 +981,12 @@ namespace AskTheModel {
             }
 
             if (repository_menu_button != null) {
-                repository_menu_button.sensitive = true;
+                repository_menu_button.sensitive =
+                    !repository_scope_locked ();
             }
             if (refresh_repositories_button != null) {
-                refresh_repositories_button.sensitive = true;
+                refresh_repositories_button.sensitive =
+                    !repository_scope_locked ();
             }
 
             set_activity_working (
@@ -1205,17 +1281,87 @@ namespace AskTheModel {
             Gtk.TextView prompt_view,
             Gtk.Button send_button
         ) {
-            try {
-                string answer = yield ollama_provider.chat (prompt);
+            bool grounded_turn_prepared = false;
 
-                if (!assistant_stream_started && answer.length > 0) {
+            try {
+                if (!conversation_session.is_active ()) {
+                    RepositoryDescriptor[] selected =
+                        repository_selection.selected_repositories ();
+
+                    repository_scope_starting = true;
+                    update_repository_selector_label ();
+
+                    ConversationGrounding grounding =
+                        yield repository_lifecycle.prepare_conversation_grounding (
+                            selected
+                        );
+
+                    conversation_session.begin (grounding);
+                    repository_scope_starting = false;
+                    update_repository_selector_label ();
+                }
+
+                bool needs_clarification;
+                string? system_instructions;
+                string? evidence_text;
+                string? post_evidence_reminder;
+
+                bool has_grounding =
+                    conversation_session.prepare_turn (
+                        prompt,
+                        out needs_clarification,
+                        out system_instructions,
+                        out evidence_text,
+                        out post_evidence_reminder
+                    );
+
+                if (needs_clarification) {
                     append_transcript (
                         transcript,
-                        "Assistant: " + answer
+                        "Assistant: Please restate the question with the repository, variable, source, or topic you mean."
                     );
-                    assistant_stream_started = true;
+                } else {
+                    string answer;
+
+                    if (has_grounding) {
+                        grounded_turn_prepared = true;
+                        answer = yield ollama_provider.chat_grounded (
+                            prompt,
+                            system_instructions ?? "",
+                            evidence_text ?? "",
+                            post_evidence_reminder ?? ""
+                        );
+
+                        if (!conversation_session.commit_turn ()) {
+                            throw new ConversationSessionError.INVALID_GROUNDING (
+                                "Grounded conversation turn could not be committed."
+                            );
+                        }
+
+                        grounded_turn_prepared = false;
+                    } else {
+                        answer = yield ollama_provider.chat (prompt);
+                    }
+
+                    if (!assistant_stream_started &&
+                        answer.length > 0) {
+                        append_transcript (
+                            transcript,
+                            "Assistant: " + answer
+                        );
+                        assistant_stream_started = true;
+                    }
                 }
             } catch (GLib.Error error) {
+                if (grounded_turn_prepared) {
+                    conversation_session.abort_turn ();
+                }
+
+                if (repository_scope_starting) {
+                    repository_scope_starting = false;
+                    update_repository_selector_label ();
+                }
+
                 append_transcript (
                     transcript,
                     "System: " + error.message
@@ -1225,6 +1371,11 @@ namespace AskTheModel {
             prompt_view.sensitive = true;
             send_button.sensitive =
                 prompt_view.buffer.text.strip ().length > 0;
+
+            if (new_chat_action != null) {
+                new_chat_action.set_enabled (true);
+            }
+
             prompt_view.grab_focus ();
         }
 
@@ -1365,6 +1516,7 @@ namespace AskTheModel {
                 height_request = 72,
                 hexpand = true
             };
+            prompt_input_view = prompt_view;
 
             var prompt_overlay = new Gtk.Overlay () {
                 child = prompt_view
@@ -1391,6 +1543,7 @@ namespace AskTheModel {
                 valign = Gtk.Align.END,
                 sensitive = false
             };
+            send_prompt_button = send_button;
 
             prompt_view.buffer.changed.connect (() => {
                 prompt_placeholder.visible =
@@ -1405,6 +1558,19 @@ namespace AskTheModel {
                 string prompt = prompt_view.buffer.text.strip ();
                 if (prompt.length == 0) {
                     return;
+                }
+
+                if (!conversation_session.is_active () &&
+                    repository_operation_active ()) {
+                    append_transcript (
+                        transcript,
+                        "System: Finish the current repository operation before starting a conversation."
+                    );
+                    return;
+                }
+
+                if (new_chat_action != null) {
+                    new_chat_action.set_enabled (false);
                 }
 
                 append_transcript (
