@@ -295,11 +295,19 @@ namespace AskTheModel {
                     "; remote check offline";
             }
 
-            status_lcd.tooltip_text =
+            string summary =
                 "%s. %s.".printf (
                     ai_summary,
                     repository_summary
                 );
+
+            status_lcd.tooltip_text = summary;
+            status_lcd.update_property (
+                Gtk.AccessibleProperty.LABEL,
+                "Application status",
+                Gtk.AccessibleProperty.DESCRIPTION,
+                summary
+            );
         }
 
         private void update_ai_annunciators () {
@@ -618,12 +626,22 @@ namespace AskTheModel {
                     Gtk.AccessibleState.HIDDEN,
                     !has_action
                 );
-                repository_action_button.tooltip_text =
+
+                string? action_tooltip =
                     has_action
                         ? repository_lifecycle.action_tooltip (
                             selected
                         )
                         : null;
+                repository_action_button.tooltip_text =
+                    action_tooltip;
+
+                if (has_action && action_tooltip != null) {
+                    repository_action_button.update_property (
+                        Gtk.AccessibleProperty.LABEL,
+                        action_tooltip
+                    );
+                }
             }
         }
 
@@ -978,6 +996,10 @@ namespace AskTheModel {
             repository_menu_button.add_css_class (
                 "atm-triangle-selector"
             );
+            repository_menu_button.update_property (
+                Gtk.AccessibleProperty.LABEL,
+                "Select repository context"
+            );
             repository_menu_button.set_popover (popover);
 
             return build_selector_triangle_overlay (
@@ -1045,6 +1067,10 @@ namespace AskTheModel {
             model_dropdown.add_css_class (
                 "atm-triangle-selector"
             );
+            model_dropdown.update_property (
+                Gtk.AccessibleProperty.LABEL,
+                "Local AI model"
+            );
             model_dropdown.set_model (model_list);
             model_dropdown.notify["selected"].connect (() => {
                 if (updating_model_selector ||
@@ -1074,6 +1100,10 @@ namespace AskTheModel {
                     tooltip_text = "Refresh models"
                 };
             refresh_models_button.add_css_class ("circular");
+            refresh_models_button.update_property (
+                Gtk.AccessibleProperty.LABEL,
+                "Refresh local AI models"
+            );
             refresh_models_button.clicked.connect (() => {
                 refresh_local_models.begin ();
             });
@@ -1102,6 +1132,10 @@ namespace AskTheModel {
                     sensitive = false
                 };
             refresh_repositories_button.add_css_class ("circular");
+            refresh_repositories_button.update_property (
+                Gtk.AccessibleProperty.LABEL,
+                "Check selected repositories"
+            );
             refresh_repositories_button.clicked.connect (() => {
                 refresh_selected_repositories.begin ();
             });
