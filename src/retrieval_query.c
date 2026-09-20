@@ -129,6 +129,10 @@ source_role_bit_from_name (const char *role)
         return ATM_SOURCE_ROLE_CANONICAL;
     }
 
+    if (g_strcmp0 (role, "status") == 0) {
+        return ATM_SOURCE_ROLE_STATUS;
+    }
+
     if (g_strcmp0 (role, "structural") == 0) {
         return ATM_SOURCE_ROLE_STRUCTURAL;
     }
@@ -540,6 +544,29 @@ out:
 #define ATM_RETRIEVAL_MAX_FTS_TERMS 16
 #define ATM_RETRIEVAL_MAX_FTS_QUERY_BYTES 4096
 
+static gboolean
+fts_term_is_stopword (const char *folded)
+{
+    static const char *stopwords[] = {
+        "a", "an", "and", "are", "as", "at",
+        "be", "by", "does", "for", "from",
+        "how", "in", "is", "of", "on", "or",
+        "the", "to", "what", "which", "with",
+        "și", "si", "în", "in", "de", "din",
+        "este", "sunt", "ce", "care", "cu",
+        "la", "pe", "pentru", "sau", "un",
+        "o", "ale", "al", "a"
+    };
+
+    for (gsize i = 0; i < G_N_ELEMENTS (stopwords); i++) {
+        if (g_strcmp0 (folded, stopwords[i]) == 0) {
+            return TRUE;
+        }
+    }
+
+    return FALSE;
+}
+
 static void
 flush_fts_term (
     GString *token,
@@ -557,6 +584,12 @@ flush_fts_term (
         token->str,
         token->len
     );
+
+    if (fts_term_is_stopword (folded)) {
+        g_free (folded);
+        g_string_set_size (token, 0);
+        return;
+    }
 
     if (!g_hash_table_contains (seen, folded)) {
         g_hash_table_add (seen, folded);
@@ -864,10 +897,10 @@ atm_retrieval_search_fts (
     if (sqlite3_prepare_v2 (
             db,
             "SELECT evidence_kind, evidence_id, logical_source_id, "
-            "title, body, bm25(search_fts) "
+            "title, body, bm25(search_fts, 0.0, 0.0, 0.0, 4.0, 1.0) "
             "FROM search_fts "
             "WHERE search_fts MATCH ?1 "
-            "ORDER BY bm25(search_fts), rowid "
+            "ORDER BY bm25(search_fts, 0.0, 0.0, 0.0, 4.0, 1.0), rowid "
             "LIMIT ?2;",
             -1,
             &search_statement,
@@ -1198,7 +1231,14 @@ atm_retrieval_lookup_dataset_rows (
             "AND (?2 IS NULL "
                  "OR d.native_id = ?2 COLLATE BINARY "
                  "OR d.logical_source_id = ?2 COLLATE BINARY "
-                 "OR s.path = ?2 COLLATE BINARY) "
+                 "OR s.path = ?2 COLLATE BINARY "
+                 "OR (length(s.path) > length(?2) "
+                     "AND substr(s.path, -length(?2)) = ?2 COLLATE BINARY "
+                     "AND substr("
+                         "s.path, "
+                         "length(s.path) - length(?2), "
+                         "1"
+                     ") = '/')) "
             "ORDER BY s.path COLLATE BINARY, "
             "d.logical_source_id COLLATE BINARY, r.ordinal "
             "LIMIT ?3;",

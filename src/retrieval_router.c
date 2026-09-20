@@ -52,6 +52,29 @@ technical_identifier_character (char character)
         character == '-';
 }
 
+static void
+trim_terminal_identifier_punctuation (char *candidate)
+{
+    if (candidate == NULL) {
+        return;
+    }
+
+    gsize length = strlen (candidate);
+
+    while (length > 0) {
+        char terminal = candidate[length - 1];
+
+        if (terminal != '.' &&
+            terminal != ':' &&
+            terminal != '/' &&
+            terminal != '-') {
+            break;
+        }
+
+        candidate[--length] = '\0';
+    }
+}
+
 static gboolean
 technical_identifier_shape (const char *candidate)
 {
@@ -120,6 +143,10 @@ extract_technical_candidates (const char *query)
                 cursor - start
             );
 
+            trim_terminal_identifier_punctuation (
+                candidate
+            );
+
             if (technical_identifier_shape (candidate)) {
                 add_unique_candidate (
                     candidates,
@@ -173,6 +200,65 @@ token_is_quarter (const char *token)
         (token[5] == 'q' || token[5] == 'Q') &&
         token[6] >= '1' &&
         token[6] <= '4';
+}
+
+static gboolean
+technical_candidate_is_csv_dataset (
+    const char *candidate
+)
+{
+    if (candidate == NULL) {
+        return FALSE;
+    }
+
+    gsize length = strlen (candidate);
+
+    return length >= 4 &&
+        g_ascii_strcasecmp (
+            candidate + length - 4,
+            ".csv"
+        ) == 0;
+}
+
+static GPtrArray *
+extract_dataset_candidates (
+    const GPtrArray *technical_candidates
+)
+{
+    GPtrArray *datasets = g_ptr_array_new_with_free_func (
+        g_free
+    );
+    GHashTable *seen = g_hash_table_new_full (
+        g_str_hash,
+        g_str_equal,
+        g_free,
+        NULL
+    );
+
+    for (guint i = 0;
+         i < technical_candidates->len &&
+         datasets->len < ATM_RETRIEVAL_ROUTER_MAX_CANDIDATES;
+         i++) {
+        const char *candidate = g_ptr_array_index (
+            (GPtrArray *) technical_candidates,
+            i
+        );
+
+        if (!technical_candidate_is_csv_dataset (
+                candidate
+            )) {
+            continue;
+        }
+
+        add_unique_candidate (
+            datasets,
+            seen,
+            candidate
+        );
+    }
+
+    g_hash_table_unref (seen);
+    return datasets;
 }
 
 static GPtrArray *
@@ -247,13 +333,21 @@ extract_row_key_candidates (
          i < technical_candidates->len &&
          candidates->len < ATM_RETRIEVAL_ROUTER_MAX_CANDIDATES;
          i++) {
+        const char *candidate = g_ptr_array_index (
+            (GPtrArray *) technical_candidates,
+            i
+        );
+
+        if (technical_candidate_is_csv_dataset (
+                candidate
+            )) {
+            continue;
+        }
+
         add_unique_candidate (
             candidates,
             seen,
-            g_ptr_array_index (
-                (GPtrArray *) technical_candidates,
-                i
-            )
+            candidate
         );
     }
 
@@ -284,6 +378,7 @@ collect_repository_evidence (
     const AtmRetrievalRepositoryScope *scope,
     const AtmNormalizedQuery *normalized,
     const GPtrArray *technical_candidates,
+    const GPtrArray *dataset_candidates,
     const GPtrArray *row_key_candidates,
     guint max_results,
     AtmRepositoryEvidenceSet **out_set,
@@ -333,19 +428,46 @@ collect_repository_evidence (
             i
         );
 
-        if (!atm_retrieval_lookup_dataset_rows (
-                scope->index_path,
-                NULL,
-                row_key,
-                candidate_limit,
-                &partial,
-                error
-            )) {
-            goto out;
+        if (dataset_candidates->len == 0) {
+            if (!atm_retrieval_lookup_dataset_rows (
+                    scope->index_path,
+                    NULL,
+                    row_key,
+                    candidate_limit,
+                    &partial,
+                    error
+                )) {
+                goto out;
+            }
+
+            append_results (collected, partial);
+            partial = NULL;
+            continue;
         }
 
-        append_results (collected, partial);
-        partial = NULL;
+        for (guint dataset_index = 0;
+             dataset_index < dataset_candidates->len;
+             dataset_index++) {
+            const char *dataset_identifier =
+                g_ptr_array_index (
+                    (GPtrArray *) dataset_candidates,
+                    dataset_index
+                );
+
+            if (!atm_retrieval_lookup_dataset_rows (
+                    scope->index_path,
+                    dataset_identifier,
+                    row_key,
+                    candidate_limit,
+                    &partial,
+                    error
+                )) {
+                goto out;
+            }
+
+            append_results (collected, partial);
+            partial = NULL;
+        }
     }
 
     if (!atm_retrieval_search_fts (
@@ -421,6 +543,7 @@ atm_retrieval_run (
     AtmNormalizedQuery *normalized = NULL;
     AtmRetrievalResultSet *results = NULL;
     GPtrArray *technical_candidates = NULL;
+    GPtrArray *dataset_candidates = NULL;
     GPtrArray *row_key_candidates = NULL;
     gsize query_length;
 
@@ -460,6 +583,9 @@ atm_retrieval_run (
     }
 
     technical_candidates = extract_technical_candidates (query);
+    dataset_candidates = extract_dataset_candidates (
+        technical_candidates
+    );
     row_key_candidates = extract_row_key_candidates (
         query,
         technical_candidates
@@ -481,6 +607,7 @@ atm_retrieval_run (
         *out_results = g_steal_pointer (&results);
 
         g_ptr_array_unref (row_key_candidates);
+        g_ptr_array_unref (dataset_candidates);
         g_ptr_array_unref (technical_candidates);
         atm_normalized_query_free (normalized);
         atm_retrieval_scope_selection_free (selection);
@@ -501,6 +628,7 @@ atm_retrieval_run (
                 scope,
                 normalized,
                 technical_candidates,
+                dataset_candidates,
                 row_key_candidates,
                 max_results_per_repository,
                 &repository_set,
@@ -518,6 +646,7 @@ atm_retrieval_run (
     *out_results = g_steal_pointer (&results);
 
     g_ptr_array_unref (row_key_candidates);
+    g_ptr_array_unref (dataset_candidates);
     g_ptr_array_unref (technical_candidates);
     atm_normalized_query_free (normalized);
     atm_retrieval_scope_selection_free (selection);
@@ -525,6 +654,7 @@ atm_retrieval_run (
 
 out:
     g_clear_pointer (&row_key_candidates, g_ptr_array_unref);
+    g_clear_pointer (&dataset_candidates, g_ptr_array_unref);
     g_clear_pointer (&technical_candidates, g_ptr_array_unref);
     g_clear_pointer (&results, atm_retrieval_result_set_free);
     g_clear_pointer (&normalized, atm_normalized_query_free);

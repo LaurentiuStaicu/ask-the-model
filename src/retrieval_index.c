@@ -13,7 +13,7 @@
 #include <sys/stat.h>
 
 #define ATM_RETRIEVAL_SCHEMA_RESOURCE \
-    "/io/github/laurentiustaicu/ask_the_model/schemas/retrieval-index-v1.sql"
+    "/io/github/laurentiustaicu/ask_the_model/schemas/retrieval-index-v2.sql"
 
 GQuark
 atm_retrieval_index_error_quark (void)
@@ -265,6 +265,7 @@ insert_source_catalog (
         const char *name;
     } roles[] = {
         { ATM_SOURCE_ROLE_CANONICAL, "canonical" },
+        { ATM_SOURCE_ROLE_STATUS, "status" },
         { ATM_SOURCE_ROLE_STRUCTURAL, "structural" },
         { ATM_SOURCE_ROLE_EVIDENCE, "evidence" },
         { ATM_SOURCE_ROLE_TABULAR, "tabular" },
@@ -2504,6 +2505,10 @@ source_role_bit_from_name (const char *role)
 {
     if (g_strcmp0 (role, "canonical") == 0) {
         return ATM_SOURCE_ROLE_CANONICAL;
+    }
+
+    if (g_strcmp0 (role, "status") == 0) {
+        return ATM_SOURCE_ROLE_STATUS;
     }
 
     if (g_strcmp0 (role, "structural") == 0) {

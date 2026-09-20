@@ -119,7 +119,7 @@ test_schema_and_integrity (void)
     g_assert_cmpint (
         query_single_int (db, "PRAGMA user_version;"),
         ==,
-        1
+        2
     );
 
     g_assert_true (
@@ -161,6 +161,8 @@ test_schema_and_integrity (void)
             "INSERT INTO source_roles(source_id, role) "
             "VALUES(1, 'canonical');"
             "INSERT INTO source_roles(source_id, role) "
+            "VALUES(1, 'status');"
+            "INSERT INTO source_roles(source_id, role) "
             "VALUES(1, 'evidence');"
         )
     );
@@ -172,7 +174,7 @@ test_schema_and_integrity (void)
             "WHERE source_id = 1;"
         ),
         ==,
-        2
+        3
     );
 
     g_assert_true (

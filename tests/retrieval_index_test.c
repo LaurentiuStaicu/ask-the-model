@@ -349,13 +349,22 @@ test_source_catalog_is_committed_before_promotion (void)
             "SELECT count(*) FROM source_roles;"
         ),
         ==,
-        4
+        5
     );
     g_assert_cmpint (
         query_int (
             db,
             "SELECT count(*) FROM source_roles "
             "WHERE role = 'tabular';"
+        ),
+        ==,
+        1
+    );
+    g_assert_cmpint (
+        query_int (
+            db,
+            "SELECT count(*) FROM source_roles "
+            "WHERE role = 'status';"
         ),
         ==,
         1

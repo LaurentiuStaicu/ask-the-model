@@ -88,6 +88,55 @@ test_current_state_authority_precedes_lexical_magnitude (void)
 }
 
 static void
+test_current_state_prefers_declared_status_role (void)
+{
+    GPtrArray *results = new_results ();
+    GError *error = NULL;
+
+    g_ptr_array_add (
+        results,
+        new_record (
+            "rmd:file:README.md",
+            ATM_SOURCE_ROLE_CANONICAL,
+            ATM_EVIDENCE_MATCH_LEXICAL,
+            TRUE,
+            -100.0
+        )
+    );
+    g_ptr_array_add (
+        results,
+        new_record (
+            "rmd:file:STATUS.md",
+            ATM_SOURCE_ROLE_CANONICAL |
+                ATM_SOURCE_ROLE_STATUS,
+            ATM_EVIDENCE_MATCH_LEXICAL,
+            TRUE,
+            -1.0
+        )
+    );
+
+    g_assert_true (
+        atm_retrieval_rank_and_deduplicate (
+            results,
+            ATM_RETRIEVAL_INTENT_CURRENT_STATE,
+            10,
+            &error
+        )
+    );
+    g_assert_no_error (error);
+    g_assert_cmpstr (
+        ((AtmEvidenceRecord *) g_ptr_array_index (
+            results,
+            0
+        ))->logical_source_id,
+        ==,
+        "rmd:file:STATUS.md"
+    );
+
+    g_ptr_array_unref (results);
+}
+
+static void
 test_implementation_intent_changes_authority_order (void)
 {
     GPtrArray *results = new_results ();
@@ -168,6 +217,94 @@ test_numeric_intent_prefers_tabular_role (void)
 
     atm_evidence_record_free (table);
     atm_evidence_record_free (canonical);
+}
+
+static void
+test_structure_intent_keeps_canonical_and_structural_peers (void)
+{
+    AtmEvidenceRecord *canonical = new_record (
+        "ewd:file:canonical-paradigm",
+        ATM_SOURCE_ROLE_CANONICAL,
+        ATM_EVIDENCE_MATCH_LEXICAL,
+        TRUE,
+        -8.0
+    );
+    AtmEvidenceRecord *structural = new_record (
+        "ewd:file:structural-detail",
+        ATM_SOURCE_ROLE_STRUCTURAL,
+        ATM_EVIDENCE_MATCH_LEXICAL,
+        TRUE,
+        -2.0
+    );
+
+    g_assert_cmpuint (
+        atm_evidence_authority_rank (
+            canonical,
+            ATM_RETRIEVAL_INTENT_STRUCTURE
+        ),
+        ==,
+        atm_evidence_authority_rank (
+            structural,
+            ATM_RETRIEVAL_INTENT_STRUCTURE
+        )
+    );
+
+    atm_evidence_record_free (structural);
+    atm_evidence_record_free (canonical);
+}
+
+static void
+test_structure_intent_prefers_declared_status_source (void)
+{
+    AtmEvidenceRecord *status = new_record (
+        "cbd:file:STATUS.md",
+        ATM_SOURCE_ROLE_STATUS |
+            ATM_SOURCE_ROLE_CANONICAL,
+        ATM_EVIDENCE_MATCH_LEXICAL,
+        TRUE,
+        -1.0
+    );
+    AtmEvidenceRecord *canonical = new_record (
+        "cbd:file:README.md",
+        ATM_SOURCE_ROLE_CANONICAL,
+        ATM_EVIDENCE_MATCH_LEXICAL,
+        TRUE,
+        -100.0
+    );
+    AtmEvidenceRecord *structural = new_record (
+        "cbd:entity:module:x",
+        ATM_SOURCE_ROLE_STRUCTURAL,
+        ATM_EVIDENCE_MATCH_LEXICAL,
+        TRUE,
+        -100.0
+    );
+
+    g_assert_cmpuint (
+        atm_evidence_authority_rank (
+            status,
+            ATM_RETRIEVAL_INTENT_STRUCTURE
+        ),
+        <,
+        atm_evidence_authority_rank (
+            canonical,
+            ATM_RETRIEVAL_INTENT_STRUCTURE
+        )
+    );
+    g_assert_cmpuint (
+        atm_evidence_authority_rank (
+            status,
+            ATM_RETRIEVAL_INTENT_STRUCTURE
+        ),
+        <,
+        atm_evidence_authority_rank (
+            structural,
+            ATM_RETRIEVAL_INTENT_STRUCTURE
+        )
+    );
+
+    atm_evidence_record_free (structural);
+    atm_evidence_record_free (canonical);
+    atm_evidence_record_free (status);
 }
 
 static void
@@ -271,6 +408,116 @@ test_same_authority_uses_bm25_order (void)
 }
 
 static void
+test_nonexact_same_source_saturation_keeps_complementary_status (void)
+{
+    GPtrArray *results = new_results ();
+    GError *error = NULL;
+
+    for (guint i = 0; i < 4; i++) {
+        AtmEvidenceRecord *row = new_record (
+            i == 0
+                ? "cbd:dataset-row:recovery.csv:13"
+                : i == 1
+                    ? "cbd:dataset-row:recovery.csv:16"
+                    : i == 2
+                        ? "cbd:dataset-row:recovery.csv:12"
+                        : "cbd:dataset-row:recovery.csv:14",
+            ATM_SOURCE_ROLE_EVIDENCE |
+                ATM_SOURCE_ROLE_TABULAR,
+            ATM_EVIDENCE_MATCH_TABULAR,
+            FALSE,
+            0.0
+        );
+        g_free (row->source_path);
+        row->source_path = g_strdup (
+            "model/benchmarks/results/recovery.csv"
+        );
+        g_ptr_array_add (results, row);
+    }
+
+    AtmEvidenceRecord *status = new_record (
+        "cbd:section:STATUS.md:lines:17-29",
+        ATM_SOURCE_ROLE_CANONICAL |
+            ATM_SOURCE_ROLE_STATUS,
+        ATM_EVIDENCE_MATCH_LEXICAL,
+        TRUE,
+        -1.0
+    );
+    g_free (status->source_path);
+    status->source_path = g_strdup ("STATUS.md");
+    g_ptr_array_add (results, status);
+
+    g_assert_true (
+        atm_retrieval_rank_and_deduplicate (
+            results,
+            ATM_RETRIEVAL_INTENT_NUMERIC,
+            5,
+            &error
+        )
+    );
+    g_assert_no_error (error);
+    g_assert_cmpuint (results->len, ==, 5);
+    g_assert_cmpstr (
+        ((AtmEvidenceRecord *) g_ptr_array_index (
+            results,
+            2
+        ))->logical_source_id,
+        ==,
+        "cbd:section:STATUS.md:lines:17-29"
+    );
+
+    g_ptr_array_unref (results);
+}
+
+static void
+test_exact_matches_are_not_saturated (void)
+{
+    GPtrArray *results = new_results ();
+    GError *error = NULL;
+
+    for (guint i = 0; i < 3; i++) {
+        char *logical_id = g_strdup_printf (
+            "ewd:entity:variable:exact_%u",
+            i
+        );
+        AtmEvidenceRecord *record = new_record (
+            logical_id,
+            ATM_SOURCE_ROLE_STRUCTURAL,
+            ATM_EVIDENCE_MATCH_EXACT,
+            FALSE,
+            0.0
+        );
+        g_free (logical_id);
+        g_free (record->source_path);
+        record->source_path = g_strdup ("model/core.json");
+        g_ptr_array_add (results, record);
+    }
+
+    g_assert_true (
+        atm_retrieval_rank_and_deduplicate (
+            results,
+            ATM_RETRIEVAL_INTENT_STRUCTURE,
+            3,
+            &error
+        )
+    );
+    g_assert_no_error (error);
+
+    for (guint i = 0; i < 3; i++) {
+        g_assert_cmpint (
+            ((AtmEvidenceRecord *) g_ptr_array_index (
+                results,
+                i
+            ))->match_kind,
+            ==,
+            ATM_EVIDENCE_MATCH_EXACT
+        );
+    }
+
+    g_ptr_array_unref (results);
+}
+
+static void
 test_rank_limit_truncates_after_deduplication (void)
 {
     GPtrArray *results = new_results ();
@@ -347,6 +594,10 @@ main (int argc, char **argv)
         test_current_state_authority_precedes_lexical_magnitude
     );
     g_test_add_func (
+        "/retrieval-rank/current-state-status-source",
+        test_current_state_prefers_declared_status_role
+    );
+    g_test_add_func (
         "/retrieval-rank/implementation-authority",
         test_implementation_intent_changes_authority_order
     );
@@ -355,12 +606,28 @@ main (int argc, char **argv)
         test_numeric_intent_prefers_tabular_role
     );
     g_test_add_func (
+        "/retrieval-rank/structure-canonical-peer",
+        test_structure_intent_keeps_canonical_and_structural_peers
+    );
+    g_test_add_func (
+        "/retrieval-rank/structure-status-source",
+        test_structure_intent_prefers_declared_status_source
+    );
+    g_test_add_func (
         "/retrieval-rank/exact-dedup-wins",
         test_exact_duplicate_wins_over_lexical_duplicate
     );
     g_test_add_func (
         "/retrieval-rank/bm25-within-authority",
         test_same_authority_uses_bm25_order
+    );
+    g_test_add_func (
+        "/retrieval-rank/source-saturation",
+        test_nonexact_same_source_saturation_keeps_complementary_status
+    );
+    g_test_add_func (
+        "/retrieval-rank/exact-not-saturated",
+        test_exact_matches_are_not_saturated
     );
     g_test_add_func (
         "/retrieval-rank/truncate",

@@ -12,6 +12,7 @@
 #define ATM_HASH_BUFFER_BYTES (64 * 1024)
 
 typedef struct {
+    const char *status_source;
     JsonArray *canonical;
     JsonArray *structural;
     JsonArray *evidence;
@@ -59,6 +60,8 @@ atm_source_role_name (AtmSourceRole role)
     switch (role) {
         case ATM_SOURCE_ROLE_CANONICAL:
             return "canonical";
+        case ATM_SOURCE_ROLE_STATUS:
+            return "status";
         case ATM_SOURCE_ROLE_STRUCTURAL:
             return "structural";
         case ATM_SOURCE_ROLE_EVIDENCE:
@@ -112,6 +115,10 @@ roles_for_path (
 )
 {
     guint roles = 0;
+
+    if (g_strcmp0 (path, retrieval->status_source) == 0) {
+        roles |= ATM_SOURCE_ROLE_STATUS;
+    }
 
     if (array_matches_path (retrieval->canonical, path)) {
         roles |= ATM_SOURCE_ROLE_CANONICAL;
@@ -524,6 +531,32 @@ atm_repository_source_catalog_build (
     }
 
     retrieval_object = json_node_get_object (retrieval_node);
+
+    if (!json_object_has_member (root, "status_source")) {
+        g_set_error_literal (
+            error,
+            ATM_SOURCE_CATALOG_ERROR,
+            ATM_SOURCE_CATALOG_ERROR_MANIFEST,
+            "Repository manifest has no status_source."
+        );
+        goto out;
+    }
+
+    retrieval.status_source = json_object_get_string_member (
+        root,
+        "status_source"
+    );
+
+    if (retrieval.status_source == NULL ||
+        retrieval.status_source[0] == '\0') {
+        g_set_error_literal (
+            error,
+            ATM_SOURCE_CATALOG_ERROR,
+            ATM_SOURCE_CATALOG_ERROR_MANIFEST,
+            "Repository manifest status_source is empty."
+        );
+        goto out;
+    }
 
     retrieval.canonical = json_object_get_array_member (
         retrieval_object,
