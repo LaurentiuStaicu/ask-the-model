@@ -1,0 +1,103 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "resource:///io/github/laurentiustaicu/ask_the_model/schemas/repository-manifest-v1.schema.json",
+  "title": "Ask the Model repository manifest v1",
+  "type": "object",
+  "additionalProperties": false,
+  "required": [
+    "schema_version",
+    "repository_id",
+    "acronym",
+    "display_name",
+    "version_source",
+    "status_source",
+    "required_paths",
+    "retrieval"
+  ],
+  "properties": {
+    "schema_version": {
+      "const": 1
+    },
+    "repository_id": {
+      "enum": ["ewd", "cbd", "rmd"]
+    },
+    "acronym": {
+      "enum": ["EWD", "CBD", "RMD"]
+    },
+    "display_name": {
+      "type": "string",
+      "minLength": 1,
+      "maxLength": 120
+    },
+    "version_source": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["type", "path"],
+      "properties": {
+        "type": {
+          "const": "cff"
+        },
+        "path": {
+          "const": "CITATION.cff"
+        }
+      }
+    },
+    "status_source": {
+      "const": "STATUS.md"
+    },
+    "required_paths": {
+      "type": "array",
+      "uniqueItems": true,
+      "items": {
+        "$ref": "#/$defs/repositoryPath"
+      }
+    },
+    "retrieval": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "canonical",
+        "structural",
+        "evidence",
+        "tabular",
+        "implementation",
+        "exclude"
+      ],
+      "properties": {
+        "canonical": {
+          "$ref": "#/$defs/pathList"
+        },
+        "structural": {
+          "$ref": "#/$defs/pathList"
+        },
+        "evidence": {
+          "$ref": "#/$defs/pathList"
+        },
+        "tabular": {
+          "$ref": "#/$defs/pathList"
+        },
+        "implementation": {
+          "$ref": "#/$defs/pathList"
+        },
+        "exclude": {
+          "$ref": "#/$defs/pathList"
+        }
+      }
+    }
+  },
+  "$defs": {
+    "repositoryPath": {
+      "type": "string",
+      "minLength": 1,
+      "maxLength": 512,
+      "pattern": "^(?!/)(?!.*(?:^|/)\\.\\.(?:/|$)).+$"
+    },
+    "pathList": {
+      "type": "array",
+      "uniqueItems": true,
+      "items": {
+        "$ref": "#/$defs/repositoryPath"
+      }
+    }
+  }
+}
