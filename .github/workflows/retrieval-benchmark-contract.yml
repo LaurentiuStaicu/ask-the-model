@@ -1,0 +1,51 @@
+name: Retrieval benchmark contract
+
+on:
+  workflow_dispatch:
+  pull_request:
+    paths:
+      - 'data/schemas/retrieval-benchmark-v1.schema.json'
+      - 'data/schemas/retrieval-benchmark-run-v1.schema.json'
+      - 'benchmarks/retrieval-v1/**'
+      - 'scripts/evaluate_retrieval_benchmark.py'
+      - 'tests/retrieval_benchmark_metrics_test.py'
+      - '.github/workflows/retrieval-benchmark-contract.yml'
+  push:
+    branches:
+      - main
+    paths:
+      - 'data/schemas/retrieval-benchmark-v1.schema.json'
+      - 'data/schemas/retrieval-benchmark-run-v1.schema.json'
+      - 'benchmarks/retrieval-v1/**'
+      - 'scripts/evaluate_retrieval_benchmark.py'
+      - 'tests/retrieval_benchmark_metrics_test.py'
+      - '.github/workflows/retrieval-benchmark-contract.yml'
+
+permissions:
+  contents: read
+
+jobs:
+  contract:
+    runs-on: ubuntu-24.04
+    timeout-minutes: 5
+
+    steps:
+      - name: Checkout AtM
+        uses: actions/checkout@v6
+
+      - name: Parse benchmark schemas
+        shell: bash
+        run: |
+          set -euo pipefail
+          python3 -m json.tool \
+            data/schemas/retrieval-benchmark-v1.schema.json \
+            >/dev/null
+          python3 -m json.tool \
+            data/schemas/retrieval-benchmark-run-v1.schema.json \
+            >/dev/null
+
+      - name: Test benchmark evaluator
+        shell: bash
+        run: |
+          set -euo pipefail
+          python3 tests/retrieval_benchmark_metrics_test.py
