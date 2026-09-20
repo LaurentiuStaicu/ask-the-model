@@ -408,6 +408,116 @@ test_same_authority_uses_bm25_order (void)
 }
 
 static void
+test_nonexact_same_source_saturation_keeps_complementary_status (void)
+{
+    GPtrArray *results = new_results ();
+    GError *error = NULL;
+
+    for (guint i = 0; i < 4; i++) {
+        AtmEvidenceRecord *row = new_record (
+            i == 0
+                ? "cbd:dataset-row:recovery.csv:13"
+                : i == 1
+                    ? "cbd:dataset-row:recovery.csv:16"
+                    : i == 2
+                        ? "cbd:dataset-row:recovery.csv:12"
+                        : "cbd:dataset-row:recovery.csv:14",
+            ATM_SOURCE_ROLE_EVIDENCE |
+                ATM_SOURCE_ROLE_TABULAR,
+            ATM_EVIDENCE_MATCH_TABULAR,
+            FALSE,
+            0.0
+        );
+        g_free (row->source_path);
+        row->source_path = g_strdup (
+            "model/benchmarks/results/recovery.csv"
+        );
+        g_ptr_array_add (results, row);
+    }
+
+    AtmEvidenceRecord *status = new_record (
+        "cbd:section:STATUS.md:lines:17-29",
+        ATM_SOURCE_ROLE_CANONICAL |
+            ATM_SOURCE_ROLE_STATUS,
+        ATM_EVIDENCE_MATCH_LEXICAL,
+        TRUE,
+        -1.0
+    );
+    g_free (status->source_path);
+    status->source_path = g_strdup ("STATUS.md");
+    g_ptr_array_add (results, status);
+
+    g_assert_true (
+        atm_retrieval_rank_and_deduplicate (
+            results,
+            ATM_RETRIEVAL_INTENT_NUMERIC,
+            5,
+            &error
+        )
+    );
+    g_assert_no_error (error);
+    g_assert_cmpuint (results->len, ==, 5);
+    g_assert_cmpstr (
+        ((AtmEvidenceRecord *) g_ptr_array_index (
+            results,
+            2
+        ))->logical_source_id,
+        ==,
+        "cbd:section:STATUS.md:lines:17-29"
+    );
+
+    g_ptr_array_unref (results);
+}
+
+static void
+test_exact_matches_are_not_saturated (void)
+{
+    GPtrArray *results = new_results ();
+    GError *error = NULL;
+
+    for (guint i = 0; i < 3; i++) {
+        char *logical_id = g_strdup_printf (
+            "ewd:entity:variable:exact_%u",
+            i
+        );
+        AtmEvidenceRecord *record = new_record (
+            logical_id,
+            ATM_SOURCE_ROLE_STRUCTURAL,
+            ATM_EVIDENCE_MATCH_EXACT,
+            FALSE,
+            0.0
+        );
+        g_free (logical_id);
+        g_free (record->source_path);
+        record->source_path = g_strdup ("model/core.json");
+        g_ptr_array_add (results, record);
+    }
+
+    g_assert_true (
+        atm_retrieval_rank_and_deduplicate (
+            results,
+            ATM_RETRIEVAL_INTENT_STRUCTURE,
+            3,
+            &error
+        )
+    );
+    g_assert_no_error (error);
+
+    for (guint i = 0; i < 3; i++) {
+        g_assert_cmpint (
+            ((AtmEvidenceRecord *) g_ptr_array_index (
+                results,
+                i
+            ))->match_kind,
+            ==,
+            ATM_EVIDENCE_MATCH_EXACT
+        );
+    }
+
+    g_ptr_array_unref (results);
+}
+
+static void
 test_rank_limit_truncates_after_deduplication (void)
 {
     GPtrArray *results = new_results ();
@@ -510,6 +620,14 @@ main (int argc, char **argv)
     g_test_add_func (
         "/retrieval-rank/bm25-within-authority",
         test_same_authority_uses_bm25_order
+    );
+    g_test_add_func (
+        "/retrieval-rank/source-saturation",
+        test_nonexact_same_source_saturation_keeps_complementary_status
+    );
+    g_test_add_func (
+        "/retrieval-rank/exact-not-saturated",
+        test_exact_matches_are_not_saturated
     );
     g_test_add_func (
         "/retrieval-rank/truncate",
