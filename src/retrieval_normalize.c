@@ -105,6 +105,31 @@ atm_retrieval_normalize_query (
     static const char *loop_ro[] = {
         "bucla", "buclă", "bucle"
     };
+    static const char *paradigm_ro[] = {
+        "paradigma", "paradigmă", "paradigme", "paradigmele"
+    };
+    static const char *modeling_ro[] = {
+        "modelare", "modelarea", "modelarii", "modelării"
+    };
+    static const char *canonical_ro[] = {
+        "canonic", "canonica", "canonică", "canonice", "canonicele"
+    };
+    static const char *compare_ro[] = {
+        "compara", "compară", "comparatie", "comparație", "comparația"
+    };
+    static const char *validation_ro[] = {
+        "validare", "validarea", "validarii", "validării"
+    };
+    static const char *participant_ro[] = {
+        "participant", "participanti", "participanți",
+        "participantii", "participanții"
+    };
+    static const char *human_ro[] = {
+        "uman", "umana", "umană", "umani", "umane"
+    };
+    static const char *established_ro[] = {
+        "stabilit", "stabilita", "stabilită", "stabilite"
+    };
     static const char *source_ro[] = {
         "sursa", "sursă", "surse", "sursele"
     };
@@ -277,6 +302,69 @@ atm_retrieval_normalize_query (
 
         if (token_is_any (
                 token,
+                paradigm_ro,
+                G_N_ELEMENTS (paradigm_ro)
+            )) {
+            append_alias_once (
+                expanded,
+                aliases,
+                "paradigm"
+            );
+            normalized->intents |=
+                ATM_RETRIEVAL_INTENT_STRUCTURE;
+        }
+
+        if (token_is_any (
+                token,
+                modeling_ro,
+                G_N_ELEMENTS (modeling_ro)
+            )) {
+            append_alias_once (
+                expanded,
+                aliases,
+                "modeling"
+            );
+            append_alias_once (
+                expanded,
+                aliases,
+                "model"
+            );
+            normalized->intents |=
+                ATM_RETRIEVAL_INTENT_STRUCTURE;
+        }
+
+        if (token_is_any (
+                token,
+                canonical_ro,
+                G_N_ELEMENTS (canonical_ro)
+            )) {
+            append_alias_once (
+                expanded,
+                aliases,
+                "canonical"
+            );
+        }
+
+        if (token_is_any (
+                token,
+                compare_ro,
+                G_N_ELEMENTS (compare_ro)
+            )) {
+            append_alias_once (
+                expanded,
+                aliases,
+                "compare"
+            );
+        }
+
+        if (g_strcmp0 (token, "paradigm") == 0 ||
+            g_strcmp0 (token, "modeling") == 0) {
+            normalized->intents |=
+                ATM_RETRIEVAL_INTENT_STRUCTURE;
+        }
+
+        if (token_is_any (
+                token,
                 source_ro,
                 G_N_ELEMENTS (source_ro)
             )) {
@@ -321,6 +409,61 @@ atm_retrieval_normalize_query (
             g_strcmp0 (token, "sources") == 0 ||
             g_strcmp0 (token, "evidence") == 0 ||
             g_strcmp0 (token, "provenance") == 0) {
+            normalized->intents |=
+                ATM_RETRIEVAL_INTENT_EVIDENCE;
+        }
+
+        if (token_is_any (
+                token,
+                validation_ro,
+                G_N_ELEMENTS (validation_ro)
+            )) {
+            append_alias_once (
+                expanded,
+                aliases,
+                "validation"
+            );
+            normalized->intents |=
+                ATM_RETRIEVAL_INTENT_EVIDENCE;
+        }
+
+        if (token_is_any (
+                token,
+                participant_ro,
+                G_N_ELEMENTS (participant_ro)
+            )) {
+            append_alias_once (
+                expanded,
+                aliases,
+                "participant"
+            );
+        }
+
+        if (token_is_any (
+                token,
+                human_ro,
+                G_N_ELEMENTS (human_ro)
+            )) {
+            append_alias_once (
+                expanded,
+                aliases,
+                "human"
+            );
+        }
+
+        if (token_is_any (
+                token,
+                established_ro,
+                G_N_ELEMENTS (established_ro)
+            )) {
+            append_alias_once (
+                expanded,
+                aliases,
+                "established"
+            );
+        }
+
+        if (g_strcmp0 (token, "validation") == 0) {
             normalized->intents |=
                 ATM_RETRIEVAL_INTENT_EVIDENCE;
         }

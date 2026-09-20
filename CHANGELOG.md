@@ -7,6 +7,7 @@ All notable public releases of Ask the Model are recorded here.
 ### Repository and retrieval backend
 
 - added per-topic R5 evaluation diagnostics with rank and top-5 visibility for required evidence, preserving the frozen corpus, qrels, aggregate metrics and provisional gates;
+- expanded conservative Romanian→English runtime query aliases for paradigm/modeling/comparison and human-validation terminology using only R5 development-split needs; benchmark qrels and provisional targets remain unchanged;
 - implemented the fixed-catalog R1 repository lifecycle with SHA resolution, bounded safe extraction, strict manifest/version validation and immutable snapshot promotion;
 - implemented deterministic R2 per-snapshot SQLite/FTS5 indexing with source roles, structured entities/relations, Markdown sections, tabular datasets, integrity/provenance checks and rebuild-from-snapshot behavior;
 - added deterministic R3 exact technical-ID, structured, lexical BM25 and tabular row-key retrieval;
