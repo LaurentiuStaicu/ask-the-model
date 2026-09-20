@@ -200,6 +200,26 @@ result_at (GPtrArray *results, guint index)
 }
 
 static void
+assert_snapshot_provenance (const AtmEvidenceRecord *record)
+{
+    g_assert_cmpstr (
+        record->repository_id,
+        ==,
+        "ewd"
+    );
+    g_assert_cmpstr (
+        record->repository_version,
+        ==,
+        "0.1.0"
+    );
+    g_assert_cmpstr (
+        record->snapshot_sha,
+        ==,
+        "0123456789abcdef0123456789abcdef01234567"
+    );
+}
+
+static void
 test_native_entity_lookup (void)
 {
     char *snapshot_root = new_snapshot ();
@@ -227,6 +247,7 @@ test_native_entity_lookup (void)
 
     AtmEvidenceRecord *record = result_at (results, 0);
 
+    assert_snapshot_provenance (record);
     g_assert_cmpstr (record->evidence_kind, ==, "entity");
     g_assert_cmpint (
         record->match_kind,
@@ -444,6 +465,7 @@ test_fts_romanian_diacritic_search (void)
 
     AtmEvidenceRecord *record = result_at (results, 0);
 
+    assert_snapshot_provenance (record);
     g_assert_cmpstr (record->evidence_kind, ==, "section");
     g_assert_cmpstr (record->source_path, ==, "STATUS.md");
     g_assert_true (
@@ -496,6 +518,7 @@ test_fts_dataset_row_provenance (void)
 
     AtmEvidenceRecord *record = result_at (results, 0);
 
+    assert_snapshot_provenance (record);
     g_assert_cmpstr (
         record->evidence_kind,
         ==,

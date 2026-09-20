@@ -26,6 +26,9 @@ typedef enum {
 typedef struct {
     char *evidence_kind;
     gint64 evidence_id;
+    char *repository_id;
+    char *repository_version;
+    char *snapshot_sha;
     char *logical_source_id;
     char *source_path;
     char *locator;
