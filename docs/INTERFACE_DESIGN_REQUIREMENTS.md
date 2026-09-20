@@ -93,7 +93,7 @@ For each proposed element, the design review should state:
 
 The first visual decision is the overall window topology. Subsequent elements should be reviewed only after that topology is selected.
 
-## Multi-model discussion requirement
+## Multi-repository discussion requirement
 
 AtM must allow the user to select **zero, one or more** scientific dynamical-model repositories for a conversation. Zero repositories preserves ordinary local AI chat; one or more repositories enables repository-grounded chat.
 
@@ -105,7 +105,7 @@ The initial selectable set is:
 
 The selector must support both single-model discussion and cross-model discussion without introducing a permanent navigation pane solely for this purpose.
 
-The preferred GTK interaction pattern for the first visual prototype is a compact `Gtk.MenuButton` in the upper application area that opens a `Gtk.Popover` containing independent check controls for each available dynamical model. This supports genuine multi-selection and keeps the main conversation area uncluttered.
+The preferred GTK interaction pattern for the first visual prototype is a compact `Gtk.MenuButton` in the upper application area that opens a `Gtk.Popover` containing independent check controls for each available repository. This supports genuine multi-selection and keeps the main conversation area uncluttered.
 
 The closed control must summarize the active scope clearly, for example:
 
