@@ -779,19 +779,24 @@ namespace AskTheModel {
                 finish_repository_operation (
                     RepositoryOperationOutcome.NORMAL
                 );
-            } catch (GLib.Error error) {
-                bool transport_failure =
-                    error.domain != RepositoryError.quark ();
-
+            } catch (RepositoryError error) {
                 finish_repository_operation (
-                    transport_failure
-                        ? RepositoryOperationOutcome.OFFLINE
-                        : RepositoryOperationOutcome.ERROR,
+                    RepositoryOperationOutcome.ERROR,
                     error.message
                 );
 
                 stderr.printf (
                     "AtM: repository refresh failed: %s\n",
+                    error.message
+                );
+            } catch (GLib.Error error) {
+                finish_repository_operation (
+                    RepositoryOperationOutcome.OFFLINE,
+                    error.message
+                );
+
+                stderr.printf (
+                    "AtM: repository refresh transport failed: %s\n",
                     error.message
                 );
             }
@@ -879,19 +884,24 @@ namespace AskTheModel {
                         changed
                     );
                 }
-            } catch (GLib.Error error) {
-                bool transport_failure =
-                    error.domain != RepositoryError.quark ();
-
+            } catch (RepositoryError error) {
                 finish_repository_operation (
-                    transport_failure
-                        ? RepositoryOperationOutcome.OFFLINE
-                        : RepositoryOperationOutcome.ERROR,
+                    RepositoryOperationOutcome.ERROR,
                     error.message
                 );
 
                 stderr.printf (
                     "AtM: repository download/update failed: %s\n",
+                    error.message
+                );
+            } catch (GLib.Error error) {
+                finish_repository_operation (
+                    RepositoryOperationOutcome.OFFLINE,
+                    error.message
+                );
+
+                stderr.printf (
+                    "AtM: repository download/update transport failed: %s\n",
                     error.message
                 );
             }
