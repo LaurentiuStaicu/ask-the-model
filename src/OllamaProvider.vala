@@ -10,12 +10,14 @@ namespace AskTheModel {
         private string[] roles = {};
         private string[] contents = {};
         private string[] completion_models = {};
+        private string[] completion_model_digests = {};
 
         public signal void response_chunk (string chunk);
         public signal void discovery_progress (uint percent);
 
         public string? base_url { get; private set; default = null; }
         public string? model_name { get; private set; default = null; }
+        public string? model_digest { get; private set; default = null; }
         public uint model_count { get; private set; default = 0; }
 
         public OllamaProvider () {
@@ -28,9 +30,13 @@ namespace AskTheModel {
         }
 
         public bool select_model (string requested_model) {
-            foreach (string available_model in completion_models) {
-                if (available_model == requested_model) {
+            for (int i = 0; i < completion_models.length; i++) {
+                if (completion_models[i] == requested_model) {
                     model_name = requested_model;
+                    model_digest =
+                        completion_model_digests[i].length > 0
+                            ? completion_model_digests[i]
+                            : null;
                     return true;
                 }
             }
@@ -129,6 +135,7 @@ namespace AskTheModel {
 
                     Json.Array models = root.get_array_member ("models");
                     string[] detected_completion_models = {};
+                    string[] detected_completion_digests = {};
 
                     model_count = models.get_length ();
                     base_url = candidate;
@@ -153,7 +160,21 @@ namespace AskTheModel {
                                 candidate,
                                 candidate_model
                             )) {
+                                string candidate_digest = "";
+
+                                if (model.has_member ("digest")) {
+                                    string? raw_digest =
+                                        model.get_string_member ("digest");
+
+                                    if (raw_digest != null) {
+                                        candidate_digest =
+                                            raw_digest.strip ();
+                                    }
+                                }
+
                                 detected_completion_models += candidate_model;
+                                detected_completion_digests +=
+                                    candidate_digest;
                             }
                         }
 
@@ -163,19 +184,18 @@ namespace AskTheModel {
                     }
 
                     completion_models = detected_completion_models;
+                    completion_model_digests =
+                        detected_completion_digests;
                     model_name = null;
+                    model_digest = null;
 
                     if (previous_model != null) {
-                        foreach (string detected_model in completion_models) {
-                            if (detected_model == previous_model) {
-                                model_name = previous_model;
-                                break;
-                            }
-                        }
+                        select_model (previous_model);
                     }
 
-                    if (model_name == null && completion_models.length > 0) {
-                        model_name = completion_models[0];
+                    if (model_name == null &&
+                        completion_models.length > 0) {
+                        select_model (completion_models[0]);
                     }
 
                     return true;
@@ -186,8 +206,10 @@ namespace AskTheModel {
 
             base_url = null;
             model_name = null;
+            model_digest = null;
             model_count = 0;
             completion_models = {};
+            completion_model_digests = {};
             return false;
         }
 
