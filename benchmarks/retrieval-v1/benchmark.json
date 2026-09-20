@@ -1,0 +1,1072 @@
+{
+  "schema_version": 1,
+  "benchmark_id": "atm-retrieval-v1-2026-09-20",
+  "corpus": [
+    {
+      "repository_id": "ewd",
+      "repository_version": "0.1.0",
+      "snapshot_sha": "795a6b8e42e2a19497f686a89e7c3a6056e6930c"
+    },
+    {
+      "repository_id": "cbd",
+      "repository_version": "0.1.0",
+      "snapshot_sha": "e6e3b3077b7d78e3f37d963e0734e9084e8a62ab"
+    },
+    {
+      "repository_id": "rmd",
+      "repository_version": "0.1.0",
+      "snapshot_sha": "a8b5ff89a951d3194fdedb59771bc79937fe7bc7"
+    }
+  ],
+  "topics": [
+    {
+      "topic_id": "exact.ewd.food_per_capita.en",
+      "information_need_id": "need.ewd.food_per_capita",
+      "split": "development",
+      "topic_type": "exact_entity_lookup",
+      "language": "en",
+      "query": "EWD: find the exact technical entity food_per_capita.",
+      "active_repositories": [
+        "ewd",
+        "cbd",
+        "rmd"
+      ],
+      "explicit_repositories": [
+        "ewd"
+      ],
+      "expected_outcome": "retrieval",
+      "judgments": [
+        {
+          "repository_id": "ewd",
+          "logical_source_id": "ewd:entity:variable:food_per_capita",
+          "grade": 3,
+          "required": true
+        }
+      ],
+      "expect_unsupported": false,
+      "expected_exact": {
+        "repository_id": "ewd",
+        "logical_source_id": "ewd:entity:variable:food_per_capita"
+      }
+    },
+    {
+      "topic_id": "exact.ewd.food_per_capita.ro",
+      "information_need_id": "need.ewd.food_per_capita",
+      "split": "development",
+      "topic_type": "exact_entity_lookup",
+      "language": "ro",
+      "query": "În EWD, găsește entitatea tehnică exactă food_per_capita.",
+      "active_repositories": [
+        "ewd",
+        "cbd",
+        "rmd"
+      ],
+      "explicit_repositories": [
+        "ewd"
+      ],
+      "expected_outcome": "retrieval",
+      "judgments": [
+        {
+          "repository_id": "ewd",
+          "logical_source_id": "ewd:entity:variable:food_per_capita",
+          "grade": 3,
+          "required": true
+        }
+      ],
+      "expect_unsupported": false,
+      "expected_exact": {
+        "repository_id": "ewd",
+        "logical_source_id": "ewd:entity:variable:food_per_capita"
+      }
+    },
+    {
+      "topic_id": "exact.ewd.food_per_capita.mixed",
+      "information_need_id": "need.ewd.food_per_capita",
+      "split": "development",
+      "topic_type": "exact_entity_lookup",
+      "language": "mixed",
+      "query": "EWD: variabila exactă food_per_capita, technical ID.",
+      "active_repositories": [
+        "ewd",
+        "cbd",
+        "rmd"
+      ],
+      "explicit_repositories": [
+        "ewd"
+      ],
+      "expected_outcome": "retrieval",
+      "expected_exact": {
+        "repository_id": "ewd",
+        "logical_source_id": "ewd:entity:variable:food_per_capita"
+      },
+      "judgments": [
+        {
+          "repository_id": "ewd",
+          "logical_source_id": "ewd:entity:variable:food_per_capita",
+          "grade": 3,
+          "required": true
+        }
+      ],
+      "expect_unsupported": false
+    },
+    {
+      "topic_id": "exact.cbd.belief_claim.en",
+      "information_need_id": "need.cbd.belief_claim",
+      "split": "validation",
+      "topic_type": "exact_entity_lookup",
+      "language": "en",
+      "query": "CBD: retrieve the exact variable VAR.BELIEF.CLAIM.",
+      "active_repositories": [
+        "ewd",
+        "cbd",
+        "rmd"
+      ],
+      "explicit_repositories": [
+        "cbd"
+      ],
+      "expected_outcome": "retrieval",
+      "judgments": [
+        {
+          "repository_id": "cbd",
+          "logical_source_id": "cbd:entity:variable:VAR.BELIEF.CLAIM",
+          "grade": 3,
+          "required": true
+        }
+      ],
+      "expect_unsupported": false,
+      "expected_exact": {
+        "repository_id": "cbd",
+        "logical_source_id": "cbd:entity:variable:VAR.BELIEF.CLAIM"
+      }
+    },
+    {
+      "topic_id": "exact.cbd.belief_claim.ro",
+      "information_need_id": "need.cbd.belief_claim",
+      "split": "validation",
+      "topic_type": "exact_entity_lookup",
+      "language": "ro",
+      "query": "În CBD, recuperează variabila exactă VAR.BELIEF.CLAIM.",
+      "active_repositories": [
+        "ewd",
+        "cbd",
+        "rmd"
+      ],
+      "explicit_repositories": [
+        "cbd"
+      ],
+      "expected_outcome": "retrieval",
+      "judgments": [
+        {
+          "repository_id": "cbd",
+          "logical_source_id": "cbd:entity:variable:VAR.BELIEF.CLAIM",
+          "grade": 3,
+          "required": true
+        }
+      ],
+      "expect_unsupported": false,
+      "expected_exact": {
+        "repository_id": "cbd",
+        "logical_source_id": "cbd:entity:variable:VAR.BELIEF.CLAIM"
+      }
+    },
+    {
+      "topic_id": "exact.rmd.refinancing_loop.en",
+      "information_need_id": "need.rmd.refinancing_loop",
+      "split": "development",
+      "topic_type": "exact_entity_lookup",
+      "language": "en",
+      "query": "RMD: retrieve government_refinancing_interest_loop.",
+      "active_repositories": [
+        "ewd",
+        "cbd",
+        "rmd"
+      ],
+      "explicit_repositories": [
+        "rmd"
+      ],
+      "expected_outcome": "retrieval",
+      "judgments": [
+        {
+          "repository_id": "rmd",
+          "logical_source_id": "rmd:entity:feedback_loop:government_refinancing_interest_loop",
+          "grade": 3,
+          "required": true
+        }
+      ],
+      "expect_unsupported": false,
+      "expected_exact": {
+        "repository_id": "rmd",
+        "logical_source_id": "rmd:entity:feedback_loop:government_refinancing_interest_loop"
+      }
+    },
+    {
+      "topic_id": "exact.rmd.refinancing_loop.ro",
+      "information_need_id": "need.rmd.refinancing_loop",
+      "split": "development",
+      "topic_type": "exact_entity_lookup",
+      "language": "ro",
+      "query": "În RMD, recuperează government_refinancing_interest_loop.",
+      "active_repositories": [
+        "ewd",
+        "cbd",
+        "rmd"
+      ],
+      "explicit_repositories": [
+        "rmd"
+      ],
+      "expected_outcome": "retrieval",
+      "judgments": [
+        {
+          "repository_id": "rmd",
+          "logical_source_id": "rmd:entity:feedback_loop:government_refinancing_interest_loop",
+          "grade": 3,
+          "required": true
+        }
+      ],
+      "expect_unsupported": false,
+      "expected_exact": {
+        "repository_id": "rmd",
+        "logical_source_id": "rmd:entity:feedback_loop:government_refinancing_interest_loop"
+      }
+    },
+    {
+      "topic_id": "status.rmd.current_boundary.en",
+      "information_need_id": "need.rmd.current_boundary",
+      "split": "validation",
+      "topic_type": "current_status_boundary",
+      "language": "en",
+      "query": "In RMD, what is the current scientific status and validation boundary?",
+      "active_repositories": [
+        "ewd",
+        "cbd",
+        "rmd"
+      ],
+      "explicit_repositories": [
+        "rmd"
+      ],
+      "expected_outcome": "retrieval",
+      "judgments": [
+        {
+          "repository_id": "rmd",
+          "logical_source_id": "rmd:section:STATUS.md:lines:3-8",
+          "grade": 3,
+          "required": true
+        },
+        {
+          "repository_id": "rmd",
+          "logical_source_id": "rmd:section:STATUS.md:lines:77-92",
+          "grade": 3,
+          "required": true
+        },
+        {
+          "repository_id": "rmd",
+          "logical_source_id": "rmd:section:STATUS.md:lines:177-190",
+          "grade": 2,
+          "required": false
+        }
+      ],
+      "expect_unsupported": false
+    },
+    {
+      "topic_id": "status.rmd.current_boundary.ro",
+      "information_need_id": "need.rmd.current_boundary",
+      "split": "validation",
+      "topic_type": "current_status_boundary",
+      "language": "ro",
+      "query": "În RMD, care este starea științifică actuală și limita actuală de validare?",
+      "active_repositories": [
+        "ewd",
+        "cbd",
+        "rmd"
+      ],
+      "explicit_repositories": [
+        "rmd"
+      ],
+      "expected_outcome": "retrieval",
+      "judgments": [
+        {
+          "repository_id": "rmd",
+          "logical_source_id": "rmd:section:STATUS.md:lines:3-8",
+          "grade": 3,
+          "required": true
+        },
+        {
+          "repository_id": "rmd",
+          "logical_source_id": "rmd:section:STATUS.md:lines:77-92",
+          "grade": 3,
+          "required": true
+        },
+        {
+          "repository_id": "rmd",
+          "logical_source_id": "rmd:section:STATUS.md:lines:177-190",
+          "grade": 2,
+          "required": false
+        }
+      ],
+      "expect_unsupported": false
+    },
+    {
+      "topic_id": "structure.cbd.paradigm.en",
+      "information_need_id": "need.cbd.paradigm",
+      "split": "development",
+      "topic_type": "structure_mechanism",
+      "language": "en",
+      "query": "What modeling paradigm does CBD use, and is it currently a formal System Dynamics model?",
+      "active_repositories": [
+        "ewd",
+        "cbd",
+        "rmd"
+      ],
+      "explicit_repositories": [
+        "cbd"
+      ],
+      "expected_outcome": "retrieval",
+      "judgments": [
+        {
+          "repository_id": "cbd",
+          "logical_source_id": "cbd:section:STATUS.md:lines:9-16",
+          "grade": 3,
+          "required": true
+        },
+        {
+          "repository_id": "cbd",
+          "logical_source_id": "cbd:section:STATUS.md:lines:17-29",
+          "grade": 2,
+          "required": false
+        }
+      ],
+      "expect_unsupported": false
+    },
+    {
+      "topic_id": "structure.cbd.paradigm.ro",
+      "information_need_id": "need.cbd.paradigm",
+      "split": "development",
+      "topic_type": "structure_mechanism",
+      "language": "ro",
+      "query": "Ce paradigmă de modelare folosește CBD și este în prezent un model formal System Dynamics?",
+      "active_repositories": [
+        "ewd",
+        "cbd",
+        "rmd"
+      ],
+      "explicit_repositories": [
+        "cbd"
+      ],
+      "expected_outcome": "retrieval",
+      "judgments": [
+        {
+          "repository_id": "cbd",
+          "logical_source_id": "cbd:section:STATUS.md:lines:9-16",
+          "grade": 3,
+          "required": true
+        },
+        {
+          "repository_id": "cbd",
+          "logical_source_id": "cbd:section:STATUS.md:lines:17-29",
+          "grade": 2,
+          "required": false
+        }
+      ],
+      "expect_unsupported": false
+    },
+    {
+      "topic_id": "evidence.ewd.resources_identifiability.en",
+      "information_need_id": "need.ewd.resources_identifiability",
+      "split": "validation",
+      "topic_type": "evidence_provenance",
+      "language": "en",
+      "query": "Which EWD evidence shows whether the resources parameter is weakly identified?",
+      "active_repositories": [
+        "ewd",
+        "cbd",
+        "rmd"
+      ],
+      "explicit_repositories": [
+        "ewd"
+      ],
+      "expected_outcome": "retrieval",
+      "judgments": [
+        {
+          "repository_id": "ewd",
+          "logical_source_id": "ewd:dataset-row:data/scenarios/parameter_identifiability.csv:0",
+          "grade": 3,
+          "required": true
+        },
+        {
+          "repository_id": "ewd",
+          "logical_source_id": "ewd:section:STATUS.md:lines:17-26",
+          "grade": 2,
+          "required": false
+        }
+      ],
+      "expect_unsupported": false
+    },
+    {
+      "topic_id": "evidence.ewd.resources_identifiability.ro",
+      "information_need_id": "need.ewd.resources_identifiability",
+      "split": "validation",
+      "topic_type": "evidence_provenance",
+      "language": "ro",
+      "query": "Ce dovadă din EWD arată dacă parametrul resources este slab identificat?",
+      "active_repositories": [
+        "ewd",
+        "cbd",
+        "rmd"
+      ],
+      "explicit_repositories": [
+        "ewd"
+      ],
+      "expected_outcome": "retrieval",
+      "judgments": [
+        {
+          "repository_id": "ewd",
+          "logical_source_id": "ewd:dataset-row:data/scenarios/parameter_identifiability.csv:0",
+          "grade": 3,
+          "required": true
+        },
+        {
+          "repository_id": "ewd",
+          "logical_source_id": "ewd:section:STATUS.md:lines:17-26",
+          "grade": 2,
+          "required": false
+        }
+      ],
+      "expect_unsupported": false
+    },
+    {
+      "topic_id": "numeric.ewd.food_fit.en",
+      "information_need_id": "need.ewd.food_fit",
+      "split": "development",
+      "topic_type": "numeric_tabular",
+      "language": "en",
+      "query": "In EWD, what historical MAPE is reported for food_per_capita in fit_diagnostics.csv?",
+      "active_repositories": [
+        "ewd",
+        "cbd",
+        "rmd"
+      ],
+      "explicit_repositories": [
+        "ewd"
+      ],
+      "expected_outcome": "retrieval",
+      "judgments": [
+        {
+          "repository_id": "ewd",
+          "logical_source_id": "ewd:dataset-row:data/scenarios/fit_diagnostics.csv:2",
+          "grade": 3,
+          "required": true
+        },
+        {
+          "repository_id": "ewd",
+          "logical_source_id": "ewd:entity:variable:food_per_capita",
+          "grade": 2,
+          "required": false
+        }
+      ],
+      "expect_unsupported": false
+    },
+    {
+      "topic_id": "numeric.ewd.food_fit.ro",
+      "information_need_id": "need.ewd.food_fit",
+      "split": "development",
+      "topic_type": "numeric_tabular",
+      "language": "ro",
+      "query": "În EWD, ce MAPE istoric este raportat pentru food_per_capita în fit_diagnostics.csv?",
+      "active_repositories": [
+        "ewd",
+        "cbd",
+        "rmd"
+      ],
+      "explicit_repositories": [
+        "ewd"
+      ],
+      "expected_outcome": "retrieval",
+      "judgments": [
+        {
+          "repository_id": "ewd",
+          "logical_source_id": "ewd:dataset-row:data/scenarios/fit_diagnostics.csv:2",
+          "grade": 3,
+          "required": true
+        },
+        {
+          "repository_id": "ewd",
+          "logical_source_id": "ewd:entity:variable:food_per_capita",
+          "grade": 2,
+          "required": false
+        }
+      ],
+      "expect_unsupported": false
+    },
+    {
+      "topic_id": "numeric.cbd.recovery_160_medium.en",
+      "information_need_id": "need.cbd.recovery_160_medium",
+      "split": "validation",
+      "topic_type": "numeric_tabular",
+      "language": "en",
+      "query": "In CBD candidate recovery, what recovery probability is reported for EVSD, medium, n_target=160 and n_foil=160?",
+      "active_repositories": [
+        "ewd",
+        "cbd",
+        "rmd"
+      ],
+      "explicit_repositories": [
+        "cbd"
+      ],
+      "expected_outcome": "retrieval",
+      "judgments": [
+        {
+          "repository_id": "cbd",
+          "logical_source_id": "cbd:dataset-row:model/benchmarks/results/m1_e4_candidate_recovery_authoritative_2026-09-16.csv:13",
+          "grade": 3,
+          "required": true
+        },
+        {
+          "repository_id": "cbd",
+          "logical_source_id": "cbd:section:STATUS.md:lines:17-29",
+          "grade": 2,
+          "required": false
+        }
+      ],
+      "expect_unsupported": false
+    },
+    {
+      "topic_id": "numeric.cbd.recovery_160_medium.ro",
+      "information_need_id": "need.cbd.recovery_160_medium",
+      "split": "validation",
+      "topic_type": "numeric_tabular",
+      "language": "ro",
+      "query": "În benchmarkul CBD de candidate recovery, ce recovery probability este raportată pentru EVSD, medium, n_target=160 și n_foil=160?",
+      "active_repositories": [
+        "ewd",
+        "cbd",
+        "rmd"
+      ],
+      "explicit_repositories": [
+        "cbd"
+      ],
+      "expected_outcome": "retrieval",
+      "judgments": [
+        {
+          "repository_id": "cbd",
+          "logical_source_id": "cbd:dataset-row:model/benchmarks/results/m1_e4_candidate_recovery_authoritative_2026-09-16.csv:13",
+          "grade": 3,
+          "required": true
+        },
+        {
+          "repository_id": "cbd",
+          "logical_source_id": "cbd:section:STATUS.md:lines:17-29",
+          "grade": 2,
+          "required": false
+        }
+      ],
+      "expect_unsupported": false
+    },
+    {
+      "topic_id": "limitation.ewd.probabilistic.en",
+      "information_need_id": "need.ewd.probabilistic",
+      "split": "validation",
+      "topic_type": "negative_limitation",
+      "language": "en",
+      "query": "Does EWD v0.1.0 claim calibrated probabilistic forecasts or probability intervals?",
+      "active_repositories": [
+        "ewd",
+        "cbd",
+        "rmd"
+      ],
+      "explicit_repositories": [
+        "ewd"
+      ],
+      "expected_outcome": "retrieval",
+      "judgments": [
+        {
+          "repository_id": "ewd",
+          "logical_source_id": "ewd:section:STATUS.md:lines:17-26",
+          "grade": 3,
+          "required": true
+        },
+        {
+          "repository_id": "ewd",
+          "logical_source_id": "ewd:section:STATUS.md:lines:33-43",
+          "grade": 3,
+          "required": true
+        }
+      ],
+      "expect_unsupported": false
+    },
+    {
+      "topic_id": "limitation.ewd.probabilistic.ro",
+      "information_need_id": "need.ewd.probabilistic",
+      "split": "validation",
+      "topic_type": "negative_limitation",
+      "language": "ro",
+      "query": "Pretinde EWD v0.1.0 că oferă prognoze probabilistice calibrate sau intervale de probabilitate?",
+      "active_repositories": [
+        "ewd",
+        "cbd",
+        "rmd"
+      ],
+      "explicit_repositories": [
+        "ewd"
+      ],
+      "expected_outcome": "retrieval",
+      "judgments": [
+        {
+          "repository_id": "ewd",
+          "logical_source_id": "ewd:section:STATUS.md:lines:17-26",
+          "grade": 3,
+          "required": true
+        },
+        {
+          "repository_id": "ewd",
+          "logical_source_id": "ewd:section:STATUS.md:lines:33-43",
+          "grade": 3,
+          "required": true
+        }
+      ],
+      "expect_unsupported": false
+    },
+    {
+      "topic_id": "limitation.cbd.human_validation.en",
+      "information_need_id": "need.cbd.human_validation",
+      "split": "development",
+      "topic_type": "negative_limitation",
+      "language": "en",
+      "query": "Has CBD v0.1.0 established human-participant validation of M1.E4?",
+      "active_repositories": [
+        "ewd",
+        "cbd",
+        "rmd"
+      ],
+      "explicit_repositories": [
+        "cbd"
+      ],
+      "expected_outcome": "retrieval",
+      "judgments": [
+        {
+          "repository_id": "cbd",
+          "logical_source_id": "cbd:section:STATUS.md:lines:30-42",
+          "grade": 3,
+          "required": true
+        },
+        {
+          "repository_id": "cbd",
+          "logical_source_id": "cbd:section:STATUS.md:lines:17-29",
+          "grade": 2,
+          "required": false
+        }
+      ],
+      "expect_unsupported": false
+    },
+    {
+      "topic_id": "limitation.cbd.human_validation.ro",
+      "information_need_id": "need.cbd.human_validation",
+      "split": "development",
+      "topic_type": "negative_limitation",
+      "language": "ro",
+      "query": "A stabilit CBD v0.1.0 validarea M1.E4 pe participanți umani?",
+      "active_repositories": [
+        "ewd",
+        "cbd",
+        "rmd"
+      ],
+      "explicit_repositories": [
+        "cbd"
+      ],
+      "expected_outcome": "retrieval",
+      "judgments": [
+        {
+          "repository_id": "cbd",
+          "logical_source_id": "cbd:section:STATUS.md:lines:30-42",
+          "grade": 3,
+          "required": true
+        },
+        {
+          "repository_id": "cbd",
+          "logical_source_id": "cbd:section:STATUS.md:lines:17-29",
+          "grade": 2,
+          "required": false
+        }
+      ],
+      "expect_unsupported": false
+    },
+    {
+      "topic_id": "unsupported.rmd.lunar_driver.en",
+      "information_need_id": "need.rmd.lunar_driver",
+      "split": "validation",
+      "topic_type": "unsupported_premise",
+      "language": "en",
+      "query": "In RMD, what is the calibrated coefficient for lunar_cycle_exchange_rate_driver?",
+      "active_repositories": [
+        "ewd",
+        "cbd",
+        "rmd"
+      ],
+      "explicit_repositories": [
+        "rmd"
+      ],
+      "expected_outcome": "retrieval",
+      "judgments": [],
+      "expect_unsupported": true,
+      "notes": "The pinned RMD corpus does not define this technical identifier; the desired behavior is no selected grounding context rather than fabrication."
+    },
+    {
+      "topic_id": "unsupported.rmd.lunar_driver.ro",
+      "information_need_id": "need.rmd.lunar_driver",
+      "split": "validation",
+      "topic_type": "unsupported_premise",
+      "language": "ro",
+      "query": "În RMD, care este coeficientul calibrat pentru lunar_cycle_exchange_rate_driver?",
+      "active_repositories": [
+        "ewd",
+        "cbd",
+        "rmd"
+      ],
+      "explicit_repositories": [
+        "rmd"
+      ],
+      "expected_outcome": "retrieval",
+      "judgments": [],
+      "expect_unsupported": true,
+      "notes": "The pinned RMD corpus does not define this technical identifier; the desired behavior is no selected grounding context rather than fabrication."
+    },
+    {
+      "topic_id": "compare.paradigms.en",
+      "information_need_id": "need.compare.paradigms",
+      "split": "development",
+      "topic_type": "cross_repository_comparison",
+      "language": "en",
+      "query": "Compare the canonical modeling paradigms of EWD, CBD and RMD.",
+      "active_repositories": [
+        "ewd",
+        "cbd",
+        "rmd"
+      ],
+      "explicit_repositories": [
+        "ewd",
+        "cbd",
+        "rmd"
+      ],
+      "expected_outcome": "retrieval",
+      "judgments": [
+        {
+          "repository_id": "ewd",
+          "logical_source_id": "ewd:section:STATUS.md:lines:9-16",
+          "grade": 3,
+          "required": true
+        },
+        {
+          "repository_id": "cbd",
+          "logical_source_id": "cbd:section:STATUS.md:lines:9-16",
+          "grade": 3,
+          "required": true
+        },
+        {
+          "repository_id": "rmd",
+          "logical_source_id": "rmd:section:STATUS.md:lines:69-76",
+          "grade": 3,
+          "required": true
+        },
+        {
+          "repository_id": "rmd",
+          "logical_source_id": "rmd:section:STATUS.md:lines:177-190",
+          "grade": 2,
+          "required": false
+        }
+      ],
+      "expect_unsupported": false
+    },
+    {
+      "topic_id": "compare.paradigms.ro",
+      "information_need_id": "need.compare.paradigms",
+      "split": "development",
+      "topic_type": "cross_repository_comparison",
+      "language": "ro",
+      "query": "Compară paradigmele canonice de modelare pentru EWD, CBD și RMD.",
+      "active_repositories": [
+        "ewd",
+        "cbd",
+        "rmd"
+      ],
+      "explicit_repositories": [
+        "ewd",
+        "cbd",
+        "rmd"
+      ],
+      "expected_outcome": "retrieval",
+      "judgments": [
+        {
+          "repository_id": "ewd",
+          "logical_source_id": "ewd:section:STATUS.md:lines:9-16",
+          "grade": 3,
+          "required": true
+        },
+        {
+          "repository_id": "cbd",
+          "logical_source_id": "cbd:section:STATUS.md:lines:9-16",
+          "grade": 3,
+          "required": true
+        },
+        {
+          "repository_id": "rmd",
+          "logical_source_id": "rmd:section:STATUS.md:lines:69-76",
+          "grade": 3,
+          "required": true
+        },
+        {
+          "repository_id": "rmd",
+          "logical_source_id": "rmd:section:STATUS.md:lines:177-190",
+          "grade": 2,
+          "required": false
+        }
+      ],
+      "expect_unsupported": false
+    },
+    {
+      "topic_id": "conv.ewd.food_year.1",
+      "information_need_id": "need.conv.ewd.food_year.1",
+      "split": "validation",
+      "topic_type": "exact_entity_lookup",
+      "language": "ro",
+      "query": "În EWD, găsește food_per_capita.",
+      "active_repositories": [
+        "ewd",
+        "rmd"
+      ],
+      "explicit_repositories": [
+        "ewd"
+      ],
+      "expected_outcome": "retrieval",
+      "expected_exact": {
+        "repository_id": "ewd",
+        "logical_source_id": "ewd:entity:variable:food_per_capita"
+      },
+      "judgments": [
+        {
+          "repository_id": "ewd",
+          "logical_source_id": "ewd:entity:variable:food_per_capita",
+          "grade": 3,
+          "required": true
+        }
+      ],
+      "expect_unsupported": false,
+      "conversation_id": "conv-ewd-food-year",
+      "turn_index": 1
+    },
+    {
+      "topic_id": "conv.ewd.food_year.2",
+      "information_need_id": "need.conv.ewd.food_year.2",
+      "split": "validation",
+      "topic_type": "multi_turn_follow_up",
+      "language": "ro",
+      "query": "Dar în 2025?",
+      "active_repositories": [
+        "ewd",
+        "rmd"
+      ],
+      "explicit_repositories": [],
+      "expected_outcome": "retrieval",
+      "judgments": [
+        {
+          "repository_id": "ewd",
+          "logical_source_id": "ewd:entity:variable:food_per_capita",
+          "grade": 3,
+          "required": true
+        }
+      ],
+      "expect_unsupported": false,
+      "conversation_id": "conv-ewd-food-year",
+      "turn_index": 2,
+      "notes": "This turn tests inherited EWD scope and exact-entity identity. A year-keyed row is not judged relevant merely because it contains 2025; it must be semantically sufficient for the anchored entity."
+    },
+    {
+      "topic_id": "conv.cross_exact_clarify.1",
+      "information_need_id": "need.conv.cross_exact_clarify.1",
+      "split": "validation",
+      "topic_type": "exact_entity_lookup",
+      "language": "ro",
+      "query": "EWD food_per_capita",
+      "active_repositories": [
+        "ewd",
+        "rmd"
+      ],
+      "explicit_repositories": [
+        "ewd"
+      ],
+      "expected_outcome": "retrieval",
+      "expected_exact": {
+        "repository_id": "ewd",
+        "logical_source_id": "ewd:entity:variable:food_per_capita"
+      },
+      "judgments": [
+        {
+          "repository_id": "ewd",
+          "logical_source_id": "ewd:entity:variable:food_per_capita",
+          "grade": 3,
+          "required": true
+        }
+      ],
+      "expect_unsupported": false,
+      "conversation_id": "conv-cross-exact-clarify",
+      "turn_index": 1
+    },
+    {
+      "topic_id": "conv.cross_exact_clarify.2",
+      "information_need_id": "need.conv.cross_exact_clarify.2",
+      "split": "validation",
+      "topic_type": "multi_turn_follow_up",
+      "language": "ro",
+      "query": "Și în RMD?",
+      "active_repositories": [
+        "ewd",
+        "rmd"
+      ],
+      "explicit_repositories": [
+        "rmd"
+      ],
+      "expected_outcome": "needs_clarification",
+      "judgments": [],
+      "expect_unsupported": false,
+      "conversation_id": "conv-cross-exact-clarify",
+      "turn_index": 2,
+      "notes": "The previous exact EWD entity has no assumed RMD counterpart. The deterministic state must refuse to guess."
+    },
+    {
+      "topic_id": "conv.status_repo_switch.1",
+      "information_need_id": "need.conv.status_repo_switch.1",
+      "split": "development",
+      "topic_type": "current_status_boundary",
+      "language": "ro",
+      "query": "Care este starea curentă în EWD?",
+      "active_repositories": [
+        "ewd",
+        "rmd"
+      ],
+      "explicit_repositories": [
+        "ewd"
+      ],
+      "expected_outcome": "retrieval",
+      "judgments": [
+        {
+          "repository_id": "ewd",
+          "logical_source_id": "ewd:section:STATUS.md:lines:3-8",
+          "grade": 3,
+          "required": true
+        },
+        {
+          "repository_id": "ewd",
+          "logical_source_id": "ewd:section:STATUS.md:lines:17-26",
+          "grade": 2,
+          "required": false
+        }
+      ],
+      "expect_unsupported": false,
+      "conversation_id": "conv-status-repo-switch",
+      "turn_index": 1
+    },
+    {
+      "topic_id": "conv.status_repo_switch.2",
+      "information_need_id": "need.conv.status_repo_switch.2",
+      "split": "development",
+      "topic_type": "multi_turn_follow_up",
+      "language": "ro",
+      "query": "Și în RMD?",
+      "active_repositories": [
+        "ewd",
+        "rmd"
+      ],
+      "explicit_repositories": [
+        "rmd"
+      ],
+      "expected_outcome": "retrieval",
+      "judgments": [
+        {
+          "repository_id": "rmd",
+          "logical_source_id": "rmd:section:STATUS.md:lines:3-8",
+          "grade": 3,
+          "required": true
+        },
+        {
+          "repository_id": "rmd",
+          "logical_source_id": "rmd:section:STATUS.md:lines:77-92",
+          "grade": 3,
+          "required": true
+        }
+      ],
+      "expect_unsupported": false,
+      "conversation_id": "conv-status-repo-switch",
+      "turn_index": 2
+    },
+    {
+      "topic_id": "conv.status_compare.1",
+      "information_need_id": "need.conv.status_compare.1",
+      "split": "development",
+      "topic_type": "current_status_boundary",
+      "language": "ro",
+      "query": "Care este starea curentă în EWD?",
+      "active_repositories": [
+        "ewd",
+        "rmd"
+      ],
+      "explicit_repositories": [
+        "ewd"
+      ],
+      "expected_outcome": "retrieval",
+      "judgments": [
+        {
+          "repository_id": "ewd",
+          "logical_source_id": "ewd:section:STATUS.md:lines:3-8",
+          "grade": 3,
+          "required": true
+        }
+      ],
+      "expect_unsupported": false,
+      "conversation_id": "conv-status-compare",
+      "turn_index": 1
+    },
+    {
+      "topic_id": "conv.status_compare.2",
+      "information_need_id": "need.conv.status_compare.2",
+      "split": "development",
+      "topic_type": "multi_turn_follow_up",
+      "language": "ro",
+      "query": "Compară cu RMD.",
+      "active_repositories": [
+        "ewd",
+        "rmd"
+      ],
+      "explicit_repositories": [
+        "rmd"
+      ],
+      "expected_outcome": "retrieval",
+      "judgments": [
+        {
+          "repository_id": "ewd",
+          "logical_source_id": "ewd:section:STATUS.md:lines:3-8",
+          "grade": 3,
+          "required": true
+        },
+        {
+          "repository_id": "rmd",
+          "logical_source_id": "rmd:section:STATUS.md:lines:3-8",
+          "grade": 3,
+          "required": true
+        },
+        {
+          "repository_id": "ewd",
+          "logical_source_id": "ewd:section:STATUS.md:lines:9-16",
+          "grade": 2,
+          "required": false
+        },
+        {
+          "repository_id": "rmd",
+          "logical_source_id": "rmd:section:STATUS.md:lines:69-76",
+          "grade": 2,
+          "required": false
+        }
+      ],
+      "expect_unsupported": false,
+      "conversation_id": "conv-status-compare",
+      "turn_index": 2
+    }
+  ]
+}
