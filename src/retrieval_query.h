@@ -17,6 +17,12 @@ typedef enum {
 #define ATM_RETRIEVAL_QUERY_ERROR \
     (atm_retrieval_query_error_quark ())
 
+typedef enum {
+    ATM_EVIDENCE_MATCH_EXACT,
+    ATM_EVIDENCE_MATCH_TABULAR,
+    ATM_EVIDENCE_MATCH_LEXICAL
+} AtmEvidenceMatch;
+
 typedef struct {
     char *evidence_kind;
     gint64 evidence_id;
@@ -26,6 +32,7 @@ typedef struct {
     char *title;
     char *body;
     guint source_roles;
+    AtmEvidenceMatch match_kind;
     gboolean has_lexical_score;
     double lexical_score;
 } AtmEvidenceRecord;

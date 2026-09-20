@@ -228,6 +228,11 @@ test_native_entity_lookup (void)
     AtmEvidenceRecord *record = result_at (results, 0);
 
     g_assert_cmpstr (record->evidence_kind, ==, "entity");
+    g_assert_cmpint (
+        record->match_kind,
+        ==,
+        ATM_EVIDENCE_MATCH_EXACT
+    );
     g_assert_cmpstr (
         record->logical_source_id,
         ==,
@@ -444,6 +449,11 @@ test_fts_romanian_diacritic_search (void)
     g_assert_true (
         (record->source_roles & ATM_SOURCE_ROLE_CANONICAL) != 0
     );
+    g_assert_cmpint (
+        record->match_kind,
+        ==,
+        ATM_EVIDENCE_MATCH_LEXICAL
+    );
     g_assert_true (record->has_lexical_score);
     g_assert_true (isfinite (record->lexical_score));
     g_assert_nonnull (
@@ -612,6 +622,11 @@ test_tabular_row_key_lookup_global_and_scoped (void)
     );
     g_assert_cmpstr (record->locator, ==, "lines:2-2");
     g_assert_cmpstr (record->title, ==, "2025");
+    g_assert_cmpint (
+        record->match_kind,
+        ==,
+        ATM_EVIDENCE_MATCH_TABULAR
+    );
     g_assert_nonnull (strstr (record->body, "\"value\":\"1\""));
     g_assert_true (
         (record->source_roles & ATM_SOURCE_ROLE_EVIDENCE) != 0
