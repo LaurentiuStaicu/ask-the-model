@@ -8,11 +8,11 @@ v0.2.2 preserves the v0.2.0 Local Chat Baseline and the v0.2.1 release-distribut
 
 The project remains in the `0.x` initial-development series. Repository-aware retrieval and scientific provenance are not implemented in this release.
 
-## Development main — unreleased repository backend
+## Development main — unreleased repository-aware application
 
-Development `main` has advanced beyond the public v0.2.2 UI boundary with repository/retrieval backend work that is not yet released as an end-user feature.
+Development `main` has advanced beyond the public v0.2.2 UI boundary with repository/retrieval work and a repository-aware GTK conversation path that remain unreleased.
 
-The current backend includes:
+The current development implementation includes:
 
 - SHA-pinned, validated and immutable local snapshots for the fixed EWD/CBD/RMD catalog;
 - deterministic per-snapshot index schema v2 validated against real EWD, CBD and RMD snapshots, including the manifest-declared `status_source` as a distinct authority role;
@@ -34,7 +34,9 @@ The current backend includes:
 - a deterministic real-corpus R5 runner that checks out the pinned SHAs, rebuilds the real indexes, executes the R3/R4 conversation/grounding path and evaluates the versioned run contract;
 - a passing frozen R5 retrieval benchmark under the provisional gates; the current verified baseline on 2026-09-20 records exact-ID Success@1 1.00, MRR 1.00, nDCG@5 0.9069, required Recall@5 0.9833, RO–EN nDCG gap 0.0333, wrong-repository contamination@5 0.0207, evidence traceability 1.00 and clarification-outcome accuracy 1.00.
 
-The development GTK application now contains the draft EWD/CBD/RMD selector and repository lifecycle controls, while the message-generation path still uses ordinary local chat and does not yet expose end-to-end grounded chat or user-visible citation rendering. R4 backend building blocks are implemented and tested, but they are not yet wired into the released conversation UI. The frozen R5 deterministic retrieval benchmark now passes its provisional engineering gates on the pinned EWD/CBD/RMD corpus. This validates the unreleased deterministic retrieval backend against the current benchmark; it does not make repository-grounded chat a released UI feature or establish scientific validity of the underlying models. Therefore **v0.2.2 remains the current public release** and its user-facing capability boundary is unchanged.
+The unreleased development GTK path now exposes the fixed EWD/CBD/RMD repository selector and lifecycle controls, real multi-chat tabs with independent in-memory provider/session state, first-Send repository/model pinning, end-to-end grounded message generation and compact user-visible source references. Grounded turns validate temporary source labels before commit and preserve exact repository/version/SHA/logical-source/locator provenance for on-demand inspection. Ordinary zero-repository chat remains available and continues to stream normally.
+
+The frozen R5 deterministic retrieval benchmark passes its provisional engineering gates on the pinned EWD/CBD/RMD corpus, and the real-repository R4 integration gate continues to exercise citation traceability independently of the GTK UI. This validates the unreleased development implementation against the current engineering contracts; it does not establish scientific validity of the underlying models. Therefore **v0.2.2 remains the current public release** and its user-facing capability boundary is unchanged.
 
 ## Canonical application role
 
