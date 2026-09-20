@@ -2,6 +2,7 @@
 
 #include <glib.h>
 
+#include "citation_labels.h"
 #include "retrieval_scope.h"
 
 G_BEGIN_DECLS
@@ -81,6 +82,13 @@ gboolean atm_conversation_grounding_prepare_turn (
     char **out_system_instructions,
     char **out_evidence_text,
     char **out_post_evidence_reminder,
+    GError **error
+);
+
+gboolean atm_conversation_grounding_resolve_turn_citations (
+    AtmConversationGroundingState *state,
+    const char *model_output,
+    AtmCitationResolution **out_resolution,
     GError **error
 );
 
