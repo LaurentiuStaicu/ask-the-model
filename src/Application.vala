@@ -598,6 +598,10 @@ namespace AskTheModel {
                 repository_action_button.can_target = has_action;
                 repository_action_button.opacity =
                     has_action ? 1.0 : 0.0;
+                repository_action_button.update_state (
+                    Gtk.AccessibleState.HIDDEN,
+                    !has_action
+                );
                 repository_action_button.tooltip_text =
                     has_action
                         ? repository_lifecycle.action_tooltip (
@@ -1076,6 +1080,10 @@ namespace AskTheModel {
                     can_target = false,
                     opacity = 0.0
                 };
+            repository_action_button.update_state (
+                Gtk.AccessibleState.HIDDEN,
+                true
+            );
             repository_action_button.add_css_class ("circular");
             repository_action_button.clicked.connect (() => {
                 download_or_update_selected_repositories.begin ();
