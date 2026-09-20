@@ -40,6 +40,7 @@ executable(
     'src/retrieval_index_lifecycle.c',
     'src/retrieval_query.c',
     'src/retrieval_rank.c',
+    'src/retrieval_scope.c',
     'src/repository_sources.c',
     'src/markdown_sections.c',
     'src/csv_table.c',
@@ -321,6 +322,24 @@ retrieval_rank_test = executable(
 test(
   'retrieval-rank',
   retrieval_rank_test
+)
+
+retrieval_scope_test = executable(
+  'retrieval-scope-test',
+  [
+    'src/retrieval_scope.c',
+    'tests/retrieval_scope_test.c'
+  ],
+  include_directories: include_directories('src'),
+  dependencies: [
+    glib_dep
+  ],
+  install: false
+)
+
+test(
+  'retrieval-scope',
+  retrieval_scope_test
 )
 
 repository_sources_test = executable(
