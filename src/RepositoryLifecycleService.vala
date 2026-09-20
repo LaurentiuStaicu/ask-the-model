@@ -324,68 +324,70 @@ namespace AskTheModel {
                     snapshot_path (descriptor, sha);
                 string? archive_path = null;
 
-                if (!GLib.FileUtils.test (
-                        expected_snapshot,
-                        GLib.FileTest.IS_DIR
-                    )) {
+                try {
+                    if (!GLib.FileUtils.test (
+                            expected_snapshot,
+                            GLib.FileTest.IS_DIR
+                        )) {
+                        progress (
+                            updating_existing
+                                ? "Updating %s…".printf (
+                                    descriptor.acronym
+                                )
+                                : "Downloading %s…".printf (
+                                    descriptor.acronym
+                                )
+                        );
+                        archive_path =
+                            yield client.download_archive_to_staging (
+                                descriptor,
+                                sha,
+                                cancellable
+                            );
+                    }
+
                     progress (
-                        updating_existing
-                            ? "Updating %s…".printf (
-                                descriptor.acronym
-                            )
-                            : "Downloading %s…".printf (
-                                descriptor.acronym
-                            )
+                        "Validating %s…".printf (
+                            descriptor.acronym
+                        )
                     );
-                    archive_path =
-                        yield client.download_archive_to_staging (
+
+                    RepositoryInstallResult result =
+                        yield prepare_snapshot (
                             descriptor,
                             sha,
-                            cancellable
+                            archive_path
                         );
-                }
 
-                progress (
-                    "Validating %s…".printf (
-                        descriptor.acronym
-                    )
-                );
+                    if (result.version != info.remote_version) {
+                        throw new RepositoryError.INVALID_RESPONSE (
+                            "Validated repository version does not match the exact-SHA remote metadata."
+                        );
+                    }
 
-                RepositoryInstallResult result =
-                    yield prepare_snapshot (
-                        descriptor,
+                    state_store.set_current (
+                        descriptor.id,
                         sha,
-                        archive_path
+                        result.version
                     );
 
-                if (result.version != info.remote_version) {
-                    throw new RepositoryError.INVALID_RESPONSE (
-                        "Validated repository version does not match the exact-SHA remote metadata."
+                    info.remote_sha = sha;
+                    info.remote_version = result.version;
+                    changed++;
+
+                    stdout.printf (
+                        "AtM: repository %s ready version=%s sha=%s snapshot=%s index=%s\n",
+                        descriptor.acronym,
+                        result.version,
+                        sha,
+                        result.snapshot_path,
+                        result.index_path
                     );
+                } finally {
+                    if (archive_path != null) {
+                        GLib.FileUtils.remove (archive_path);
+                    }
                 }
-
-                state_store.set_current (
-                    descriptor.id,
-                    sha,
-                    result.version
-                );
-
-                info.remote_sha = sha;
-                info.remote_version = result.version;
-                changed++;
-
-                if (archive_path != null) {
-                    GLib.FileUtils.remove (archive_path);
-                }
-
-                stdout.printf (
-                    "AtM: repository %s ready version=%s sha=%s snapshot=%s index=%s\n",
-                    descriptor.acronym,
-                    result.version,
-                    sha,
-                    result.snapshot_path,
-                    result.index_path
-                );
             }
 
             return changed;
