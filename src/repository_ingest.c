@@ -188,6 +188,19 @@ atm_repository_ingest_archive (
         return FALSE;
     }
 
+    GStatBuf archive_stat;
+    if (g_lstat (archive_path, &archive_stat) != 0 ||
+        !S_ISREG (archive_stat.st_mode) ||
+        S_ISLNK (archive_stat.st_mode)) {
+        g_set_error_literal (
+            error,
+            ATM_INGEST_ERROR,
+            ATM_INGEST_ERROR_INVALID_ARGUMENT,
+            "Repository ingestion archive must be a real regular file."
+        );
+        return FALSE;
+    }
+
     staging_path = atm_repository_extraction_staging_path (
         data_root,
         repository_id,
