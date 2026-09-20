@@ -208,6 +208,66 @@ test_trailing_heading_markers_are_trimmed (void)
 }
 
 static void
+test_atx_edge_cases (void)
+{
+    const char *contents =
+        "   ## Indented heading\n"
+        "Body one\n"
+        "### C#\n"
+        "Body two\n"
+        "```\n"
+        "```not-a-closing-fence\n"
+        "# still code\n"
+        "```\n"
+        "## After code\n"
+        "Body three";
+    char *path = new_temp_file (contents, -1);
+    GPtrArray *sections = NULL;
+    GError *error = NULL;
+
+    g_assert_true (
+        atm_markdown_extract_sections (
+            path,
+            &sections,
+            &error
+        )
+    );
+    g_assert_no_error (error);
+    g_assert_cmpuint (sections->len, ==, 3);
+
+    AtmDocumentSection *first = section_at (sections, 0);
+    AtmDocumentSection *second = section_at (sections, 1);
+    AtmDocumentSection *third = section_at (sections, 2);
+
+    g_assert_cmpstr (first->title, ==, "Indented heading");
+    g_assert_cmpstr (
+        first->heading_path,
+        ==,
+        "Indented heading"
+    );
+
+    g_assert_cmpstr (second->title, ==, "C#");
+    g_assert_cmpstr (
+        second->heading_path,
+        ==,
+        "Indented heading > C#"
+    );
+    g_assert_true (
+        strstr (second->body, "# still code") != NULL
+    );
+
+    g_assert_cmpstr (third->title, ==, "After code");
+    g_assert_cmpstr (
+        third->heading_path,
+        ==,
+        "Indented heading > After code"
+    );
+
+    g_ptr_array_unref (sections);
+    remove_temp_file (path);
+}
+
+static void
 test_invalid_utf8_is_rejected (void)
 {
     const char invalid[] = { (char) 0xff };
@@ -249,6 +309,10 @@ main (int argc, char **argv)
     g_test_add_func (
         "/markdown/trailing-markers",
         test_trailing_heading_markers_are_trimmed
+    );
+    g_test_add_func (
+        "/markdown/atx-edge-cases",
+        test_atx_edge_cases
     );
     g_test_add_func (
         "/markdown/invalid-utf8",
