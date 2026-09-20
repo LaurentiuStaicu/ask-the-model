@@ -415,6 +415,12 @@ Multi-turn benchmark conversations test at least:
 - scope changes requiring New Chat;
 - snapshot consistency across turns.
 
+Clarification is a distinct conversation outcome, not an alias for unsupported
+evidence or an empty retrieval. Benchmark runs must record whether each turn
+performed retrieval or returned `needs_clarification`. Clarification topics
+must achieve 100% outcome accuracy and must not attach fabricated retrieval
+evidence.
+
 ### Pass condition
 
 The deterministic retrieval pipeline meets the agreed benchmark gates or its shortcomings are explicitly documented before semantic expansion.
