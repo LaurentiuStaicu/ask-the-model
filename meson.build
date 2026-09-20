@@ -218,6 +218,7 @@ test(
 retrieval_index_test = executable(
   'retrieval-index-test',
   [
+    'src/repository_sources.c',
     'src/retrieval_index.c',
     'tests/retrieval_index_test.c',
     resources
@@ -226,6 +227,7 @@ retrieval_index_test = executable(
   dependencies: [
     glib_dep,
     gio_dep,
+    json_glib_dep,
     sqlite_dep
   ],
   install: false
