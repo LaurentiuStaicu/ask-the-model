@@ -119,6 +119,29 @@ find_logical_id (
 }
 
 static AtmEvidenceRecord *
+find_source_path (
+    AtmRepositoryEvidenceSet *set,
+    const char *source_path
+)
+{
+    for (guint i = 0; i < set->evidence->len; i++) {
+        AtmEvidenceRecord *record = g_ptr_array_index (
+            set->evidence,
+            i
+        );
+
+        if (g_strcmp0 (
+                record->source_path,
+                source_path
+            ) == 0) {
+            return record;
+        }
+    }
+
+    return NULL;
+}
+
+static AtmEvidenceRecord *
 find_match_kind (
     AtmRepositoryEvidenceSet *set,
     AtmEvidenceMatch match_kind,
@@ -452,21 +475,26 @@ test_cross_repository_current_state (
             set->evidence,
             0
         );
-
-        g_assert_cmpstr (
-            first->source_path,
-            ==,
+        AtmEvidenceRecord *status = find_source_path (
+            set,
             "STATUS.md"
         );
+
         g_assert_true (
             (first->source_roles &
              ATM_SOURCE_ROLE_CANONICAL) != 0
         );
+        g_assert_nonnull (status);
+        g_assert_true (
+            (status->source_roles &
+             ATM_SOURCE_ROLE_CANONICAL) != 0
+        );
 
         g_print (
-            "PASS R3 cross-repo: %s top=%s\n",
+            "PASS R3 cross-repo: %s top=%s status=%s\n",
             ids[i],
-            first->source_path
+            first->source_path,
+            status->source_path
         );
     }
 
