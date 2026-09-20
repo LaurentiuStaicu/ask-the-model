@@ -378,6 +378,111 @@ test_dataset_logical_id_lookup (void)
 }
 
 static void
+test_dataset_row_key_lookup (void)
+{
+    char *snapshot_root = new_snapshot ();
+    char *cache_root = new_temp_root (
+        "atm-tabular-retrieval-cache-XXXXXX"
+    );
+    char *index_path = build_index (
+        snapshot_root,
+        cache_root
+    );
+    GPtrArray *results = NULL;
+    GError *error = NULL;
+
+    g_assert_true (
+        atm_retrieval_lookup_dataset_rows (
+            index_path,
+            "ewd:dataset:data/series.csv",
+            "2025",
+            10,
+            &results,
+            &error
+        )
+    );
+    g_assert_no_error (error);
+    g_assert_cmpuint (results->len, ==, 1);
+
+    AtmEvidenceRecord *record = result_at (results, 0);
+
+    g_assert_cmpstr (
+        record->evidence_kind,
+        ==,
+        "dataset_row"
+    );
+    g_assert_cmpstr (
+        record->logical_source_id,
+        ==,
+        "ewd:dataset-row:data/series.csv:0"
+    );
+    g_assert_cmpstr (
+        record->source_path,
+        ==,
+        "data/series.csv"
+    );
+    g_assert_cmpstr (record->locator, ==, "lines:2-2");
+    g_assert_cmpstr (record->title, ==, "2025");
+    g_assert_nonnull (
+        strstr (record->body, "\"year\":\"2025\"")
+    );
+    g_assert_nonnull (
+        strstr (record->body, "\"value\":\"1\"")
+    );
+    g_assert_true (
+        (record->source_roles & ATM_SOURCE_ROLE_EVIDENCE) != 0
+    );
+    g_assert_true (
+        (record->source_roles & ATM_SOURCE_ROLE_TABULAR) != 0
+    );
+    g_assert_false (record->has_lexical_score);
+
+    g_ptr_array_unref (results);
+    results = NULL;
+
+    g_assert_true (
+        atm_retrieval_lookup_dataset_rows (
+            index_path,
+            "data/series.csv",
+            "2025",
+            10,
+            &results,
+            &error
+        )
+    );
+    g_assert_no_error (error);
+    g_assert_cmpuint (results->len, ==, 1);
+    g_assert_cmpstr (
+        result_at (results, 0)->logical_source_id,
+        ==,
+        "ewd:dataset-row:data/series.csv:0"
+    );
+
+    g_ptr_array_unref (results);
+    results = NULL;
+
+    g_assert_true (
+        atm_retrieval_lookup_dataset_rows (
+            index_path,
+            "ewd:dataset:data/series.csv",
+            "2030",
+            10,
+            &results,
+            &error
+        )
+    );
+    g_assert_no_error (error);
+    g_assert_cmpuint (results->len, ==, 0);
+
+    g_ptr_array_unref (results);
+    g_free (index_path);
+    remove_tree_best_effort (snapshot_root);
+    g_free (snapshot_root);
+    remove_tree_best_effort (cache_root);
+    g_free (cache_root);
+}
+
+static void
 test_exact_lookup_is_case_sensitive (void)
 {
     char *snapshot_root = new_snapshot ();
@@ -607,6 +712,44 @@ test_invalid_arguments_rejected (void)
     g_assert_null (results);
 
     g_clear_error (&error);
+
+    g_assert_false (
+        atm_retrieval_lookup_dataset_rows (
+            "/does/not/matter.sqlite",
+            "",
+            "2025",
+            10,
+            &results,
+            &error
+        )
+    );
+    g_assert_error (
+        error,
+        ATM_RETRIEVAL_QUERY_ERROR,
+        ATM_RETRIEVAL_QUERY_ERROR_ARGUMENT
+    );
+    g_assert_null (results);
+
+    g_clear_error (&error);
+
+    g_assert_false (
+        atm_retrieval_lookup_dataset_rows (
+            "/does/not/matter.sqlite",
+            "ewd:dataset:data/series.csv",
+            "",
+            ATM_RETRIEVAL_MAX_TABULAR_RESULTS + 1,
+            &results,
+            &error
+        )
+    );
+    g_assert_error (
+        error,
+        ATM_RETRIEVAL_QUERY_ERROR,
+        ATM_RETRIEVAL_QUERY_ERROR_ARGUMENT
+    );
+    g_assert_null (results);
+
+    g_clear_error (&error);
 }
 
 int
@@ -625,6 +768,10 @@ main (int argc, char **argv)
     g_test_add_func (
         "/retrieval-query/dataset-logical-id",
         test_dataset_logical_id_lookup
+    );
+    g_test_add_func (
+        "/retrieval-query/dataset-row-key",
+        test_dataset_row_key_lookup
     );
     g_test_add_func (
         "/retrieval-query/case-sensitive",
