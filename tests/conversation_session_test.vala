@@ -8,7 +8,7 @@ test_requires_frozen_grounding ()
     bool rejected = false;
 
     try {
-        session.begin (grounding);
+        session.begin (grounding, "test-model");
     } catch (Error error) {
         rejected = true;
         assert (
@@ -30,7 +30,7 @@ test_zero_scope_start_prepare_reset ()
 
     try {
         assert (grounding.freeze ());
-        session.begin (grounding);
+        session.begin (grounding, "test-model");
     } catch (Error error) {
         critical ("%s", error.message);
         assert_not_reached ();
@@ -78,7 +78,7 @@ test_rejects_second_begin_until_reset ()
     try {
         assert (first.freeze ());
         assert (second.freeze ());
-        session.begin (first);
+        session.begin (first, "first-model");
     } catch (Error error) {
         critical ("%s", error.message);
         assert_not_reached ();
@@ -87,7 +87,7 @@ test_rejects_second_begin_until_reset ()
     bool rejected = false;
 
     try {
-        session.begin (second);
+        session.begin (second, "second-model");
     } catch (Error error) {
         rejected = true;
         assert (
@@ -102,7 +102,7 @@ test_rejects_second_begin_until_reset ()
     session.reset ();
 
     try {
-        session.begin (second);
+        session.begin (second, "second-model");
     } catch (Error error) {
         critical ("%s", error.message);
         assert_not_reached ();
@@ -119,7 +119,7 @@ test_zero_scope_has_no_committable_grounded_turn ()
 
     try {
         assert (grounding.freeze ());
-        session.begin (grounding);
+        session.begin (grounding, "test-model");
 
         bool needs_clarification;
         string? system_instructions;
@@ -159,6 +159,82 @@ test_zero_scope_has_no_committable_grounded_turn ()
     assert (session.is_active ());
 }
 
+private static void
+test_model_identity_is_pinned_until_reset ()
+{
+    var first = new AskTheModel.ConversationGrounding ();
+    var second = new AskTheModel.ConversationGrounding ();
+    var session = new AskTheModel.ConversationSession ();
+
+    try {
+        assert (first.freeze ());
+        assert (second.freeze ());
+        session.begin (first, "model-a");
+
+        assert (session.model_name () == "model-a");
+        session.require_model ("model-a");
+    } catch (Error error) {
+        critical ("%s", error.message);
+        assert_not_reached ();
+    }
+
+    bool mismatch_rejected = false;
+
+    try {
+        session.require_model ("model-b");
+    } catch (Error error) {
+        mismatch_rejected = true;
+        assert (
+            error.message ==
+            "The active AI model differs from the model pinned to this conversation."
+        );
+    }
+
+    assert (mismatch_rejected);
+
+    session.reset ();
+    assert (session.model_name () == null);
+
+    try {
+        session.begin (second, "model-b");
+        assert (session.model_name () == "model-b");
+        session.require_model (" model-b ");
+    } catch (Error error) {
+        critical ("%s", error.message);
+        assert_not_reached ();
+    }
+}
+
+private static void
+test_empty_model_is_rejected ()
+{
+    var grounding = new AskTheModel.ConversationGrounding ();
+    var session = new AskTheModel.ConversationSession ();
+
+    try {
+        assert (grounding.freeze ());
+    } catch (Error error) {
+        critical ("%s", error.message);
+        assert_not_reached ();
+    }
+
+    bool rejected = false;
+
+    try {
+        session.begin (grounding, "   ");
+    } catch (Error error) {
+        rejected = true;
+        assert (
+            error.message ==
+            "Conversation AI model must be known before the session starts."
+        );
+    }
+
+    assert (rejected);
+    assert (!session.is_active ());
+    assert (session.model_name () == null);
+}
+
 public static int
 main (string[] args)
 {
@@ -179,6 +255,14 @@ main (string[] args)
     Test.add_func (
         "/conversation-session/zero-scope-no-grounded-commit",
         test_zero_scope_has_no_committable_grounded_turn
+    );
+    Test.add_func (
+        "/conversation-session/model-pinned-until-reset",
+        test_model_identity_is_pinned_until_reset
+    );
+    Test.add_func (
+        "/conversation-session/empty-model-rejected",
+        test_empty_model_is_rejected
     );
 
     return Test.run ();
