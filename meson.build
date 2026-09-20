@@ -28,6 +28,7 @@ executable(
   [
     'src/Application.vala',
     'src/OllamaProvider.vala',
+    'src/RepositoryService.vala',
     resources
   ],
   dependencies: [
@@ -56,6 +57,25 @@ test(
   env: {
     'ATM_FLATPAK_MANIFEST': meson.project_source_root() / 'io.github.laurentiustaicu.ask_the_model.yml'
   }
+)
+
+repository_catalog_test = executable(
+  'repository-catalog-test',
+  [
+    'src/RepositoryService.vala',
+    'tests/repository_catalog_test.vala'
+  ],
+  dependencies: [
+    glib_dep,
+    soup_dep,
+    json_glib_dep
+  ],
+  install: false
+)
+
+test(
+  'repository-catalog',
+  repository_catalog_test
 )
 
 subdir('data')
