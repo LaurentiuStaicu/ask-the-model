@@ -1,0 +1,67 @@
+name: Provider / model compatibility
+description: Report a provider endpoint, model discovery, model capability, or compatibility issue.
+title: "[Compatibility]: "
+body:
+  - type: input
+    id: atm
+    attributes:
+      label: AtM version
+      placeholder: "v0.2.2"
+    validations:
+      required: true
+  - type: input
+    id: provider
+    attributes:
+      label: Provider and version
+      placeholder: "Ollama ..."
+    validations:
+      required: true
+  - type: input
+    id: endpoint
+    attributes:
+      label: Endpoint
+      placeholder: "127.0.0.1:11434"
+    validations:
+      required: false
+  - type: input
+    id: model
+    attributes:
+      label: Model
+      description: Provider-visible model name/tag.
+    validations:
+      required: false
+  - type: dropdown
+    id: area
+    attributes:
+      label: Affected behavior
+      options:
+        - Provider discovery
+        - Model listing
+        - Capability filtering
+        - Model selection
+        - Chat request / streaming
+        - Import/registration documentation
+        - Other
+    validations:
+      required: true
+  - type: textarea
+    id: facts
+    attributes:
+      label: Observed behavior
+    validations:
+      required: true
+  - type: textarea
+    id: expected
+    attributes:
+      label: Expected behavior
+    validations:
+      required: true
+  - type: checkboxes
+    id: boundary
+    attributes:
+      label: Boundary checks
+      options:
+        - label: I verified that the provider knows about the model (for example, it appears in the provider model list).
+          required: false
+        - label: I am not assuming that a raw GGUF file is automatically visible to AtM without provider registration.
+          required: true
