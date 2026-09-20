@@ -1,0 +1,241 @@
+#include "retrieval_normalize.h"
+
+#include <glib.h>
+
+static void
+test_romanian_aliases_preserve_original_query (void)
+{
+    const char *query =
+        "Care este starea curentă și sursele pentru "
+        "VAR.BELIEF.CLAIM în 2024?";
+    AtmNormalizedQuery *normalized = NULL;
+    GError *error = NULL;
+
+    g_assert_true (
+        atm_retrieval_normalize_query (
+            query,
+            &normalized,
+            &error
+        )
+    );
+    g_assert_no_error (error);
+    g_assert_nonnull (normalized);
+    g_assert_true (
+        g_str_has_prefix (
+            normalized->expanded_text,
+            query
+        )
+    );
+    g_assert_nonnull (
+        strstr (
+            normalized->expanded_text,
+            "VAR.BELIEF.CLAIM"
+        )
+    );
+    g_assert_nonnull (
+        strstr (
+            normalized->expanded_text,
+            "2024"
+        )
+    );
+    g_assert_nonnull (
+        strstr (
+            normalized->expanded_text,
+            "status"
+        )
+    );
+    g_assert_nonnull (
+        strstr (
+            normalized->expanded_text,
+            "current"
+        )
+    );
+    g_assert_nonnull (
+        strstr (
+            normalized->expanded_text,
+            "source"
+        )
+    );
+    g_assert_true (
+        (normalized->intents &
+         ATM_RETRIEVAL_INTENT_CURRENT_STATE) != 0
+    );
+    g_assert_true (
+        (normalized->intents &
+         ATM_RETRIEVAL_INTENT_EVIDENCE) != 0
+    );
+    g_assert_true (
+        (normalized->intents &
+         ATM_RETRIEVAL_INTENT_NUMERIC) != 0
+    );
+
+    atm_normalized_query_free (normalized);
+}
+
+static void
+test_structure_aliases_are_conservative (void)
+{
+    AtmNormalizedQuery *normalized = NULL;
+    GError *error = NULL;
+
+    g_assert_true (
+        atm_retrieval_normalize_query (
+            "Explică bucla și mecanismul",
+            &normalized,
+            &error
+        )
+    );
+    g_assert_no_error (error);
+    g_assert_nonnull (
+        strstr (
+            normalized->expanded_text,
+            "feedback"
+        )
+    );
+    g_assert_nonnull (
+        strstr (
+            normalized->expanded_text,
+            "loop"
+        )
+    );
+    g_assert_nonnull (
+        strstr (
+            normalized->expanded_text,
+            "mechanism"
+        )
+    );
+    g_assert_true (
+        (normalized->intents &
+         ATM_RETRIEVAL_INTENT_STRUCTURE) != 0
+    );
+
+    atm_normalized_query_free (normalized);
+}
+
+static void
+test_english_query_sets_intents_without_translation_requirement (void)
+{
+    const char *query =
+        "current evidence code value 2025";
+    AtmNormalizedQuery *normalized = NULL;
+    GError *error = NULL;
+
+    g_assert_true (
+        atm_retrieval_normalize_query (
+            query,
+            &normalized,
+            &error
+        )
+    );
+    g_assert_no_error (error);
+    g_assert_true (
+        g_str_has_prefix (
+            normalized->expanded_text,
+            query
+        )
+    );
+    g_assert_true (
+        (normalized->intents &
+         ATM_RETRIEVAL_INTENT_CURRENT_STATE) != 0
+    );
+    g_assert_true (
+        (normalized->intents &
+         ATM_RETRIEVAL_INTENT_EVIDENCE) != 0
+    );
+    g_assert_true (
+        (normalized->intents &
+         ATM_RETRIEVAL_INTENT_NUMERIC) != 0
+    );
+    g_assert_true (
+        (normalized->intents &
+         ATM_RETRIEVAL_INTENT_IMPLEMENTATION) != 0
+    );
+
+    atm_normalized_query_free (normalized);
+}
+
+static void
+test_boundary_alias_marks_current_state (void)
+{
+    AtmNormalizedQuery *normalized = NULL;
+    GError *error = NULL;
+
+    g_assert_true (
+        atm_retrieval_normalize_query (
+            "Care este limita modelului?",
+            &normalized,
+            &error
+        )
+    );
+    g_assert_no_error (error);
+    g_assert_nonnull (
+        strstr (
+            normalized->expanded_text,
+            "boundary"
+        )
+    );
+    g_assert_true (
+        (normalized->intents &
+         ATM_RETRIEVAL_INTENT_CURRENT_STATE) != 0
+    );
+
+    atm_normalized_query_free (normalized);
+}
+
+static void
+test_invalid_normalization_input_is_rejected (void)
+{
+    AtmNormalizedQuery *normalized = NULL;
+    GError *error = NULL;
+
+    g_assert_false (
+        atm_retrieval_normalize_query (
+            "",
+            &normalized,
+            &error
+        )
+    );
+    g_assert_error (
+        error,
+        ATM_RETRIEVAL_NORMALIZE_ERROR,
+        ATM_RETRIEVAL_NORMALIZE_ERROR_ARGUMENT
+    );
+    g_assert_null (normalized);
+
+    g_clear_error (&error);
+}
+
+int
+main (int argc, char **argv)
+{
+    g_test_init (&argc, &argv, NULL);
+
+    g_assert_cmpint (
+        ATM_RETRIEVAL_ALIAS_VERSION,
+        ==,
+        1
+    );
+
+    g_test_add_func (
+        "/retrieval-normalize/romanian-preserve",
+        test_romanian_aliases_preserve_original_query
+    );
+    g_test_add_func (
+        "/retrieval-normalize/structure",
+        test_structure_aliases_are_conservative
+    );
+    g_test_add_func (
+        "/retrieval-normalize/english-intents",
+        test_english_query_sets_intents_without_translation_requirement
+    );
+    g_test_add_func (
+        "/retrieval-normalize/boundary",
+        test_boundary_alias_marks_current_state
+    );
+    g_test_add_func (
+        "/retrieval-normalize/invalid-input",
+        test_invalid_normalization_input_is_rejected
+    );
+
+    return g_test_run ();
+}
