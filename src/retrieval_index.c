@@ -1,4 +1,5 @@
 #include "retrieval_index.h"
+#include "markdown_sections.h"
 
 #include <gio/gio.h>
 #include <glib/gstdio.h>
@@ -415,6 +416,287 @@ out:
     return ok;
 }
 
+static gboolean
+insert_document_sections (
+    sqlite3 *db,
+    const char *snapshot_root,
+    const char *repository_id,
+    const AtmSourceCatalog *catalog,
+    GError **error
+)
+{
+    sqlite3_stmt *source_statement = NULL;
+    sqlite3_stmt *section_statement = NULL;
+    sqlite3_stmt *fts_statement = NULL;
+    gboolean ok = FALSE;
+
+    if (sqlite3_prepare_v2 (
+            db,
+            "SELECT id FROM source_files WHERE path = ?1;",
+            -1,
+            &source_statement,
+            NULL
+        ) != SQLITE_OK ||
+        sqlite3_prepare_v2 (
+            db,
+            "INSERT INTO document_sections("
+            "source_id, ordinal, heading_path, locator, "
+            "logical_source_id, title, body"
+            ") VALUES(?1, ?2, ?3, ?4, ?5, ?6, ?7);",
+            -1,
+            &section_statement,
+            NULL
+        ) != SQLITE_OK ||
+        sqlite3_prepare_v2 (
+            db,
+            "INSERT INTO search_fts("
+            "evidence_kind, evidence_id, logical_source_id, "
+            "title, body"
+            ") VALUES('section', ?1, ?2, ?3, ?4);",
+            -1,
+            &fts_statement,
+            NULL
+        ) != SQLITE_OK) {
+        g_set_error (
+            error,
+            ATM_RETRIEVAL_INDEX_ERROR,
+            ATM_RETRIEVAL_INDEX_ERROR_SQLITE,
+            "Could not prepare document-index inserts: %s",
+            sqlite3_errmsg (db)
+        );
+        goto out;
+    }
+
+    for (guint i = 0; i < catalog->files->len; i++) {
+        const AtmSourceRecord *source = g_ptr_array_index (
+            catalog->files,
+            i
+        );
+
+        if (g_strcmp0 (
+                source->media_type,
+                "text/markdown"
+            ) != 0) {
+            continue;
+        }
+
+        char *absolute_path = g_build_filename (
+            snapshot_root,
+            source->path,
+            NULL
+        );
+        GPtrArray *sections = NULL;
+
+        if (!atm_markdown_extract_sections (
+                absolute_path,
+                &sections,
+                error
+            )) {
+            g_free (absolute_path);
+            goto out;
+        }
+
+        g_free (absolute_path);
+
+        sqlite3_reset (source_statement);
+        sqlite3_clear_bindings (source_statement);
+        sqlite3_bind_text (
+            source_statement,
+            1,
+            source->path,
+            -1,
+            SQLITE_STATIC
+        );
+
+        if (sqlite3_step (source_statement) != SQLITE_ROW) {
+            g_set_error (
+                error,
+                ATM_RETRIEVAL_INDEX_ERROR,
+                ATM_RETRIEVAL_INDEX_ERROR_INTEGRITY,
+                "Markdown source '%s' is missing from source_files.",
+                source->path
+            );
+            g_ptr_array_unref (sections);
+            goto out;
+        }
+
+        sqlite3_int64 source_id = sqlite3_column_int64 (
+            source_statement,
+            0
+        );
+
+        for (guint section_index = 0;
+             section_index < sections->len;
+             section_index++) {
+            const AtmDocumentSection *section = g_ptr_array_index (
+                sections,
+                section_index
+            );
+            char *locator = g_strdup_printf (
+                "lines:%u-%u",
+                section->start_line,
+                section->end_line
+            );
+            char *logical_source_id = g_strdup_printf (
+                "%s:section:%s:%s",
+                repository_id,
+                source->path,
+                locator
+            );
+
+            sqlite3_reset (section_statement);
+            sqlite3_clear_bindings (section_statement);
+            sqlite3_bind_int64 (
+                section_statement,
+                1,
+                source_id
+            );
+            sqlite3_bind_int (
+                section_statement,
+                2,
+                (int) section->ordinal
+            );
+
+            if (section->heading_path != NULL &&
+                section->heading_path[0] != '\0') {
+                sqlite3_bind_text (
+                    section_statement,
+                    3,
+                    section->heading_path,
+                    -1,
+                    SQLITE_STATIC
+                );
+            } else {
+                sqlite3_bind_null (section_statement, 3);
+            }
+
+            sqlite3_bind_text (
+                section_statement,
+                4,
+                locator,
+                -1,
+                SQLITE_TRANSIENT
+            );
+            sqlite3_bind_text (
+                section_statement,
+                5,
+                logical_source_id,
+                -1,
+                SQLITE_TRANSIENT
+            );
+
+            if (section->title != NULL) {
+                sqlite3_bind_text (
+                    section_statement,
+                    6,
+                    section->title,
+                    -1,
+                    SQLITE_STATIC
+                );
+            } else {
+                sqlite3_bind_null (section_statement, 6);
+            }
+
+            sqlite3_bind_text (
+                section_statement,
+                7,
+                section->body,
+                -1,
+                SQLITE_STATIC
+            );
+
+            if (sqlite3_step (section_statement) != SQLITE_DONE) {
+                g_set_error (
+                    error,
+                    ATM_RETRIEVAL_INDEX_ERROR,
+                    ATM_RETRIEVAL_INDEX_ERROR_SQLITE,
+                    "Could not insert Markdown section for '%s': %s",
+                    source->path,
+                    sqlite3_errmsg (db)
+                );
+                g_free (logical_source_id);
+                g_free (locator);
+                g_ptr_array_unref (sections);
+                goto out;
+            }
+
+            sqlite3_int64 section_id = sqlite3_last_insert_rowid (db);
+
+            sqlite3_reset (fts_statement);
+            sqlite3_clear_bindings (fts_statement);
+            sqlite3_bind_int64 (
+                fts_statement,
+                1,
+                section_id
+            );
+            sqlite3_bind_text (
+                fts_statement,
+                2,
+                logical_source_id,
+                -1,
+                SQLITE_TRANSIENT
+            );
+
+            if (section->title != NULL) {
+                sqlite3_bind_text (
+                    fts_statement,
+                    3,
+                    section->title,
+                    -1,
+                    SQLITE_STATIC
+                );
+            } else {
+                sqlite3_bind_null (fts_statement, 3);
+            }
+
+            sqlite3_bind_text (
+                fts_statement,
+                4,
+                section->body,
+                -1,
+                SQLITE_STATIC
+            );
+
+            if (sqlite3_step (fts_statement) != SQLITE_DONE) {
+                g_set_error (
+                    error,
+                    ATM_RETRIEVAL_INDEX_ERROR,
+                    ATM_RETRIEVAL_INDEX_ERROR_SQLITE,
+                    "Could not insert FTS section for '%s': %s",
+                    source->path,
+                    sqlite3_errmsg (db)
+                );
+                g_free (logical_source_id);
+                g_free (locator);
+                g_ptr_array_unref (sections);
+                goto out;
+            }
+
+            g_free (logical_source_id);
+            g_free (locator);
+        }
+
+        g_ptr_array_unref (sections);
+    }
+
+    ok = TRUE;
+
+out:
+    if (fts_statement != NULL) {
+        sqlite3_finalize (fts_statement);
+    }
+
+    if (section_statement != NULL) {
+        sqlite3_finalize (section_statement);
+    }
+
+    if (source_statement != NULL) {
+        sqlite3_finalize (source_statement);
+    }
+
+    return ok;
+}
+
 char *
 atm_retrieval_index_path (
     const char *cache_root,
@@ -472,6 +754,7 @@ atm_retrieval_index_staging_path (
 static gboolean
 retrieval_index_create_internal (
     const char *cache_root,
+    const char *snapshot_root,
     const AtmRetrievalIndexMetadata *metadata,
     const AtmSourceCatalog *source_catalog,
     char **out_index_path,
@@ -671,6 +954,15 @@ retrieval_index_create_internal (
              source_catalog,
              error
          )) ||
+        (snapshot_root != NULL &&
+         source_catalog != NULL &&
+         !insert_document_sections (
+             db,
+             snapshot_root,
+             metadata->repository_id,
+             source_catalog,
+             error
+         )) ||
         !sqlite_exec_checked (db, "COMMIT;", error)) {
         goto out;
     }
@@ -738,6 +1030,7 @@ atm_retrieval_index_create_empty (
 {
     return retrieval_index_create_internal (
         cache_root,
+        NULL,
         metadata,
         NULL,
         out_index_path,
@@ -758,6 +1051,30 @@ atm_retrieval_index_create_with_sources (
 
     return retrieval_index_create_internal (
         cache_root,
+        NULL,
+        metadata,
+        source_catalog,
+        out_index_path,
+        error
+    );
+}
+
+gboolean
+atm_retrieval_index_create_with_documents (
+    const char *cache_root,
+    const char *snapshot_root,
+    const AtmRetrievalIndexMetadata *metadata,
+    const AtmSourceCatalog *source_catalog,
+    char **out_index_path,
+    GError **error
+)
+{
+    g_return_val_if_fail (snapshot_root != NULL, FALSE);
+    g_return_val_if_fail (source_catalog != NULL, FALSE);
+
+    return retrieval_index_create_internal (
+        cache_root,
+        snapshot_root,
         metadata,
         source_catalog,
         out_index_path,
