@@ -1,6 +1,7 @@
 #include "cff_version.h"
 
 #include <glib.h>
+#include <string.h>
 
 static void
 assert_version (const char *document, const char *expected)
