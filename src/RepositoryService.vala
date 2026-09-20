@@ -6,6 +6,12 @@ namespace AskTheModel {
         STORAGE
     }
 
+    public errordomain CitationError {
+        INVALID_SHA,
+        INVALID_SOURCE,
+        INVALID_LOCATOR
+    }
+
     public class RepositoryDescriptor : Object {
         public string id { get; construct; }
         public string acronym { get; construct; }
@@ -46,6 +52,110 @@ namespace AskTheModel {
                 repository,
                 sha
             );
+        }
+
+        private static bool citation_source_path_is_safe (
+            string source_path
+        ) {
+            if (source_path.length == 0 ||
+                GLib.Path.is_absolute (source_path) ||
+                source_path.has_prefix ("/")) {
+                return false;
+            }
+
+            foreach (string segment in source_path.split ("/")) {
+                if (segment.length == 0 ||
+                    segment == "." ||
+                    segment == "..") {
+                    return false;
+                }
+            }
+
+            return true;
+        }
+
+        private static string? citation_line_anchor (
+            string? locator
+        ) throws CitationError {
+            if (locator == null ||
+                !locator.has_prefix ("lines:")) {
+                return null;
+            }
+
+            if (!GLib.Regex.match_simple (
+                    "^lines:[1-9][0-9]*-[1-9][0-9]*$",
+                    locator
+                )) {
+                throw new CitationError.INVALID_LOCATOR (
+                    "Citation line locator is invalid."
+                );
+            }
+
+            string[] range = locator.substring (6).split ("-");
+            uint64 start = uint64.parse (range[0]);
+            uint64 end = uint64.parse (range[1]);
+
+            if (end < start) {
+                throw new CitationError.INVALID_LOCATOR (
+                    "Citation line range is reversed."
+                );
+            }
+
+            if (start == end) {
+                return "#L%llu".printf (start);
+            }
+
+            return "#L%llu-L%llu".printf (
+                start,
+                end
+            );
+        }
+
+        public string immutable_file_permalink (
+            string sha,
+            string source_path,
+            string? locator = null
+        ) throws CitationError {
+            if (!GLib.Regex.match_simple (
+                    "^[0-9a-f]{40}$",
+                    sha
+                )) {
+                throw new CitationError.INVALID_SHA (
+                    "Citation snapshot SHA must be canonical lowercase hex."
+                );
+            }
+
+            if (!citation_source_path_is_safe (source_path)) {
+                throw new CitationError.INVALID_SOURCE (
+                    "Citation source path is not repository-relative and safe."
+                );
+            }
+
+            string escaped_path = GLib.Uri.escape_string (
+                source_path,
+                "/",
+                false
+            );
+            string url =
+                "https://github.com/%s/%s/blob/%s/%s".printf (
+                    owner,
+                    repository,
+                    sha,
+                    escaped_path
+                );
+
+            string? anchor = citation_line_anchor (locator);
+
+            if (anchor != null) {
+                if (source_path.down ().has_suffix (".md") ||
+                    source_path.down ().has_suffix (".markdown")) {
+                    url += "?plain=1";
+                }
+
+                url += anchor;
+            }
+
+            return url;
         }
     }
 
