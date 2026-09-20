@@ -13,8 +13,9 @@ The reviewed seed corpus is `benchmark.json`. It pins EWD, CBD and RMD
 v0.1.0 to exact commit SHAs and contains development/validation topics covering
 all R5 topic classes, English/Romanian/mixed-language retrieval, unsupported
 premises and deterministic multi-turn clarification. The corpus is an
-evaluation fixture, not a claim that the current retrieval implementation has
-already met the R5 gates.
+evaluation fixture with fixed qrels and targets; the current deterministic
+retrieval implementation is evaluated against it by the real-corpus runner
+rather than by modifying the corpus to fit implementation behavior.
 
 ## Relevance scale
 
@@ -135,15 +136,34 @@ technical entities use structured-entity IDs, numeric topics use deterministic
 CSV row IDs, and canonical status/limitation topics use Markdown section IDs
 with line locators from the same section parser used by the index.
 
-## Stage boundary
+## Passing deterministic baseline
 
-The frozen seed corpus and evaluator now exist, but **R5 is not yet passed**.
+R5 now has a deterministic real-corpus runner. It checks out the exact pinned
+EWD/CBD/RMD snapshots, validates their SHAs and declared versions, rebuilds the
+per-SHA indexes, executes topics through the R3 router and deterministic
+retrieval-conversation state, constructs bounded R4 context, records the
+versioned run contract and evaluates the result.
 
-The next R5 gate is a deterministic run generator that checks out these exact
-EWD/CBD/RMD snapshots, builds the per-SHA indexes, executes topics in split- and
-conversation-correct order through the R3 router / retrieval-conversation
-state, constructs bounded R4 context, records the run contract and evaluates
-the resulting metrics. Only that real run can establish whether the current
-deterministic pipeline meets the provisional gates.
+The first gate-passing deterministic baseline on 2026-09-20 recorded:
 
-No embeddings or reranker are introduced by R5.
+- exact-ID Success@1: **1.00**;
+- MRR: **1.00**;
+- nDCG@5: **0.9002**;
+- required/canonical Recall@5: **0.9833**;
+- wrong-repository contamination@5: **0.0207**;
+- paired RO–EN nDCG gap: **0.0149**;
+- evidence traceability: **1.00**;
+- expected turn-outcome accuracy: **1.00**;
+- clarification-outcome accuracy: **1.00**.
+
+These values satisfy every provisional R5 gate without changing the frozen
+qrels or thresholds. Latency and byte-budget diagnostics remain recorded per
+run and are expected to vary by CI host. Evidence token count remains unset
+until the project adopts an explicit tokenizer/counting contract.
+
+R5 passing validates this fixed deterministic retrieval baseline only. It does
+not imply that the released v0.2.2 GTK application exposes repository-aware
+chat, that the benchmark can never be expanded, or that the scientific models
+themselves are validated by AtM.
+
+No embeddings or reranker are required by the passing R5 baseline.
