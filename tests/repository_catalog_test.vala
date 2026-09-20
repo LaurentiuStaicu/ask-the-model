@@ -36,13 +36,13 @@ namespace AskTheModel.Tests {
             "empirical-world3-dynamics/branches/main"
         );
 
+        string sha = "0123456789abcdef0123456789abcdef01234567";
+
         assert (
             repositories[2].archive_api_url (sha) ==
             "https://api.github.com/repos/LaurentiuStaicu/" +
             "romanian-monetary-dynamics/tarball/" + sha
         );
-
-        string sha = "0123456789abcdef0123456789abcdef01234567";
 
         try {
             assert (
