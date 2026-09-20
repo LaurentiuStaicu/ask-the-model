@@ -707,6 +707,56 @@ test_sources_followup_keeps_previous_scope_and_topic (void)
 }
 
 static void
+test_new_substantive_intent_replaces_previous_intent (void)
+{
+    Fixture *fixture = fixture_new ();
+    AtmRetrievalConversationState *state = new_state (
+        fixture
+    );
+
+    AtmRetrievalConversationTurn *first = run_turn (
+        state,
+        "Care este starea curentă în EWD?"
+    );
+    atm_retrieval_conversation_turn_free (first);
+
+    AtmRetrievalConversationTurn *second = run_turn (
+        state,
+        "Dar structura?"
+    );
+
+    g_assert_false (second->needs_clarification);
+    g_assert_true (second->used_previous_scope);
+    g_assert_false (second->used_previous_intent);
+    g_assert_nonnull (
+        strstr (
+            second->effective_query,
+            "structura"
+        )
+    );
+    g_assert_null (
+        strstr (
+            second->effective_query,
+            "current status"
+        )
+    );
+    g_assert_true (
+        (second->retrieval->intents &
+         ATM_RETRIEVAL_INTENT_STRUCTURE) != 0
+    );
+    g_assert_cmpuint (
+        second->retrieval->repositories->len,
+        ==,
+        1
+    );
+    g_assert_nonnull (find_set (second->retrieval, "ewd"));
+
+    atm_retrieval_conversation_turn_free (second);
+    atm_retrieval_conversation_state_free (state);
+    fixture_free (fixture);
+}
+
+static void
 test_standalone_new_query_does_not_stick_to_previous_scope (void)
 {
     Fixture *fixture = fixture_new ();
@@ -768,6 +818,10 @@ main (int argc, char **argv)
     g_test_add_func (
         "/retrieval-conversation/sources-followup",
         test_sources_followup_keeps_previous_scope_and_topic
+    );
+    g_test_add_func (
+        "/retrieval-conversation/substantive-intent-replaces",
+        test_new_substantive_intent_replaces_previous_intent
     );
     g_test_add_func (
         "/retrieval-conversation/new-query-not-sticky",
