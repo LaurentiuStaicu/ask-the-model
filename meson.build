@@ -39,6 +39,7 @@ executable(
     'src/retrieval_index.c',
     'src/repository_sources.c',
     'src/markdown_sections.c',
+    'src/csv_table.c',
     resources
   ],
   dependencies: [
@@ -274,6 +275,24 @@ markdown_sections_test = executable(
 test(
   'markdown-sections',
   markdown_sections_test
+)
+
+csv_table_test = executable(
+  'csv-table-test',
+  [
+    'src/csv_table.c',
+    'tests/csv_table_test.c'
+  ],
+  include_directories: include_directories('src'),
+  dependencies: [
+    glib_dep
+  ],
+  install: false
+)
+
+test(
+  'csv-table',
+  csv_table_test
 )
 
 subdir('data')
