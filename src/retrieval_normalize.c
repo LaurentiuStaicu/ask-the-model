@@ -66,17 +66,17 @@ token_looks_numeric_scope (const char *token)
 {
     gsize length = strlen (token);
 
-    if (length == 4) {
-        for (gsize i = 0; i < length; i++) {
-            if (!g_ascii_isdigit (token[i])) {
-                return FALSE;
-            }
-        }
-
-        return TRUE;
+    if (length == 0 || length > 12) {
+        return FALSE;
     }
 
-    return FALSE;
+    for (gsize i = 0; i < length; i++) {
+        if (!g_ascii_isdigit (token[i])) {
+            return FALSE;
+        }
+    }
+
+    return TRUE;
 }
 
 gboolean
@@ -125,6 +125,32 @@ atm_retrieval_normalize_query (
     };
     static const char *implementation_ro[] = {
         "implementare", "implementarea", "cod"
+    };
+    static const char *validation_ro[] = {
+        "validare", "validarea", "validari", "validări",
+        "validat", "validata", "validată", "validate"
+    };
+    static const char *paradigm_ro[] = {
+        "paradigma", "paradigmă", "paradigme", "paradigmele"
+    };
+    static const char *modeling_ro[] = {
+        "modelare", "modelarea"
+    };
+    static const char *compare_ro[] = {
+        "compara", "compară", "comparați", "comparati",
+        "comparare", "compară"
+    };
+    static const char *forecast_ro[] = {
+        "prognoza", "prognoză", "prognoze", "prognozele"
+    };
+    static const char *probability_ro[] = {
+        "probabilitate", "probabilitatea", "probabilitati",
+        "probabilități", "probabilistic", "probabilistica",
+        "probabilistică", "probabilistice"
+    };
+    static const char *numeric_terms[] = {
+        "probability", "probabilistic", "mape", "percent",
+        "percentage", "rate", "ratio", "coefficient"
     };
     gchar **tokens = NULL;
     GHashTable *aliases = NULL;
@@ -277,6 +303,109 @@ atm_retrieval_normalize_query (
 
         if (token_is_any (
                 token,
+                validation_ro,
+                G_N_ELEMENTS (validation_ro)
+            )) {
+            append_alias_once (
+                expanded,
+                aliases,
+                "validation"
+            );
+            normalized->intents |=
+                ATM_RETRIEVAL_INTENT_CURRENT_STATE;
+        }
+
+        if (g_strcmp0 (token, "validation") == 0 ||
+            g_strcmp0 (token, "validated") == 0 ||
+            g_strcmp0 (token, "limitation") == 0 ||
+            g_strcmp0 (token, "limitations") == 0) {
+            normalized->intents |=
+                ATM_RETRIEVAL_INTENT_CURRENT_STATE;
+        }
+
+        if (token_is_any (
+                token,
+                paradigm_ro,
+                G_N_ELEMENTS (paradigm_ro)
+            )) {
+            append_alias_once (
+                expanded,
+                aliases,
+                "paradigm"
+            );
+            normalized->intents |=
+                ATM_RETRIEVAL_INTENT_STRUCTURE;
+        }
+
+        if (token_is_any (
+                token,
+                modeling_ro,
+                G_N_ELEMENTS (modeling_ro)
+            )) {
+            append_alias_once (
+                expanded,
+                aliases,
+                "modeling"
+            );
+            normalized->intents |=
+                ATM_RETRIEVAL_INTENT_STRUCTURE;
+        }
+
+        if (token_is_any (
+                token,
+                compare_ro,
+                G_N_ELEMENTS (compare_ro)
+            )) {
+            append_alias_once (
+                expanded,
+                aliases,
+                "compare"
+            );
+        }
+
+        if (g_strcmp0 (token, "paradigm") == 0 ||
+            g_strcmp0 (token, "paradigms") == 0 ||
+            g_strcmp0 (token, "modeling") == 0 ||
+            g_strcmp0 (token, "modelling") == 0) {
+            normalized->intents |=
+                ATM_RETRIEVAL_INTENT_STRUCTURE;
+        }
+
+        if (token_is_any (
+                token,
+                forecast_ro,
+                G_N_ELEMENTS (forecast_ro)
+            )) {
+            append_alias_once (
+                expanded,
+                aliases,
+                "forecast"
+            );
+            normalized->intents |=
+                ATM_RETRIEVAL_INTENT_CURRENT_STATE;
+        }
+
+        if (token_is_any (
+                token,
+                probability_ro,
+                G_N_ELEMENTS (probability_ro)
+            )) {
+            append_alias_once (
+                expanded,
+                aliases,
+                "probability"
+            );
+            append_alias_once (
+                expanded,
+                aliases,
+                "probabilistic"
+            );
+            normalized->intents |=
+                ATM_RETRIEVAL_INTENT_NUMERIC;
+        }
+
+        if (token_is_any (
+                token,
                 source_ro,
                 G_N_ELEMENTS (source_ro)
             )) {
@@ -370,6 +499,11 @@ atm_retrieval_normalize_query (
         if (g_strcmp0 (token, "value") == 0 ||
             g_strcmp0 (token, "year") == 0 ||
             g_strcmp0 (token, "period") == 0 ||
+            token_is_any (
+                token,
+                numeric_terms,
+                G_N_ELEMENTS (numeric_terms)
+            ) ||
             token_looks_numeric_scope (token)) {
             normalized->intents |=
                 ATM_RETRIEVAL_INTENT_NUMERIC;
