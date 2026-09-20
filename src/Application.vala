@@ -1879,7 +1879,7 @@ namespace AskTheModel {
         ) {
             generation_active = true;
             state.generating = true;
-            streaming_transcript = state.transcript;
+            streaming_transcript = null;
             assistant_stream_started = false;
             update_conversation_ui_state ();
 
@@ -1956,6 +1956,7 @@ namespace AskTheModel {
                     );
                 } else {
                     string answer;
+                    string title_answer;
 
                     if (has_grounding) {
                         grounded_turn_prepared = true;
@@ -1964,11 +1965,29 @@ namespace AskTheModel {
                             system_instructions ?? "",
                             evidence_text ?? "",
                             post_evidence_reminder ?? "",
-                            state.conversation
+                            state.conversation,
+                            false
                         );
 
                         CitationResolution citation_resolution =
                             state.session.resolve_turn_citations (
+                                answer
+                            );
+
+                        if (citation_resolution.unknown_label_count () > 0) {
+                            string unknown =
+                                citation_resolution.unknown_label_at (0) ??
+                                "unknown";
+
+                            throw new ConversationSessionError.INVALID_GROUNDING (
+                                "Grounded response used an unknown source label: %s".printf (
+                                    unknown
+                                )
+                            );
+                        }
+
+                        string visible_answer =
+                            strip_repository_source_labels (
                                 answer
                             );
 
@@ -1978,34 +1997,48 @@ namespace AskTheModel {
                             );
                         }
 
+                        state.conversation.commit_exchange (
+                            prompt,
+                            answer
+                        );
                         state.grounded_answers += answer;
                         state.grounded_citations +=
                             citation_resolution;
                         grounded_turn_prepared = false;
+
+                        append_grounded_answer (
+                            state.transcript,
+                            visible_answer,
+                            citation_resolution
+                        );
+                        assistant_stream_started = true;
+                        title_answer = visible_answer;
                     } else {
+                        streaming_transcript = state.transcript;
                         answer = yield ollama_provider.chat (
                             prompt,
                             state.conversation
                         );
+                        title_answer = answer;
+
+                        if (!assistant_stream_started &&
+                            answer.length > 0) {
+                            append_transcript (
+                                state.transcript,
+                                "Assistant: " + answer
+                            );
+                            assistant_stream_started = true;
+                        }
                     }
 
                     if (should_generate_title &&
-                        answer.length > 0) {
+                        title_answer.length > 0) {
                         update_conversation_title.begin (
                             state,
                             prompt,
-                            answer,
+                            title_answer,
                             serial
                         );
-                    }
-
-                    if (!assistant_stream_started &&
-                        answer.length > 0) {
-                        append_transcript (
-                            state.transcript,
-                            "Assistant: " + answer
-                        );
-                        assistant_stream_started = true;
                     }
                 }
             } catch (GLib.Error error) {
