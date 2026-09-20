@@ -71,13 +71,9 @@ Before repository feature implementation depends on SQLite/libarchive, CI on the
 - libarchive development linkage works.
 - secure extraction API needed by AtM is available.
 - valid archive extraction works.
-- the selected libarchive path enables secure no-absolute-path, no-`..` and symlink protections when those APIs are used.
-- path traversal archive entries are rejected.
-- absolute-path entries are rejected.
-- symlink/hardlink escape cases are rejected.
-- special archive entries that are not intended regular files/directories are rejected.
-- configured limits for archive bytes, entry count, individual extracted-file size and total uncompressed bytes are enforced.
-- a decompression-bomb fixture is rejected without exhausting the staging filesystem.
+- the selected libarchive path exposes the secure no-absolute-path, no-`..` and symlink protections required by the design.
+- representative path-traversal, absolute-path and link-escape fixtures can be rejected using the selected extraction API.
+- the archive API exposes entry type and size information needed for application-controlled resource limits.
 - XDG data directory is writable.
 - XDG cache directory is writable.
 - XDG state directory is writable.
@@ -161,6 +157,19 @@ Before promotion:
 - manifest schema is supported;
 - required paths exist;
 - unsafe archive entries are rejected.
+
+### Bounded extraction
+
+Repository ingestion enforces application-controlled limits for:
+
+- downloaded archive bytes;
+- number of archive entries;
+- maximum individual extracted-file size;
+- maximum total uncompressed bytes written to staging.
+
+Special archive entries outside the intended regular-file/directory set are rejected. Nested archives are not recursively unpacked during repository ingestion.
+
+A decompression-bomb fixture and fixtures that exceed each configured limit must fail safely without exhausting the staging filesystem or damaging the previously ready snapshot.
 
 ### Promotion
 
