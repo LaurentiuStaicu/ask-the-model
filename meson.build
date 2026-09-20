@@ -570,6 +570,7 @@ conversation_grounding_test = executable(
     'src/retrieval_router.c',
     'src/retrieval_conversation.c',
     'src/grounding_context.c',
+    'src/citation_labels.c',
     'src/conversation_grounding.c',
     'tests/conversation_grounding_test.c',
     resources
@@ -608,6 +609,7 @@ conversation_grounding_vala_test = executable(
     'src/retrieval_router.c',
     'src/retrieval_conversation.c',
     'src/grounding_context.c',
+    'src/citation_labels.c',
     'src/conversation_grounding.c',
     'tests/conversation_grounding_vala_test.vala',
     resources
@@ -649,6 +651,7 @@ conversation_session_test = executable(
     'src/retrieval_router.c',
     'src/retrieval_conversation.c',
     'src/grounding_context.c',
+    'src/citation_labels.c',
     'src/conversation_grounding.c',
     'tests/conversation_session_test.vala',
     resources
