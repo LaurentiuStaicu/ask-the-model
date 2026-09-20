@@ -35,6 +35,10 @@ jobs:
             git archive origin/flatpak-repo repo | tar -x
           fi
 
+      - name: Validate release metadata
+        shell: bash
+        run: bash scripts/validate_release_metadata.sh
+
       - name: Validate README contract
         shell: bash
         run: bash scripts/validate_readme_contract.sh
