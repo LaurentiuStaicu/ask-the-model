@@ -211,7 +211,10 @@ extract_row_key_candidates (
          *cursor != '\0' &&
          candidates->len < ATM_RETRIEVAL_ROUTER_MAX_CANDIDATES;
          cursor++) {
-        if (g_ascii_isdigit (cursor[0]) &&
+        gsize remaining = strlen (cursor);
+
+        if (remaining >= 7 &&
+            g_ascii_isdigit (cursor[0]) &&
             g_ascii_isdigit (cursor[1]) &&
             g_ascii_isdigit (cursor[2]) &&
             g_ascii_isdigit (cursor[3]) &&
@@ -221,7 +224,8 @@ extract_row_key_candidates (
             cursor[6] <= '4' &&
             (cursor == query ||
              !technical_identifier_character (cursor[-1])) &&
-            !technical_identifier_character (cursor[7])) {
+            (remaining == 7 ||
+             !technical_identifier_character (cursor[7]))) {
             char quarter[8] = { 0 };
 
             memcpy (quarter, cursor, 7);
