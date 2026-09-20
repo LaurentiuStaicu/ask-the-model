@@ -1200,24 +1200,6 @@ namespace AskTheModel {
                 refresh_local_models.begin ();
             });
 
-            new_chat_button =
-                new Gtk.Button.from_icon_name (
-                    "document-new-symbolic"
-                ) {
-                    tooltip_text = "New Chat (Ctrl+N)",
-                    sensitive = false
-                };
-            new_chat_button.add_css_class ("circular");
-            new_chat_button.update_property (
-                Gtk.AccessibleProperty.LABEL,
-                "New Chat"
-            );
-            new_chat_button.clicked.connect (() => {
-                if (new_chat_action != null) {
-                    new_chat_action.activate (null);
-                }
-            });
-
             var model_controls = new Gtk.Box (
                 Gtk.Orientation.HORIZONTAL,
                 6
@@ -1290,7 +1272,6 @@ namespace AskTheModel {
                 Gtk.Orientation.HORIZONTAL,
                 12
             );
-            header_controls.append (new_chat_button);
             header_controls.append (model_controls);
             header_controls.append (repository_controls);
 
@@ -1563,10 +1544,62 @@ namespace AskTheModel {
             composer.append (prompt_frame);
             composer.append (send_button);
 
-            var content = new Gtk.Box (Gtk.Orientation.VERTICAL, 0);
+            var chat_page = new Gtk.Box (
+                Gtk.Orientation.VERTICAL,
+                0
+            ) {
+                hexpand = true,
+                vexpand = true
+            };
+            chat_page.append (transcript_scroll);
+            chat_page.append (composer);
+
+            var chat_tabs = new Gtk.Notebook () {
+                hexpand = true,
+                vexpand = true,
+                scrollable = true,
+                show_border = false,
+                tab_pos = Gtk.PositionType.TOP
+            };
+
+            var current_tab_label = new Gtk.Label ("Chat 1") {
+                single_line_mode = true
+            };
+
+            chat_tabs.append_page (
+                chat_page,
+                current_tab_label
+            );
+
+            new_chat_button =
+                new Gtk.Button.from_icon_name (
+                    "list-add-symbolic"
+                ) {
+                    tooltip_text = "New Chat (Ctrl+N)",
+                    sensitive = false,
+                    valign = Gtk.Align.CENTER
+                };
+            new_chat_button.update_property (
+                Gtk.AccessibleProperty.LABEL,
+                "New Chat"
+            );
+            new_chat_button.clicked.connect (() => {
+                if (new_chat_action != null) {
+                    new_chat_action.activate (null);
+                }
+            });
+
+            chat_tabs.set_action_widget (
+                new_chat_button,
+                Gtk.PackType.END
+            );
+
+            var content = new Gtk.Box (
+                Gtk.Orientation.VERTICAL,
+                0
+            );
             content.append (lcd_frame);
-            content.append (transcript_scroll);
-            content.append (composer);
+            content.append (chat_tabs);
 
             return content;
         }
