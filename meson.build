@@ -42,10 +42,11 @@ executable(
     gtk_dep,
     granite_dep,
     soup_dep,
-    json_glib_dep,
-    archive_dep,
-    yaml_dep,
-    gio_dep
+    json_glib_dep
+  ],
+  link_args: [
+    '-larchive',
+    '-lyaml'
   ],
   install: true
 )
