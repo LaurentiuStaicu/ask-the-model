@@ -8,6 +8,7 @@ namespace AskTheModel {
         private Gtk.Settings gtk_settings;
         private OllamaProvider ollama_provider;
         private Gtk.TextView? transcript_view;
+        private Gtk.Frame? status_lcd;
         private Gtk.DropDown? model_dropdown;
         private Gtk.StringList? model_list;
         private Gtk.Button? refresh_models_button;
@@ -166,6 +167,8 @@ namespace AskTheModel {
                 valign = Gtk.Align.CENTER,
                 single_line_mode = true
             };
+            label.accessible_role =
+                Gtk.AccessibleRole.PRESENTATION;
             label.add_css_class ("atm-annunciator");
 
             if (extra_class != null) {
@@ -180,6 +183,8 @@ namespace AskTheModel {
                 valign = Gtk.Align.CENTER,
                 single_line_mode = true
             };
+            separator.accessible_role =
+                Gtk.AccessibleRole.PRESENTATION;
             separator.add_css_class (
                 "atm-annunciator-separator"
             );
@@ -201,6 +206,102 @@ namespace AskTheModel {
             }
         }
 
+        private void update_status_lcd_accessibility () {
+            if (status_lcd == null) {
+                return;
+            }
+
+            string ai_summary =
+                ai_scanning
+                    ? "Local AI scan in progress"
+                    : ollama_provider.is_ready ()
+                        ? "Local AI ready"
+                        : "No usable local AI available";
+
+            RepositoryDescriptor[] selected =
+                repository_selection.selected_repositories ();
+            string acronyms = "";
+            bool any_ready = false;
+            bool all_ready = selected.length > 0;
+            bool needs_download = false;
+            bool update_available = false;
+
+            foreach (RepositoryDescriptor descriptor in selected) {
+                if (acronyms.length > 0) {
+                    acronyms += ", ";
+                }
+                acronyms += descriptor.acronym;
+
+                RepositoryRuntimeInfo info =
+                    repository_lifecycle.info_for (
+                        descriptor.id
+                    );
+
+                if (info.download_required ()) {
+                    needs_download = true;
+                    all_ready = false;
+                } else {
+                    any_ready = true;
+                    if (info.update_available ()) {
+                        update_available = true;
+                    }
+                }
+            }
+
+            string repository_summary;
+
+            if (repository_error) {
+                repository_summary =
+                    "Repository operation failed";
+            } else if (repository_validating) {
+                repository_summary =
+                    "Validating repositories";
+            } else if (repository_updating) {
+                repository_summary =
+                    "Updating repositories";
+            } else if (repository_downloading) {
+                repository_summary =
+                    "Downloading repositories";
+            } else if (repository_checking) {
+                repository_summary =
+                    "Checking repositories";
+            } else if (!any_ready) {
+                repository_summary =
+                    "No local repository snapshot ready";
+            } else if (all_ready && update_available) {
+                repository_summary =
+                    "Repositories %s ready; update available".printf (
+                        acronyms
+                    );
+            } else if (all_ready) {
+                repository_summary =
+                    "Repositories %s ready".printf (
+                        acronyms
+                    );
+            } else if (needs_download) {
+                repository_summary =
+                    "Repositories %s partially ready; download required".printf (
+                        acronyms
+                    );
+            } else {
+                repository_summary =
+                    "Repositories %s available".printf (
+                        acronyms
+                    );
+            }
+
+            if (repository_offline && any_ready) {
+                repository_summary +=
+                    "; remote check offline";
+            }
+
+            status_lcd.tooltip_text =
+                "%s. %s.".printf (
+                    ai_summary,
+                    repository_summary
+                );
+        }
+
         private void update_ai_annunciators () {
             bool ai_missing =
                 !ai_scanning &&
@@ -214,6 +315,7 @@ namespace AskTheModel {
                 ai_scan_annunciator,
                 ai_scanning
             );
+            update_status_lcd_accessibility ();
         }
 
         private void update_repository_annunciators () {
@@ -307,6 +409,7 @@ namespace AskTheModel {
                 repo_error_annunciator,
                 repository_error
             );
+            update_status_lcd_accessibility ();
         }
 
         private void show_model_standby_status () {
@@ -900,7 +1003,8 @@ namespace AskTheModel {
 
             model_dropdown = new Gtk.DropDown (null, null) {
                 sensitive = false,
-                show_arrow = false
+                show_arrow = false,
+                tooltip_text = "Select local AI model"
             };
             model_dropdown.add_css_class (
                 "atm-triangle-selector"
@@ -1152,11 +1256,14 @@ namespace AskTheModel {
                 lcd_row.append (lcd_segments[i]);
             }
 
-            var status_lcd = new Gtk.Frame (null) {
+            var lcd_frame = new Gtk.Frame (null) {
                 child = lcd_row,
                 hexpand = true
             };
-            status_lcd.add_css_class ("atm-status-lcd");
+            lcd_frame.accessible_role =
+                Gtk.AccessibleRole.GROUP;
+            lcd_frame.add_css_class ("atm-status-lcd");
+            status_lcd = lcd_frame;
 
             update_ai_annunciators ();
             update_repository_annunciators ();
@@ -1262,7 +1369,7 @@ namespace AskTheModel {
             composer.append (send_button);
 
             var content = new Gtk.Box (Gtk.Orientation.VERTICAL, 0);
-            content.append (status_lcd);
+            content.append (lcd_frame);
             content.append (transcript_scroll);
             content.append (composer);
 
