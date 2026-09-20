@@ -247,7 +247,7 @@ ollama pull SMALLER_MODEL
 
 ### What the current public release does not yet expose
 
-<small>The public v0.2.2 application does not yet expose the repository-aware backend work that is being developed on `main`. In the released application, users cannot yet:</small>
+<small>The public v0.2.2 application does not yet expose the repository-aware development work on `main`. In the released application, users cannot yet:</small>
 
 - <small>download, import, update or delete AI models through AtM;</small>
 - <small>install, start, stop or update the external provider through AtM;</small>
