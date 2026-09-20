@@ -30,6 +30,7 @@ TARGETS = {
     "wrong_repository_contamination_at_5_max": 0.05,
     "ro_en_ndcg_gap_max": 0.05,
     "evidence_traceability_min": 1.0,
+    "clarification_outcome_accuracy_min": 1.0,
 }
 
 REPOSITORIES = {"ewd", "cbd", "rmd"}
@@ -46,6 +47,7 @@ TOPIC_TYPES = {
     "multi_turn_follow_up",
 }
 SPLITS = {"development", "validation"}
+OUTCOMES = {"retrieval", "needs_clarification"}
 
 
 class BenchmarkError(ValueError):
@@ -139,6 +141,7 @@ def validate_benchmark(benchmark: dict[str, Any]) -> None:
         explicit = topic.get("explicit_repositories")
         judgments = topic.get("judgments")
         expect_unsupported = topic.get("expect_unsupported")
+        expected_outcome = topic.get("expected_outcome")
 
         if not isinstance(topic_id, str) or not topic_id:
             raise BenchmarkError("every topic requires topic_id.")
@@ -169,6 +172,11 @@ def validate_benchmark(benchmark: dict[str, Any]) -> None:
             )
         if not isinstance(query, str) or not query:
             raise BenchmarkError(f"{topic_id}: query is required.")
+        if expected_outcome not in OUTCOMES:
+            raise BenchmarkError(
+                f"{topic_id}: invalid expected_outcome "
+                f"{expected_outcome!r}."
+            )
         if not isinstance(active, list) or not active:
             raise BenchmarkError(
                 f"{topic_id}: active_repositories must be non-empty."
@@ -256,7 +264,23 @@ def validate_benchmark(benchmark: dict[str, Any]) -> None:
                     )
                 required += 1
 
-        if expect_unsupported:
+        if expected_outcome == "needs_clarification":
+            if topic_type != "multi_turn_follow_up":
+                raise BenchmarkError(
+                    f"{topic_id}: needs_clarification is only valid "
+                    "for multi_turn_follow_up topics."
+                )
+            if expect_unsupported:
+                raise BenchmarkError(
+                    f"{topic_id}: clarification must not be conflated "
+                    "with expect_unsupported."
+                )
+            if positive > 0 or required > 0:
+                raise BenchmarkError(
+                    f"{topic_id}: clarification topics cannot have "
+                    "positive or required qrels."
+                )
+        elif expect_unsupported:
             if positive > 0 or required > 0:
                 raise BenchmarkError(
                     f"{topic_id}: unsupported topic cannot have positive qrels."
@@ -273,6 +297,10 @@ def validate_benchmark(benchmark: dict[str, Any]) -> None:
 
         expected_exact = topic.get("expected_exact")
         if topic_type == "exact_entity_lookup":
+            if expected_outcome != "retrieval":
+                raise BenchmarkError(
+                    f"{topic_id}: exact lookup must expect retrieval."
+                )
             if not isinstance(expected_exact, dict):
                 raise BenchmarkError(
                     f"{topic_id}: exact lookup requires expected_exact."
@@ -330,6 +358,12 @@ def validate_run(
                 f"run contains duplicate topic_id: {topic_id}"
             )
         seen.add(topic_id)
+
+        outcome = topic_run.get("outcome")
+        if outcome not in OUTCOMES:
+            raise BenchmarkError(
+                f"{topic_id}: invalid run outcome {outcome!r}."
+            )
 
         latency = topic_run.get("latency_ms")
         if (
@@ -389,6 +423,23 @@ def validate_run(
                     raise BenchmarkError(
                         f"{topic_id}: evidence logical_source_id required."
                     )
+
+        if outcome == "needs_clarification":
+            if topic_run["results"] or topic_run["context_sources"]:
+                raise BenchmarkError(
+                    f"{topic_id}: clarification outcome cannot carry "
+                    "retrieval evidence."
+                )
+            if evidence_bytes != 0:
+                raise BenchmarkError(
+                    f"{topic_id}: clarification outcome must have "
+                    "evidence_bytes = 0."
+                )
+            if token_count not in (None, 0):
+                raise BenchmarkError(
+                    f"{topic_id}: clarification outcome cannot report "
+                    "non-zero evidence tokens."
+                )
 
     missing = set(benchmark_topics) - seen
     if missing:
@@ -563,6 +614,8 @@ def evaluate(
     unsupported_total = 0
     duplicate_results = 0
     total_results = 0
+    expected_outcome_scores: list[float] = []
+    clarification_outcome_scores: list[float] = []
     language_ndcg: dict[str, list[float]] = {
         "en": [],
         "ro": [],
@@ -574,6 +627,15 @@ def evaluate(
         topic = topic_by_id[topic_run["topic_id"]]
         results = topic_run["results"]
         context_sources = topic_run["context_sources"]
+
+        outcome_score = (
+            1.0
+            if topic_run["outcome"] == topic["expected_outcome"]
+            else 0.0
+        )
+        expected_outcome_scores.append(outcome_score)
+        if topic["expected_outcome"] == "needs_clarification":
+            clarification_outcome_scores.append(outcome_score)
 
         latencies.append(float(topic_run["latency_ms"]))
         evidence_bytes.append(topic_run["evidence_bytes"])
@@ -712,6 +774,12 @@ def evaluate(
             if total_results
             else 0.0
         ),
+        "expected_outcome_accuracy": mean_or_none(
+            expected_outcome_scores
+        ),
+        "clarification_outcome_accuracy": mean_or_none(
+            clarification_outcome_scores
+        ),
     }
 
     gates = {
@@ -745,6 +813,11 @@ def evaluate(
                 TARGETS["evidence_traceability_min"],
                 abs_tol=1e-12,
             )
+        ),
+        "clarification_outcome_accuracy": (
+            metrics["clarification_outcome_accuracy"] is not None
+            and metrics["clarification_outcome_accuracy"]
+            >= TARGETS["clarification_outcome_accuracy_min"]
         ),
     }
 
