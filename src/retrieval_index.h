@@ -59,6 +59,15 @@ gboolean atm_retrieval_index_create_with_sources (
     GError **error
 );
 
+gboolean atm_retrieval_index_create_with_documents (
+    const char *cache_root,
+    const char *snapshot_root,
+    const AtmRetrievalIndexMetadata *metadata,
+    const AtmSourceCatalog *source_catalog,
+    char **out_index_path,
+    GError **error
+);
+
 gboolean atm_retrieval_index_validate_identity (
     const char *index_path,
     const char *expected_repository_id,
