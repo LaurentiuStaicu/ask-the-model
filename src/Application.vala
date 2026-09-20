@@ -66,7 +66,7 @@ namespace AskTheModel {
                 repository_status_generation++;
                 if (repository_scan_status != null) {
                     repository_scan_status.label = message;
-                    repository_scan_status.visible = true;
+                    repository_scan_status.opacity = 1.0;
                 }
             });
 
@@ -74,7 +74,7 @@ namespace AskTheModel {
                 if (model_scan_status != null) {
                     model_scan_status.label =
                         "%u%%".printf (percent);
-                    model_scan_status.visible = true;
+                    model_scan_status.opacity = 1.0;
                 }
             });
 
@@ -146,7 +146,7 @@ namespace AskTheModel {
 
             if (model_scan_status != null) {
                 model_scan_status.label = "0%";
-                model_scan_status.visible = true;
+                model_scan_status.opacity = 1.0;
             }
         }
 
@@ -159,13 +159,13 @@ namespace AskTheModel {
             }
 
             model_scan_status.label = message;
-            model_scan_status.visible = true;
+            model_scan_status.opacity = 1.0;
 
             Timeout.add_seconds (3, () => {
                 if (generation == model_status_generation &&
                     model_scan_status != null) {
                     model_scan_status.label = "";
-                    model_scan_status.visible = false;
+                    model_scan_status.opacity = 0.0;
                 }
 
                 return false;
@@ -373,7 +373,7 @@ namespace AskTheModel {
 
             if (repository_scan_status != null) {
                 repository_scan_status.label = "Checking…";
-                repository_scan_status.visible = true;
+                repository_scan_status.opacity = 1.0;
             }
         }
 
@@ -389,7 +389,7 @@ namespace AskTheModel {
             }
 
             repository_scan_status.label = message;
-            repository_scan_status.visible = true;
+            repository_scan_status.opacity = 1.0;
 
             if (persistent) {
                 return;
@@ -399,7 +399,7 @@ namespace AskTheModel {
                 if (generation == repository_status_generation &&
                     repository_scan_status != null) {
                     repository_scan_status.label = "";
-                    repository_scan_status.visible = false;
+                    repository_scan_status.opacity = 0.0;
                 }
 
                 return false;
@@ -555,7 +555,7 @@ namespace AskTheModel {
             set_activity_working (repository_action_ring, true);
             if (repository_scan_status != null) {
                 repository_scan_status.label = "Preparing repositories…";
-                repository_scan_status.visible = true;
+                repository_scan_status.opacity = 1.0;
             }
 
             if (repository_menu_button != null) {
@@ -762,12 +762,6 @@ namespace AskTheModel {
                 refresh_local_models.begin ();
             });
 
-            model_scan_status = new Gtk.Label ("") {
-                valign = Gtk.Align.CENTER,
-                visible = false
-            };
-            model_scan_status.add_css_class ("dim-label");
-
             var model_controls = new Gtk.Box (
                 Gtk.Orientation.HORIZONTAL,
                 6
@@ -781,7 +775,6 @@ namespace AskTheModel {
                     refresh_models_ring
                 )
             );
-            model_controls.append (model_scan_status);
 
             refresh_repositories_button =
                 new Gtk.Button.from_icon_name ("view-refresh-symbolic") {
@@ -804,12 +797,6 @@ namespace AskTheModel {
                 download_or_update_selected_repositories.begin ();
             });
 
-            repository_scan_status = new Gtk.Label ("") {
-                valign = Gtk.Align.CENTER,
-                visible = false
-            };
-            repository_scan_status.add_css_class ("dim-label");
-
             var repository_controls = new Gtk.Box (
                 Gtk.Orientation.HORIZONTAL,
                 6
@@ -830,7 +817,6 @@ namespace AskTheModel {
                     repository_action_ring
                 )
             );
-            repository_controls.append (repository_scan_status);
 
             var header_controls = new Gtk.Box (
                 Gtk.Orientation.HORIZONTAL,
@@ -891,6 +877,50 @@ namespace AskTheModel {
         }
 
         private Gtk.Widget build_main_content () {
+            model_scan_status = new Gtk.Label ("") {
+                valign = Gtk.Align.CENTER,
+                halign = Gtk.Align.FILL,
+                hexpand = true,
+                xalign = 0.0f,
+                ellipsize = Pango.EllipsizeMode.END,
+                single_line_mode = true,
+                opacity = 0.0
+            };
+            model_scan_status.add_css_class ("atm-lcd-text");
+            model_scan_status.add_css_class ("monospace");
+
+            repository_scan_status = new Gtk.Label ("") {
+                valign = Gtk.Align.CENTER,
+                halign = Gtk.Align.FILL,
+                hexpand = true,
+                xalign = 1.0f,
+                ellipsize = Pango.EllipsizeMode.END,
+                single_line_mode = true,
+                opacity = 0.0
+            };
+            repository_scan_status.add_css_class ("atm-lcd-text");
+            repository_scan_status.add_css_class ("monospace");
+
+            var lcd_contents = new Gtk.Box (
+                Gtk.Orientation.HORIZONTAL,
+                12
+            ) {
+                margin_start = 9,
+                margin_end = 9
+            };
+            lcd_contents.append (model_scan_status);
+            lcd_contents.append (repository_scan_status);
+
+            var status_lcd = new Gtk.Frame (null) {
+                child = lcd_contents,
+                hexpand = true,
+                margin_top = 4,
+                margin_bottom = 6,
+                margin_start = 12,
+                margin_end = 12
+            };
+            status_lcd.add_css_class ("atm-status-lcd");
+
             var transcript = new Gtk.TextView () {
                 editable = false,
                 cursor_visible = false,
@@ -898,7 +928,7 @@ namespace AskTheModel {
                 wrap_mode = Gtk.WrapMode.WORD_CHAR,
                 left_margin = 12,
                 right_margin = 12,
-                top_margin = 20,
+                top_margin = 8,
                 bottom_margin = 12,
                 vexpand = true
             };
@@ -992,6 +1022,7 @@ namespace AskTheModel {
             composer.append (send_button);
 
             var content = new Gtk.Box (Gtk.Orientation.VERTICAL, 0);
+            content.append (status_lcd);
             content.append (transcript_scroll);
             content.append (composer);
 
