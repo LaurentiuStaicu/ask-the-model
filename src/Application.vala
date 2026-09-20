@@ -171,6 +171,7 @@ namespace AskTheModel {
 
         private async void refresh_local_models () {
             begin_model_scan_status ();
+            set_button_working (refresh_models_button, true);
 
             if (refresh_models_button != null) {
                 refresh_models_button.sensitive = false;
@@ -217,6 +218,8 @@ namespace AskTheModel {
                     "AtM: refresh could not reach local Ollama on ports 11434 or 11435.\n"
                 );
             }
+
+            set_button_working (refresh_models_button, false);
         }
 
         private void update_model_selector () {
@@ -256,6 +259,28 @@ namespace AskTheModel {
             model_dropdown.sensitive = models.length > 0;
 
             updating_model_selector = false;
+        }
+
+        private void set_button_working (
+            Gtk.Button? button,
+            bool working
+        ) {
+            if (button == null) {
+                return;
+            }
+
+            if (working) {
+                button.add_css_class ("atm-working-ring");
+
+                if (gtk_settings.gtk_enable_animations) {
+                    button.add_css_class ("atm-working-ring-animated");
+                } else {
+                    button.remove_css_class ("atm-working-ring-animated");
+                }
+            } else {
+                button.remove_css_class ("atm-working-ring-animated");
+                button.remove_css_class ("atm-working-ring");
+            }
         }
 
         private void update_repository_selector_label () {
@@ -385,6 +410,7 @@ namespace AskTheModel {
             }
 
             begin_repository_scan_status ();
+            set_button_working (refresh_repositories_button, true);
 
             if (refresh_repositories_button != null) {
                 refresh_repositories_button.sensitive = false;
@@ -505,6 +531,7 @@ namespace AskTheModel {
                 refresh_repositories_button.sensitive = true;
             }
 
+            set_button_working (refresh_repositories_button, false);
             update_repository_option_labels ();
             update_repository_selector_label ();
         }
@@ -519,6 +546,7 @@ namespace AskTheModel {
             }
 
             repository_status_generation++;
+            set_button_working (repository_action_button, true);
             if (repository_scan_status != null) {
                 repository_scan_status.label = "Preparing repositories…";
                 repository_scan_status.visible = true;
@@ -567,6 +595,7 @@ namespace AskTheModel {
                 refresh_repositories_button.sensitive = true;
             }
 
+            set_button_working (repository_action_button, false);
             update_repository_option_labels ();
             update_repository_selector_label ();
         }
