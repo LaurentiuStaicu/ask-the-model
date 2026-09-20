@@ -63,6 +63,12 @@ window.atm-window menubutton.atm-triangle-selector > button:hover {
     background-color: #FAFBF9;
 }
 
+window.atm-window dropdown.atm-triangle-selector > popover > contents,
+window.atm-window dropdown.atm-triangle-selector > popover listview {
+    background-color: #EFF0ED;
+    color: #1B1B18;
+}
+
 window.atm-window menubutton.atm-triangle-selector > button {
     padding-right: 20px;
 }
@@ -270,6 +276,12 @@ window.atm-window.atm-dark menubutton.atm-triangle-selector > button {
 window.atm-window.atm-dark dropdown.atm-triangle-selector > button:hover,
 window.atm-window.atm-dark menubutton.atm-triangle-selector > button:hover {
     background-color: #1B1B18;
+}
+
+window.atm-window.atm-dark dropdown.atm-triangle-selector > popover > contents,
+window.atm-window.atm-dark dropdown.atm-triangle-selector > popover listview {
+    background-color: #2D2D2A;
+    color: #FAFBF9;
 }
 
 window.atm-window.atm-dark scrolledwindow,
