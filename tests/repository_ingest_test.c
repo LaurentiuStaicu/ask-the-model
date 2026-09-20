@@ -544,6 +544,59 @@ test_existing_snapshot_survives_failed_replacement (void)
     g_free (root);
 }
 
+static void
+test_symlink_archive_rejected (void)
+{
+    char *root = new_root ();
+    char *real_archive = g_build_filename (
+        root,
+        "real.tar.gz",
+        NULL
+    );
+    char *link_archive = g_build_filename (
+        root,
+        "link.tar.gz",
+        NULL
+    );
+    char *version = NULL;
+    char *snapshot = NULL;
+    GError *error = NULL;
+
+    write_valid_fixture_archive (real_archive, "ewd");
+    g_assert_cmpint (
+        symlink (real_archive, link_archive),
+        ==,
+        0
+    );
+
+    g_assert_false (
+        atm_repository_ingest_archive (
+            link_archive,
+            root,
+            "ewd",
+            "EWD",
+            "Empirical World3 Dynamics",
+            valid_sha (),
+            &version,
+            &snapshot,
+            &error
+        )
+    );
+    g_assert_error (
+        error,
+        ATM_INGEST_ERROR,
+        ATM_INGEST_ERROR_INVALID_ARGUMENT
+    );
+    g_assert_null (version);
+    g_assert_null (snapshot);
+
+    g_clear_error (&error);
+    g_free (link_archive);
+    g_free (real_archive);
+    remove_tree_best_effort (root);
+    g_free (root);
+}
+
 int
 main (int argc, char **argv)
 {
@@ -572,6 +625,10 @@ main (int argc, char **argv)
     g_test_add_func (
         "/ingest/existing-snapshot-survives",
         test_existing_snapshot_survives_failed_replacement
+    );
+    g_test_add_func (
+        "/ingest/symlink-archive-rejected",
+        test_symlink_archive_rejected
     );
 
     return g_test_run ();
