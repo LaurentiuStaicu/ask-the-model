@@ -20,9 +20,15 @@ Implemented and tested backend layers include:
 - conversation-pinned repository scoping;
 - conservative Romanian/English query aliasing with protected identifiers preserved;
 - repository ID, repository-declared version and snapshot SHA carried on evidence records;
-- a deterministic repository router that combines scope, normalization, exact/tabular/lexical retrieval and ranking without requiring embeddings.
+- a deterministic repository router that combines scope, normalization, exact/tabular/lexical retrieval and ranking without requiring embeddings;
+- immutable per-conversation repository pinning with snapshot/index identity checks and post-freeze scope-mutation rejection;
+- current-turn grounding context and Ollama request construction that keep repository evidence transient instead of persisting grounding blocks in normal chat history;
+- current-turn citation-label resolution into persistent provenance objects, including fail-closed handling of invalid provenance and no fabricated metadata for unknown labels;
+- real-repository R4 traceability tests spanning EWD, CBD and RMD;
+- deterministic multi-turn retrieval state with inherited repository intent/exact anchors, bounded effective follow-up queries and explicit clarification outcomes;
+- versioned R5 benchmark/run schemas, a deterministic evaluator, provisional metric gates and CI for the benchmark contract.
 
-These backend components are not yet connected to the current GTK conversation flow or Ollama request context. Their presence on development `main` therefore does not make repository-grounded chat a released v0.2.2 feature.
+These backend components are still not connected end-to-end to the current GTK repository-selection and conversation flow. Grounded-request and citation-provenance building blocks exist and are tested, but the public application does not yet invoke them from the released UI or render user-visible citations. The R5 benchmark framework exists, but a reviewed fixed benchmark corpus and a real gate-passing benchmark run are not yet claimed. Their presence on development `main` therefore does not make repository-grounded chat a released v0.2.2 feature.
 
 ## Implemented logical components
 
@@ -84,7 +90,7 @@ The backend can already represent and route a pinned repository set, but this li
 
 Responsible for selecting retrieved evidence within a turn budget, recording exactly which repository sources were supplied to the AI, mapping temporary source labels to immutable provenance, and distinguishing retrieved source material from AI-generated interpretation.
 
-The retrieval backend now supplies the required source identity and snapshot provenance, but the provider-context and user-visible citation layer is not yet implemented.
+Backend building blocks are now implemented and tested for current-turn grounding context, grounded Ollama request construction, temporary source-label resolution, persistent citation provenance and real-repository traceability. The remaining work is end-to-end orchestration from the GTK repository/conversation lifecycle and user-visible citation rendering. These backend primitives are not yet a released repository-grounded chat feature.
 
 ### Conversation persistence service
 
@@ -113,7 +119,7 @@ The v1 architecture allows zero to three repository contexts. Zero repositories 
 
 The deterministic backend can keep requested repositories in separate evidence sets and refuses to add a repository that is outside the conversation-pinned scope. The selected repository set is conversation context, not AI-provider configuration. Repository context and the active local AI model remain separate concepts.
 
-The remaining grounded-context/citation layer must preserve this per-repository attribution rather than flattening retrieved material into unidentified combined context.
+The remaining UI/orchestration layer must preserve this per-repository attribution rather than flattening retrieved material into unidentified combined context.
 
 ## Localization and terminology
 
