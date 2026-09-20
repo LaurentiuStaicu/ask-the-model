@@ -3,6 +3,7 @@
 #include <glib.h>
 #include <glib/gstdio.h>
 #include <sqlite3.h>
+#include <yaml.h>
 
 #include <errno.h>
 #include <stdio.h>
@@ -314,6 +315,56 @@ out:
 }
 
 static gboolean
+probe_yaml (void)
+{
+    const unsigned char sample[] =
+        "cff-version: 1.2.0\n"
+        "title: Example\n"
+        "version: 0.1.0\n";
+    yaml_parser_t parser;
+    yaml_document_t document;
+    gboolean ok = FALSE;
+
+    if (!require_true (
+            yaml_parser_initialize (&parser) != 0,
+            "libyaml parser could not be initialized")) {
+        return FALSE;
+    }
+
+    yaml_parser_set_input_string (
+        &parser,
+        sample,
+        sizeof sample - 1
+    );
+
+    if (!require_true (
+            yaml_parser_load (&parser, &document) != 0,
+            "libyaml could not parse a minimal CITATION.cff document")) {
+        yaml_parser_delete (&parser);
+        return FALSE;
+    }
+
+    yaml_node_t *root = yaml_document_get_root_node (&document);
+    if (!require_true (
+            root != NULL && root->type == YAML_MAPPING_NODE,
+            "libyaml did not expose the CFF document as a YAML mapping")) {
+        goto out;
+    }
+
+    ok = TRUE;
+
+out:
+    yaml_document_delete (&document);
+    yaml_parser_delete (&parser);
+
+    if (ok) {
+        g_print ("PASS: libyaml parses YAML mapping input for CITATION.cff\n");
+    }
+
+    return ok;
+}
+
+static gboolean
 probe_writable_directory (const char *directory, const char *label)
 {
     GError *error = NULL;
@@ -403,6 +454,10 @@ main (void)
     }
 
     if (!probe_libarchive ()) {
+        return 1;
+    }
+
+    if (!probe_yaml ()) {
         return 1;
     }
 
