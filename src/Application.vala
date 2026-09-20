@@ -795,7 +795,6 @@ namespace AskTheModel {
 
             repository_action_button =
                 new Gtk.Button.from_icon_name ("folder-download-symbolic") {
-                    tooltip_text = null,
                     sensitive = false,
                     can_target = false,
                     opacity = 0.0
