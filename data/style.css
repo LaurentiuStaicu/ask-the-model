@@ -87,7 +87,7 @@ window.atm-window label.atm-annunciator {
 
 window.atm-window label.atm-annunciator.active {
     color: #C79A52;
-    font-weight: 600;
+    font-weight: 500;
     text-shadow: 0 0 1px rgba(199, 154, 82, 0.20);
 }
 
