@@ -4,6 +4,49 @@
 
 #include <string.h>
 
+static void
+test_record_free (AtmEvidenceRecord *record)
+{
+    if (record == NULL) {
+        return;
+    }
+
+    g_free (record->evidence_kind);
+    g_free (record->repository_id);
+    g_free (record->repository_version);
+    g_free (record->snapshot_sha);
+    g_free (record->logical_source_id);
+    g_free (record->source_path);
+    g_free (record->locator);
+    g_free (record->title);
+    g_free (record->body);
+    g_free (record);
+}
+
+static void
+test_set_free (AtmRepositoryEvidenceSet *set)
+{
+    if (set == NULL) {
+        return;
+    }
+
+    g_free (set->repository_id);
+    g_clear_pointer (&set->evidence, g_ptr_array_unref);
+    g_free (set);
+}
+
+static void
+test_results_free (AtmRetrievalResultSet *results)
+{
+    if (results == NULL) {
+        return;
+    }
+
+    g_clear_pointer (&results->repositories, g_ptr_array_unref);
+    g_free (results->expanded_query);
+    g_free (results);
+}
+
 static const char *
 sha_1 (void)
 {
@@ -61,7 +104,7 @@ new_set (const char *repository_id)
 
     set->repository_id = g_strdup (repository_id);
     set->evidence = g_ptr_array_new_with_free_func (
-        (GDestroyNotify) atm_evidence_record_free
+        (GDestroyNotify) test_record_free
     );
 
     return set;
@@ -76,7 +119,7 @@ new_results (void)
     );
 
     results->repositories = g_ptr_array_new_with_free_func (
-        (GDestroyNotify) atm_repository_evidence_set_free
+        (GDestroyNotify) test_set_free
     );
     results->expanded_query = g_strdup ("current status");
     results->intents = ATM_RETRIEVAL_INTENT_CURRENT_STATE;
@@ -263,7 +306,7 @@ test_round_robin_labels_and_untrusted_quoting (void)
     );
 
     atm_grounding_context_free (context);
-    atm_retrieval_result_set_free (results);
+    test_results_free (results);
 }
 
 static void
@@ -329,7 +372,7 @@ test_budget_truncates_excerpt_without_overflow (void)
 
     g_string_free (long_body, TRUE);
     atm_grounding_context_free (context);
-    atm_retrieval_result_set_free (results);
+    test_results_free (results);
 }
 
 static void
@@ -399,7 +442,7 @@ test_labels_reset_each_turn (void)
 
     atm_grounding_context_free (second);
     atm_grounding_context_free (first);
-    atm_retrieval_result_set_free (results);
+    test_results_free (results);
 }
 
 static void
@@ -444,7 +487,7 @@ test_invalid_provenance_fails_closed (void)
     g_assert_null (context);
 
     g_clear_error (&error);
-    atm_retrieval_result_set_free (results);
+    test_results_free (results);
 }
 
 static void
@@ -475,7 +518,7 @@ test_empty_evidence_is_valid_grounded_no_support_state (void)
     );
 
     atm_grounding_context_free (context);
-    atm_retrieval_result_set_free (results);
+    test_results_free (results);
 }
 
 int
