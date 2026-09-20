@@ -217,6 +217,12 @@ probe_libarchive (void)
                 "/tmp/atm-platform-probe-symlink-%ld",
                 (long) getpid ());
 
+    if (!require_true (archive_write_probe_entry ("safe-file") == ARCHIVE_OK,
+                       "libarchive could not extract a valid regular-file entry")) {
+        goto out;
+    }
+    g_remove ("safe-file");
+
     if (!require_true (archive_write_probe_entry (absolute_path) != ARCHIVE_OK,
                        "libarchive accepted an absolute extraction path")) {
         goto out;
@@ -261,11 +267,13 @@ probe_libarchive (void)
 
     archive_entry_set_size (metadata_entry, 1234);
     archive_entry_set_filetype (metadata_entry, AE_IFREG);
+    archive_entry_set_hardlink (metadata_entry, "../outside-hardlink-target");
 
     if (!require_true (archive_entry_size_is_set (metadata_entry) &&
                        archive_entry_size (metadata_entry) == 1234 &&
-                       archive_entry_filetype (metadata_entry) == AE_IFREG,
-                       "libarchive entry size/type metadata is unavailable")) {
+                       archive_entry_filetype (metadata_entry) == AE_IFREG &&
+                       archive_entry_hardlink (metadata_entry) != NULL,
+                       "libarchive entry size/type/link metadata is unavailable")) {
         goto out;
     }
 
@@ -276,6 +284,7 @@ out:
         archive_entry_free (metadata_entry);
     }
 
+    g_remove ("safe-file");
     g_remove ("escape-link");
 
     if (old_cwd != NULL) {
