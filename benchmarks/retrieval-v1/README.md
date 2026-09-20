@@ -161,6 +161,23 @@ qrels or thresholds. Latency and byte-budget diagnostics remain recorded per
 run and are expected to vary by CI host. Evidence token count remains unset
 until the project adopts an explicit tokenizer/counting contract.
 
+A later verification on the current post-diversification implementation
+(`github-35511507164-1`, 2026-09-20) also passed every gate and recorded:
+
+- exact-ID Success@1: **1.00**;
+- MRR: **1.00**;
+- nDCG@5: **0.9069**;
+- required/canonical Recall@5: **0.9833**;
+- wrong-repository contamination@5: **0.0207**;
+- paired RO–EN nDCG gap: **0.0333**;
+- evidence traceability: **1.00**;
+- expected turn-outcome accuracy: **1.00**;
+- clarification-outcome accuracy: **1.00**.
+
+The retrieval-quality metrics above are deterministic for the pinned corpus and
+current implementation. Latency remains a host diagnostic rather than a frozen
+quality result.
+
 R5 passing validates this fixed deterministic retrieval baseline only. It does
 not imply that the released v0.2.2 GTK application exposes repository-aware
 chat, that the benchmark can never be expanded, or that the scientific models
