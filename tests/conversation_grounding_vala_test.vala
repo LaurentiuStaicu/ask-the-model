@@ -17,6 +17,30 @@ test_zero_scope_freeze ()
 
     assert (grounding.is_frozen ());
     assert (grounding.repository_count () == 0);
+
+    bool needs_clarification;
+    string? system_instructions;
+    string? evidence_text;
+    string? post_evidence_reminder;
+
+    try {
+        bool has_grounding = grounding.prepare_turn (
+            "ordinary local chat",
+            out needs_clarification,
+            out system_instructions,
+            out evidence_text,
+            out post_evidence_reminder
+        );
+
+        assert (!has_grounding);
+        assert (!needs_clarification);
+        assert (system_instructions == null);
+        assert (evidence_text == null);
+        assert (post_evidence_reminder == null);
+    } catch (Error error) {
+        critical ("%s", error.message);
+        assert_not_reached ();
+    }
 }
 
 private static void
