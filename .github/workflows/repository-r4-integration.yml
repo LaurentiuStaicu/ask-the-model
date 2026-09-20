@@ -1,0 +1,191 @@
+name: Real repository R4 integration
+
+on:
+  workflow_dispatch:
+  pull_request:
+    paths:
+      - 'src/cff_version.c'
+      - 'src/cff_version.h'
+      - 'src/repository_sources.c'
+      - 'src/repository_sources.h'
+      - 'src/markdown_sections.c'
+      - 'src/markdown_sections.h'
+      - 'src/csv_table.c'
+      - 'src/csv_table.h'
+      - 'src/structured_json.c'
+      - 'src/structured_json.h'
+      - 'src/retrieval_index.c'
+      - 'src/retrieval_index.h'
+      - 'src/retrieval_index_lifecycle.c'
+      - 'src/retrieval_index_lifecycle.h'
+      - 'src/retrieval_query.c'
+      - 'src/retrieval_query.h'
+      - 'src/retrieval_rank.c'
+      - 'src/retrieval_rank.h'
+      - 'src/retrieval_scope.c'
+      - 'src/retrieval_scope.h'
+      - 'src/retrieval_normalize.c'
+      - 'src/retrieval_normalize.h'
+      - 'src/retrieval_router.c'
+      - 'src/retrieval_router.h'
+      - 'src/grounding_context.c'
+      - 'src/grounding_context.h'
+      - 'src/citation_labels.c'
+      - 'src/citation_labels.h'
+      - 'data/schemas/retrieval-index-v1.sql'
+      - 'data/io.github.laurentiustaicu.ask_the_model.gresource.xml'
+      - 'tests/repository_real_grounding_test.c'
+      - '.github/workflows/repository-r4-integration.yml'
+  push:
+    branches:
+      - main
+    paths:
+      - 'src/cff_version.c'
+      - 'src/cff_version.h'
+      - 'src/repository_sources.c'
+      - 'src/repository_sources.h'
+      - 'src/markdown_sections.c'
+      - 'src/markdown_sections.h'
+      - 'src/csv_table.c'
+      - 'src/csv_table.h'
+      - 'src/structured_json.c'
+      - 'src/structured_json.h'
+      - 'src/retrieval_index.c'
+      - 'src/retrieval_index.h'
+      - 'src/retrieval_index_lifecycle.c'
+      - 'src/retrieval_index_lifecycle.h'
+      - 'src/retrieval_query.c'
+      - 'src/retrieval_query.h'
+      - 'src/retrieval_rank.c'
+      - 'src/retrieval_rank.h'
+      - 'src/retrieval_scope.c'
+      - 'src/retrieval_scope.h'
+      - 'src/retrieval_normalize.c'
+      - 'src/retrieval_normalize.h'
+      - 'src/retrieval_router.c'
+      - 'src/retrieval_router.h'
+      - 'src/grounding_context.c'
+      - 'src/grounding_context.h'
+      - 'src/citation_labels.c'
+      - 'src/citation_labels.h'
+      - 'data/schemas/retrieval-index-v1.sql'
+      - 'data/io.github.laurentiustaicu.ask_the_model.gresource.xml'
+      - 'tests/repository_real_grounding_test.c'
+      - '.github/workflows/repository-r4-integration.yml'
+
+permissions:
+  contents: read
+
+concurrency:
+  group: repository-r4-integration-${{ github.event.pull_request.number || github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  real-grounding:
+    runs-on: ubuntu-24.04
+    timeout-minutes: 15
+
+    steps:
+      - name: Checkout AtM
+        uses: actions/checkout@v6
+
+      - name: Install backend build dependencies
+        shell: bash
+        run: |
+          set -euo pipefail
+          sudo apt-get update
+          sudo apt-get install -y --no-install-recommends \
+            build-essential \
+            git \
+            pkg-config \
+            libglib2.0-dev \
+            libglib2.0-bin \
+            libjson-glib-dev \
+            libsqlite3-dev \
+            libyaml-dev
+
+      - name: Checkout current repository snapshots
+        shell: bash
+        run: |
+          set -euo pipefail
+
+          mkdir -p .integration
+
+          git clone --depth 1 \
+            https://github.com/LaurentiuStaicu/empirical-world3-dynamics.git \
+            .integration/ewd
+          git clone --depth 1 \
+            https://github.com/LaurentiuStaicu/cognitive-belief-dynamics.git \
+            .integration/cbd
+          git clone --depth 1 \
+            https://github.com/LaurentiuStaicu/romanian-monetary-dynamics.git \
+            .integration/rmd
+
+          EWD_SHA="$(git -C .integration/ewd rev-parse HEAD)"
+          CBD_SHA="$(git -C .integration/cbd rev-parse HEAD)"
+          RMD_SHA="$(git -C .integration/rmd rev-parse HEAD)"
+
+          rm -rf \
+            .integration/ewd/.git \
+            .integration/cbd/.git \
+            .integration/rmd/.git
+
+          {
+            echo "ATM_REAL_EWD_ROOT=$GITHUB_WORKSPACE/.integration/ewd"
+            echo "ATM_REAL_EWD_SHA=$EWD_SHA"
+            echo "ATM_REAL_CBD_ROOT=$GITHUB_WORKSPACE/.integration/cbd"
+            echo "ATM_REAL_CBD_SHA=$CBD_SHA"
+            echo "ATM_REAL_RMD_ROOT=$GITHUB_WORKSPACE/.integration/rmd"
+            echo "ATM_REAL_RMD_SHA=$RMD_SHA"
+          } >> "$GITHUB_ENV"
+
+          printf 'EWD %s\nCBD %s\nRMD %s\n' \
+            "$EWD_SHA" "$CBD_SHA" "$RMD_SHA"
+
+      - name: Compile R4 grounding integration probe
+        shell: bash
+        run: |
+          set -euo pipefail
+
+          glib-compile-resources \
+            data/io.github.laurentiustaicu.ask_the_model.gresource.xml \
+            --sourcedir=data \
+            --generate-source \
+            --target=/tmp/atm-resources.c
+
+          cc \
+            -std=c11 \
+            -D_GNU_SOURCE \
+            -O2 \
+            -Wall \
+            -Wextra \
+            -Isrc \
+            src/cff_version.c \
+            src/repository_sources.c \
+            src/markdown_sections.c \
+            src/csv_table.c \
+            src/structured_json.c \
+            src/retrieval_index.c \
+            src/retrieval_index_lifecycle.c \
+            src/retrieval_query.c \
+            src/retrieval_rank.c \
+            src/retrieval_scope.c \
+            src/retrieval_normalize.c \
+            src/retrieval_router.c \
+            src/grounding_context.c \
+            src/citation_labels.c \
+            tests/repository_real_grounding_test.c \
+            /tmp/atm-resources.c \
+            $(pkg-config --cflags --libs \
+              glib-2.0 \
+              gio-2.0 \
+              json-glib-1.0 \
+              sqlite3 \
+              yaml-0.1) \
+            -o /tmp/repository-real-grounding-test
+
+      - name: Exercise R4 grounding and citation traceability
+        shell: bash
+        run: |
+          set -euo pipefail
+          /tmp/repository-real-grounding-test
