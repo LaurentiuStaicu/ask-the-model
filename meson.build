@@ -157,6 +157,31 @@ test(
   repository_storage_test
 )
 
+repository_ingest_test = executable(
+  'repository-ingest-test',
+  [
+    'src/archive_extract.c',
+    'src/cff_version.c',
+    'src/repository_manifest.c',
+    'src/repository_storage.c',
+    'src/repository_ingest.c',
+    'tests/repository_ingest_test.c'
+  ],
+  include_directories: include_directories('src'),
+  dependencies: [
+    glib_dep,
+    json_glib_dep,
+    archive_dep,
+    yaml_dep
+  ],
+  install: false
+)
+
+test(
+  'repository-ingest',
+  repository_ingest_test
+)
+
 subdir('data')
 
 icon_sizes = ['16', '24', '32', '48', '64', '128']
