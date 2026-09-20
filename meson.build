@@ -34,6 +34,8 @@ executable(
     'src/RepositoryService.vala',
     'src/RepositoryNative.vala',
     'src/RepositorySelection.vala',
+    'src/RepositoryState.vala',
+    'src/RepositoryLifecycleService.vala',
     'src/cff_version.c',
     'src/archive_extract.c',
     'src/repository_manifest.c',
@@ -127,6 +129,26 @@ repository_selection_test = executable(
 test(
   'repository-selection',
   repository_selection_test
+)
+
+repository_state_test = executable(
+  'repository-state-test',
+  [
+    'src/RepositoryService.vala',
+    'src/RepositoryState.vala',
+    'tests/repository_state_test.vala'
+  ],
+  dependencies: [
+    glib_dep,
+    soup_dep,
+    json_glib_dep
+  ],
+  install: false
+)
+
+test(
+  'repository-state',
+  repository_state_test
 )
 
 chat_request_builder_test = executable(
