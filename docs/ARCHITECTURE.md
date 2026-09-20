@@ -78,6 +78,20 @@ Implemented in the repository lifecycle, index, query, ranking, normalization, s
 
 The backend preserves immutable snapshot identity and returns evidence objects rather than generated scientific conclusions. The scientific repositories remain canonical; AtM does not rewrite their state or convert AI-generated text into canonical project data.
 
+### R4 grounding and citation backend
+
+Implemented across the grounding-context, conversation-grounding, grounded request-builder and citation-label components under `src/`.
+
+The R4 backend can freeze validated repository snapshots for a conversation, build transient current-turn grounding context, construct grounded Ollama requests without persisting evidence blocks into ordinary chat history, resolve temporary `[S#]` labels only against current-turn evidence and retain citation provenance for later inspection. Real-repository integration tests exercise traceability across EWD, CBD and RMD.
+
+These are backend capabilities. The current GTK application still sends ordinary local-chat prompts through the released UI path and does not render repository citations.
+
+### R5 retrieval-conversation and benchmark framework
+
+The retrieval-conversation backend can preserve relevant repository scope, intent and exact anchors across deterministic follow-up turns, while returning an explicit clarification outcome when a follow-up is too ambiguous to retrieve safely.
+
+R5 also defines versioned benchmark/run schemas, deterministic metric evaluation, provisional gates and CI for the benchmark contract. The framework does not itself constitute a passed R5 benchmark: the fixed reviewed corpus and a real benchmark run meeting the gates remain separate work.
+
 ## Remaining / not yet user-facing components
 
 ### Repository UI and conversation-context service
