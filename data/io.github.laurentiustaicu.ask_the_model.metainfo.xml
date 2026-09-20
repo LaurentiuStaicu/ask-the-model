@@ -3,7 +3,7 @@
   <id>io.github.laurentiustaicu.ask_the_model</id>
 
   <name>Ask the Model</name>
-  <summary>Chat with locally managed AI models</summary>
+  <summary>Chat with local AI and scientific model repositories</summary>
 
   <metadata_license>CC0-1.0</metadata_license>
   <project_license>MIT</project_license>
@@ -15,15 +15,16 @@
   <description>
     <p>
       Ask the Model is a local-first desktop chat interface for locally managed
-      language models through an Ollama-compatible provider. The current release
-      discovers compatible provider-managed models, streams responses and keeps
-      conversation context in memory for the current session.
+      language models through an Ollama-compatible provider. It discovers
+      completion-capable provider-managed models and keeps conversation state in
+      memory for the current application session.
     </p>
     <p>
-      The project is being developed toward natural-language exploration of
-      scientific dynamical-model repositories such as Empirical World3 Dynamics,
-      Cognitive Belief Dynamics and Romanian Monetary Dynamics. Repository-aware
-      retrieval and scientific provenance are not yet implemented, and the source
+      The current release can also query the fixed Empirical World3 Dynamics,
+      Cognitive Belief Dynamics and Romanian Monetary Dynamics repository suite.
+      It manages validated immutable local snapshots, uses deterministic
+      repository retrieval, freezes repository/model identity per conversation,
+      and exposes exact source provenance through on-demand citations. The source
       repositories remain authoritative for their own scientific content.
     </p>
   </description>
@@ -39,6 +40,15 @@
   <content_rating type="oars-1.1"/>
 
   <releases>
+    <release version="0.3.0" date="2026-09-20">
+      <description>
+        <p>
+          Repository-grounded multi-chat with validated EWD/CBD/RMD snapshot
+          lifecycle, deterministic retrieval, frozen per-conversation scope and
+          exact on-demand citation provenance.
+        </p>
+      </description>
+    </release>
     <release version="0.2.2" date="2026-09-20">
       <description>
         <p>
