@@ -1,7 +1,9 @@
 #include "retrieval_index.h"
 #include "markdown_sections.h"
+#include "csv_table.h"
 
 #include <gio/gio.h>
+#include <json-glib/json-glib.h>
 #include <glib/gstdio.h>
 #include <sqlite3.h>
 
@@ -697,6 +699,477 @@ out:
     return ok;
 }
 
+static char *
+csv_metadata_json (const AtmCsvTable *table)
+{
+    JsonBuilder *builder = json_builder_new ();
+    JsonGenerator *generator = json_generator_new ();
+    JsonNode *root;
+    char *json;
+
+    json_builder_begin_object (builder);
+    json_builder_set_member_name (builder, "columns");
+    json_builder_begin_array (builder);
+
+    for (guint i = 0; i < table->headers->len; i++) {
+        json_builder_add_string_value (
+            builder,
+            g_ptr_array_index (table->headers, i)
+        );
+    }
+
+    json_builder_end_array (builder);
+    json_builder_set_member_name (builder, "row_count");
+    json_builder_add_int_value (
+        builder,
+        (gint64) table->rows->len
+    );
+    json_builder_set_member_name (builder, "delimiter");
+    json_builder_add_string_value (builder, ",");
+    json_builder_end_object (builder);
+
+    root = json_builder_get_root (builder);
+    json_generator_set_root (generator, root);
+    json = json_generator_to_data (generator, NULL);
+
+    json_node_free (root);
+    g_object_unref (generator);
+    g_object_unref (builder);
+    return json;
+}
+
+static char *
+csv_row_payload_json (
+    const AtmCsvTable *table,
+    const AtmCsvRow *row
+)
+{
+    JsonBuilder *builder = json_builder_new ();
+    JsonGenerator *generator = json_generator_new ();
+    JsonNode *root;
+    char *json;
+
+    json_builder_begin_object (builder);
+
+    for (guint i = 0; i < table->headers->len; i++) {
+        json_builder_set_member_name (
+            builder,
+            g_ptr_array_index (table->headers, i)
+        );
+        json_builder_add_string_value (
+            builder,
+            g_ptr_array_index (row->fields, i)
+        );
+    }
+
+    json_builder_end_object (builder);
+
+    root = json_builder_get_root (builder);
+    json_generator_set_root (generator, root);
+    json = json_generator_to_data (generator, NULL);
+
+    json_node_free (root);
+    g_object_unref (generator);
+    g_object_unref (builder);
+    return json;
+}
+
+static char *
+csv_row_search_text (
+    const AtmCsvTable *table,
+    const AtmCsvRow *row
+)
+{
+    GString *search = g_string_new (NULL);
+
+    for (guint i = 0; i < table->headers->len; i++) {
+        const char *header = g_ptr_array_index (
+            table->headers,
+            i
+        );
+        const char *value = g_ptr_array_index (
+            row->fields,
+            i
+        );
+
+        if (search->len > 0) {
+            g_string_append_c (search, '\n');
+        }
+
+        g_string_append (search, header);
+        g_string_append_c (search, '=');
+        g_string_append (search, value);
+    }
+
+    return g_string_free (search, FALSE);
+}
+
+static gboolean
+insert_tabular_datasets (
+    sqlite3 *db,
+    const char *snapshot_root,
+    const char *repository_id,
+    const AtmSourceCatalog *catalog,
+    GError **error
+)
+{
+    sqlite3_stmt *source_statement = NULL;
+    sqlite3_stmt *dataset_statement = NULL;
+    sqlite3_stmt *row_statement = NULL;
+    sqlite3_stmt *fts_statement = NULL;
+    gboolean ok = FALSE;
+
+    if (sqlite3_prepare_v2 (
+            db,
+            "SELECT id FROM source_files WHERE path = ?1;",
+            -1,
+            &source_statement,
+            NULL
+        ) != SQLITE_OK ||
+        sqlite3_prepare_v2 (
+            db,
+            "INSERT INTO datasets("
+            "source_id, native_id, logical_source_id, locator, "
+            "title, metadata_json"
+            ") VALUES(?1, NULL, ?2, ?3, ?4, ?5);",
+            -1,
+            &dataset_statement,
+            NULL
+        ) != SQLITE_OK ||
+        sqlite3_prepare_v2 (
+            db,
+            "INSERT INTO dataset_rows("
+            "dataset_id, ordinal, row_key, locator, "
+            "payload_json, search_text"
+            ") VALUES(?1, ?2, ?3, ?4, ?5, ?6);",
+            -1,
+            &row_statement,
+            NULL
+        ) != SQLITE_OK ||
+        sqlite3_prepare_v2 (
+            db,
+            "INSERT INTO search_fts("
+            "evidence_kind, evidence_id, logical_source_id, "
+            "title, body"
+            ") VALUES('dataset_row', ?1, ?2, ?3, ?4);",
+            -1,
+            &fts_statement,
+            NULL
+        ) != SQLITE_OK) {
+        g_set_error (
+            error,
+            ATM_RETRIEVAL_INDEX_ERROR,
+            ATM_RETRIEVAL_INDEX_ERROR_SQLITE,
+            "Could not prepare dataset-index inserts: %s",
+            sqlite3_errmsg (db)
+        );
+        goto out;
+    }
+
+    for (guint i = 0; i < catalog->files->len; i++) {
+        const AtmSourceRecord *source = g_ptr_array_index (
+            catalog->files,
+            i
+        );
+
+        if ((source->roles & ATM_SOURCE_ROLE_TABULAR) == 0 ||
+            g_strcmp0 (source->media_type, "text/csv") != 0) {
+            continue;
+        }
+
+        char *absolute_path = g_build_filename (
+            snapshot_root,
+            source->path,
+            NULL
+        );
+        AtmCsvTable *table = NULL;
+
+        if (!atm_csv_parse_file (
+                absolute_path,
+                &table,
+                error
+            )) {
+            g_free (absolute_path);
+            goto out;
+        }
+
+        g_free (absolute_path);
+
+        sqlite3_reset (source_statement);
+        sqlite3_clear_bindings (source_statement);
+        sqlite3_bind_text (
+            source_statement,
+            1,
+            source->path,
+            -1,
+            SQLITE_STATIC
+        );
+
+        if (sqlite3_step (source_statement) != SQLITE_ROW) {
+            g_set_error (
+                error,
+                ATM_RETRIEVAL_INDEX_ERROR,
+                ATM_RETRIEVAL_INDEX_ERROR_INTEGRITY,
+                "CSV source '%s' is missing from source_files.",
+                source->path
+            );
+            atm_csv_table_free (table);
+            goto out;
+        }
+
+        sqlite3_int64 source_id = sqlite3_column_int64 (
+            source_statement,
+            0
+        );
+        char *dataset_id = g_strdup_printf (
+            "%s:dataset:%s",
+            repository_id,
+            source->path
+        );
+        char *dataset_locator = g_strdup_printf (
+            "file:%s",
+            source->path
+        );
+        char *metadata_json = csv_metadata_json (table);
+
+        sqlite3_reset (dataset_statement);
+        sqlite3_clear_bindings (dataset_statement);
+        sqlite3_bind_int64 (
+            dataset_statement,
+            1,
+            source_id
+        );
+        sqlite3_bind_text (
+            dataset_statement,
+            2,
+            dataset_id,
+            -1,
+            SQLITE_TRANSIENT
+        );
+        sqlite3_bind_text (
+            dataset_statement,
+            3,
+            dataset_locator,
+            -1,
+            SQLITE_TRANSIENT
+        );
+        sqlite3_bind_text (
+            dataset_statement,
+            4,
+            source->path,
+            -1,
+            SQLITE_STATIC
+        );
+        sqlite3_bind_text (
+            dataset_statement,
+            5,
+            metadata_json,
+            -1,
+            SQLITE_TRANSIENT
+        );
+
+        if (sqlite3_step (dataset_statement) != SQLITE_DONE) {
+            g_set_error (
+                error,
+                ATM_RETRIEVAL_INDEX_ERROR,
+                ATM_RETRIEVAL_INDEX_ERROR_SQLITE,
+                "Could not insert dataset for '%s': %s",
+                source->path,
+                sqlite3_errmsg (db)
+            );
+            g_free (metadata_json);
+            g_free (dataset_locator);
+            g_free (dataset_id);
+            atm_csv_table_free (table);
+            goto out;
+        }
+
+        sqlite3_int64 sqlite_dataset_id =
+            sqlite3_last_insert_rowid (db);
+
+        for (guint row_index = 0;
+             row_index < table->rows->len;
+             row_index++) {
+            const AtmCsvRow *row = g_ptr_array_index (
+                table->rows,
+                row_index
+            );
+            const char *first_value = row->fields->len > 0
+                ? g_ptr_array_index (row->fields, 0)
+                : NULL;
+            char *locator = g_strdup_printf (
+                "lines:%u-%u",
+                row->start_line,
+                row->end_line
+            );
+            char *payload_json = csv_row_payload_json (
+                table,
+                row
+            );
+            char *search_text = csv_row_search_text (
+                table,
+                row
+            );
+            char *logical_row_id = g_strdup_printf (
+                "%s:dataset-row:%s:%u",
+                repository_id,
+                source->path,
+                row->ordinal
+            );
+
+            sqlite3_reset (row_statement);
+            sqlite3_clear_bindings (row_statement);
+            sqlite3_bind_int64 (
+                row_statement,
+                1,
+                sqlite_dataset_id
+            );
+            sqlite3_bind_int (
+                row_statement,
+                2,
+                (int) row->ordinal
+            );
+
+            if (first_value != NULL && first_value[0] != '\0') {
+                sqlite3_bind_text (
+                    row_statement,
+                    3,
+                    first_value,
+                    -1,
+                    SQLITE_STATIC
+                );
+            } else {
+                sqlite3_bind_null (row_statement, 3);
+            }
+
+            sqlite3_bind_text (
+                row_statement,
+                4,
+                locator,
+                -1,
+                SQLITE_TRANSIENT
+            );
+            sqlite3_bind_text (
+                row_statement,
+                5,
+                payload_json,
+                -1,
+                SQLITE_TRANSIENT
+            );
+            sqlite3_bind_text (
+                row_statement,
+                6,
+                search_text,
+                -1,
+                SQLITE_TRANSIENT
+            );
+
+            if (sqlite3_step (row_statement) != SQLITE_DONE) {
+                g_set_error (
+                    error,
+                    ATM_RETRIEVAL_INDEX_ERROR,
+                    ATM_RETRIEVAL_INDEX_ERROR_SQLITE,
+                    "Could not insert dataset row for '%s': %s",
+                    source->path,
+                    sqlite3_errmsg (db)
+                );
+                g_free (logical_row_id);
+                g_free (search_text);
+                g_free (payload_json);
+                g_free (locator);
+                g_free (metadata_json);
+                g_free (dataset_locator);
+                g_free (dataset_id);
+                atm_csv_table_free (table);
+                goto out;
+            }
+
+            sqlite3_int64 sqlite_row_id =
+                sqlite3_last_insert_rowid (db);
+
+            sqlite3_reset (fts_statement);
+            sqlite3_clear_bindings (fts_statement);
+            sqlite3_bind_int64 (
+                fts_statement,
+                1,
+                sqlite_row_id
+            );
+            sqlite3_bind_text (
+                fts_statement,
+                2,
+                logical_row_id,
+                -1,
+                SQLITE_TRANSIENT
+            );
+            sqlite3_bind_text (
+                fts_statement,
+                3,
+                source->path,
+                -1,
+                SQLITE_STATIC
+            );
+            sqlite3_bind_text (
+                fts_statement,
+                4,
+                search_text,
+                -1,
+                SQLITE_TRANSIENT
+            );
+
+            if (sqlite3_step (fts_statement) != SQLITE_DONE) {
+                g_set_error (
+                    error,
+                    ATM_RETRIEVAL_INDEX_ERROR,
+                    ATM_RETRIEVAL_INDEX_ERROR_SQLITE,
+                    "Could not insert FTS dataset row for '%s': %s",
+                    source->path,
+                    sqlite3_errmsg (db)
+                );
+                g_free (logical_row_id);
+                g_free (search_text);
+                g_free (payload_json);
+                g_free (locator);
+                g_free (metadata_json);
+                g_free (dataset_locator);
+                g_free (dataset_id);
+                atm_csv_table_free (table);
+                goto out;
+            }
+
+            g_free (logical_row_id);
+            g_free (search_text);
+            g_free (payload_json);
+            g_free (locator);
+        }
+
+        g_free (metadata_json);
+        g_free (dataset_locator);
+        g_free (dataset_id);
+        atm_csv_table_free (table);
+    }
+
+    ok = TRUE;
+
+out:
+    if (fts_statement != NULL) {
+        sqlite3_finalize (fts_statement);
+    }
+
+    if (row_statement != NULL) {
+        sqlite3_finalize (row_statement);
+    }
+
+    if (dataset_statement != NULL) {
+        sqlite3_finalize (dataset_statement);
+    }
+
+    if (source_statement != NULL) {
+        sqlite3_finalize (source_statement);
+    }
+
+    return ok;
+}
+
 char *
 atm_retrieval_index_path (
     const char *cache_root,
@@ -757,6 +1230,7 @@ retrieval_index_create_internal (
     const char *snapshot_root,
     const AtmRetrievalIndexMetadata *metadata,
     const AtmSourceCatalog *source_catalog,
+    gboolean include_datasets,
     char **out_index_path,
     GError **error
 )
@@ -963,6 +1437,16 @@ retrieval_index_create_internal (
              source_catalog,
              error
          )) ||
+        (include_datasets &&
+         snapshot_root != NULL &&
+         source_catalog != NULL &&
+         !insert_tabular_datasets (
+             db,
+             snapshot_root,
+             metadata->repository_id,
+             source_catalog,
+             error
+         )) ||
         !sqlite_exec_checked (db, "COMMIT;", error)) {
         goto out;
     }
@@ -1033,6 +1517,7 @@ atm_retrieval_index_create_empty (
         NULL,
         metadata,
         NULL,
+        FALSE,
         out_index_path,
         error
     );
@@ -1054,6 +1539,7 @@ atm_retrieval_index_create_with_sources (
         NULL,
         metadata,
         source_catalog,
+        FALSE,
         out_index_path,
         error
     );
@@ -1077,6 +1563,31 @@ atm_retrieval_index_create_with_documents (
         snapshot_root,
         metadata,
         source_catalog,
+        FALSE,
+        out_index_path,
+        error
+    );
+}
+
+gboolean
+atm_retrieval_index_create_with_content (
+    const char *cache_root,
+    const char *snapshot_root,
+    const AtmRetrievalIndexMetadata *metadata,
+    const AtmSourceCatalog *source_catalog,
+    char **out_index_path,
+    GError **error
+)
+{
+    g_return_val_if_fail (snapshot_root != NULL, FALSE);
+    g_return_val_if_fail (source_catalog != NULL, FALSE);
+
+    return retrieval_index_create_internal (
+        cache_root,
+        snapshot_root,
+        metadata,
+        source_catalog,
+        TRUE,
         out_index_path,
         error
     );
