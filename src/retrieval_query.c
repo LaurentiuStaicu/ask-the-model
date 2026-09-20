@@ -893,10 +893,10 @@ atm_retrieval_search_fts (
     if (sqlite3_prepare_v2 (
             db,
             "SELECT evidence_kind, evidence_id, logical_source_id, "
-            "title, body, bm25(search_fts) "
+            "title, body, bm25(search_fts, 0.0, 0.0, 0.0, 4.0, 1.0) "
             "FROM search_fts "
             "WHERE search_fts MATCH ?1 "
-            "ORDER BY bm25(search_fts), rowid "
+            "ORDER BY bm25(search_fts, 0.0, 0.0, 0.0, 4.0, 1.0), rowid "
             "LIMIT ?2;",
             -1,
             &search_statement,
