@@ -38,6 +38,7 @@ executable(
     'src/repository_ingest.c',
     'src/retrieval_index.c',
     'src/repository_sources.c',
+    'src/structured_json.c',
     resources
   ],
   dependencies: [
@@ -255,6 +256,25 @@ repository_sources_test = executable(
 test(
   'repository-sources',
   repository_sources_test
+)
+
+structured_json_test = executable(
+  'structured-json-test',
+  [
+    'src/structured_json.c',
+    'tests/structured_json_test.c'
+  ],
+  include_directories: include_directories('src'),
+  dependencies: [
+    glib_dep,
+    json_glib_dep
+  ],
+  install: false
+)
+
+test(
+  'structured-json',
+  structured_json_test
 )
 
 subdir('data')
