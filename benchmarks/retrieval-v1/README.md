@@ -59,6 +59,13 @@ Clarification is deliberately separate from unsupported evidence. A
 must refuse to guess from the available turn context. It is not scored as a
 successful empty retrieval and it must not carry retrieved context.
 
+An `expect_unsupported` topic describes a premise or requested claim that the
+pinned repositories do not establish. It does **not** mean that retrieval should
+be empty. Canonical limitation, validation-boundary or negative evidence may be
+positively relevant and required when it is what allows a grounded answer to
+correct the premise. If no such evidence exists, an unsupported topic may have
+no positive qrels.
+
 All language variants of one information need must remain in the same split.
 
 A run records, per topic:
@@ -94,7 +101,9 @@ corpus.
 - median and p95 retrieval latency;
 - mean/max evidence bytes;
 - mean/max evidence token count and token-count coverage;
-- unsupported-topic empty-context rate;
+- unsupported-topic empty-context rate (diagnostic only; neither direction is
+  universally preferable because some unsupported premises have relevant
+  boundary evidence and others do not);
 - duplicate-result rate;
 - expected turn-outcome accuracy;
 - clarification-outcome accuracy.
