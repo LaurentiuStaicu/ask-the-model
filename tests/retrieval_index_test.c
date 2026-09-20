@@ -839,6 +839,8 @@ test_structured_json_entities_relations_and_fts_are_committed (void)
             "SELECT count(*) FROM structured_relations "
             "WHERE native_id = 'LINK.FOOD.POP' "
             "AND relation_type = 'INFLUENCE' "
+            "AND logical_source_id = "
+            "'ewd:entity:relation:LINK.FOOD.POP' "
             "AND from_logical_source_id = "
             "'ewd:entity:variable:food_per_capita' "
             "AND to_logical_source_id = "
