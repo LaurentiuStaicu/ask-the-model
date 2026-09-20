@@ -1,0 +1,31 @@
+{
+  "contract_version": "1.0",
+  "frozen_on": "2026-09-20",
+  "suite_role": "APPLICATION_INTERFACE",
+  "purpose": "Apply the shared suite community-health shell to Ask the Model while keeping application/provider/model boundaries explicit.",
+  "shared_with_suite": [
+    "CONTRIBUTING structure",
+    "SUPPORT routing",
+    "bug issue form structure",
+    "pull-request checklist structure"
+  ],
+  "project_specific": [
+    "Flatpak/build context",
+    "provider/model compatibility reporting",
+    "application capability boundary"
+  ],
+  "deferred": {
+    "code_of_conduct": "PENDING_GOVERNANCE_DECISION",
+    "security_policy": "PENDING_PRIVATE_REPORTING_ROUTE",
+    "account_level_defaults": "PENDING_PUBLIC_ACCOUNT_LEVEL_DOT_GITHUB_REPOSITORY"
+  },
+  "invariants": [
+    "AtM is an interface, not a scientific model.",
+    "External providers and AI model files remain separate dependencies/artifacts.",
+    "Do not present AI-generated content as a canonical EWD/CBD/RMD result without repository-grounded provenance or actual model execution.",
+    "Do not bump the application version as part of an unrelated change.",
+    "Release publication must remain tied to the exact versioned release notes and reviewed commit."
+  ],
+  "current_public_version": "0.2.2",
+  "version_bump_required": false
+}
