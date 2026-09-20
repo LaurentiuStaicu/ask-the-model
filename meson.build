@@ -38,6 +38,7 @@ executable(
     'src/repository_ingest.c',
     'src/retrieval_index.c',
     'src/repository_sources.c',
+    'src/markdown_sections.c',
     resources
   ],
   dependencies: [
@@ -255,6 +256,24 @@ repository_sources_test = executable(
 test(
   'repository-sources',
   repository_sources_test
+)
+
+markdown_sections_test = executable(
+  'markdown-sections-test',
+  [
+    'src/markdown_sections.c',
+    'tests/markdown_sections_test.c'
+  ],
+  include_directories: include_directories('src'),
+  dependencies: [
+    glib_dep
+  ],
+  install: false
+)
+
+test(
+  'markdown-sections',
+  markdown_sections_test
 )
 
 subdir('data')
