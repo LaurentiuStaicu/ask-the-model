@@ -120,6 +120,25 @@ test(
   repository_manifest_test
 )
 
+archive_extract_test = executable(
+  'archive-extract-test',
+  [
+    'src/archive_extract.c',
+    'tests/archive_extract_test.c'
+  ],
+  include_directories: include_directories('src'),
+  dependencies: [
+    glib_dep,
+    archive_dep
+  ],
+  install: false
+)
+
+test(
+  'archive-extract',
+  archive_extract_test
+)
+
 subdir('data')
 
 icon_sizes = ['16', '24', '32', '48', '64', '128']
