@@ -241,49 +241,45 @@ namespace AskTheModel {
         }
 
         public async string chat (string prompt) throws GLib.Error {
+            return yield chat_internal (
+                prompt,
+                null,
+                null,
+                null
+            );
+        }
+
+        public async string chat_grounded (
+            string prompt,
+            string grounding_system,
+            string evidence_text,
+            string post_evidence_reminder
+        ) throws GLib.Error {
+            return yield chat_internal (
+                prompt,
+                grounding_system,
+                evidence_text,
+                post_evidence_reminder
+            );
+        }
+
+        private async string chat_internal (
+            string prompt,
+            string? grounding_system,
+            string? evidence_text,
+            string? post_evidence_reminder
+        ) throws GLib.Error {
             yield ensure_ready ();
 
-            var builder = new Json.Builder ();
-            builder.begin_object ();
-
-            builder.set_member_name ("model");
-            builder.add_string_value (model_name);
-
-            builder.set_member_name ("messages");
-            builder.begin_array ();
-
-            for (int i = 0; i < roles.length; i++) {
-                builder.begin_object ();
-                builder.set_member_name ("role");
-                builder.add_string_value (roles[i]);
-                builder.set_member_name ("content");
-                builder.add_string_value (contents[i]);
-                builder.end_object ();
-            }
-
-            builder.begin_object ();
-            builder.set_member_name ("role");
-            builder.add_string_value ("user");
-            builder.set_member_name ("content");
-            builder.add_string_value (prompt);
-            builder.end_object ();
-
-            builder.end_array ();
-
-            // Some reasoning-capable models can spend significant latency
-            // on a hidden reasoning trace. The default chat path requests
-            // the final answer directly for a more responsive interface.
-            builder.set_member_name ("think");
-            builder.add_boolean_value (false);
-
-            builder.set_member_name ("stream");
-            builder.add_boolean_value (true);
-
-            builder.end_object ();
-
-            var generator = new Json.Generator ();
-            generator.set_root (builder.get_root ());
-            string request_body = generator.to_data (null);
+            string request_body = ChatRequestBuilder.build (
+                model_name,
+                roles,
+                contents,
+                prompt,
+                grounding_system,
+                evidence_text,
+                post_evidence_reminder
+            );
 
             var message = new Soup.Message (
                 "POST",
