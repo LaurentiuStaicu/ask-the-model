@@ -477,6 +477,65 @@ test_valid_pins_are_canonical_and_frozen (void)
         )
     );
 
+    atm_conversation_grounding_abort_turn (state);
+
+    AtmCitationResolution *aborted_resolution = NULL;
+
+    g_assert_false (
+        atm_conversation_grounding_resolve_turn_citations (
+            state,
+            "Aborted output [S1].",
+            &aborted_resolution,
+            &error
+        )
+    );
+    g_assert_error (
+        error,
+        ATM_CONVERSATION_GROUNDING_ERROR,
+        ATM_CONVERSATION_GROUNDING_ERROR_VALIDATION
+    );
+    g_assert_null (aborted_resolution);
+    g_clear_error (&error);
+
+    g_assert_false (
+        atm_conversation_grounding_commit_turn (
+            state,
+            &error
+        )
+    );
+    g_assert_error (
+        error,
+        ATM_CONVERSATION_GROUNDING_ERROR,
+        ATM_CONVERSATION_GROUNDING_ERROR_VALIDATION
+    );
+    g_clear_error (&error);
+
+    g_clear_pointer (
+        &post_evidence_reminder,
+        g_free
+    );
+    g_clear_pointer (&evidence_text, g_free);
+    g_clear_pointer (&system_instructions, g_free);
+
+    has_grounding = FALSE;
+    needs_clarification = FALSE;
+
+    g_assert_true (
+        atm_conversation_grounding_prepare_turn (
+            state,
+            "What is the current fixture status in EWD?",
+            &has_grounding,
+            &needs_clarification,
+            &system_instructions,
+            &evidence_text,
+            &post_evidence_reminder,
+            &error
+        )
+    );
+    g_assert_no_error (error);
+    g_assert_true (has_grounding);
+    g_assert_false (needs_clarification);
+
     AtmCitationResolution *ewd_resolution = NULL;
 
     g_assert_true (
