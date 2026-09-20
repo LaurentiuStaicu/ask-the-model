@@ -66,7 +66,7 @@ window.atm-window .atm-selector-triangle {
  * #E6BD66 matches the moving highlight in ActivityRing.
  */
 window.atm-window frame.atm-status-lcd {
-    min-height: 20px;
+    min-height: 34px;
     padding: 1px 0;
     background-color: rgba(43, 35, 20, 0.76);
     border: 1px solid rgba(135, 107, 55, 0.42);
@@ -75,10 +75,25 @@ window.atm-window frame.atm-status-lcd {
     background-clip: padding-box;
 }
 
-window.atm-window label.atm-lcd-text {
+window.atm-window label.atm-annunciator {
+    color: rgba(230, 189, 102, 0.16);
+    font-size: 0.70em;
+    font-weight: 500;
+    text-shadow: none;
+}
+
+window.atm-window label.atm-annunciator.active {
     color: #E6BD66;
-    font-size: 0.82em;
-    text-shadow: 0 0 2px rgba(230, 189, 102, 0.42);
+    font-weight: 600;
+    text-shadow: 0 0 2px rgba(230, 189, 102, 0.44);
+}
+
+window.atm-window label.atm-annunciator-title.active {
+    text-shadow: 0 0 2px rgba(230, 189, 102, 0.30);
+}
+
+window.atm-window label.atm-annunciator-model {
+    min-width: 7em;
 }
 
 window.atm-window frame.atm-input-frame {
@@ -141,7 +156,12 @@ window.atm-window.atm-dark frame.atm-status-lcd {
     box-shadow: none;
 }
 
-window.atm-window.atm-dark label.atm-lcd-text {
+window.atm-window.atm-dark label.atm-annunciator {
+    color: rgba(230, 189, 102, 0.14);
+    text-shadow: none;
+}
+
+window.atm-window.atm-dark label.atm-annunciator.active {
     color: #E6BD66;
     text-shadow: 0 0 2px rgba(230, 189, 102, 0.46);
 }
