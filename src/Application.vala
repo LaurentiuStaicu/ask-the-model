@@ -274,6 +274,22 @@ namespace AskTheModel {
             if (repository_action_button != null) {
                 RepositoryDescriptor[] selected =
                     repository_selection.selected_repositories ();
+                bool needs_download = false;
+
+                foreach (RepositoryDescriptor descriptor in selected) {
+                    if (repository_lifecycle.info_for (
+                            descriptor.id
+                        ).download_required ()) {
+                        needs_download = true;
+                        break;
+                    }
+                }
+
+                repository_action_button.set_icon_name (
+                    needs_download
+                        ? "folder-download-symbolic"
+                        : "software-update-available-symbolic"
+                );
                 repository_action_button.sensitive =
                     repository_lifecycle.selection_needs_action (
                         selected
