@@ -585,8 +585,172 @@ namespace AskTheModel {
             );
         }
 
+        private string[] selected_repository_ids () {
+            string[] ids = {};
+
+            foreach (
+                RepositoryDescriptor descriptor
+                in RepositoryCatalog.all ()
+            ) {
+                if (repository_selection.is_selected (descriptor.id)) {
+                    ids += descriptor.id;
+                }
+            }
+
+            return ids;
+        }
+
+        private bool repository_id_in (
+            string[] ids,
+            string repository_id
+        ) {
+            foreach (string id in ids) {
+                if (id == repository_id) {
+                    return true;
+                }
+            }
+
+            return false;
+        }
+
+        private ChatTabState? chat_state_for_page (
+            Gtk.Widget page
+        ) {
+            foreach (ChatTabState state in chat_states) {
+                if (state.page == page) {
+                    return state;
+                }
+            }
+
+            return null;
+        }
+
+        private bool chat_state_is_open (
+            ChatTabState candidate
+        ) {
+            foreach (ChatTabState state in chat_states) {
+                if (state == candidate) {
+                    return true;
+                }
+            }
+
+            return false;
+        }
+
+        private void restore_chat_controls (
+            ChatTabState state
+        ) {
+            restoring_chat_controls = true;
+
+            if (state.model_name != null) {
+                ollama_provider.select_model (state.model_name);
+
+                if (model_list != null && model_dropdown != null) {
+                    for (uint i = 0; i < model_list.n_items; i++) {
+                        string? listed = model_list.get_string (i);
+                        if (listed == state.model_name) {
+                            updating_model_selector = true;
+                            model_dropdown.set_selected (i);
+                            updating_model_selector = false;
+                            break;
+                        }
+                    }
+                }
+            }
+
+            RepositoryDescriptor[] catalog = RepositoryCatalog.all ();
+            for (int i = 0; i < catalog.length; i++) {
+                bool selected = repository_id_in (
+                    state.repository_ids,
+                    catalog[i].id
+                );
+
+                repository_selection.set_selected (
+                    catalog[i].id,
+                    selected
+                );
+
+                if (i < repository_check_buttons.length) {
+                    repository_check_buttons[i].active = selected;
+                }
+            }
+
+            restoring_chat_controls = false;
+            update_repository_selector_label ();
+            update_ai_annunciators ();
+            update_repository_annunciators ();
+        }
+
+        private void activate_chat_state (
+            ChatTabState state
+        ) {
+            active_chat = state;
+            restore_chat_controls (state);
+            update_conversation_ui_state ();
+
+            if (!generation_active) {
+                state.prompt.grab_focus ();
+            }
+        }
+
+        private void remove_chat_state (
+            ChatTabState target
+        ) {
+            ChatTabState[] updated = {};
+
+            foreach (ChatTabState state in chat_states) {
+                if (state != target) {
+                    updated += state;
+                }
+            }
+
+            chat_states = updated;
+        }
+
+        private void close_chat_tab (
+            ChatTabState state
+        ) {
+            if (state.generating || chat_notebook == null) {
+                return;
+            }
+
+            int page_num = chat_notebook.page_num (state.page);
+            if (page_num < 0) {
+                return;
+            }
+
+            bool was_active = active_chat == state;
+            chat_notebook.remove_page (page_num);
+            remove_chat_state (state);
+
+            if (was_active) {
+                active_chat = null;
+            }
+
+            if (chat_notebook.get_n_pages () == 0) {
+                create_chat_tab ();
+                return;
+            }
+
+            int current = chat_notebook.get_current_page ();
+            Gtk.Widget? current_page =
+                chat_notebook.get_nth_page (current);
+
+            if (current_page != null) {
+                ChatTabState? next =
+                    chat_state_for_page (current_page);
+
+                if (next != null) {
+                    activate_chat_state (next);
+                }
+            }
+        }
+
         private void update_conversation_ui_state () {
-            bool editable = !conversation_ui_locked;
+            bool editable =
+                active_chat != null &&
+                !active_chat.locked &&
+                !generation_active;
             bool provider_ready =
                 ollama_provider.get_completion_models ().length > 0;
 
@@ -613,10 +777,18 @@ namespace AskTheModel {
                 check.sensitive = editable;
             }
 
+            foreach (ChatTabState state in chat_states) {
+                state.prompt.sensitive = !generation_active;
+                state.send_button.sensitive =
+                    !generation_active &&
+                    state.prompt.buffer.text.strip ().length > 0;
+                state.close_button.sensitive =
+                    !state.generating;
+            }
+
             update_repository_selector_label ();
 
-            bool can_start_new_chat =
-                conversation_ui_locked && !generation_active;
+            bool can_start_new_chat = !generation_active;
 
             if (new_chat_button != null) {
                 new_chat_button.sensitive = can_start_new_chat;
@@ -625,37 +797,6 @@ namespace AskTheModel {
             if (new_chat_action != null) {
                 new_chat_action.set_enabled (can_start_new_chat);
             }
-        }
-
-        private void reset_preview_conversation () {
-            if (generation_active) {
-                return;
-            }
-
-            ollama_provider.reset_conversation ();
-            conversation_serial++;
-            conversation_ui_locked = false;
-            assistant_stream_started = false;
-
-            if (current_chat_tab_label != null) {
-                current_chat_tab_label.label = "New";
-            }
-
-            if (transcript_view != null) {
-                transcript_view.buffer.text = "";
-            }
-
-            if (prompt_input_view != null) {
-                prompt_input_view.buffer.text = "";
-                prompt_input_view.sensitive = true;
-                prompt_input_view.grab_focus ();
-            }
-
-            if (send_prompt_button != null) {
-                send_prompt_button.sensitive = false;
-            }
-
-            update_conversation_ui_state ();
         }
 
         private void update_model_selector () {
