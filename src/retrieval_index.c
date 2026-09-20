@@ -1216,10 +1216,11 @@ lookup_source_id (
 }
 
 static gboolean
-collect_native_entity_counts (
+collect_native_record_counts (
     const char *snapshot_root,
     const AtmSourceCatalog *catalog,
-    GHashTable *counts,
+    GHashTable *entity_counts,
+    GHashTable *relation_counts,
     GError **error
 )
 {
@@ -1261,14 +1262,41 @@ collect_native_entity_counts (
             );
             guint count = GPOINTER_TO_UINT (
                 g_hash_table_lookup (
-                    counts,
+                    entity_counts,
                     entity->native_id
                 )
             );
 
             g_hash_table_replace (
-                counts,
+                entity_counts,
                 g_strdup (entity->native_id),
+                GUINT_TO_POINTER (count + 1)
+            );
+        }
+
+        for (guint relation_index = 0;
+             relation_index < records->relations->len;
+             relation_index++) {
+            const AtmStructuredRelation *relation = g_ptr_array_index (
+                records->relations,
+                relation_index
+            );
+
+            if (relation->native_id == NULL ||
+                relation->native_id[0] == '\0') {
+                continue;
+            }
+
+            guint count = GPOINTER_TO_UINT (
+                g_hash_table_lookup (
+                    relation_counts,
+                    relation->native_id
+                )
+            );
+
+            g_hash_table_replace (
+                relation_counts,
+                g_strdup (relation->native_id),
                 GUINT_TO_POINTER (count + 1)
             );
         }
@@ -1309,14 +1337,24 @@ static char *
 structured_relation_logical_id (
     const char *repository_id,
     const AtmSourceRecord *source,
-    const AtmStructuredRelation *relation
+    const AtmStructuredRelation *relation,
+    gboolean native_id_is_unique
 )
 {
+    if (native_id_is_unique &&
+        relation->native_id != NULL &&
+        relation->native_id[0] != '\0') {
+        return g_strdup_printf (
+            "%s:entity:relation:%s",
+            repository_id,
+            relation->native_id
+        );
+    }
+
     return g_strdup_printf (
-        "%s:relation:%s:%s:%s",
+        "%s:entity:relation:%s:%s",
         repository_id,
         source->path,
-        relation->relation_type,
         relation->locator
     );
 }
@@ -1335,10 +1373,17 @@ insert_structured_json_content (
     sqlite3_stmt *relation_statement = NULL;
     sqlite3_stmt *fts_statement = NULL;
     GHashTable *native_counts = NULL;
+    GHashTable *relation_counts = NULL;
     GHashTable *native_to_logical = NULL;
     gboolean ok = FALSE;
 
     native_counts = g_hash_table_new_full (
+        g_str_hash,
+        g_str_equal,
+        g_free,
+        NULL
+    );
+    relation_counts = g_hash_table_new_full (
         g_str_hash,
         g_str_equal,
         g_free,
@@ -1351,10 +1396,11 @@ insert_structured_json_content (
         g_free
     );
 
-    if (!collect_native_entity_counts (
+    if (!collect_native_record_counts (
             snapshot_root,
             catalog,
             native_counts,
+            relation_counts,
             error
         )) {
         goto out;
@@ -1669,10 +1715,20 @@ insert_structured_json_content (
                     relation->to_native_id
                 )
                 : NULL;
+            guint relation_native_count =
+                relation->native_id != NULL
+                    ? GPOINTER_TO_UINT (
+                        g_hash_table_lookup (
+                            relation_counts,
+                            relation->native_id
+                        )
+                    )
+                    : 0;
             char *logical_id = structured_relation_logical_id (
                 repository_id,
                 source,
-                relation
+                relation,
+                relation_native_count == 1
             );
 
             sqlite3_reset (relation_statement);
@@ -1827,6 +1883,7 @@ insert_structured_json_content (
 
 out:
     g_clear_pointer (&native_to_logical, g_hash_table_unref);
+    g_clear_pointer (&relation_counts, g_hash_table_unref);
     g_clear_pointer (&native_counts, g_hash_table_unref);
 
     if (fts_statement != NULL) {
