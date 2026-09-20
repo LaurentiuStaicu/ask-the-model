@@ -787,6 +787,7 @@ atm_retrieval_search_fts (
     sqlite3_stmt *row_statement = NULL;
     GPtrArray *results = NULL;
     char *fts_query = NULL;
+    AtmSnapshotProvenance provenance = { 0 };
     gboolean ok = FALSE;
     int rc;
 
@@ -849,6 +850,14 @@ atm_retrieval_search_fts (
             "Could not configure read-only FTS connection: %s",
             sqlite3_errmsg (db)
         );
+        goto out;
+    }
+
+    if (!load_snapshot_provenance (
+            db,
+            &provenance,
+            error
+        )) {
         goto out;
     }
 
@@ -956,6 +965,7 @@ atm_retrieval_search_fts (
 
         record->evidence_kind = g_strdup (kind);
         record->match_kind = ATM_EVIDENCE_MATCH_LEXICAL;
+        apply_snapshot_provenance (record, &provenance);
         record->evidence_id = evidence_id;
         record->logical_source_id = g_strdup (
             (const char *) sqlite3_column_text (
@@ -1038,6 +1048,7 @@ atm_retrieval_search_fts (
 out:
     g_clear_pointer (&results, g_ptr_array_unref);
     g_clear_pointer (&fts_query, g_free);
+    snapshot_provenance_clear (&provenance);
 
     if (row_statement != NULL) {
         sqlite3_finalize (row_statement);
@@ -1085,6 +1096,7 @@ atm_retrieval_lookup_dataset_rows (
     sqlite3_stmt *statement = NULL;
     sqlite3_stmt *role_statement = NULL;
     GPtrArray *results = NULL;
+    AtmSnapshotProvenance provenance = { 0 };
     gboolean ok = FALSE;
     int rc;
 
@@ -1163,6 +1175,14 @@ atm_retrieval_lookup_dataset_rows (
             "Could not configure read-only tabular retrieval: %s",
             sqlite3_errmsg (db)
         );
+        goto out;
+    }
+
+    if (!load_snapshot_provenance (
+            db,
+            &provenance,
+            error
+        )) {
         goto out;
     }
 
@@ -1260,6 +1280,7 @@ atm_retrieval_lookup_dataset_rows (
 
         record->evidence_kind = g_strdup ("dataset_row");
         record->match_kind = ATM_EVIDENCE_MATCH_TABULAR;
+        apply_snapshot_provenance (record, &provenance);
         record->evidence_id = sqlite3_column_int64 (
             statement,
             0
@@ -1320,6 +1341,7 @@ atm_retrieval_lookup_dataset_rows (
 
 out:
     g_clear_pointer (&results, g_ptr_array_unref);
+    snapshot_provenance_clear (&provenance);
 
     if (role_statement != NULL) {
         sqlite3_finalize (role_statement);
