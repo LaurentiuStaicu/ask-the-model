@@ -13,7 +13,7 @@ namespace AskTheModel {
         [CCode (
             cname = "atm_conversation_grounding_add_ready_repository"
         )]
-        public bool add_ready_repository (
+        public extern bool add_ready_repository (
             string repository_id,
             string repository_version,
             string snapshot_sha,
@@ -22,14 +22,14 @@ namespace AskTheModel {
         ) throws GLib.Error;
 
         [CCode (cname = "atm_conversation_grounding_freeze")]
-        public bool freeze () throws GLib.Error;
+        public extern bool freeze () throws GLib.Error;
 
         [CCode (cname = "atm_conversation_grounding_is_frozen")]
-        public bool is_frozen ();
+        public extern bool is_frozen ();
 
         [CCode (
             cname = "atm_conversation_grounding_repository_count"
         )]
-        public uint repository_count ();
+        public extern uint repository_count ();
     }
 }
