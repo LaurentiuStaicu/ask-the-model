@@ -208,10 +208,11 @@ normalize_entry_path (
 }
 
 gboolean
-atm_archive_extract_snapshot (
+atm_archive_extract_snapshot_cancellable (
     const char *archive_path,
     const char *destination,
     const AtmArchiveLimits *limits,
+    GCancellable *cancellable,
     guint64 *out_entries,
     guint64 *out_total_bytes,
     GError **error
@@ -239,6 +240,11 @@ atm_archive_extract_snapshot (
 
     if (out_total_bytes != NULL) {
         *out_total_bytes = 0;
+    }
+
+    if (cancellable != NULL &&
+        g_cancellable_set_error_if_cancelled (cancellable, error)) {
+        return FALSE;
     }
 
     if (g_mkdir (destination, 0700) != 0) {
@@ -294,6 +300,11 @@ atm_archive_extract_snapshot (
     }
 
     while ((result = archive_read_next_header (reader, &entry)) == ARCHIVE_OK) {
+        if (cancellable != NULL &&
+            g_cancellable_set_error_if_cancelled (cancellable, error)) {
+            goto out;
+        }
+
         const char *pathname = archive_entry_pathname (entry);
         const char *symlink_target = archive_entry_symlink (entry);
         const char *hardlink_target = archive_entry_hardlink (entry);
@@ -439,6 +450,18 @@ atm_archive_extract_snapshot (
             }
 
             while (TRUE) {
+                if (cancellable != NULL &&
+                    g_cancellable_set_error_if_cancelled (
+                        cancellable,
+                        error
+                    )) {
+                    close (fd);
+                    g_remove (output_path);
+                    g_free (output_path);
+                    g_free (relative);
+                    goto out;
+                }
+
                 la_ssize_t count = archive_read_data (
                     reader,
                     buffer,
@@ -559,6 +582,11 @@ atm_archive_extract_snapshot (
         goto out;
     }
 
+    if (cancellable != NULL &&
+        g_cancellable_set_error_if_cancelled (cancellable, error)) {
+        goto out;
+    }
+
     if (out_entries != NULL) {
         *out_entries = entry_count;
     }
@@ -582,4 +610,25 @@ out:
     }
 
     return ok;
+}
+
+gboolean
+atm_archive_extract_snapshot (
+    const char *archive_path,
+    const char *destination,
+    const AtmArchiveLimits *limits,
+    guint64 *out_entries,
+    guint64 *out_total_bytes,
+    GError **error
+)
+{
+    return atm_archive_extract_snapshot_cancellable (
+        archive_path,
+        destination,
+        limits,
+        NULL,
+        out_entries,
+        out_total_bytes,
+        error
+    );
 }
