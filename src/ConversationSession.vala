@@ -120,6 +120,20 @@ namespace AskTheModel {
             );
         }
 
+        public CitationResolution resolve_turn_citations (
+            string model_output
+        ) throws GLib.Error {
+            if (grounding == null) {
+                throw new ConversationSessionError.NOT_ACTIVE (
+                    "Conversation session has not started."
+                );
+            }
+
+            return grounding.resolve_turn_citations (
+                model_output
+            );
+        }
+
         public bool commit_turn () throws GLib.Error {
             if (grounding == null) {
                 throw new ConversationSessionError.NOT_ACTIVE (
