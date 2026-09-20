@@ -285,19 +285,31 @@ namespace AskTheModel {
                     }
                 }
 
-                repository_action_button.set_icon_name (
-                    needs_download
-                        ? "folder-download-symbolic"
-                        : "software-update-available-symbolic"
-                );
-                repository_action_button.sensitive =
+                bool has_action =
                     repository_lifecycle.selection_needs_action (
                         selected
                     );
-                repository_action_button.tooltip_text =
-                    repository_lifecycle.action_tooltip (
-                        selected
+
+                if (needs_download) {
+                    repository_action_button.set_icon_name (
+                        "folder-download-symbolic"
                     );
+                } else {
+                    repository_action_button.set_icon_name (
+                        "software-update-available-symbolic"
+                    );
+                }
+
+                repository_action_button.sensitive = has_action;
+                repository_action_button.can_target = has_action;
+                repository_action_button.opacity =
+                    has_action ? 1.0 : 0.0;
+                repository_action_button.tooltip_text =
+                    has_action
+                        ? repository_lifecycle.action_tooltip (
+                            selected
+                        )
+                        : null;
             }
         }
 
@@ -741,8 +753,10 @@ namespace AskTheModel {
 
             repository_action_button =
                 new Gtk.Button.from_icon_name ("folder-download-symbolic") {
-                    tooltip_text = "Download selected repositories",
-                    sensitive = false
+                    tooltip_text = null,
+                    sensitive = false,
+                    can_target = false,
+                    opacity = 0.0
                 };
             repository_action_button.add_css_class ("circular");
             repository_action_button.clicked.connect (() => {
