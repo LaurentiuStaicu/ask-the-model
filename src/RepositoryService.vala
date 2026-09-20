@@ -19,6 +19,7 @@ namespace AskTheModel {
         public string owner { get; construct; }
         public string repository { get; construct; }
         public string tracked_branch { get; construct; }
+        public string supported_version { get; construct; }
 
         public RepositoryDescriptor (
             string id,
@@ -26,7 +27,8 @@ namespace AskTheModel {
             string display_name,
             string owner,
             string repository,
-            string tracked_branch
+            string tracked_branch,
+            string supported_version = "0.1.0"
         ) {
             Object (
                 id: id,
@@ -34,7 +36,16 @@ namespace AskTheModel {
                 display_name: display_name,
                 owner: owner,
                 repository: repository,
-                tracked_branch: tracked_branch
+                tracked_branch: tracked_branch,
+                supported_version: supported_version
+            );
+        }
+
+        public string selector_label () {
+            return "%s (%s) v%s".printf (
+                acronym,
+                display_name,
+                supported_version
             );
         }
 
@@ -168,7 +179,8 @@ namespace AskTheModel {
                     "Empirical World3 Dynamics",
                     "LaurentiuStaicu",
                     "empirical-world3-dynamics",
-                    "main"
+                    "main",
+                    "0.1.0"
                 ),
                 new RepositoryDescriptor (
                     "cbd",
@@ -176,7 +188,8 @@ namespace AskTheModel {
                     "Cognitive Belief Dynamics",
                     "LaurentiuStaicu",
                     "cognitive-belief-dynamics",
-                    "main"
+                    "main",
+                    "0.1.0"
                 ),
                 new RepositoryDescriptor (
                     "rmd",
@@ -184,7 +197,8 @@ namespace AskTheModel {
                     "Romanian Monetary Dynamics",
                     "LaurentiuStaicu",
                     "romanian-monetary-dynamics",
-                    "main"
+                    "main",
+                    "0.1.0"
                 )
             };
         }
