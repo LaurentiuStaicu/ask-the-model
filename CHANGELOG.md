@@ -2,6 +2,29 @@
 
 All notable public releases of Ask the Model are recorded here.
 
+## 0.2.2 - 2026-09-20
+
+Documentation and public-metadata consistency correction.
+
+### Included
+
+- redesigned the main repository README around first-time local-AI user needs;
+- added step-by-step setup expectations, automatic model-discovery explanation and practical model-management guidance;
+- added `docs/MODEL_GUIDE.md` for model sources, GGUF import, quantization, storage, deletion, hardware and licensing;
+- added `docs/TROUBLESHOOTING.md` for provider, model, performance, storage and Flatpak diagnostics;
+- reduced README visual density with compact metadata badges, smaller explanatory text and progressive disclosure for secondary sections;
+- corrected `CITATION.cff` to the current release and capability boundary;
+- corrected AppStream and desktop-launcher metadata so implemented local chat is clearly separated from the planned scientific-repository roadmap;
+- preserved the v0.2.1 release asset rather than mutating an already-published version.
+
+### Application status
+
+The local-chat behavior is unchanged from v0.2.1. This patch changes documentation and packaged public metadata only.
+
+### Scope boundary
+
+Repository-aware retrieval, scientific provenance, persistent conversations, provider settings and in-app AI-model download/delete remain unimplemented.
+
 ## 0.2.1 - 2026-09-19
 
 Installation and release-distribution correction.
