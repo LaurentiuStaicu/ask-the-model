@@ -1,15 +1,5 @@
 namespace AskTheModel.RepositoryNative {
     [CCode (
-        cname = "AtmRetrievalEnsureResult",
-        cprefix = "ATM_RETRIEVAL_ENSURE_",
-        has_type_id = false
-    )]
-    public enum RetrievalEnsureResult {
-        REUSED,
-        REBUILT
-    }
-
-    [CCode (
         cname = "atm_cff_extract_version",
         cheader_filename = "cff_version.h"
     )]
@@ -37,8 +27,8 @@ namespace AskTheModel.RepositoryNative {
     ) throws GLib.Error;
 
     [CCode (
-        cname = "atm_retrieval_index_ensure_for_snapshot",
-        cheader_filename = "retrieval_index_lifecycle.h"
+        cname = "atm_repository_ui_ensure_index",
+        cheader_filename = "repository_ui_bridge.h"
     )]
     public static extern bool ensure_index (
         string cache_root,
@@ -46,7 +36,6 @@ namespace AskTheModel.RepositoryNative {
         string repository_id,
         string snapshot_sha,
         out string index_path,
-        out string repository_version,
-        out RetrievalEnsureResult result
+        out string repository_version
     ) throws GLib.Error;
 }
