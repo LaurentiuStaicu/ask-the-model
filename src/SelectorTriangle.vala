@@ -1,8 +1,10 @@
 namespace AskTheModel {
     public class SelectorTriangle : Gtk.DrawingArea {
         public SelectorTriangle () {
-            accessible_role =
-                Gtk.AccessibleRole.PRESENTATION;
+            update_state (
+                Gtk.AccessibleState.HIDDEN,
+                true
+            );
             can_target = false;
             focusable = false;
             width_request = 8;
