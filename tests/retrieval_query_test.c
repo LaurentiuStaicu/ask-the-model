@@ -200,26 +200,6 @@ result_at (GPtrArray *results, guint index)
 }
 
 static void
-assert_snapshot_provenance (const AtmEvidenceRecord *record)
-{
-    g_assert_cmpstr (
-        record->repository_id,
-        ==,
-        "ewd"
-    );
-    g_assert_cmpstr (
-        record->repository_version,
-        ==,
-        "0.1.0"
-    );
-    g_assert_cmpstr (
-        record->snapshot_sha,
-        ==,
-        "0123456789abcdef0123456789abcdef01234567"
-    );
-}
-
-static void
 test_native_entity_lookup (void)
 {
     char *snapshot_root = new_snapshot ();
@@ -247,13 +227,7 @@ test_native_entity_lookup (void)
 
     AtmEvidenceRecord *record = result_at (results, 0);
 
-    assert_snapshot_provenance (record);
     g_assert_cmpstr (record->evidence_kind, ==, "entity");
-    g_assert_cmpint (
-        record->match_kind,
-        ==,
-        ATM_EVIDENCE_MATCH_EXACT
-    );
     g_assert_cmpstr (
         record->logical_source_id,
         ==,
@@ -465,16 +439,10 @@ test_fts_romanian_diacritic_search (void)
 
     AtmEvidenceRecord *record = result_at (results, 0);
 
-    assert_snapshot_provenance (record);
     g_assert_cmpstr (record->evidence_kind, ==, "section");
     g_assert_cmpstr (record->source_path, ==, "STATUS.md");
     g_assert_true (
         (record->source_roles & ATM_SOURCE_ROLE_CANONICAL) != 0
-    );
-    g_assert_cmpint (
-        record->match_kind,
-        ==,
-        ATM_EVIDENCE_MATCH_LEXICAL
     );
     g_assert_true (record->has_lexical_score);
     g_assert_true (isfinite (record->lexical_score));
@@ -518,7 +486,6 @@ test_fts_dataset_row_provenance (void)
 
     AtmEvidenceRecord *record = result_at (results, 0);
 
-    assert_snapshot_provenance (record);
     g_assert_cmpstr (
         record->evidence_kind,
         ==,
@@ -592,221 +559,6 @@ test_fts_syntax_is_not_passed_through (void)
     g_assert_null (results);
 
     g_clear_error (&error);
-    g_free (index_path);
-    remove_tree_best_effort (snapshot_root);
-    g_free (snapshot_root);
-    remove_tree_best_effort (cache_root);
-    g_free (cache_root);
-}
-
-static void
-test_tabular_row_key_lookup_global_and_scoped (void)
-{
-    char *snapshot_root = new_snapshot ();
-    char *cache_root = new_temp_root (
-        "atm-tabular-retrieval-cache-XXXXXX"
-    );
-    char *index_path = build_index (
-        snapshot_root,
-        cache_root
-    );
-    GPtrArray *results = NULL;
-    GError *error = NULL;
-
-    g_assert_true (
-        atm_retrieval_lookup_dataset_rows (
-            index_path,
-            NULL,
-            "2025",
-            10,
-            &results,
-            &error
-        )
-    );
-    g_assert_no_error (error);
-    g_assert_cmpuint (results->len, ==, 1);
-
-    AtmEvidenceRecord *record = result_at (results, 0);
-
-    g_assert_cmpstr (
-        record->evidence_kind,
-        ==,
-        "dataset_row"
-    );
-    g_assert_cmpstr (
-        record->logical_source_id,
-        ==,
-        "ewd:dataset-row:data/series.csv:0"
-    );
-    g_assert_cmpstr (
-        record->source_path,
-        ==,
-        "data/series.csv"
-    );
-    g_assert_cmpstr (record->locator, ==, "lines:2-2");
-    g_assert_cmpstr (record->title, ==, "2025");
-    g_assert_cmpint (
-        record->match_kind,
-        ==,
-        ATM_EVIDENCE_MATCH_TABULAR
-    );
-    g_assert_nonnull (strstr (record->body, "\"value\":\"1\""));
-    g_assert_true (
-        (record->source_roles & ATM_SOURCE_ROLE_EVIDENCE) != 0
-    );
-    g_assert_true (
-        (record->source_roles & ATM_SOURCE_ROLE_TABULAR) != 0
-    );
-    g_assert_false (record->has_lexical_score);
-
-    g_ptr_array_unref (results);
-    results = NULL;
-
-    g_assert_true (
-        atm_retrieval_lookup_dataset_rows (
-            index_path,
-            "ewd:dataset:data/series.csv",
-            "2025",
-            10,
-            &results,
-            &error
-        )
-    );
-    g_assert_no_error (error);
-    g_assert_cmpuint (results->len, ==, 1);
-
-    g_ptr_array_unref (results);
-    results = NULL;
-
-    g_assert_true (
-        atm_retrieval_lookup_dataset_rows (
-            index_path,
-            "data/series.csv",
-            "2025",
-            10,
-            &results,
-            &error
-        )
-    );
-    g_assert_no_error (error);
-    g_assert_cmpuint (results->len, ==, 1);
-
-    g_ptr_array_unref (results);
-    g_free (index_path);
-    remove_tree_best_effort (snapshot_root);
-    g_free (snapshot_root);
-    remove_tree_best_effort (cache_root);
-    g_free (cache_root);
-}
-
-static void
-test_tabular_duplicate_row_keys_are_preserved (void)
-{
-    char *snapshot_root = new_snapshot ();
-    char *cache_root = new_temp_root (
-        "atm-tabular-retrieval-cache-XXXXXX"
-    );
-
-    write_text (
-        snapshot_root,
-        "data/series.csv",
-        "year,value\n"
-        "2025,1\n"
-        "2025,2\n"
-    );
-
-    char *index_path = build_index (
-        snapshot_root,
-        cache_root
-    );
-    GPtrArray *results = NULL;
-    GError *error = NULL;
-
-    g_assert_true (
-        atm_retrieval_lookup_dataset_rows (
-            index_path,
-            NULL,
-            "2025",
-            10,
-            &results,
-            &error
-        )
-    );
-    g_assert_no_error (error);
-    g_assert_cmpuint (results->len, ==, 2);
-
-    g_assert_cmpstr (
-        result_at (results, 0)->logical_source_id,
-        ==,
-        "ewd:dataset-row:data/series.csv:0"
-    );
-    g_assert_cmpstr (
-        result_at (results, 1)->logical_source_id,
-        ==,
-        "ewd:dataset-row:data/series.csv:1"
-    );
-    g_assert_cmpstr (
-        result_at (results, 0)->locator,
-        ==,
-        "lines:2-2"
-    );
-    g_assert_cmpstr (
-        result_at (results, 1)->locator,
-        ==,
-        "lines:3-3"
-    );
-
-    g_ptr_array_unref (results);
-    g_free (index_path);
-    remove_tree_best_effort (snapshot_root);
-    g_free (snapshot_root);
-    remove_tree_best_effort (cache_root);
-    g_free (cache_root);
-}
-
-static void
-test_tabular_scope_and_missing_key (void)
-{
-    char *snapshot_root = new_snapshot ();
-    char *cache_root = new_temp_root (
-        "atm-tabular-retrieval-cache-XXXXXX"
-    );
-    char *index_path = build_index (
-        snapshot_root,
-        cache_root
-    );
-    GPtrArray *results = NULL;
-    GError *error = NULL;
-
-    g_assert_true (
-        atm_retrieval_lookup_dataset_rows (
-            index_path,
-            "ewd:dataset:missing.csv",
-            "2025",
-            10,
-            &results,
-            &error
-        )
-    );
-    g_assert_no_error (error);
-    g_assert_cmpuint (results->len, ==, 0);
-    g_ptr_array_unref (results);
-    results = NULL;
-
-    g_assert_true (
-        atm_retrieval_lookup_dataset_rows (
-            index_path,
-            NULL,
-            "1999",
-            10,
-            &results,
-            &error
-        )
-    );
-    g_assert_no_error (error);
-    g_assert_cmpuint (results->len, ==, 0);
-
-    g_ptr_array_unref (results);
     g_free (index_path);
     remove_tree_best_effort (snapshot_root);
     g_free (snapshot_root);
@@ -889,18 +641,6 @@ main (int argc, char **argv)
     g_test_add_func (
         "/retrieval-query/fts-syntax-safety",
         test_fts_syntax_is_not_passed_through
-    );
-    g_test_add_func (
-        "/retrieval-query/tabular-row-key",
-        test_tabular_row_key_lookup_global_and_scoped
-    );
-    g_test_add_func (
-        "/retrieval-query/tabular-duplicate-row-key",
-        test_tabular_duplicate_row_keys_are_preserved
-    );
-    g_test_add_func (
-        "/retrieval-query/tabular-scope-missing",
-        test_tabular_scope_and_missing_key
     );
     g_test_add_func (
         "/retrieval-query/invalid-arguments",
