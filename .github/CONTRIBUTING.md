@@ -45,7 +45,7 @@ For UI changes, describe the intended behavior under both light and dark appeara
 
 Do not change the application version as part of an unrelated contribution.
 
-The main workflow can publish a GitHub Release when a versioned release-note file exists. A version bump therefore requires deliberate release preparation, consistent metadata and reviewed release notes.
+The main workflow can publish a GitHub Release when a versioned release-note file exists. A version bump therefore requires deliberate release preparation, consistent metadata and reviewed release notes. The required synchronized surfaces are defined in [.github/release_metadata_contract.json](release_metadata_contract.json) and validated before every Flatpak build.
 
 ## Reporting problems
 
