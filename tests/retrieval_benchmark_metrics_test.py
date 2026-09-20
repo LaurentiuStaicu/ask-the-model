@@ -138,8 +138,8 @@ def benchmark_fixture():
                     {
                         "repository_id": "ewd",
                         "logical_source_id": "ewd:section:STATUS.md:lines:1-4",
-                        "grade": 0,
-                        "required": False,
+                        "grade": 3,
+                        "required": True,
                     }
                 ],
                 "expected_outcome": "retrieval",
@@ -254,10 +254,20 @@ def run_fixture():
                 "topic_id": "unsupported-ewd",
                 "outcome": "retrieval",
                 "latency_ms": 5,
-                "results": [],
-                "context_sources": [],
-                "evidence_bytes": 0,
-                "evidence_token_count": 0,
+                "results": [
+                    evidence(
+                        "ewd",
+                        "ewd:section:STATUS.md:lines:1-4",
+                    )
+                ],
+                "context_sources": [
+                    evidence(
+                        "ewd",
+                        "ewd:section:STATUS.md:lines:1-4",
+                    )
+                ],
+                "evidence_bytes": 250,
+                "evidence_token_count": 60,
             },
             {
                 "topic_id": "clarify-cross-repo-ro",
@@ -286,7 +296,7 @@ class RetrievalBenchmarkEvaluatorTest(unittest.TestCase):
         )
         self.assertAlmostEqual(
             metrics["mrr"],
-            (1.0 + 0.5 + 1.0) / 3.0,
+            (1.0 + 0.5 + 1.0 + 1.0) / 4.0,
         )
 
         ro_ndcg = (
@@ -314,7 +324,7 @@ class RetrievalBenchmarkEvaluatorTest(unittest.TestCase):
         )
         self.assertAlmostEqual(
             metrics["ndcg_at_5"],
-            (1.0 + ro_ndcg + 1.0) / 3.0,
+            (1.0 + ro_ndcg + 1.0 + 1.0) / 4.0,
         )
         self.assertAlmostEqual(
             metrics["canonical_required_recall_at_5"],
@@ -322,11 +332,11 @@ class RetrievalBenchmarkEvaluatorTest(unittest.TestCase):
         )
         self.assertAlmostEqual(
             metrics["context_precision"],
-            (1.0 + 0.5 + 1.0) / 3.0,
+            (1.0 + 0.5 + 1.0 + 1.0) / 4.0,
         )
         self.assertAlmostEqual(
             metrics["wrong_repository_contamination_at_5"],
-            1.0 / 6.0,
+            1.0 / 7.0,
         )
         self.assertAlmostEqual(
             metrics["evidence_traceability"],
@@ -342,7 +352,7 @@ class RetrievalBenchmarkEvaluatorTest(unittest.TestCase):
         )
         self.assertEqual(
             metrics["evidence_bytes_mean"],
-            240.0,
+            290.0,
         )
         self.assertEqual(
             metrics["evidence_bytes_max"],
@@ -350,7 +360,7 @@ class RetrievalBenchmarkEvaluatorTest(unittest.TestCase):
         )
         self.assertEqual(
             metrics["evidence_token_count_mean"],
-            45.0,
+            60.0,
         )
         self.assertEqual(
             metrics["evidence_token_count_max"],
@@ -362,7 +372,7 @@ class RetrievalBenchmarkEvaluatorTest(unittest.TestCase):
         )
         self.assertEqual(
             metrics["unsupported_empty_context_rate"],
-            1.0,
+            0.0,
         )
         self.assertEqual(
             metrics["duplicate_result_rate"],
@@ -443,6 +453,26 @@ class RetrievalBenchmarkEvaluatorTest(unittest.TestCase):
         self.assertFalse(
             result["gates"]["clarification_outcome_accuracy"]
         )
+
+    def test_unsupported_premise_may_use_required_boundary_evidence(self):
+        benchmark = benchmark_fixture()
+
+        evaluator.validate_benchmark(benchmark)
+
+    def test_unsupported_premise_may_have_no_retrievable_boundary_evidence(self):
+        benchmark = benchmark_fixture()
+        topic = benchmark["topics"][3]
+        topic["judgments"] = []
+
+        evaluator.validate_benchmark(benchmark)
+
+    def test_unsupported_positive_qrels_require_boundary_evidence(self):
+        benchmark = benchmark_fixture()
+        topic = benchmark["topics"][3]
+        topic["judgments"][0]["required"] = False
+
+        with self.assertRaises(evaluator.BenchmarkError):
+            evaluator.validate_benchmark(benchmark)
 
     def test_clarification_is_not_unsupported_evidence(self):
         benchmark = benchmark_fixture()
