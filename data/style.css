@@ -200,6 +200,37 @@ window.atm-window notebook.atm-chat-tabs > header.top button.atm-tab-close:hover
     background-color: rgba(27, 27, 24, 0.10);
 }
 
+/* Compact source references embedded below grounded answers. */
+window.atm-window textview menubutton.atm-source-ref > button {
+    min-width: 0;
+    min-height: 0;
+    padding: 0 2px;
+    margin: 0;
+    background-image: none;
+    background-color: rgba(255, 255, 255, 0);
+    color: #5F605C;
+    border: none;
+    box-shadow: none;
+}
+
+window.atm-window textview menubutton.atm-source-ref > button:hover,
+window.atm-window textview menubutton.atm-source-ref > button:checked {
+    background-color: rgba(27, 27, 24, 0.08);
+    color: #1B1B18;
+}
+
+window.atm-window label.atm-source-excerpt {
+    padding: 6px 8px;
+    background-color: #EFF0ED;
+    color: #1B1B18;
+    border: 1px solid #A4A5A1;
+    border-radius: 6px;
+}
+
+window.atm-window button.atm-source-link {
+    padding: 2px 0;
+}
+
 /* Dark variant */
 window.atm-window.atm-dark {
     background-color: #1B1B18;
@@ -310,6 +341,23 @@ window.atm-window.atm-dark notebook.atm-chat-tabs > header.top button.atm-tab-cl
 
 window.atm-window.atm-dark notebook.atm-chat-tabs > header.top button.atm-tab-close:hover {
     background-color: rgba(250, 251, 249, 0.12);
+}
+
+window.atm-window.atm-dark textview menubutton.atm-source-ref > button {
+    background-color: rgba(0, 0, 0, 0);
+    color: #C9CAC7;
+}
+
+window.atm-window.atm-dark textview menubutton.atm-source-ref > button:hover,
+window.atm-window.atm-dark textview menubutton.atm-source-ref > button:checked {
+    background-color: rgba(250, 251, 249, 0.10);
+    color: #FAFBF9;
+}
+
+window.atm-window.atm-dark label.atm-source-excerpt {
+    background-color: #2D2D2A;
+    color: #FAFBF9;
+    border-color: #6F706C;
 }
 
 window.atm-window.atm-dark frame.atm-input-frame {
