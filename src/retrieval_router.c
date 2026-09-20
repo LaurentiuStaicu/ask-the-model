@@ -198,13 +198,44 @@ extract_row_key_candidates (
          tokens[i] != NULL &&
          candidates->len < ATM_RETRIEVAL_ROUTER_MAX_CANDIDATES;
          i++) {
-        if (token_is_year (tokens[i]) ||
-            token_is_quarter (tokens[i])) {
+        if (token_is_year (tokens[i])) {
             add_unique_candidate (
                 candidates,
                 seen,
                 tokens[i]
             );
+        }
+    }
+
+    for (const char *cursor = query;
+         *cursor != '\0' &&
+         candidates->len < ATM_RETRIEVAL_ROUTER_MAX_CANDIDATES;
+         cursor++) {
+        if (g_ascii_isdigit (cursor[0]) &&
+            g_ascii_isdigit (cursor[1]) &&
+            g_ascii_isdigit (cursor[2]) &&
+            g_ascii_isdigit (cursor[3]) &&
+            cursor[4] == '-' &&
+            (cursor[5] == 'Q' || cursor[5] == 'q') &&
+            cursor[6] >= '1' &&
+            cursor[6] <= '4' &&
+            (cursor == query ||
+             !technical_identifier_character (cursor[-1])) &&
+            !technical_identifier_character (cursor[7])) {
+            char quarter[8] = { 0 };
+
+            memcpy (quarter, cursor, 7);
+            quarter[5] = 'Q';
+
+            if (token_is_quarter (quarter)) {
+                add_unique_candidate (
+                    candidates,
+                    seen,
+                    quarter
+                );
+            }
+
+            cursor += 6;
         }
     }
 
