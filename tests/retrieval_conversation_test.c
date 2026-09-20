@@ -631,6 +631,68 @@ test_cross_repository_exact_followup_requires_clarification (void)
 }
 
 static void
+test_clarification_preserves_previous_exact_state (void)
+{
+    Fixture *fixture = fixture_new ();
+    AtmRetrievalConversationState *state = new_state (
+        fixture
+    );
+
+    AtmRetrievalConversationTurn *first = run_turn (
+        state,
+        "food_per_capita EWD"
+    );
+    g_assert_false (first->needs_clarification);
+    atm_retrieval_conversation_turn_free (first);
+
+    AtmRetrievalConversationTurn *clarify = run_turn (
+        state,
+        "Și în RMD?"
+    );
+    g_assert_true (clarify->needs_clarification);
+    g_assert_null (clarify->retrieval);
+    atm_retrieval_conversation_turn_free (clarify);
+
+    AtmRetrievalConversationTurn *third = run_turn (
+        state,
+        "Dar în 2025?"
+    );
+
+    g_assert_false (third->needs_clarification);
+    g_assert_true (third->used_previous_scope);
+    g_assert_true (third->used_previous_anchor);
+    g_assert_cmpuint (
+        third->retrieval->repositories->len,
+        ==,
+        1
+    );
+
+    AtmRepositoryEvidenceSet *ewd = find_set (
+        third->retrieval,
+        "ewd"
+    );
+    g_assert_nonnull (ewd);
+    g_assert_nonnull (
+        find_match (
+            ewd,
+            ATM_EVIDENCE_MATCH_EXACT,
+            NULL
+        )
+    );
+    g_assert_nonnull (
+        find_match (
+            ewd,
+            ATM_EVIDENCE_MATCH_TABULAR,
+            "2025"
+        )
+    );
+
+    atm_retrieval_conversation_turn_free (third);
+    atm_retrieval_conversation_state_free (state);
+    fixture_free (fixture);
+}
+
+static void
 test_orphan_followup_requires_clarification (void)
 {
     Fixture *fixture = fixture_new ();
@@ -810,6 +872,10 @@ main (int argc, char **argv)
     g_test_add_func (
         "/retrieval-conversation/exact-cross-repo-clarify",
         test_cross_repository_exact_followup_requires_clarification
+    );
+    g_test_add_func (
+        "/retrieval-conversation/clarification-preserves-state",
+        test_clarification_preserves_previous_exact_state
     );
     g_test_add_func (
         "/retrieval-conversation/orphan-clarify",
