@@ -245,25 +245,27 @@ ollama pull SMALLER_MODEL
 - <small>follows the desktop light/dark appearance;</small>
 - <small>runs as a GTK 4 / Granite application packaged for the elementary OS 8 Flatpak runtime.</small>
 
-### What AtM does not yet do
+### What the current public release does not yet expose
 
-- <small>download, import, update or delete AI models;</small>
-- <small>install, start, stop or update the external provider;</small>
-- <small>provide configurable provider host/port, authentication or TLS;</small>
+<small>The public v0.2.2 application does not yet expose the repository-aware backend work that is being developed on `main`. In the released application, users cannot yet:</small>
+
+- <small>download, import, update or delete AI models through AtM;</small>
+- <small>install, start, stop or update the external provider through AtM;</small>
+- <small>configure provider host/port, authentication or TLS in the UI;</small>
 - <small>persist conversations across restarts;</small>
-- <small>ingest or retrieve scientific repositories;</small>
-- <small>show repository-grounded citations or provenance;</small>
+- <small>select, ingest or retrieve scientific repositories through the released GTK conversation flow;</small>
+- <small>receive repository-grounded citations or provenance in the released chat UI;</small>
 - <small>execute or simulate EWD, CBD or RMD;</small>
 - <small>turn ordinary AI chat output into an authoritative scientific-model result.</small>
 
-<small>These boundaries are intentional and are tracked in <a href="STATUS.md">Application status</a>.</small>
+<small>These are release boundaries, not claims that no development backend exists. See <a href="STATUS.md">Application status</a> for the separate development-`main` state.</small>
 
 <details>
 <summary><strong>Scientific-model roadmap and boundary</strong></summary>
 
 <small>AtM is intended to work with scientific dynamical-model repositories without replacing them. The planned initial suite includes EWD, CBD and RMD. Each source repository remains canonical for its documentation, code, data, assumptions, provenance, validation and release boundaries.</small>
 
-<small>Future repository-aware functionality must keep repository evidence, actual model outputs and AI-generated interpretation distinguishable from one another. Ordinary local chat in v0.2.2 should not be interpreted as repository-grounded scientific analysis.</small>
+<small>Development `main` already contains unreleased repository/retrieval backend foundations, but they are not yet wired into the released GTK repository-selection, grounded-chat and citation path. Future user-facing repository functionality must keep repository evidence, actual model outputs and AI-generated interpretation distinguishable from one another. Ordinary local chat in v0.2.2 should not be interpreted as repository-grounded scientific analysis.</small>
 
 </details>
 
