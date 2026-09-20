@@ -99,6 +99,27 @@ test(
   cff_version_test
 )
 
+repository_manifest_test = executable(
+  'repository-manifest-test',
+  [
+    'src/cff_version.c',
+    'src/repository_manifest.c',
+    'tests/repository_manifest_test.c'
+  ],
+  include_directories: include_directories('src'),
+  dependencies: [
+    glib_dep,
+    json_glib_dep,
+    yaml_dep
+  ],
+  install: false
+)
+
+test(
+  'repository-manifest',
+  repository_manifest_test
+)
+
 subdir('data')
 
 icon_sizes = ['16', '24', '32', '48', '64', '128']
