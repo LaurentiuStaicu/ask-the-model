@@ -43,6 +43,7 @@ executable(
     'src/retrieval_scope.c',
     'src/retrieval_router.c',
     'src/grounding_context.c',
+    'src/citation_labels.c',
     'src/retrieval_normalize.c',
     'src/repository_sources.c',
     'src/markdown_sections.c',
@@ -410,6 +411,25 @@ grounding_context_test = executable(
 test(
   'grounding-context',
   grounding_context_test
+)
+
+citation_labels_test = executable(
+  'citation-labels-test',
+  [
+    'src/grounding_context.c',
+    'src/citation_labels.c',
+    'tests/citation_labels_test.c'
+  ],
+  include_directories: include_directories('src'),
+  dependencies: [
+    glib_dep
+  ],
+  install: false
+)
+
+test(
+  'citation-labels',
+  citation_labels_test
 )
 
 repository_sources_test = executable(
