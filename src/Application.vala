@@ -94,8 +94,10 @@ namespace AskTheModel {
             });
 
             ollama_provider.discovery_progress.connect ((percent) => {
-                ai_scanning = percent < 100;
-                update_ai_annunciators ();
+                if (percent < 100) {
+                    ai_scanning = true;
+                    update_ai_annunciators ();
+                }
             });
 
             ollama_provider.response_chunk.connect ((chunk) => {
