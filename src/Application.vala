@@ -1662,12 +1662,20 @@ namespace AskTheModel {
                         state.model_name,
                         state.model_digest
                     );
-                } else {
-                    state.session.require_model (
-                        state.model_name,
-                        state.model_digest
+                }
+
+                if (!ollama_provider.select_model (
+                        state.model_name
+                    )) {
+                    throw new ConversationSessionError.INVALID_MODEL (
+                        "The AI model pinned to this conversation is not currently available."
                     );
                 }
+
+                state.session.require_model (
+                    state.model_name,
+                    ollama_provider.model_digest
+                );
 
                 bool needs_clarification;
                 string? system_instructions;
