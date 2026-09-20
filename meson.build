@@ -32,6 +32,7 @@ executable(
     'src/ChatRequestBuilder.vala',
     'src/OllamaProvider.vala',
     'src/RepositoryService.vala',
+    'src/RepositoryNative.vala',
     'src/RepositorySelection.vala',
     'src/cff_version.c',
     'src/archive_extract.c',
