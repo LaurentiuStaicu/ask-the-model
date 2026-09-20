@@ -13,9 +13,15 @@ namespace AskTheModel {
         private Gtk.Button? refresh_models_button;
         private Gtk.Label? model_scan_status;
         private Gtk.MenuButton? repository_menu_button;
+        private Gtk.Button? refresh_repositories_button;
+        private Gtk.Button? repository_action_button;
+        private Gtk.Label? repository_scan_status;
         private RepositorySelection repository_selection =
             new RepositorySelection ();
+        private RepositoryClient repository_client =
+            new RepositoryClient ();
         private uint model_status_generation = 0;
+        private uint repository_status_generation = 0;
         private bool assistant_stream_started = false;
         private bool updating_model_selector = false;
 
@@ -243,12 +249,159 @@ namespace AskTheModel {
         }
 
         private void update_repository_selector_label () {
-            if (repository_menu_button == null) {
+            if (repository_menu_button != null) {
+                repository_menu_button.label =
+                    repository_selection.summary ();
+            }
+
+            bool has_selection =
+                repository_selection.selected_repositories ().length > 0;
+
+            if (refresh_repositories_button != null) {
+                refresh_repositories_button.sensitive = has_selection;
+            }
+
+            if (repository_action_button != null) {
+                repository_action_button.sensitive = false;
+            }
+        }
+
+        private void begin_repository_scan_status () {
+            repository_status_generation++;
+
+            if (repository_scan_status != null) {
+                repository_scan_status.label = "Checking…";
+                repository_scan_status.visible = true;
+            }
+        }
+
+        private void show_repository_scan_result (
+            string message,
+            bool persistent = false
+        ) {
+            repository_status_generation++;
+            uint generation = repository_status_generation;
+
+            if (repository_scan_status == null) {
                 return;
             }
 
-            repository_menu_button.label =
-                repository_selection.summary ();
+            repository_scan_status.label = message;
+            repository_scan_status.visible = true;
+
+            if (persistent) {
+                return;
+            }
+
+            Timeout.add_seconds (3, () => {
+                if (generation == repository_status_generation &&
+                    repository_scan_status != null) {
+                    repository_scan_status.label = "";
+                    repository_scan_status.visible = false;
+                }
+
+                return false;
+            });
+        }
+
+        private async void refresh_selected_repositories () {
+            RepositoryDescriptor[] selected =
+                repository_selection.selected_repositories ();
+
+            if (selected.length == 0) {
+                show_repository_scan_result ("Select repositories");
+                return;
+            }
+
+            begin_repository_scan_status ();
+
+            if (refresh_repositories_button != null) {
+                refresh_repositories_button.sensitive = false;
+            }
+
+            if (repository_menu_button != null) {
+                repository_menu_button.sensitive = false;
+            }
+
+            uint changed_versions = 0;
+            string? single_report = null;
+
+            try {
+                foreach (RepositoryDescriptor descriptor in selected) {
+                    string sha = yield repository_client.resolve_branch_sha (
+                        descriptor
+                    );
+                    string version =
+                        yield repository_client.resolve_remote_version (
+                            descriptor,
+                            sha
+                        );
+
+                    if (version != descriptor.supported_version) {
+                        changed_versions++;
+                    }
+
+                    if (selected.length == 1) {
+                        single_report =
+                            version != descriptor.supported_version
+                                ? "%s v%s available".printf (
+                                    descriptor.acronym,
+                                    version
+                                )
+                                : "%s v%s current".printf (
+                                    descriptor.acronym,
+                                    version
+                                );
+                    }
+
+                    stdout.printf (
+                        "AtM: repository %s remote version=%s sha=%s\n",
+                        descriptor.acronym,
+                        version,
+                        sha
+                    );
+                }
+
+                if (selected.length == 1 && single_report != null) {
+                    show_repository_scan_result (
+                        single_report,
+                        changed_versions > 0
+                    );
+                } else if (changed_versions > 0) {
+                    show_repository_scan_result (
+                        changed_versions == 1
+                            ? "1 repository update available"
+                            : "%u repository updates available".printf (
+                                changed_versions
+                            ),
+                        true
+                    );
+                } else {
+                    show_repository_scan_result (
+                        "%u repositories current".printf (
+                            selected.length
+                        )
+                    );
+                }
+            } catch (GLib.Error error) {
+                show_repository_scan_result (
+                    "Repository check failed",
+                    true
+                );
+
+                stderr.printf (
+                    "AtM: repository refresh failed: %s\n",
+                    error.message
+                );
+            }
+
+            if (repository_menu_button != null) {
+                repository_menu_button.sensitive = true;
+            }
+
+            if (refresh_repositories_button != null) {
+                refresh_repositories_button.sensitive = true;
+            }
         }
 
         private Gtk.CheckButton build_repository_check_button (
@@ -412,12 +565,44 @@ namespace AskTheModel {
             model_controls.append (refresh_models_button);
             model_controls.append (model_scan_status);
 
+            refresh_repositories_button =
+                new Gtk.Button.from_icon_name ("view-refresh-symbolic") {
+                    tooltip_text = "Refresh repositories",
+                    sensitive = false
+                };
+            refresh_repositories_button.add_css_class ("circular");
+            refresh_repositories_button.clicked.connect (() => {
+                refresh_selected_repositories.begin ();
+            });
+
+            repository_action_button =
+                new Gtk.Button.from_icon_name ("document-save-symbolic") {
+                    tooltip_text = "Download or update selected repositories",
+                    sensitive = false
+                };
+            repository_action_button.add_css_class ("circular");
+
+            repository_scan_status = new Gtk.Label ("") {
+                valign = Gtk.Align.CENTER,
+                visible = false
+            };
+            repository_scan_status.add_css_class ("dim-label");
+
+            var repository_controls = new Gtk.Box (
+                Gtk.Orientation.HORIZONTAL,
+                6
+            );
+            repository_controls.append (build_repository_selector ());
+            repository_controls.append (refresh_repositories_button);
+            repository_controls.append (repository_action_button);
+            repository_controls.append (repository_scan_status);
+
             var header_controls = new Gtk.Box (
                 Gtk.Orientation.HORIZONTAL,
                 12
             );
-            header_controls.append (build_repository_selector ());
             header_controls.append (model_controls);
+            header_controls.append (repository_controls);
 
             headerbar.pack_start (header_controls);
 
