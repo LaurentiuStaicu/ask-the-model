@@ -179,7 +179,7 @@ The header presents repository controls as a distinct group immediately after th
 
 The repository selector remains a selection control only. Its popover contains the EWD/CBD/RMD multi-selection controls and does not become a repository-management dialog.
 
-The repository Refresh tool button checks the configured GitHub origins for the currently selected repository set without modifying local repository files. The Download/Update tool button performs the explicit local lifecycle action. Both are icon-only tool buttons with descriptive tooltips. Repository lifecycle status is shown in a dedicated repository-status area rather than reusing AI-provider status text.
+The repository Refresh tool button checks the configured GitHub origins for the currently selected repository set without modifying local repository files. The contextual repository action occupies a permanent fixed slot: it shows a Download icon when a selected repository is missing locally, remains fully transparent and non-interactive when there is no available repository action, and shows an Update icon only when a refresh has identified an available update. The widget must remain allocated while transparent so the selector, Refresh control and repository-status text do not shift horizontally as its state changes. Visible action states are icon-only and use descriptive tooltips. Repository lifecycle status is shown in a dedicated repository-status area rather than reusing AI-provider status text.
 
 The repository group must distinguish at least: checking, no update available, update available, downloading/updating, ready/offline-local, and failure. An actionable update-available status remains visible until acted on or refreshed; short scan-completion messages may expire.
 
