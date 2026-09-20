@@ -121,6 +121,15 @@ new_snapshot (void)
 
     write_text (
         root,
+        "data/noise.csv",
+        "id,text\n"
+        "1,ce este pentru și în de care\n"
+        "2,ce este pentru și în de care\n"
+        "3,ce este pentru și în de care\n"
+    );
+
+    write_text (
+        root,
         "model/core.json",
         "{"
         "\"variables\":["
@@ -480,6 +489,45 @@ test_fts_romanian_diacritic_search (void)
     g_assert_true (isfinite (record->lexical_score));
     g_assert_nonnull (
         strstr (record->body, "curentă")
+    );
+
+    g_ptr_array_unref (results);
+    g_free (index_path);
+    remove_tree_best_effort (snapshot_root);
+    g_free (snapshot_root);
+    remove_tree_best_effort (cache_root);
+    g_free (cache_root);
+}
+
+static void
+test_fts_common_function_words_do_not_swamp_technical_terms (void)
+{
+    char *snapshot_root = new_snapshot ();
+    char *cache_root = new_temp_root (
+        "atm-fts-retrieval-cache-XXXXXX"
+    );
+    char *index_path = build_index (
+        snapshot_root,
+        cache_root
+    );
+    GPtrArray *results = NULL;
+    GError *error = NULL;
+
+    g_assert_true (
+        atm_retrieval_search_fts (
+            index_path,
+            "ce este pentru food_per_capita și în de care",
+            10,
+            &results,
+            &error
+        )
+    );
+    g_assert_no_error (error);
+    g_assert_cmpuint (results->len, >, 0);
+    g_assert_cmpstr (
+        result_at (results, 0)->logical_source_id,
+        ==,
+        "ewd:entity:variable:food_per_capita"
     );
 
     g_ptr_array_unref (results);
@@ -881,6 +929,10 @@ main (int argc, char **argv)
     g_test_add_func (
         "/retrieval-query/fts-romanian-diacritics",
         test_fts_romanian_diacritic_search
+    );
+    g_test_add_func (
+        "/retrieval-query/fts-stopwords",
+        test_fts_common_function_words_do_not_swamp_technical_terms
     );
     g_test_add_func (
         "/retrieval-query/fts-dataset-row",
