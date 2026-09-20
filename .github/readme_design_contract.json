@@ -31,7 +31,8 @@
     "citation_source": "CITATION.cff",
     "status_source": "STATUS.md",
     "release_note": "releases/v0.2.2.md",
-    "version_bump_required": false
+    "version_bump_required": false,
+    "atomic_release_metadata_contract": ".github/release_metadata_contract.json"
   },
   "implemented_capabilities": [
     "local Ollama-compatible provider discovery",
@@ -66,7 +67,13 @@
     "workflow": ".github/workflows/flatpak.yml",
     "placement": "before Flatpak build",
     "runtime_dependencies": "POSIX shell/coreutils only",
-    "no_application_runtime_dependency": true
+    "no_application_runtime_dependency": true,
+    "release_metadata_script": "scripts/validate_release_metadata.sh",
+    "order": [
+      "release metadata",
+      "README capability/design",
+      "Flatpak build"
+    ]
   },
   "release_boundary": {
     "documentation_contract_change_is_unreleased": true,
