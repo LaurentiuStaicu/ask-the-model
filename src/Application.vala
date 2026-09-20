@@ -599,7 +599,7 @@ namespace AskTheModel {
             assistant_stream_started = false;
 
             if (current_chat_tab_label != null) {
-                current_chat_tab_label.label = "New Chat";
+                current_chat_tab_label.label = "New";
             }
 
             if (transcript_view != null) {
@@ -1344,7 +1344,7 @@ namespace AskTheModel {
             }
 
             if (words.length == 0) {
-                return "New Chat";
+                return "New";
             }
 
             return string.joinv (" ", words);
@@ -1398,7 +1398,7 @@ namespace AskTheModel {
             uint serial = conversation_serial;
             bool should_generate_title =
                 current_chat_tab_label != null &&
-                current_chat_tab_label.label == "New Chat";
+                current_chat_tab_label.label == "New";
 
             try {
                 string answer = yield ollama_provider.chat (prompt);
@@ -1666,10 +1666,11 @@ namespace AskTheModel {
             };
             chat_tabs.add_css_class ("atm-chat-tabs");
 
-            var current_tab_label = new Gtk.Label ("New Chat") {
+            var current_tab_label = new Gtk.Label ("New") {
                 single_line_mode = true,
                 ellipsize = Pango.EllipsizeMode.END,
-                max_width_chars = 18
+                width_chars = 3,
+                max_width_chars = 24
             };
             current_chat_tab_label = current_tab_label;
 
