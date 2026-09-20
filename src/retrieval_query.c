@@ -542,7 +542,7 @@ safe_fts_query (
 
     for (guint i = 0; i < terms->len; i++) {
         if (i > 0) {
-            g_string_append (fts, " AND ");
+            g_string_append (fts, " OR ");
         }
 
         g_string_append_c (fts, '"');
