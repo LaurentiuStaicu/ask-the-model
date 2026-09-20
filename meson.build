@@ -604,8 +604,10 @@ conversation_grounding_vala_test = executable(
     glib_dep,
     gio_dep,
     json_glib_dep,
-    sqlite_dep,
-    yaml_dep
+    sqlite_dep
+  ],
+  link_args: [
+    '-lyaml'
   ],
   install: false
 )
