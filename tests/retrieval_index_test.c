@@ -1,5 +1,6 @@
 #include "retrieval_index.h"
 #include "markdown_sections.h"
+#include "csv_table.h"
 
 #include <glib.h>
 #include <glib/gstdio.h>
@@ -539,6 +540,197 @@ test_invalid_markdown_never_promotes (void)
 }
 
 static void
+test_csv_datasets_rows_and_fts_are_committed (void)
+{
+    char *cache_root = new_cache_root ();
+    char *snapshot_root = new_source_snapshot ();
+    AtmSourceCatalog *catalog = NULL;
+    AtmRetrievalIndexMetadata metadata = valid_metadata ();
+    char *index_path = NULL;
+    sqlite3 *db = NULL;
+    GError *error = NULL;
+
+    g_assert_true (
+        atm_repository_source_catalog_build (
+            snapshot_root,
+            "ewd",
+            &catalog,
+            &error
+        )
+    );
+    g_assert_no_error (error);
+
+    metadata.manifest_sha256 = catalog->manifest_sha256;
+
+    g_assert_true (
+        atm_retrieval_index_create_with_content (
+            cache_root,
+            snapshot_root,
+            &metadata,
+            catalog,
+            &index_path,
+            &error
+        )
+    );
+    g_assert_no_error (error);
+    g_assert_nonnull (index_path);
+
+    g_assert_cmpint (
+        sqlite3_open_v2 (
+            index_path,
+            &db,
+            SQLITE_OPEN_READONLY,
+            NULL
+        ),
+        ==,
+        SQLITE_OK
+    );
+
+    g_assert_cmpint (
+        query_int (
+            db,
+            "SELECT count(*) FROM datasets "
+            "WHERE logical_source_id = "
+            "'ewd:dataset:data/series.csv' "
+            "AND locator = 'file:data/series.csv';"
+        ),
+        ==,
+        1
+    );
+    g_assert_cmpint (
+        query_int (
+            db,
+            "SELECT count(*) FROM datasets "
+            "WHERE metadata_json LIKE "
+            "'%\"columns\":[\"year\",\"value\"]%' "
+            "AND metadata_json LIKE '%\"row_count\":1%';"
+        ),
+        ==,
+        1
+    );
+    g_assert_cmpint (
+        query_int (
+            db,
+            "SELECT count(*) FROM dataset_rows "
+            "WHERE ordinal = 0 "
+            "AND row_key = '2025' "
+            "AND locator = 'lines:2-2' "
+            "AND payload_json LIKE '%\"year\":\"2025\"%' "
+            "AND payload_json LIKE '%\"value\":\"1\"%';"
+        ),
+        ==,
+        1
+    );
+    g_assert_cmpint (
+        query_int (
+            db,
+            "SELECT count(*) FROM search_fts "
+            "WHERE evidence_kind = 'dataset_row' "
+            "AND logical_source_id = "
+            "'ewd:dataset-row:data/series.csv:0' "
+            "AND search_fts MATCH '2025';"
+        ),
+        ==,
+        1
+    );
+
+    g_assert_cmpint (sqlite3_close (db), ==, SQLITE_OK);
+    db = NULL;
+
+    atm_source_catalog_free (catalog);
+    g_free (index_path);
+    remove_tree_best_effort (snapshot_root);
+    g_free (snapshot_root);
+    remove_tree_best_effort (cache_root);
+    g_free (cache_root);
+}
+
+static void
+test_invalid_csv_never_promotes_content_index (void)
+{
+    char *cache_root = new_cache_root ();
+    char *snapshot_root = new_source_snapshot ();
+    char *csv_path = g_build_filename (
+        snapshot_root,
+        "data",
+        "series.csv",
+        NULL
+    );
+    GError *error = NULL;
+
+    g_assert_true (
+        g_file_set_contents (
+            csv_path,
+            "year,value\n2025\n",
+            -1,
+            &error
+        )
+    );
+    g_assert_no_error (error);
+
+    AtmSourceCatalog *catalog = NULL;
+    AtmRetrievalIndexMetadata metadata = valid_metadata ();
+    char *index_path = NULL;
+
+    g_assert_true (
+        atm_repository_source_catalog_build (
+            snapshot_root,
+            "ewd",
+            &catalog,
+            &error
+        )
+    );
+    g_assert_no_error (error);
+
+    metadata.manifest_sha256 = catalog->manifest_sha256;
+
+    g_assert_false (
+        atm_retrieval_index_create_with_content (
+            cache_root,
+            snapshot_root,
+            &metadata,
+            catalog,
+            &index_path,
+            &error
+        )
+    );
+    g_assert_error (
+        error,
+        ATM_CSV_ERROR,
+        ATM_CSV_ERROR_SHAPE
+    );
+    g_assert_null (index_path);
+
+    char *final_path = atm_retrieval_index_path (
+        cache_root,
+        metadata.repository_id,
+        metadata.snapshot_sha
+    );
+    char *staging_path = atm_retrieval_index_staging_path (
+        cache_root,
+        metadata.repository_id,
+        metadata.snapshot_sha
+    );
+
+    g_assert_false (
+        g_file_test (final_path, G_FILE_TEST_EXISTS)
+    );
+    g_assert_false (
+        g_file_test (staging_path, G_FILE_TEST_EXISTS)
+    );
+
+    g_free (staging_path);
+    g_free (final_path);
+    g_clear_error (&error);
+    atm_source_catalog_free (catalog);
+    g_free (csv_path);
+    remove_tree_best_effort (snapshot_root);
+    g_free (snapshot_root);
+    remove_tree_best_effort (cache_root);
+    g_free (cache_root);
+}
+
+static void
 test_manifest_hash_mismatch_never_promotes (void)
 {
     char *cache_root = new_cache_root ();
@@ -686,6 +878,14 @@ main (int argc, char **argv)
     g_test_add_func (
         "/retrieval-index/invalid-markdown-rollback",
         test_invalid_markdown_never_promotes
+    );
+    g_test_add_func (
+        "/retrieval-index/csv-datasets-fts",
+        test_csv_datasets_rows_and_fts_are_committed
+    );
+    g_test_add_func (
+        "/retrieval-index/invalid-csv-rollback",
+        test_invalid_csv_never_promotes_content_index
     );
     g_test_add_func (
         "/retrieval-index/manifest-hash-mismatch",
