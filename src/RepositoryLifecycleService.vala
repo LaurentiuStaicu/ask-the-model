@@ -265,7 +265,8 @@ namespace AskTheModel {
 
             if (failure != null) {
                 throw new RepositoryError.STORAGE (
-                    failure
+                    failure ??
+                    "Repository preparation failed."
                 );
             }
 
@@ -303,7 +304,7 @@ namespace AskTheModel {
                     continue;
                 }
 
-                string sha = info.remote_sha;
+                string sha = info.remote_sha ?? "";
                 string expected_snapshot =
                     snapshot_path (descriptor, sha);
                 string? archive_path = null;
