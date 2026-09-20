@@ -623,6 +623,22 @@ namespace AskTheModel {
             return selected;
         }
 
+        private RepositoryDescriptor?
+        repository_descriptor_for_id (
+            string repository_id
+        ) {
+            foreach (
+                RepositoryDescriptor descriptor
+                in RepositoryCatalog.all ()
+            ) {
+                if (descriptor.id == repository_id) {
+                    return descriptor;
+                }
+            }
+
+            return null;
+        }
+
         private bool repository_id_in (
             string[] ids,
             string repository_id
@@ -1518,17 +1534,259 @@ namespace AskTheModel {
             Gtk.TextView transcript,
             string entry
         ) {
-            string current = transcript.buffer.text;
-            string separator = current.length > 0 ? "\n\n" : "";
-            transcript.buffer.text = current + separator + entry;
+            Gtk.TextBuffer buffer = transcript.buffer;
+            Gtk.TextIter end;
+            buffer.get_end_iter (out end);
+
+            if (buffer.get_char_count () > 0) {
+                buffer.insert (
+                    ref end,
+                    "\n\n",
+                    -1
+                );
+            }
+
+            buffer.insert (
+                ref end,
+                entry,
+                -1
+            );
         }
 
         private void append_transcript_raw (
             Gtk.TextView transcript,
             string text
         ) {
-            transcript.buffer.text =
-                transcript.buffer.text + text;
+            Gtk.TextIter end;
+            transcript.buffer.get_end_iter (out end);
+            transcript.buffer.insert (
+                ref end,
+                text,
+                -1
+            );
+        }
+
+        private string strip_repository_source_labels (
+            string answer
+        ) throws GLib.Error {
+            var label_regex = new GLib.Regex (
+                "[ \\t]*\\[S[1-9][0-9]{0,3}\\]"
+            );
+
+            return label_regex.replace_literal (
+                answer,
+                -1,
+                0,
+                ""
+            ).strip ();
+        }
+
+        private Gtk.Widget build_source_popover_content (
+            CitationReference citation,
+            uint display_number
+        ) {
+            var content = new Gtk.Box (
+                Gtk.Orientation.VERTICAL,
+                6
+            ) {
+                margin_top = 10,
+                margin_bottom = 10,
+                margin_start = 12,
+                margin_end = 12
+            };
+
+            RepositoryDescriptor? descriptor =
+                repository_descriptor_for_id (
+                    citation.repository_id
+                );
+            string repository_name =
+                descriptor != null
+                    ? descriptor.acronym
+                    : citation.repository_id;
+
+            var heading = new Gtk.Label (
+                "[%u] %s · v%s".printf (
+                    display_number,
+                    repository_name,
+                    citation.repository_version
+                )
+            ) {
+                halign = Gtk.Align.START,
+                xalign = 0.0f,
+                selectable = true
+            };
+            heading.add_css_class ("heading");
+            content.append (heading);
+
+            var source = new Gtk.Label (
+                "%s · %s".printf (
+                    citation.source_path,
+                    citation.locator
+                )
+            ) {
+                halign = Gtk.Align.START,
+                xalign = 0.0f,
+                selectable = true,
+                wrap = true,
+                max_width_chars = 72
+            };
+            source.add_css_class ("dim-label");
+            content.append (source);
+
+            var sha = new Gtk.Label (
+                "Snapshot: " + citation.snapshot_sha
+            ) {
+                halign = Gtk.Align.START,
+                xalign = 0.0f,
+                selectable = true,
+                wrap = true,
+                max_width_chars = 72
+            };
+            sha.add_css_class ("dim-label");
+            content.append (sha);
+
+            if (citation.title != null &&
+                citation.title.strip ().length > 0) {
+                var title = new Gtk.Label (
+                    citation.title
+                ) {
+                    halign = Gtk.Align.START,
+                    xalign = 0.0f,
+                    selectable = true,
+                    wrap = true,
+                    max_width_chars = 72
+                };
+                content.append (title);
+            }
+
+            if (citation.excerpt != null &&
+                citation.excerpt.strip ().length > 0) {
+                var excerpt = new Gtk.Label (
+                    citation.excerpt
+                ) {
+                    halign = Gtk.Align.START,
+                    xalign = 0.0f,
+                    selectable = true,
+                    wrap = true,
+                    max_width_chars = 72
+                };
+                excerpt.add_css_class ("atm-source-excerpt");
+                content.append (excerpt);
+            }
+
+            if (descriptor != null) {
+                try {
+                    string permalink =
+                        descriptor.immutable_file_permalink (
+                            citation.snapshot_sha,
+                            citation.source_path,
+                            citation.locator
+                        );
+
+                    var link =
+                        new Gtk.LinkButton.with_label (
+                            permalink,
+                            "Open immutable source"
+                        ) {
+                            halign = Gtk.Align.START
+                        };
+                    link.add_css_class ("atm-source-link");
+                    content.append (link);
+                } catch (GLib.Error error) {
+                    /* Provenance remains visible even if a URL cannot be built. */
+                }
+            }
+
+            return content;
+        }
+
+        private Gtk.MenuButton build_source_reference_button (
+            CitationReference citation,
+            uint display_number
+        ) {
+            var popover = new Gtk.Popover () {
+                child = build_source_popover_content (
+                    citation,
+                    display_number
+                ),
+                has_arrow = true,
+                position = Gtk.PositionType.BOTTOM
+            };
+
+            var button = new Gtk.MenuButton () {
+                label = "[%u]".printf (display_number),
+                direction = Gtk.ArrowType.NONE,
+                always_show_arrow = false,
+                has_frame = false,
+                tooltip_text = "Show source %u".printf (
+                    display_number
+                )
+            };
+            button.add_css_class ("atm-source-ref");
+            button.update_property (
+                Gtk.AccessibleProperty.LABEL,
+                "Source %u".printf (display_number)
+            );
+            button.set_popover (popover);
+            return button;
+        }
+
+        private void append_grounded_answer (
+            Gtk.TextView transcript,
+            string visible_answer,
+            CitationResolution resolution
+        ) {
+            append_transcript (
+                transcript,
+                "Assistant: " + visible_answer
+            );
+
+            if (resolution.citation_count () == 0) {
+                return;
+            }
+
+            Gtk.TextBuffer buffer = transcript.buffer;
+            Gtk.TextIter end;
+            buffer.get_end_iter (out end);
+            buffer.insert (
+                ref end,
+                "\nSources: ",
+                -1
+            );
+
+            for (
+                uint i = 0;
+                i < resolution.citation_count ();
+                i++
+            ) {
+                CitationReference? citation =
+                    resolution.citation_at (i);
+
+                if (citation == null) {
+                    continue;
+                }
+
+                buffer.get_end_iter (out end);
+                unowned Gtk.TextChildAnchor anchor =
+                    buffer.create_child_anchor (end);
+
+                transcript.add_child_at_anchor (
+                    build_source_reference_button (
+                        citation,
+                        i + 1
+                    ),
+                    anchor
+                );
+
+                if (i + 1 < resolution.citation_count ()) {
+                    buffer.get_end_iter (out end);
+                    buffer.insert (
+                        ref end,
+                        " ",
+                        -1
+                    );
+                }
+            }
         }
 
         private string normalize_conversation_title (
