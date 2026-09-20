@@ -35,6 +35,10 @@ jobs:
             git archive origin/flatpak-repo repo | tar -x
           fi
 
+      - name: Validate README contract
+        shell: bash
+        run: bash scripts/validate_readme_contract.sh
+
       - name: Build Flatpak
         uses: flatpak/flatpak-github-actions/flatpak-builder@v6
         with:
