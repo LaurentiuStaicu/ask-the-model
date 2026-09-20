@@ -15,14 +15,28 @@ namespace AskTheModel {
             );
         }
 
-        public bool update_available () {
-            return local.is_ready () &&
-                remote_sha != null &&
-                remote_sha != local.current_sha;
+        public bool download_required () {
+            if (!local.is_ready ()) {
+                return true;
+            }
+
+            string sha = local.current_sha ?? "";
+            string path =
+                RepositoryLifecycleService.snapshot_path (
+                    descriptor,
+                    sha
+                );
+
+            return !GLib.FileUtils.test (
+                path,
+                GLib.FileTest.IS_DIR
+            );
         }
 
-        public bool download_required () {
-            return !local.is_ready ();
+        public bool update_available () {
+            return !download_required () &&
+                remote_sha != null &&
+                remote_sha != local.current_sha;
         }
     }
 
