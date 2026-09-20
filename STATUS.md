@@ -23,9 +23,15 @@ The current backend includes:
 - conversation-pinned repository scoping;
 - conservative Romanian/English query normalization;
 - evidence records carrying repository ID, repository version and snapshot SHA;
-- a deterministic repository router combining those primitives without embeddings.
+- a deterministic repository router combining those primitives without embeddings;
+- immutable per-conversation repository pinning that validates repository/index identity, supports valid zero-repository local chat and rejects post-freeze scope mutation;
+- current-turn grounded Ollama request construction that keeps repository evidence transient rather than persisting grounding blocks into ordinary chat history;
+- current-turn citation-label resolution into persistent provenance objects without fabricating metadata for unknown labels;
+- real-repository R4 traceability checks across EWD, CBD and RMD;
+- deterministic multi-turn retrieval state that can inherit repository scope, intent and exact anchors across follow-ups and return an explicit clarification outcome where needed;
+- versioned R5 benchmark/run schemas, deterministic metric evaluation, provisional gates and CI for the benchmark contract, including clarification-outcome semantics.
 
-This development backend is not yet connected to the current GTK repository-selection lifecycle, current-turn provider context, citation rendering or repository-grounded chat path. R5 benchmark/acceptance work also remains separate. Therefore **v0.2.2 remains the current public release** and its user-facing capability boundary is unchanged.
+The current GTK application still uses the ordinary local-chat path and does not expose repository selection, end-to-end grounded chat or user-visible citation rendering. R4 backend building blocks are implemented and tested, but they are not yet wired into the released conversation UI. R5 now has a benchmark framework and evaluator, but the exact reviewed benchmark corpus and a real gate-passing benchmark run are not yet claimed. Therefore **v0.2.2 remains the current public release** and its user-facing capability boundary is unchanged.
 
 ## Canonical application role
 
