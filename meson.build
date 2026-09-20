@@ -41,6 +41,7 @@ executable(
     'src/retrieval_query.c',
     'src/retrieval_rank.c',
     'src/retrieval_scope.c',
+    'src/retrieval_router.c',
     'src/retrieval_normalize.c',
     'src/repository_sources.c',
     'src/markdown_sections.c',
@@ -359,6 +360,37 @@ retrieval_normalize_test = executable(
 test(
   'retrieval-normalize',
   retrieval_normalize_test
+)
+
+retrieval_router_test = executable(
+  'retrieval-router-test',
+  [
+    'src/repository_sources.c',
+    'src/markdown_sections.c',
+    'src/csv_table.c',
+    'src/structured_json.c',
+    'src/retrieval_index.c',
+    'src/retrieval_query.c',
+    'src/retrieval_rank.c',
+    'src/retrieval_scope.c',
+    'src/retrieval_normalize.c',
+    'src/retrieval_router.c',
+    'tests/retrieval_router_test.c',
+    resources
+  ],
+  include_directories: include_directories('src'),
+  dependencies: [
+    glib_dep,
+    gio_dep,
+    json_glib_dep,
+    sqlite_dep
+  ],
+  install: false
+)
+
+test(
+  'retrieval-router',
+  retrieval_router_test
 )
 
 repository_sources_test = executable(

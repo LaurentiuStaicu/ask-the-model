@@ -8,6 +8,25 @@ v0.2.2 preserves the v0.2.0 Local Chat Baseline and the v0.2.1 release-distribut
 
 The project remains in the `0.x` initial-development series. Repository-aware retrieval and scientific provenance are not implemented in this release.
 
+## Development main — unreleased repository backend
+
+Development `main` has advanced beyond the public v0.2.2 UI boundary with repository/retrieval backend work that is not yet released as an end-user feature.
+
+The current backend includes:
+
+- SHA-pinned, validated and immutable local snapshots for the fixed EWD/CBD/RMD catalog;
+- deterministic per-snapshot indexes validated against real EWD, CBD and RMD snapshots;
+- exact technical-ID and structured entity/relation retrieval;
+- safe FTS5/BM25 lexical retrieval;
+- deterministic tabular row-key retrieval;
+- intent-aware source authority and deduplication;
+- conversation-pinned repository scoping;
+- conservative Romanian/English query normalization;
+- evidence records carrying repository ID, repository version and snapshot SHA;
+- a deterministic repository router combining those primitives without embeddings.
+
+This development backend is not yet connected to the current GTK repository-selection lifecycle, current-turn provider context, citation rendering or repository-grounded chat path. R5 benchmark/acceptance work also remains separate. Therefore **v0.2.2 remains the current public release** and its user-facing capability boundary is unchanged.
+
 ## Canonical application role
 
 **Ask the Model (AtM) is a local conversational interface designed for querying, exploring and discussing repositories of scientific dynamical models through natural language. It is not itself a scientific model and does not embed, redefine or replace the canonical models maintained in those repositories.**
