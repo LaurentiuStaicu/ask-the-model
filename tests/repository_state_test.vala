@@ -48,8 +48,10 @@ namespace AskTheModel.Tests {
                     "invalid",
                     "0.1.0"
                 );
-            } catch (RepositoryError.INVALID_RESPONSE error) {
-                rejected = true;
+            } catch (RepositoryError error) {
+                rejected =
+                    error.code ==
+                    RepositoryError.INVALID_RESPONSE;
             }
 
             assert (rejected);
