@@ -39,6 +39,7 @@ executable(
     'src/retrieval_index.c',
     'src/retrieval_index_lifecycle.c',
     'src/retrieval_query.c',
+    'src/retrieval_rank.c',
     'src/repository_sources.c',
     'src/markdown_sections.c',
     'src/csv_table.c',
@@ -300,6 +301,26 @@ retrieval_query_test = executable(
 test(
   'retrieval-query',
   retrieval_query_test
+)
+
+retrieval_rank_test = executable(
+  'retrieval-rank-test',
+  [
+    'src/retrieval_query.c',
+    'src/retrieval_rank.c',
+    'tests/retrieval_rank_test.c'
+  ],
+  include_directories: include_directories('src'),
+  dependencies: [
+    glib_dep,
+    sqlite_dep
+  ],
+  install: false
+)
+
+test(
+  'retrieval-rank',
+  retrieval_rank_test
 )
 
 repository_sources_test = executable(
