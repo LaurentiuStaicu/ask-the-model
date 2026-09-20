@@ -71,9 +71,13 @@ Before repository feature implementation depends on SQLite/libarchive, CI on the
 - libarchive development linkage works.
 - secure extraction API needed by AtM is available.
 - valid archive extraction works.
+- the selected libarchive path enables secure no-absolute-path, no-`..` and symlink protections when those APIs are used.
 - path traversal archive entries are rejected.
 - absolute-path entries are rejected.
 - symlink/hardlink escape cases are rejected.
+- special archive entries that are not intended regular files/directories are rejected.
+- configured limits for archive bytes, entry count, individual extracted-file size and total uncompressed bytes are enforced.
+- a decompression-bomb fixture is rejected without exhausting the staging filesystem.
 - XDG data directory is writable.
 - XDG cache directory is writable.
 - XDG state directory is writable.
@@ -222,6 +226,7 @@ Before the repository becomes `READY`:
 - `PRAGMA foreign_key_check` returns no violations;
 - FTS5 `integrity-check` succeeds;
 - required canonical/structural inputs have expected index presence;
+- indexed source files carry SHA-256 content hashes derived from the pinned snapshot;
 - index snapshot SHA exactly matches local snapshot SHA.
 
 ### Cache loss
@@ -438,7 +443,9 @@ The automated suite should include:
 6. index metadata SHA mismatch → repository not ready;
 7. corrupt SQLite index → repository not ready/rebuild;
 8. corrupt or unsafe snapshot input → not ready;
-9. unsupported AtM manifest schema → incompatible;
+9. archive entry-count/uncompressed-size limit exceeded → update/download fails safely and the previous ready snapshot remains usable;
+10. indexed source hash mismatch against the pinned snapshot → repository not ready/rebuild;
+11. unsupported AtM manifest schema → incompatible;
 10. newer repository-declared version than latest GitHub Release → informational, not automatically invalid;
 11. failed repository update → previous ready snapshot preserved;
 12. current-turn evidence does not accumulate in later provider history.
