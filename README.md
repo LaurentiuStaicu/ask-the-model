@@ -30,7 +30,7 @@
 
 <small><strong>Ask the Model</strong> provides the chat interface. A <strong>local provider</strong>, such as Ollama, loads and runs AI models and exposes a local API. The <strong>AI model</strong> is a separate set of files, often several gigabytes in size, that must currently be downloaded and managed outside AtM.</small>
 
-<small>This distinction matters in the current release: AtM can automatically discover compatible models that your provider already knows about, but AtM v0.2.1 does <strong>not</strong> download, import, move or delete AI models for you.</small>
+<small>This distinction matters in the current release: AtM can automatically discover compatible models that your provider already knows about, but AtM v0.2.2 does <strong>not</strong> download, import, move or delete AI models for you.</small>
 
 <small>The longer-term purpose of AtM is broader than ordinary local chat. It is intended to become a natural-language access layer for scientific dynamical-model repositories such as Empirical World3 Dynamics (EWD), Cognitive Belief Dynamics (CBD) and Romanian Monetary Dynamics (RMD), without replacing those repositories as the authoritative source for their code, data, assumptions, provenance or validation.</small>
 
@@ -166,7 +166,7 @@ flatpak run io.github.laurentiustaicu.ask_the_model
 | [Phi-4 Mini 3.8B Q4_K_M](https://ollama.com/library/phi4-mini/tags) | 2.5 GB | `ollama pull phi4-mini:3.8b-q4_K_M` | Alternative compact model family for comparison. |
 | [Qwen 3.5 4B Q4_K_M](https://ollama.com/library/qwen3.5/tags) | 3.4 GB | `ollama pull qwen3.5:4b-q4_K_M` | Larger small-model option when the machine has more memory available. |
 
-<small><strong>Model capability does not automatically become AtM capability.</strong> A model may advertise vision, tool use or reasoning features, but AtM v0.2.1 currently provides text chat only and requests <code>think: false</code> on its default chat path. For more detail on GGUF, quantization, importing models, hardware considerations and model licensing, see <a href="docs/MODEL_GUIDE.md">Choosing, installing and managing AI models</a>.</small>
+<small><strong>Model capability does not automatically become AtM capability.</strong> A model may advertise vision, tool use or reasoning features, but AtM v0.2.2 currently provides text chat only and requests <code>think: false</code> on its default chat path. For more detail on GGUF, quantization, importing models, hardware considerations and model licensing, see <a href="docs/MODEL_GUIDE.md">Choosing, installing and managing AI models</a>.</small>
 
 ### Managing models, disk space and memory
 
@@ -216,7 +216,7 @@ ollama pull SMALLER_MODEL
 
 ### Privacy and the local-provider boundary
 
-<small>AtM v0.2.1 connects only to loopback provider addresses on the same machine and sends prompt content when you activate <strong>Send</strong>. Conversation history is held in AtM memory for the current application process and is not persisted by AtM across restarts.</small>
+<small>AtM v0.2.2 connects only to loopback provider addresses on the same machine and sends prompt content when you activate <strong>Send</strong>. Conversation history is held in AtM memory for the current application process and is not persisted by AtM across restarts.</small>
 
 <small>A loopback connection does not by itself prove that every model is local. The external provider decides how a selected model is executed. Modern Ollama versions can also expose cloud features. If strict local-only operation is required, choose a locally installed model and configure the provider accordingly; Ollama documents a local-only mode using <code>OLLAMA_NO_CLOUD=1</code> or <code>disable_ollama_cloud</code> in its server configuration.</small>
 
@@ -263,7 +263,7 @@ ollama pull SMALLER_MODEL
 
 <small>AtM is intended to work with scientific dynamical-model repositories without replacing them. The planned initial suite includes EWD, CBD and RMD. Each source repository remains canonical for its documentation, code, data, assumptions, provenance, validation and release boundaries.</small>
 
-<small>Future repository-aware functionality must keep repository evidence, actual model outputs and AI-generated interpretation distinguishable from one another. Ordinary local chat in v0.2.1 should not be interpreted as repository-grounded scientific analysis.</small>
+<small>Future repository-aware functionality must keep repository evidence, actual model outputs and AI-generated interpretation distinguishable from one another. Ordinary local chat in v0.2.2 should not be interpreted as repository-grounded scientific analysis.</small>
 
 </details>
 
