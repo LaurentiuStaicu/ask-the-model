@@ -833,11 +833,15 @@ namespace AskTheModel {
             }
 
             model_dropdown.set_selected (selected_index);
-            model_dropdown.sensitive =
-                !conversation_ui_locked &&
-                models.length > 0;
 
             updating_model_selector = false;
+
+            if (active_chat != null &&
+                !active_chat.locked &&
+                ollama_provider.model_name != null) {
+                active_chat.model_name =
+                    ollama_provider.model_name;
+            }
             update_ai_annunciators ();
             update_conversation_ui_state ();
         }
@@ -886,7 +890,10 @@ namespace AskTheModel {
         }
 
         private void update_repository_selector_label () {
-            bool editable = !conversation_ui_locked;
+            bool editable =
+                active_chat != null &&
+                !active_chat.locked &&
+                !generation_active;
             bool repository_busy =
                 repository_checking ||
                 repository_downloading ||
@@ -1231,6 +1238,14 @@ namespace AskTheModel {
                     descriptor.id,
                     check.active
                 );
+
+                if (active_chat != null &&
+                    !active_chat.locked &&
+                    !restoring_chat_controls) {
+                    active_chat.repository_ids =
+                        selected_repository_ids ();
+                }
+
                 update_repository_selector_label ();
                 show_repository_standby_status ();
             });
@@ -1366,6 +1381,12 @@ namespace AskTheModel {
                 }
 
                 if (ollama_provider.select_model (selected_model)) {
+                    if (active_chat != null &&
+                        !active_chat.locked &&
+                        !restoring_chat_controls) {
+                        active_chat.model_name = selected_model;
+                    }
+
                     show_model_standby_status ();
                     stdout.printf (
                         "AtM: selected model %s\n",
