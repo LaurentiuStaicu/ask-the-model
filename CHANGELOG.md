@@ -16,6 +16,7 @@ All notable public releases of Ask the Model are recorded here.
 
 ### Repository governance
 
+- aligned the primary release badge alternative text with the explicit project version so assistive technologies receive the same release information as the visual badge;
 - added a machine-checked README design/capability contract that verifies release-version consistency, suite visual identity, application/provider/model boundaries and essential documentation routes before every Flatpak build;
 - added PR-only workflow concurrency so superseded Flatpak builds on the same pull-request branch are canceled without canceling main-branch publication/release workflows;
 - added contribution and support guidance;
