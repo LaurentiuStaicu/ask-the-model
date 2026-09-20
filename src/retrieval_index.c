@@ -248,6 +248,173 @@ insert_metadata (
     return TRUE;
 }
 
+static gboolean
+insert_source_catalog (
+    sqlite3 *db,
+    const char *repository_id,
+    const AtmSourceCatalog *catalog,
+    GError **error
+)
+{
+    static const struct {
+        AtmSourceRole role;
+        const char *name;
+    } roles[] = {
+        { ATM_SOURCE_ROLE_CANONICAL, "canonical" },
+        { ATM_SOURCE_ROLE_STRUCTURAL, "structural" },
+        { ATM_SOURCE_ROLE_EVIDENCE, "evidence" },
+        { ATM_SOURCE_ROLE_TABULAR, "tabular" },
+        { ATM_SOURCE_ROLE_IMPLEMENTATION, "implementation" }
+    };
+    sqlite3_stmt *source_statement = NULL;
+    sqlite3_stmt *role_statement = NULL;
+    gboolean ok = FALSE;
+
+    if (sqlite3_prepare_v2 (
+            db,
+            "INSERT INTO source_files("
+            "path, sha256, byte_size, media_type, logical_source_id"
+            ") VALUES(?1, ?2, ?3, ?4, ?5);",
+            -1,
+            &source_statement,
+            NULL
+        ) != SQLITE_OK ||
+        sqlite3_prepare_v2 (
+            db,
+            "INSERT INTO source_roles(source_id, role) "
+            "VALUES(?1, ?2);",
+            -1,
+            &role_statement,
+            NULL
+        ) != SQLITE_OK) {
+        g_set_error (
+            error,
+            ATM_RETRIEVAL_INDEX_ERROR,
+            ATM_RETRIEVAL_INDEX_ERROR_SQLITE,
+            "Could not prepare source-catalog inserts: %s",
+            sqlite3_errmsg (db)
+        );
+        goto out;
+    }
+
+    for (guint i = 0; i < catalog->files->len; i++) {
+        const AtmSourceRecord *record = g_ptr_array_index (
+            catalog->files,
+            i
+        );
+        char *logical_source_id = g_strdup_printf (
+            "%s:file:%s",
+            repository_id,
+            record->path
+        );
+        sqlite3_int64 source_id;
+
+        sqlite3_reset (source_statement);
+        sqlite3_clear_bindings (source_statement);
+
+        sqlite3_bind_text (
+            source_statement,
+            1,
+            record->path,
+            -1,
+            SQLITE_STATIC
+        );
+        sqlite3_bind_text (
+            source_statement,
+            2,
+            record->sha256,
+            -1,
+            SQLITE_STATIC
+        );
+        sqlite3_bind_int64 (
+            source_statement,
+            3,
+            (sqlite3_int64) record->byte_size
+        );
+        sqlite3_bind_text (
+            source_statement,
+            4,
+            record->media_type,
+            -1,
+            SQLITE_STATIC
+        );
+        sqlite3_bind_text (
+            source_statement,
+            5,
+            logical_source_id,
+            -1,
+            SQLITE_TRANSIENT
+        );
+
+        if (sqlite3_step (source_statement) != SQLITE_DONE) {
+            g_set_error (
+                error,
+                ATM_RETRIEVAL_INDEX_ERROR,
+                ATM_RETRIEVAL_INDEX_ERROR_SQLITE,
+                "Could not insert source file '%s': %s",
+                record->path,
+                sqlite3_errmsg (db)
+            );
+            g_free (logical_source_id);
+            goto out;
+        }
+
+        source_id = sqlite3_last_insert_rowid (db);
+
+        for (gsize role_index = 0;
+             role_index < G_N_ELEMENTS (roles);
+             role_index++) {
+            if ((record->roles & roles[role_index].role) == 0) {
+                continue;
+            }
+
+            sqlite3_reset (role_statement);
+            sqlite3_clear_bindings (role_statement);
+            sqlite3_bind_int64 (
+                role_statement,
+                1,
+                source_id
+            );
+            sqlite3_bind_text (
+                role_statement,
+                2,
+                roles[role_index].name,
+                -1,
+                SQLITE_STATIC
+            );
+
+            if (sqlite3_step (role_statement) != SQLITE_DONE) {
+                g_set_error (
+                    error,
+                    ATM_RETRIEVAL_INDEX_ERROR,
+                    ATM_RETRIEVAL_INDEX_ERROR_SQLITE,
+                    "Could not insert source role '%s' for '%s': %s",
+                    roles[role_index].name,
+                    record->path,
+                    sqlite3_errmsg (db)
+                );
+                g_free (logical_source_id);
+                goto out;
+            }
+        }
+
+        g_free (logical_source_id);
+    }
+
+    ok = TRUE;
+
+out:
+    if (role_statement != NULL) {
+        sqlite3_finalize (role_statement);
+    }
+
+    if (source_statement != NULL) {
+        sqlite3_finalize (source_statement);
+    }
+
+    return ok;
+}
+
 char *
 atm_retrieval_index_path (
     const char *cache_root,
@@ -302,10 +469,11 @@ atm_retrieval_index_staging_path (
     return path;
 }
 
-gboolean
-atm_retrieval_index_create_empty (
+static gboolean
+retrieval_index_create_internal (
     const char *cache_root,
     const AtmRetrievalIndexMetadata *metadata,
+    const AtmSourceCatalog *source_catalog,
     char **out_index_path,
     GError **error
 )
@@ -354,6 +522,20 @@ atm_retrieval_index_create_empty (
             ATM_RETRIEVAL_INDEX_ERROR,
             ATM_RETRIEVAL_INDEX_ERROR_INVALID_MANIFEST_HASH,
             "Manifest SHA-256 must be 64 lowercase hexadecimal characters."
+        );
+        goto out;
+    }
+
+    if (source_catalog != NULL &&
+        g_strcmp0 (
+            source_catalog->manifest_sha256,
+            metadata->manifest_sha256
+        ) != 0) {
+        g_set_error_literal (
+            error,
+            ATM_RETRIEVAL_INDEX_ERROR,
+            ATM_RETRIEVAL_INDEX_ERROR_INTEGRITY,
+            "Source catalog manifest hash does not match index metadata."
         );
         goto out;
     }
@@ -482,6 +664,13 @@ atm_retrieval_index_create_empty (
 
     if (!sqlite_exec_checked (db, schema_sql, error) ||
         !insert_metadata (db, metadata, error) ||
+        (source_catalog != NULL &&
+         !insert_source_catalog (
+             db,
+             metadata->repository_id,
+             source_catalog,
+             error
+         )) ||
         !sqlite_exec_checked (db, "COMMIT;", error)) {
         goto out;
     }
@@ -537,6 +726,43 @@ out:
     g_clear_pointer (&staging_path, g_free);
     g_clear_pointer (&final_path, g_free);
     return ok;
+}
+
+gboolean
+atm_retrieval_index_create_empty (
+    const char *cache_root,
+    const AtmRetrievalIndexMetadata *metadata,
+    char **out_index_path,
+    GError **error
+)
+{
+    return retrieval_index_create_internal (
+        cache_root,
+        metadata,
+        NULL,
+        out_index_path,
+        error
+    );
+}
+
+gboolean
+atm_retrieval_index_create_with_sources (
+    const char *cache_root,
+    const AtmRetrievalIndexMetadata *metadata,
+    const AtmSourceCatalog *source_catalog,
+    char **out_index_path,
+    GError **error
+)
+{
+    g_return_val_if_fail (source_catalog != NULL, FALSE);
+
+    return retrieval_index_create_internal (
+        cache_root,
+        metadata,
+        source_catalog,
+        out_index_path,
+        error
+    );
 }
 
 gboolean
