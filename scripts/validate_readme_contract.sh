@@ -67,7 +67,7 @@ require_text README.md 'These are release boundaries, not claims that no develop
 require_text README.md 'Development `main` now contains an unreleased repository-aware GTK path for the fixed EWD/CBD/RMD suite'
 require_text README.md 'turn ordinary AI chat output into an authoritative scientific-model result.'
 require_text README.md 'Each source repository remains canonical for its documentation, code, data, assumptions, provenance, validation and release boundaries.'
-require_text README.md "Ordinary local chat in v$version should not be interpreted as repository-grounded scientific analysis."
+require_text README.md "ordinary local chat in v$version must not be interpreted as repository-grounded scientific analysis."
 
 require_text README.md 'href="docs/MODEL_GUIDE.md"'
 require_text README.md 'href="docs/TROUBLESHOOTING.md"'
@@ -83,7 +83,7 @@ require_text STATUS.md '## Development main — unreleased repository-aware appl
 require_text STATUS.md 'Development `main` has advanced beyond the public v0.2.2 UI boundary with repository/retrieval work and a repository-aware GTK conversation path that remain unreleased.'
 require_text STATUS.md 'The unreleased development GTK path now exposes the fixed EWD/CBD/RMD repository selector and lifecycle controls, real multi-chat tabs with independent in-memory provider/session state, first-Send repository/model pinning, end-to-end grounded message generation and compact user-visible source references.'
 require_text STATUS.md 'Grounded turns validate temporary source labels before commit and preserve exact repository/version/SHA/logical-source/locator provenance for on-demand inspection.'
-require_text STATUS.md 'The frozen R5 deterministic retrieval benchmark now passes its provisional engineering gates on the pinned EWD/CBD/RMD corpus.'
+require_text STATUS.md 'The frozen R5 deterministic retrieval benchmark passes its provisional engineering gates on the pinned EWD/CBD/RMD corpus'
 require_text STATUS.md 'AtM does not bundle, install, start, stop or update the local provider.'
 require_text STATUS.md 'AtM must not present an AI-generated explanation as if it were a canonical model result'
 require_text STATUS.md 'repository ingestion or retrieval;'
