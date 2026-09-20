@@ -183,6 +183,8 @@ The repository Refresh tool button checks the configured GitHub origins for the 
 
 The repository group must distinguish at least: checking, no update available, update available, downloading/updating, ready/offline-local, and failure. An actionable update-available status remains visible until acted on or refreshed; short scan-completion messages may expire.
 
+While a header action is actively working, its circular button uses a thin activity sleeve: a short muted-gold highlight travels around the button perimeter with a soft low-opacity trail. The effect applies consistently to local-model Refresh, repository Refresh and repository Download/Update. It is an overlay only and must not alter button allocation, icon position or neighboring layout. The existing textual status remains visible so activity is never communicated by color or animation alone. When system animations are disabled, the sleeve remains static rather than rotating.
+
 Repository files are stored visibly under `~/Ask the Model/Repositories`, while derived retrieval indexes remain application-private cache data. The UI should make this distinction understandable without exposing SHA values in the normal header.
 
 The repository scope is editable before the first user message. Once the first message is sent, the scope is pinned for that conversation, including the valid zero-repository case. A later repository-scope change must start a new chat rather than silently changing the scientific basis of an existing conversation.
