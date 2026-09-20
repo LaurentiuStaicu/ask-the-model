@@ -1,0 +1,75 @@
+{
+  "contract_version": "1.0",
+  "frozen_on": "2026-09-20",
+  "purpose": "Keep the public Ask the Model landing page consistent with the implemented application/provider/model boundary and the current public release without reducing the first-time-user detail that the application README intentionally provides.",
+  "suite_visual_identity": {
+    "icon_width_px": 112,
+    "title_html": "h2 centered",
+    "badge_style": "flat-square",
+    "palette": [
+      "#333333",
+      "#707070",
+      "#a0a0a0",
+      "white",
+      "black"
+    ],
+    "primary_badges": [
+      "release",
+      "license",
+      "platform"
+    ],
+    "action_badges": [
+      "download Flatpak",
+      "getting started",
+      "model guide"
+    ],
+    "note": "AtM intentionally has a second action row because it is an installable application. Scientific-model repositories keep only the primary identity row."
+  },
+  "current_public_release": {
+    "version": "0.2.2",
+    "meson_source": "meson.build",
+    "citation_source": "CITATION.cff",
+    "status_source": "STATUS.md",
+    "release_note": "releases/v0.2.2.md",
+    "version_bump_required": false
+  },
+  "implemented_capabilities": [
+    "local Ollama-compatible provider discovery",
+    "provider-managed model enumeration",
+    "completion-capability filtering",
+    "refreshable model selector",
+    "streamed text chat",
+    "in-memory session conversation context",
+    "loopback-only provider addressing in the current provider implementation"
+  ],
+  "required_boundaries": [
+    "AtM is the interface; the local provider runs the AI model.",
+    "AI model files are separate artifacts and must currently be downloaded/managed outside AtM.",
+    "AtM discovers models through the provider; it does not scan arbitrary disks for GGUF files.",
+    "AtM does not currently download, import, move, update or delete AI models.",
+    "Repository-aware retrieval and scientific provenance are not implemented in v0.2.2.",
+    "Scientific repositories remain authoritative for their code, data, assumptions, provenance and validation.",
+    "AtM must not present AI-generated text as a canonical scientific-model result without repository-grounded provenance or actual model execution."
+  ],
+  "required_routes": [
+    "docs/MODEL_GUIDE.md",
+    "docs/TROUBLESHOOTING.md",
+    "docs/DEPENDENCIES_AND_COMPATIBILITY.md",
+    "STATUS.md",
+    ".github/CONTRIBUTING.md",
+    ".github/SUPPORT.md",
+    "LICENSE",
+    "CITATION.cff"
+  ],
+  "validation": {
+    "script": "scripts/validate_readme_contract.sh",
+    "workflow": ".github/workflows/flatpak.yml",
+    "placement": "before Flatpak build",
+    "runtime_dependencies": "POSIX shell/coreutils only",
+    "no_application_runtime_dependency": true
+  },
+  "release_boundary": {
+    "documentation_contract_change_is_unreleased": true,
+    "version_bump_required": false
+  }
+}
