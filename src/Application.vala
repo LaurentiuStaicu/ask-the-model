@@ -1093,6 +1093,27 @@ namespace AskTheModel {
                     "atm-annunciator-critical"
                 );
 
+            no_ai_annunciator.tooltip_text =
+                "No usable local AI available";
+            no_repos_annunciator.tooltip_text =
+                "No local repository snapshot loaded";
+            ai_scan_annunciator.tooltip_text =
+                "Scan local AI models";
+            repo_check_annunciator.tooltip_text =
+                "Check selected repositories";
+            repo_download_annunciator.tooltip_text =
+                "Download repository snapshot";
+            repo_update_annunciator.tooltip_text =
+                "Update repository snapshot";
+            repo_validate_annunciator.tooltip_text =
+                "Validate repository snapshot";
+            repo_ready_annunciator.tooltip_text =
+                "Selected repositories are ready";
+            repo_offline_annunciator.tooltip_text =
+                "Remote check unavailable; local repositories may remain usable";
+            repo_error_annunciator.tooltip_text =
+                "Repository operation failed";
+
             var lcd_row = new Gtk.Box (
                 Gtk.Orientation.HORIZONTAL,
                 5
