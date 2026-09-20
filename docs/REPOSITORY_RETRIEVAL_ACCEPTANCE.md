@@ -152,10 +152,13 @@ For each repository:
 
 Before promotion:
 
-- repository identity matches catalog;
-- version metadata is readable;
+- `.atm/repository.json` exists;
+- the manifest validates against AtM's embedded v1 JSON Schema;
+- repository identity matches both the built-in catalog and the manifest;
+- version metadata is readable from the manifest-declared `CITATION.cff`;
 - manifest schema is supported;
-- required paths exist;
+- every manifest-declared required path exists;
+- manifest retrieval paths remain inside the validated snapshot;
 - unsafe archive entries are rejected.
 
 ### Bounded extraction
@@ -196,7 +199,7 @@ A failed update leaves the previous snapshot usable.
 
 ### Pass condition
 
-Download, cancellation, retry, update and removal behave correctly for all three repositories and failure injection cannot destroy the last valid ready snapshot.
+Download, cancellation, retry, update and removal behave correctly for all three repositories; all three catalog repositories provide manifests conforming to the same embedded v1 schema; and failure injection cannot destroy the last valid ready snapshot.
 
 ## R2 — Snapshot index
 
