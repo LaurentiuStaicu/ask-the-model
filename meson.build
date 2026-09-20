@@ -106,8 +106,10 @@ repository_catalog_test = executable(
   dependencies: [
     glib_dep,
     soup_dep,
-    json_glib_dep,
-    yaml_dep
+    json_glib_dep
+  ],
+  link_args: [
+    '-lyaml'
   ],
   install: false
 )
@@ -130,8 +132,10 @@ repository_selection_test = executable(
   dependencies: [
     glib_dep,
     soup_dep,
-    json_glib_dep,
-    yaml_dep
+    json_glib_dep
+  ],
+  link_args: [
+    '-lyaml'
   ],
   install: false
 )
@@ -154,8 +158,10 @@ repository_state_test = executable(
   dependencies: [
     glib_dep,
     soup_dep,
-    json_glib_dep,
-    yaml_dep
+    json_glib_dep
+  ],
+  link_args: [
+    '-lyaml'
   ],
   install: false
 )
