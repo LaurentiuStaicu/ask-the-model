@@ -28,7 +28,7 @@ Implemented and tested backend layers include:
 - deterministic multi-turn retrieval state with inherited repository intent/exact anchors, bounded effective follow-up queries and explicit clarification outcomes;
 - versioned R5 benchmark/run schemas, a reviewed frozen EWD/CBD/RMD corpus, a deterministic real-corpus runner, provisional metric gates and CI that now passes the fixed deterministic baseline.
 
-These backend components are still not connected end-to-end to the current GTK repository-selection and conversation flow. Grounded-request and citation-provenance building blocks exist and are tested, but the public application does not yet invoke them from the released UI or render user-visible citations. The reviewed frozen R5 corpus, deterministic real-corpus runner and gate-passing retrieval baseline now exist on development `main`; this validates the backend retrieval stage but does not make repository-grounded chat a released v0.2.2 feature.
+The development GTK application now has a repository-selection/lifecycle control group that can check GitHub and manage local immutable repository snapshots, but repository selection is not yet connected end-to-end to grounded message generation. Grounded-request and citation-provenance building blocks exist and are tested, but the released v0.2.2 UI does not invoke them or render user-visible citations. The reviewed frozen R5 corpus, deterministic real-corpus runner and gate-passing retrieval baseline now exist on development `main`; this validates the backend retrieval stage but does not make repository-grounded chat a released v0.2.2 feature.
 
 ## Implemented logical components
 
@@ -96,9 +96,9 @@ R5 defines versioned benchmark/run schemas, deterministic metric evaluation, pro
 
 ### Repository UI and conversation-context service
 
-Responsible for exposing the fixed EWD/CBD/RMD selection in the GTK interface, freezing the selected repository set and snapshot SHAs after the first user turn, and requiring an explicit new-chat transition for scope changes.
+The development UI exposes the fixed EWD/CBD/RMD selector together with separate repository refresh, Download/Update and repository-status controls. Refresh performs a read-only GitHub check; Download/Update uses the validated snapshot lifecycle. Persistent source snapshots are stored under `~/Ask the Model/Repositories`, while retrieval indexes remain private XDG cache data.
 
-The backend can already represent and route a pinned repository set, but this lifecycle is not yet wired into the current application UI.
+The remaining conversation-context responsibility is to freeze the selected repository set and exact snapshot SHAs after the first user turn, require an explicit new-chat transition for scope changes, and feed the pinned retrieval/grounding path into message generation.
 
 ### Grounded context and citation service
 
@@ -112,7 +112,7 @@ Responsible for future durable local conversation storage, conversation navigati
 
 ### Application settings
 
-Responsible for future provider endpoint configuration, preferred AI model and application-level preferences. Repository snapshots in the v1 architecture are application-managed inside AtM's Flatpak-local XDG storage rather than configured as arbitrary host filesystem locations.
+Responsible for future provider endpoint configuration, preferred AI model and application-level preferences. Repository source snapshots use the fixed visible location `~/Ask the Model/Repositories`; derived indexes and application state remain in AtM's private XDG cache/state locations. Arbitrary repository storage locations are not a v1 setting.
 
 ## Explicitly outside the v0.2.2 boundary
 
