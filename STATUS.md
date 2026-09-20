@@ -15,7 +15,7 @@ Development `main` has advanced beyond the public v0.2.2 UI boundary with reposi
 The current backend includes:
 
 - SHA-pinned, validated and immutable local snapshots for the fixed EWD/CBD/RMD catalog;
-- deterministic per-snapshot indexes validated against real EWD, CBD and RMD snapshots;
+- deterministic per-snapshot index schema v2 validated against real EWD, CBD and RMD snapshots, including the manifest-declared `status_source` as a distinct authority role;
 - exact technical-ID and structured entity/relation retrieval;
 - safe FTS5/BM25 lexical retrieval;
 - deterministic tabular row-key retrieval;
@@ -30,9 +30,11 @@ The current backend includes:
 - real-repository R4 traceability checks across EWD, CBD and RMD;
 - deterministic multi-turn retrieval state that can inherit repository scope, intent and exact anchors across follow-ups and return an explicit clarification outcome where needed;
 - versioned R5 benchmark/run schemas, deterministic metric evaluation, provisional gates and CI for the benchmark contract, including clarification-outcome semantics;
-- a reviewed frozen R5 seed corpus pinned to exact EWD/CBD/RMD v0.1.0 snapshots, with all required topic classes, Romanian/English/mixed coverage, unsupported cases and deterministic multi-turn cases.
+- a reviewed frozen R5 seed corpus pinned to exact EWD/CBD/RMD v0.1.0 snapshots, with all required topic classes, Romanian/English/mixed coverage, unsupported cases and deterministic multi-turn cases;
+- a deterministic real-corpus R5 runner that checks out the pinned SHAs, rebuilds the real indexes, executes the R3/R4 conversation/grounding path and evaluates the versioned run contract;
+- a passing frozen R5 retrieval benchmark under the provisional gates: exact-ID Success@1 1.00, MRR 1.00, nDCG@5 0.9002, required Recall@5 0.9833, RO–EN nDCG gap 0.0149, wrong-repository contamination@5 0.0207, evidence traceability 1.00 and clarification-outcome accuracy 1.00.
 
-The current GTK application still uses the ordinary local-chat path and does not expose repository selection, end-to-end grounded chat or user-visible citation rendering. R4 backend building blocks are implemented and tested, but they are not yet wired into the released conversation UI. R5 now has a benchmark framework, evaluator and frozen seed corpus, but a deterministic real-corpus run generator and a gate-passing benchmark run are not yet claimed. Therefore **v0.2.2 remains the current public release** and its user-facing capability boundary is unchanged.
+The current GTK application still uses the ordinary local-chat path and does not expose repository selection, end-to-end grounded chat or user-visible citation rendering. R4 backend building blocks are implemented and tested, but they are not yet wired into the released conversation UI. The frozen R5 deterministic retrieval benchmark now passes its provisional engineering gates on the pinned EWD/CBD/RMD corpus. This validates the unreleased deterministic retrieval backend against the current benchmark; it does not make repository-grounded chat a released UI feature or establish scientific validity of the underlying models. Therefore **v0.2.2 remains the current public release** and its user-facing capability boundary is unchanged.
 
 ## Canonical application role
 
