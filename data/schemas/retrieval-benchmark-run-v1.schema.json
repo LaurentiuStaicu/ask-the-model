@@ -1,0 +1,145 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "resource:///io/github/laurentiustaicu/ask_the_model/schemas/retrieval-benchmark-run-v1.schema.json",
+  "title": "Ask the Model retrieval benchmark run v1",
+  "type": "object",
+  "additionalProperties": false,
+  "required": [
+    "schema_version",
+    "benchmark_id",
+    "run_id",
+    "corpus",
+    "topics"
+  ],
+  "properties": {
+    "schema_version": {
+      "const": 1
+    },
+    "benchmark_id": {
+      "type": "string",
+      "minLength": 1,
+      "maxLength": 80
+    },
+    "run_id": {
+      "type": "string",
+      "minLength": 1,
+      "maxLength": 120
+    },
+    "corpus": {
+      "type": "array",
+      "minItems": 1,
+      "maxItems": 3,
+      "items": {
+        "$ref": "#/$defs/corpusRepository"
+      }
+    },
+    "topics": {
+      "type": "array",
+      "minItems": 1,
+      "items": {
+        "$ref": "#/$defs/topicRun"
+      }
+    }
+  },
+  "$defs": {
+    "repositoryId": {
+      "enum": ["ewd", "cbd", "rmd"]
+    },
+    "sha": {
+      "type": "string",
+      "pattern": "^[0-9a-f]{40}$"
+    },
+    "corpusRepository": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "repository_id",
+        "repository_version",
+        "snapshot_sha"
+      ],
+      "properties": {
+        "repository_id": {
+          "$ref": "#/$defs/repositoryId"
+        },
+        "repository_version": {
+          "type": "string",
+          "minLength": 1,
+          "maxLength": 80
+        },
+        "snapshot_sha": {
+          "$ref": "#/$defs/sha"
+        }
+      }
+    },
+    "evidenceRef": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "repository_id",
+        "repository_version",
+        "snapshot_sha",
+        "logical_source_id"
+      ],
+      "properties": {
+        "repository_id": {
+          "$ref": "#/$defs/repositoryId"
+        },
+        "repository_version": {
+          "type": "string",
+          "minLength": 1,
+          "maxLength": 80
+        },
+        "snapshot_sha": {
+          "$ref": "#/$defs/sha"
+        },
+        "logical_source_id": {
+          "type": "string",
+          "minLength": 1,
+          "maxLength": 1024
+        }
+      }
+    },
+    "topicRun": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "topic_id",
+        "latency_ms",
+        "results",
+        "context_sources",
+        "evidence_bytes"
+      ],
+      "properties": {
+        "topic_id": {
+          "type": "string",
+          "minLength": 1,
+          "maxLength": 100
+        },
+        "latency_ms": {
+          "type": "number",
+          "minimum": 0
+        },
+        "results": {
+          "type": "array",
+          "items": {
+            "$ref": "#/$defs/evidenceRef"
+          }
+        },
+        "context_sources": {
+          "type": "array",
+          "items": {
+            "$ref": "#/$defs/evidenceRef"
+          }
+        },
+        "evidence_bytes": {
+          "type": "integer",
+          "minimum": 0
+        },
+        "evidence_token_count": {
+          "type": ["integer", "null"],
+          "minimum": 0
+        }
+      }
+    }
+  }
+}
