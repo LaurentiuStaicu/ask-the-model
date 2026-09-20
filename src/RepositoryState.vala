@@ -67,9 +67,19 @@ namespace AskTheModel {
 
             RepositoryLocalRecord record =
                 record_for (repository_id);
+            string? previous_sha = record.current_sha;
+            string? previous_version = record.version;
+
             record.current_sha = sha;
             record.version = version;
-            save ();
+
+            try {
+                save ();
+            } catch (RepositoryError error) {
+                record.current_sha = previous_sha;
+                record.version = previous_version;
+                throw error;
+            }
         }
 
         private void load_best_effort () {
@@ -203,25 +213,17 @@ namespace AskTheModel {
             generator.pretty = true;
 
             string data = generator.to_data (null);
-            string temporary_path = state_path + ".part";
 
             try {
-                GLib.FileUtils.set_contents (
-                    temporary_path,
-                    data
+                GLib.FileUtils.set_contents_full (
+                    state_path,
+                    data,
+                    -1,
+                    GLib.FileSetContentsFlags.CONSISTENT |
+                        GLib.FileSetContentsFlags.DURABLE,
+                    0600
                 );
-
-                if (GLib.FileUtils.rename (
-                        temporary_path,
-                        state_path
-                    ) != 0) {
-                    throw new RepositoryError.STORAGE (
-                        "Repository state could not be promoted atomically."
-                    );
-                }
-            } catch (GLib.Error error) {
-                GLib.FileUtils.remove (temporary_path);
-
+            } catch (GLib.FileError error) {
                 throw new RepositoryError.STORAGE (
                     "Repository state could not be written: %s".printf (
                         error.message
