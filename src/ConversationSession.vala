@@ -77,7 +77,10 @@ namespace AskTheModel {
         }
 
         public void reset () {
-            grounding = null;
+            if (grounding != null) {
+                grounding.abort_turn ();
+                grounding = null;
+            }
         }
     }
 }
