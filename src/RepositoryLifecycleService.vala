@@ -211,9 +211,6 @@ namespace AskTheModel {
                         string ingest_version = "";
                         string index_path;
                         string index_version;
-                        RepositoryNative.RetrievalEnsureResult
-                            ensure_result;
-
                         if (!GLib.FileUtils.test (
                                 snapshot,
                                 GLib.FileTest.IS_DIR
@@ -251,8 +248,7 @@ namespace AskTheModel {
                                 descriptor.id,
                                 sha,
                                 out index_path,
-                                out index_version,
-                                out ensure_result
+                                out index_version
                             )) {
                             throw new RepositoryError.STORAGE (
                                 "Repository retrieval index could not be prepared."
