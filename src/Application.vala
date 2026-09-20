@@ -724,7 +724,7 @@ namespace AskTheModel {
             });
 
             repository_action_button =
-                new Gtk.Button.from_icon_name ("document-save-symbolic") {
+                new Gtk.Button.from_icon_name ("folder-download-symbolic") {
                     tooltip_text = "Download selected repositories",
                     sensitive = false
                 };
