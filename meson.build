@@ -31,6 +31,7 @@ executable(
     'src/Application.vala',
     'src/ActivityRing.vala',
     'src/SelectorTriangle.vala',
+    'src/AnnunciatorLabel.vala',
     'src/ChatRequestBuilder.vala',
     'src/OllamaProvider.vala',
     'src/RepositoryService.vala',
