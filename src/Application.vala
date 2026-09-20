@@ -303,7 +303,8 @@ namespace AskTheModel {
                 label = repository_selection.summary (),
                 tooltip_text = "Select repository context",
                 direction = Gtk.ArrowType.DOWN,
-                always_show_arrow = true
+                always_show_arrow = true,
+                can_shrink = true
             };
             repository_menu_button.set_popover (popover);
 
