@@ -175,6 +175,90 @@ test_document_without_atx_heading_is_one_section (void)
 }
 
 static void
+test_commonmark_atx_spacing_rules (void)
+{
+    const char *contents =
+        "   # Indented\t###\n"
+        "Body one\n"
+        "## KeepsHash#\n"
+        "Body two";
+    char *path = new_temp_file (contents, -1);
+    GPtrArray *sections = NULL;
+    GError *error = NULL;
+
+    g_assert_true (
+        atm_markdown_extract_sections (
+            path,
+            &sections,
+            &error
+        )
+    );
+    g_assert_no_error (error);
+    g_assert_cmpuint (sections->len, ==, 2);
+
+    AtmDocumentSection *first = section_at (sections, 0);
+    AtmDocumentSection *second = section_at (sections, 1);
+
+    g_assert_cmpstr (first->title, ==, "Indented");
+    g_assert_cmpstr (
+        first->heading_path,
+        ==,
+        "Indented"
+    );
+    g_assert_cmpstr (first->body, ==, "Body one\n");
+
+    g_assert_cmpstr (second->title, ==, "KeepsHash#");
+    g_assert_cmpstr (
+        second->heading_path,
+        ==,
+        "Indented > KeepsHash#"
+    );
+    g_assert_cmpstr (second->body, ==, "Body two");
+
+    g_ptr_array_unref (sections);
+    remove_temp_file (path);
+}
+
+static void
+test_fence_with_trailing_text_does_not_close (void)
+{
+    const char *contents =
+        "# Top\n"
+        "```text\n"
+        "## literal\n"
+        "```not-close\n"
+        "### still literal\n"
+        "```\n"
+        "## Child\n"
+        "Body";
+    char *path = new_temp_file (contents, -1);
+    GPtrArray *sections = NULL;
+    GError *error = NULL;
+
+    g_assert_true (
+        atm_markdown_extract_sections (
+            path,
+            &sections,
+            &error
+        )
+    );
+    g_assert_no_error (error);
+    g_assert_cmpuint (sections->len, ==, 2);
+
+    AtmDocumentSection *top = section_at (sections, 0);
+    AtmDocumentSection *child = section_at (sections, 1);
+
+    g_assert_cmpstr (top->title, ==, "Top");
+    g_assert_nonnull (
+        strstr (top->body, "### still literal")
+    );
+    g_assert_cmpstr (child->title, ==, "Child");
+
+    g_ptr_array_unref (sections);
+    remove_temp_file (path);
+}
+
+static void
 test_trailing_heading_markers_are_trimmed (void)
 {
     const char *contents =
@@ -305,6 +389,14 @@ main (int argc, char **argv)
     g_test_add_func (
         "/markdown/no-atx-heading",
         test_document_without_atx_heading_is_one_section
+    );
+    g_test_add_func (
+        "/markdown/commonmark-atx-spacing",
+        test_commonmark_atx_spacing_rules
+    );
+    g_test_add_func (
+        "/markdown/fence-trailing-text",
+        test_fence_with_trailing_text_does_not_close
     );
     g_test_add_func (
         "/markdown/trailing-markers",
