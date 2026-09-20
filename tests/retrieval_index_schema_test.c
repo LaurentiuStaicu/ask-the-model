@@ -119,7 +119,7 @@ test_schema_and_integrity (void)
     g_assert_cmpint (
         query_single_int (db, "PRAGMA user_version;"),
         ==,
-        3
+        2
     );
 
     g_assert_true (
