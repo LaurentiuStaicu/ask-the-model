@@ -141,6 +141,73 @@ namespace AskTheModel {
             }
         }
 
+        private void show_model_standby_status () {
+            model_status_generation++;
+
+            if (model_scan_status == null) {
+                return;
+            }
+
+            if (ollama_provider.is_ready () &&
+                ollama_provider.model_name != null) {
+                model_scan_status.label =
+                    "AI · %s · connected".printf (
+                        ollama_provider.model_name
+                    );
+            } else if (ollama_provider.base_url != null) {
+                model_scan_status.label =
+                    "AI · connected · no chat model";
+            } else {
+                model_scan_status.label =
+                    "AI · not connected";
+            }
+
+            model_scan_status.opacity = 1.0;
+        }
+
+        private void show_repository_standby_status () {
+            repository_status_generation++;
+
+            if (repository_scan_status == null) {
+                return;
+            }
+
+            RepositoryDescriptor[] selected =
+                repository_selection.selected_repositories ();
+
+            if (selected.length == 0) {
+                repository_scan_status.label =
+                    "REPOS · none selected";
+                repository_scan_status.opacity = 1.0;
+                return;
+            }
+
+            string acronyms = "";
+            bool all_ready = true;
+
+            foreach (RepositoryDescriptor descriptor in selected) {
+                if (acronyms.length > 0) {
+                    acronyms += " + ";
+                }
+
+                acronyms += descriptor.acronym;
+
+                if (repository_lifecycle.info_for (
+                        descriptor.id
+                    ).download_required ()) {
+                    all_ready = false;
+                }
+            }
+
+            repository_scan_status.label =
+                all_ready
+                    ? "REPOS · %s · ready".printf (acronyms)
+                    : "REPOS · %s · download needed".printf (
+                        acronyms
+                    );
+            repository_scan_status.opacity = 1.0;
+        }
+
         private void begin_model_scan_status () {
             model_status_generation++;
 
@@ -164,8 +231,7 @@ namespace AskTheModel {
             Timeout.add_seconds (3, () => {
                 if (generation == model_status_generation &&
                     model_scan_status != null) {
-                    model_scan_status.label = "";
-                    model_scan_status.opacity = 0.0;
+                    show_model_standby_status ();
                 }
 
                 return false;
@@ -398,8 +464,7 @@ namespace AskTheModel {
             Timeout.add_seconds (3, () => {
                 if (generation == repository_status_generation &&
                     repository_scan_status != null) {
-                    repository_scan_status.label = "";
-                    repository_scan_status.opacity = 0.0;
+                    show_repository_standby_status ();
                 }
 
                 return false;
@@ -631,6 +696,7 @@ namespace AskTheModel {
                     check.active
                 );
                 update_repository_selector_label ();
+                show_repository_standby_status ();
             });
 
             repository_check_buttons += check;
@@ -746,6 +812,7 @@ namespace AskTheModel {
                 }
 
                 if (ollama_provider.select_model (selected_model)) {
+                    show_model_standby_status ();
                     stdout.printf (
                         "AtM: selected model %s\n",
                         selected_model
@@ -900,6 +967,9 @@ namespace AskTheModel {
             };
             repository_scan_status.add_css_class ("atm-lcd-text");
             repository_scan_status.add_css_class ("monospace");
+
+            show_model_standby_status ();
+            show_repository_standby_status ();
 
             var lcd_contents = new Gtk.Box (
                 Gtk.Orientation.HORIZONTAL,
