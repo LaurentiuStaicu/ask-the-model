@@ -14,10 +14,13 @@ namespace AskTheModel {
         public Gtk.Label title_label;
         public Gtk.Button close_button;
         public OllamaConversation conversation;
+        public ConversationSession session =
+            new ConversationSession ();
         public uint serial;
         public bool locked = false;
         public bool generating = false;
         public string? model_name = null;
+        public string? model_digest = null;
         public string[] repository_ids = {};
 
         public ChatTabState (
@@ -600,6 +603,24 @@ namespace AskTheModel {
             return ids;
         }
 
+        private RepositoryDescriptor[]
+        repository_descriptors_for_ids (
+            string[] ids
+        ) {
+            RepositoryDescriptor[] selected = {};
+
+            foreach (
+                RepositoryDescriptor descriptor
+                in RepositoryCatalog.all ()
+            ) {
+                if (repository_id_in (ids, descriptor.id)) {
+                    selected += descriptor;
+                }
+            }
+
+            return selected;
+        }
+
         private bool repository_id_in (
             string[] ids,
             string repository_id
@@ -720,6 +741,7 @@ namespace AskTheModel {
             }
 
             bool was_active = active_chat == state;
+            state.session.reset ();
             chat_notebook.remove_page (page_num);
             remove_chat_state (state);
 
@@ -841,6 +863,8 @@ namespace AskTheModel {
                 ollama_provider.model_name != null) {
                 active_chat.model_name =
                     ollama_provider.model_name;
+                active_chat.model_digest =
+                    ollama_provider.model_digest;
             }
             update_ai_annunciators ();
             update_conversation_ui_state ();
@@ -1385,6 +1409,8 @@ namespace AskTheModel {
                         !active_chat.locked &&
                         !restoring_chat_controls) {
                         active_chat.model_name = selected_model;
+                        active_chat.model_digest =
+                            ollama_provider.model_digest;
                     }
 
                     show_model_standby_status ();
@@ -1796,6 +1822,7 @@ namespace AskTheModel {
                 conversation_serial
             );
             state.model_name = ollama_provider.model_name;
+            state.model_digest = ollama_provider.model_digest;
             state.repository_ids =
                 selected_repository_ids ();
 
@@ -1823,6 +1850,8 @@ namespace AskTheModel {
                 if (!state.locked) {
                     state.model_name =
                         ollama_provider.model_name;
+                    state.model_digest =
+                        ollama_provider.model_digest;
                     state.repository_ids =
                         selected_repository_ids ();
                     state.locked = true;
