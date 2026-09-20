@@ -20,12 +20,18 @@ The current backend includes:
 - safe FTS5/BM25 lexical retrieval;
 - deterministic tabular row-key retrieval;
 - intent-aware source authority and deduplication;
-- conversation-pinned repository scoping;
 - conservative Romanian/English query normalization;
+- a deterministic repository router combining those primitives without embeddings;
 - evidence records carrying repository ID, repository version and snapshot SHA;
-- a deterministic repository router combining those primitives without embeddings.
+- conversation repository pinning that validates version/index/snapshot identity and freezes the selected repository set before retrieval;
+- bounded current-turn grounding contexts with application-owned `[S#]` labels and explicit untrusted-data delimiters;
+- citation-label resolution that deep-copies exact repository/version/SHA/logical-source/path/locator provenance;
+- immutable GitHub file permalinks constructed from the fixed repository catalog and exact snapshot SHA rather than from model-generated URLs;
+- a grounded Ollama request path in which repository evidence is transient to the current request and is not appended to persistent provider history;
+- real EWD/CBD/RMD R4 integration tests that trace temporary source labels back to exact snapshot evidence;
+- a versioned R5 pinned-corpus benchmark/run contract, deterministic metric evaluator and metric-regression CI.
 
-This development backend is not yet connected to the current GTK repository-selection lifecycle, current-turn provider context, citation rendering or repository-grounded chat path. R5 benchmark/acceptance work also remains separate. Therefore **v0.2.2 remains the current public release** and its user-facing capability boundary is unchanged.
+These development components are **not yet wired into the current GTK repository-selection and Send lifecycle**, and user-visible citation rendering is not implemented. The current GTK Send action therefore remains ordinary local chat even though the grounded provider-request primitive exists in the backend. The real R5 corpus/topics/qrels and scored benchmark run also remain to be completed. Therefore **v0.2.2 remains the current public release** and its user-facing capability boundary is unchanged.
 
 ## Canonical application role
 
