@@ -159,7 +159,8 @@ test_catalog_roles_hashes_and_order (void)
     g_assert_cmpuint (
         r0->roles,
         ==,
-        ATM_SOURCE_ROLE_CANONICAL
+        ATM_SOURCE_ROLE_CANONICAL |
+        ATM_SOURCE_ROLE_STATUS
     );
     g_assert_cmpuint (
         r1->roles,
@@ -203,6 +204,11 @@ test_catalog_roles_hashes_and_order (void)
         atm_source_role_name (ATM_SOURCE_ROLE_TABULAR),
         ==,
         "tabular"
+    );
+    g_assert_cmpstr (
+        atm_source_role_name (ATM_SOURCE_ROLE_STATUS),
+        ==,
+        "status"
     );
 
     atm_source_catalog_free (catalog);
