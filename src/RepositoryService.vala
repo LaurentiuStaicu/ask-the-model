@@ -263,10 +263,18 @@ namespace AskTheModel {
             }
 
             var parser = new Json.Parser ();
-            parser.load_from_data (
-                (string) body.get_data (),
-                (ssize_t) body.get_size ()
-            );
+            try {
+                parser.load_from_data (
+                    (string) body.get_data (),
+                    (ssize_t) body.get_size ()
+                );
+            } catch (GLib.Error error) {
+                throw new RepositoryError.INVALID_RESPONSE (
+                    "GitHub branch response is not valid JSON: %s".printf (
+                        error.message
+                    )
+                );
+            }
 
             Json.Node root_node = parser.get_root ();
             if (root_node.get_node_type () != Json.NodeType.OBJECT) {
@@ -340,13 +348,23 @@ namespace AskTheModel {
             unowned uint8[] bytes = body.get_data ();
             string version;
 
-            if (!RepositoryNative.cff_extract_version (
-                    bytes,
-                    body.get_size (),
-                    out version
-                )) {
+            try {
+                if (!RepositoryNative.cff_extract_version (
+                        bytes,
+                        body.get_size (),
+                        out version
+                    )) {
+                    throw new RepositoryError.INVALID_RESPONSE (
+                        "GitHub CITATION.cff contains invalid version metadata."
+                    );
+                }
+            } catch (RepositoryError error) {
+                throw error;
+            } catch (GLib.Error error) {
                 throw new RepositoryError.INVALID_RESPONSE (
-                    "GitHub CITATION.cff contains invalid version metadata."
+                    "GitHub CITATION.cff contains invalid version metadata: %s".printf (
+                        error.message
+                    )
                 );
             }
 
