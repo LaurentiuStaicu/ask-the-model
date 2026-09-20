@@ -1,5 +1,7 @@
 #include "retrieval_scope.h"
 
+#include <string.h>
+
 GQuark
 atm_retrieval_scope_error_quark (void)
 {
