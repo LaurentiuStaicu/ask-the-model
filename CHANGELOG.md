@@ -12,7 +12,13 @@ All notable public releases of Ask the Model are recorded here.
 - added intent-aware source authority, logical-source deduplication, conversation-pinned repository scoping and conservative Romanian/English query normalization;
 - attached repository ID, repository version and exact snapshot SHA to retrieval evidence records;
 - integrated the R3 retrieval router with fail-closed outside-scope behavior and index/scope provenance matching;
-- kept all repository/retrieval backend work unreleased and separate from the current v0.2.2 GTK/chat capability boundary.
+- added validated per-conversation repository/snapshot pinning with an immutable frozen scope;
+- added bounded current-turn grounding contexts with application-owned temporary source labels and explicit untrusted-data boundaries;
+- added deep-copied citation provenance, strict current-turn source-label resolution and immutable commit-pinned GitHub file links constructed from the fixed repository catalog;
+- added a grounded Ollama request path that keeps repository evidence out of persistent provider history and prevents stale temporary citation labels from being rebound across turns;
+- validated R4 grounding/citation traceability against current real EWD, CBD and RMD snapshots;
+- added the R5 pinned-corpus benchmark/run contract, deterministic retrieval metric evaluator and metric-regression CI; the real benchmark corpus/topics/qrels remain pending;
+- kept all repository/retrieval/grounding backend work unreleased and separate from the current v0.2.2 GTK/chat capability boundary.
 
 ### Repository governance
 
