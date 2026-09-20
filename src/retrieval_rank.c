@@ -37,7 +37,7 @@ authority_rank_for_intent (
         0, 1, 1, 2, 3
     };
     static const guint structure[5] = {
-        1, 0, 2, 3, 2
+        0, 0, 2, 3, 2
     };
     static const guint evidence[5] = {
         1, 2, 0, 0, 3
