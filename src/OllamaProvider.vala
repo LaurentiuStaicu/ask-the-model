@@ -287,14 +287,18 @@ namespace AskTheModel {
         }
 
         public async string generate_conversation_title (
-            string topic_text
+            string topic_text,
+            string? model_override = null
         ) throws GLib.Error {
             yield ensure_ready ();
+
+            string title_model =
+                model_override ?? model_name;
 
             var builder = new Json.Builder ();
             builder.begin_object ();
             builder.set_member_name ("model");
-            builder.add_string_value (model_name);
+            builder.add_string_value (title_model);
             builder.set_member_name ("system");
             builder.add_string_value (
                 "Create a concise conversation title. " +
