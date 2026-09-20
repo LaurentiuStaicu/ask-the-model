@@ -281,9 +281,10 @@ def validate_benchmark(benchmark: dict[str, Any]) -> None:
                     "positive or required qrels."
                 )
         elif expect_unsupported:
-            if positive > 0 or required > 0:
+            if positive > 0 and required == 0:
                 raise BenchmarkError(
-                    f"{topic_id}: unsupported topic cannot have positive qrels."
+                    f"{topic_id}: unsupported topic with positive qrels "
+                    "needs required boundary evidence."
                 )
         else:
             if positive == 0:
