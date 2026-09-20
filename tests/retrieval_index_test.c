@@ -1,4 +1,5 @@
 #include "retrieval_index.h"
+#include "markdown_sections.h"
 
 #include <glib.h>
 #include <glib/gstdio.h>
@@ -110,7 +111,15 @@ new_source_snapshot (void)
         "  }\n"
         "}\n"
     );
-    write_text (root, "STATUS.md", "# Status\n");
+    write_text (
+        root,
+        "STATUS.md",
+        "# Scientific status\n"
+        "## Release status\n"
+        "Stare curentă verificată.\n"
+        "## Boundary\n"
+        "Model core only.\n"
+    );
     write_text (root, "model/core.json", "{}\n");
     write_text (root, "data/series.csv", "year,value\n2025,1\n");
 
@@ -347,6 +356,189 @@ test_source_catalog_is_committed_before_promotion (void)
 }
 
 static void
+test_markdown_sections_and_fts_are_committed (void)
+{
+    char *cache_root = new_cache_root ();
+    char *snapshot_root = new_source_snapshot ();
+    AtmSourceCatalog *catalog = NULL;
+    AtmRetrievalIndexMetadata metadata = valid_metadata ();
+    char *index_path = NULL;
+    sqlite3 *db = NULL;
+    GError *error = NULL;
+
+    g_assert_true (
+        atm_repository_source_catalog_build (
+            snapshot_root,
+            "ewd",
+            &catalog,
+            &error
+        )
+    );
+    g_assert_no_error (error);
+
+    metadata.manifest_sha256 = catalog->manifest_sha256;
+
+    g_assert_true (
+        atm_retrieval_index_create_with_documents (
+            cache_root,
+            snapshot_root,
+            &metadata,
+            catalog,
+            &index_path,
+            &error
+        )
+    );
+    g_assert_no_error (error);
+    g_assert_nonnull (index_path);
+
+    g_assert_cmpint (
+        sqlite3_open_v2 (
+            index_path,
+            &db,
+            SQLITE_OPEN_READONLY,
+            NULL
+        ),
+        ==,
+        SQLITE_OK
+    );
+
+    g_assert_cmpint (
+        query_int (
+            db,
+            "SELECT count(*) FROM document_sections;"
+        ),
+        ==,
+        2
+    );
+    g_assert_cmpint (
+        query_int (
+            db,
+            "SELECT count(*) FROM document_sections "
+            "WHERE heading_path = "
+            "'Scientific status > Release status' "
+            "AND locator = 'lines:2-3' "
+            "AND logical_source_id = "
+            "'ewd:section:STATUS.md:lines:2-3';"
+        ),
+        ==,
+        1
+    );
+    g_assert_cmpint (
+        query_int (
+            db,
+            "SELECT count(*) FROM search_fts "
+            "WHERE search_fts MATCH 'curenta';"
+        ),
+        ==,
+        1
+    );
+    g_assert_cmpint (
+        query_int (
+            db,
+            "SELECT count(*) FROM search_fts "
+            "WHERE evidence_kind = 'section';"
+        ),
+        ==,
+        2
+    );
+
+    g_assert_cmpint (sqlite3_close (db), ==, SQLITE_OK);
+    db = NULL;
+
+    atm_source_catalog_free (catalog);
+    g_free (index_path);
+    remove_tree_best_effort (snapshot_root);
+    g_free (snapshot_root);
+    remove_tree_best_effort (cache_root);
+    g_free (cache_root);
+}
+
+static void
+test_invalid_markdown_never_promotes (void)
+{
+    char *cache_root = new_cache_root ();
+    char *snapshot_root = new_source_snapshot ();
+    char *status_path = g_build_filename (
+        snapshot_root,
+        "STATUS.md",
+        NULL
+    );
+    const char invalid[] = { (char) 0xff };
+    GError *error = NULL;
+
+    g_assert_true (
+        g_file_set_contents (
+            status_path,
+            invalid,
+            1,
+            &error
+        )
+    );
+    g_assert_no_error (error);
+
+    AtmSourceCatalog *catalog = NULL;
+    AtmRetrievalIndexMetadata metadata = valid_metadata ();
+    char *index_path = NULL;
+
+    g_assert_true (
+        atm_repository_source_catalog_build (
+            snapshot_root,
+            "ewd",
+            &catalog,
+            &error
+        )
+    );
+    g_assert_no_error (error);
+
+    metadata.manifest_sha256 = catalog->manifest_sha256;
+
+    g_assert_false (
+        atm_retrieval_index_create_with_documents (
+            cache_root,
+            snapshot_root,
+            &metadata,
+            catalog,
+            &index_path,
+            &error
+        )
+    );
+    g_assert_error (
+        error,
+        ATM_MARKDOWN_ERROR,
+        ATM_MARKDOWN_ERROR_ENCODING
+    );
+    g_assert_null (index_path);
+
+    char *final_path = atm_retrieval_index_path (
+        cache_root,
+        metadata.repository_id,
+        metadata.snapshot_sha
+    );
+    char *staging_path = atm_retrieval_index_staging_path (
+        cache_root,
+        metadata.repository_id,
+        metadata.snapshot_sha
+    );
+
+    g_assert_false (
+        g_file_test (final_path, G_FILE_TEST_EXISTS)
+    );
+    g_assert_false (
+        g_file_test (staging_path, G_FILE_TEST_EXISTS)
+    );
+
+    g_free (staging_path);
+    g_free (final_path);
+    g_clear_error (&error);
+    atm_source_catalog_free (catalog);
+    g_free (status_path);
+    remove_tree_best_effort (snapshot_root);
+    g_free (snapshot_root);
+    remove_tree_best_effort (cache_root);
+    g_free (cache_root);
+}
+
+static void
 test_manifest_hash_mismatch_never_promotes (void)
 {
     char *cache_root = new_cache_root ();
@@ -486,6 +678,14 @@ main (int argc, char **argv)
     g_test_add_func (
         "/retrieval-index/source-catalog-committed",
         test_source_catalog_is_committed_before_promotion
+    );
+    g_test_add_func (
+        "/retrieval-index/markdown-sections-fts",
+        test_markdown_sections_and_fts_are_committed
+    );
+    g_test_add_func (
+        "/retrieval-index/invalid-markdown-rollback",
+        test_invalid_markdown_never_promotes
     );
     g_test_add_func (
         "/retrieval-index/manifest-hash-mismatch",
