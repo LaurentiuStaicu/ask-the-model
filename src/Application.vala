@@ -355,6 +355,16 @@ namespace AskTheModel {
             return overlay;
         }
 
+        private Gtk.Widget build_selector_triangle_overlay (
+            Gtk.Widget selector
+        ) {
+            var overlay = new Gtk.Overlay () {
+                child = selector
+            };
+            overlay.add_overlay (new SelectorTriangle ());
+            return overlay;
+        }
+
         private void update_repository_selector_label () {
             if (repository_menu_button != null) {
                 repository_menu_button.label =
@@ -732,13 +742,18 @@ namespace AskTheModel {
             repository_menu_button = new Gtk.MenuButton () {
                 label = repository_selection.summary (),
                 tooltip_text = "Select repository context",
-                direction = Gtk.ArrowType.DOWN,
-                always_show_arrow = true,
+                direction = Gtk.ArrowType.NONE,
+                always_show_arrow = false,
                 can_shrink = true
             };
+            repository_menu_button.add_css_class (
+                "atm-triangle-selector"
+            );
             repository_menu_button.set_popover (popover);
 
-            return repository_menu_button;
+            return build_selector_triangle_overlay (
+                repository_menu_button
+            );
         }
 
         private bool system_prefers_dark () {
@@ -794,8 +809,12 @@ namespace AskTheModel {
             model_list = new Gtk.StringList (initial_items);
 
             model_dropdown = new Gtk.DropDown (null, null) {
-                sensitive = false
+                sensitive = false,
+                show_arrow = false
             };
+            model_dropdown.add_css_class (
+                "atm-triangle-selector"
+            );
             model_dropdown.set_model (model_list);
             model_dropdown.notify["selected"].connect (() => {
                 if (updating_model_selector ||
@@ -835,7 +854,11 @@ namespace AskTheModel {
             );
             refresh_models_ring = new ActivityRing ();
 
-            model_controls.append (model_dropdown);
+            model_controls.append (
+                build_selector_triangle_overlay (
+                    model_dropdown
+                )
+            );
             model_controls.append (
                 build_activity_overlay (
                     refresh_models_button,
