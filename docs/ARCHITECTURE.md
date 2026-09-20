@@ -22,6 +22,7 @@ Implemented and tested backend layers include:
 - repository ID, repository-declared version and snapshot SHA carried on evidence records;
 - a deterministic repository router that combines scope, normalization, exact/tabular/lexical retrieval and ranking without requiring embeddings;
 - immutable per-conversation repository pinning with snapshot/index identity checks and post-freeze scope-mutation rejection;
+- a non-visual conversation-session boundary with explicit start/reset semantics, transactional grounded-turn prepare/commit/abort, and pinned local-AI model identity plus provider digest when available;
 - current-turn grounding context and Ollama request construction that keep repository evidence transient instead of persisting grounding blocks in normal chat history;
 - current-turn citation-label resolution into persistent provenance objects, including fail-closed handling of invalid provenance and no fabricated metadata for unknown labels;
 - real-repository R4 traceability tests spanning EWD, CBD and RMD;
@@ -51,9 +52,16 @@ AtM does not own the provider process. It does not install, start, stop, update 
 
 ### Conversation state
 
-The current conversation is an in-memory ordered sequence of user and assistant messages held by the provider layer.
+The provider layer keeps the current user/assistant message history in memory. A separate non-visual `ConversationSession` boundary now owns the immutable conversation grounding identity before GTK wiring:
 
-The state is not persisted across application restarts. Switching the active AI model does not yet create a separate persisted conversation.
+- repository scope is supplied as an already-frozen `ConversationGrounding` object;
+- the selected local AI model name is pinned at session start;
+- the provider model digest is also pinned when discovery exposes one;
+- a later model-name or pinned-digest mismatch can be rejected before accepting it as the same conversation;
+- grounded retrieval turns use explicit prepare/commit/abort semantics so a failed model request does not advance follow-up retrieval state;
+- reset aborts any pending grounded turn and clears repository grounding plus pinned model identity.
+
+The state is not persisted across application restarts. The development GTK application does not yet bind selector sensitivity, first-send session start or a visible New Chat action to this backend boundary.
 
 ### User interface
 
@@ -98,7 +106,7 @@ R5 defines versioned benchmark/run schemas, deterministic metric evaluation, pro
 
 The development UI exposes the fixed EWD/CBD/RMD selector together with separate repository refresh, Download/Update and repository-status controls. Refresh performs a read-only GitHub check; Download/Update uses the validated snapshot lifecycle. Persistent source snapshots are stored under `~/Ask the Model/Repositories`, while retrieval indexes remain private XDG cache data.
 
-The remaining conversation-context responsibility is to freeze the selected repository set and exact snapshot SHAs after the first user turn, require an explicit new-chat transition for scope changes, and feed the pinned retrieval/grounding path into message generation.
+The repository/snapshot freeze, transactional grounded-turn lifecycle and AI-model identity pinning are implemented behind a non-visual session boundary. The remaining conversation-context responsibility is GTK orchestration: start that session atomically on the first user turn, keep the repository and AI-model controls visibly understandable but non-editable for the active conversation, provide an explicit New Chat transition that resets provider/session state, and feed the pinned retrieval/grounding path into message generation.
 
 ### Grounded context and citation service
 
