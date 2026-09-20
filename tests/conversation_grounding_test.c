@@ -516,6 +516,14 @@ test_valid_pins_are_canonical_and_frozen (void)
         ewd_sha
     );
 
+    g_assert_true (
+        atm_conversation_grounding_commit_turn (
+            state,
+            &error
+        )
+    );
+    g_assert_no_error (error);
+
     g_clear_pointer (
         &post_evidence_reminder,
         g_free
@@ -575,6 +583,14 @@ test_valid_pins_are_canonical_and_frozen (void)
         ==,
         rmd_sha
     );
+
+    g_assert_true (
+        atm_conversation_grounding_commit_turn (
+            state,
+            &error
+        )
+    );
+    g_assert_no_error (error);
 
     /*
      * The first resolution is a deep copy. Preparing a later turn must
