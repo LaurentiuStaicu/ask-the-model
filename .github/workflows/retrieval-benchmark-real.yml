@@ -175,6 +175,8 @@ jobs:
             --generate-source \
             --target=/tmp/atm-resources.c
 
+          # Keep the new runner itself warning-clean without turning
+          # pre-existing backend warnings into unrelated R5 failures.
           cc \
             -std=c11 \
             -D_GNU_SOURCE \
@@ -182,6 +184,20 @@ jobs:
             -Wall \
             -Wextra \
             -Werror \
+            -Isrc \
+            $(pkg-config --cflags \
+              glib-2.0 \
+              gio-2.0 \
+              json-glib-1.0) \
+            -c tests/retrieval_benchmark_runner.c \
+            -o /tmp/retrieval-benchmark-runner.o
+
+          cc \
+            -std=c11 \
+            -D_GNU_SOURCE \
+            -O2 \
+            -Wall \
+            -Wextra \
             -Isrc \
             src/cff_version.c \
             src/repository_sources.c \
@@ -197,7 +213,7 @@ jobs:
             src/retrieval_router.c \
             src/retrieval_conversation.c \
             src/grounding_context.c \
-            tests/retrieval_benchmark_runner.c \
+            /tmp/retrieval-benchmark-runner.o \
             /tmp/atm-resources.c \
             $(pkg-config --cflags --libs \
               glib-2.0 \
