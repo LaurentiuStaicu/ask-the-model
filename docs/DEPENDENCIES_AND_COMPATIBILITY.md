@@ -22,7 +22,7 @@ For a normal release installation, the required pieces are deliberately separate
 3. **At least one completion-capable AI model** — installed through that provider.
 4. **The AtM Flatpak bundle** — installed from the GitHub release.
 
-The elementary runtime is resolved by Flatpak. Meson, Vala, GTK/Granite development headers, libsoup development headers, json-glib development headers and the elementary SDK are not normal-user prerequisites.
+The elementary runtime is resolved by Flatpak. Meson, Vala, GTK/Granite development headers, libsoup development headers, json-glib development headers, SQLite/libarchive development headers and the elementary SDK are not normal-user prerequisites.
 
 ## Local AI provider requirement
 
@@ -142,22 +142,28 @@ Wayland behavior is supported by the Flatpak manifest. The release does not clai
 
 ## Native development build dependencies
 
-These packages are required only when building the native application from source:
+These packages are required only when building the native application and its repository-platform capability tests from source:
 
 - GTK 4 development files;
 - Granite 7 development files;
 - libsoup 3.0 development files;
 - json-glib development files;
+- GLib development files;
+- SQLite 3 development files;
+- libarchive development files;
+- a C compiler for the non-installed platform probe;
 - Vala;
 - Meson >= 1.0.0.
 
 On elementary OS 8 / Ubuntu-compatible systems:
 
 ```bash
-sudo apt install meson valac libgtk-4-dev libgranite-7-dev libsoup-3.0-dev libjson-glib-dev
+sudo apt install meson valac build-essential libgtk-4-dev libgranite-7-dev libsoup-3.0-dev libjson-glib-dev libglib2.0-dev libsqlite3-dev libarchive-dev
 ```
 
-For a Flatpak **development build**, `flatpak-builder` and `io.elementary.Sdk//8` are also required. The SDK is a build-time dependency, not a normal end-user prerequisite.
+For a Flatpak **development build**, `flatpak-builder` and `io.elementary.Sdk//8` are also required. CI builds against that same elementary SDK baseline and runs the Meson test suite inside the Flatpak build environment.
+
+The SQLite/libarchive probe is an implementation prerequisite for the planned repository-aware layer. It does not mean that v0.2.2 already performs repository ingestion or retrieval, and the probe executable is not installed in the application bundle.
 
 ## Privacy and network boundary
 
