@@ -234,8 +234,48 @@ namespace AskTheModel {
     }
 
     public class CitationResolution : Object {
-        public CitationReference[] citations = {};
-        public string[] unknown_labels = {};
+        private CitationReference[] citations_store = {};
+        private string[] unknown_labels_store = {};
+
+        internal void add_citation (
+            CitationReference citation
+        ) {
+            citations_store += citation;
+        }
+
+        internal void add_unknown_label (
+            string label
+        ) {
+            unknown_labels_store += label;
+        }
+
+        public uint citation_count () {
+            return citations_store.length;
+        }
+
+        public CitationReference? citation_at (
+            uint index
+        ) {
+            if (index >= citations_store.length) {
+                return null;
+            }
+
+            return citations_store[index];
+        }
+
+        public uint unknown_label_count () {
+            return unknown_labels_store.length;
+        }
+
+        public string? unknown_label_at (
+            uint index
+        ) {
+            if (index >= unknown_labels_store.length) {
+                return null;
+            }
+
+            return unknown_labels_store[index];
+        }
     }
 
     public class ConversationGrounding : Object {
@@ -390,7 +430,8 @@ namespace AskTheModel {
                         );
                     }
 
-                    result.citations += new CitationReference (
+                    result.add_citation (
+                        new CitationReference (
                         label,
                         repository_id,
                         repository_version,
@@ -400,6 +441,7 @@ namespace AskTheModel {
                         locator,
                         title,
                         excerpt
+                    )
                     );
                 }
 
@@ -416,7 +458,7 @@ namespace AskTheModel {
                         );
 
                     if (unknown != null) {
-                        result.unknown_labels += unknown;
+                        result.add_unknown_label (unknown);
                     }
                 }
             } finally {
