@@ -251,6 +251,28 @@ namespace AskTheModel {
                 repository_selection.summary ();
         }
 
+        private Gtk.CheckButton build_repository_check_button (
+            RepositoryDescriptor descriptor
+        ) {
+            var check = new Gtk.CheckButton.with_label (
+                descriptor.selector_label ()
+            ) {
+                active = repository_selection.is_selected (
+                    descriptor.id
+                )
+            };
+
+            check.toggled.connect (() => {
+                repository_selection.set_selected (
+                    descriptor.id,
+                    check.active
+                );
+                update_repository_selector_label ();
+            });
+
+            return check;
+        }
+
         private Gtk.Widget build_repository_selector () {
             var content = new Gtk.Box (
                 Gtk.Orientation.VERTICAL,
@@ -266,24 +288,9 @@ namespace AskTheModel {
                 RepositoryDescriptor descriptor
                 in RepositoryCatalog.all ()
             ) {
-                var check = new Gtk.CheckButton.with_label (
-                    descriptor.selector_label ()
-                ) {
-                    active = repository_selection.is_selected (
-                        descriptor.id
-                    )
-                };
-
-                string repository_id = descriptor.id;
-                check.toggled.connect (() => {
-                    repository_selection.set_selected (
-                        repository_id,
-                        check.active
-                    );
-                    update_repository_selector_label ();
-                });
-
-                content.append (check);
+                content.append (
+                    build_repository_check_button (descriptor)
+                );
             }
 
             var popover = new Gtk.Popover () {
