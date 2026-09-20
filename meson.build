@@ -37,6 +37,7 @@ executable(
     'src/repository_storage.c',
     'src/repository_ingest.c',
     'src/retrieval_index.c',
+    'src/retrieval_index_lifecycle.c',
     'src/repository_sources.c',
     'src/markdown_sections.c',
     'src/csv_table.c',
@@ -242,6 +243,35 @@ retrieval_index_test = executable(
 test(
   'retrieval-index',
   retrieval_index_test
+)
+
+retrieval_index_lifecycle_test = executable(
+  'retrieval-index-lifecycle-test',
+  [
+    'src/cff_version.c',
+    'src/repository_sources.c',
+    'src/markdown_sections.c',
+    'src/csv_table.c',
+    'src/structured_json.c',
+    'src/retrieval_index.c',
+    'src/retrieval_index_lifecycle.c',
+    'tests/retrieval_index_lifecycle_test.c',
+    resources
+  ],
+  include_directories: include_directories('src'),
+  dependencies: [
+    glib_dep,
+    gio_dep,
+    json_glib_dep,
+    sqlite_dep,
+    yaml_dep
+  ],
+  install: false
+)
+
+test(
+  'retrieval-index-lifecycle',
+  retrieval_index_lifecycle_test
 )
 
 repository_sources_test = executable(
