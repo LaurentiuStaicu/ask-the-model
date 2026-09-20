@@ -183,6 +183,43 @@ test_boundary_alias_marks_current_state (void)
 }
 
 static void
+test_romanian_scientific_aliases_and_numeric_scope (void)
+{
+    AtmNormalizedQuery *normalized = NULL;
+    GError *error = NULL;
+
+    g_assert_true (
+        atm_retrieval_normalize_query (
+            "Compară paradigmele de modelare și validarea; "
+            "recovery probability la 160, cu prognoze probabilistice.",
+            &normalized,
+            &error
+        )
+    );
+    g_assert_no_error (error);
+    g_assert_nonnull (strstr (normalized->expanded_text, "compare"));
+    g_assert_nonnull (strstr (normalized->expanded_text, "paradigm"));
+    g_assert_nonnull (strstr (normalized->expanded_text, "modeling"));
+    g_assert_nonnull (strstr (normalized->expanded_text, "validation"));
+    g_assert_nonnull (strstr (normalized->expanded_text, "forecast"));
+    g_assert_nonnull (strstr (normalized->expanded_text, "probability"));
+    g_assert_true (
+        (normalized->intents &
+         ATM_RETRIEVAL_INTENT_CURRENT_STATE) != 0
+    );
+    g_assert_true (
+        (normalized->intents &
+         ATM_RETRIEVAL_INTENT_STRUCTURE) != 0
+    );
+    g_assert_true (
+        (normalized->intents &
+         ATM_RETRIEVAL_INTENT_NUMERIC) != 0
+    );
+
+    atm_normalized_query_free (normalized);
+}
+
+static void
 test_invalid_normalization_input_is_rejected (void)
 {
     AtmNormalizedQuery *normalized = NULL;
@@ -213,7 +250,7 @@ main (int argc, char **argv)
     g_assert_cmpint (
         ATM_RETRIEVAL_ALIAS_VERSION,
         ==,
-        1
+        2
     );
 
     g_test_add_func (
@@ -231,6 +268,10 @@ main (int argc, char **argv)
     g_test_add_func (
         "/retrieval-normalize/boundary",
         test_boundary_alias_marks_current_state
+    );
+    g_test_add_func (
+        "/retrieval-normalize/scientific-aliases",
+        test_romanian_scientific_aliases_and_numeric_scope
     );
     g_test_add_func (
         "/retrieval-normalize/invalid-input",
