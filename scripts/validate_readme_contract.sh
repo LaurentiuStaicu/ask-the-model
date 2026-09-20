@@ -38,7 +38,7 @@ require_text README.md "AtM v$version"
 
 require_text README.md '<img src="assets/icon.png" alt="Ask the Model icon" width="112">'
 require_text README.md '<h2 align="center">Ask the Model (AtM)</h2>'
-require_text README.md 'img alt="Latest release"'
+require_text README.md "img alt=\"Version: $version\""
 require_text README.md 'img alt="MIT License"'
 require_text README.md 'img alt="Linux / Flatpak"'
 require_text README.md 'img alt="Download Flatpak"'
