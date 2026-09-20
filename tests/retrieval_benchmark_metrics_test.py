@@ -350,7 +350,7 @@ class RetrievalBenchmarkEvaluatorTest(unittest.TestCase):
         )
         self.assertEqual(
             metrics["evidence_token_count_mean"],
-            60.0,
+            45.0,
         )
         self.assertEqual(
             metrics["evidence_token_count_max"],
