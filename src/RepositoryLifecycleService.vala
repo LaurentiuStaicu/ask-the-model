@@ -130,15 +130,23 @@ namespace AskTheModel {
                 descriptor,
                 cancellable
             );
-            string version =
+
+            info.remote_sha = sha;
+
+            if (!info.download_required () &&
+                info.local.current_sha == sha &&
+                info.local.version != null) {
+                info.remote_version = info.local.version;
+                return info;
+            }
+
+            info.remote_version =
                 yield client.resolve_remote_version (
                     descriptor,
                     sha,
                     cancellable
                 );
 
-            info.remote_sha = sha;
-            info.remote_version = version;
             return info;
         }
 
@@ -301,10 +309,13 @@ namespace AskTheModel {
                 bool updating_existing =
                     !info.download_required ();
 
-                info = yield refresh (
-                    descriptor,
-                    cancellable
-                );
+                if (info.remote_sha == null ||
+                    info.remote_version == null) {
+                    info = yield refresh (
+                        descriptor,
+                        cancellable
+                    );
+                }
 
                 if (info.remote_sha == null ||
                     info.remote_version == null) {
