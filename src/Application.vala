@@ -42,6 +42,12 @@ namespace AskTheModel {
             new RepositorySelection ();
         private RepositoryLifecycleService repository_lifecycle =
             new RepositoryLifecycleService ();
+        private GLib.SimpleAction? new_chat_action;
+        private Gtk.Button? new_chat_button;
+        private Gtk.TextView? prompt_input_view;
+        private Gtk.Button? send_prompt_button;
+        private bool conversation_ui_locked = false;
+        private bool generation_active = false;
         private bool ai_scanning = false;
         private bool repository_checking = false;
         private bool repository_downloading = false;
@@ -85,6 +91,19 @@ namespace AskTheModel {
             apply_system_style ();
 
             ollama_provider = new OllamaProvider ();
+
+            new_chat_action = new GLib.SimpleAction (
+                "new-chat",
+                null
+            );
+            new_chat_action.activate.connect (() => {
+                reset_preview_conversation ();
+            });
+            add_action (new_chat_action);
+            set_accels_for_action (
+                "app.new-chat",
+                { "<Primary>n" }
+            );
 
             repository_lifecycle.progress.connect ((message) => {
                 repository_validating =
@@ -497,12 +516,9 @@ namespace AskTheModel {
             bool found = yield ollama_provider.discover ();
             update_model_selector ();
 
-            if (refresh_models_button != null) {
-                refresh_models_button.sensitive = true;
-            }
-
             ai_scanning = false;
             update_ai_annunciators ();
+            update_conversation_ui_state ();
 
             if (found && ollama_provider.model_name != null) {
                 stdout.printf (
@@ -526,6 +542,74 @@ namespace AskTheModel {
                 refresh_models_ring,
                 false
             );
+        }
+
+        private void update_conversation_ui_state () {
+            bool editable = !conversation_ui_locked;
+            bool provider_ready =
+                ollama_provider.get_completion_models ().length > 0;
+
+            if (model_dropdown != null) {
+                model_dropdown.sensitive =
+                    editable && provider_ready;
+            }
+
+            if (refresh_models_button != null) {
+                refresh_models_button.sensitive =
+                    editable && !ai_scanning;
+            }
+
+            if (repository_menu_button != null) {
+                repository_menu_button.sensitive =
+                    editable &&
+                    !repository_checking &&
+                    !repository_downloading &&
+                    !repository_updating &&
+                    !repository_validating;
+            }
+
+            foreach (Gtk.CheckButton check in repository_check_buttons) {
+                check.sensitive = editable;
+            }
+
+            update_repository_selector_label ();
+
+            bool can_start_new_chat =
+                conversation_ui_locked && !generation_active;
+
+            if (new_chat_button != null) {
+                new_chat_button.sensitive = can_start_new_chat;
+            }
+
+            if (new_chat_action != null) {
+                new_chat_action.set_enabled (can_start_new_chat);
+            }
+        }
+
+        private void reset_preview_conversation () {
+            if (generation_active) {
+                return;
+            }
+
+            ollama_provider.reset_conversation ();
+            conversation_ui_locked = false;
+            assistant_stream_started = false;
+
+            if (transcript_view != null) {
+                transcript_view.buffer.text = "";
+            }
+
+            if (prompt_input_view != null) {
+                prompt_input_view.buffer.text = "";
+                prompt_input_view.sensitive = true;
+                prompt_input_view.grab_focus ();
+            }
+
+            if (send_prompt_button != null) {
+                send_prompt_button.sensitive = false;
+            }
+
+            update_conversation_ui_state ();
         }
 
         private void update_model_selector () {
@@ -562,10 +646,13 @@ namespace AskTheModel {
             }
 
             model_dropdown.set_selected (selected_index);
-            model_dropdown.sensitive = models.length > 0;
+            model_dropdown.sensitive =
+                !conversation_ui_locked &&
+                models.length > 0;
 
             updating_model_selector = false;
             update_ai_annunciators ();
+            update_conversation_ui_state ();
         }
 
         private void set_activity_working (
@@ -612,16 +699,32 @@ namespace AskTheModel {
         }
 
         private void update_repository_selector_label () {
+            bool editable = !conversation_ui_locked;
+            bool repository_busy =
+                repository_checking ||
+                repository_downloading ||
+                repository_updating ||
+                repository_validating;
+
             if (repository_menu_button != null) {
                 repository_menu_button.label =
                     repository_selection.summary ();
+                repository_menu_button.sensitive =
+                    editable && !repository_busy;
+            }
+
+            foreach (Gtk.CheckButton check in repository_check_buttons) {
+                check.sensitive = editable;
             }
 
             bool has_selection =
                 repository_selection.selected_repositories ().length > 0;
 
             if (refresh_repositories_button != null) {
-                refresh_repositories_button.sensitive = has_selection;
+                refresh_repositories_button.sensitive =
+                    editable &&
+                    !repository_busy &&
+                    has_selection;
             }
 
             if (repository_action_button != null) {
@@ -653,8 +756,14 @@ namespace AskTheModel {
                     );
                 }
 
-                repository_action_button.sensitive = has_action;
-                repository_action_button.can_target = has_action;
+                repository_action_button.sensitive =
+                    editable &&
+                    !repository_busy &&
+                    has_action;
+                repository_action_button.can_target =
+                    editable &&
+                    !repository_busy &&
+                    has_action;
                 repository_action_button.opacity =
                     has_action ? 1.0 : 0.0;
                 repository_action_button.update_state (
@@ -801,13 +910,7 @@ namespace AskTheModel {
                 );
             }
 
-            if (repository_menu_button != null) {
-                repository_menu_button.sensitive = true;
-            }
-
-            if (refresh_repositories_button != null) {
-                refresh_repositories_button.sensitive = true;
-            }
+            update_conversation_ui_state ();
 
             set_activity_working (
                 refresh_repositories_button,
@@ -906,12 +1009,7 @@ namespace AskTheModel {
                 );
             }
 
-            if (repository_menu_button != null) {
-                repository_menu_button.sensitive = true;
-            }
-            if (refresh_repositories_button != null) {
-                refresh_repositories_button.sensitive = true;
-            }
+            update_conversation_ui_state ();
 
             set_activity_working (
                 repository_action_button,
@@ -1102,6 +1200,24 @@ namespace AskTheModel {
                 refresh_local_models.begin ();
             });
 
+            new_chat_button =
+                new Gtk.Button.from_icon_name (
+                    "document-new-symbolic"
+                ) {
+                    tooltip_text = "New Chat (Ctrl+N)",
+                    sensitive = false
+                };
+            new_chat_button.add_css_class ("circular");
+            new_chat_button.update_property (
+                Gtk.AccessibleProperty.LABEL,
+                "New Chat"
+            );
+            new_chat_button.clicked.connect (() => {
+                if (new_chat_action != null) {
+                    new_chat_action.activate (null);
+                }
+            });
+
             var model_controls = new Gtk.Box (
                 Gtk.Orientation.HORIZONTAL,
                 6
@@ -1174,6 +1290,7 @@ namespace AskTheModel {
                 Gtk.Orientation.HORIZONTAL,
                 12
             );
+            header_controls.append (new_chat_button);
             header_controls.append (model_controls);
             header_controls.append (repository_controls);
 
@@ -1205,6 +1322,9 @@ namespace AskTheModel {
             Gtk.TextView prompt_view,
             Gtk.Button send_button
         ) {
+            generation_active = true;
+            update_conversation_ui_state ();
+
             try {
                 string answer = yield ollama_provider.chat (prompt);
 
@@ -1222,9 +1342,11 @@ namespace AskTheModel {
                 );
             }
 
+            generation_active = false;
             prompt_view.sensitive = true;
             send_button.sensitive =
                 prompt_view.buffer.text.strip ().length > 0;
+            update_conversation_ui_state ();
             prompt_view.grab_focus ();
         }
 
@@ -1365,6 +1487,7 @@ namespace AskTheModel {
                 height_request = 72,
                 hexpand = true
             };
+            prompt_input_view = prompt_view;
 
             var prompt_overlay = new Gtk.Overlay () {
                 child = prompt_view
@@ -1391,6 +1514,7 @@ namespace AskTheModel {
                 valign = Gtk.Align.END,
                 sensitive = false
             };
+            send_prompt_button = send_button;
 
             prompt_view.buffer.changed.connect (() => {
                 prompt_placeholder.visible =
@@ -1405,6 +1529,11 @@ namespace AskTheModel {
                 string prompt = prompt_view.buffer.text.strip ();
                 if (prompt.length == 0) {
                     return;
+                }
+
+                if (!conversation_ui_locked) {
+                    conversation_ui_locked = true;
+                    update_conversation_ui_state ();
                 }
 
                 append_transcript (
