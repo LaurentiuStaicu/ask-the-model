@@ -268,6 +268,36 @@ test_atx_edge_cases (void)
 }
 
 static void
+test_trailing_newline_does_not_add_phantom_line (void)
+{
+    const char *contents =
+        "# Status\n"
+        "Body\n";
+    char *path = new_temp_file (contents, -1);
+    GPtrArray *sections = NULL;
+    GError *error = NULL;
+
+    g_assert_true (
+        atm_markdown_extract_sections (
+            path,
+            &sections,
+            &error
+        )
+    );
+    g_assert_no_error (error);
+    g_assert_cmpuint (sections->len, ==, 1);
+
+    AtmDocumentSection *section = section_at (sections, 0);
+
+    g_assert_cmpuint (section->start_line, ==, 1);
+    g_assert_cmpuint (section->end_line, ==, 2);
+    g_assert_cmpstr (section->body, ==, "Body\n");
+
+    g_ptr_array_unref (sections);
+    remove_temp_file (path);
+}
+
+static void
 test_invalid_utf8_is_rejected (void)
 {
     const char invalid[] = { (char) 0xff };
@@ -313,6 +343,10 @@ main (int argc, char **argv)
     g_test_add_func (
         "/markdown/atx-edge-cases",
         test_atx_edge_cases
+    );
+    g_test_add_func (
+        "/markdown/trailing-newline-locator",
+        test_trailing_newline_does_not_add_phantom_line
     );
     g_test_add_func (
         "/markdown/invalid-utf8",
