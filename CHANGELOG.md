@@ -11,6 +11,7 @@ All notable public releases of Ask the Model are recorded here.
 - implemented deterministic R2 per-snapshot SQLite/FTS5 indexing with source roles, structured entities/relations, Markdown sections, tabular datasets, integrity/provenance checks and rebuild-from-snapshot behavior;
 - added deterministic R3 exact technical-ID, structured, lexical BM25 and tabular row-key retrieval;
 - added intent-aware source authority, logical-source deduplication, conversation-pinned repository scoping and conservative Romanian/English query normalization;
+- promoted each repository manifest's declared `status_source` into retrieval-index schema v2 as a distinct authority role, keeping current-status and model-level structure questions anchored to the canonical status document while retaining BM25 title/body relevance within that boundary;
 - attached repository ID, repository version and exact snapshot SHA to retrieval evidence records;
 - integrated the R3 retrieval router with fail-closed outside-scope behavior and index/scope provenance matching;
 - added R4 immutable per-conversation repository pinning with validated snapshot/index identity, zero-repository local-chat support and rejection of post-freeze scope mutation;
@@ -18,7 +19,7 @@ All notable public releases of Ask the Model are recorded here.
 - added R4 current-turn citation-label resolution into persistent provenance objects without fabricating metadata for unknown labels;
 - added real-repository R4 grounding traceability tests across EWD, CBD and RMD;
 - added R5 deterministic multi-turn retrieval state with inherited scope/intent/exact-anchor context, bounded effective follow-up queries and explicit clarification outcomes;
-- added versioned R5 benchmark/run schemas, deterministic metric evaluation, provisional engineering gates and CI for the benchmark contract without claiming that the real fixed benchmark corpus has already passed;
+- added versioned R5 benchmark/run schemas, a reviewed frozen EWD/CBD/RMD corpus, deterministic metric evaluation and a real-corpus CI runner; the fixed deterministic baseline now passes all provisional R5 gates without changing benchmark qrels or thresholds;
 - kept all repository/retrieval backend work unreleased and separate from the current v0.2.2 GTK/chat capability boundary.
 
 ### Repository governance
