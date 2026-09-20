@@ -12,20 +12,41 @@ namespace AskTheModel {
         private Gtk.StringList? model_list;
         private Gtk.Button? refresh_models_button;
         private ActivityRing? refresh_models_ring;
-        private Gtk.Label? model_scan_status;
+        private AnnunciatorLabel? ai_title_annunciator;
+        private AnnunciatorLabel? ai_model_annunciator;
+        private AnnunciatorLabel? ai_connected_annunciator;
+        private AnnunciatorLabel? ai_scan_annunciator;
+        private AnnunciatorLabel? ai_offline_annunciator;
+        private AnnunciatorLabel? ai_error_annunciator;
         private Gtk.MenuButton? repository_menu_button;
         private Gtk.CheckButton[] repository_check_buttons = {};
         private Gtk.Button? refresh_repositories_button;
         private ActivityRing? refresh_repositories_ring;
         private Gtk.Button? repository_action_button;
         private ActivityRing? repository_action_ring;
-        private Gtk.Label? repository_scan_status;
+        private AnnunciatorLabel? repos_title_annunciator;
+        private AnnunciatorLabel? repo_ewd_annunciator;
+        private AnnunciatorLabel? repo_cbd_annunciator;
+        private AnnunciatorLabel? repo_rmd_annunciator;
+        private AnnunciatorLabel? repo_none_annunciator;
+        private AnnunciatorLabel? repo_check_annunciator;
+        private AnnunciatorLabel? repo_download_annunciator;
+        private AnnunciatorLabel? repo_update_annunciator;
+        private AnnunciatorLabel? repo_validate_annunciator;
+        private AnnunciatorLabel? repo_ready_annunciator;
+        private AnnunciatorLabel? repo_offline_annunciator;
+        private AnnunciatorLabel? repo_error_annunciator;
         private RepositorySelection repository_selection =
             new RepositorySelection ();
         private RepositoryLifecycleService repository_lifecycle =
             new RepositoryLifecycleService ();
-        private uint model_status_generation = 0;
-        private uint repository_status_generation = 0;
+        private bool ai_scanning = false;
+        private bool repository_checking = false;
+        private bool repository_downloading = false;
+        private bool repository_updating = false;
+        private bool repository_validating = false;
+        private bool repository_offline = false;
+        private bool repository_error = false;
         private bool assistant_stream_started = false;
         private bool updating_model_selector = false;
 
@@ -63,19 +84,18 @@ namespace AskTheModel {
             ollama_provider = new OllamaProvider ();
 
             repository_lifecycle.progress.connect ((message) => {
-                repository_status_generation++;
-                if (repository_scan_status != null) {
-                    repository_scan_status.label = message;
-                    repository_scan_status.opacity = 1.0;
-                }
+                repository_validating =
+                    message.has_prefix ("Validating ");
+                repository_downloading =
+                    message.has_prefix ("Downloading ");
+                repository_updating =
+                    message.has_prefix ("Updating ");
+                update_repository_annunciators ();
             });
 
             ollama_provider.discovery_progress.connect ((percent) => {
-                if (model_scan_status != null) {
-                    model_scan_status.label =
-                        "%u%%".printf (percent);
-                    model_scan_status.opacity = 1.0;
-                }
+                ai_scanning = percent < 100;
+                update_ai_annunciators ();
             });
 
             ollama_provider.response_chunk.connect ((chunk) => {
@@ -141,101 +161,152 @@ namespace AskTheModel {
             }
         }
 
-        private void show_model_standby_status () {
-            model_status_generation++;
-
-            if (model_scan_status == null) {
-                return;
+        private void set_annunciator (
+            AnnunciatorLabel? annunciator,
+            bool active
+        ) {
+            if (annunciator != null) {
+                annunciator.set_active (active);
             }
+        }
 
-            if (ollama_provider.is_ready () &&
-                ollama_provider.model_name != null) {
-                model_scan_status.label =
-                    "AI · %s · connected".printf (
-                        ollama_provider.model_name
+        private void update_ai_annunciators () {
+            bool connected = ollama_provider.is_ready ();
+            bool provider_seen = ollama_provider.base_url != null;
+            bool no_chat_model =
+                provider_seen && ollama_provider.model_name == null;
+
+            set_annunciator (ai_title_annunciator, true);
+            set_annunciator (
+                ai_connected_annunciator,
+                connected
+            );
+            set_annunciator (
+                ai_scan_annunciator,
+                ai_scanning
+            );
+            set_annunciator (
+                ai_offline_annunciator,
+                !ai_scanning && !provider_seen
+            );
+            set_annunciator (
+                ai_error_annunciator,
+                !ai_scanning && no_chat_model
+            );
+
+            if (ai_model_annunciator != null) {
+                ai_model_annunciator.label =
+                    ollama_provider.model_name ??
+                    "NO MODEL";
+                ai_model_annunciator.set_active (
+                    ollama_provider.model_name != null
+                );
+            }
+        }
+
+        private void update_repository_annunciators () {
+            RepositoryDescriptor[] selected =
+                repository_selection.selected_repositories ();
+            bool has_selection = selected.length > 0;
+            bool ewd_selected = false;
+            bool cbd_selected = false;
+            bool rmd_selected = false;
+            bool needs_download = false;
+            bool update_available = false;
+            bool all_ready = has_selection;
+
+            foreach (RepositoryDescriptor descriptor in selected) {
+                if (descriptor.id == "ewd") {
+                    ewd_selected = true;
+                } else if (descriptor.id == "cbd") {
+                    cbd_selected = true;
+                } else if (descriptor.id == "rmd") {
+                    rmd_selected = true;
+                }
+
+                RepositoryRuntimeInfo info =
+                    repository_lifecycle.info_for (
+                        descriptor.id
                     );
-            } else if (ollama_provider.base_url != null) {
-                model_scan_status.label =
-                    "AI · connected · no chat model";
-            } else {
-                model_scan_status.label =
-                    "AI · not connected";
+
+                if (info.download_required ()) {
+                    needs_download = true;
+                    all_ready = false;
+                } else if (info.update_available ()) {
+                    update_available = true;
+                }
             }
 
-            model_scan_status.opacity = 1.0;
+            bool operation_active =
+                repository_checking ||
+                repository_downloading ||
+                repository_updating ||
+                repository_validating;
+
+            set_annunciator (repos_title_annunciator, true);
+            set_annunciator (repo_ewd_annunciator, ewd_selected);
+            set_annunciator (repo_cbd_annunciator, cbd_selected);
+            set_annunciator (repo_rmd_annunciator, rmd_selected);
+            set_annunciator (
+                repo_none_annunciator,
+                !has_selection
+            );
+            set_annunciator (
+                repo_check_annunciator,
+                repository_checking
+            );
+            set_annunciator (
+                repo_download_annunciator,
+                repository_downloading ||
+                (!operation_active && needs_download)
+            );
+            set_annunciator (
+                repo_update_annunciator,
+                repository_updating ||
+                (!operation_active && update_available)
+            );
+            set_annunciator (
+                repo_validate_annunciator,
+                repository_validating
+            );
+            set_annunciator (
+                repo_ready_annunciator,
+                !operation_active &&
+                all_ready &&
+                !update_available &&
+                !repository_error
+            );
+            set_annunciator (
+                repo_offline_annunciator,
+                repository_offline
+            );
+            set_annunciator (
+                repo_error_annunciator,
+                repository_error
+            );
+        }
+
+        private void show_model_standby_status () {
+            ai_scanning = false;
+            update_ai_annunciators ();
         }
 
         private void show_repository_standby_status () {
-            repository_status_generation++;
-
-            if (repository_scan_status == null) {
-                return;
-            }
-
-            RepositoryDescriptor[] selected =
-                repository_selection.selected_repositories ();
-
-            if (selected.length == 0) {
-                repository_scan_status.label =
-                    "REPOS · none selected";
-                repository_scan_status.opacity = 1.0;
-                return;
-            }
-
-            string acronyms = "";
-            bool all_ready = true;
-
-            foreach (RepositoryDescriptor descriptor in selected) {
-                if (acronyms.length > 0) {
-                    acronyms += " + ";
-                }
-
-                acronyms += descriptor.acronym;
-
-                if (repository_lifecycle.info_for (
-                        descriptor.id
-                    ).download_required ()) {
-                    all_ready = false;
-                }
-            }
-
-            repository_scan_status.label =
-                all_ready
-                    ? "REPOS · %s · ready".printf (acronyms)
-                    : "REPOS · %s · download needed".printf (
-                        acronyms
-                    );
-            repository_scan_status.opacity = 1.0;
+            repository_checking = false;
+            repository_downloading = false;
+            repository_updating = false;
+            repository_validating = false;
+            update_repository_annunciators ();
         }
 
         private void begin_model_scan_status () {
-            model_status_generation++;
-
-            if (model_scan_status != null) {
-                model_scan_status.label = "0%";
-                model_scan_status.opacity = 1.0;
-            }
+            ai_scanning = true;
+            update_ai_annunciators ();
         }
 
         private void show_model_scan_result (string message) {
-            model_status_generation++;
-            uint generation = model_status_generation;
-
-            if (model_scan_status == null) {
-                return;
-            }
-
-            model_scan_status.label = message;
-            model_scan_status.opacity = 1.0;
-
-            Timeout.add_seconds (3, () => {
-                if (generation == model_status_generation &&
-                    model_scan_status != null) {
-                    show_model_standby_status ();
-                }
-
-                return false;
-            });
+            ai_scanning = false;
+            update_ai_annunciators ();
         }
 
         private async void refresh_local_models () {
@@ -257,18 +328,10 @@ namespace AskTheModel {
                 refresh_models_button.sensitive = true;
             }
 
+            ai_scanning = false;
+            update_ai_annunciators ();
+
             if (found && ollama_provider.model_name != null) {
-                string[] chat_models =
-                    ollama_provider.get_completion_models ();
-
-                show_model_scan_result (
-                    chat_models.length == 1
-                        ? "1 model found"
-                        : "%d models found".printf (
-                            chat_models.length
-                        )
-                );
-
                 stdout.printf (
                     "AtM: model list refreshed; using %s (%u installed model%s)\n",
                     ollama_provider.model_name,
@@ -276,13 +339,10 @@ namespace AskTheModel {
                     ollama_provider.model_count == 1 ? "" : "s"
                 );
             } else if (found) {
-                show_model_scan_result ("No chat models");
                 stderr.printf (
                     "AtM: model list refreshed, but no completion-capable model was found.\n"
                 );
             } else {
-                show_model_scan_result ("Ollama not found");
-
                 stderr.printf (
                     "AtM: refresh could not reach local Ollama on ports 11434 or 11435.\n"
                 );
@@ -328,6 +388,7 @@ namespace AskTheModel {
             model_dropdown.sensitive = models.length > 0;
 
             updating_model_selector = false;
+            update_ai_annunciators ();
         }
 
         private void set_activity_working (
@@ -445,40 +506,30 @@ namespace AskTheModel {
         }
 
         private void begin_repository_scan_status () {
-            repository_status_generation++;
-
-            if (repository_scan_status != null) {
-                repository_scan_status.label = "Checking…";
-                repository_scan_status.opacity = 1.0;
-            }
+            repository_checking = true;
+            repository_offline = false;
+            repository_error = false;
+            update_repository_annunciators ();
         }
 
         private void show_repository_scan_result (
             string message,
             bool persistent = false
         ) {
-            repository_status_generation++;
-            uint generation = repository_status_generation;
+            repository_checking = false;
 
-            if (repository_scan_status == null) {
-                return;
+            if (message.has_prefix ("Offline")) {
+                repository_offline = true;
+                repository_error = false;
+            } else if (message.has_suffix ("failed")) {
+                repository_error = true;
+                repository_offline = false;
+            } else {
+                repository_offline = false;
+                repository_error = false;
             }
 
-            repository_scan_status.label = message;
-            repository_scan_status.opacity = 1.0;
-
-            if (persistent) {
-                return;
-            }
-
-            Timeout.add_seconds (3, () => {
-                if (generation == repository_status_generation &&
-                    repository_scan_status != null) {
-                    show_repository_standby_status ();
-                }
-
-                return false;
-            });
+            update_repository_annunciators ();
         }
 
         private async void refresh_selected_repositories () {
