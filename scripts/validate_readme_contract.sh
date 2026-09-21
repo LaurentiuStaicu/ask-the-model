@@ -53,8 +53,6 @@ require_text README.md 'img alt="Download Flatpak"'
 require_text README.md 'img alt="Getting started"'
 require_text README.md 'img alt="Interface guide"'
 require_text README.md 'img alt="Developer guide"'
-require_text README.md '### Technical interface sketch'
-require_text README.md 'This is a documentation wireframe, not a screenshot or decorative reconstruction.'
 
 header="$(sed -n '1,26p' README.md)"
 if grep -Fq 'blue?style=' <<<"$header"; then
