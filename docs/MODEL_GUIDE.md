@@ -2,7 +2,7 @@
 
 This guide explains the model-management tasks that Ask the Model (AtM) does not yet perform inside its own interface. It is written primarily for the recommended reference setup: AtM on Linux with a local Ollama provider.
 
-AtM v0.2.2 discovers models through the provider API. It does not crawl the filesystem for model files and it does not currently download, import, move or delete models.
+AtM v0.3.0 discovers models through the provider API. It does not crawl the filesystem for model files and it does not currently download, import, move or delete models.
 
 ## 1. Understand the three separate components
 
@@ -123,9 +123,9 @@ The listed download size is not the same as total RAM or VRAM required at runtim
 
 ## 7. Capabilities beyond text chat
 
-A provider may report capabilities such as vision, tool use, embeddings or reasoning/thinking. AtM v0.2.2 does not expose all provider/model capabilities simply because the selected model supports them.
+A provider may report capabilities such as vision, tool use, embeddings or reasoning/thinking. AtM v0.3.0 does not expose all provider/model capabilities simply because the selected model supports them.
 
-The current AtM interface sends text chat messages only. It does not provide image input or tool-calling controls, and its default `/api/chat` request sets `think: false` to prioritize interactive latency.
+AtM v0.3.0 provides ordinary text chat plus repository-grounded text retrieval. It does not provide image input or tool-calling controls, and its default `/api/chat` request sets `think: false` to prioritize interactive latency.
 
 Therefore a multimodal or reasoning-capable model can still be useful for text chat, but its additional capabilities should not be interpreted as current AtM features.
 
@@ -204,7 +204,7 @@ Ollama currently documents these default model locations:
 | macOS | `~/.ollama/models` |
 | Windows | `C:\Users\%username%\.ollama\models` |
 
-AtM v0.2.2 is packaged primarily for Linux/elementary OS, but the other paths are included here because they are part of the provider documentation.
+AtM v0.3.0 is packaged primarily for Linux/elementary OS, but the other paths are included here because they are part of the provider documentation.
 
 Do not normally delete individual files or blobs directly from the provider model store. Use `ollama rm MODEL` so the provider remains aware of the change.
 
@@ -243,7 +243,7 @@ Hugging Face model pages can expose license metadata, but you should still read 
 
 ## 15. Local model versus cloud-backed model
 
-AtM connects only to loopback provider addresses in v0.2.2. This means AtM talks to software on the same machine. It does not guarantee that every model exposed by that software performs inference locally.
+AtM connects only to loopback provider addresses in v0.3.0. This means AtM talks to software on the same machine. It does not guarantee that every model exposed by that software performs inference locally.
 
 For example, current Ollama versions can expose cloud functionality in addition to local models.
 
