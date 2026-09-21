@@ -6,6 +6,7 @@ All notable public releases of Ask the Model are recorded here.
 
 ### Repository and retrieval backend
 
+- Markdown excerpts in source-detail windows are now presented as readable visible text instead of raw Markdown/HTML control syntax, while non-Markdown evidence remains literal and immutable provenance metadata is unchanged;
 - source-reference details now open in a transient GTK window instead of a GtkPopover attached to a TextView child anchor, avoiding the GTK 4.14 allocation path that remained unreliable in local smoke testing;
 - citation popovers created on demand are now explicitly presented before popup, ensuring GTK allocates them even when their MenuButton is embedded through a GtkTextChildAnchor;
 - source-reference provenance popovers are now created on demand after their anchored menu buttons are mapped, avoiding GTK4 allocation warnings that could suppress citation details in the transcript;
