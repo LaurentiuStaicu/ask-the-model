@@ -6,7 +6,7 @@ All notable public releases of Ask the Model are recorded here.
 
 ### Build / repository security
 
-- pinned all externally referenced GitHub Actions in the Flatpak workflow to verified full-length commit SHAs while retaining version comments for maintainability.
+- pinned all externally referenced GitHub Actions in the Flatpak workflow to verified full-length commit SHAs while retaining version comments, and enabled weekly Dependabot updates for those action references.
 
 ### Documentation
 
