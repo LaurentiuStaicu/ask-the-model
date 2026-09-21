@@ -36,7 +36,11 @@ The current development implementation includes:
 
 The unreleased development GTK path now exposes the fixed EWD/CBD/RMD repository selector and lifecycle controls, real multi-chat tabs with independent in-memory provider/session state, first-Send repository/model pinning, end-to-end grounded message generation and compact user-visible source references. Grounded turns validate temporary source labels before commit and preserve exact repository/version/SHA/logical-source/locator provenance for on-demand inspection. Ordinary zero-repository chat remains available and continues to stream normally.
 
-The frozen R5 deterministic retrieval benchmark passes its provisional engineering gates on the pinned EWD/CBD/RMD corpus, and the real-repository R4 integration gate continues to exercise citation traceability independently of the GTK UI. This validates the unreleased development implementation against the current engineering contracts; it does not establish scientific validity of the underlying models. Therefore **v0.2.2 remains the current public release** and its user-facing capability boundary is unchanged.
+The frozen R5 deterministic retrieval benchmark passes its provisional engineering gates on the pinned EWD/CBD/RMD corpus, and the real-repository R4 integration gate continues to exercise citation traceability independently of the GTK UI. This validates the unreleased development implementation against the current engineering contracts; it does not establish scientific validity of the underlying models.
+
+A separate **non-canonical live compatibility smoke** on 2026-09-21 kept the benchmark topics, qrels, evaluator and provisional thresholds unchanged, while testing the current live repository SHAs: EWD `795a6b8e42e2a19497f686a89e7c3a6056e6930c`, CBD `e6e3b3077b7d78e3f37d963e0734e9084e8a62ab` and RMD `45dff217e8ee2689ab96193723fd9ed667482814`. All provisional R5 gates passed: exact-ID Success@1 1.00, MRR 1.00, nDCG@5 0.9062, required Recall@5 0.9833, RO–EN nDCG gap 0.0353, wrong-repository contamination@5 0.0207, evidence traceability 1.00 and clarification-outcome accuracy 1.00. This smoke did **not** replace or mutate the reviewed frozen corpus; the benchmark immutability guard correctly rejected the temporary pin change as a canonical corpus modification.
+
+Therefore **v0.2.2 remains the current public release** and its user-facing capability boundary is unchanged.
 
 ## Canonical application role
 
