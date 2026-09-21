@@ -31,5 +31,5 @@
     "Release publication must remain tied to exact versioned release notes and the reviewed commit."
   ],
   "current_public_version": "0.3.0",
-  "version_bump_required": true
+  "version_bump_required": false
 }
