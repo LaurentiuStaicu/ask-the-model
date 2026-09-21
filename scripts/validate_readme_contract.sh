@@ -111,4 +111,10 @@ require_text STATUS.md 'scientific certification of a repository merely because 
 require_text STATUS.md 'in-app AI-model download/import/delete'
 require_text STATUS.md 'execution or simulation of EWD, CBD or RMD'
 
+require_text docs/DEPENDENCIES_AND_COMPATIBILITY.md 'The v0.3.0 release exposes the fixed EWD/CBD/RMD repository selector, lifecycle controls, deterministic retrieval and provenance UI.'
+require_text docs/DEPENDENCIES_AND_COMPATIBILITY.md 'arbitrary unreviewed repository origins beyond the fixed EWD/CBD/RMD catalog'
+if grep -Fq -- '- repository ingestion or retrieval;' docs/DEPENDENCIES_AND_COMPATIBILITY.md; then
+  fail "compatibility limitations contradict the released v0.3.0 repository ingestion/retrieval capability"
+fi
+
 printf 'AtM README contract PASS: version %s, visual shell, released repository-grounded capability boundaries and documentation routes are consistent.\n' "$version"
