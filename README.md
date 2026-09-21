@@ -35,13 +35,40 @@
 
 <small>Version 0.3.0 adds repository selection, exact-SHA refresh/download/update, immutable validated local snapshots, deterministic local retrieval, independent multi-chat state and compact numbered citations with inspectable provenance. EWD, CBD and RMD remain authoritative for their own code, data, assumptions, provenance and validation.</small>
 
-### Application map
+### Technical interface sketch
 
-<p align="center">
-  <img src="assets/application-map-v0.3.svg" alt="Annotated Ask the Model v0.3 interface map showing model and repository selectors, lifecycle controls, status LCD, chat tabs, grounded sources, prompt composer and source detail window">
-</p>
+```text
++----------------------------------------------------------------------------------+
+| [1 AI model v] [2 Refresh]  [3 Repositories v] [4 Refresh] [5 Download/Update] |
+|                                  Ask the Model                                    |
++----------------------------------------------------------------------------------+
+| [6] EWD   CBD   RMD                         READY                                |
++----------------------------------------------------------------------------------+
+| [7 +] [Conversation tab x]                                                       |
++----------------------------------------------------------------------------------+
+| [8] You: question                                                               |
+|                                                                                  |
+|     Assistant: grounded answer                                                   |
+|                                                                                  |
+|     Sources: [9 1] [9 2] [9 3]                                                  |
+|                                                                                  |
+|                                                                                  |
++----------------------------------------------------------------------------------+
+| [10 Ask something....................................................] [11 Send] |
++----------------------------------------------------------------------------------+
 
-<small>The diagram is a vector reconstruction rather than a screenshot. See <a href="docs/USER_INTERFACE_GUIDE.md">Interface guide</a> for a control-by-control explanation.</small>
+                                          +---------------------------------------+
+                                          | [12] Source [1]                      |
+                                          | repository/version                   |
+                                          | file + locator                       |
+                                          | exact snapshot SHA                   |
+                                          | Source ID                            |
+                                          | readable evidence excerpt            |
+                                          | Open immutable source                |
+                                          +---------------------------------------+
+```
+
+<small>This is a documentation wireframe, not a screenshot or decorative reconstruction. It records the current control topology and the separate source-detail window. See <a href="docs/USER_INTERFACE_GUIDE.md">Interface guide</a> for the numbered legend and state behavior.</small>
 
 ### Repository-grounded scientific-model chat
 
