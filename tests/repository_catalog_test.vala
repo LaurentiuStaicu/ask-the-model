@@ -1,4 +1,45 @@
 namespace AskTheModel.Tests {
+    private static int async_result = 0;
+
+    private static async void
+    assert_cancelled_bounded_copy (GLib.MainLoop loop) {
+        uint8[] payload = { 1, 2, 3, 4 };
+        var input = new GLib.MemoryInputStream.from_bytes (
+            new GLib.Bytes (payload)
+        );
+        var output = new GLib.MemoryOutputStream.resizable ();
+        var cancellable = new GLib.Cancellable ();
+        bool cancelled = false;
+
+        cancellable.cancel ();
+
+        try {
+            yield RepositoryClient.copy_stream_bounded (
+                input,
+                output,
+                1024,
+                cancellable
+            );
+        } catch (GLib.IOError.CANCELLED error) {
+            cancelled = true;
+        } catch (GLib.Error error) {
+            stderr.printf (
+                "Unexpected bounded-copy error: %s\n",
+                error.message
+            );
+            async_result = 1;
+        }
+
+        if (!cancelled) {
+            stderr.printf (
+                "Pre-cancelled bounded copy was not cancelled.\n"
+            );
+            async_result = 1;
+        }
+
+        loop.quit ();
+    }
+
     public static int main (string[] args) {
         RepositoryDescriptor[] repositories = RepositoryCatalog.all ();
 
@@ -176,6 +217,10 @@ namespace AskTheModel.Tests {
             )
         );
 
-        return 0;
+        var loop = new GLib.MainLoop ();
+        assert_cancelled_bounded_copy.begin (loop);
+        loop.run ();
+
+        return async_result;
     }
 }
