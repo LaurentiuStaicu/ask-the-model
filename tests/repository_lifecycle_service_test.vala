@@ -31,6 +31,40 @@ namespace AskTheModel.Tests {
             assert (freshness.remote_sha == null);
             assert (freshness.remote_version == null);
 
+            RepositoryRuntimeInfo first =
+                service.info_for (catalog[0].id);
+            RepositoryRuntimeInfo second =
+                service.info_for (catalog[1].id);
+            RepositoryRuntimeInfo third =
+                service.info_for (catalog[2].id);
+            first.remote_sha =
+                "1111111111111111111111111111111111111111";
+            first.remote_version = "1.0.0";
+            second.remote_sha =
+                "2222222222222222222222222222222222222222";
+            second.remote_version = "2.0.0";
+            third.remote_sha =
+                "3333333333333333333333333333333333333333";
+            third.remote_version = "3.0.0";
+
+            RepositoryDescriptor[] batch = {
+                catalog[0],
+                catalog[2]
+            };
+            service.clear_remote_identities (batch);
+
+            assert (first.remote_sha == null);
+            assert (first.remote_version == null);
+            assert (
+                second.remote_sha ==
+                "2222222222222222222222222222222222222222"
+            );
+            assert (second.remote_version == "2.0.0");
+            assert (third.remote_sha == null);
+            assert (third.remote_version == null);
+
+            second.clear_remote_identity ();
+
             foreach (RepositoryDescriptor descriptor in catalog) {
                 RepositoryRuntimeInfo info =
                     service.info_for (descriptor.id);
