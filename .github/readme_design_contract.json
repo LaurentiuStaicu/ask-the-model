@@ -32,7 +32,7 @@
     "citation_source": "CITATION.cff",
     "status_source": "STATUS.md",
     "release_note": "releases/v0.3.0.md",
-    "version_bump_required": true,
+    "version_bump_required": false,
     "atomic_release_metadata_contract": ".github/release_metadata_contract.json"
   },
   "implemented_capabilities": [
@@ -85,7 +85,7 @@
     ]
   },
   "release_boundary": {
-    "documentation_contract_change_is_release_prep": true,
+    "documentation_contract_change_is_release_prep": false,
     "version_bump_required": true
   },
   "release_vs_development_boundary": {
