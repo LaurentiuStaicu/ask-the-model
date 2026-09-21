@@ -22,6 +22,15 @@ namespace AskTheModel.Tests {
 
             assert (catalog.length == 3);
 
+            RepositoryRuntimeInfo freshness =
+                service.info_for (catalog[0].id);
+            freshness.remote_sha =
+                "1111111111111111111111111111111111111111";
+            freshness.remote_version = "9.9.9";
+            freshness.clear_remote_identity ();
+            assert (freshness.remote_sha == null);
+            assert (freshness.remote_version == null);
+
             foreach (RepositoryDescriptor descriptor in catalog) {
                 RepositoryRuntimeInfo info =
                     service.info_for (descriptor.id);

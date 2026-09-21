@@ -6,6 +6,7 @@ All notable public releases of Ask the Model are recorded here.
 
 ### Repository and retrieval backend
 
+- repository refresh now invalidates the previous remote SHA/version before resolving a new coherent pair, so a failed refresh cannot leave stale update availability;
 - added direct lifecycle-service regression coverage for zero-repository grounding and fail-closed handling of selected repositories that are not locally ready;
 - added per-topic R5 evaluation diagnostics with rank and top-5 visibility for required evidence, preserving the frozen corpus, qrels, aggregate metrics and provisional gates;
 - expanded conservative Romanian→English runtime query aliases for paradigm/modeling/comparison and human-validation terminology using only R5 development-split needs; benchmark qrels and provisional targets remain unchanged;
