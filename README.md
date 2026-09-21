@@ -49,7 +49,7 @@
 - <small><strong>At least one chat-capable AI model</strong> — downloaded separately through the provider; AtM does not currently download it for you.</small>
 - <small><strong>Enough free disk space and runtime memory</strong> — model downloads commonly occupy gigabytes, and running a model also requires RAM and, where available, GPU memory.</small>
 
-<small>You also need Internet access for the initial AtM/provider/model downloads. Once a genuinely local model is installed, the current AtM chat path itself talks to the provider through the local loopback interface.</small>
+<small>You also need Internet access for the initial AtM/provider/model downloads and for explicit repository Refresh/Download/Update. Once a genuinely local model is installed, ordinary chat talks to the provider through the local loopback interface.</small>
 
 <small>If any of these terms are unfamiliar, continue in order rather than skipping ahead. Each step below includes the result you should expect before moving to the next one.</small>
 
@@ -91,7 +91,7 @@ ollama ls
 ollama pull qwen3.5:2b-q4_K_M
 ```
 
-<small>The Ollama library currently lists this variant at about 1.9 GB. This is an example, not a claim that it is the best model for every computer or task. See <a href="#finding-and-choosing-an-ai-model">Finding and choosing an AI model</a> below before installing larger models.</small>
+<small>The Ollama library currently lists this variant at about 1.9 GB. This is an example, not a claim that it is the best model for every computer or task. See <a href="docs/MODEL_GUIDE.md">Choosing, installing and managing AI models</a> before installing larger models.</small>
 
 <small>After the download completes, verify that the provider has registered it:</small>
 
@@ -121,11 +121,11 @@ flatpak run io.github.laurentiustaicu.ask_the_model
 
 <small>When AtM starts, it automatically probes the supported local provider endpoints, asks the provider which models are installed, checks which of those models are chat/completion-capable, and fills the model selector with the compatible models it finds. If at least one compatible model is available, AtM selects one automatically.</small>
 
-<small><strong>Expected result:</strong> the title bar shows a compatible AI model instead of <code>No chat models detected</code>, and you can send a prompt. A brief scan status such as <code>1 model found</code> may appear while discovery finishes.</small>
+<small><strong>Expected result:</strong> the model selector in the application header shows a compatible AI model instead of <code>No chat models detected</code>, and you can send a prompt. A brief scan status such as <code>1 model found</code> may appear while discovery finishes.</small>
 
 #### 6. Download more models later and use Refresh
 
-<small>You can install another model at any time with your provider. If AtM is already open when the download finishes, click the circular <strong>Refresh models</strong> button in the title bar. AtM repeats model discovery and updates the selector; you do not need to add the model to AtM manually.</small>
+<small>You can install another model at any time with your provider. If AtM is already open when the download finishes, click the circular <strong>Refresh models</strong> button beside the model selector in the application header. AtM repeats model discovery and updates the selector; you do not need to add the model to AtM manually.</small>
 
 <small><strong>Expected result:</strong> compatible newly installed models appear in the selector; models removed from the provider disappear after the refresh.</small>
 
@@ -137,96 +137,20 @@ flatpak run io.github.laurentiustaicu.ask_the_model
 
 <small><strong>Expected result:</strong> the status strip reaches READY, a grounded answer can show numbered source references, and opening a source exposes exact immutable provenance.</small>
 
-### How AtM discovers models
+### Model discovery and management
 
 <small>AtM does <strong>not</strong> search every SSD, HDD or folder for files ending in <code>.gguf</code>. Model discovery is provider-based:</small>
 
 - <small>AtM asks the provider for the installed model list through <code>GET /api/tags</code>.</small>
 - <small>For each reported model, AtM checks capabilities through <code>POST /api/show</code>.</small>
-- <small>Only models advertising the <code>completion</code> capability are placed in the AtM model selector.</small>
-- <small>Embedding-only models are intentionally excluded.</small>
-- <small>Refresh repeats the same discovery process after you install, remove or change models.</small>
+- <small>Only models advertising the <code>completion</code> capability are placed in the AtM model selector; embedding-only models are excluded.</small>
+- <small>Refresh repeats discovery after models are installed, removed or changed.</small>
 
-<small>A GGUF file copied manually into <code>Downloads</code> or another folder therefore does not become visible to AtM merely because the file exists. The provider must know about the model. Ollama documents importing an external GGUF through a <code>Modelfile</code> and <code>ollama create</code>; see the <a href="https://docs.ollama.com/import">official Ollama import guide</a> and the more detailed <a href="docs/MODEL_GUIDE.md">AtM model guide</a>.</small>
+<small>A raw GGUF file does not become visible to AtM merely because it exists on disk; it must first be registered with a compatible provider. For model sources, GGUF import, parameter scales, quantization, context windows, starter examples, storage, CPU/GPU checks and Ollama management commands, see <a href="docs/MODEL_GUIDE.md">Choosing, installing and managing AI models</a>.</small>
 
-### Finding and choosing an AI model
+<small><strong>Model capability does not automatically become AtM capability.</strong> AtM v0.3.0 currently provides text chat and repository-grounded text retrieval. Image input and tool-calling controls are not part of this release, and the default chat path requests <code>think: false</code>.</small>
 
-<small>There is no single model that is appropriate for every machine and every task. Before downloading one, consider its download size, parameter count, quantization, supported languages and tasks, context window, expected memory use and license.</small>
-
-#### Where to look
-
-- <small><a href="https://ollama.com/library">Ollama Library</a> is the simplest starting point when using Ollama. Models and variants can be downloaded directly with <code>ollama pull</code>.</small>
-- <small><a href="https://huggingface.co/models?library=gguf">Hugging Face GGUF models</a> provide a much larger catalog for advanced users. A downloaded GGUF must still be imported into a compatible provider before AtM can discover it.</small>
-- <small>On Hugging Face, read the model card before downloading. Model cards can document intended use, limitations, evaluation results, languages and licensing.</small>
-
-#### What the common labels mean
-
-| Label | Practical meaning |
-| --- | --- |
-| `0.8B`, `2B`, `4B`, etc. | Approximate parameter scale. Larger models usually require more storage and memory, but size alone does not determine quality. |
-| `Q4_K_M`, `Q8_0`, `BF16`, etc. | Quantization or numerical precision. Lower-precision variants can reduce storage and memory requirements, with an efficiency-versus-fidelity trade-off. |
-| Download size | Useful for disk planning, but **not** the same as total RAM or VRAM required while running. Context and provider configuration also use memory. |
-| Context window | The amount of input/history the model can handle under the provider configuration. Larger context can increase memory use. |
-| License | The model's own usage terms. The MIT license of AtM does not automatically apply to any AI model used with it. |
-
-#### Small models to begin experimenting with
-
-<small>The examples below were checked against the Ollama library on 2026-09-19. They are starting points for experimentation, not a benchmark ranking or a guarantee of performance on a particular computer.</small>
-
-| Example | Approx. download | Example command | Why it may be useful as a first test |
-| --- | ---: | --- | --- |
-| [Qwen 3.5 0.8B](https://ollama.com/library/qwen3.5/tags) | 1.0 GB | `ollama pull qwen3.5:0.8b` | Very small installation for checking that the complete AtM/provider workflow works. |
-| [Qwen 3.5 2B Q4_K_M](https://ollama.com/library/qwen3.5/tags) | 1.9 GB | `ollama pull qwen3.5:2b-q4_K_M` | Small quantized variant with modest disk requirements. |
-| [Phi-4 Mini 3.8B Q4_K_M](https://ollama.com/library/phi4-mini/tags) | 2.5 GB | `ollama pull phi4-mini:3.8b-q4_K_M` | Alternative compact model family for comparison. |
-| [Qwen 3.5 4B Q4_K_M](https://ollama.com/library/qwen3.5/tags) | 3.4 GB | `ollama pull qwen3.5:4b-q4_K_M` | Larger small-model option when the machine has more memory available. |
-
-<small><strong>Model capability does not automatically become AtM capability.</strong> A model may advertise vision, tool use or reasoning features, but AtM v0.3.0 currently provides text chat and repository-grounded text retrieval; it requests <code>think: false</code> on its default chat path. For more detail on GGUF, quantization, importing models, hardware considerations and model licensing, see <a href="docs/MODEL_GUIDE.md">Choosing, installing and managing AI models</a>.</small>
-
-### Managing models, disk space and memory
-
-<small>Until AtM gains model-management controls of its own, model administration is handled by the provider. With Ollama, the most useful commands are:</small>
-
-| Command | What it does |
-| --- | --- |
-| `ollama pull MODEL` | Downloads or updates a model. |
-| `ollama ls` | Lists models installed in the Ollama model store. |
-| `ollama ps` | Shows models currently loaded in memory and whether they are using CPU, GPU or both. |
-| `ollama stop MODEL` | Unloads a running model from RAM/VRAM without deleting it from disk. |
-| `ollama rm MODEL` | Removes the model from the Ollama model store and frees its disk space. |
-
-<small><strong>Stopping is not deleting.</strong> Use <code>ollama stop</code> when you only want to free memory. Use <code>ollama rm</code> when you want to remove the installed model files.</small>
-
-#### Where Ollama stores models
-
-<small>With the standard Linux installation, Ollama documents its default model store as:</small>
-
-```text
-/usr/share/ollama/.ollama/models
-```
-
-<small>The storage location can be changed with the <code>OLLAMA_MODELS</code> environment variable. On a standard Linux service installation, the <code>ollama</code> user must have read/write permission to the new directory. This is useful if models should live on a larger SSD or HDD.</small>
-
-<small>Do not normally delete individual blob files by hand. Use the provider's model-removal command so its model store remains internally consistent. The <a href="https://docs.ollama.com/faq">Ollama FAQ</a> documents storage paths, moving the model directory and checking CPU/GPU loading.</small>
-
-### If a model is too slow or too large
-
-<small>A model that downloads successfully may still be a poor fit for a particular machine. Disk size is only one part of the requirement; runtime memory, context length and CPU/GPU offloading also matter.</small>
-
-<small>Check what is actually loaded:</small>
-
-```bash
-ollama ps
-```
-
-<small>Ollama reports whether a loaded model is using GPU memory, system memory or a mixture of both. If responses are unacceptably slow, a practical sequence is: stop the current model, remove it if you no longer need it, choose a smaller or more strongly quantized variant, download the replacement, and then use Refresh in AtM.</small>
-
-```bash
-ollama stop MODEL
-ollama rm MODEL
-ollama pull SMALLER_MODEL
-```
-
-<small>See <a href="docs/TROUBLESHOOTING.md">Troubleshooting</a> for symptom-by-symptom checks.</small>
+<small>If a model is too slow, consumes too much memory or does not appear in AtM, use <a href="docs/TROUBLESHOOTING.md">Troubleshooting</a> for symptom-by-symptom checks rather than treating model size or download success as proof of compatibility.</small>
 
 ### Privacy and the local-provider boundary
 
@@ -242,6 +166,8 @@ ollama pull SMALLER_MODEL
 | **No chat models** | Run `ollama ls`; install a chat/completion model; then press Refresh in AtM. |
 | **A downloaded `.gguf` does not appear** | A raw file is not enough. Import/register it with the provider first. |
 | **A new model does not appear while AtM is open** | Press **Refresh models** after the provider finishes installing the model. |
+| **A selected repository is not READY or shows an update** | Press **Refresh repositories**; if the exact remote SHA differs or the repository is missing, use **Download/Update**. |
+| **A grounded answer has no `Sources:` references** | Confirm the repository was selected and READY **before the first Send**. Repository scope is frozen for that chat; create a new chat to change it. |
 | **Responses are very slow** | Run `ollama ps`; try a smaller or more strongly quantized model if CPU/RAM use is dominating or memory is tight. |
 | **Disk space is low** | Use `ollama ls` to identify installed models and `ollama rm MODEL` to remove models you no longer need. |
 
