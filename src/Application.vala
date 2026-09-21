@@ -1092,6 +1092,14 @@ namespace AskTheModel {
                 return;
             }
 
+            // A batch refresh is one freshness observation for the
+            // whole selected scope. Clear every previous remote identity
+            // before the first network request so an early failure cannot
+            // leave an unvisited repository looking freshly checked.
+            repository_lifecycle.clear_remote_identities (
+                selected
+            );
+
             begin_repository_scan_status ();
             set_activity_working (
                 refresh_repositories_button,
