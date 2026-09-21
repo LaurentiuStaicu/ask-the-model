@@ -1,5 +1,7 @@
 # Interface design requirements
 
+> v0.3.0 implements the approved compact repository/model header, status LCD, multi-chat tabs, first-Send identity freeze and on-demand source details described below. Future UI work should preserve these interaction contracts unless a reviewed design change replaces them.
+
 ## Purpose
 
 This document defines the functional requirements that the Ask the Model (AtM) interface must make understandable before any visual layout is approved.
@@ -168,7 +170,7 @@ The closed AI-model and repository selector surfaces use the same neutral surfac
 
 Grounded answers do not expose temporary model-facing labels such as `[S1]`. AtM validates those labels against the current-turn evidence map before committing the turn.
 
-After a successful grounded answer, the transcript shows only a compact line such as `Sources: [1] [2]`. Each numbered reference opens a contextual popover containing:
+After a successful grounded answer, the transcript shows only a compact line such as `Sources: [1] [2]`. Each numbered reference opens a transient source-detail window containing:
 
 - repository and repository version;
 - exact snapshot SHA;
@@ -177,7 +179,7 @@ After a successful grounded answer, the transcript shows only a compact line suc
 - evidence title/excerpt when available;
 - immutable source permalink when it can be constructed safely.
 
-Provenance detail is on demand rather than permanently occupying a sidebar or secondary pane.
+Provenance detail is on demand rather than permanently occupying a sidebar or secondary pane. The transient window is used because local GTK 4.14 smoke testing showed that a `GtkPopover` attached through a `GtkTextChildAnchor` did not receive a reliable allocation.
 
 ## Typography baseline
 
