@@ -195,7 +195,8 @@ v0.3.0 does not provide:
 - cloud AI providers;
 - model download/deletion;
 - automatic provider installation or service management;
-- repository ingestion or retrieval;
+- arbitrary unreviewed repository origins beyond the fixed EWD/CBD/RMD catalog;
+- full repository snapshot-history/removal management;
 - persistent conversations.
 
 Any of these additions changes the compatibility/security boundary and must be documented in the release that introduces it.
