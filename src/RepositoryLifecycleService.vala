@@ -15,6 +15,11 @@ namespace AskTheModel {
             );
         }
 
+        public void clear_remote_identity () {
+            remote_sha = null;
+            remote_version = null;
+        }
+
         public bool download_required () {
             if (!local.is_ready ()) {
                 return true;
@@ -125,6 +130,11 @@ namespace AskTheModel {
         ) throws GLib.Error {
             RepositoryRuntimeInfo info =
                 info_for (descriptor.id);
+
+            // A remote identity is valid only for the most recent
+            // successful refresh. Fail closed if the new check cannot
+            // resolve both the SHA and repository version.
+            info.clear_remote_identity ();
 
             string sha = yield client.resolve_branch_sha (
                 descriptor,
