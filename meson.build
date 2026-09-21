@@ -711,10 +711,7 @@ repository_lifecycle_service_test = executable(
     glib_dep,
     gio_dep,
     soup_dep,
-    json_glib_dep,
-    sqlite_dep,
-    archive_dep,
-    yaml_dep
+    json_glib_dep
   ],
   link_args: [
     '-larchive',
