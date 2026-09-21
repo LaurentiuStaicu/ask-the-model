@@ -49,7 +49,7 @@
 - <small><strong>At least one chat-capable AI model</strong> — downloaded separately through the provider; AtM does not currently download it for you.</small>
 - <small><strong>Enough free disk space and runtime memory</strong> — model downloads commonly occupy gigabytes, and running a model also requires RAM and, where available, GPU memory.</small>
 
-<small>You also need Internet access for the initial AtM/provider/model downloads. Once a genuinely local model is installed, the current AtM chat path itself talks to the provider through the local loopback interface.</small>
+<small>You also need Internet access for the initial AtM/provider/model downloads and for explicit repository Refresh/Download/Update. Once a genuinely local model is installed, ordinary chat talks to the provider through the local loopback interface.</small>
 
 <small>If any of these terms are unfamiliar, continue in order rather than skipping ahead. Each step below includes the result you should expect before moving to the next one.</small>
 
@@ -91,7 +91,7 @@ ollama ls
 ollama pull qwen3.5:2b-q4_K_M
 ```
 
-<small>The Ollama library currently lists this variant at about 1.9 GB. This is an example, not a claim that it is the best model for every computer or task. See <a href="#finding-and-choosing-an-ai-model">Finding and choosing an AI model</a> below before installing larger models.</small>
+<small>The Ollama library currently lists this variant at about 1.9 GB. This is an example, not a claim that it is the best model for every computer or task. See <a href="docs/MODEL_GUIDE.md">Choosing, installing and managing AI models</a> before installing larger models.</small>
 
 <small>After the download completes, verify that the provider has registered it:</small>
 
@@ -166,6 +166,8 @@ flatpak run io.github.laurentiustaicu.ask_the_model
 | **No chat models** | Run `ollama ls`; install a chat/completion model; then press Refresh in AtM. |
 | **A downloaded `.gguf` does not appear** | A raw file is not enough. Import/register it with the provider first. |
 | **A new model does not appear while AtM is open** | Press **Refresh models** after the provider finishes installing the model. |
+| **A selected repository is not READY or shows an update** | Press **Refresh repositories**; if the exact remote SHA differs or the repository is missing, use **Download/Update**. |
+| **A grounded answer has no `Sources:` references** | Confirm the repository was selected and READY **before the first Send**. Repository scope is frozen for that chat; create a new chat to change it. |
 | **Responses are very slow** | Run `ollama ps`; try a smaller or more strongly quantized model if CPU/RAM use is dominating or memory is tight. |
 | **Disk space is low** | Use `ollama ls` to identify installed models and `ollama rm MODEL` to remove models you no longer need. |
 
