@@ -1766,6 +1766,14 @@ namespace AskTheModel {
                     position = Gtk.PositionType.BOTTOM
                 };
                 menu_button.set_popover (popover);
+
+                /*
+                 * The popover is created after this anchored MenuButton's
+                 * most recent size allocation. Present it explicitly so it
+                 * receives a current allocation before MenuButton continues
+                 * with gtk_popover_popup().
+                 */
+                popover.present ();
             });
 
             return button;
