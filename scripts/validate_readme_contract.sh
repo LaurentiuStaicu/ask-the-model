@@ -52,7 +52,6 @@ require_text README.md 'img alt="Linux / Flatpak"'
 require_text README.md 'img alt="Download Flatpak"'
 require_text README.md 'img alt="Getting started"'
 require_text README.md 'img alt="Interface guide"'
-require_text README.md 'img alt="Developer guide"'
 
 header="$(sed -n '1,26p' README.md)"
 if grep -Fq 'blue?style=' <<<"$header"; then
@@ -79,6 +78,8 @@ require_text README.md 'READY is not a scientific certification'
 require_text README.md 'turn generated text into an authoritative scientific-model result without repository-grounded provenance or actual model execution.'
 
 require_text README.md 'href="docs/USER_INTERFACE_GUIDE.md"'
+require_text README.md '#### User documentation'
+require_text README.md '#### Developer / architecture documentation'
 require_text README.md 'href="docs/DEVELOPMENT_GUIDE.md"'
 require_text README.md 'href="docs/MODEL_GUIDE.md"'
 require_text README.md 'href="docs/TROUBLESHOOTING.md"'
