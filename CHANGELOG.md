@@ -33,6 +33,7 @@ All notable public releases of Ask the Model are recorded here.
 
 ### Repository governance
 
+- aligned the backend-v0.9 exit contracts with the implemented frozen-selector behavior, SHA-based update model, deferred removal/history surface and a non-canonical live-RMD R5 compatibility smoke that passed every provisional gate without changing the canonical frozen benchmark;
 - aligned R1 acceptance with the approved compact repository header: service-level cancellation/retry remain required, while removal/history controls are explicitly retained as a separate future repository-management gate;
 - added an atomic release-metadata contract and pre-build validator requiring application version/date consistency across Meson, CITATION, README, STATUS, CHANGELOG, release notes and the current AppStream release entry; the Desktop Entry `Version=1.0` field is explicitly excluded because it is the desktop-file specification version;
 - clarified the public README so unreleased repository/retrieval backend work on development `main` is distinguished from capabilities actually exposed by the current v0.2.2 application;
