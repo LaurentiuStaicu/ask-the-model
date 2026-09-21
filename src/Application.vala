@@ -1734,15 +1734,6 @@ namespace AskTheModel {
             CitationReference citation,
             uint display_number
         ) {
-            var popover = new Gtk.Popover () {
-                child = build_source_popover_content (
-                    citation,
-                    display_number
-                ),
-                has_arrow = true,
-                position = Gtk.PositionType.BOTTOM
-            };
-
             var button = new Gtk.MenuButton () {
                 label = "[%u]".printf (display_number),
                 direction = Gtk.ArrowType.NONE,
@@ -1757,7 +1748,26 @@ namespace AskTheModel {
                 Gtk.AccessibleProperty.LABEL,
                 "Source %u".printf (display_number)
             );
-            button.set_popover (popover);
+
+            /*
+             * Source buttons are embedded through GtkTextChildAnchor.  Build
+             * their popover only when GTK is about to show it, after the
+             * anchored MenuButton has been mapped and allocated.  Creating
+             * the popover eagerly can make GTK try to snapshot it before it
+             * has a current allocation on elementary OS 8 / GTK 4.14.
+             */
+            button.set_create_popup_func ((menu_button) => {
+                var popover = new Gtk.Popover () {
+                    child = build_source_popover_content (
+                        citation,
+                        display_number
+                    ),
+                    has_arrow = true,
+                    position = Gtk.PositionType.BOTTOM
+                };
+                menu_button.set_popover (popover);
+            });
+
             return button;
         }
 
