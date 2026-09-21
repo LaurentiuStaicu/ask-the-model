@@ -33,7 +33,7 @@ jobs:
 
     steps:
       - name: Checkout AtM
-        uses: actions/checkout@v6
+        uses: actions/checkout@v7
 
       - name: Parse benchmark schemas and corpus
         shell: bash
