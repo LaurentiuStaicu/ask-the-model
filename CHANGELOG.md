@@ -4,6 +4,10 @@ All notable public releases of Ask the Model are recorded here.
 
 ## Unreleased
 
+### Build / repository security
+
+- pinned all externally referenced GitHub Actions in the Flatpak workflow to verified full-length commit SHAs while retaining version comments, and enabled weekly Dependabot updates for those action references.
+
 ### Documentation
 
 - corrected the v0.3.0 compatibility limitations so they no longer incorrectly list repository ingestion/retrieval as unavailable, and added a CI guard against reintroducing that contradiction;

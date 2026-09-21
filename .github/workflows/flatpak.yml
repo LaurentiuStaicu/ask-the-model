@@ -22,7 +22,7 @@ jobs:
 
     steps:
       - name: Checkout
-        uses: actions/checkout@v6
+        uses: actions/checkout@d23441a48e516b6c34aea4fa41551a30e30af803 # v6
 
       - name: Restore development repository history
         if: github.event_name == 'push' && github.ref == 'refs/heads/main'
@@ -44,7 +44,7 @@ jobs:
         run: bash scripts/validate_readme_contract.sh
 
       - name: Build Flatpak
-        uses: flatpak/flatpak-github-actions/flatpak-builder@v6
+        uses: flatpak/flatpak-github-actions/flatpak-builder@79327416609af08178ad73b352877e51450790b3 # v6
         with:
           bundle: AskTheModel.flatpak
           artifact-name: AskTheModel-x86_64.flatpak
@@ -57,7 +57,7 @@ jobs:
 
       - name: Publish versioned GitHub release and bundle when needed
         if: github.event_name == 'push' && github.ref == 'refs/heads/main'
-        uses: actions/github-script@v9
+        uses: actions/github-script@3a2844b7e9c422d3c10d287c895573f7108da1b3 # v9
         with:
           github-token: ${{ secrets.GITHUB_TOKEN }}
           script: |
