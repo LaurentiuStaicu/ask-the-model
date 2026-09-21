@@ -121,11 +121,11 @@ flatpak run io.github.laurentiustaicu.ask_the_model
 
 <small>When AtM starts, it automatically probes the supported local provider endpoints, asks the provider which models are installed, checks which of those models are chat/completion-capable, and fills the model selector with the compatible models it finds. If at least one compatible model is available, AtM selects one automatically.</small>
 
-<small><strong>Expected result:</strong> the title bar shows a compatible AI model instead of <code>No chat models detected</code>, and you can send a prompt. A brief scan status such as <code>1 model found</code> may appear while discovery finishes.</small>
+<small><strong>Expected result:</strong> the model selector in the application header shows a compatible AI model instead of <code>No chat models detected</code>, and you can send a prompt. A brief scan status such as <code>1 model found</code> may appear while discovery finishes.</small>
 
 #### 6. Download more models later and use Refresh
 
-<small>You can install another model at any time with your provider. If AtM is already open when the download finishes, click the circular <strong>Refresh models</strong> button in the title bar. AtM repeats model discovery and updates the selector; you do not need to add the model to AtM manually.</small>
+<small>You can install another model at any time with your provider. If AtM is already open when the download finishes, click the circular <strong>Refresh models</strong> button beside the model selector in the application header. AtM repeats model discovery and updates the selector; you do not need to add the model to AtM manually.</small>
 
 <small><strong>Expected result:</strong> compatible newly installed models appear in the selector; models removed from the provider disappear after the refresh.</small>
 
