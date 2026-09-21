@@ -124,6 +124,14 @@ namespace AskTheModel {
             assert_not_reached ();
         }
 
+        public void clear_remote_identities (
+            RepositoryDescriptor[] selected
+        ) {
+            foreach (RepositoryDescriptor descriptor in selected) {
+                info_for (descriptor.id).clear_remote_identity ();
+            }
+        }
+
         public async RepositoryRuntimeInfo refresh (
             RepositoryDescriptor descriptor,
             GLib.Cancellable? cancellable = null
