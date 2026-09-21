@@ -122,15 +122,16 @@ A `New Chat` action exists and clears the current provider/conversation state.
 
 ### Conversation-freeze behavior
 
-Before the first message, repository selection is editable.
+Before the first message, repository selection and AI-model selection are editable.
 
-After the first message:
+After the first Send:
 
-- changing repository scope triggers an explicit new-chat transition;
-- it does not silently mutate the current conversation;
-- current scope remains visually understandable.
+- the current chat keeps its pinned repository scope and AI-model identity;
+- the repository and AI-model selectors remain visible but become insensitive for that chat;
+- changing either identity requires the user to create a New chat rather than mutating the active conversation;
+- switching between chat tabs restores each tab's own pinned display state.
 
-The preferred v1 behavior also freezes the AI model after the first message and requires a new chat to change it.
+No automatic scope mutation or implicit chat replacement is permitted.
 
 ### Pass condition
 
@@ -494,20 +495,25 @@ Semantic retrieval is adopted only if the measured improvement is large enough t
 
 The automated suite should include:
 
-1. repository updated during active chat → chat stays on old SHA;
-2. repository selection change → explicit New Chat transition;
-3. AI-model change after first turn → explicit New Chat transition under the preferred v1 policy;
-4. active snapshot removal → blocked;
-5. retrieval index removed → rebuilt from snapshot;
-6. index metadata SHA mismatch → repository not ready;
-7. corrupt SQLite index → repository not ready/rebuild;
-8. corrupt or unsafe snapshot input → not ready;
-9. archive entry-count/uncompressed-size limit exceeded → update/download fails safely and the previous ready snapshot remains usable;
-10. indexed source hash mismatch against the pinned snapshot → repository not ready/rebuild;
-11. unsupported AtM manifest schema → incompatible;
-10. newer repository-declared version than latest GitHub Release → informational, not automatically invalid;
-11. failed repository update → previous ready snapshot preserved;
-12. current-turn evidence does not accumulate in later provider history.
+1. repository updated during active chat → chat stays on its pinned old SHA;
+2. repository selector after first Send → remains visible but locked; changing scope requires New chat;
+3. AI-model selector after first Send → remains visible but locked; changing model requires New chat;
+4. retrieval index removed → rebuilt from the validated snapshot;
+5. index metadata SHA mismatch → repository is rejected or the index is rebuilt before use;
+6. corrupt SQLite index → repository is rejected or the index is rebuilt before use;
+7. corrupt or unsafe snapshot input → not ready;
+8. archive entry-count/uncompressed-size limit exceeded → update/download fails safely and the previous ready snapshot remains usable;
+9. indexed source hash mismatch against the pinned snapshot → repository is rejected or the index is rebuilt before use;
+10. unsupported AtM manifest schema → incompatible;
+11. failed repository update → previous ready snapshot remains usable;
+12. current-turn evidence does not accumulate in later provider history;
+13. cancelled repository I/O → cancellation propagates and incomplete staging output is not promoted;
+14. failed multi-repository Refresh → repositories not reached after the failure do not retain stale remote identities from an older batch.
+
+Future repository-management regression gate, when removal/history is implemented:
+
+- active-conversation snapshot removal → blocked;
+- removal affects only AtM local storage and never the upstream repository.
 
 ## Documentation gate
 
