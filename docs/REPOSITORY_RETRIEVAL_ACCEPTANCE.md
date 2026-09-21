@@ -200,17 +200,28 @@ An update:
 
 A failed update leaves the previous snapshot usable.
 
-### Remove
+### Compact-header cancellation and retry boundary
 
-`Remove Local Copy`:
+The repository lifecycle backend accepts a `GLib.Cancellable` for remote refresh/download operations and propagates it through the network path. The approved compact v1 header does not require a separate visible Cancel control. A failed or cancelled repository operation may be retried through the existing Refresh or Download/Update action after the operation returns to an idle state.
 
-- affects only AtM local storage;
-- never affects GitHub;
-- is blocked if the snapshot is required by the active conversation.
+### Deferred repository-management surface
+
+`Remove Local Copy` and snapshot-history controls belong to a future detailed repository-management surface rather than the compact v1 header.
+
+When removal is implemented, it must:
+
+- affect only AtM local storage;
+- never affect GitHub;
+- refuse to remove a snapshot pinned by an active conversation;
+- preserve any other snapshot required for safe update/rollback.
+
+These constraints remain mandatory for that future surface; they are not part of the compact-header R1 completion gate.
 
 ### Pass condition
 
-Download, cancellation, retry, update and removal behave correctly for all three repositories; all three catalog repositories provide manifests conforming to the same embedded v1 schema; and failure injection cannot destroy the last valid ready snapshot.
+For the compact v1 header, download, service-level cancellation, retry and update must behave correctly for all three repositories; all three catalog repositories must provide manifests conforming to the same embedded v1 schema; and failure injection must not destroy the last valid ready snapshot.
+
+Removal/history remain a separate future repository-management acceptance gate.
 
 ## R2 — Snapshot index
 
