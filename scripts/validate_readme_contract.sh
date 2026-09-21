@@ -65,9 +65,10 @@ done
 
 require_text README.md 'A local-first desktop interface for local AI chat and repository-grounded exploration'
 require_text README.md 'must currently be downloaded and managed through the provider rather than AtM.'
+require_text README.md '### Model discovery and management'
 require_text README.md 'AtM does <strong>not</strong> search every SSD, HDD or folder'
 require_text README.md 'AtM asks the provider for the installed model list through <code>GET /api/tags</code>.'
-require_text README.md 'Only models advertising the <code>completion</code> capability are placed in the AtM model selector.'
+require_text README.md 'Only models advertising the <code>completion</code> capability are placed in the AtM model selector; embedding-only models are excluded.'
 require_text README.md "AtM v$version currently provides text chat and repository-grounded text retrieval"
 require_text README.md 'fixed EWD/CBD/RMD repository catalog'
 require_text README.md 'resolves repository Refresh to exact Git SHAs'
@@ -76,6 +77,12 @@ require_text README.md 'pins AI-model and repository snapshot identity per chat 
 require_text README.md 'shows compact numbered citations with exact repository/version/SHA/source/locator provenance'
 require_text README.md 'READY is not a scientific certification'
 require_text README.md 'turn generated text into an authoritative scientific-model result without repository-grounded provenance or actual model execution.'
+
+if grep -Fq '### Finding and choosing an AI model' README.md || \
+   grep -Fq '### Managing models, disk space and memory' README.md || \
+   grep -Fq '### If a model is too slow or too large' README.md; then
+  fail "README duplicates detailed model-management documentation that belongs in docs/MODEL_GUIDE.md or docs/TROUBLESHOOTING.md"
+fi
 
 require_text README.md 'href="docs/USER_INTERFACE_GUIDE.md"'
 require_text README.md '#### User documentation'
