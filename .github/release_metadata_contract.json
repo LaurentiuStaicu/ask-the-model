@@ -1,18 +1,18 @@
 {
-  "contract_version": "1.0",
-  "frozen_on": "2026-09-20",
+  "contract_version": "1.1",
+  "frozen_on": "2026-09-21",
   "purpose": "Prevent partial Ask the Model release/version updates by requiring the public version and release date to move atomically across all version-bearing public metadata before Flatpak build or GitHub Release publication.",
   "versioning_basis": {
     "scheme": "Semantic Versioning",
     "source": "https://semver.org/",
     "current_series": "0.x initial development",
-    "policy": "Unreleased private/backend development does not by itself change the current public release. A version change is made when a new public release is deliberately prepared."
+    "policy": "Release version changes are deliberate. A minor release is appropriate when substantial backward-compatible user-facing functionality is added; patch releases are reserved for compatible corrections."
   },
   "current_public_release": {
-    "version": "0.2.2",
-    "date": "2026-09-20",
-    "version_bump_required_now": false,
-    "reason": "Repository/retrieval R1-R5 backend work remains unreleased and is not yet exposed as end-user repository-grounded chat."
+    "version": "0.3.0",
+    "date": "2026-09-21",
+    "version_bump_required_now": true,
+    "reason": "The repository-aware GTK path is now user-facing and locally smoke-tested: fixed EWD/CBD/RMD lifecycle, deterministic retrieval, per-chat pinning, grounded citations and exact-SHA provenance materially extend the v0.2 local-chat baseline."
   },
   "canonical_sources": {
     "version": "meson.build project() version",
@@ -61,8 +61,9 @@
     "failure_policy": "Any version/date mismatch fails before the expensive Flatpak build and before release publication."
   },
   "future_release_rule": {
-    "repository_grounded_chat": "When repository selection, grounded context and citations become deliberately released user-facing functionality, prepare a new release and update every synchronized surface atomically.",
-    "patch_documentation": "Documentation-only corrections may use a patch release when deliberately published as a new immutable release.",
+    "repository_grounded_chat": "Repository selection, exact-SHA snapshots, grounded context and inspectable citations are public v0.3.0 functionality and must remain covered by release documentation and regression gates.",
+    "patch_documentation": "Documentation-only or compatible bug corrections may use a patch release when deliberately published as a new immutable release.",
+    "new_capability": "Substantial new user-facing capability should normally prepare a new 0.x minor release while the public API remains pre-1.0.",
     "released_versions_are_immutable": true
   }
 }
