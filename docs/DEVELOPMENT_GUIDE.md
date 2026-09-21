@@ -164,7 +164,7 @@ For repository/retrieval changes, report the exact repository SHAs or test fixtu
 
 - `README.md` — public landing page and first-use path;
 - `STATUS.md` — current release and capability boundary;
-- `docs/USER_INTERFACE_GUIDE.md` — technical interface wireframe, control legend and state behavior;
+- `docs/USER_INTERFACE_GUIDE.md` — user-facing controls and state behavior;
 - `docs/ARCHITECTURE.md` — application architecture;
 - `docs/REPOSITORY_RETRIEVAL_ARCHITECTURE.md` — repository/retrieval design;
 - `docs/REPOSITORY_RETRIEVAL_ACCEPTANCE.md` — acceptance gates;
