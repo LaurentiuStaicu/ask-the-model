@@ -144,7 +144,7 @@ The v1 architecture allows zero to three repository contexts. Zero repositories 
 
 The deterministic backend can keep requested repositories in separate evidence sets and refuses to add a repository that is outside the conversation-pinned scope. The selected repository set is conversation context, not AI-provider configuration. Repository context and the active local AI model remain separate concepts.
 
-The remaining UI/orchestration layer must preserve this per-repository attribution rather than flattening retrieved material into unidentified combined context.
+The wired GTK UI/orchestration layer preserves this per-repository attribution through conversation-pinned scope, per-source provenance and compact source references rather than flattening retrieved material into unidentified combined context.
 
 ## Localization and terminology
 
