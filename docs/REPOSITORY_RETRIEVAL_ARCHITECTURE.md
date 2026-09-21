@@ -117,17 +117,16 @@ The origin URL, repository owner/name and tracked branch are application-control
 
 ## Repository version and revision
 
-AtM tracks at least:
+AtM v1 tracks at least:
 
 - repository ID;
-- repository-declared version;
-- latest published GitHub release when available;
+- repository-declared version read from `CITATION.cff` at the resolved tracked-branch SHA;
 - exact installed snapshot SHA;
 - exact retrieval-index snapshot SHA.
 
-The normal selector shows only the repository-declared version.
+The normal selector shows only the repository-declared version. Update availability is determined by exact tracked-branch SHA identity, not by GitHub Release metadata.
 
-A difference between the version declared on the tracked repository state and the latest published GitHub Release is informational rather than an automatic validation failure. A development branch may legitimately declare a newer version before that version is published as a release.
+A future detailed repository-management surface may display published GitHub Release metadata as additional information. If it does, a difference between the tracked repository version and the latest published release is informational rather than an automatic validation failure: a development branch may legitimately move before a release is published.
 
 AtM must not invent suffixes such as `-dev` unless the repository declares them itself.
 
