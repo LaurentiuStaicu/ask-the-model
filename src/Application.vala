@@ -1596,7 +1596,7 @@ namespace AskTheModel {
             ).strip ();
         }
 
-        private Gtk.Widget build_source_popover_content (
+        private Gtk.Widget build_source_detail_content (
             CitationReference citation,
             uint display_number
         ) {
@@ -1730,14 +1730,45 @@ namespace AskTheModel {
             return content;
         }
 
-        private Gtk.MenuButton build_source_reference_button (
+        private void show_source_detail_window (
             CitationReference citation,
             uint display_number
         ) {
-            var button = new Gtk.MenuButton () {
+            var scroller = new Gtk.ScrolledWindow () {
+                hscrollbar_policy = Gtk.PolicyType.NEVER,
+                vscrollbar_policy = Gtk.PolicyType.AUTOMATIC,
+                min_content_width = 520,
+                min_content_height = 240,
+                max_content_height = 520,
+                propagate_natural_height = true
+            };
+            scroller.set_child (
+                build_source_detail_content (
+                    citation,
+                    display_number
+                )
+            );
+
+            var source_window = new Gtk.Window () {
+                application = this,
+                title = "Source [%u]".printf (display_number),
+                transient_for = this.active_window,
+                modal = false,
+                destroy_with_parent = true,
+                resizable = true,
+                default_width = 620,
+                default_height = 360,
+                child = scroller
+            };
+            source_window.present ();
+        }
+
+        private Gtk.Button build_source_reference_button (
+            CitationReference citation,
+            uint display_number
+        ) {
+            var button = new Gtk.Button () {
                 label = "[%u]".printf (display_number),
-                direction = Gtk.ArrowType.NONE,
-                always_show_arrow = false,
                 has_frame = false,
                 tooltip_text = "Show source %u".printf (
                     display_number
@@ -1748,34 +1779,12 @@ namespace AskTheModel {
                 Gtk.AccessibleProperty.LABEL,
                 "Source %u".printf (display_number)
             );
-
-            /*
-             * Source buttons are embedded through GtkTextChildAnchor.  Build
-             * their popover only when GTK is about to show it, after the
-             * anchored MenuButton has been mapped and allocated.  Creating
-             * the popover eagerly can make GTK try to snapshot it before it
-             * has a current allocation on elementary OS 8 / GTK 4.14.
-             */
-            button.set_create_popup_func ((menu_button) => {
-                var popover = new Gtk.Popover () {
-                    child = build_source_popover_content (
-                        citation,
-                        display_number
-                    ),
-                    has_arrow = true,
-                    position = Gtk.PositionType.BOTTOM
-                };
-                menu_button.set_popover (popover);
-
-                /*
-                 * The popover is created after this anchored MenuButton's
-                 * most recent size allocation. Present it explicitly so it
-                 * receives a current allocation before MenuButton continues
-                 * with gtk_popover_popup().
-                 */
-                popover.present ();
+            button.clicked.connect (() => {
+                show_source_detail_window (
+                    citation,
+                    display_number
+                );
             });
-
             return button;
         }
 
