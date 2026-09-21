@@ -4,7 +4,11 @@ All notable public releases of Ask the Model are recorded here.
 
 ## Unreleased
 
-No changes recorded after the v0.3.0 release candidate.
+### Documentation
+
+- tightened the repository README by moving detailed model-selection, quantization, storage and performance guidance to the dedicated model/troubleshooting documents while preserving first-use discovery guidance;
+- aligned `docs/MODEL_GUIDE.md` with the v0.3.0 capability boundary and removed stale v0.2.2 references;
+- strengthened the README design/validation contract so detailed model-management material does not drift back into the landing page.
 
 ## 0.3.0 - 2026-09-21
 
