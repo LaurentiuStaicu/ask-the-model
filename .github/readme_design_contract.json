@@ -1,7 +1,7 @@
 {
-  "contract_version": "1.0",
-  "frozen_on": "2026-09-20",
-  "purpose": "Keep the public Ask the Model landing page consistent with the implemented application/provider/model boundary and the current public release without reducing the first-time-user detail that the application README intentionally provides.",
+  "contract_version": "1.1",
+  "frozen_on": "2026-09-21",
+  "purpose": "Keep the public Ask the Model landing page consistent with the implemented application/provider/model/repository boundary while preserving a first-time-user path and clear developer routes.",
   "suite_visual_identity": {
     "icon_width_px": 112,
     "title_html": "h2 centered",
@@ -21,38 +21,47 @@
     "action_badges": [
       "download Flatpak",
       "getting started",
-      "model guide"
+      "interface guide",
+      "developer guide"
     ],
-    "note": "AtM intentionally has a second action row because it is an installable application. Scientific-model repositories keep only the primary identity row."
+    "note": "AtM intentionally carries user/developer action routes because it is an installable application and a repository-grounded interface."
   },
   "current_public_release": {
-    "version": "0.2.2",
+    "version": "0.3.0",
     "meson_source": "meson.build",
     "citation_source": "CITATION.cff",
     "status_source": "STATUS.md",
-    "release_note": "releases/v0.2.2.md",
-    "version_bump_required": false,
+    "release_note": "releases/v0.3.0.md",
+    "version_bump_required": true,
     "atomic_release_metadata_contract": ".github/release_metadata_contract.json"
   },
   "implemented_capabilities": [
     "local Ollama-compatible provider discovery",
-    "provider-managed model enumeration",
-    "completion-capability filtering",
+    "provider-managed model enumeration and completion-capability filtering",
     "refreshable model selector",
     "streamed text chat",
-    "in-memory session conversation context",
+    "independent in-memory multi-chat tabs",
+    "fixed EWD/CBD/RMD repository selection",
+    "exact-SHA repository refresh and explicit download/update",
+    "validated immutable repository snapshots",
+    "deterministic local repository retrieval",
+    "first-Send model/repository identity pinning",
+    "repository-grounded current-turn evidence",
+    "compact numbered citations with inspectable exact-SHA provenance",
     "loopback-only provider addressing in the current provider implementation"
   ],
   "required_boundaries": [
     "AtM is the interface; the local provider runs the AI model.",
     "AI model files are separate artifacts and must currently be downloaded/managed outside AtM.",
     "AtM discovers models through the provider; it does not scan arbitrary disks for GGUF files.",
-    "AtM does not currently download, import, move, update or delete AI models.",
-    "Repository/retrieval backend work on development main remains unreleased and is not exposed through the public v0.2.2 GTK repository-selection, grounded-chat or citation flow.",
+    "The v0.3.0 repository catalog is fixed to EWD, CBD and RMD; repository manifests cannot add arbitrary origins.",
     "Scientific repositories remain authoritative for their code, data, assumptions, provenance and validation.",
+    "READY means AtM-compatible local snapshot/index, not scientific certification.",
     "AtM must not present AI-generated text as a canonical scientific-model result without repository-grounded provenance or actual model execution."
   ],
   "required_routes": [
+    "docs/USER_INTERFACE_GUIDE.md",
+    "docs/DEVELOPMENT_GUIDE.md",
     "docs/MODEL_GUIDE.md",
     "docs/TROUBLESHOOTING.md",
     "docs/DEPENDENCIES_AND_COMPATIBILITY.md",
@@ -76,12 +85,12 @@
     ]
   },
   "release_boundary": {
-    "documentation_contract_change_is_unreleased": true,
-    "version_bump_required": false
+    "documentation_contract_change_is_release_prep": true,
+    "version_bump_required": true
   },
   "release_vs_development_boundary": {
-    "public_release": "v0.2.2 remains local-chat only from an end-user perspective.",
-    "development_main": "Unreleased repository/retrieval backend work may exist on main without changing the current public release capability boundary.",
-    "readme_rule": "README statements about repository retrieval must distinguish released user-facing behavior from development-main backend implementation."
+    "public_release": "v0.3.0 deliberately exposes the fixed EWD/CBD/RMD repository-aware grounded-chat path.",
+    "development_main": "Future work may extend retrieval, provider support, persistence or repository management without silently broadening the v0.3.0 release claim.",
+    "readme_rule": "README statements about repository retrieval must match released behavior and keep scientific validity/model execution boundaries explicit."
   }
 }
