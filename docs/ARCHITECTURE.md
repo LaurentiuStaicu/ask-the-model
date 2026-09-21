@@ -1,14 +1,14 @@
 # Application architecture boundary
 
-## Released state — v0.2.2
+## Released state — v0.3.0
 
-AtM v0.2.2 provides a functional GTK 4 / Granite local-chat application, desktop integration, AppStream metadata, elementary OS 8 Flatpak packaging and an implemented local AI-provider layer.
+AtM v0.3.0 provides a functional GTK 4 / Granite local-chat application, desktop integration, AppStream metadata, elementary OS 8 Flatpak packaging, an implemented local AI-provider layer and the first public repository-grounded EWD/CBD/RMD conversation path.
 
-The released UI remains local-chat only. Repository selection, repository-grounded provider context, citations and provenance presentation are not part of v0.2.2.
+Repository selection, validated immutable snapshots, deterministic retrieval, per-chat repository/model pinning, grounded citations and on-demand provenance inspection are part of the v0.3.0 release.
 
-## Development-main state — unreleased
+## Repository-aware implementation — released in v0.3.0
 
-The development repository now contains the backend foundations for repository-aware retrieval, while keeping them separate from the released UI capability boundary.
+The repository/retrieval backend and GTK orchestration are now part of the released capability boundary.
 
 Implemented and tested backend layers include:
 
@@ -29,7 +29,7 @@ Implemented and tested backend layers include:
 - deterministic multi-turn retrieval state with inherited repository intent/exact anchors, bounded effective follow-up queries and explicit clarification outcomes;
 - versioned R5 benchmark/run schemas, a reviewed frozen EWD/CBD/RMD corpus, a deterministic real-corpus runner, provisional metric gates and CI that now passes the fixed deterministic baseline.
 
-The unreleased development GTK application now connects repository selection end-to-end to per-conversation grounded message generation. Each chat tab owns independent provider history and a `ConversationSession`; the first Send freezes repository snapshots plus AI-model identity for that tab, and subsequent grounded turns use the pinned retrieval scope. Temporary model labels are resolved before a grounded turn is committed, unknown labels fail closed, and user-visible compact source references open provenance details including repository/version, exact snapshot SHA, logical source ID, physical locator, evidence excerpt and immutable permalink when available. The released v0.2.2 application remains outside this development capability boundary.
+The v0.3.0 GTK application connects repository selection end-to-end to per-conversation grounded message generation. Each chat tab owns independent provider history and a `ConversationSession`; the first Send freezes repository snapshots plus AI-model identity for that tab, and subsequent grounded turns use the pinned retrieval scope. Temporary model labels are resolved before a grounded turn is committed, unknown labels fail closed, and user-visible compact source references open provenance details including repository/version, exact snapshot SHA, logical source ID, physical locator, evidence excerpt and immutable permalink when available. This is the released v0.3.0 capability boundary.
 
 ## Implemented logical components
 
@@ -67,7 +67,7 @@ Conversation state is not persisted across application restarts.
 
 ### User interface
 
-The current unreleased development UI provides:
+The v0.3.0 UI provides:
 
 - elementary-style GTK/Granite shell and system color-scheme following;
 - separate AI-model and multi-repository selectors with explicit refresh/download/update lifecycle controls;
@@ -95,7 +95,7 @@ Implemented across the grounding-context, conversation-grounding, grounded reque
 
 The R4 backend can freeze validated repository snapshots for a conversation, build transient current-turn grounding context, construct grounded Ollama requests without persisting evidence blocks into ordinary chat history, resolve temporary `[S#]` labels only against current-turn evidence and retain citation provenance for later inspection. Real-repository integration tests exercise traceability across EWD, CBD and RMD.
 
-These capabilities are now wired into the unreleased GTK development path. Grounded answers are held until current-turn citation labels are resolved; unknown labels fail closed. Successful grounded answers retain turn-owned provenance and render compact source-reference controls in the transcript.
+These capabilities are wired into the released v0.3.0 GTK path. Grounded answers are held until current-turn citation labels are resolved; unknown labels fail closed. Successful grounded answers retain turn-owned provenance and render compact source-reference controls in the transcript.
 
 ### R5 retrieval-conversation and benchmark framework
 
@@ -103,9 +103,9 @@ The retrieval-conversation backend can preserve relevant repository scope, inten
 
 R5 defines versioned benchmark/run schemas, deterministic metric evaluation, provisional gates and CI for the benchmark contract. The reviewed corpus is pinned to exact EWD/CBD/RMD v0.1.0 SHAs, and the real-corpus runner executes the same R3 retrieval-conversation and R4 bounded-grounding primitives against those snapshots. The frozen deterministic baseline now meets every provisional R5 gate.
 
-## Remaining / not yet user-facing components
+## Remaining / future components
 
-### Repository UI and conversation-context service
+### Repository lifecycle and conversation-context service
 
 The development UI exposes the fixed EWD/CBD/RMD selector together with separate repository refresh, Download/Update and repository-status controls. Refresh performs a read-only GitHub check; Download/Update uses the validated snapshot lifecycle. Persistent source snapshots are stored under `~/Ask the Model/Repositories`, while retrieval indexes remain private XDG cache data.
 
@@ -115,7 +115,7 @@ The repository/snapshot freeze, transactional grounded-turn lifecycle and AI-mod
 
 Responsible for selecting retrieved evidence within a turn budget, recording exactly which repository sources were supplied to the AI, mapping temporary source labels to immutable provenance, and distinguishing retrieved source material from AI-generated interpretation.
 
-Current-turn grounding context, grounded Ollama request construction, temporary source-label resolution, persistent citation provenance and real-repository traceability are implemented and wired through the unreleased GTK path. User-visible references are intentionally compact; detailed provenance is disclosed only on demand in a popover. This remains unreleased development functionality until a later release boundary is explicitly approved.
+Current-turn grounding context, grounded Ollama request construction, temporary source-label resolution, persistent citation provenance and real-repository traceability are implemented and wired through the released v0.3.0 GTK path. User-visible references are intentionally compact; detailed provenance is disclosed on demand in a transient source-detail window rather than a permanent pane.
 
 ### Conversation persistence service
 
@@ -125,15 +125,17 @@ Responsible for future durable local conversation storage, conversation navigati
 
 Responsible for future provider endpoint configuration, preferred AI model and application-level preferences. Repository source snapshots use the fixed visible location `~/Ask the Model/Repositories`; derived indexes and application state remain in AtM's private XDG cache/state locations. Arbitrary repository storage locations are not a v1 setting.
 
-## Explicitly outside the v0.2.2 boundary
+## Explicitly outside the v0.3.0 boundary
 
-- repository ingestion or retrieval;
-- EWD/CBD/RMD context selection;
-- source/provenance presentation;
+- persistent conversation storage across application restarts;
+- arbitrary unreviewed repository origins beyond the fixed EWD/CBD/RMD catalog;
+- full repository snapshot-history/removal management UI;
+- in-app AI-model download/import/delete;
+- provider installation/service management and configurable remote-provider settings;
 - executing EWD, CBD or RMD simulations;
 - modifying scientific-model repository files;
 - treating AI responses as canonical scientific results;
-- cloud AI providers;
+- cloud AI providers owned/configured directly by AtM;
 - autonomous changes to scientific models.
 
 Any future model-execution or write-back capability requires a separate architecture and safety review before implementation.
@@ -163,4 +165,4 @@ The repository-aware architecture and staged acceptance gates are defined in:
 - `docs/REPOSITORY_RETRIEVAL_ARCHITECTURE.md`;
 - `docs/REPOSITORY_RETRIEVAL_ACCEPTANCE.md`.
 
-Those documents remain the governing design/acceptance contracts. Backend implementation on development `main` does not imply that repository ingestion, retrieval, grounded context or citation functionality is already exposed in the public v0.2.2 application.
+Those documents remain the governing design/acceptance contracts. These documents remain the governing contracts for the repository-grounded functionality released in v0.3.0 and for later extensions.

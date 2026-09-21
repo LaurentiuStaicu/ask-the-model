@@ -3,7 +3,7 @@
   <id>io.github.laurentiustaicu.ask_the_model</id>
 
   <name>Ask the Model</name>
-  <summary>Chat with locally managed AI models</summary>
+  <summary>Local AI chat with repository-grounded scientific sources</summary>
 
   <metadata_license>CC0-1.0</metadata_license>
   <project_license>MIT</project_license>
@@ -14,17 +14,24 @@
 
   <description>
     <p>
-      Ask the Model is a local-first desktop chat interface for locally managed
-      language models through an Ollama-compatible provider. The current release
-      discovers compatible provider-managed models, streams responses and keeps
-      conversation context in memory for the current session.
+      Ask the Model is a local-first GTK desktop interface for locally managed
+      language models through an Ollama-compatible provider. It discovers
+      completion-capable provider models, streams responses and keeps independent
+      in-memory conversation state in multiple chat tabs.
     </p>
     <p>
-      The project is being developed toward natural-language exploration of
-      scientific dynamical-model repositories such as Empirical World3 Dynamics,
-      Cognitive Belief Dynamics and Romanian Monetary Dynamics. Repository-aware
-      retrieval and scientific provenance are not yet implemented, and the source
-      repositories remain authoritative for their own scientific content.
+      Version 0.3.0 adds repository-grounded exploration for the fixed Empirical
+      World3 Dynamics, Cognitive Belief Dynamics and Romanian Monetary Dynamics
+      repository suite. AtM can refresh and download exact Git revisions, validate
+      immutable local snapshots, build deterministic local retrieval indexes and
+      expose compact citations with exact repository, version, SHA, locator and
+      immutable-source provenance.
+    </p>
+    <p>
+      AtM remains an interface and retrieval layer. The external provider owns
+      inference, AI model files remain separate artifacts, and the scientific
+      repositories remain authoritative for their own model definitions, data,
+      assumptions, provenance and validation.
     </p>
   </description>
 
@@ -39,6 +46,15 @@
   <content_rating type="oars-1.1"/>
 
   <releases>
+    <release version="0.3.0" date="2026-09-21">
+      <description>
+        <p>
+          Repository-Grounded Multi-Chat with validated immutable EWD/CBD/RMD
+          snapshots, deterministic local retrieval, per-chat identity pinning,
+          compact citations and exact-SHA source provenance.
+        </p>
+      </description>
+    </release>
     <release version="0.2.2" date="2026-09-20">
       <description>
         <p>

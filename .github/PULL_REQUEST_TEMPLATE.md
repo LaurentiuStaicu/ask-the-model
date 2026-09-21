@@ -8,16 +8,18 @@ Describe the change and why it is needed.
 - [ ] Flatpak / build / packaging
 - [ ] Provider discovery / compatibility
 - [ ] Model discovery / capability handling
-- [ ] Chat / streaming behavior
+- [ ] Chat / streaming / multi-chat
+- [ ] Repository lifecycle / snapshot validation
+- [ ] Retrieval / grounding / provenance
 - [ ] Documentation
-- [ ] Repository-aware scientific-model work
 - [ ] Release / versioning
 
 ## Boundary checklist
 
 - [ ] I did not treat AtM as the AI provider.
 - [ ] I did not imply that AtM bundles or owns external AI models unless this PR explicitly implements that feature.
-- [ ] I did not present AI-generated output as a canonical EWD/CBD/RMD result without provenance or model execution.
+- [ ] I preserved exact repository snapshot/provenance identity for grounded evidence, or documented a reviewed architecture change.
+- [ ] I did not present AI-generated output as a canonical EWD/CBD/RMD result without repository-grounded provenance or actual model execution.
 - [ ] I updated documentation if the implemented capability boundary changed.
 - [ ] I did not change the version unless this is an authorized release change.
 
@@ -25,7 +27,12 @@ Describe the change and why it is needed.
 
 Describe the checks performed. The Flatpak GitHub Actions workflow should pass.
 
+For repository/retrieval changes, include fixtures or exact SHAs when relevant.
+
+For UI changes, include the target GTK/Linux environment and visual behavior checked.
+
 ## Release impact
 
 - [ ] No version bump required.
-- [ ] Release preparation required.
+- [ ] Release documentation/metadata update required.
+- [ ] New minor/patch release preparation required.

@@ -16,13 +16,21 @@ require_text() {
   grep -Fq -- "$needle" "$file" || fail "$file is missing required text: $needle"
 }
 
-require_regex() {
-  local file="$1"
-  local pattern="$2"
-  grep -Eq -- "$pattern" "$file" || fail "$file does not match required pattern: $pattern"
-}
-
-for path in   README.md   meson.build   CITATION.cff   STATUS.md   LICENSE   docs/MODEL_GUIDE.md   docs/TROUBLESHOOTING.md   docs/DEPENDENCIES_AND_COMPATIBILITY.md   .github/CONTRIBUTING.md   .github/SUPPORT.md
+for path in \
+  README.md \
+  meson.build \
+  CITATION.cff \
+  STATUS.md \
+  LICENSE \
+  docs/USER_INTERFACE_GUIDE.md \
+  docs/DEVELOPMENT_GUIDE.md \
+  docs/MODEL_GUIDE.md \
+  docs/TROUBLESHOOTING.md \
+  docs/DEPENDENCIES_AND_COMPATIBILITY.md \
+  docs/REPOSITORY_RETRIEVAL_ARCHITECTURE.md \
+  docs/REPOSITORY_RETRIEVAL_ACCEPTANCE.md \
+  .github/CONTRIBUTING.md \
+  .github/SUPPORT.md
 do
   require_file "$path"
 done
@@ -43,50 +51,56 @@ require_text README.md 'img alt="MIT License"'
 require_text README.md 'img alt="Linux / Flatpak"'
 require_text README.md 'img alt="Download Flatpak"'
 require_text README.md 'img alt="Getting started"'
-require_text README.md 'img alt="Model guide"'
+require_text README.md 'img alt="Interface guide"'
+require_text README.md 'img alt="Developer guide"'
 
-header="$(sed -n '1,24p' README.md)"
+header="$(sed -n '1,26p' README.md)"
 if grep -Fq 'blue?style=' <<<"$header"; then
   fail "header uses a non-suite blue badge"
 fi
 for colour in 333333 707070 a0a0a0; do
-  grep -Fqi -- "color=$colour" <<<"$header" || grep -Fqi -- "-$colour?style=flat-square" <<<"$header" || fail "header is missing suite grayscale token $colour"
+  grep -Fqi -- "color=$colour" <<<"$header" || \
+    grep -Fqi -- "-$colour?style=flat-square" <<<"$header" || \
+    fail "header is missing suite grayscale token $colour"
 done
 
-require_text README.md 'It is deliberately separate from the software that actually runs the model and from the model files themselves.'
-require_text README.md 'must currently be downloaded and managed outside AtM.'
-require_text README.md 'does <strong>not</strong> download, import, move or delete AI models for you.'
+require_text README.md 'A local-first desktop interface for local AI chat and repository-grounded exploration'
+require_text README.md 'must currently be downloaded and managed through the provider rather than AtM.'
 require_text README.md 'AtM does <strong>not</strong> search every SSD, HDD or folder'
 require_text README.md 'AtM asks the provider for the installed model list through <code>GET /api/tags</code>.'
 require_text README.md 'Only models advertising the <code>completion</code> capability are placed in the AtM model selector.'
-require_text README.md "AtM v$version currently provides text chat only"
-require_text README.md "The public v$version application does not yet expose the repository-aware development work on \`main\`."
-require_text README.md 'select, ingest or retrieve scientific repositories through the released GTK conversation flow;'
-require_text README.md 'receive repository-grounded citations or provenance in the released chat UI;'
-require_text README.md 'These are release boundaries, not claims that no development implementation exists.'
-require_text README.md 'Development `main` now contains an unreleased repository-aware GTK path for the fixed EWD/CBD/RMD suite'
-require_text README.md 'turn ordinary AI chat output into an authoritative scientific-model result.'
-require_text README.md 'Each source repository remains canonical for its documentation, code, data, assumptions, provenance, validation and release boundaries.'
-require_text README.md "ordinary local chat in v$version must not be interpreted as repository-grounded scientific analysis."
+require_text README.md "AtM v$version currently provides text chat and repository-grounded text retrieval"
+require_text README.md 'fixed EWD/CBD/RMD repository catalog'
+require_text README.md 'resolves repository Refresh to exact Git SHAs'
+require_text README.md 'stores immutable validated snapshots under <code>~/Ask the Model/Repositories</code>'
+require_text README.md 'pins AI-model and repository snapshot identity per chat on the first Send'
+require_text README.md 'shows compact numbered citations with exact repository/version/SHA/source/locator provenance'
+require_text README.md 'READY is not a scientific certification'
+require_text README.md 'turn generated text into an authoritative scientific-model result without repository-grounded provenance or actual model execution.'
 
+require_text README.md 'href="docs/USER_INTERFACE_GUIDE.md"'
+require_text README.md 'href="docs/DEVELOPMENT_GUIDE.md"'
 require_text README.md 'href="docs/MODEL_GUIDE.md"'
 require_text README.md 'href="docs/TROUBLESHOOTING.md"'
 require_text README.md 'href="docs/DEPENDENCIES_AND_COMPATIBILITY.md"'
+require_text README.md 'href="docs/REPOSITORY_RETRIEVAL_ARCHITECTURE.md"'
+require_text README.md 'href="docs/REPOSITORY_RETRIEVAL_ACCEPTANCE.md"'
 require_text README.md 'href="STATUS.md"'
 require_text README.md 'href=".github/SUPPORT.md"'
 require_text README.md 'href=".github/CONTRIBUTING.md"'
 require_text README.md 'href="LICENSE"'
 require_text README.md 'href="CITATION.cff"'
 
-require_text STATUS.md 'Repository-aware retrieval and scientific provenance are not implemented in this release.'
-require_text STATUS.md '## Development main — unreleased repository-aware application'
-require_text STATUS.md 'Development `main` has advanced beyond the public v0.2.2 UI boundary with repository/retrieval work and a repository-aware GTK conversation path that remain unreleased.'
-require_text STATUS.md 'The unreleased development GTK path now exposes the fixed EWD/CBD/RMD repository selector and lifecycle controls, real multi-chat tabs with independent in-memory provider/session state, first-Send repository/model pinning, end-to-end grounded message generation and compact user-visible source references.'
-require_text STATUS.md 'Grounded turns validate temporary source labels before commit and preserve exact repository/version/SHA/logical-source/locator provenance for on-demand inspection.'
-require_text STATUS.md 'The frozen R5 deterministic retrieval benchmark passes its provisional engineering gates on the pinned EWD/CBD/RMD corpus'
-require_text STATUS.md 'AtM does not bundle, install, start, stop or update the local provider.'
-require_text STATUS.md 'AtM must not present an AI-generated explanation as if it were a canonical model result'
-require_text STATUS.md 'repository ingestion or retrieval;'
-require_text STATUS.md 'model installation, download or deletion;'
+require_text STATUS.md 'validated immutable EWD/CBD/RMD snapshots'
+require_text STATUS.md 'exact remote SHA/version Refresh'
+require_text STATUS.md 'compact numbered source references'
+require_text STATUS.md 'source-detail windows exposing repository/version, exact snapshot SHA'
+require_text STATUS.md 'The first Send freezes:'
+require_text STATUS.md 'Repository text is treated as untrusted data'
+require_text STATUS.md 'The Flatpak receives write access only to the dedicated `~/Ask the Model` directory'
+require_text STATUS.md 'AtM does not bundle, install, start, stop or update the local AI provider.'
+require_text STATUS.md 'scientific certification of a repository merely because it is READY'
+require_text STATUS.md 'in-app AI-model download/import/delete'
+require_text STATUS.md 'execution or simulation of EWD, CBD or RMD'
 
-printf 'AtM README contract PASS: version %s, visual shell, capability boundaries and documentation routes are consistent.\n' "$version"
+printf 'AtM README contract PASS: version %s, visual shell, released repository-grounded capability boundaries and documentation routes are consistent.\n' "$version"

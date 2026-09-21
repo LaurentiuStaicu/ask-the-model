@@ -6,7 +6,7 @@ body:
     id: version
     attributes:
       label: AtM version
-      placeholder: "v0.2.2"
+      placeholder: "v0.3.0"
     validations:
       required: true
   - type: dropdown

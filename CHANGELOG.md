@@ -4,50 +4,77 @@ All notable public releases of Ask the Model are recorded here.
 
 ## Unreleased
 
-### Repository and retrieval backend
+No changes recorded after the v0.3.0 release candidate.
 
-- Markdown excerpts in source-detail windows are now presented as readable visible text instead of raw Markdown/HTML control syntax, while non-Markdown evidence remains literal and immutable provenance metadata is unchanged;
-- source-reference details now open in a transient GTK window instead of a GtkPopover attached to a TextView child anchor, avoiding the GTK 4.14 allocation path that remained unreliable in local smoke testing;
-- citation popovers created on demand are now explicitly presented before popup, ensuring GTK allocates them even when their MenuButton is embedded through a GtkTextChildAnchor;
-- source-reference provenance popovers are now created on demand after their anchored menu buttons are mapped, avoiding GTK4 allocation warnings that could suppress citation details in the transcript;
-- multi-repository Refresh now clears previous remote identities for the entire selected batch before the first network request, preventing unvisited repositories from retaining stale update availability after an early failure;
-- repository refresh now invalidates the previous remote SHA/version before resolving a new coherent pair, so a failed refresh cannot leave stale update availability;
-- added direct lifecycle-service regression coverage for zero-repository grounding and fail-closed handling of selected repositories that are not locally ready;
-- added per-topic R5 evaluation diagnostics with rank and top-5 visibility for required evidence, preserving the frozen corpus, qrels, aggregate metrics and provisional gates;
-- expanded conservative Romanian→English runtime query aliases for paradigm/modeling/comparison and human-validation terminology using only R5 development-split needs; benchmark qrels and provisional targets remain unchanged;
-- implemented the fixed-catalog R1 repository lifecycle with SHA resolution, bounded safe extraction, strict manifest/version validation and immutable snapshot promotion;
-- implemented deterministic R2 per-snapshot SQLite/FTS5 indexing with source roles, structured entities/relations, Markdown sections, tabular datasets, integrity/provenance checks and rebuild-from-snapshot behavior;
-- added deterministic R3 exact technical-ID, structured, lexical BM25 and tabular row-key retrieval;
-- added intent-aware source authority, logical-source deduplication, conversation-pinned repository scoping and conservative Romanian/English query normalization;
-- promoted each repository manifest's declared `status_source` into retrieval-index schema v2 as a distinct authority role, keeping current-status and model-level structure questions anchored to the canonical status document while retaining BM25 title/body relevance within that boundary;
-- attached repository ID, repository version and exact snapshot SHA to retrieval evidence records;
-- integrated the R3 retrieval router with fail-closed outside-scope behavior and index/scope provenance matching;
-- added R4 immutable per-conversation repository pinning with validated snapshot/index identity, zero-repository local-chat support and rejection of post-freeze scope mutation;
-- added R4 current-turn grounded Ollama request construction that keeps repository evidence transient and strips stale temporary source labels from replayed assistant history;
-- added R4 current-turn citation-label resolution into persistent provenance objects without fabricating metadata for unknown labels;
-- added real-repository R4 grounding traceability tests across EWD, CBD and RMD;
-- wired the fixed repository selector and validated snapshots into per-chat `ConversationSession` grounding on the GTK Send path;
-- added real independent chat tabs with per-tab Ollama history, frozen repository/model identity, automatic short titles, New-tab creation and per-tab close controls;
-- added compact user-visible grounded source references that resolve temporary `[S#]` labels before commit and expose repository/version/SHA/logical-source/locator/excerpt provenance plus immutable source permalinks on demand;
-- kept ordinary zero-repository local chat as a separate streaming path;
-- aligned the AI-model and repository selectors to the same compact disclosure-triangle geometry and the same neutral surface palette as the chat tabs;
-- added R5 deterministic multi-turn retrieval state with inherited scope/intent/exact-anchor context, bounded effective follow-up queries and explicit clarification outcomes;
-- added versioned R5 benchmark/run schemas, a reviewed frozen EWD/CBD/RMD corpus, deterministic metric evaluation and a real-corpus CI runner; the fixed deterministic baseline now passes all provisional R5 gates without changing benchmark qrels or thresholds;
-- kept all repository-aware development functionality unreleased and separate from the current public v0.2.2 capability boundary.
+## 0.3.0 - 2026-09-21
 
-### Repository governance
+Repository-Grounded Multi-Chat.
 
-- aligned the backend-v0.9 exit contracts with the implemented frozen-selector behavior, SHA-based update model, deferred removal/history surface and a non-canonical live-RMD R5 compatibility smoke that passed every provisional gate without changing the canonical frozen benchmark;
-- aligned R1 acceptance with the approved compact repository header: service-level cancellation/retry remain required, while removal/history controls are explicitly retained as a separate future repository-management gate;
-- added an atomic release-metadata contract and pre-build validator requiring application version/date consistency across Meson, CITATION, README, STATUS, CHANGELOG, release notes and the current AppStream release entry; the Desktop Entry `Version=1.0` field is explicitly excluded because it is the desktop-file specification version;
-- clarified the public README so unreleased repository/retrieval backend work on development `main` is distinguished from capabilities actually exposed by the current v0.2.2 application;
-- aligned the primary release badge alternative text with the explicit project version so assistive technologies receive the same release information as the visual badge;
-- added a machine-checked README design/capability contract that verifies release-version consistency, suite visual identity, application/provider/model boundaries and essential documentation routes before every Flatpak build;
-- added PR-only workflow concurrency so superseded Flatpak builds on the same pull-request branch are canceled without canceling main-branch publication/release workflows;
-- added contribution and support guidance;
-- added structured application and provider/model compatibility issue forms;
-- added a pull-request checklist that preserves the application/provider/model and scientific-repository boundaries;
-- deferred security-policy and code-of-conduct adoption until private reporting and enforcement routes are explicitly configured.
+### User-facing capabilities
+
+- added the fixed EWD/CBD/RMD repository selector to the GTK conversation flow;
+- added explicit repository Refresh and Download/Update lifecycle controls;
+- added a subdued repository/model status LCD;
+- added independent multi-chat tabs with per-tab in-memory provider and retrieval state;
+- froze AI-model and repository snapshot identity on the first Send for each chat;
+- retained ordinary zero-repository streaming chat;
+- added repository-grounded current-turn generation;
+- added compact numbered source references;
+- added source-detail windows with repository/version, exact snapshot SHA, source path/locator, logical source ID, readable excerpt and immutable GitHub permalink;
+- added readable plain-text presentation for Markdown source evidence after local GTK smoke testing.
+
+### Repository lifecycle and safety
+
+- implemented exact tracked-branch SHA resolution before repository download;
+- implemented bounded safe archive extraction and strict repository-manifest validation;
+- implemented immutable validated local snapshots under `~/Ask the Model/Repositories`;
+- implemented fail-closed remote identity refresh;
+- hardened multi-repository Refresh so an early failure cannot leave stale remote state on unvisited selected repositories;
+- preserved previous valid snapshots and indexes across successful updates;
+- added service-level cancellation coverage for repository I/O;
+- restricted Flatpak filesystem access to the dedicated `~/Ask the Model` directory.
+
+### Retrieval and provenance
+
+- implemented deterministic per-snapshot SQLite/FTS5 retrieval index schema v2;
+- indexed manifest-declared status, canonical, structural, evidence, tabular and implementation roles;
+- added exact technical-ID, structured entity/relation, lexical BM25 and tabular row-key retrieval;
+- added deterministic source authority, deduplication and repository scoping;
+- added conservative Romanian/English runtime normalization;
+- added deterministic multi-turn retrieval state with explicit clarification outcomes;
+- attached repository ID, repository version and exact snapshot SHA to evidence records;
+- kept retrieved repository content as untrusted current-turn data rather than persistent provider-history instructions;
+- resolved temporary model-visible source labels into persistent provenance objects;
+- generated immutable commit-pinned GitHub source links.
+
+### Benchmark and regression gates
+
+- added real-repository grounding traceability checks across EWD, CBD and RMD;
+- added a reviewed frozen R5 corpus and deterministic real-corpus runner;
+- added versioned R5 run schemas, metrics, provisional gates and per-topic diagnostics;
+- kept benchmark corpus/qrels/threshold immutability separate from development diagnostics;
+- verified a non-canonical live-repository compatibility smoke without modifying the canonical frozen benchmark;
+- expanded regression coverage for lifecycle, index integrity, grounding, citation resolution, conversation pinning and cancellation.
+
+### GTK and interface hardening
+
+- aligned AI-model and repository selectors to the compact neutral suite palette;
+- fixed GTK 4.14 citation-detail presentation by replacing the unreliable TextChildAnchor/Popover path with a transient source-detail window;
+- converted Markdown/HTML presentation syntax in source excerpts into readable plain text without executing repository content as GTK/Pango markup;
+- locally smoke-tested grounded EWD+CBD+RMD chat, selector freeze, source-detail windows and immutable permalinks on elementary OS 8 / GTK 4.14.
+
+### Documentation and contributor experience
+
+- added `docs/USER_INTERFACE_GUIDE.md`;
+- added `docs/DEVELOPMENT_GUIDE.md` with code map, invariants, extension points and release workflow;
+- updated README, STATUS, AppStream, desktop metadata, CITATION and release contracts for the repository-grounded capability boundary;
+- retained synchronized release metadata validation and README capability/design validation before Flatpak builds.
+
+### Scope boundary
+
+v0.3.0 does not add persistent conversations, in-app AI-model file management, provider service management, arbitrary unreviewed repository origins, scientific-model execution/simulation or autonomous modification of scientific repositories.
+
+EWD, CBD and RMD remain authoritative for their own scientific content and validation.
 
 ## 0.2.2 - 2026-09-20
 

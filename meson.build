@@ -2,7 +2,7 @@ project(
   'io.github.laurentiustaicu.ask_the_model',
   'vala',
   'c',
-  version: '0.2.2',
+  version: '0.3.0',
   meson_version: '>= 1.0.0',
   license: 'MIT'
 )

@@ -1,0 +1,101 @@
+name: Repository / grounding / provenance
+description: Report an EWD/CBD/RMD lifecycle, retrieval, grounding, citation, or provenance problem.
+title: "[Repository]: "
+body:
+  - type: input
+    id: atm
+    attributes:
+      label: AtM version
+      placeholder: "v0.3.0"
+    validations:
+      required: true
+  - type: input
+    id: environment
+    attributes:
+      label: Environment
+      placeholder: "elementary OS 8 / Wayland or X11 / other Linux environment"
+    validations:
+      required: true
+  - type: dropdown
+    id: repository
+    attributes:
+      label: Repository scope
+      options:
+        - EWD
+        - CBD
+        - RMD
+        - EWD + CBD
+        - EWD + RMD
+        - CBD + RMD
+        - EWD + CBD + RMD
+        - Zero-repository chat
+        - Other / unclear
+    validations:
+      required: true
+  - type: dropdown
+    id: area
+    attributes:
+      label: Affected behavior
+      options:
+        - Refresh / remote identity
+        - Download / Update
+        - Validation / READY state
+        - Retrieval / grounding
+        - Multi-turn follow-up
+        - Numbered citation
+        - Source detail window
+        - Immutable source permalink
+        - Selector freeze / New chat
+        - Other
+    validations:
+      required: true
+  - type: input
+    id: snapshot
+    attributes:
+      label: Snapshot SHA
+      description: Exact SHA shown by AtM when available.
+      placeholder: "40-character Git SHA"
+    validations:
+      required: false
+  - type: input
+    id: source
+    attributes:
+      label: Source ID / locator
+      description: Include the Source ID and locator from the source-detail window when the issue involves evidence or citations.
+    validations:
+      required: false
+  - type: textarea
+    id: steps
+    attributes:
+      label: Steps to reproduce
+    validations:
+      required: true
+  - type: textarea
+    id: expected
+    attributes:
+      label: Expected behavior
+    validations:
+      required: true
+  - type: textarea
+    id: actual
+    attributes:
+      label: Actual behavior
+    validations:
+      required: true
+  - type: textarea
+    id: terminal
+    attributes:
+      label: Relevant terminal output
+      description: Start AtM from a terminal when possible. Remove private prompts or sensitive paths before posting.
+      render: text
+  - type: checkboxes
+    id: checks
+    attributes:
+      label: Checks
+      options:
+        - label: I checked the interface/troubleshooting documentation.
+          required: true
+        - label: I included exact provenance identifiers when this is a citation/retrieval problem and they are available.
+          required: false
+        - label: This issue does not contain credentials or sensitive vulnerability details.
+          required: true
