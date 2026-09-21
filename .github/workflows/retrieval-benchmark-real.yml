@@ -272,7 +272,7 @@ jobs:
 
       - name: Upload benchmark run and evaluation
         if: always()
-        uses: actions/upload-artifact@v4
+        uses: actions/upload-artifact@v7
         with:
           name: atm-r5-retrieval-benchmark-${{ github.run_id }}-${{ github.run_attempt }}
           path: |
