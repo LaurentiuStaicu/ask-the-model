@@ -5,7 +5,7 @@
 <h2 align="center">Ask the Model (AtM)</h2>
 
 <p align="center">
-  <a href="https://github.com/LaurentiuStaicu/ask-the-model/releases/latest"><img alt="Version: 0.2.2" src="https://img.shields.io/github/v/tag/LaurentiuStaicu/ask-the-model?sort=semver&style=flat-square&label=release&color=333333"></a>
+  <a href="https://github.com/LaurentiuStaicu/ask-the-model/releases/latest"><img alt="Version: 0.3.0" src="https://img.shields.io/github/v/tag/LaurentiuStaicu/ask-the-model?sort=semver&style=flat-square&label=release&color=333333"></a>
   <a href="LICENSE"><img alt="MIT License" src="https://img.shields.io/badge/license-MIT-707070?style=flat-square"></a>
   <a href="#supported-platform-and-compatibility"><img alt="Linux / Flatpak" src="https://img.shields.io/badge/platform-Linux%20%2F%20Flatpak-a0a0a0?style=flat-square"></a>
 </p>
@@ -13,26 +13,41 @@
 <p align="center">
   <a href="https://github.com/LaurentiuStaicu/ask-the-model/releases/latest/download/AskTheModel.flatpak"><img alt="Download Flatpak" src="https://img.shields.io/badge/download-Flatpak-333333?style=flat-square&logo=flatpak&logoColor=white"></a>
   <a href="#start-here-first-time-setup"><img alt="Getting started" src="https://img.shields.io/badge/read-Getting%20started-707070?style=flat-square"></a>
-  <a href="docs/MODEL_GUIDE.md"><img alt="Model guide" src="https://img.shields.io/badge/read-Model%20guide-a0a0a0?style=flat-square"></a>
+  <a href="docs/USER_INTERFACE_GUIDE.md"><img alt="Interface guide" src="https://img.shields.io/badge/read-Interface%20guide-a0a0a0?style=flat-square"></a>
+  <a href="docs/DEVELOPMENT_GUIDE.md"><img alt="Developer guide" src="https://img.shields.io/badge/read-Developer%20guide-333333?style=flat-square"></a>
 </p>
 
-<p align="center"><small><strong>A local-first desktop interface for chatting with locally managed AI models and, progressively, for querying and exploring repositories of scientific dynamical models.</strong></small></p>
+<p align="center"><small><strong>A local-first desktop interface for local AI chat and repository-grounded exploration of scientific dynamical models with exact, inspectable provenance.</strong></small></p>
 
-<p align="center"><small><a href="#start-here-first-time-setup">First-time setup</a> · <a href="#finding-and-choosing-an-ai-model">Choosing a model</a> · <a href="#managing-models-disk-space-and-memory">Managing models</a> · <a href="docs/TROUBLESHOOTING.md">Troubleshooting</a> · <a href="STATUS.md">Project status</a></small></p>
+<p align="center"><small><a href="#start-here-first-time-setup">First-time setup</a> · <a href="#repository-grounded-scientific-model-chat">Repository-grounded chat</a> · <a href="docs/USER_INTERFACE_GUIDE.md">Interface map</a> · <a href="docs/TROUBLESHOOTING.md">Troubleshooting</a> · <a href="STATUS.md">Project status</a></small></p>
 
 ---
 
 ### What is Ask the Model?
 
-<small>Ask the Model (AtM) is the desktop interface you use to write prompts, choose an available AI model and read streamed responses. It is deliberately separate from the software that actually runs the model and from the model files themselves.</small>
+<small>Ask the Model (AtM) is a local-first desktop interface for two related workflows: ordinary chat with locally managed AI models, and repository-grounded exploration of the fixed EWD/CBD/RMD scientific-model suite.</small>
 
 <p align="center"><code>You → Ask the Model → local provider → AI model</code></p>
 
-<small><strong>Ask the Model</strong> provides the chat interface. A <strong>local provider</strong>, such as Ollama, loads and runs AI models and exposes a local API. The <strong>AI model</strong> is a separate set of files, often several gigabytes in size, that must currently be downloaded and managed outside AtM.</small>
+<p align="center"><code>You → Ask the Model → validated repository snapshot → retrieval/provenance → AI model</code></p>
 
-<small>This distinction matters in the current release: AtM can automatically discover compatible models that your provider already knows about, but AtM v0.2.2 does <strong>not</strong> download, import, move or delete AI models for you.</small>
+<small><strong>Ask the Model</strong> provides the interface and retrieval/provenance layer. A <strong>local provider</strong>, such as Ollama, loads and runs AI models. The <strong>AI model</strong> remains a separate artifact that must currently be downloaded and managed through the provider rather than AtM.</small>
 
-<small>The longer-term purpose of AtM is broader than ordinary local chat. It is intended to become a natural-language access layer for scientific dynamical-model repositories such as Empirical World3 Dynamics (EWD), Cognitive Belief Dynamics (CBD) and Romanian Monetary Dynamics (RMD), without replacing those repositories as the authoritative source for their code, data, assumptions, provenance or validation.</small>
+<small>Version 0.3.0 adds repository selection, exact-SHA refresh/download/update, immutable validated local snapshots, deterministic local retrieval, independent multi-chat state and compact numbered citations with inspectable provenance. EWD, CBD and RMD remain authoritative for their own code, data, assumptions, provenance and validation.</small>
+
+### Application map
+
+<p align="center">
+  <img src="assets/application-map-v0.3.svg" alt="Annotated Ask the Model v0.3 interface map showing model and repository selectors, lifecycle controls, status LCD, chat tabs, grounded sources, prompt composer and source detail window">
+</p>
+
+<small>The diagram is a vector reconstruction rather than a screenshot. See <a href="docs/USER_INTERFACE_GUIDE.md">Interface guide</a> for a control-by-control explanation.</small>
+
+### Repository-grounded scientific-model chat
+
+<small>Select any combination of EWD, CBD and RMD before the first Send. Refresh resolves each tracked branch to an exact Git SHA. Download/Update validates an immutable local snapshot and builds a deterministic per-snapshot retrieval index. The first Send freezes the model/repository identity for that chat.</small>
+
+<small>Grounded answers expose numbered source references. Opening a source shows repository/version, exact snapshot SHA, file/locator, logical source ID, readable excerpt and an immutable GitHub permalink where appropriate. Repository evidence is current-turn data and is not accumulated permanently into ordinary provider conversation history.</small>
 
 ### Before you begin
 
@@ -123,6 +138,14 @@ flatpak run io.github.laurentiustaicu.ask_the_model
 
 <small><strong>Expected result:</strong> compatible newly installed models appear in the selector; models removed from the provider disappear after the refresh.</small>
 
+#### 7. Optional: use repository-grounded chat
+
+<small>Open the repository selector and choose EWD, CBD, RMD or any combination. Press <strong>Refresh repositories</strong> to compare your local state with each tracked remote SHA. If a repository is not installed or has changed, use <strong>Download/Update</strong>.</small>
+
+<small>Validated snapshots are stored under <code>~/Ask the Model/Repositories</code>. After the first Send, the selected AI model and repository snapshot set are frozen for that chat; create a new chat to change either identity.</small>
+
+<small><strong>Expected result:</strong> the status strip reaches READY, a grounded answer can show numbered source references, and opening a source exposes exact immutable provenance.</small>
+
 ### How AtM discovers models
 
 <small>AtM does <strong>not</strong> search every SSD, HDD or folder for files ending in <code>.gguf</code>. Model discovery is provider-based:</small>
@@ -166,7 +189,7 @@ flatpak run io.github.laurentiustaicu.ask_the_model
 | [Phi-4 Mini 3.8B Q4_K_M](https://ollama.com/library/phi4-mini/tags) | 2.5 GB | `ollama pull phi4-mini:3.8b-q4_K_M` | Alternative compact model family for comparison. |
 | [Qwen 3.5 4B Q4_K_M](https://ollama.com/library/qwen3.5/tags) | 3.4 GB | `ollama pull qwen3.5:4b-q4_K_M` | Larger small-model option when the machine has more memory available. |
 
-<small><strong>Model capability does not automatically become AtM capability.</strong> A model may advertise vision, tool use or reasoning features, but AtM v0.2.2 currently provides text chat only and requests <code>think: false</code> on its default chat path. For more detail on GGUF, quantization, importing models, hardware considerations and model licensing, see <a href="docs/MODEL_GUIDE.md">Choosing, installing and managing AI models</a>.</small>
+<small><strong>Model capability does not automatically become AtM capability.</strong> A model may advertise vision, tool use or reasoning features, but AtM v0.3.0 currently provides text chat and repository-grounded text retrieval; it requests <code>think: false</code> on its default chat path. For more detail on GGUF, quantization, importing models, hardware considerations and model licensing, see <a href="docs/MODEL_GUIDE.md">Choosing, installing and managing AI models</a>.</small>
 
 ### Managing models, disk space and memory
 
@@ -216,7 +239,7 @@ ollama pull SMALLER_MODEL
 
 ### Privacy and the local-provider boundary
 
-<small>AtM v0.2.2 connects only to loopback provider addresses on the same machine and sends prompt content when you activate <strong>Send</strong>. Conversation history is held in AtM memory for the current application process and is not persisted by AtM across restarts.</small>
+<small>AtM v0.3.0 connects only to loopback provider addresses on the same machine and sends prompt content when you activate <strong>Send</strong>. Conversation history is held in AtM memory for the current application process and is not persisted by AtM across restarts. Repository-grounded evidence comes from validated local snapshots; network access is used for explicit repository Refresh/Download/Update and for immutable GitHub links opened by the user.</small>
 
 <small>A loopback connection does not by itself prove that every model is local. The external provider decides how a selected model is executed. Modern Ollama versions can also expose cloud features. If strict local-only operation is required, choose a locally installed model and configure the provider accordingly; Ollama documents a local-only mode using <code>OLLAMA_NO_CLOUD=1</code> or <code>disable_ollama_cloud</code> in its server configuration.</small>
 
@@ -235,37 +258,36 @@ ollama pull SMALLER_MODEL
 
 ### What AtM does today
 
-- <small>discovers a supported local Ollama-compatible provider;</small>
-- <small>automatically enumerates provider-managed models;</small>
-- <small>filters the list to models advertising the <code>completion</code> capability;</small>
-- <small>lets you switch among compatible detected models;</small>
-- <small>refreshes model discovery without restarting the application;</small>
-- <small>streams assistant responses as they are generated;</small>
-- <small>keeps multi-turn conversation context in memory for the current session;</small>
-- <small>follows the desktop light/dark appearance;</small>
-- <small>runs as a GTK 4 / Granite application packaged for the elementary OS 8 Flatpak runtime.</small>
+- <small>discovers a supported local Ollama-compatible provider and completion-capable provider-managed models;</small>
+- <small>refreshes model discovery without restarting;</small>
+- <small>streams assistant responses and keeps independent in-memory multi-chat histories;</small>
+- <small>selects any combination of the fixed EWD/CBD/RMD repository catalog before the first Send;</small>
+- <small>resolves repository Refresh to exact Git SHAs and performs explicit validated Download/Update;</small>
+- <small>stores immutable validated snapshots under <code>~/Ask the Model/Repositories</code>;</small>
+- <small>builds deterministic per-snapshot SQLite/FTS5 retrieval indexes;</small>
+- <small>retrieves exact identifiers, structured entities/relations, lexical evidence and tabular rows;</small>
+- <small>pins AI-model and repository snapshot identity per chat on the first Send;</small>
+- <small>constructs current-turn repository grounding without accumulating evidence blocks into normal provider history;</small>
+- <small>shows compact numbered citations with exact repository/version/SHA/source/locator provenance and immutable source links;</small>
+- <small>follows desktop light/dark appearance and runs as a GTK 4 / Granite Flatpak for the elementary OS 8 runtime.</small>
 
-### What the current public release does not yet expose
+### What v0.3.0 still does not do
 
-<small>The public v0.2.2 application does not yet expose the repository-aware development work on `main`. In the released application, users cannot yet:</small>
-
-- <small>download, import, update or delete AI models through AtM;</small>
+- <small>download, import, move, update or delete AI model files through AtM;</small>
 - <small>install, start, stop or update the external provider through AtM;</small>
 - <small>configure provider host/port, authentication or TLS in the UI;</small>
-- <small>persist conversations across restarts;</small>
-- <small>select, ingest or retrieve scientific repositories through the released GTK conversation flow;</small>
-- <small>receive repository-grounded citations or provenance in the released chat UI;</small>
+- <small>persist conversations across application restarts;</small>
+- <small>accept arbitrary unreviewed repository origins beyond the fixed EWD/CBD/RMD catalog;</small>
 - <small>execute or simulate EWD, CBD or RMD;</small>
-- <small>turn ordinary AI chat output into an authoritative scientific-model result.</small>
-
-<small>These are release boundaries, not claims that no development implementation exists. See <a href="STATUS.md">Application status</a> for the separate development-`main` state.</small>
+- <small>autonomously modify scientific repositories;</small>
+- <small>turn generated text into an authoritative scientific-model result without repository-grounded provenance or actual model execution.</small>
 
 <details>
-<summary><strong>Scientific-model roadmap and boundary</strong></summary>
+<summary><strong>Scientific-model boundary</strong></summary>
 
-<small>AtM is intended to work with scientific dynamical-model repositories without replacing them. The planned initial suite includes EWD, CBD and RMD. Each source repository remains canonical for its documentation, code, data, assumptions, provenance, validation and release boundaries.</small>
+<small>AtM is an interface and retrieval/provenance layer. The source repositories remain canonical for their documentation, code, data, assumptions, provenance, validation and release boundaries. A repository marked READY has passed AtM compatibility/integrity checks; READY is not a scientific certification.</small>
 
-<small>Development `main` now contains an unreleased repository-aware GTK path for the fixed EWD/CBD/RMD suite: repository lifecycle controls, per-chat frozen repository/model context, deterministic retrieval, grounded generation, multi-chat navigation and on-demand citation provenance. This development functionality is not part of the public v0.2.2 release. Repository evidence, actual scientific-model outputs and AI-generated interpretation remain distinct concepts, and ordinary local chat in v0.2.2 must not be interpreted as repository-grounded scientific analysis.</small>
+<small>Future work may add broader repository management, provider support, persistent conversations, semantic retrieval or explicit scientific-model execution. Such work must preserve exact provenance and remain distinct from generated interpretation.</small>
 
 </details>
 
@@ -283,7 +305,7 @@ ollama pull SMALLER_MODEL
 #### Native build dependencies
 
 ```bash
-sudo apt install meson valac libgtk-4-dev libgranite-7-dev libsoup-3.0-dev libjson-glib-dev
+sudo apt install meson valac libgtk-4-dev libgranite-7-dev libsoup-3.0-dev libjson-glib-dev libsqlite3-dev libarchive-dev libyaml-dev
 meson setup build --prefix=/usr
 meson compile -C build
 ./build/io.github.laurentiustaicu.ask_the_model
@@ -313,15 +335,16 @@ flatpak run io.github.laurentiustaicu.ask_the_model
 
 ### Documentation
 
+- <small><a href="docs/USER_INTERFACE_GUIDE.md">User interface guide</a> — annotated application map and control/state behavior.</small>
+- <small><a href="docs/DEVELOPMENT_GUIDE.md">Development guide</a> — code map, extension points, invariants, tests and release workflow.</small>
 - <small><a href="docs/MODEL_GUIDE.md">Choosing, installing and managing AI models</a> — model sources, GGUF, quantization, storage, imports and local-only considerations.</small>
-- <small><a href="docs/TROUBLESHOOTING.md">Troubleshooting</a> — provider detection, missing models, performance, storage and installation problems.</small>
+- <small><a href="docs/TROUBLESHOOTING.md">Troubleshooting</a> — provider detection, models, performance, repositories, storage and installation problems.</small>
 - <small><a href="STATUS.md">Application status</a> — implemented capabilities and current release boundary.</small>
 - <small><a href="docs/DEPENDENCIES_AND_COMPATIBILITY.md">Dependencies and compatibility</a> — provider API contract, sandbox and platform details.</small>
-- <small><a href="docs/ARCHITECTURE.md">Architecture boundary</a> — relationship between AtM and scientific-model repositories.</small>
-- <small><a href="docs/INTERFACE_DESIGN_REQUIREMENTS.md">Interface design requirements</a>.</small>
-- <small><a href="docs/TERMINOLOGY.md">Terminology</a>.</small>
-- <small><a href="CHANGELOG.md">Changelog</a> and <a href="releases/">release notes</a>.</small>
-- <small><a href="CITATION.cff">Citation metadata</a>.</small>
+- <small><a href="docs/ARCHITECTURE.md">Application architecture</a> and <a href="docs/REPOSITORY_RETRIEVAL_ARCHITECTURE.md">repository/retrieval architecture</a>.</small>
+- <small><a href="docs/REPOSITORY_RETRIEVAL_ACCEPTANCE.md">Repository/retrieval acceptance gates</a>.</small>
+- <small><a href="docs/INTERFACE_DESIGN_REQUIREMENTS.md">Interface design requirements</a> and <a href="docs/TERMINOLOGY.md">terminology</a>.</small>
+- <small><a href="CHANGELOG.md">Changelog</a>, <a href="releases/">release notes</a> and <a href="CITATION.cff">citation metadata</a>.</small>
 
 ### Help and project maintenance
 
@@ -329,7 +352,7 @@ flatpak run io.github.laurentiustaicu.ask_the_model
 
 <small>If the problem remains reproducible, open a <a href="https://github.com/LaurentiuStaicu/ask-the-model/issues">GitHub issue</a> and include the AtM version, Linux distribution/session, provider version, model name and the exact steps needed to reproduce the problem. See <a href=".github/SUPPORT.md">Support</a> for the correct issue route and <a href=".github/CONTRIBUTING.md">Contributing</a> before proposing repository changes. Do not include private prompts, sensitive local information or vulnerability details in a public issue.</small>
 
-<small>Ask the Model is maintained in this repository by <a href="https://github.com/LaurentiuStaicu">LaurentiuStaicu</a>. Release history, current boundaries and planned scientific-repository integration are documented in <a href="CHANGELOG.md">CHANGELOG.md</a>, <a href="STATUS.md">STATUS.md</a> and the <a href="releases/">release notes</a>.</small>
+<small>Ask the Model is maintained in this repository by <a href="https://github.com/LaurentiuStaicu">LaurentiuStaicu</a>. Release history, current boundaries, repository/retrieval architecture and future extension points are documented in <a href="CHANGELOG.md">CHANGELOG.md</a>, <a href="STATUS.md">STATUS.md</a>, <a href="docs/DEVELOPMENT_GUIDE.md">the development guide</a> and the <a href="releases/">release notes</a>.</small>
 
 ### License
 
