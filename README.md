@@ -327,7 +327,7 @@ flatpak run io.github.laurentiustaicu.ask_the_model
 
 ### Documentation
 
-- <small><a href="docs/USER_INTERFACE_GUIDE.md">User interface guide</a> — annotated application map and control/state behavior.</small>
+- <small><a href="docs/USER_INTERFACE_GUIDE.md">User interface guide</a> — controls, repository lifecycle states, chat behavior and source-detail behavior.</small>
 - <small><a href="docs/DEVELOPMENT_GUIDE.md">Development guide</a> — code map, extension points, invariants, tests and release workflow.</small>
 - <small><a href="docs/MODEL_GUIDE.md">Choosing, installing and managing AI models</a> — model sources, GGUF, quantization, storage, imports and local-only considerations.</small>
 - <small><a href="docs/TROUBLESHOOTING.md">Troubleshooting</a> — provider detection, models, performance, repositories, storage and installation problems.</small>
