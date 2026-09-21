@@ -6,6 +6,7 @@ All notable public releases of Ask the Model are recorded here.
 
 ### Repository and retrieval backend
 
+- source-reference provenance popovers are now created on demand after their anchored menu buttons are mapped, avoiding GTK4 allocation warnings that could suppress citation details in the transcript;
 - multi-repository Refresh now clears previous remote identities for the entire selected batch before the first network request, preventing unvisited repositories from retaining stale update availability after an early failure;
 - repository refresh now invalidates the previous remote SHA/version before resolving a new coherent pair, so a failed refresh cannot leave stale update availability;
 - added direct lifecycle-service regression coverage for zero-repository grounding and fail-closed handling of selected repositories that are not locally ready;
