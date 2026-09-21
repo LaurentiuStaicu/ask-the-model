@@ -1,6 +1,6 @@
 # Troubleshooting Ask the Model
 
-This guide covers the most common problems in the AtM v0.2.2 local-chat setup. Work through the checks in order. The reference provider in the examples is Ollama.
+This guide covers the most common problems in the AtM v0.3.0 local-chat setup. Work through the checks in order. The reference provider in the examples is Ollama.
 
 ## Quick diagnostic sequence
 
@@ -23,7 +23,7 @@ This gives you a basic picture of whether Flatpak is available, whether the prov
 
 ## AtM shows “Ollama not found”
 
-AtM v0.2.2 probes these endpoints in order:
+AtM v0.3.0 probes these endpoints in order:
 
 1. `http://127.0.0.1:11434`
 2. `http://127.0.0.1:11435`
@@ -266,11 +266,79 @@ If direct provider execution also fails, fix the provider/model problem before d
 
 ## My conversation disappeared after restarting AtM
 
-This is expected in v0.2.2. Conversation history exists only in application memory for the current AtM process. Persistent conversation storage is not implemented yet.
+This is expected in v0.3.0. Conversation history exists only in application memory for the current AtM process. Persistent conversation storage is not implemented yet.
+
+## Repository Refresh shows an update
+
+Repository Refresh compares the selected repository's tracked remote branch with the exact SHA of the current validated local snapshot.
+
+If Refresh shows an update, this is not an error. Use **Download/Update** to fetch and validate the new exact revision.
+
+AtM does not overwrite the old snapshot in place. A successful update creates a new immutable snapshot/index pair and may retain the previous one for rollback or active-chat pinning.
+
+## Repository Download/Update fails
+
+Start AtM from a terminal:
+
+```bash
+flatpak run io.github.laurentiustaicu.ask_the_model
+```
+
+Then repeat Refresh and Download/Update.
+
+Useful checks:
+
+1. confirm normal Internet access to GitHub;
+2. confirm the repository selector includes the intended repository;
+3. read the terminal line naming the repository, remote SHA and any validation error;
+4. verify that the application still reports the previous valid snapshot as usable if one existed.
+
+Do not manually move partial content from `Repositories/.staging` into a snapshot directory. Promotion to READY is intentionally application-controlled.
+
+## A grounded answer has no numbered sources
+
+Check that:
+
+1. at least one repository was selected **before the first Send**;
+2. the selected repository reached READY;
+3. the question is related to content that exists in the selected repository scope;
+4. you are not expecting a chat that started with zero repositories to acquire repository scope later.
+
+Repository scope is frozen on the first Send. Create a new chat to change it.
+
+## The model or repository selector is locked
+
+This is expected after the first Send.
+
+Each chat freezes its selected AI-model identity and exact repository snapshot set so later provider/repository changes cannot silently alter the evidence basis of an existing transcript.
+
+Create a new chat to choose a different model or repository scope.
+
+## A numbered source opens unexpected text
+
+Open the source-detail window and record:
+
+- repository acronym/version;
+- snapshot SHA;
+- source file and locator;
+- Source ID;
+- the visible excerpt.
+
+Then use **Open immutable source** and verify that GitHub opens the same commit SHA and locator.
+
+If those identifiers disagree, report it through the **Repository / grounding / provenance** issue form. Do not report only the generated prose; provenance identifiers are required to diagnose retrieval/citation problems.
+
+## Old repository snapshots remain after an update
+
+This can be expected.
+
+Validated snapshots are immutable. AtM may retain the previous snapshot/index pair for safe rollback or because an active chat is pinned to it.
+
+The v0.3.0 compact header does not yet expose full snapshot-history/removal management.
 
 ## I expected AtM to download or delete a model
 
-This is not implemented in v0.2.2.
+This is not implemented in v0.3.0.
 
 For now, use provider commands:
 
@@ -311,7 +379,7 @@ Open the badge or the repository Actions tab to inspect the failing run.
 
 The repository previously experimented with publishing the development Flatpak repository through GitHub Pages. That historical Pages deployment failed because GitHub Pages had not been enabled, and the workflow was subsequently replaced with direct publication to the `flatpak-repo` branch.
 
-The current build/release workflow no longer uses the `github-pages` environment. A historical red Deployment therefore does not describe the current AtM v0.2.2 build state.
+The current build/release workflow no longer uses the `github-pages` environment. A historical red Deployment therefore does not describe the current AtM v0.3.0 build state.
 
 Repository administrators can clean up obsolete deployment/environment history from GitHub settings or the GitHub Deployments API where appropriate.
 
@@ -328,6 +396,7 @@ If the problem remains reproducible, collect:
 - output of `ollama ls`;
 - output of `ollama ps` while the problem is happening;
 - terminal output from `flatpak run io.github.laurentiustaicu.ask_the_model`;
+- for repository/grounding problems, repository acronym, snapshot SHA and Source ID/locator when available;
 - the exact steps needed to reproduce the problem.
 
 Do not include private prompts, credentials or sensitive local paths unless they are necessary and you intentionally want to share them.
@@ -337,8 +406,10 @@ Issues can be reported through the [AtM GitHub Issues page](https://github.com/L
 ## Related documentation
 
 - [README / first-time setup](../README.md#start-here-first-time-setup)
+- [Interface guide](USER_INTERFACE_GUIDE.md)
 - [Model guide](MODEL_GUIDE.md)
 - [Dependencies and compatibility](DEPENDENCIES_AND_COMPATIBILITY.md)
+- [Development guide](DEVELOPMENT_GUIDE.md)
 - [Application status](../STATUS.md)
 - [Ollama CLI](https://docs.ollama.com/cli)
 - [Ollama FAQ](https://docs.ollama.com/faq)
