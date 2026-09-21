@@ -392,6 +392,62 @@ class RetrievalBenchmarkEvaluatorTest(unittest.TestCase):
         )
         self.assertFalse(result["passes_provisional_targets"])
 
+    def test_per_topic_diagnostics_expose_required_evidence_ranks(self):
+        result = evaluator.evaluate(
+            benchmark_fixture(),
+            run_fixture(),
+        )
+
+        diagnostics = {
+            item["topic_id"]: item
+            for item in result["topic_diagnostics"]
+        }
+
+        english = diagnostics["exact-food-en"]
+        self.assertEqual(english["exact_id_success_at_1"], 1.0)
+        self.assertEqual(english["reciprocal_rank"], 1.0)
+        self.assertEqual(
+            english["canonical_required_recall_at_5"],
+            1.0,
+        )
+        self.assertEqual(
+            english["required_evidence"],
+            [
+                {
+                    "repository_id": "ewd",
+                    "logical_source_id":
+                        "ewd:entity:variable:food_per_capita",
+                    "grade": 3,
+                    "rank": 1,
+                    "in_top_k": True,
+                }
+            ],
+        )
+
+        romanian = diagnostics["exact-food-ro"]
+        self.assertEqual(romanian["exact_id_success_at_1"], 0.0)
+        self.assertAlmostEqual(romanian["reciprocal_rank"], 1.0 / 2.0)
+        self.assertEqual(
+            romanian["canonical_required_recall_at_5"],
+            1.0,
+        )
+        self.assertEqual(
+            romanian["required_evidence"][0]["rank"],
+            3,
+        )
+        self.assertTrue(
+            romanian["required_evidence"][0]["in_top_k"]
+        )
+
+        unsupported = diagnostics["unsupported-ewd"]
+        self.assertIsNone(
+            unsupported["canonical_required_recall_at_5"]
+        )
+        self.assertEqual(
+            unsupported["required_evidence"],
+            [],
+        )
+
     def test_cross_language_variants_must_share_split(self):
         benchmark = benchmark_fixture()
         benchmark["topics"][1]["split"] = "development"
