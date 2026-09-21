@@ -525,6 +525,39 @@ def required_recall_at_k(
     return len(required & retrieved) / len(required)
 
 
+def required_evidence_diagnostics(
+    topic: dict[str, Any],
+    results: list[dict[str, Any]],
+    k: int,
+) -> list[dict[str, Any]]:
+    ranks: dict[tuple[str, str], int] = {}
+
+    for rank, result in enumerate(results, start=1):
+        key = source_key(result)
+        if key not in ranks:
+            ranks[key] = rank
+
+    diagnostics: list[dict[str, Any]] = []
+
+    for judgment in topic["judgments"]:
+        if not judgment["required"]:
+            continue
+
+        key = source_key(judgment)
+        rank = ranks.get(key)
+        diagnostics.append(
+            {
+                "repository_id": judgment["repository_id"],
+                "logical_source_id": judgment["logical_source_id"],
+                "grade": judgment["grade"],
+                "rank": rank,
+                "in_top_k": rank is not None and rank <= k,
+            }
+        )
+
+    return diagnostics
+
+
 def context_precision(
     topic: dict[str, Any],
     context_sources: list[dict[str, Any]],
@@ -616,6 +649,7 @@ def evaluate(
     total_results = 0
     expected_outcome_scores: list[float] = []
     clarification_outcome_scores: list[float] = []
+    topic_diagnostics: list[dict[str, Any]] = []
     language_ndcg: dict[str, list[float]] = {
         "en": [],
         "ro": [],
@@ -643,14 +677,16 @@ def evaluate(
         if topic_run.get("evidence_token_count") is not None:
             evidence_tokens.append(topic_run["evidence_token_count"])
 
+        exact_success = None
+
         if topic["topic_type"] == "exact_entity_lookup":
             target = source_key(topic["expected_exact"])
-            success = (
+            exact_success = (
                 1.0
                 if results and source_key(results[0]) == target
                 else 0.0
             )
-            exact_scores.append(success)
+            exact_scores.append(exact_success)
 
         rr = reciprocal_rank(topic, results)
         if rr is not None:
@@ -673,6 +709,28 @@ def evaluate(
         precision = context_precision(topic, context_sources)
         if precision is not None:
             context_precisions.append(precision)
+
+        topic_diagnostics.append(
+            {
+                "topic_id": topic["topic_id"],
+                "information_need_id": topic["information_need_id"],
+                "split": topic["split"],
+                "topic_type": topic["topic_type"],
+                "language": topic["language"],
+                "expected_outcome": topic["expected_outcome"],
+                "observed_outcome": topic_run["outcome"],
+                "exact_id_success_at_1": exact_success,
+                "reciprocal_rank": rr,
+                "ndcg_at_5": ndcg,
+                "canonical_required_recall_at_5": recall,
+                "context_precision": precision,
+                "required_evidence": required_evidence_diagnostics(
+                    topic,
+                    results,
+                    5,
+                ),
+            }
+        )
 
         if (
             len(topic["explicit_repositories"]) == 1
@@ -826,6 +884,7 @@ def evaluate(
         "benchmark_id": benchmark["benchmark_id"],
         "run_id": run["run_id"],
         "topic_count": len(benchmark["topics"]),
+        "topic_diagnostics": topic_diagnostics,
         "metrics": metrics,
         "provisional_targets": TARGETS,
         "gates": gates,
