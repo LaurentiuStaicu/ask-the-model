@@ -14,7 +14,6 @@
   <a href="https://github.com/LaurentiuStaicu/ask-the-model/releases/latest/download/AskTheModel.flatpak"><img alt="Download Flatpak" src="https://img.shields.io/badge/download-Flatpak-333333?style=flat-square&logo=flatpak&logoColor=white"></a>
   <a href="#start-here-first-time-setup"><img alt="Getting started" src="https://img.shields.io/badge/read-Getting%20started-707070?style=flat-square"></a>
   <a href="docs/USER_INTERFACE_GUIDE.md"><img alt="Interface guide" src="https://img.shields.io/badge/read-Interface%20guide-a0a0a0?style=flat-square"></a>
-  <a href="docs/DEVELOPMENT_GUIDE.md"><img alt="Developer guide" src="https://img.shields.io/badge/read-Developer%20guide-333333?style=flat-square"></a>
 </p>
 
 <p align="center"><small><strong>A local-first desktop interface for local AI chat and repository-grounded exploration of scientific dynamical models with exact, inspectable provenance.</strong></small></p>
@@ -327,16 +326,21 @@ flatpak run io.github.laurentiustaicu.ask_the_model
 
 ### Documentation
 
+#### User documentation
+
 - <small><a href="docs/USER_INTERFACE_GUIDE.md">User interface guide</a> — controls, repository lifecycle states, chat behavior and source-detail behavior.</small>
-- <small><a href="docs/DEVELOPMENT_GUIDE.md">Development guide</a> — code map, extension points, invariants, tests and release workflow.</small>
 - <small><a href="docs/MODEL_GUIDE.md">Choosing, installing and managing AI models</a> — model sources, GGUF, quantization, storage, imports and local-only considerations.</small>
 - <small><a href="docs/TROUBLESHOOTING.md">Troubleshooting</a> — provider detection, models, performance, repositories, storage and installation problems.</small>
 - <small><a href="STATUS.md">Application status</a> — implemented capabilities and current release boundary.</small>
+
+#### Developer / architecture documentation
+
+- <small><a href="docs/DEVELOPMENT_GUIDE.md">Development guide</a> — code map, extension points, invariants, tests and release workflow.</small>
 - <small><a href="docs/DEPENDENCIES_AND_COMPATIBILITY.md">Dependencies and compatibility</a> — provider API contract, sandbox and platform details.</small>
 - <small><a href="docs/ARCHITECTURE.md">Application architecture</a> and <a href="docs/REPOSITORY_RETRIEVAL_ARCHITECTURE.md">repository/retrieval architecture</a>.</small>
 - <small><a href="docs/REPOSITORY_RETRIEVAL_ACCEPTANCE.md">Repository/retrieval acceptance gates</a>.</small>
 - <small><a href="docs/INTERFACE_DESIGN_REQUIREMENTS.md">Interface design requirements</a> and <a href="docs/TERMINOLOGY.md">terminology</a>.</small>
-- <small><a href="CHANGELOG.md">Changelog</a>, <a href="releases/">release notes</a> and <a href="CITATION.cff">citation metadata</a>.</small>
+- <small><a href=".github/CONTRIBUTING.md">Contributing</a>, <a href=".github/SUPPORT.md">support</a>, <a href="CHANGELOG.md">changelog</a>, <a href="releases/">release notes</a> and <a href="CITATION.cff">citation metadata</a>.</small>
 
 ### Help and project maintenance
 
