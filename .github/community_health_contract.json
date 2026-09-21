@@ -1,8 +1,8 @@
 {
-  "contract_version": "1.0",
-  "frozen_on": "2026-09-20",
+  "contract_version": "1.1",
+  "frozen_on": "2026-09-21",
   "suite_role": "APPLICATION_INTERFACE",
-  "purpose": "Apply the shared suite community-health shell to Ask the Model while keeping application/provider/model boundaries explicit.",
+  "purpose": "Apply the shared suite community-health shell to Ask the Model while keeping application/provider/model/scientific-repository boundaries explicit.",
   "shared_with_suite": [
     "CONTRIBUTING structure",
     "SUPPORT routing",
@@ -12,6 +12,8 @@
   "project_specific": [
     "Flatpak/build context",
     "provider/model compatibility reporting",
+    "repository lifecycle and retrieval reporting",
+    "grounded citation/provenance reporting",
     "application capability boundary"
   ],
   "deferred": {
@@ -20,12 +22,14 @@
     "account_level_defaults": "PENDING_PUBLIC_ACCOUNT_LEVEL_DOT_GITHUB_REPOSITORY"
   },
   "invariants": [
-    "AtM is an interface, not a scientific model.",
+    "AtM is an interface and retrieval layer, not a scientific model.",
     "External providers and AI model files remain separate dependencies/artifacts.",
+    "Scientific repositories remain canonical for their own scientific content and validation.",
     "Do not present AI-generated content as a canonical EWD/CBD/RMD result without repository-grounded provenance or actual model execution.",
+    "Do not weaken exact-SHA snapshot identity, fail-closed repository lifecycle or per-chat identity pinning without a reviewed architecture change.",
     "Do not bump the application version as part of an unrelated change.",
-    "Release publication must remain tied to the exact versioned release notes and reviewed commit."
+    "Release publication must remain tied to exact versioned release notes and the reviewed commit."
   ],
-  "current_public_version": "0.2.2",
-  "version_bump_required": false
+  "current_public_version": "0.3.0",
+  "version_bump_required": true
 }
