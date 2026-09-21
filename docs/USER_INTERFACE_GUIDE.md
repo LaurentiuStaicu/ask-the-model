@@ -2,70 +2,7 @@
 
 This guide explains the user-facing controls in Ask the Model v0.3.0 and the state transitions that matter when using repository-grounded chat.
 
-The interface is documented as a technical wireframe rather than a screenshot or generated illustration. That keeps the documentation editable, reviewable in Git diffs, and independent of a particular desktop background or window size.
-
-## Technical wireframe
-
-```text
- MAIN WINDOW
-
-+--------------------------------------------------------------------------------------+
-| [1] AI model selector  [2] model refresh   [3] repository selector  [4] repo refresh |
-|                                                        [5] contextual Download/Update |
-|                                   Ask the Model                                      |
-+--------------------------------------------------------------------------------------+
-| [6] repository/status LCD:     EWD   CBD   RMD      ...      READY                   |
-+--------------------------------------------------------------------------------------+
-| [7] +   [ conversation tab ..................................................... x ] |
-+--------------------------------------------------------------------------------------+
-|                                                                                      |
-| [8] You: <question>                                                                  |
-|                                                                                      |
-|     Assistant: <ordinary or repository-grounded answer>                              |
-|                                                                                      |
-|     Sources: [9][1] [9][2] [9][3] ...                                                |
-|                                                                                      |
-|                                                                                      |
-|                                                                                      |
-+--------------------------------------------------------------------------------------+
-| [10] Ask something.....................................................  [11] Send    |
-+--------------------------------------------------------------------------------------+
-
-
- SOURCE DETAIL WINDOW
-
-                         +------------------------------------------------------------+
-                         | [12] Source [1]                                             |
-                         +------------------------------------------------------------+
-                         | Repository + repository-declared version                   |
-                         | Source file + physical locator                             |
-                         | Exact immutable snapshot SHA                               |
-                         | Logical Source ID                                          |
-                         |                                                            |
-                         | Readable evidence excerpt                                  |
-                         |                                                            |
-                         | Open immutable source                                      |
-                         +------------------------------------------------------------+
-```
-
-The wireframe describes topology and responsibilities, not pixel-perfect widget dimensions. The actual GTK theme, font metrics and window decoration are supplied by the desktop environment.
-
-## Numbered control legend
-
-| # | Surface | Purpose |
-| ---: | --- | --- |
-| 1 | AI model selector | Chooses a completion-capable model reported by the local provider before the first Send. |
-| 2 | Model refresh | Repeats provider/model discovery without restarting AtM. |
-| 3 | Repository selector | Chooses zero or more repositories from the fixed EWD/CBD/RMD catalog. |
-| 4 | Repository refresh | Resolves the selected repositories to their current exact remote Git SHA/version without modifying local snapshots. |
-| 5 | Download / Update | Appears contextually when a selected repository is missing or a newer exact SHA is available. |
-| 6 | Status LCD | Shows compact repository identity/lifecycle state such as READY, refresh/update activity, offline or error. |
-| 7 | Chat tabs | Creates, switches and closes independent in-memory conversations. |
-| 8 | Transcript | Shows user/assistant turns and grounded source references. |
-| 9 | Numbered source reference | Opens exact provenance for evidence used in the grounded answer. |
-| 10 | Prompt composer | Accepts the next user message. |
-| 11 | Send | Starts the turn; on the first Send it also freezes AI-model and repository identity for that chat. |
-| 12 | Source detail window | Shows repository/version, source locator, exact snapshot SHA, Source ID, readable excerpt and immutable source link. |
+The guide is intentionally text-first. A dedicated visual application guide is deferred until a representation can be produced and reviewed against the real GTK interface without introducing invented controls, proportions, decoration, or layout.
 
 ## Header controls
 
