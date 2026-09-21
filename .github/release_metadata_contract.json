@@ -11,7 +11,7 @@
   "current_public_release": {
     "version": "0.3.0",
     "date": "2026-09-21",
-    "version_bump_required_now": true,
+    "version_bump_required_now": false,
     "reason": "The repository-aware GTK path is now user-facing and locally smoke-tested: fixed EWD/CBD/RMD lifecycle, deterministic retrieval, per-chat pinning, grounded citations and exact-SHA provenance materially extend the v0.2 local-chat baseline."
   },
   "canonical_sources": {
