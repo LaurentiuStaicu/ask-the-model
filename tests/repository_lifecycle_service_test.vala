@@ -26,6 +26,9 @@ namespace AskTheModel.Tests {
                 RepositoryRuntimeInfo info =
                     service.info_for (descriptor.id);
 
+                assert (
+                    info.descriptor.id == descriptor.id
+                );
                 assert (!info.local.is_ready ());
                 assert (info.download_required ());
                 assert (!info.update_available ());
