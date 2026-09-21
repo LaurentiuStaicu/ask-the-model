@@ -65,7 +65,6 @@ Repository-Grounded Multi-Chat.
 
 ### Documentation and contributor experience
 
-- added a version-controlled technical interface wireframe and numbered control legend;
 - added `docs/USER_INTERFACE_GUIDE.md`;
 - added `docs/DEVELOPMENT_GUIDE.md` with code map, invariants, extension points and release workflow;
 - updated README, STATUS, AppStream, desktop metadata, CITATION and release contracts for the repository-grounded capability boundary;
