@@ -1,5 +1,5 @@
 {
-  "contract_version": "1.1",
+  "contract_version": "1.2",
   "frozen_on": "2026-09-21",
   "purpose": "Keep the public Ask the Model landing page consistent with the implemented application/provider/model/repository boundary while preserving a first-time-user path and clear developer routes.",
   "suite_visual_identity": {
@@ -21,10 +21,9 @@
     "action_badges": [
       "download Flatpak",
       "getting started",
-      "interface guide",
-      "developer guide"
+      "interface guide"
     ],
-    "note": "AtM intentionally carries user/developer action routes because it is an installable application and a repository-grounded interface."
+    "note": "AtM keeps the repository header user-first: release identity and three primary user actions stay above the fold, while developer routes remain in the structured documentation and CONTRIBUTING surfaces."
   },
   "current_public_release": {
     "version": "0.3.0",
@@ -92,5 +91,11 @@
     "public_release": "v0.3.0 deliberately exposes the fixed EWD/CBD/RMD repository-aware grounded-chat path.",
     "development_main": "Future work may extend retrieval, provider support, persistence or repository management without silently broadening the v0.3.0 release claim.",
     "readme_rule": "README statements about repository retrieval must match released behavior and keep scientific validity/model execution boundaries explicit."
+  },
+  "readme_information_architecture": {
+    "above_the_fold": "identity, release/license/platform, three user actions, concise purpose and quick-start navigation",
+    "user_documentation": "interface, model, troubleshooting and status",
+    "developer_documentation": "development, dependencies, architecture, acceptance, interface requirements, terminology and contribution/support routes",
+    "principle": "Keep the README scannable; detailed contributor and architecture material remains linked rather than promoted into the primary action row."
   }
 }
