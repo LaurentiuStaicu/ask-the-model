@@ -152,7 +152,7 @@ Any such work should preserve the invariants documented in `docs/DEVELOPMENT_GUI
 ## Documentation
 
 - `README.md` — public landing page and first-use path;
-- `docs/USER_INTERFACE_GUIDE.md` — annotated interface map;
+- `docs/USER_INTERFACE_GUIDE.md` — user-facing controls and state behavior;
 - `docs/DEVELOPMENT_GUIDE.md` — code map, invariants and extension points;
 - `docs/ARCHITECTURE.md` — application architecture;
 - `docs/REPOSITORY_RETRIEVAL_ARCHITECTURE.md` — repository/retrieval architecture;
