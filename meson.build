@@ -109,6 +109,7 @@ repository_catalog_test = executable(
   include_directories: include_directories('src'),
   dependencies: [
     glib_dep,
+    gio_dep,
     soup_dep,
     json_glib_dep
   ],
