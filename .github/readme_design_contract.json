@@ -86,7 +86,7 @@
   },
   "release_boundary": {
     "documentation_contract_change_is_release_prep": false,
-    "version_bump_required": true
+    "version_bump_required": false
   },
   "release_vs_development_boundary": {
     "public_release": "v0.3.0 deliberately exposes the fixed EWD/CBD/RMD repository-aware grounded-chat path.",
