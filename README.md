@@ -19,7 +19,7 @@
 
 <p align="center"><small><strong>A local-first desktop interface for local AI chat and repository-grounded exploration of scientific dynamical models with exact, inspectable provenance.</strong></small></p>
 
-<p align="center"><small><a href="#start-here-first-time-setup">First-time setup</a> · <a href="#repository-grounded-scientific-model-chat">Repository-grounded chat</a> · <a href="docs/USER_INTERFACE_GUIDE.md">Technical sketch</a> · <a href="docs/TROUBLESHOOTING.md">Troubleshooting</a> · <a href="STATUS.md">Project status</a></small></p>
+<p align="center"><small><a href="#start-here-first-time-setup">First-time setup</a> · <a href="#repository-grounded-scientific-model-chat">Repository-grounded chat</a> · <a href="docs/USER_INTERFACE_GUIDE.md">Interface guide</a> · <a href="docs/TROUBLESHOOTING.md">Troubleshooting</a> · <a href="STATUS.md">Project status</a></small></p>
 
 ---
 
@@ -34,41 +34,6 @@
 <small><strong>Ask the Model</strong> provides the interface and retrieval/provenance layer. A <strong>local provider</strong>, such as Ollama, loads and runs AI models. The <strong>AI model</strong> remains a separate artifact that must currently be downloaded and managed through the provider rather than AtM.</small>
 
 <small>Version 0.3.0 adds repository selection, exact-SHA refresh/download/update, immutable validated local snapshots, deterministic local retrieval, independent multi-chat state and compact numbered citations with inspectable provenance. EWD, CBD and RMD remain authoritative for their own code, data, assumptions, provenance and validation.</small>
-
-### Technical interface sketch
-
-```text
-+----------------------------------------------------------------------------------+
-| [1 AI model v] [2 Refresh]  [3 Repositories v] [4 Refresh] [5 Download/Update] |
-|                                  Ask the Model                                    |
-+----------------------------------------------------------------------------------+
-| [6] EWD   CBD   RMD                         READY                                |
-+----------------------------------------------------------------------------------+
-| [7 +] [Conversation tab x]                                                       |
-+----------------------------------------------------------------------------------+
-| [8] You: question                                                               |
-|                                                                                  |
-|     Assistant: grounded answer                                                   |
-|                                                                                  |
-|     Sources: [9 1] [9 2] [9 3]                                                  |
-|                                                                                  |
-|                                                                                  |
-+----------------------------------------------------------------------------------+
-| [10 Ask something....................................................] [11 Send] |
-+----------------------------------------------------------------------------------+
-
-                                          +---------------------------------------+
-                                          | [12] Source [1]                      |
-                                          | repository/version                   |
-                                          | file + locator                       |
-                                          | exact snapshot SHA                   |
-                                          | Source ID                            |
-                                          | readable evidence excerpt            |
-                                          | Open immutable source                |
-                                          +---------------------------------------+
-```
-
-<small>This is a documentation wireframe, not a screenshot or decorative reconstruction. It records the current control topology and the separate source-detail window. See <a href="docs/USER_INTERFACE_GUIDE.md">Interface guide</a> for the numbered legend and state behavior.</small>
 
 ### Repository-grounded scientific-model chat
 
