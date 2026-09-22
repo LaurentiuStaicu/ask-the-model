@@ -86,6 +86,201 @@ All checks succeed in the same runtime/SDK baseline used for the release Flatpak
 
 Failure blocks repository lifecycle implementation until the dependency strategy is revised.
 
+## G-S0 — Startup qualification and clean-install reconciliation
+
+This gate is distinct from G-P0.
+
+G-P0 proves in CI that the supported Flatpak SDK/runtime baseline exposes the
+capabilities required by the repository implementation. G-S0 qualifies the
+state of the installation that is actually running and reconciles local
+repository state without contacting the network.
+
+Passing G-P0 does not imply that a particular installed deployment passes
+G-S0.
+
+### Execution identity
+
+For a packaged Flatpak deployment, startup qualification reads the effective
+sandbox metadata from `/.flatpak-info` and records at least:
+
+- application ID/ref;
+- application commit;
+- runtime ref;
+- runtime commit;
+- architecture/branch information exposed by the deployment;
+- application extensions;
+- runtime extensions;
+- Flatpak version exposed by the instance metadata.
+
+The application ID must match
+`io.github.laurentiustaicu.ask_the_model`. The runtime must match the
+supported elementary OS 8 runtime family documented by the release.
+
+Missing, malformed or contradictory deployment identity is a platform
+qualification failure.
+
+A development execution with no usable Flatpak instance metadata must be
+classified explicitly as an unpackaged/development execution. It must never
+be represented as a qualified release installation merely because the binary
+starts successfully.
+
+### Platform fingerprint
+
+AtM computes a deterministic platform fingerprint from the canonicalized
+deployment identity and the startup-qualification policy/schema version.
+
+The fingerprint includes the exact application/runtime refs and commits plus
+sorted application/runtime extension identities. Observed Flatpak-version
+metadata is recorded for diagnostics; changing the qualification policy or a
+deployment identity component requires requalification.
+
+The fingerprint is a local comparison key, not a replacement for Flatpak
+repository signature verification or external build/release attestation.
+
+### Local storage boundary
+
+The visible repository root remains:
+
+`~/Ask the Model`
+
+Security-sensitive qualification of this path must fail closed if the root is
+a symlink or is not a real directory owned by the current user.
+
+The qualification implementation must use descriptor-based no-follow checks
+for the security boundary rather than a check-then-open path test. It must
+also verify that the directory is not writable by group/other users and prove
+application write capability using an application-owned temporary probe that
+is removed after the check.
+
+A storage failure blocks repository-qualified operation but must not turn a
+partially inspected repository into READY.
+
+### Repository-state load result
+
+Loading persistent repository state must expose an explicit diagnostic result
+instead of silently making corrupt state indistinguishable from a clean
+installation.
+
+At minimum, the state-load result distinguishes:
+
+- `ABSENT` — no prior repository state exists;
+- `VALID` — state schema and recorded entries are valid;
+- `INVALID` — state exists but cannot be accepted.
+
+Invalid state is preserved for diagnosis/recovery unless a separate explicit
+repair operation is defined. Startup qualification must not guess the
+"latest" snapshot from directory names and must not silently repin a
+repository after state corruption.
+
+### Per-repository offline reconciliation
+
+EWD, CBD and RMD are reconciled independently. A failure in one repository
+must not prevent a different valid repository from becoming locally usable.
+
+Startup reconciliation performs no remote Refresh and no Download/Update.
+
+For each catalog repository:
+
+1. no valid state entry means `NOT_INSTALLED`;
+2. state that names a missing snapshot means `SNAPSHOT_MISSING`;
+3. a snapshot path that is not a real non-symlink directory means
+   `SNAPSHOT_INVALID`;
+4. a local snapshot is validated against the built-in catalog and repository
+   manifest contract before it can be READY;
+5. the validated repository version must match the persisted version;
+6. the retrieval index is validated for that exact snapshot SHA;
+7. a missing, stale, schema-incompatible or corrupt index is rebuilt from the
+   validated immutable snapshot rather than triggering a repository download;
+8. a valid reused index yields `READY`;
+9. a successfully rebuilt index yields `READY_REPAIRED_INDEX`;
+10. a snapshot/manifest/version failure remains not READY and the snapshot is
+    preserved for diagnosis rather than being rewritten in place.
+
+The exact snapshot SHA remains the repository identity. Reconciliation never
+selects repository content heuristically.
+
+### Qualification record
+
+A successful or partially successful qualification writes a durable local
+record in application state using an atomic/consistent durable-write path.
+
+The record contains installation facts and qualification outcomes, including:
+
+- qualification schema/policy version;
+- qualification timestamp;
+- execution mode;
+- application/runtime deployment identity;
+- platform fingerprint;
+- storage-root result;
+- repository-state load result;
+- per-repository status, exact SHA/version when applicable, index status and
+  stable reason codes;
+- overall platform/storage qualification outcome.
+
+The record does not claim that a release attestation was verified from inside
+the running application. Supply-chain attestation/signature verification is
+an external installation/distribution trust decision.
+
+Local AI-provider availability is also not part of the durable installation
+qualification record. Provider discovery remains runtime state because the
+provider can appear, disappear or change models without changing the AtM
+installation.
+
+### Clean-install behavior
+
+A clean installation with no repository state and no local EWD/CBD/RMD
+snapshots is a valid G-S0 outcome when the deployment and storage boundary are
+valid:
+
+- the installation can be platform/storage qualified;
+- EWD, CBD and RMD are `NOT_INSTALLED`;
+- no network request is required by G-S0;
+- no repository is downloaded automatically;
+- provider absence does not turn the installation qualification into a
+  failure.
+
+Repository Refresh and Download/Update remain explicit user actions governed
+by R1.
+
+### Required regression matrix
+
+Automated coverage must include at least:
+
+1. clean packaged installation, empty state/data, offline -> platform/storage
+   qualified and all repositories `NOT_INSTALLED`;
+2. valid state + snapshot + valid index -> `READY`;
+3. missing index -> rebuilt locally -> `READY_REPAIRED_INDEX`;
+4. corrupt or snapshot-mismatched index -> rebuilt locally before use;
+5. state points to missing snapshot -> `SNAPSHOT_MISSING`;
+6. malformed/corrupt repository-state file -> state `INVALID`, no heuristic
+   snapshot selection, existing snapshots preserved;
+7. persisted version differs from validated snapshot version -> not READY;
+8. snapshot root is a symlink or non-directory -> `SNAPSHOT_INVALID`;
+9. visible data root is a symlink or violates the storage boundary -> storage
+   qualification failure;
+10. wrong/malformed application or runtime deployment identity -> platform
+    qualification failure;
+11. application/runtime commit or qualification-policy change -> deterministic
+    fingerprint change and requalification;
+12. durable qualification-record write/read round trip;
+13. one broken repository with other valid repositories -> failure isolation;
+14. unpackaged development execution -> explicit development/unqualified
+    execution state, never a qualified release deployment;
+15. startup reconciliation performs no repository network I/O.
+
+### Pass condition
+
+G-S0 passes for the installation plane when the packaged deployment identity
+and dedicated storage boundary qualify.
+
+Repository readiness is reported independently per EWD/CBD/RMD and may remain
+`NOT_INSTALLED` on a clean installation. Any repository reported READY must
+have passed exact-SHA local snapshot validation and exact-snapshot retrieval
+index validation/rebuild.
+
+G-S0 does not scientifically certify EWD, CBD or RMD. The global READY
+definition remains a local AtM compatibility/retrieval state only.
+
 ## R0 — UX and conversation foundation
 
 ### Required behavior
