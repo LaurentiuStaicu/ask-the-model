@@ -45,4 +45,20 @@ void atm_repository_reconcile_result_free (
     AtmRepositoryReconcileResult *result
 );
 
+gboolean atm_repository_reconcile_local_values (
+    const char *cache_root,
+    const char *snapshot_root,
+    const char *repository_id,
+    const char *repository_acronym,
+    const char *repository_display_name,
+    const char *snapshot_sha,
+    const char *persisted_version,
+    gint *out_status,
+    char **out_reason_code,
+    char **out_detail,
+    char **out_repository_version,
+    char **out_index_path,
+    GError **error
+);
+
 G_END_DECLS
