@@ -150,6 +150,13 @@ read_sorted_extensions (
         return FALSE;
     }
 
+    if (length == 0 ||
+        (length == 1 && values[0][0] == '\0')) {
+        g_strfreev (values);
+        *out_values = g_new0 (char *, 1);
+        return TRUE;
+    }
+
     for (gsize i = 0; i < length; i++) {
         if (!extension_entry_is_valid (values[i])) {
             g_set_error (
