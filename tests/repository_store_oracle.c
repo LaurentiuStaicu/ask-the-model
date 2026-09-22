@@ -727,6 +727,231 @@ out:
 }
 
 static gboolean
+oracle_collect_seal_entries (
+    const char *snapshot_root,
+    const char *relative_directory,
+    GPtrArray *entries,
+    GError **error
+)
+{
+    char *absolute_directory =
+        relative_directory[0] == '\0'
+            ? g_strdup (snapshot_root)
+            : g_build_filename (
+                snapshot_root,
+                relative_directory,
+                NULL
+            );
+    GDir *directory =
+        g_dir_open (absolute_directory, 0, error);
+
+    if (directory == NULL) {
+        g_free (absolute_directory);
+        return FALSE;
+    }
+
+    const char *name;
+
+    while ((name = g_dir_read_name (directory)) != NULL) {
+        char *relative =
+            relative_directory[0] == '\0'
+                ? g_strdup (name)
+                : g_build_filename (
+                    relative_directory,
+                    name,
+                    NULL
+                );
+        char *absolute =
+            g_build_filename (
+                snapshot_root,
+                relative,
+                NULL
+            );
+        GStatBuf st;
+
+        if (!g_utf8_validate (name, -1, NULL) ||
+            g_lstat (absolute, &st) != 0 ||
+            S_ISLNK (st.st_mode) ||
+            (!S_ISDIR (st.st_mode) &&
+             !S_ISREG (st.st_mode))) {
+            g_set_error (
+                error,
+                ORACLE_ERROR,
+                ORACLE_ERROR_INTEGRITY,
+                "Oracle seal found an unsafe snapshot entry: %s",
+                relative
+            );
+            g_free (absolute);
+            g_free (relative);
+            g_dir_close (directory);
+            g_free (absolute_directory);
+            return FALSE;
+        }
+
+        if (S_ISDIR (st.st_mode)) {
+            if (!oracle_collect_seal_entries (
+                    snapshot_root,
+                    relative,
+                    entries,
+                    error
+                )) {
+                g_free (absolute);
+                g_free (relative);
+                g_dir_close (directory);
+                g_free (absolute_directory);
+                return FALSE;
+            }
+        } else {
+            OracleSealEntry *entry =
+                g_new0 (OracleSealEntry, 1);
+            entry->path = g_strdup (relative);
+            g_strlcpy (
+                entry->mode,
+                (st.st_mode & 0111) != 0
+                    ? "100755"
+                    : "100644",
+                sizeof entry->mode
+            );
+
+            if (!oracle_hash_file (
+                    absolute,
+                    &entry->sha256,
+                    &entry->byte_size,
+                    error
+                )) {
+                oracle_seal_entry_free (entry);
+                g_free (absolute);
+                g_free (relative);
+                g_dir_close (directory);
+                g_free (absolute_directory);
+                return FALSE;
+            }
+
+            g_ptr_array_add (entries, entry);
+        }
+
+        g_free (absolute);
+        g_free (relative);
+    }
+
+    g_dir_close (directory);
+    g_free (absolute_directory);
+    return TRUE;
+}
+
+static gboolean
+oracle_compute_snapshot_seal (
+    const char *snapshot_root,
+    char **out_sha256,
+    GError **error
+)
+{
+    GPtrArray *entries =
+        g_ptr_array_new_with_free_func (
+            (GDestroyNotify) oracle_seal_entry_free
+        );
+    GChecksum *checksum = NULL;
+    gboolean ok = FALSE;
+
+    if (!root_is_real_directory (
+            snapshot_root,
+            error
+        ) ||
+        !oracle_collect_seal_entries (
+            snapshot_root,
+            "",
+            entries,
+            error
+        )) {
+        goto out;
+    }
+
+    g_ptr_array_sort (
+        entries,
+        compare_oracle_seal_entries
+    );
+
+    checksum = g_checksum_new (G_CHECKSUM_SHA256);
+    if (checksum == NULL) {
+        g_set_error_literal (
+            error,
+            ORACLE_ERROR,
+            ORACLE_ERROR_INTEGRITY,
+            "Oracle could not initialize snapshot seal checksum."
+        );
+        goto out;
+    }
+
+    static const char header[] =
+        "ATM-SNAPSHOT-SEAL-v1\0";
+    g_checksum_update (
+        checksum,
+        (const guchar *) header,
+        sizeof header - 1
+    );
+
+    for (guint i = 0; i < entries->len; i++) {
+        OracleSealEntry *entry =
+            g_ptr_array_index (entries, i);
+        char size_buffer[32];
+
+        g_snprintf (
+            size_buffer,
+            sizeof size_buffer,
+            "%" G_GUINT64_FORMAT,
+            entry->byte_size
+        );
+
+        g_checksum_update (
+            checksum,
+            (const guchar *) entry->mode,
+            strlen (entry->mode) + 1
+        );
+        g_checksum_update (
+            checksum,
+            (const guchar *) entry->path,
+            strlen (entry->path) + 1
+        );
+        g_checksum_update (
+            checksum,
+            (const guchar *) size_buffer,
+            strlen (size_buffer) + 1
+        );
+        g_checksum_update (
+            checksum,
+            (const guchar *) entry->sha256,
+            strlen (entry->sha256)
+        );
+        g_checksum_update (
+            checksum,
+            (const guchar *) "\n",
+            1
+        );
+    }
+
+    *out_sha256 =
+        g_strdup (g_checksum_get_string (checksum));
+    ok = *out_sha256 != NULL;
+
+    if (!ok) {
+        g_set_error_literal (
+            error,
+            ORACLE_ERROR,
+            ORACLE_ERROR_INTEGRITY,
+            "Oracle could not finalize snapshot seal."
+        );
+    }
+
+out:
+    if (!ok) {
+        g_clear_pointer (out_sha256, g_free);
+    }
+    g_clear_pointer (&checksum, g_checksum_free);
+    g_ptr_array_unref (entries);
+    return ok;
+}
+
+static gboolean
 oracle_collect_regular_files (
     const char *snapshot_root,
     const char *relative_directory,
