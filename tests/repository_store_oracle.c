@@ -2838,6 +2838,125 @@ run_self_test (void)
     }
     sqlite3_close (db);
 
+    if (sqlite3_open_v2 (
+            index_path,
+            &db,
+            SQLITE_OPEN_READWRITE,
+            NULL
+        ) != SQLITE_OK ||
+        sqlite3_exec (
+            db,
+            "UPDATE source_files "
+            "SET sha256='aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa"
+            "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa' "
+            "WHERE path='STATUS.md';",
+            NULL,
+            NULL,
+            NULL
+        ) != SQLITE_OK) {
+        if (db != NULL) {
+            sqlite3_close (db);
+        }
+        valid = FALSE;
+        goto out;
+    }
+    sqlite3_close (db);
+
+    if (oracle_check (&input, NULL, &error)) {
+        g_printerr ("oracle accepted source SHA-256 divergence\n");
+        valid = FALSE;
+        goto out;
+    }
+    g_clear_error (&error);
+
+    char *status_hash =
+        g_compute_checksum_for_string (
+            G_CHECKSUM_SHA256,
+            "# Status\n",
+            -1
+        );
+    char *restore_status_hash =
+        sqlite3_mprintf (
+            "UPDATE source_files SET sha256='%q' "
+            "WHERE path='STATUS.md';",
+            status_hash
+        );
+
+    if (sqlite3_open_v2 (
+            index_path,
+            &db,
+            SQLITE_OPEN_READWRITE,
+            NULL
+        ) != SQLITE_OK ||
+        sqlite3_exec (
+            db,
+            restore_status_hash,
+            NULL,
+            NULL,
+            NULL
+        ) != SQLITE_OK ||
+        sqlite3_exec (
+            db,
+            "DELETE FROM source_roles "
+            "WHERE role='canonical' AND source_id=("
+            "SELECT id FROM source_files WHERE path='STATUS.md'"
+            ");",
+            NULL,
+            NULL,
+            NULL
+        ) != SQLITE_OK) {
+        if (db != NULL) {
+            sqlite3_close (db);
+        }
+        sqlite3_free (restore_status_hash);
+        g_free (status_hash);
+        valid = FALSE;
+        goto out;
+    }
+    sqlite3_close (db);
+    sqlite3_free (restore_status_hash);
+    g_free (status_hash);
+
+    if (oracle_check (&input, NULL, &error)) {
+        g_printerr ("oracle accepted source-role divergence\n");
+        valid = FALSE;
+        goto out;
+    }
+    g_clear_error (&error);
+
+    if (sqlite3_open_v2 (
+            index_path,
+            &db,
+            SQLITE_OPEN_READWRITE,
+            NULL
+        ) != SQLITE_OK ||
+        sqlite3_exec (
+            db,
+            "INSERT INTO source_roles(source_id,role) "
+            "SELECT id,'canonical' FROM source_files "
+            "WHERE path='STATUS.md';",
+            NULL,
+            NULL,
+            NULL
+        ) != SQLITE_OK) {
+        if (db != NULL) {
+            sqlite3_close (db);
+        }
+        valid = FALSE;
+        goto out;
+    }
+    sqlite3_close (db);
+
+    if (!oracle_check (&input, NULL, &error)) {
+        g_printerr (
+            "oracle did not recover after provenance fixture restoration: %s\n",
+            error != NULL ? error->message : "unknown error"
+        );
+        g_clear_error (&error);
+        valid = FALSE;
+        goto out;
+    }
+
     if (!write_text_file (
             manifest_path,
             "{\n"
