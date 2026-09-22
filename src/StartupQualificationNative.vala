@@ -59,17 +59,6 @@ namespace AskTheModel.StartupQualificationNative {
     }
 
     [CCode (
-        cname = "AtmStorageQualification",
-        has_type_id = false
-    )]
-    public struct StorageQualification {
-        public bool qualified;
-        public bool created;
-        public uint32 mode;
-        public uint64 owner_uid;
-    }
-
-    [CCode (
         cname = "AtmRepositoryReconcileResult",
         free_function = "atm_repository_reconcile_result_free",
         has_type_id = false
@@ -97,12 +86,15 @@ namespace AskTheModel.StartupQualificationNative {
     ) throws GLib.Error;
 
     [CCode (
-        cname = "atm_startup_qualify_storage_root",
+        cname = "atm_startup_qualify_storage_root_values",
         cheader_filename = "startup_qualification.h"
     )]
-    public static extern bool qualify_storage_root (
+    public static extern bool qualify_storage_root_values (
         string storage_root,
-        out StorageQualification qualification
+        out bool qualified,
+        out bool created,
+        out uint32 mode,
+        out uint64 owner_uid
     ) throws GLib.Error;
 
     [CCode (
