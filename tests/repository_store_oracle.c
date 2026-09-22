@@ -10,7 +10,8 @@
 #include <sys/stat.h>
 #include <unistd.h>
 
-#define ORACLE_STATE_SCHEMA_VERSION 1
+#define ORACLE_STATE_SCHEMA_LEGACY_VERSION 1
+#define ORACLE_STATE_SCHEMA_CURRENT_VERSION 2
 #define ORACLE_MANIFEST_SCHEMA_VERSION 1
 #define ORACLE_RETRIEVAL_SCHEMA_VERSION 2
 
@@ -27,6 +28,7 @@ typedef enum {
 typedef struct {
     char *sha;
     char *version;
+    char *snapshot_seal_sha256;
 } OraclePinnedState;
 
 typedef struct {
@@ -78,6 +80,7 @@ oracle_pinned_state_clear (OraclePinnedState *state)
 {
     g_clear_pointer (&state->sha, g_free);
     g_clear_pointer (&state->version, g_free);
+    g_clear_pointer (&state->snapshot_seal_sha256, g_free);
 }
 
 static void
@@ -932,8 +935,6 @@ read_pinned_state (
         json_object_get_member (root, "repositories");
 
     if (!is_integer_node (schema_node) ||
-        json_node_get_int (schema_node) !=
-            ORACLE_STATE_SCHEMA_VERSION ||
         repositories_node == NULL ||
         json_node_get_node_type (repositories_node) !=
             JSON_NODE_ARRAY) {
@@ -942,6 +943,21 @@ read_pinned_state (
             ORACLE_ERROR,
             ORACLE_ERROR_STATE,
             "Repository state schema is invalid."
+        );
+        goto out;
+    }
+
+    gint64 state_schema_version =
+        json_node_get_int (schema_node);
+    if (state_schema_version !=
+            ORACLE_STATE_SCHEMA_LEGACY_VERSION &&
+        state_schema_version !=
+            ORACLE_STATE_SCHEMA_CURRENT_VERSION) {
+        g_set_error_literal (
+            error,
+            ORACLE_ERROR,
+            ORACLE_ERROR_STATE,
+            "Repository state schema version is unsupported."
         );
         goto out;
     }
@@ -981,10 +997,18 @@ read_pinned_state (
             json_object_get_member (item, "sha");
         JsonNode *version_node =
             json_object_get_member (item, "version");
+        JsonNode *seal_node =
+            json_object_get_member (
+                item,
+                "snapshot_seal_sha256"
+            );
 
         if (!is_nonempty_string_node (id_node) ||
             !is_nonempty_string_node (sha_node) ||
-            !is_nonempty_string_node (version_node)) {
+            !is_nonempty_string_node (version_node) ||
+            (state_schema_version ==
+                ORACLE_STATE_SCHEMA_CURRENT_VERSION &&
+             seal_node == NULL)) {
             g_set_error_literal (
                 error,
                 ORACLE_ERROR,
@@ -998,6 +1022,31 @@ read_pinned_state (
         const char *sha = json_node_get_string (sha_node);
         const char *version =
             json_node_get_string (version_node);
+        const char *seal = NULL;
+
+        if (state_schema_version ==
+            ORACLE_STATE_SCHEMA_CURRENT_VERSION) {
+            if (json_node_get_node_type (seal_node) ==
+                JSON_NODE_NULL) {
+                seal = NULL;
+            } else if (
+                is_nonempty_string_node (seal_node) &&
+                lower_hex_is_valid (
+                    json_node_get_string (seal_node),
+                    64
+                )
+            ) {
+                seal = json_node_get_string (seal_node);
+            } else {
+                g_set_error_literal (
+                    error,
+                    ORACLE_ERROR,
+                    ORACLE_ERROR_STATE,
+                    "Repository state snapshot seal is invalid."
+                );
+                goto out;
+            }
+        }
 
         if (!safe_component_is_valid (id) ||
             !lower_hex_is_valid (sha, 40)) {
@@ -1027,6 +1076,8 @@ read_pinned_state (
             found = TRUE;
             out_state->sha = g_strdup (sha);
             out_state->version = g_strdup (version);
+            out_state->snapshot_seal_sha256 =
+                seal != NULL ? g_strdup (seal) : NULL;
         }
     }
 
