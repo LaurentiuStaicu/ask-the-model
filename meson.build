@@ -44,6 +44,7 @@ executable(
     'src/cff_version.c',
     'src/archive_extract.c',
     'src/repository_manifest.c',
+    'src/repository_reconcile.c',
     'src/repository_storage.c',
     'src/repository_ingest.c',
     'src/repository_ui_bridge.c',
@@ -389,6 +390,38 @@ retrieval_index_lifecycle_test = executable(
 test(
   'retrieval-index-lifecycle',
   retrieval_index_lifecycle_test
+)
+
+
+repository_reconcile_test = executable(
+  'repository-reconcile-test',
+  [
+    'src/cff_version.c',
+    'src/repository_manifest.c',
+    'src/repository_sources.c',
+    'src/markdown_sections.c',
+    'src/csv_table.c',
+    'src/structured_json.c',
+    'src/retrieval_index.c',
+    'src/retrieval_index_lifecycle.c',
+    'src/repository_reconcile.c',
+    'tests/repository_reconcile_test.c',
+    resources
+  ],
+  include_directories: include_directories('src'),
+  dependencies: [
+    glib_dep,
+    gio_dep,
+    json_glib_dep,
+    sqlite_dep,
+    yaml_dep
+  ],
+  install: false
+)
+
+test(
+  'repository-reconcile',
+  repository_reconcile_test
 )
 
 retrieval_query_test = executable(
