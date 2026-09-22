@@ -197,9 +197,6 @@ namespace AskTheModel {
             update_model_selector ();
 
             if (found && ollama_provider.model_name != null) {
-                string[] chat_models =
-                    ollama_provider.get_completion_models ();
-
                 finish_model_scan_status ();
 
                 stdout.printf (
