@@ -67,6 +67,13 @@ typedef struct {
     guint roles;
 } OracleExpectedSource;
 
+typedef struct {
+    char *path;
+    char mode[7];
+    guint64 byte_size;
+    char *sha256;
+} OracleSealEntry;
+
 static GQuark
 oracle_error_quark (void)
 {
@@ -110,6 +117,32 @@ oracle_expected_source_free (OracleExpectedSource *source)
     g_free (source->sha256);
     g_free (source->media_type);
     g_free (source);
+}
+
+static void
+oracle_seal_entry_free (OracleSealEntry *entry)
+{
+    if (entry == NULL) {
+        return;
+    }
+
+    g_free (entry->path);
+    g_free (entry->sha256);
+    g_free (entry);
+}
+
+static gint
+compare_oracle_seal_entries (
+    gconstpointer a,
+    gconstpointer b
+)
+{
+    const OracleSealEntry *left =
+        *(OracleSealEntry * const *) a;
+    const OracleSealEntry *right =
+        *(OracleSealEntry * const *) b;
+
+    return g_strcmp0 (left->path, right->path);
 }
 
 static gboolean
