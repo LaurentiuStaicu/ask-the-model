@@ -218,6 +218,12 @@ namespace AskTheModel.Tests {
 
             assert (catalog.length == 3);
 
+            assert (!service.repository_operations_allowed ());
+            service.apply_installation_qualification (false);
+            assert (!service.repository_operations_allowed ());
+            service.apply_installation_qualification (true);
+            assert (service.repository_operations_allowed ());
+
             RepositoryRuntimeInfo freshness =
                 service.info_for (catalog[0].id);
             freshness.remote_sha =
@@ -334,6 +340,19 @@ namespace AskTheModel.Tests {
             RepositoryDescriptor[] sealed_selection = {
                 sealed_descriptor
             };
+
+            bool startup_gate_rejected = false;
+            try {
+                yield sealed_service.prepare_conversation_grounding (
+                    sealed_selection
+                );
+            } catch (RepositoryError error) {
+                startup_gate_rejected =
+                    error.code == RepositoryError.NOT_READY;
+            }
+            assert (startup_gate_rejected);
+
+            sealed_service.apply_installation_qualification (true);
 
             ConversationGrounding sealed_grounding =
                 yield sealed_service.prepare_conversation_grounding (
