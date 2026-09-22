@@ -4,6 +4,11 @@ namespace AskTheModel {
         public RepositoryLocalRecord local { get; construct; }
         public string? remote_sha { get; set; }
         public string? remote_version { get; set; }
+        public bool integrity_invalid {
+            get;
+            private set;
+            default = false;
+        }
         private string data_root;
 
         public RepositoryRuntimeInfo (
@@ -23,8 +28,16 @@ namespace AskTheModel {
             remote_version = null;
         }
 
+        public void mark_integrity_invalid () {
+            integrity_invalid = true;
+        }
+
+        public void clear_integrity_invalid () {
+            integrity_invalid = false;
+        }
+
         public bool download_required () {
-            if (!local.is_ready ()) {
+            if (integrity_invalid || !local.is_ready ()) {
                 return true;
             }
 
@@ -153,6 +166,12 @@ namespace AskTheModel {
             assert_not_reached ();
         }
 
+        public void mark_integrity_invalid (
+            string repository_id
+        ) {
+            info_for (repository_id).mark_integrity_invalid ();
+        }
+
         public void clear_remote_identities (
             RepositoryDescriptor[] selected
         ) {
@@ -250,11 +269,13 @@ namespace AskTheModel {
         prepare_snapshot (
             RepositoryDescriptor descriptor,
             string sha,
-            string? archive_path
+            string? archive_path,
+            string? expected_seal = null
         ) throws RepositoryError {
             SourceFunc callback = prepare_snapshot.callback;
             RepositoryInstallResult? worker_result = null;
             string? failure = null;
+            bool integrity_failure = false;
             string expected_snapshot =
                 snapshot_path_for_root (
                     data_root,
@@ -316,6 +337,14 @@ namespace AskTheModel {
                             );
                         }
 
+                        if (expected_seal != null &&
+                            expected_seal != pre_snapshot_seal) {
+                            integrity_failure = true;
+                            throw new RepositoryError.NOT_READY (
+                                "Repository snapshot integrity seal does not match persistent state."
+                            );
+                        }
+
                         if (!RepositoryNative.ensure_index (
                                 cache_root,
                                 snapshot,
@@ -347,6 +376,7 @@ namespace AskTheModel {
                         if (pre_snapshot_seal != post_snapshot_seal ||
                             pre_sealed_files != post_sealed_files ||
                             pre_sealed_bytes != post_sealed_bytes) {
+                            integrity_failure = true;
                             throw new RepositoryError.NOT_READY (
                                 "Repository snapshot changed while it was being prepared."
                             );
@@ -372,6 +402,13 @@ namespace AskTheModel {
             worker.join ();
 
             if (failure != null) {
+                if (integrity_failure) {
+                    throw new RepositoryError.NOT_READY (
+                        failure ??
+                        "Repository snapshot integrity verification failed."
+                    );
+                }
+
                 throw new RepositoryError.STORAGE (
                     failure ??
                     "Repository preparation failed."
@@ -411,13 +448,23 @@ namespace AskTheModel {
                 string sha = info.local.current_sha ?? "";
                 string local_version =
                     info.local.version ?? "";
+                string? expected_seal =
+                    info.local.snapshot_seal_sha256;
 
-                RepositoryInstallResult result =
-                    yield prepare_snapshot (
+                RepositoryInstallResult result;
+                try {
+                    result = yield prepare_snapshot (
                         descriptor,
                         sha,
-                        null
+                        null,
+                        expected_seal
                     );
+                } catch (RepositoryError error) {
+                    if (error.code == RepositoryError.NOT_READY) {
+                        info.mark_integrity_invalid ();
+                    }
+                    throw error;
+                }
 
                 if (result.version != local_version) {
                     throw new RepositoryError.INVALID_RESPONSE (
@@ -427,11 +474,9 @@ namespace AskTheModel {
                     );
                 }
 
-                string? expected_seal =
-                    info.local.snapshot_seal_sha256;
-
                 if (expected_seal != null &&
                     expected_seal != result.snapshot_seal_sha256) {
+                    info.mark_integrity_invalid ();
                     throw new RepositoryError.NOT_READY (
                         "Repository %s local snapshot integrity seal does not match persistent state.".printf (
                             descriptor.acronym
@@ -480,6 +525,8 @@ namespace AskTheModel {
             foreach (RepositoryDescriptor descriptor in selected) {
                 RepositoryRuntimeInfo info =
                     info_for (descriptor.id);
+                bool integrity_repair =
+                    info.integrity_invalid;
                 bool updating_existing =
                     !info.download_required ();
 
@@ -512,9 +559,17 @@ namespace AskTheModel {
                         sha
                     );
                 string? archive_path = null;
+                bool repairing_same_snapshot =
+                    integrity_repair &&
+                    info.local.current_sha == sha &&
+                    GLib.FileUtils.test (
+                        expected_snapshot,
+                        GLib.FileTest.EXISTS
+                    );
 
                 try {
-                    if (!GLib.FileUtils.test (
+                    if (repairing_same_snapshot ||
+                        !GLib.FileUtils.test (
                             expected_snapshot,
                             GLib.FileTest.IS_DIR
                         )) {
@@ -535,6 +590,33 @@ namespace AskTheModel {
                             );
                     }
 
+                    if (repairing_same_snapshot) {
+                        progress (
+                            "Repairing %s…".printf (
+                                descriptor.acronym
+                            )
+                        );
+
+                        string quarantine_path;
+                        if (!RepositoryNative.quarantine_snapshot (
+                                data_root,
+                                descriptor.id,
+                                sha,
+                                out quarantine_path
+                            )) {
+                            throw new RepositoryError.STORAGE (
+                                "Invalid repository snapshot could not be quarantined for repair."
+                            );
+                        }
+
+                        stdout.printf (
+                            "AtM: quarantined invalid repository %s snapshot=%s path=%s\n",
+                            descriptor.acronym,
+                            sha,
+                            quarantine_path
+                        );
+                    }
+
                     progress (
                         "Validating %s…".printf (
                             descriptor.acronym
@@ -545,7 +627,8 @@ namespace AskTheModel {
                         yield prepare_snapshot (
                             descriptor,
                             sha,
-                            archive_path
+                            archive_path,
+                            null
                         );
 
                     if (result.version != info.remote_version) {
@@ -560,6 +643,7 @@ namespace AskTheModel {
                         result.version,
                         result.snapshot_seal_sha256
                     );
+                    info.clear_integrity_invalid ();
 
                     info.remote_sha = sha;
                     info.remote_version = result.version;
