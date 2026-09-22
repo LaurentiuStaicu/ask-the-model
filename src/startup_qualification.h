@@ -62,9 +62,40 @@ void atm_deployment_qualification_free (
     AtmDeploymentQualification *qualification
 );
 
+gboolean atm_startup_qualify_deployment_values (
+    const char *flatpak_info_path,
+    const char *expected_application_id,
+    const char *expected_runtime_id,
+    const char *expected_runtime_branch,
+    guint policy_version,
+    gint *out_execution_mode,
+    gboolean *out_platform_qualified,
+    char **out_application_id,
+    char **out_application_ref,
+    char **out_application_commit,
+    char **out_runtime_ref,
+    char **out_runtime_commit,
+    char **out_architecture,
+    char **out_branch,
+    char **out_flatpak_version,
+    char **out_application_extensions,
+    char **out_runtime_extensions,
+    char **out_platform_fingerprint,
+    GError **error
+);
+
 gboolean atm_startup_qualify_storage_root (
     const char *storage_root,
     AtmStorageQualification *out_qualification,
+    GError **error
+);
+
+gboolean atm_startup_qualify_storage_root_values (
+    const char *storage_root,
+    gboolean *out_qualified,
+    gboolean *out_created,
+    guint32 *out_mode,
+    guint64 *out_owner_uid,
     GError **error
 );
 
