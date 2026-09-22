@@ -283,3 +283,73 @@ atm_repository_reconcile_local (
     *out_result = result;
     return TRUE;
 }
+
+
+gboolean
+atm_repository_reconcile_local_values (
+    const char *cache_root,
+    const char *snapshot_root,
+    const char *repository_id,
+    const char *repository_acronym,
+    const char *repository_display_name,
+    const char *snapshot_sha,
+    const char *persisted_version,
+    gint *out_status,
+    char **out_reason_code,
+    char **out_detail,
+    char **out_repository_version,
+    char **out_index_path,
+    GError **error
+)
+{
+    AtmRepositoryReconcileResult *result = NULL;
+    gboolean ok = FALSE;
+
+    g_return_val_if_fail (out_status != NULL, FALSE);
+    g_return_val_if_fail (out_reason_code != NULL, FALSE);
+    g_return_val_if_fail (*out_reason_code == NULL, FALSE);
+    g_return_val_if_fail (out_detail != NULL, FALSE);
+    g_return_val_if_fail (*out_detail == NULL, FALSE);
+    g_return_val_if_fail (out_repository_version != NULL, FALSE);
+    g_return_val_if_fail (*out_repository_version == NULL, FALSE);
+    g_return_val_if_fail (out_index_path != NULL, FALSE);
+    g_return_val_if_fail (*out_index_path == NULL, FALSE);
+
+    *out_status = ATM_REPOSITORY_RECONCILE_INDEX_ERROR;
+
+    if (!atm_repository_reconcile_local (
+            cache_root,
+            snapshot_root,
+            repository_id,
+            repository_acronym,
+            repository_display_name,
+            snapshot_sha,
+            persisted_version,
+            &result,
+            error
+        )) {
+        goto out;
+    }
+
+    *out_status = (gint) result->status;
+    *out_reason_code = g_strdup (result->reason_code);
+    *out_detail = g_strdup (result->detail);
+    *out_repository_version =
+        g_strdup (result->repository_version);
+    *out_index_path = g_strdup (result->index_path);
+    ok = TRUE;
+
+out:
+    if (!ok) {
+        g_clear_pointer (out_reason_code, g_free);
+        g_clear_pointer (out_detail, g_free);
+        g_clear_pointer (out_repository_version, g_free);
+        g_clear_pointer (out_index_path, g_free);
+    }
+
+    g_clear_pointer (
+        &result,
+        atm_repository_reconcile_result_free
+    );
+    return ok;
+}
