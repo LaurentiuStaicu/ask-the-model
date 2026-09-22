@@ -1,6 +1,6 @@
 # Ask the Model interface guide
 
-This guide explains the user-facing controls in Ask the Model v0.3.0 and the state transitions that matter when using repository-grounded chat.
+This guide explains the user-facing controls in Ask the Model v0.4.0 and the state transitions that matter when using repository-grounded chat.
 
 The guide is intentionally text-first. A dedicated visual application guide is deferred until a representation can be produced and reviewed against the real GTK interface without introducing invented controls, proportions, decoration, or layout.
 
@@ -14,7 +14,7 @@ The adjacent **Refresh models** button repeats provider discovery. AtM does not 
 
 ### Repository selector
 
-The repository selector controls the scientific source scope for the next conversation. The fixed v0.3.0 catalog is:
+The repository selector controls the scientific source scope for the next conversation. The fixed v0.4.0 catalog is:
 
 - **EWD** — Empirical World3 Dynamics;
 - **CBD** — Cognitive Belief Dynamics;
