@@ -535,6 +535,47 @@ namespace AskTheModel {
             return report;
         }
 
+
+        public async StartupQualificationReport run_async ()
+            throws GLib.Error {
+            SourceFunc callback = run_async.callback;
+            StartupQualificationReport? worker_result = null;
+            string? failure = null;
+
+            var worker = new GLib.Thread<void*> (
+                "atm-startup-qualification",
+                () => {
+                    try {
+                        worker_result = run ();
+                    } catch (GLib.Error error) {
+                        failure = error.message;
+                    }
+
+                    GLib.Idle.add ((owned) callback);
+                    return null;
+                }
+            );
+
+            yield;
+            worker.join ();
+
+            if (failure != null) {
+                throw new StartupQualificationError.RECORD (
+                    "Startup qualification failed: %s".printf (
+                        failure ?? "unknown error"
+                    )
+                );
+            }
+
+            if (worker_result == null) {
+                throw new StartupQualificationError.RECORD (
+                    "Startup qualification returned no result."
+                );
+            }
+
+            return worker_result;
+        }
+
         private void write_record (
             StartupQualificationReport report
         ) throws GLib.Error {
