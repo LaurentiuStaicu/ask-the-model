@@ -194,10 +194,19 @@ For each catalog repository:
 8. a valid reused index yields `READY`;
 9. a successfully rebuilt index yields `READY_REPAIRED_INDEX`;
 10. a snapshot/manifest/version failure remains not READY and the snapshot is
-    preserved for diagnosis rather than being rewritten in place.
+    preserved for diagnosis rather than being rewritten in place;
+11. a persisted snapshot with an enrolled local integrity seal is checked
+    before index validation/rebuild; a mismatch is `SNAPSHOT_INVALID` with a
+    stable integrity reason code and no new index is built from that snapshot;
+12. READY/READY_REPAIRED_INDEX candidates are sealed again after
+    reconciliation and must have the same pre/post local seal;
+13. a schema-v1 repository entry with no seal may be enrolled into schema v2
+    only after strict snapshot/version/index reconciliation succeeds.
 
-The exact snapshot SHA remains the repository identity. Reconciliation never
-selects repository content heuristically.
+The exact snapshot SHA remains the repository identity. The local snapshot
+seal is a separate tamper-detection key and never replaces upstream Git
+revision provenance. Reconciliation never selects repository content
+heuristically.
 
 ### Qualification record
 
@@ -266,7 +275,15 @@ Automated coverage must include at least:
 13. one broken repository with other valid repositories -> failure isolation;
 14. unpackaged development execution -> explicit development/unqualified
     execution state, never a qualified release deployment;
-15. startup reconciliation performs no repository network I/O.
+15. startup reconciliation performs no repository network I/O;
+16. schema-v1 valid persisted snapshot -> strict local reconciliation -> seal
+    enrollment -> schema-v2 state;
+17. enrolled seal mismatch -> `SNAPSHOT_INVALID` before retrieval-index
+    creation/rebuild;
+18. snapshot changes while G-S0 reconciliation is running -> pre/post seal
+    mismatch -> not READY;
+19. a failed seal check or enrollment never silently changes the persisted
+    repository SHA/version.
 
 ### Pass condition
 
@@ -703,7 +720,11 @@ The automated suite should include:
 11. failed repository update → previous ready snapshot remains usable;
 12. current-turn evidence does not accumulate in later provider history;
 13. cancelled repository I/O → cancellation propagates and incomplete staging output is not promoted;
-14. failed multi-repository Refresh → repositories not reached after the failure do not retain stale remote identities from an older batch.
+14. failed multi-repository Refresh → repositories not reached after the failure do not retain stale remote identities from an older batch;
+15. schema-v1 ready snapshot → conversation preparation revalidates it and enrolls a schema-v2 local snapshot seal;
+16. locally modified snapshot after seal enrollment → conversation grounding fails closed with NOT_READY and preserves the expected seal;
+17. snapshot content changes during index validation/rebuild → pre/post seal mismatch and preparation fails before persistence or grounding;
+18. snapshot mtime-only change → local snapshot seal remains stable, while content or executable-mode change changes the seal.
 
 Future repository-management regression gate, when removal/history is implemented:
 
@@ -718,7 +739,8 @@ Before a stage is merged:
 - `docs/INTERFACE_DESIGN_REQUIREMENTS.md` must reflect approved UI semantics;
 - `docs/DEPENDENCIES_AND_COMPATIBILITY.md` must list any new build/runtime dependencies actually introduced;
 - README capability claims must remain conservative;
-- release/status documentation must distinguish implemented behavior from planned behavior.
+- release/status documentation must distinguish implemented behavior from planned behavior;
+- local snapshot-seal documentation must state explicitly that the seal is a local integrity key, not the upstream Git commit SHA or an external supply-chain attestation.
 
 ## References used to define these gates
 
