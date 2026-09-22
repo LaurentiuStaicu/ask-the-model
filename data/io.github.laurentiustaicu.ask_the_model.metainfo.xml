@@ -20,12 +20,11 @@
       in-memory conversation state in multiple chat tabs.
     </p>
     <p>
-      Version 0.3.0 adds repository-grounded exploration for the fixed Empirical
+      Version 0.4.0 retains repository-grounded exploration for the fixed Empirical
       World3 Dynamics, Cognitive Belief Dynamics and Romanian Monetary Dynamics
-      repository suite. AtM can refresh and download exact Git revisions, validate
-      immutable local snapshots, build deterministic local retrieval indexes and
-      expose compact citations with exact repository, version, SHA, locator and
-      immutable-source provenance.
+      repository suite and adds offline startup qualification plus deterministic
+      local snapshot-integrity seals. Upstream Git SHA provenance remains distinct
+      from local integrity verification.
     </p>
     <p>
       AtM remains an interface and retrieval layer. The external provider owns
@@ -46,6 +45,15 @@
   <content_rating type="oars-1.1"/>
 
   <releases>
+    <release version="0.4.0" date="2026-09-22">
+      <description>
+        <p>
+          Startup Qualification and Snapshot Integrity with offline deployment and
+          storage qualification, backward-compatible repository-state migration,
+          deterministic local snapshot seals and fail-closed repository reuse.
+        </p>
+      </description>
+    </release>
     <release version="0.3.0" date="2026-09-21">
       <description>
         <p>
