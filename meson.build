@@ -487,6 +487,40 @@ test(
   repository_reconcile_test
 )
 
+repository_oracle_integration_test = executable(
+  'repository-oracle-integration-test',
+  [
+    'src/cff_version.c',
+    'src/repository_manifest.c',
+    'src/repository_sources.c',
+    'src/markdown_sections.c',
+    'src/csv_table.c',
+    'src/structured_json.c',
+    'src/retrieval_index.c',
+    'src/retrieval_index_lifecycle.c',
+    'src/repository_reconcile.c',
+    'tests/repository_oracle_integration_test.c',
+    resources
+  ],
+  include_directories: include_directories('src'),
+  dependencies: [
+    glib_dep,
+    gio_dep,
+    json_glib_dep,
+    sqlite_dep,
+    yaml_dep
+  ],
+  install: false
+)
+
+test(
+  'repository-oracle-production-divergence',
+  repository_oracle_integration_test,
+  env: {
+    'ATM_REPOSITORY_ORACLE': meson.current_build_dir() / 'repository-store-oracle'
+  }
+)
+
 retrieval_query_test = executable(
   'retrieval-query-test',
   [
