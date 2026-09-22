@@ -24,14 +24,18 @@ Startup Qualification and Snapshot Integrity.
 - migrated legacy schema-v1 state only after strict local snapshot/version/index validation succeeds;
 - verified an enrolled seal before any retrieval-index reuse/rebuild and classified mismatch as `SNAPSHOT_INVALID`;
 - added pre/post seal checks around both startup reconciliation and normal lifecycle index preparation to detect local mutation during preparation;
-- rejected locally modified sealed snapshots before conversation grounding while preserving the expected persistent seal.
+- rejected locally modified sealed snapshots before conversation grounding while preserving the expected persistent seal;
+- made an integrity-invalid repository require the existing Download action;
+- added explicit same-SHA repair that downloads the exact archive before moving local content, quarantines the invalid real-directory snapshot for diagnosis and only then validates/promotes the replacement;
+- refused to follow or quarantine symlink/non-directory snapshot paths as valid repair sources.
 
 ### Regression coverage
 
 - added clean-install, unpackaged-development, invalid-state and missing-snapshot G-S0 tests;
 - added deterministic seal tests for file order, content, executable mode, mtime stability, symlink rejection and add/remove behavior;
 - added schema-v1 to schema-v2 seal migration, malformed-seal and wrong-SHA enrollment tests;
-- added isolated lifecycle tests proving legacy seal enrollment and fail-closed grounding after local snapshot modification.
+- added isolated lifecycle tests proving legacy seal enrollment, pre-index seal rejection, repair-action activation and fail-closed grounding after local snapshot modification;
+- added storage regressions proving invalid snapshot quarantine preserves diagnostic content and rejects symlink snapshots.
 
 ### Build / repository security
 
