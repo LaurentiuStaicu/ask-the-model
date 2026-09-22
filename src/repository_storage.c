@@ -86,6 +86,153 @@ atm_repository_extraction_staging_path (
 }
 
 gboolean
+atm_repository_quarantine_snapshot (
+    const char *data_root,
+    const char *repository_id,
+    const char *sha,
+    char **out_quarantine_path,
+    GError **error
+)
+{
+    char *snapshot_path = NULL;
+    char *snapshot_parent = NULL;
+    char *quarantine_path = NULL;
+    GStatBuf stat_buffer;
+    gint64 timestamp;
+    gboolean ok = FALSE;
+
+    g_return_val_if_fail (data_root != NULL, FALSE);
+    g_return_val_if_fail (repository_id != NULL, FALSE);
+    g_return_val_if_fail (sha != NULL, FALSE);
+    g_return_val_if_fail (out_quarantine_path != NULL, FALSE);
+    g_return_val_if_fail (*out_quarantine_path == NULL, FALSE);
+
+    if (!repository_id_is_valid (repository_id)) {
+        g_set_error_literal (
+            error,
+            ATM_STORAGE_ERROR,
+            ATM_STORAGE_ERROR_INVALID_ID,
+            "Repository ID is not part of the v1 catalog."
+        );
+        goto out;
+    }
+
+    if (!sha_is_valid (sha)) {
+        g_set_error_literal (
+            error,
+            ATM_STORAGE_ERROR,
+            ATM_STORAGE_ERROR_INVALID_SHA,
+            "Snapshot SHA must contain exactly 40 hexadecimal characters."
+        );
+        goto out;
+    }
+
+    snapshot_path = atm_repository_snapshot_path (
+        data_root,
+        repository_id,
+        sha
+    );
+
+    if (g_lstat (snapshot_path, &stat_buffer) != 0) {
+        g_set_error (
+            error,
+            ATM_STORAGE_ERROR,
+            ATM_STORAGE_ERROR_INVALID_SNAPSHOT,
+            "Snapshot selected for quarantine does not exist: %s.",
+            g_strerror (errno)
+        );
+        goto out;
+    }
+
+    if (!S_ISDIR (stat_buffer.st_mode) ||
+        S_ISLNK (stat_buffer.st_mode)) {
+        g_set_error_literal (
+            error,
+            ATM_STORAGE_ERROR,
+            ATM_STORAGE_ERROR_INVALID_SNAPSHOT,
+            "Snapshot selected for quarantine is not a real directory."
+        );
+        goto out;
+    }
+
+    snapshot_parent = g_path_get_dirname (snapshot_path);
+    timestamp = g_get_real_time ();
+
+    for (guint attempt = 0; attempt < 100; attempt++) {
+        char *name = g_strdup_printf (
+            ".invalid-%s-%" G_GINT64_FORMAT "-%u",
+            sha,
+            timestamp,
+            attempt
+        );
+
+        g_clear_pointer (&quarantine_path, g_free);
+        quarantine_path = g_build_filename (
+            snapshot_parent,
+            name,
+            NULL
+        );
+        g_free (name);
+
+        if (g_lstat (quarantine_path, &stat_buffer) != 0) {
+            if (errno == ENOENT) {
+                break;
+            }
+
+            g_set_error (
+                error,
+                ATM_STORAGE_ERROR,
+                ATM_STORAGE_ERROR_IO,
+                "Could not inspect snapshot quarantine path: %s.",
+                g_strerror (errno)
+            );
+            goto out;
+        }
+
+        if (attempt == 99) {
+            g_set_error_literal (
+                error,
+                ATM_STORAGE_ERROR,
+                ATM_STORAGE_ERROR_IO,
+                "Could not allocate a unique snapshot quarantine path."
+            );
+            goto out;
+        }
+    }
+
+    if (quarantine_path == NULL) {
+        g_set_error_literal (
+            error,
+            ATM_STORAGE_ERROR,
+            ATM_STORAGE_ERROR_IO,
+            "Could not calculate snapshot quarantine path."
+        );
+        goto out;
+    }
+
+    if (g_rename (snapshot_path, quarantine_path) != 0) {
+        g_set_error (
+            error,
+            ATM_STORAGE_ERROR,
+            ATM_STORAGE_ERROR_IO,
+            "Could not quarantine invalid snapshot: %s.",
+            g_strerror (errno)
+        );
+        goto out;
+    }
+
+    *out_quarantine_path =
+        g_steal_pointer (&quarantine_path);
+    ok = TRUE;
+
+out:
+    g_clear_pointer (&quarantine_path, g_free);
+    g_clear_pointer (&snapshot_parent, g_free);
+    g_clear_pointer (&snapshot_path, g_free);
+    return ok;
+}
+
+gboolean
 atm_repository_promote_snapshot (
     const char *data_root,
     const char *repository_id,

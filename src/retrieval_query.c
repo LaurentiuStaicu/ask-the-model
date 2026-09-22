@@ -728,7 +728,6 @@ prepare_provenance_statement (
 
 static gboolean
 load_fts_provenance (
-    sqlite3 *db,
     sqlite3_stmt *section_statement,
     sqlite3_stmt *entity_statement,
     sqlite3_stmt *relation_statement,
@@ -1038,7 +1037,6 @@ atm_retrieval_search_fts (
         );
 
         if (!load_fts_provenance (
-                db,
                 section_statement,
                 entity_statement,
                 relation_statement,

@@ -8,6 +8,7 @@ typedef enum {
     ATM_STORAGE_ERROR_INVALID_ID,
     ATM_STORAGE_ERROR_INVALID_SHA,
     ATM_STORAGE_ERROR_INVALID_STAGING,
+    ATM_STORAGE_ERROR_INVALID_SNAPSHOT,
     ATM_STORAGE_ERROR_EXISTS,
     ATM_STORAGE_ERROR_IO
 } AtmStorageError;
@@ -26,6 +27,14 @@ char *atm_repository_extraction_staging_path (
     const char *data_root,
     const char *repository_id,
     const char *sha
+);
+
+gboolean atm_repository_quarantine_snapshot (
+    const char *data_root,
+    const char *repository_id,
+    const char *sha,
+    char **out_quarantine_path,
+    GError **error
 );
 
 gboolean atm_repository_promote_snapshot (

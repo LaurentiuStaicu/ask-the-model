@@ -321,13 +321,15 @@ test_exact_identities (
         {
             "VAR.BELIEF.CLAIM CBD",
             "cbd",
-            "cbd:entity:variable:VAR.BELIEF.CLAIM"
+            "cbd:entity:variable:"
+            "model/variables.json:json:/3"
         },
         {
             "government_refinancing_interest_loop RMD",
             "rmd",
             "rmd:entity:feedback_loop:"
-            "government_refinancing_interest_loop"
+            "model/dynamics/feedback_registry.json:"
+            "json:/loops/0"
         }
     };
 

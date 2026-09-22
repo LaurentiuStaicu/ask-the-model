@@ -13,6 +13,9 @@ Ask the Model (AtM) works with two different kinds of things that are both commo
 | Local service exposing AI models | **AI provider** | **Furnizor AI** | The runtime/API provider, initially Ollama-compatible |
 | A chat session | **Conversation** | **Conversație** | Ordered user/assistant messages with recorded repository and AI-model context |
 | Material retrieved from repositories | **Sources** | **Surse** | Files or passages supplied as grounded context for a response |
+| Exact local repository revision | **Snapshot** | **Snapshot** | The validated local repository state associated with one exact upstream Git commit SHA |
+| Local snapshot integrity key | **Snapshot seal** | **Sigiliu snapshot** | AtM's deterministic local SHA-256 key used to detect local snapshot content changes; it is not the upstream Git commit SHA |
+| Derived per-snapshot search database | **Retrieval index** | **Index de regăsire** | The local SQLite/FTS index built and validated for one exact repository snapshot |
 
 ## Ambiguity rule
 

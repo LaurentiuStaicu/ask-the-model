@@ -146,14 +146,18 @@ exercise_repository (const RealRepository *repository)
         g_assert_cmpint (
             query_count (
                 db,
-                "SELECT count(*) FROM structured_entities "
-                "WHERE native_id = "
+                "SELECT count(*) FROM structured_entities e "
+                "JOIN source_files s ON s.id = e.source_id "
+                "WHERE e.native_id = "
                 "'government_refinancing_interest_loop' "
-                "AND entity_type = 'feedback_loop' "
-                "AND logical_source_id = "
+                "AND e.entity_type = 'feedback_loop' "
+                "AND e.logical_source_id = "
                 "'rmd:entity:feedback_loop:"
-                "government_refinancing_interest_loop' "
-                "AND locator = 'json:/loops/0';"
+                "model/dynamics/feedback_registry.json:"
+                "json:/loops/0' "
+                "AND e.locator = 'json:/loops/0' "
+                "AND s.path = "
+                "'model/dynamics/feedback_registry.json';"
             ),
             ==,
             1

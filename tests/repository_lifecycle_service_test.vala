@@ -11,6 +11,202 @@ namespace AskTheModel.Tests {
         }
     }
 
+    private static void remove_tree_best_effort (
+        string path
+    ) {
+        if (!GLib.FileUtils.test (
+                path,
+                GLib.FileTest.EXISTS
+            )) {
+            return;
+        }
+
+        if (!GLib.FileUtils.test (
+                path,
+                GLib.FileTest.IS_DIR
+            )) {
+            GLib.FileUtils.remove (path);
+            return;
+        }
+
+        try {
+            var directory = GLib.Dir.open (path);
+            string? name;
+
+            while ((name = directory.read_name ()) != null) {
+                remove_tree_best_effort (
+                    GLib.Path.build_filename (
+                        path,
+                        name
+                    )
+                );
+            }
+        } catch (GLib.FileError error) {
+            return;
+        }
+
+        GLib.DirUtils.remove (path);
+    }
+
+    private static bool directory_is_empty (
+        string path
+    ) throws GLib.Error {
+        var directory = GLib.Dir.open (path);
+        return directory.read_name () == null;
+    }
+
+    private static string create_valid_snapshot (
+        string data_root,
+        RepositoryDescriptor descriptor,
+        string sha,
+        string version
+    ) throws GLib.Error {
+        string root =
+            RepositoryLifecycleService.snapshot_path_for_root (
+                data_root,
+                descriptor,
+                sha
+            );
+        string atm = GLib.Path.build_filename (
+            root,
+            ".atm"
+        );
+        string model = GLib.Path.build_filename (
+            root,
+            "model"
+        );
+
+        assert (
+            GLib.DirUtils.create_with_parents (
+                atm,
+                0700
+            ) == 0
+        );
+        assert (
+            GLib.DirUtils.create_with_parents (
+                model,
+                0700
+            ) == 0
+        );
+
+        string citation = GLib.Path.build_filename (
+            root,
+            "CITATION.cff"
+        );
+        string status = GLib.Path.build_filename (
+            root,
+            "STATUS.md"
+        );
+        string readme = GLib.Path.build_filename (
+            root,
+            "README.md"
+        );
+        string core = GLib.Path.build_filename (
+            root,
+            "model",
+            "core.json"
+        );
+        string manifest_path = GLib.Path.build_filename (
+            root,
+            ".atm",
+            "repository.json"
+        );
+
+        GLib.FileUtils.set_contents (
+            citation,
+            "cff-version: 1.2.0\n" +
+            "message: cite this\n" +
+            "type: software\n" +
+            "title: Test\n" +
+            "version: %s\n".printf (version)
+        );
+        GLib.FileUtils.set_contents (
+            status,
+            "# Status\nValidated test status.\n"
+        );
+        GLib.FileUtils.set_contents (
+            readme,
+            "# Test repository\nGrounded evidence.\n"
+        );
+        GLib.FileUtils.set_contents (
+            core,
+            "{\"entity\": \"test\"}\n"
+        );
+
+        string manifest =
+            "{\n" +
+            "  \"schema_version\": 1,\n" +
+            "  \"repository_id\": \"%s\",\n".printf (
+                descriptor.id
+            ) +
+            "  \"acronym\": \"%s\",\n".printf (
+                descriptor.acronym
+            ) +
+            "  \"display_name\": \"%s\",\n".printf (
+                descriptor.display_name
+            ) +
+            "  \"version_source\": {" +
+            "\"type\": \"cff\", " +
+            "\"path\": \"CITATION.cff\"},\n" +
+            "  \"status_source\": \"STATUS.md\",\n" +
+            "  \"required_paths\": [" +
+            "\"CITATION.cff\", " +
+            "\"STATUS.md\", " +
+            "\"model/core.json\"],\n" +
+            "  \"retrieval\": {\n" +
+            "    \"canonical\": [" +
+            "\"STATUS.md\", " +
+            "\"README.md\", " +
+            "\"CITATION.cff\"],\n" +
+            "    \"structural\": [" +
+            "\"model/core.json\"],\n" +
+            "    \"evidence\": [],\n" +
+            "    \"tabular\": [],\n" +
+            "    \"implementation\": [],\n" +
+            "    \"exclude\": [" +
+            "\".github\", " +
+            "\"__pycache__\"]\n" +
+            "  }\n" +
+            "}\n";
+
+        GLib.FileUtils.set_contents (
+            manifest_path,
+            manifest
+        );
+
+        return root;
+    }
+
+    private static void write_state_v1 (
+        string state_root,
+        string repository_id,
+        string sha,
+        string version
+    ) throws GLib.Error {
+        GLib.FileUtils.set_contents (
+            GLib.Path.build_filename (
+                state_root,
+                "repository-state.json"
+            ),
+            "{\n" +
+            "  \"schema_version\": 1,\n" +
+            "  \"repositories\": [\n" +
+            "    {\n" +
+            "      \"id\": \"%s\",\n".printf (
+                repository_id
+            ) +
+            "      \"sha\": \"%s\",\n".printf (
+                sha
+            ) +
+            "      \"version\": \"%s\"\n".printf (
+                version
+            ) +
+            "    }\n" +
+            "  ]\n" +
+            "}\n"
+        );
+    }
+
     private static async void run_checks (GLib.MainLoop loop) {
         string root = new_temp_root ();
 
@@ -21,6 +217,12 @@ namespace AskTheModel.Tests {
             RepositoryDescriptor[] one = { catalog[0] };
 
             assert (catalog.length == 3);
+
+            assert (!service.repository_operations_allowed ());
+            service.apply_installation_qualification (false);
+            assert (!service.repository_operations_allowed ());
+            service.apply_installation_qualification (true);
+            assert (service.repository_operations_allowed ());
 
             RepositoryRuntimeInfo freshness =
                 service.info_for (catalog[0].id);
@@ -107,12 +309,161 @@ namespace AskTheModel.Tests {
             }
 
             assert (not_ready_rejected);
+
+            string sealed_state_root = new_temp_root ();
+            string sealed_data_root = new_temp_root ();
+            string sealed_cache_root = new_temp_root ();
+            RepositoryDescriptor sealed_descriptor =
+                catalog[2];
+            string sealed_sha =
+                "5555555555555555555555555555555555555555";
+
+            string sealed_snapshot = create_valid_snapshot (
+                sealed_data_root,
+                sealed_descriptor,
+                sealed_sha,
+                "0.1.0"
+            );
+            write_state_v1 (
+                sealed_state_root,
+                sealed_descriptor.id,
+                sealed_sha,
+                "0.1.0"
+            );
+
+            var sealed_service =
+                new RepositoryLifecycleService (
+                    sealed_state_root,
+                    sealed_data_root,
+                    sealed_cache_root
+                );
+            RepositoryDescriptor[] sealed_selection = {
+                sealed_descriptor
+            };
+
+            bool startup_gate_rejected = false;
+            try {
+                yield sealed_service.prepare_conversation_grounding (
+                    sealed_selection
+                );
+            } catch (RepositoryError error) {
+                startup_gate_rejected =
+                    error.code == RepositoryError.NOT_READY;
+            }
+            assert (startup_gate_rejected);
+
+            sealed_service.apply_installation_qualification (true);
+
+            ConversationGrounding sealed_grounding =
+                yield sealed_service.prepare_conversation_grounding (
+                    sealed_selection
+                );
+
+            assert (sealed_grounding.is_frozen ());
+            assert (
+                sealed_grounding.repository_count () == 1
+            );
+
+            var enrolled_state =
+                new RepositoryStateStore (
+                    sealed_state_root
+                );
+            assert (
+                enrolled_state.loaded_schema_version == 2
+            );
+            string? enrolled_seal =
+                enrolled_state.record_for (
+                    sealed_descriptor.id
+                ).snapshot_seal_sha256;
+            assert (enrolled_seal != null);
+            assert ((enrolled_seal ?? "").length == 64);
+
+            remove_tree_best_effort (
+                sealed_cache_root
+            );
+            assert (
+                GLib.DirUtils.create (
+                    sealed_cache_root,
+                    0700
+                ) == 0
+            );
+            assert (
+                directory_is_empty (
+                    sealed_cache_root
+                )
+            );
+
+            GLib.FileUtils.set_contents (
+                GLib.Path.build_filename (
+                    sealed_snapshot,
+                    "README.md"
+                ),
+                "# Test repository\nLocally modified.\n"
+            );
+
+            bool seal_mismatch_rejected = false;
+            try {
+                yield sealed_service.prepare_conversation_grounding (
+                    sealed_selection
+                );
+            } catch (RepositoryError error) {
+                seal_mismatch_rejected =
+                    error.code == RepositoryError.NOT_READY;
+            }
+
+            assert (seal_mismatch_rejected);
+            assert (
+                sealed_service.info_for (
+                    sealed_descriptor.id
+                ).integrity_invalid
+            );
+            assert (
+                sealed_service.info_for (
+                    sealed_descriptor.id
+                ).download_required ()
+            );
+            assert (
+                sealed_service.selection_needs_action (
+                    sealed_selection
+                )
+            );
+            assert (
+                sealed_service.action_tooltip (
+                    sealed_selection
+                ) ==
+                "Download selected repositories"
+            );
+            assert (
+                directory_is_empty (
+                    sealed_cache_root
+                )
+            );
+
+            var preserved_state =
+                new RepositoryStateStore (
+                    sealed_state_root
+                );
+            assert (
+                preserved_state.record_for (
+                    sealed_descriptor.id
+                ).snapshot_seal_sha256 == enrolled_seal
+            );
+
+            remove_tree_best_effort (
+                sealed_state_root
+            );
+            remove_tree_best_effort (
+                sealed_data_root
+            );
+            remove_tree_best_effort (
+                sealed_cache_root
+            );
         } catch (GLib.Error error) {
             stderr.printf ("%s\n", error.message);
             result_code = 1;
         }
 
-        GLib.DirUtils.remove (root);
+        remove_tree_best_effort (root);
         loop.quit ();
     }
 
