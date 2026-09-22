@@ -95,6 +95,7 @@ namespace AskTheModel {
         private bool generation_active = false;
         private bool restoring_chat_controls = false;
         private bool ai_scanning = false;
+        private bool repository_startup_qualifying = true;
         private bool repository_checking = false;
         private bool repository_downloading = false;
         private bool repository_updating = false;
@@ -161,6 +162,8 @@ namespace AskTheModel {
                 update_repository_annunciators ();
             });
 
+            qualify_repository_startup.begin ();
+
             ollama_provider.discovery_progress.connect ((percent) => {
                 if (percent < 100) {
                     ai_scanning = true;
@@ -188,6 +191,128 @@ namespace AskTheModel {
             });
 
             discover_local_provider.begin ();
+        }
+
+        private static RepositoryLocalQualificationStatus
+        runtime_qualification_status (
+            StartupRepositoryStatus status
+        ) {
+            switch (status) {
+                case StartupRepositoryStatus.BLOCKED:
+                    return RepositoryLocalQualificationStatus.BLOCKED;
+                case StartupRepositoryStatus.STATE_INVALID:
+                    return RepositoryLocalQualificationStatus.STATE_INVALID;
+                case StartupRepositoryStatus.NOT_INSTALLED:
+                    return RepositoryLocalQualificationStatus.NOT_INSTALLED;
+                case StartupRepositoryStatus.SNAPSHOT_MISSING:
+                    return RepositoryLocalQualificationStatus.SNAPSHOT_MISSING;
+                case StartupRepositoryStatus.SNAPSHOT_INVALID:
+                    return RepositoryLocalQualificationStatus.SNAPSHOT_INVALID;
+                case StartupRepositoryStatus.INDEX_ERROR:
+                    return RepositoryLocalQualificationStatus.INDEX_ERROR;
+                case StartupRepositoryStatus.READY:
+                    return RepositoryLocalQualificationStatus.READY;
+                case StartupRepositoryStatus.READY_REPAIRED_INDEX:
+                    return RepositoryLocalQualificationStatus.READY_REPAIRED_INDEX;
+                default:
+                    assert_not_reached ();
+            }
+        }
+
+        private string installation_qualification_detail (
+            StartupQualificationReport report
+        ) {
+            if (!report.platform_qualified) {
+                return report.platform_detail.length > 0
+                    ? report.platform_detail
+                    : report.platform_reason_code;
+            }
+
+            if (!report.storage_qualified) {
+                return report.storage_detail.length > 0
+                    ? report.storage_detail
+                    : report.storage_reason_code;
+            }
+
+            return "Installation qualification did not pass.";
+        }
+
+        private void apply_startup_qualification (
+            StartupQualificationReport report
+        ) {
+            repository_lifecycle.apply_installation_qualification (
+                report.installation_qualified
+            );
+
+            foreach (
+                StartupRepositoryQualification repository
+                in report.repositories
+            ) {
+                repository_lifecycle.apply_local_qualification (
+                    repository.repository_id,
+                    runtime_qualification_status (
+                        repository.status
+                    ),
+                    repository.snapshot_sha,
+                    repository.persisted_version,
+                    repository.validated_version,
+                    repository.reason_code,
+                    repository.detail
+                );
+            }
+
+            repository_startup_qualifying = false;
+            repository_error =
+                !report.installation_qualified;
+            repository_status_detail =
+                report.installation_qualified
+                    ? null
+                    : installation_qualification_detail (
+                        report
+                    );
+
+            stdout.printf (
+                "AtM: startup qualification installation=%s platform=%s storage=%s record=%s\n",
+                report.installation_qualified ? "qualified" : "blocked",
+                report.platform_qualified ? "qualified" : "blocked",
+                report.storage_qualified ? "qualified" : "blocked",
+                report.record_path
+            );
+
+            update_repository_annunciators ();
+            update_repository_option_labels ();
+            update_repository_selector_label ();
+            update_conversation_ui_state ();
+        }
+
+        private async void qualify_repository_startup () {
+            var service = new StartupQualificationService ();
+
+            try {
+                StartupQualificationReport report =
+                    yield service.run_async ();
+
+                apply_startup_qualification (report);
+            } catch (GLib.Error error) {
+                repository_lifecycle.apply_installation_qualification (
+                    false
+                );
+                repository_startup_qualifying = false;
+                repository_error = true;
+                repository_status_detail =
+                    "Startup qualification failed: %s".printf (
+                        error.message
+                    );
+
+                stderr.printf (
+                    "AtM: startup qualification failed: %s\n",
+                    error.message
+                );
+
+                update_repository_annunciators ();
+                update_repository_selector_label ();
+                update_conversation_ui_state ();
+            }
         }
 
         private async void discover_local_provider () {
@@ -320,7 +445,10 @@ namespace AskTheModel {
 
             string repository_summary;
 
-            if (repository_error) {
+            if (repository_startup_qualifying) {
+                repository_summary =
+                    "Qualifying local repositories";
+            } else if (repository_error) {
                 repository_summary =
                     repository_status_detail != null
                         ? "Repository operation failed: %s".printf (
@@ -442,6 +570,7 @@ namespace AskTheModel {
             }
 
             bool operation_active =
+                repository_startup_qualifying ||
                 repository_checking ||
                 repository_downloading ||
                 repository_updating ||
@@ -479,6 +608,7 @@ namespace AskTheModel {
             );
             set_annunciator (
                 repo_validate_annunciator,
+                repository_startup_qualifying ||
                 repository_validating
             );
             set_annunciator (
@@ -946,6 +1076,8 @@ namespace AskTheModel {
                 repository_downloading ||
                 repository_updating ||
                 repository_validating;
+            bool startup_ready =
+                !repository_startup_qualifying;
 
             if (repository_menu_button != null) {
                 repository_menu_button.label =
@@ -964,6 +1096,7 @@ namespace AskTheModel {
             if (refresh_repositories_button != null) {
                 refresh_repositories_button.sensitive =
                     editable &&
+                    startup_ready &&
                     !repository_busy &&
                     has_selection;
             }
@@ -997,14 +1130,21 @@ namespace AskTheModel {
                     );
                 }
 
+                bool mutation_allowed =
+                    repository_lifecycle.repository_mutations_allowed ();
+
                 repository_action_button.sensitive =
                     editable &&
+                    startup_ready &&
                     !repository_busy &&
-                    has_action;
+                    has_action &&
+                    mutation_allowed;
                 repository_action_button.can_target =
                     editable &&
+                    startup_ready &&
                     !repository_busy &&
-                    has_action;
+                    has_action &&
+                    mutation_allowed;
                 repository_action_button.opacity =
                     has_action ? 1.0 : 0.0;
                 repository_action_button.update_state (
@@ -1014,9 +1154,11 @@ namespace AskTheModel {
 
                 string? action_tooltip =
                     has_action
-                        ? repository_lifecycle.action_tooltip (
-                            selected
-                        )
+                        ? mutation_allowed
+                            ? repository_lifecycle.action_tooltip (
+                                selected
+                            )
+                            : "Repository download/update unavailable until startup qualification passes"
                         : null;
                 repository_action_button.tooltip_text =
                     action_tooltip;
@@ -1082,6 +1224,10 @@ namespace AskTheModel {
         }
 
         private async void refresh_selected_repositories () {
+            if (repository_startup_qualifying) {
+                return;
+            }
+
             RepositoryDescriptor[] selected =
                 repository_selection.selected_repositories ();
 
@@ -1171,6 +1317,11 @@ namespace AskTheModel {
         }
 
         private async void download_or_update_selected_repositories () {
+            if (repository_startup_qualifying ||
+                !repository_lifecycle.repository_mutations_allowed ()) {
+                return;
+            }
+
             RepositoryDescriptor[] selected =
                 repository_selection.selected_repositories ();
 
