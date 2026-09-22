@@ -1240,6 +1240,7 @@ check_manifest_and_version (
     const OraclePinnedState *state,
     const char *snapshot_root,
     char **out_manifest_hash,
+    OracleManifestPolicy *out_policy,
     GError **error
 )
 {
@@ -1405,6 +1406,99 @@ check_manifest_and_version (
         goto out;
     }
 
+    JsonNode *required_node =
+        json_object_get_member (root, "required_paths");
+    JsonNode *retrieval_node =
+        json_object_get_member (root, "retrieval");
+
+    if (required_node == NULL ||
+        json_node_get_node_type (required_node) !=
+            JSON_NODE_ARRAY ||
+        retrieval_node == NULL ||
+        json_node_get_node_type (retrieval_node) !=
+            JSON_NODE_OBJECT) {
+        g_set_error_literal (
+            error,
+            ORACLE_ERROR,
+            ORACLE_ERROR_MANIFEST,
+            "Repository manifest required_paths/retrieval shape is invalid."
+        );
+        goto out;
+    }
+
+    GPtrArray *required_paths = NULL;
+    if (!copy_manifest_path_array (
+            root,
+            "required_paths",
+            snapshot_root,
+            TRUE,
+            &required_paths,
+            error
+        )) {
+        goto out;
+    }
+    g_ptr_array_unref (required_paths);
+
+    JsonObject *retrieval =
+        json_node_get_object (retrieval_node);
+    out_policy->status_source =
+        g_strdup (
+            json_node_get_string (
+                status_source_node
+            )
+        );
+
+    if (!copy_manifest_path_array (
+            retrieval,
+            "canonical",
+            snapshot_root,
+            TRUE,
+            &out_policy->canonical,
+            error
+        ) ||
+        !copy_manifest_path_array (
+            retrieval,
+            "structural",
+            snapshot_root,
+            TRUE,
+            &out_policy->structural,
+            error
+        ) ||
+        !copy_manifest_path_array (
+            retrieval,
+            "evidence",
+            snapshot_root,
+            TRUE,
+            &out_policy->evidence,
+            error
+        ) ||
+        !copy_manifest_path_array (
+            retrieval,
+            "tabular",
+            snapshot_root,
+            TRUE,
+            &out_policy->tabular,
+            error
+        ) ||
+        !copy_manifest_path_array (
+            retrieval,
+            "implementation",
+            snapshot_root,
+            TRUE,
+            &out_policy->implementation,
+            error
+        ) ||
+        !copy_manifest_path_array (
+            retrieval,
+            "exclude",
+            snapshot_root,
+            FALSE,
+            &out_policy->exclude,
+            error
+        )) {
+        goto out;
+    }
+
     if (!read_cff_version_independently (
             citation_path,
             &cff_version,
@@ -1447,6 +1541,7 @@ check_manifest_and_version (
 out:
     if (!ok) {
         g_clear_pointer (out_manifest_hash, g_free);
+        oracle_manifest_policy_clear (out_policy);
     }
 
     g_clear_pointer (&cff_version, g_free);
