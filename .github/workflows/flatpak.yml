@@ -262,6 +262,8 @@ jobs:
           Icon=https://raw.githubusercontent.com/LaurentiuStaicu/ask-the-model/main/data/icons/64.png
           EOF
 
+          printf '%s\n' "$GITHUB_SHA" > "$PUBLISH_DIR/SOURCE_COMMIT"
+
           cat > "$PUBLISH_DIR/README.md" <<'EOF'
           # Ask the Model — development Flatpak repository
 
@@ -272,7 +274,10 @@ jobs:
           Application ID: `io.github.laurentiustaicu.ask_the_model`
 
           The label **AtM Development** identifies only the Flatpak update source.
+
+          Source main commit:
           EOF
+          printf '\n`%s`\n' "$GITHUB_SHA" >> "$PUBLISH_DIR/README.md"
 
           git config user.name "github-actions[bot]"
           git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
@@ -284,6 +289,7 @@ jobs:
           cp -a "$PUBLISH_DIR/repo" .
           cp -a "$PUBLISH_DIR/atm-development.flatpakrepo" .
           cp -a "$PUBLISH_DIR/README.md" .
+          cp -a "$PUBLISH_DIR/SOURCE_COMMIT" .
           git add -A
-          git commit -m "Publish Ask the Model development Flatpak"
+          git commit -m "Publish Ask the Model development Flatpak from ${GITHUB_SHA}"
           git push --force origin HEAD:flatpak-repo
