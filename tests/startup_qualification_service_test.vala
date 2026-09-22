@@ -402,6 +402,63 @@ namespace AskTheModel.Tests {
         );
     }
 
+    private static void test_async_clean_packaged_install ()
+        throws GLib.Error {
+        string fixture_root = new_temp_root (
+            "atm-startup-orchestrator-async-fixture-XXXXXX"
+        );
+        string data_parent = new_temp_root (
+            "atm-startup-orchestrator-async-data-XXXXXX"
+        );
+        string data_root = GLib.Path.build_filename (
+            data_parent,
+            "Ask the Model"
+        );
+        string cache_root = new_temp_root (
+            "atm-startup-orchestrator-async-cache-XXXXXX"
+        );
+        string state_root = new_temp_root (
+            "atm-startup-orchestrator-async-state-XXXXXX"
+        );
+        string flatpak_info =
+            write_flatpak_fixture (fixture_root);
+
+        var service = new StartupQualificationService (
+            flatpak_info,
+            data_root,
+            cache_root,
+            state_root
+        );
+        var loop = new GLib.MainLoop ();
+        StartupQualificationReport? report = null;
+        string? failure = null;
+
+        service.run_async.begin ((obj, res) => {
+            try {
+                report = service.run_async.end (res);
+            } catch (GLib.Error error) {
+                failure = error.message;
+            }
+
+            loop.quit ();
+        });
+
+        loop.run ();
+
+        assert (failure == null);
+        assert (report != null);
+        assert (report.installation_qualified);
+        assert (report.platform_qualified);
+        assert (report.storage_qualified);
+        assert (report.repositories.length == 3);
+        assert (
+            GLib.FileUtils.test (
+                report.record_path,
+                GLib.FileTest.EXISTS
+            )
+        );
+    }
+
     public static int main (string[] args) {
         GLib.Test.init (ref args);
 
@@ -443,6 +500,17 @@ namespace AskTheModel.Tests {
             () => {
                 try {
                     test_persisted_missing_snapshot_is_reported ();
+                } catch (GLib.Error error) {
+                    GLib.error ("%s", error.message);
+                }
+            }
+        );
+
+        GLib.Test.add_func (
+            "/startup-orchestrator/async-clean-packaged-install",
+            () => {
+                try {
+                    test_async_clean_packaged_install ();
                 } catch (GLib.Error error) {
                     GLib.error ("%s", error.message);
                 }
