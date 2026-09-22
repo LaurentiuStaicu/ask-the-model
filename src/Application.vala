@@ -230,6 +230,13 @@ namespace AskTheModel {
                             StartupRepositoryOutcome repository
                             in completed_report.repositories
                         ) {
+                            if (repository.status ==
+                                StartupRepositoryStatus.SNAPSHOT_INVALID) {
+                                repository_lifecycle.mark_integrity_invalid (
+                                    repository.repository_id
+                                );
+                            }
+
                             stdout.printf (
                                 "AtM: G-S0 repository %s status=%d reason=%s\n",
                                 repository.repository_id,
