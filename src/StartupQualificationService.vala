@@ -112,20 +112,22 @@ namespace AskTheModel {
                 GLib.Environment.get_user_state_dir ();
         }
 
-        private static string[] copy_strv (
-            string[]? values
+        private static string[] extension_lines (
+            string serialized
         ) {
-            string[] copy = {};
+            string[] values = {};
 
-            if (values == null) {
-                return copy;
+            if (serialized.length == 0) {
+                return values;
             }
 
-            foreach (unowned string value in values) {
-                copy += value;
+            foreach (string value in serialized.split ("\n")) {
+                if (value.length > 0) {
+                    values += value;
+                }
             }
 
-            return copy;
+            return values;
         }
 
         private static string repository_state_name (
@@ -169,15 +171,15 @@ namespace AskTheModel {
         }
 
         private static string execution_mode_name (
-            StartupQualificationNative.ExecutionMode mode
+            int mode
         ) {
             switch (mode) {
-                case StartupQualificationNative.ExecutionMode.DEVELOPMENT:
+                case 0:
                     return "development";
-                case StartupQualificationNative.ExecutionMode.FLATPAK:
+                case 1:
                     return "flatpak";
                 default:
-                    assert_not_reached ();
+                    return "unknown";
             }
         }
 
@@ -232,11 +234,14 @@ namespace AskTheModel {
             string version = local.version ?? "";
 
             try {
-                StartupQualificationNative.RepositoryReconcileResult
-                    native_result;
+                int native_status;
+                string native_reason_code;
+                string native_detail;
+                string? native_version;
+                string? native_index_path;
 
                 bool completed =
-                    StartupQualificationNative.reconcile_local (
+                    StartupQualificationNative.reconcile_local_values (
                         cache_root,
                         snapshot_path (descriptor, sha),
                         descriptor.id,
@@ -244,7 +249,11 @@ namespace AskTheModel {
                         descriptor.display_name,
                         sha,
                         version,
-                        out native_result
+                        out native_status,
+                        out native_reason_code,
+                        out native_detail,
+                        out native_version,
+                        out native_index_path
                     );
 
                 if (!completed) {
@@ -258,34 +267,32 @@ namespace AskTheModel {
                 }
 
                 result.reason_code =
-                    native_result.reason_code ??
-                    "unknown";
+                    native_reason_code;
                 result.detail =
-                    native_result.detail ??
-                    "";
+                    native_detail;
                 result.validated_version =
-                    native_result.repository_version;
+                    native_version;
                 result.index_path =
-                    native_result.index_path;
+                    native_index_path;
 
-                switch (native_result.status) {
-                    case StartupQualificationNative.RepositoryReconcileStatus.SNAPSHOT_MISSING:
+                switch (native_status) {
+                    case 0:
                         result.status =
                             StartupRepositoryStatus.SNAPSHOT_MISSING;
                         break;
-                    case StartupQualificationNative.RepositoryReconcileStatus.SNAPSHOT_INVALID:
+                    case 1:
                         result.status =
                             StartupRepositoryStatus.SNAPSHOT_INVALID;
                         break;
-                    case StartupQualificationNative.RepositoryReconcileStatus.INDEX_ERROR:
+                    case 2:
                         result.status =
                             StartupRepositoryStatus.INDEX_ERROR;
                         break;
-                    case StartupQualificationNative.RepositoryReconcileStatus.READY:
+                    case 3:
                         result.status =
                             StartupRepositoryStatus.READY;
                         break;
-                    case StartupQualificationNative.RepositoryReconcileStatus.READY_REPAIRED_INDEX:
+                    case 4:
                         result.status =
                             StartupRepositoryStatus.READY_REPAIRED_INDEX;
                         break;
@@ -322,61 +329,83 @@ namespace AskTheModel {
             );
 
             try {
-                StartupQualificationNative.DeploymentQualification
-                    deployment;
+                int execution_mode;
+                bool platform_qualified;
+                string? application_id;
+                string? application_ref;
+                string? application_commit;
+                string? runtime_ref;
+                string? runtime_commit;
+                string? architecture;
+                string? branch;
+                string? flatpak_version;
+                string application_extensions;
+                string runtime_extensions;
+                string? platform_fingerprint;
 
                 bool completed =
-                    StartupQualificationNative.qualify_deployment (
+                    StartupQualificationNative.qualify_deployment_values (
                         flatpak_info_path,
                         EXPECTED_APP_ID,
                         EXPECTED_RUNTIME_ID,
                         EXPECTED_RUNTIME_BRANCH,
                         POLICY_VERSION,
-                        out deployment
+                        out execution_mode,
+                        out platform_qualified,
+                        out application_id,
+                        out application_ref,
+                        out application_commit,
+                        out runtime_ref,
+                        out runtime_commit,
+                        out architecture,
+                        out branch,
+                        out flatpak_version,
+                        out application_extensions,
+                        out runtime_extensions,
+                        out platform_fingerprint
                     );
 
                 if (completed) {
                     report.execution_mode =
                         execution_mode_name (
-                            deployment.execution_mode
+                            execution_mode
                         );
                     report.platform_qualified =
-                        deployment.platform_qualified;
+                        platform_qualified;
 
                     report.application_id =
-                        deployment.application_id;
+                        application_id;
                     report.application_ref =
-                        deployment.application_ref;
+                        application_ref;
                     report.application_commit =
-                        deployment.application_commit;
+                        application_commit;
                     report.runtime_ref =
-                        deployment.runtime_ref;
+                        runtime_ref;
                     report.runtime_commit =
-                        deployment.runtime_commit;
+                        runtime_commit;
                     report.architecture =
-                        deployment.architecture;
+                        architecture;
                     report.branch =
-                        deployment.branch;
+                        branch;
                     report.flatpak_version =
-                        deployment.flatpak_version;
+                        flatpak_version;
                     report.application_extensions =
-                        copy_strv (
-                            deployment.application_extensions
+                        extension_lines (
+                            application_extensions
                         );
                     report.runtime_extensions =
-                        copy_strv (
-                            deployment.runtime_extensions
+                        extension_lines (
+                            runtime_extensions
                         );
                     report.platform_fingerprint =
-                        deployment.platform_fingerprint;
+                        platform_fingerprint;
 
-                    if (deployment.platform_qualified) {
+                    if (platform_qualified) {
                         report.platform_reason_code =
                             "qualified";
                     } else {
                         report.platform_reason_code =
-                            deployment.execution_mode ==
-                                StartupQualificationNative.ExecutionMode.DEVELOPMENT
+                            execution_mode == 0
                                 ? "development_execution"
                                 : "platform_unqualified";
                     }
