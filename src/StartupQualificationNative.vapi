@@ -31,6 +31,12 @@ namespace AskTheModel.StartupQualificationNative {
         out uint64 owner_uid
     ) throws GLib.Error;
 
+    [CCode (cname = "atm_repository_probe_snapshot_root")]
+    public static bool probe_snapshot_root (
+        string snapshot_root,
+        out int status
+    ) throws GLib.Error;
+
     [CCode (cname = "atm_repository_reconcile_local_values")]
     public static bool reconcile_local_values (
         string cache_root,
