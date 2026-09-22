@@ -2957,6 +2957,360 @@ run_self_test (void)
         goto out;
     }
 
+    /* Missing exact snapshot must invalidate a READY claim. */
+    char *hidden_snapshot =
+        g_strconcat (snapshot, ".missing", NULL);
+
+    if (g_rename (snapshot, hidden_snapshot) != 0) {
+        g_free (hidden_snapshot);
+        valid = FALSE;
+        goto out;
+    }
+
+    if (oracle_check (&input, NULL, &error)) {
+        g_printerr ("oracle accepted missing exact snapshot\n");
+        g_rename (hidden_snapshot, snapshot);
+        g_free (hidden_snapshot);
+        valid = FALSE;
+        goto out;
+    }
+    g_clear_error (&error);
+
+    if (g_rename (hidden_snapshot, snapshot) != 0) {
+        g_free (hidden_snapshot);
+        valid = FALSE;
+        goto out;
+    }
+    g_free (hidden_snapshot);
+
+    if (!oracle_check (&input, NULL, &error)) {
+        g_printerr (
+            "oracle did not recover after snapshot restoration: %s\n",
+            error != NULL ? error->message : "unknown error"
+        );
+        g_clear_error (&error);
+        valid = FALSE;
+        goto out;
+    }
+
+    /* Manifest identity mismatch must fail before index trust is considered. */
+    const char *wrong_identity_manifest =
+        "{\n"
+        "  \"schema_version\": 1,\n"
+        "  \"repository_id\": \"cbd\",\n"
+        "  \"acronym\": \"EWD\",\n"
+        "  \"display_name\": \"Empirical World3 Dynamics\",\n"
+        "  \"version_source\": {\"type\": \"cff\", \"path\": \"CITATION.cff\"},\n"
+        "  \"status_source\": \"STATUS.md\",\n"
+        "  \"required_paths\": [\"CITATION.cff\", \"STATUS.md\"],\n"
+        "  \"retrieval\": {\n"
+        "    \"canonical\": [\"STATUS.md\", \"CITATION.cff\"],\n"
+        "    \"structural\": [],\n"
+        "    \"evidence\": [],\n"
+        "    \"tabular\": [],\n"
+        "    \"implementation\": [],\n"
+        "    \"exclude\": []\n"
+        "  }\n"
+        "}\n";
+
+    if (!write_text_file (
+            manifest_path,
+            wrong_identity_manifest
+        )) {
+        valid = FALSE;
+        goto out;
+    }
+
+    if (oracle_check (&input, NULL, &error)) {
+        g_printerr ("oracle accepted manifest identity divergence\n");
+        valid = FALSE;
+        goto out;
+    }
+    g_clear_error (&error);
+
+    if (!write_text_file (manifest_path, manifest)) {
+        valid = FALSE;
+        goto out;
+    }
+
+    if (!oracle_check (&input, NULL, &error)) {
+        g_printerr (
+            "oracle did not recover after manifest identity restoration: %s\n",
+            error != NULL ? error->message : "unknown error"
+        );
+        g_clear_error (&error);
+        valid = FALSE;
+        goto out;
+    }
+
+    /* Extra indexed membership must be rejected even when SQLite is valid. */
+    if (sqlite3_open_v2 (
+            index_path,
+            &db,
+            SQLITE_OPEN_READWRITE,
+            NULL
+        ) != SQLITE_OK ||
+        sqlite3_exec (
+            db,
+            "INSERT INTO source_files("
+            "path,sha256,byte_size,media_type,logical_source_id"
+            ") VALUES("
+            "'EXTRA.md',"
+            "'cccccccccccccccccccccccccccccccc"
+            "cccccccccccccccccccccccccccccccc',"
+            "0,'text/markdown','ewd:file:EXTRA.md'"
+            ");",
+            NULL,
+            NULL,
+            NULL
+        ) != SQLITE_OK) {
+        if (db != NULL) {
+            sqlite3_close (db);
+        }
+        valid = FALSE;
+        goto out;
+    }
+    sqlite3_close (db);
+
+    if (oracle_check (&input, NULL, &error)) {
+        g_printerr ("oracle accepted extra indexed source membership\n");
+        valid = FALSE;
+        goto out;
+    }
+    g_clear_error (&error);
+
+    if (sqlite3_open_v2 (
+            index_path,
+            &db,
+            SQLITE_OPEN_READWRITE,
+            NULL
+        ) != SQLITE_OK ||
+        sqlite3_exec (
+            db,
+            "DELETE FROM source_files WHERE path='EXTRA.md';",
+            NULL,
+            NULL,
+            NULL
+        ) != SQLITE_OK) {
+        if (db != NULL) {
+            sqlite3_close (db);
+        }
+        valid = FALSE;
+        goto out;
+    }
+    sqlite3_close (db);
+
+    if (!oracle_check (&input, NULL, &error)) {
+        g_printerr (
+            "oracle did not recover after source membership restoration: %s\n",
+            error != NULL ? error->message : "unknown error"
+        );
+        g_clear_error (&error);
+        valid = FALSE;
+        goto out;
+    }
+
+    /*
+     * Exercise PRAGMA integrity_check deterministically with a stored CHECK
+     * violation. SQLite permits the fixture to be created while CHECK
+     * enforcement is temporarily disabled.
+     */
+    if (sqlite3_open_v2 (
+            index_path,
+            &db,
+            SQLITE_OPEN_READWRITE,
+            NULL
+        ) != SQLITE_OK ||
+        sqlite3_exec (
+            db,
+            "CREATE TABLE oracle_integrity_probe("
+            "value INTEGER CHECK(value=1)"
+            ");"
+            "PRAGMA ignore_check_constraints=ON;"
+            "INSERT INTO oracle_integrity_probe(value) VALUES(2);"
+            "PRAGMA ignore_check_constraints=OFF;",
+            NULL,
+            NULL,
+            NULL
+        ) != SQLITE_OK) {
+        if (db != NULL) {
+            sqlite3_close (db);
+        }
+        valid = FALSE;
+        goto out;
+    }
+    sqlite3_close (db);
+
+    if (oracle_check (&input, NULL, &error)) {
+        g_printerr ("oracle accepted integrity_check CHECK violation\n");
+        valid = FALSE;
+        goto out;
+    }
+    g_clear_error (&error);
+
+    if (sqlite3_open_v2 (
+            index_path,
+            &db,
+            SQLITE_OPEN_READWRITE,
+            NULL
+        ) != SQLITE_OK ||
+        sqlite3_exec (
+            db,
+            "DROP TABLE oracle_integrity_probe;",
+            NULL,
+            NULL,
+            NULL
+        ) != SQLITE_OK) {
+        if (db != NULL) {
+            sqlite3_close (db);
+        }
+        valid = FALSE;
+        goto out;
+    }
+    sqlite3_close (db);
+
+    if (!oracle_check (&input, NULL, &error)) {
+        g_printerr (
+            "oracle did not recover after integrity fixture restoration: %s\n",
+            error != NULL ? error->message : "unknown error"
+        );
+        g_clear_error (&error);
+        valid = FALSE;
+        goto out;
+    }
+
+    /*
+     * integrity_check intentionally does not cover foreign keys. Insert a
+     * dangling role with enforcement disabled and require foreign_key_check
+     * to reject it independently.
+     */
+    if (sqlite3_open_v2 (
+            index_path,
+            &db,
+            SQLITE_OPEN_READWRITE,
+            NULL
+        ) != SQLITE_OK ||
+        sqlite3_exec (
+            db,
+            "PRAGMA foreign_keys=OFF;"
+            "INSERT INTO source_roles(source_id,role) "
+            "VALUES(999999,'evidence');",
+            NULL,
+            NULL,
+            NULL
+        ) != SQLITE_OK) {
+        if (db != NULL) {
+            sqlite3_close (db);
+        }
+        valid = FALSE;
+        goto out;
+    }
+    sqlite3_close (db);
+
+    if (oracle_check (&input, NULL, &error)) {
+        g_printerr ("oracle accepted foreign-key divergence\n");
+        valid = FALSE;
+        goto out;
+    }
+    g_clear_error (&error);
+
+    if (sqlite3_open_v2 (
+            index_path,
+            &db,
+            SQLITE_OPEN_READWRITE,
+            NULL
+        ) != SQLITE_OK ||
+        sqlite3_exec (
+            db,
+            "DELETE FROM source_roles WHERE source_id=999999;",
+            NULL,
+            NULL,
+            NULL
+        ) != SQLITE_OK) {
+        if (db != NULL) {
+            sqlite3_close (db);
+        }
+        valid = FALSE;
+        goto out;
+    }
+    sqlite3_close (db);
+
+    if (!oracle_check (&input, NULL, &error)) {
+        g_printerr (
+            "oracle did not recover after FK fixture restoration: %s\n",
+            error != NULL ? error->message : "unknown error"
+        );
+        g_clear_error (&error);
+        valid = FALSE;
+        goto out;
+    }
+
+    /* snapshot_metadata is semantically a singleton, independent of schema. */
+    if (sqlite3_open_v2 (
+            index_path,
+            &db,
+            SQLITE_OPEN_READWRITE,
+            NULL
+        ) != SQLITE_OK ||
+        sqlite3_exec (
+            db,
+            "INSERT INTO snapshot_metadata("
+            "id,repository_id,repository_version,snapshot_sha,"
+            "manifest_schema_version,manifest_sha256,created_at_utc"
+            ") SELECT 2,repository_id,repository_version,snapshot_sha,"
+            "manifest_schema_version,manifest_sha256,"
+            "'2026-09-22T00:00:01Z' "
+            "FROM snapshot_metadata WHERE id=1;",
+            NULL,
+            NULL,
+            NULL
+        ) != SQLITE_OK) {
+        if (db != NULL) {
+            sqlite3_close (db);
+        }
+        valid = FALSE;
+        goto out;
+    }
+    sqlite3_close (db);
+
+    if (oracle_check (&input, NULL, &error)) {
+        g_printerr ("oracle accepted extra snapshot_metadata row\n");
+        valid = FALSE;
+        goto out;
+    }
+    g_clear_error (&error);
+
+    if (sqlite3_open_v2 (
+            index_path,
+            &db,
+            SQLITE_OPEN_READWRITE,
+            NULL
+        ) != SQLITE_OK ||
+        sqlite3_exec (
+            db,
+            "DELETE FROM snapshot_metadata WHERE id=2;",
+            NULL,
+            NULL,
+            NULL
+        ) != SQLITE_OK) {
+        if (db != NULL) {
+            sqlite3_close (db);
+        }
+        valid = FALSE;
+        goto out;
+    }
+    sqlite3_close (db);
+
+    if (!oracle_check (&input, NULL, &error)) {
+        g_printerr (
+            "oracle did not recover after singleton restoration: %s\n",
+            error != NULL ? error->message : "unknown error"
+        );
+        g_clear_error (&error);
+        valid = FALSE;
+        goto out;
+    }
+
     if (!write_text_file (
             manifest_path,
             "{\n"
