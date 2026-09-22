@@ -148,7 +148,7 @@ test_valid_deployment_and_stable_fingerprint (void)
         runtime_extensions,
         "1.16.0",
         APP_ID,
-        "io.elementary.Platform/x86_64/8"
+        "runtime/io.elementary.Platform/x86_64/8"
     );
     char *fixture_b = fixture_text (
         app_commit,
@@ -157,7 +157,7 @@ test_valid_deployment_and_stable_fingerprint (void)
         runtime_extensions,
         "1.18.1",
         APP_ID,
-        "io.elementary.Platform/x86_64/8"
+        "runtime/io.elementary.Platform/x86_64/8"
     );
 
     char *path_a = write_fixture (
@@ -202,7 +202,7 @@ test_valid_deployment_and_stable_fingerprint (void)
     g_assert_cmpstr (
         a->runtime_ref,
         ==,
-        "io.elementary.Platform/x86_64/8"
+        "runtime/io.elementary.Platform/x86_64/8"
     );
     g_assert_cmpstr (a->flatpak_version, ==, "1.16.0");
     g_assert_nonnull (a->platform_fingerprint);
@@ -278,6 +278,65 @@ test_valid_deployment_and_stable_fingerprint (void)
 }
 
 static void
+test_accepts_metadata_runtime_triple (void)
+{
+    GError *error = NULL;
+    char *directory = g_dir_make_tmp (
+        "atm-startup-runtime-triple-XXXXXX",
+        &error
+    );
+    g_assert_no_error (error);
+    g_assert_nonnull (directory);
+
+    char *app_commit = hex64 ('a');
+    char *runtime_commit = hex64 ('b');
+    char *fixture = fixture_text (
+        app_commit,
+        runtime_commit,
+        "",
+        "",
+        "1.16.0",
+        APP_ID,
+        "io.elementary.Platform/x86_64/8"
+    );
+    char *path = write_fixture (
+        directory,
+        "flatpak.info",
+        fixture
+    );
+    AtmDeploymentQualification *qualification = NULL;
+
+    g_assert_true (
+        atm_startup_qualify_deployment (
+            path,
+            APP_ID,
+            RUNTIME_ID,
+            RUNTIME_BRANCH,
+            1,
+            &qualification,
+            &error
+        )
+    );
+    g_assert_no_error (error);
+    g_assert_nonnull (qualification);
+    g_assert_true (qualification->platform_qualified);
+    g_assert_cmpstr (
+        qualification->runtime_ref,
+        ==,
+        "io.elementary.Platform/x86_64/8"
+    );
+
+    atm_deployment_qualification_free (qualification);
+    g_remove (path);
+    g_rmdir (directory);
+    g_free (path);
+    g_free (fixture);
+    g_free (app_commit);
+    g_free (runtime_commit);
+    g_free (directory);
+}
+
+static void
 assert_invalid_fixture (
     const char *contents
 )
@@ -339,7 +398,7 @@ test_invalid_deployment_metadata (void)
         "",
         "1.16.0",
         "org.example.Wrong",
-        "io.elementary.Platform/x86_64/8"
+        "runtime/io.elementary.Platform/x86_64/8"
     );
     assert_invalid_fixture (wrong_app);
 
@@ -350,9 +409,20 @@ test_invalid_deployment_metadata (void)
         "",
         "1.16.0",
         APP_ID,
-        "io.elementary.Platform/x86_64/7"
+        "runtime/io.elementary.Platform/x86_64/7"
     );
     assert_invalid_fixture (wrong_runtime);
+
+    char *wrong_runtime_kind = fixture_text (
+        app_commit,
+        runtime_commit,
+        extensions,
+        "",
+        "1.16.0",
+        APP_ID,
+        "app/io.elementary.Platform/x86_64/8"
+    );
+    assert_invalid_fixture (wrong_runtime_kind);
 
     char *bad_commit = fixture_text (
         "not-a-commit",
@@ -361,7 +431,7 @@ test_invalid_deployment_metadata (void)
         "",
         "1.16.0",
         APP_ID,
-        "io.elementary.Platform/x86_64/8"
+        "runtime/io.elementary.Platform/x86_64/8"
     );
     assert_invalid_fixture (bad_commit);
 
@@ -372,12 +442,13 @@ test_invalid_deployment_metadata (void)
         "",
         "1.16.0",
         APP_ID,
-        "io.elementary.Platform/x86_64/8"
+        "runtime/io.elementary.Platform/x86_64/8"
     );
     assert_invalid_fixture (bad_extensions);
 
     g_free (wrong_app);
     g_free (wrong_runtime);
+    g_free (wrong_runtime_kind);
     g_free (bad_commit);
     g_free (bad_extensions);
     g_free (extensions);
@@ -407,7 +478,7 @@ test_app_commit_changes_fingerprint (void)
         "",
         "1.16.0",
         APP_ID,
-        "io.elementary.Platform/x86_64/8"
+        "runtime/io.elementary.Platform/x86_64/8"
     );
     char *fixture_c = fixture_text (
         app_c,
@@ -416,7 +487,7 @@ test_app_commit_changes_fingerprint (void)
         "",
         "1.16.0",
         APP_ID,
-        "io.elementary.Platform/x86_64/8"
+        "runtime/io.elementary.Platform/x86_64/8"
     );
 
     char *path_a = write_fixture (
@@ -668,6 +739,10 @@ main (int argc, char **argv)
     g_test_add_func (
         "/startup/deployment/valid-stable-fingerprint",
         test_valid_deployment_and_stable_fingerprint
+    );
+    g_test_add_func (
+        "/startup/deployment/metadata-runtime-triple",
+        test_accepts_metadata_runtime_triple
     );
     g_test_add_func (
         "/startup/deployment/invalid-metadata",

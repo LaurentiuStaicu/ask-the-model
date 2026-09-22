@@ -4,6 +4,11 @@ All notable public releases of Ask the Model are recorded here.
 
 ## Unreleased
 
+### Startup qualification fixes
+
+- accept the effective Flatpak runtime identity in both `runtime/ID/ARCH/BRANCH` and legacy `ID/ARCH/BRANCH` forms while still rejecting wrong ref kinds, IDs, architectures and branches;
+- align G-S0 deployment fixtures with the fully qualified runtime ref observed in real `/.flatpak-info` metadata and retain regression coverage for the legacy triple form.
+
 ### Release/distribution hardening
 
 - changed future GitHub Release publication to draft-first `create → attach asset → publish` ordering so future immutable releases can be enabled without losing the Flatpak asset;

@@ -194,11 +194,33 @@ runtime_ref_matches (
 )
 {
     char **parts = g_strsplit (runtime_ref, "/", -1);
-    gboolean matches =
-        g_strv_length (parts) == 3 &&
-        g_strcmp0 (parts[0], expected_runtime_id) == 0 &&
-        g_strcmp0 (parts[1], architecture) == 0 &&
-        g_strcmp0 (parts[2], expected_runtime_branch) == 0;
+    gsize length = g_strv_length (parts);
+    gsize offset = 0;
+    gboolean matches = FALSE;
+
+    /*
+     * Effective /.flatpak-info metadata can expose the runtime as either
+     * the historical ID/ARCH/BRANCH triple or the fully qualified
+     * runtime/ID/ARCH/BRANCH ref. Accept only those two exact shapes.
+     */
+    if (length == 4) {
+        if (g_strcmp0 (parts[0], "runtime") != 0) {
+            g_strfreev (parts);
+            return FALSE;
+        }
+        offset = 1;
+    } else if (length != 3) {
+        g_strfreev (parts);
+        return FALSE;
+    }
+
+    matches =
+        g_strcmp0 (parts[offset], expected_runtime_id) == 0 &&
+        g_strcmp0 (parts[offset + 1], architecture) == 0 &&
+        g_strcmp0 (
+            parts[offset + 2],
+            expected_runtime_branch
+        ) == 0;
 
     g_strfreev (parts);
     return matches;
