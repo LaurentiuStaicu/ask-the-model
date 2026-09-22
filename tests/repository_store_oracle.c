@@ -1940,6 +1940,201 @@ out:
 }
 
 static gboolean
+oracle_query_must_be_empty (
+    sqlite3 *db,
+    const char *sql,
+    const char *repository_id,
+    const char *failure_message,
+    GError **error
+)
+{
+    sqlite3_stmt *statement = NULL;
+
+    if (sqlite3_prepare_v2 (
+            db,
+            sql,
+            -1,
+            &statement,
+            NULL
+        ) != SQLITE_OK) {
+        g_set_error (
+            error,
+            ORACLE_ERROR,
+            ORACLE_ERROR_INDEX,
+            "Oracle could not prepare evidence-reference query: %s",
+            sqlite3_errmsg (db)
+        );
+        return FALSE;
+    }
+
+    if (repository_id != NULL) {
+        sqlite3_bind_text (
+            statement,
+            1,
+            repository_id,
+            -1,
+            SQLITE_STATIC
+        );
+    }
+
+    int rc = sqlite3_step (statement);
+    if (rc == SQLITE_ROW) {
+        sqlite3_finalize (statement);
+        g_set_error_literal (
+            error,
+            ORACLE_ERROR,
+            ORACLE_ERROR_INTEGRITY,
+            failure_message
+        );
+        return FALSE;
+    }
+
+    if (rc != SQLITE_DONE) {
+        sqlite3_finalize (statement);
+        g_set_error (
+            error,
+            ORACLE_ERROR,
+            ORACLE_ERROR_INDEX,
+            "Oracle evidence-reference query failed: %s",
+            sqlite3_errmsg (db)
+        );
+        return FALSE;
+    }
+
+    sqlite3_finalize (statement);
+    return TRUE;
+}
+
+static gboolean
+oracle_check_evidence_references (
+    sqlite3 *db,
+    const OracleInput *input,
+    GError **error
+)
+{
+    if (!oracle_query_must_be_empty (
+            db,
+            "SELECT r.id "
+            "FROM structured_relations r "
+            "LEFT JOIN structured_entities ef "
+            "ON ef.logical_source_id = r.from_logical_source_id "
+            "LEFT JOIN structured_entities et "
+            "ON et.logical_source_id = r.to_logical_source_id "
+            "WHERE (r.from_logical_source_id IS NOT NULL AND ef.id IS NULL) "
+            "OR (r.to_logical_source_id IS NOT NULL AND et.id IS NULL) "
+            "LIMIT 1;",
+            NULL,
+            "Structured relation endpoint references a missing entity.",
+            error
+        )) {
+        return FALSE;
+    }
+
+    if (!oracle_query_must_be_empty (
+            db,
+            "SELECT rowid FROM search_fts "
+            "WHERE evidence_kind NOT IN("
+            "'section','dataset_row','entity','relation'"
+            ") LIMIT 1;",
+            NULL,
+            "FTS contains an unsupported evidence kind.",
+            error
+        )) {
+        return FALSE;
+    }
+
+    if (!oracle_query_must_be_empty (
+            db,
+            "SELECT evidence_kind, evidence_id "
+            "FROM search_fts "
+            "GROUP BY evidence_kind, evidence_id "
+            "HAVING count(*) <> 1 "
+            "LIMIT 1;",
+            NULL,
+            "FTS contains duplicate evidence references.",
+            error
+        )) {
+        return FALSE;
+    }
+
+    if (!oracle_query_must_be_empty (
+            db,
+            "SELECT f.rowid "
+            "FROM search_fts f "
+            "LEFT JOIN document_sections s "
+            "ON f.evidence_kind='section' AND s.id=f.evidence_id "
+            "WHERE f.evidence_kind='section' "
+            "AND (s.id IS NULL OR f.logical_source_id<>s.logical_source_id) "
+            "UNION ALL "
+            "SELECT f.rowid "
+            "FROM search_fts f "
+            "LEFT JOIN structured_entities e "
+            "ON f.evidence_kind='entity' AND e.id=f.evidence_id "
+            "WHERE f.evidence_kind='entity' "
+            "AND (e.id IS NULL OR f.logical_source_id<>e.logical_source_id) "
+            "UNION ALL "
+            "SELECT f.rowid "
+            "FROM search_fts f "
+            "LEFT JOIN structured_relations r "
+            "ON f.evidence_kind='relation' AND r.id=f.evidence_id "
+            "WHERE f.evidence_kind='relation' "
+            "AND (r.id IS NULL OR f.logical_source_id<>r.logical_source_id) "
+            "UNION ALL "
+            "SELECT f.rowid "
+            "FROM search_fts f "
+            "LEFT JOIN dataset_rows dr "
+            "ON f.evidence_kind='dataset_row' AND dr.id=f.evidence_id "
+            "LEFT JOIN datasets d ON d.id=dr.dataset_id "
+            "LEFT JOIN source_files sf ON sf.id=d.source_id "
+            "WHERE f.evidence_kind='dataset_row' "
+            "AND (dr.id IS NULL OR sf.id IS NULL OR "
+            "f.logical_source_id <> "
+            "(?1 || ':dataset-row:' || sf.path || ':' || dr.ordinal)) "
+            "LIMIT 1;",
+            input->repository_id,
+            "FTS evidence reference does not match its canonical evidence row.",
+            error
+        )) {
+        return FALSE;
+    }
+
+    if (!oracle_query_must_be_empty (
+            db,
+            "SELECT s.id "
+            "FROM document_sections s "
+            "LEFT JOIN search_fts f "
+            "ON f.evidence_kind='section' AND f.evidence_id=s.id "
+            "GROUP BY s.id HAVING count(f.rowid)<>1 "
+            "UNION ALL "
+            "SELECT e.id "
+            "FROM structured_entities e "
+            "LEFT JOIN search_fts f "
+            "ON f.evidence_kind='entity' AND f.evidence_id=e.id "
+            "GROUP BY e.id HAVING count(f.rowid)<>1 "
+            "UNION ALL "
+            "SELECT r.id "
+            "FROM structured_relations r "
+            "LEFT JOIN search_fts f "
+            "ON f.evidence_kind='relation' AND f.evidence_id=r.id "
+            "GROUP BY r.id HAVING count(f.rowid)<>1 "
+            "UNION ALL "
+            "SELECT dr.id "
+            "FROM dataset_rows dr "
+            "LEFT JOIN search_fts f "
+            "ON f.evidence_kind='dataset_row' AND f.evidence_id=dr.id "
+            "GROUP BY dr.id HAVING count(f.rowid)<>1 "
+            "LIMIT 1;",
+            NULL,
+            "A canonical evidence row does not have exactly one FTS reference.",
+            error
+        )) {
+        return FALSE;
+    }
+
+    return TRUE;
+}
+
+static gboolean
 check_index (
     const OracleInput *input,
     const OraclePinnedState *state,
@@ -2133,6 +2328,11 @@ check_index (
             input,
             snapshot_root,
             policy,
+            error
+        ) ||
+        !oracle_check_evidence_references (
+            db,
+            input,
             error
         )) {
         goto out;
