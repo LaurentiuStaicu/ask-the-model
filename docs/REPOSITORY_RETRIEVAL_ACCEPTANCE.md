@@ -929,8 +929,15 @@ changes.
 A candidate is not eligible for production promotion merely because it reduces
 mean bytes or raises context precision. At minimum, it must preserve the
 existing frozen R5 gates and must not reduce required-evidence recall visible to
-the model relative to the production-policy baseline. Any topic-level recall
-loss must be investigated explicitly rather than hidden by aggregate means.
+the model relative to the production-policy baseline.
+
+The sweep must compare `context_required_recall` topic-by-topic against the
+production-policy evaluation. Its summary artifact records the regression count,
+worst topic-level delta and the exact affected topic IDs/information needs. A
+candidate is observationally promotion-eligible only when the existing quality
+gates pass, aggregate required-evidence recall does not fall, and no topic has a
+negative required-evidence context-recall delta. Topic-level losses must never
+be hidden by aggregate means.
 
 ### Pass condition
 
