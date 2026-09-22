@@ -37,6 +37,7 @@ executable(
     'src/RepositoryNative.vala',
     'src/RepositorySelection.vala',
     'src/RepositoryState.vala',
+    'src/StartupQualificationRecord.vala',
     'src/startup_qualification.c',
     'src/RepositoryLifecycleService.vala',
     'src/ConversationGrounding.vala',
@@ -117,6 +118,33 @@ startup_qualification_test = executable(
 test(
   'startup-qualification',
   startup_qualification_test
+)
+
+
+startup_qualification_record_test = executable(
+  'startup-qualification-record-test',
+  [
+    'src/RepositoryService.vala',
+    'src/RepositoryNative.vala',
+    'src/StartupQualificationRecord.vala',
+    'src/cff_version.c',
+    'tests/startup_qualification_record_test.vala'
+  ],
+  include_directories: include_directories('src'),
+  dependencies: [
+    glib_dep,
+    soup_dep,
+    json_glib_dep
+  ],
+  link_args: [
+    '-lyaml'
+  ],
+  install: false
+)
+
+test(
+  'startup-qualification-record',
+  startup_qualification_record_test
 )
 
 repository_catalog_test = executable(
