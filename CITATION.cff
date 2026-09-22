@@ -2,15 +2,15 @@ cff-version: 1.2.0
 message: "If you use Ask the Model, please cite this version."
 type: software
 title: "Ask the Model"
-version: 0.3.0
-date-released: 2026-09-21
+version: 0.4.0
+date-released: 2026-09-22
 authors:
   - family-names: "Staicu"
     given-names: "Laurentiu"
 repository-code: "https://github.com/LaurentiuStaicu/ask-the-model"
 url: "https://github.com/LaurentiuStaicu/ask-the-model"
 license: MIT
-abstract: "A local-first desktop interface for locally managed language models and repository-grounded exploration of scientific dynamical-model repositories. Ask the Model v0.3.0 adds validated immutable EWD/CBD/RMD snapshots, deterministic local retrieval, per-chat model/repository pinning, compact citations and inspectable exact-SHA provenance while preserving ordinary local chat."
+abstract: "A local-first desktop interface for locally managed language models and repository-grounded exploration of scientific dynamical-model repositories. Ask the Model v0.4.0 retains validated exact-SHA EWD/CBD/RMD retrieval and adds offline startup qualification, backward-compatible repository-state migration and deterministic local snapshot integrity seals while preserving ordinary local chat."
 keywords:
   - local AI
   - local-first
