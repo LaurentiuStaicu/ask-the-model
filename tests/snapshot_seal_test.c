@@ -3,6 +3,7 @@
 #include <glib.h>
 #include <glib/gstdio.h>
 
+#include <fcntl.h>
 #include <sys/stat.h>
 #include <unistd.h>
 
