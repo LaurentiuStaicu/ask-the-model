@@ -4,7 +4,7 @@
 
 **Current release: Ask the Model (AtM) v0.4.0 — Startup Qualification and Snapshot Integrity, released 2026-09-22.**
 
-v0.4.0 retains the repository-grounded multi-chat capability introduced in v0.3.0 and adds offline startup qualification, a backward-compatible repository-state v2 integrity field, deterministic local snapshot seals, fail-closed seal comparison before repository use and stable pre/post integrity checks around retrieval-index preparation.
+v0.4.0 retains the repository-grounded multi-chat capability introduced in v0.3.0 and adds offline startup qualification, an authoritative fail-closed installation gate for repository use/mutation, a backward-compatible repository-state v2 integrity field, deterministic local snapshot seals, fail-closed seal comparison before repository use, stable pre/post integrity checks around retrieval-index preparation and independent G-O0 verification of local repository state.
 
 The project remains in the `0.x` initial-development series. The public API and repository-management surface are not yet considered stable enough for v1.0.
 
@@ -51,7 +51,8 @@ v0.4.0 provides:
 - durable per-startup qualification records separated from volatile AI-provider state;
 - backward-compatible repository-state schema v2 with optional/enrolled local snapshot seals;
 - deterministic local snapshot-integrity verification before repository grounding and around index validation/rebuild;
-- explicit same-SHA recovery through the existing Download/Update action, with invalid real-directory snapshots quarantined for diagnosis before a revalidated exact-SHA replacement is promoted.
+- explicit same-SHA recovery through the existing Download/Update action, with invalid real-directory snapshots quarantined for diagnosis before a revalidated exact-SHA replacement is promoted;
+- non-empty repository grounding and Download/Update remain blocked until platform/storage startup qualification has passed; ordinary zero-repository chat remains separate and valid.
 
 ## Repository lifecycle contract
 
@@ -94,7 +95,7 @@ Temporary model-visible source labels are resolved by AtM into persistent proven
 
 ## Verification for v0.4.0
 
-The v0.4.0 development stack passes the Flatpak/Meson CI gate for startup qualification, repository-state migration, deterministic snapshot seals, G-S0 seal ordering, lifecycle seal enrollment/tamper rejection, explicit invalid-snapshot quarantine and stable pre/post snapshot identity across index preparation. The repository-grounded GTK interaction baseline remains inherited from the locally smoke-tested v0.3.0 release on elementary OS 8 / GTK 4.14.
+The v0.4.0 development stack passes the Flatpak/Meson CI gate for startup qualification, authoritative runtime gating of repository grounding/mutation, repository-state migration, deterministic snapshot seals, G-S0 seal ordering, lifecycle seal enrollment/tamper rejection, explicit invalid-snapshot quarantine, stable pre/post snapshot identity across index preparation and the independent G-O0 state/snapshot/index/provenance oracle. The repository-grounded GTK interaction baseline remains inherited from the locally smoke-tested v0.3.0 release on elementary OS 8 / GTK 4.14.
 
 Verified paths include:
 
@@ -109,7 +110,7 @@ Verified paths include:
 - readable Markdown source excerpts;
 - immutable GitHub permalink to the exact EWD snapshot and line range.
 
-The Flatpak/Meson test suite covers startup qualification, storage-boundary checks, repository-state migration, snapshot integrity, repository lifecycle, archive safety, manifests, index integrity, retrieval, grounding, citations and conversation pinning.
+The Flatpak/Meson test suite covers startup qualification, the fail-closed repository runtime gate, storage-boundary checks, repository-state migration, snapshot integrity, repository lifecycle, archive safety, manifests, index integrity, independent G-O0 verification, retrieval, grounding, citations and conversation pinning. G-O0 is a test/diagnostic verification instrument and does not become a second application runtime authority.
 
 The reviewed frozen R5 deterministic retrieval benchmark remains separate from scientific-validity claims. It validates engineering retrieval behavior, not the scientific validity of EWD, CBD or RMD.
 
