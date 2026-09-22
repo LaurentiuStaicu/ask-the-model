@@ -27,6 +27,17 @@ namespace AskTheModel.RepositoryNative {
     ) throws GLib.Error;
 
     [CCode (
+        cname = "atm_repository_quarantine_snapshot",
+        cheader_filename = "repository_storage.h"
+    )]
+    public static extern bool quarantine_snapshot (
+        string data_root,
+        string repository_id,
+        string sha,
+        out string quarantine_path
+    ) throws GLib.Error;
+
+    [CCode (
         cname = "atm_snapshot_seal_compute",
         cheader_filename = "snapshot_seal.h"
     )]
