@@ -184,6 +184,7 @@ namespace AskTheModel.Tests {
                 qualified_sha,
                 qualified_version,
                 "wrong-version",
+                "ready",
                 "Mismatched startup qualification."
             );
 
