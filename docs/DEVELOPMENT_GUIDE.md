@@ -49,6 +49,21 @@ The first Send freezes model/repository identity for that chat.
 
 `RepositoryState.vala` owns the backward-compatible v1/v2 persistent state boundary. `snapshot_seal.c` computes the local integrity key; `repository_reconcile.c` performs offline exact-SHA reconciliation for G-S0.
 
+For the packaged Flatpak, GLib's XDG state root maps to the app-private Flatpak state location. The durable files are:
+
+```text
+$XDG_STATE_HOME/startup-qualification.json
+$XDG_STATE_HOME/repository-state.json
+```
+
+On the host with the current Flatpak convention this normally corresponds to:
+
+```text
+~/.var/app/io.github.laurentiustaicu.ask_the_model/.local/state/
+```
+
+Do not make code depend on that host-side literal path; use the GLib/XDG state API so Flatpak or platform-specific state-root overrides remain valid.
+
 Native ingestion and validation helpers live in the corresponding C modules under `src/`.
 
 ### Retrieval
