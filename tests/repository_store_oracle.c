@@ -2165,6 +2165,7 @@ oracle_check (
     char *snapshot_relative = NULL;
     char *snapshot_root = NULL;
     char *manifest_hash = NULL;
+    OracleManifestPolicy policy = { 0 };
     gboolean ok = FALSE;
 
     if (input == NULL ||
@@ -2217,6 +2218,7 @@ oracle_check (
             &state,
             snapshot_root,
             &manifest_hash,
+            &policy,
             error
         )) {
         goto out;
@@ -2225,7 +2227,9 @@ oracle_check (
     if (!check_index (
             input,
             &state,
+            snapshot_root,
             manifest_hash,
+            &policy,
             error
         )) {
         goto out;
@@ -2239,6 +2243,7 @@ oracle_check (
     ok = TRUE;
 
 out:
+    oracle_manifest_policy_clear (&policy);
     g_free (manifest_hash);
     g_free (snapshot_root);
     g_free (snapshot_relative);
