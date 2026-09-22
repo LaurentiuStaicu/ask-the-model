@@ -1,6 +1,6 @@
 # Troubleshooting Ask the Model
 
-This guide covers the most common problems in the AtM v0.3.0 local-chat setup. Work through the checks in order. The reference provider in the examples is Ollama.
+This guide covers the most common problems in the AtM v0.4.0 local-chat setup. Work through the checks in order. The reference provider in the examples is Ollama.
 
 ## Quick diagnostic sequence
 
@@ -23,7 +23,7 @@ This gives you a basic picture of whether Flatpak is available, whether the prov
 
 ## AtM shows “Ollama not found”
 
-AtM v0.3.0 probes these endpoints in order:
+AtM v0.4.0 probes these endpoints in order:
 
 1. `http://127.0.0.1:11434`
 2. `http://127.0.0.1:11435`
@@ -266,7 +266,7 @@ If direct provider execution also fails, fix the provider/model problem before d
 
 ## My conversation disappeared after restarting AtM
 
-This is expected in v0.3.0. Conversation history exists only in application memory for the current AtM process. Persistent conversation storage is not implemented yet.
+This is expected in v0.4.0. Conversation history exists only in application memory for the current AtM process. Persistent conversation storage is not implemented yet.
 
 ## Repository Refresh shows an update
 
@@ -334,11 +334,11 @@ This can be expected.
 
 Validated snapshots are immutable. AtM may retain the previous snapshot/index pair for safe rollback or because an active chat is pinned to it.
 
-The v0.3.0 compact header does not yet expose full snapshot-history/removal management.
+The v0.4.0 compact header does not yet expose full snapshot-history/removal management.
 
 ## I expected AtM to download or delete a model
 
-This is not implemented in v0.3.0.
+This is not implemented in v0.4.0.
 
 For now, use provider commands:
 
@@ -379,7 +379,7 @@ Open the badge or the repository Actions tab to inspect the failing run.
 
 The repository previously experimented with publishing the development Flatpak repository through GitHub Pages. That historical Pages deployment failed because GitHub Pages had not been enabled, and the workflow was subsequently replaced with direct publication to the `flatpak-repo` branch.
 
-The current build/release workflow no longer uses the `github-pages` environment. A historical red Deployment therefore does not describe the current AtM v0.3.0 build state.
+The current build/release workflow no longer uses the `github-pages` environment. A historical red Deployment therefore does not describe the current AtM v0.4.0 build state.
 
 Repository administrators can clean up obsolete deployment/environment history from GitHub settings or the GitHub Deployments API where appropriate.
 
