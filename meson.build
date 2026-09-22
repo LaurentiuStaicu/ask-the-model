@@ -424,6 +424,26 @@ test(
   repository_reconcile_test
 )
 
+
+snapshot_seal_test = executable(
+  'snapshot-seal-test',
+  [
+    'src/snapshot_seal.c',
+    'tests/snapshot_seal_test.c'
+  ],
+  include_directories: include_directories('src'),
+  dependencies: [
+    glib_dep,
+    json_glib_dep
+  ],
+  install: false
+)
+
+test(
+  'snapshot-seal',
+  snapshot_seal_test
+)
+
 retrieval_query_test = executable(
   'retrieval-query-test',
   [
