@@ -30,6 +30,13 @@ typedef struct {
     char *repository_version;
     char *snapshot_sha;
     char *logical_source_id;
+    char *entity_type;
+    char *relation_type;
+    char *native_id;
+    char *from_logical_source_id;
+    char *to_logical_source_id;
+    char *dataset_logical_source_id;
+    char *row_key;
     char *source_path;
     char *locator;
     char *title;

@@ -285,6 +285,13 @@ test_native_entity_lookup (void)
         ==,
         "Food per capita"
     );
+    g_assert_cmpstr (record->entity_type, ==, "variable");
+    g_assert_cmpstr (record->native_id, ==, "food_per_capita");
+    g_assert_null (record->relation_type);
+    g_assert_null (record->from_logical_source_id);
+    g_assert_null (record->to_logical_source_id);
+    g_assert_null (record->dataset_logical_source_id);
+    g_assert_null (record->row_key);
     g_assert_true (
         (record->source_roles & ATM_SOURCE_ROLE_STRUCTURAL) != 0
     );
@@ -337,6 +344,21 @@ test_native_relation_and_logical_id_lookup (void)
         ==,
         "ewd:entity:relation:LINK.FOOD.POP"
     );
+    g_assert_cmpstr (relation->relation_type, ==, "INFLUENCE");
+    g_assert_cmpstr (relation->native_id, ==, "LINK.FOOD.POP");
+    g_assert_cmpstr (
+        relation->from_logical_source_id,
+        ==,
+        "ewd:entity:variable:food_per_capita"
+    );
+    g_assert_cmpstr (
+        relation->to_logical_source_id,
+        ==,
+        "ewd:entity:variable:population"
+    );
+    g_assert_null (relation->entity_type);
+    g_assert_null (relation->dataset_logical_source_id);
+    g_assert_null (relation->row_key);
     g_assert_true (
         (relation->source_roles & ATM_SOURCE_ROLE_STRUCTURAL) != 0
     );
@@ -399,6 +421,12 @@ test_dataset_logical_id_lookup (void)
 
     g_assert_cmpstr (record->evidence_kind, ==, "dataset");
     g_assert_cmpstr (record->source_path, ==, "data/series.csv");
+    g_assert_cmpstr (
+        record->dataset_logical_source_id,
+        ==,
+        "ewd:dataset:data/series.csv"
+    );
+    g_assert_null (record->row_key);
     g_assert_true (
         (record->source_roles & ATM_SOURCE_ROLE_EVIDENCE) != 0
     );
@@ -479,6 +507,13 @@ test_fts_romanian_diacritic_search (void)
     assert_snapshot_provenance (record);
     g_assert_cmpstr (record->evidence_kind, ==, "section");
     g_assert_cmpstr (record->source_path, ==, "STATUS.md");
+    g_assert_null (record->entity_type);
+    g_assert_null (record->relation_type);
+    g_assert_null (record->native_id);
+    g_assert_null (record->from_logical_source_id);
+    g_assert_null (record->to_logical_source_id);
+    g_assert_null (record->dataset_logical_source_id);
+    g_assert_null (record->row_key);
     g_assert_true (
         (record->source_roles & ATM_SOURCE_ROLE_CANONICAL) != 0
     );
@@ -526,11 +561,14 @@ test_fts_common_function_words_do_not_swamp_technical_terms (void)
     );
     g_assert_no_error (error);
     g_assert_cmpuint (results->len, >, 0);
+    AtmEvidenceRecord *record = result_at (results, 0);
     g_assert_cmpstr (
-        result_at (results, 0)->logical_source_id,
+        record->logical_source_id,
         ==,
         "ewd:entity:variable:food_per_capita"
     );
+    g_assert_cmpstr (record->entity_type, ==, "variable");
+    g_assert_cmpstr (record->native_id, ==, "food_per_capita");
 
     g_ptr_array_unref (results);
     g_free (index_path);
@@ -624,6 +662,12 @@ test_fts_dataset_row_provenance (void)
         "data/series.csv"
     );
     g_assert_cmpstr (record->locator, ==, "lines:2-2");
+    g_assert_cmpstr (
+        record->dataset_logical_source_id,
+        ==,
+        "ewd:dataset:data/series.csv"
+    );
+    g_assert_cmpstr (record->row_key, ==, "2025");
     g_assert_true (
         (record->source_roles & ATM_SOURCE_ROLE_EVIDENCE) != 0
     );
@@ -739,6 +783,12 @@ test_tabular_row_key_lookup_global_and_scoped (void)
     );
     g_assert_cmpstr (record->locator, ==, "lines:2-2");
     g_assert_cmpstr (record->title, ==, "2025");
+    g_assert_cmpstr (
+        record->dataset_logical_source_id,
+        ==,
+        "ewd:dataset:data/series.csv"
+    );
+    g_assert_cmpstr (record->row_key, ==, "2025");
     g_assert_cmpint (
         record->match_kind,
         ==,
@@ -908,6 +958,144 @@ test_tabular_scope_and_missing_key (void)
     g_free (cache_root);
 }
 
+
+static AtmEvidenceRecord *
+find_by_logical_source_id (
+    GPtrArray *results,
+    const char *logical_source_id
+)
+{
+    for (guint i = 0; i < results->len; i++) {
+        AtmEvidenceRecord *record = result_at (results, i);
+
+        if (g_strcmp0 (
+                record->logical_source_id,
+                logical_source_id
+            ) == 0) {
+            return record;
+        }
+    }
+
+    return NULL;
+}
+
+static void
+test_semantic_metadata_consistent_across_routes (void)
+{
+    char *snapshot_root = new_snapshot ();
+    char *cache_root = new_temp_root (
+        "atm-semantic-metadata-cache-XXXXXX"
+    );
+    char *index_path = build_index (
+        snapshot_root,
+        cache_root
+    );
+    GPtrArray *exact = NULL;
+    GPtrArray *lexical = NULL;
+    GPtrArray *tabular = NULL;
+    GError *error = NULL;
+
+    g_assert_true (
+        atm_retrieval_lookup_exact (
+            index_path,
+            "food_per_capita",
+            10,
+            &exact,
+            &error
+        )
+    );
+    g_assert_no_error (error);
+    g_assert_cmpuint (exact->len, ==, 1);
+
+    g_assert_true (
+        atm_retrieval_search_fts (
+            index_path,
+            "food_per_capita",
+            10,
+            &lexical,
+            &error
+        )
+    );
+    g_assert_no_error (error);
+
+    AtmEvidenceRecord *exact_entity = result_at (exact, 0);
+    AtmEvidenceRecord *lexical_entity = find_by_logical_source_id (
+        lexical,
+        exact_entity->logical_source_id
+    );
+
+    g_assert_nonnull (lexical_entity);
+    g_assert_cmpstr (
+        lexical_entity->entity_type,
+        ==,
+        exact_entity->entity_type
+    );
+    g_assert_cmpstr (
+        lexical_entity->native_id,
+        ==,
+        exact_entity->native_id
+    );
+    g_assert_cmpstr (
+        lexical_entity->relation_type,
+        ==,
+        exact_entity->relation_type
+    );
+
+    g_ptr_array_unref (lexical);
+    lexical = NULL;
+
+    g_assert_true (
+        atm_retrieval_lookup_dataset_rows (
+            index_path,
+            NULL,
+            "2025",
+            10,
+            &tabular,
+            &error
+        )
+    );
+    g_assert_no_error (error);
+    g_assert_cmpuint (tabular->len, ==, 1);
+
+    g_assert_true (
+        atm_retrieval_search_fts (
+            index_path,
+            "2025 value",
+            10,
+            &lexical,
+            &error
+        )
+    );
+    g_assert_no_error (error);
+
+    AtmEvidenceRecord *tabular_row = result_at (tabular, 0);
+    AtmEvidenceRecord *lexical_row = find_by_logical_source_id (
+        lexical,
+        tabular_row->logical_source_id
+    );
+
+    g_assert_nonnull (lexical_row);
+    g_assert_cmpstr (
+        lexical_row->dataset_logical_source_id,
+        ==,
+        tabular_row->dataset_logical_source_id
+    );
+    g_assert_cmpstr (
+        lexical_row->row_key,
+        ==,
+        tabular_row->row_key
+    );
+
+    g_ptr_array_unref (lexical);
+    g_ptr_array_unref (tabular);
+    g_ptr_array_unref (exact);
+    g_free (index_path);
+    remove_tree_best_effort (snapshot_root);
+    g_free (snapshot_root);
+    remove_tree_best_effort (cache_root);
+    g_free (cache_root);
+}
+
 static void
 test_invalid_arguments_rejected (void)
 {
@@ -1003,6 +1191,10 @@ main (int argc, char **argv)
     g_test_add_func (
         "/retrieval-query/tabular-scope-missing",
         test_tabular_scope_and_missing_key
+    );
+    g_test_add_func (
+        "/retrieval-query/semantic-metadata-consistent",
+        test_semantic_metadata_consistent_across_routes
     );
     g_test_add_func (
         "/retrieval-query/invalid-arguments",

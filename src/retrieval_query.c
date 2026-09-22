@@ -24,6 +24,13 @@ atm_evidence_record_free (AtmEvidenceRecord *record)
     g_free (record->repository_version);
     g_free (record->snapshot_sha);
     g_free (record->logical_source_id);
+    g_free (record->entity_type);
+    g_free (record->relation_type);
+    g_free (record->native_id);
+    g_free (record->from_logical_source_id);
+    g_free (record->to_logical_source_id);
+    g_free (record->dataset_logical_source_id);
+    g_free (record->row_key);
     g_free (record->source_path);
     g_free (record->locator);
     g_free (record->title);
@@ -119,6 +126,24 @@ apply_snapshot_provenance (
     );
     record->snapshot_sha = g_strdup (
         provenance->snapshot_sha
+    );
+}
+
+static char *
+duplicate_optional_column (
+    sqlite3_stmt *statement,
+    int column
+)
+{
+    if (sqlite3_column_type (statement, column) == SQLITE_NULL) {
+        return NULL;
+    }
+
+    return g_strdup (
+        (const char *) sqlite3_column_text (
+            statement,
+            column
+        )
     );
 }
 
@@ -314,6 +339,35 @@ append_exact_rows (
             );
         }
 
+        record->entity_type = duplicate_optional_column (
+            statement,
+            7
+        );
+        record->relation_type = duplicate_optional_column (
+            statement,
+            8
+        );
+        record->native_id = duplicate_optional_column (
+            statement,
+            9
+        );
+        record->from_logical_source_id = duplicate_optional_column (
+            statement,
+            10
+        );
+        record->to_logical_source_id = duplicate_optional_column (
+            statement,
+            11
+        );
+        record->dataset_logical_source_id = duplicate_optional_column (
+            statement,
+            12
+        );
+        record->row_key = duplicate_optional_column (
+            statement,
+            13
+        );
+
         if (!load_source_roles (
                 db,
                 role_statement,
@@ -356,7 +410,8 @@ atm_retrieval_lookup_exact (
 {
     static const char *entity_sql =
         "SELECT e.id, e.logical_source_id, s.path, e.locator, "
-        "COALESCE(e.label, e.native_id), e.payload_json, s.id "
+        "COALESCE(e.label, e.native_id), e.payload_json, s.id, "
+        "e.entity_type, NULL, e.native_id, NULL, NULL, NULL, NULL "
         "FROM structured_entities e "
         "JOIN source_files s ON s.id = e.source_id "
         "WHERE e.native_id = ?1 COLLATE BINARY "
@@ -366,7 +421,9 @@ atm_retrieval_lookup_exact (
 
     static const char *relation_sql =
         "SELECT r.id, r.logical_source_id, s.path, r.locator, "
-        "COALESCE(r.native_id, r.relation_type), r.payload_json, s.id "
+        "COALESCE(r.native_id, r.relation_type), r.payload_json, s.id, "
+        "NULL, r.relation_type, r.native_id, "
+        "r.from_logical_source_id, r.to_logical_source_id, NULL, NULL "
         "FROM structured_relations r "
         "JOIN source_files s ON s.id = r.source_id "
         "WHERE r.native_id = ?1 COLLATE BINARY "
@@ -377,7 +434,8 @@ atm_retrieval_lookup_exact (
     static const char *dataset_sql =
         "SELECT d.id, d.logical_source_id, s.path, d.locator, "
         "COALESCE(d.title, d.native_id, d.logical_source_id), "
-        "d.metadata_json, s.id "
+        "d.metadata_json, s.id, "
+        "NULL, NULL, d.native_id, NULL, NULL, d.logical_source_id, NULL "
         "FROM datasets d "
         "JOIN source_files s ON s.id = d.source_id "
         "WHERE d.native_id = ?1 COLLATE BINARY "
@@ -388,7 +446,8 @@ atm_retrieval_lookup_exact (
     static const char *section_sql =
         "SELECT d.id, d.logical_source_id, s.path, d.locator, "
         "COALESCE(d.title, d.heading_path, d.logical_source_id), "
-        "d.body, s.id "
+        "d.body, s.id, "
+        "NULL, NULL, NULL, NULL, NULL, NULL, NULL "
         "FROM document_sections d "
         "JOIN source_files s ON s.id = d.source_id "
         "WHERE d.logical_source_id = ?1 COLLATE BINARY "
@@ -734,8 +793,7 @@ load_fts_provenance (
     sqlite3_stmt *row_statement,
     const char *kind,
     sqlite3_int64 evidence_id,
-    char **out_source_path,
-    char **out_locator,
+    AtmEvidenceRecord *record,
     sqlite3_int64 *out_source_id,
     GError **error
 )
@@ -781,13 +839,13 @@ load_fts_provenance (
         return FALSE;
     }
 
-    *out_source_path = g_strdup (
+    record->source_path = g_strdup (
         (const char *) sqlite3_column_text (
             statement,
             0
         )
     );
-    *out_locator = g_strdup (
+    record->locator = g_strdup (
         (const char *) sqlite3_column_text (
             statement,
             1
@@ -796,6 +854,34 @@ load_fts_provenance (
     *out_source_id = sqlite3_column_int64 (
         statement,
         2
+    );
+    record->entity_type = duplicate_optional_column (
+        statement,
+        3
+    );
+    record->relation_type = duplicate_optional_column (
+        statement,
+        4
+    );
+    record->native_id = duplicate_optional_column (
+        statement,
+        5
+    );
+    record->from_logical_source_id = duplicate_optional_column (
+        statement,
+        6
+    );
+    record->to_logical_source_id = duplicate_optional_column (
+        statement,
+        7
+    );
+    record->dataset_logical_source_id = duplicate_optional_column (
+        statement,
+        8
+    );
+    record->row_key = duplicate_optional_column (
+        statement,
+        9
     );
 
     return TRUE;
@@ -915,7 +1001,8 @@ atm_retrieval_search_fts (
         ) != SQLITE_OK ||
         !prepare_provenance_statement (
             db,
-            "SELECT s.path, d.locator, s.id "
+            "SELECT s.path, d.locator, s.id, "
+            "NULL, NULL, NULL, NULL, NULL, NULL, NULL "
             "FROM document_sections d "
             "JOIN source_files s ON s.id = d.source_id "
             "WHERE d.id = ?1;",
@@ -924,7 +1011,8 @@ atm_retrieval_search_fts (
         ) ||
         !prepare_provenance_statement (
             db,
-            "SELECT s.path, e.locator, s.id "
+            "SELECT s.path, e.locator, s.id, "
+            "e.entity_type, NULL, e.native_id, NULL, NULL, NULL, NULL "
             "FROM structured_entities e "
             "JOIN source_files s ON s.id = e.source_id "
             "WHERE e.id = ?1;",
@@ -933,7 +1021,9 @@ atm_retrieval_search_fts (
         ) ||
         !prepare_provenance_statement (
             db,
-            "SELECT s.path, r.locator, s.id "
+            "SELECT s.path, r.locator, s.id, "
+            "NULL, r.relation_type, r.native_id, "
+            "r.from_logical_source_id, r.to_logical_source_id, NULL, NULL "
             "FROM structured_relations r "
             "JOIN source_files s ON s.id = r.source_id "
             "WHERE r.id = ?1;",
@@ -942,7 +1032,8 @@ atm_retrieval_search_fts (
         ) ||
         !prepare_provenance_statement (
             db,
-            "SELECT s.path, r.locator, s.id "
+            "SELECT s.path, r.locator, s.id, "
+            "NULL, NULL, NULL, NULL, NULL, d.logical_source_id, r.row_key "
             "FROM dataset_rows r "
             "JOIN datasets d ON d.id = r.dataset_id "
             "JOIN source_files s ON s.id = d.source_id "
@@ -1043,8 +1134,7 @@ atm_retrieval_search_fts (
                 row_statement,
                 kind,
                 evidence_id,
-                &record->source_path,
-                &record->locator,
+                record,
                 &source_id,
                 error
             ) ||
@@ -1220,7 +1310,8 @@ atm_retrieval_lookup_dataset_rows (
     if (sqlite3_prepare_v2 (
             db,
             "SELECT r.id, m.repository_id, s.path, r.ordinal, "
-            "r.locator, r.row_key, r.payload_json, s.id "
+            "r.locator, r.row_key, r.payload_json, s.id, "
+            "d.logical_source_id "
             "FROM dataset_rows r "
             "JOIN datasets d ON d.id = r.dataset_id "
             "JOIN source_files s ON s.id = d.source_id "
@@ -1347,6 +1438,14 @@ atm_retrieval_lookup_dataset_rows (
                 statement,
                 6
             )
+        );
+        record->dataset_logical_source_id = duplicate_optional_column (
+            statement,
+            8
+        );
+        record->row_key = duplicate_optional_column (
+            statement,
+            5
         );
 
         if (!load_source_roles (

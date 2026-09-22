@@ -108,6 +108,20 @@
       "tested_by": [
         "meson:conversation-session"
       ]
+    },
+    {
+      "id": "RETRIEVAL-S1-002",
+      "category": "RETRIEVAL",
+      "severity": "S1",
+      "lifecycle": "enforced",
+      "statement": "The same logical evidence object must expose the same structured semantic metadata regardless of whether it is discovered by exact, lexical, or tabular retrieval.",
+      "enforced_by": [
+        "src/retrieval_query.h",
+        "src/retrieval_query.c"
+      ],
+      "tested_by": [
+        "meson:retrieval-query"
+      ]
     }
   ]
 }
