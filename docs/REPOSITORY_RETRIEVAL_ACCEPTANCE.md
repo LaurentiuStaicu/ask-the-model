@@ -858,6 +858,64 @@ nDCG gap 0.0333, evidence traceability 1.00 and clarification-outcome
 accuracy 1.00. This is an engineering acceptance result for the pinned
 retrieval corpus, not a scientific-validity claim for EWD, CBD or RMD.
 
+## R5-P — Production-policy context-efficiency shadow
+
+R5-P is an observational companion to the frozen R5 benchmark. It exists to
+measure the actual model-visible retrieval policy used by the application
+without changing the historical R5 acceptance baseline.
+
+### Policy identity
+
+The application and the production-policy benchmark must consume the same
+compile-time policy constants for:
+
+- maximum ranked results per repository;
+- maximum model-visible context sources;
+- maximum model-visible context bytes.
+
+The frozen R5 runner keeps its historical 10-results / 8-sources / 32-KiB
+configuration for longitudinal comparability. The production shadow uses the
+current application policy. A change to production policy must therefore
+change the shared policy definition rather than silently changing only the
+benchmark or only the runtime.
+
+### Required measurements
+
+For the same frozen topics and exact pinned repository snapshots, R5-P records
+at least:
+
+- the existing retrieval-quality metrics and gates;
+- context precision;
+- required-evidence recall in the context actually exposed to the model;
+- model-visible context source count (mean and maximum);
+- evidence bytes (mean and maximum);
+- retrieval latency median and p95.
+
+Required-evidence context recall is separate from retrieval Recall@5. A
+retriever may find the correct evidence while an overly aggressive context
+budget removes it before model generation.
+
+### Initial status
+
+R5-P begins as a shadow diagnostic, not a release gate. Its first purpose is to
+establish the real production-policy baseline and quantify the difference from
+frozen R5.
+
+No production limit may be reduced solely because it lowers bytes or raises
+context precision. A candidate context policy is eligible for later promotion
+only after benchmark evidence shows that it preserves the frozen R5 gates,
+provenance/traceability and the required evidence visible to the model.
+
+Retrieval latency is reported but is not initially gated because CI runner
+variance can dominate millisecond-scale local SQLite measurements.
+
+### Pass condition
+
+The frozen R5 benchmark remains unchanged and continues to pass its existing
+gates; the production-policy shadow is reproducible from the same corpus,
+uses the shared runtime policy constants and produces the required
+context-efficiency diagnostics without changing application behavior.
+
 ## R6 — Optional semantic retrieval
 
 This stage is not required for repository-aware AtM v1.

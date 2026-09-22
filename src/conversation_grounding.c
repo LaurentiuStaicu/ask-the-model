@@ -4,6 +4,7 @@
 #include "grounding_context.h"
 #include "retrieval_conversation.h"
 #include "retrieval_index.h"
+#include "retrieval_policy.h"
 
 #include <string.h>
 
@@ -562,7 +563,7 @@ atm_conversation_grounding_prepare_turn (
     if (!atm_retrieval_conversation_prepare (
             state->retrieval_conversation,
             query,
-            6,
+            ATM_PRODUCTION_RETRIEVAL_RESULTS_PER_REPOSITORY,
             &turn,
             error
         )) {
@@ -587,8 +588,8 @@ atm_conversation_grounding_prepare_turn (
 
     if (!atm_grounding_context_build (
             turn->retrieval,
-            12,
-            32 * 1024,
+            ATM_PRODUCTION_GROUNDING_MAX_SOURCES,
+            ATM_PRODUCTION_GROUNDING_MAX_CONTEXT_BYTES,
             &context,
             error
         )) {

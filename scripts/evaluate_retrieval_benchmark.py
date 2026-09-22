@@ -578,6 +578,27 @@ def context_precision(
     return relevant / len(context_sources)
 
 
+def context_required_recall(
+    topic: dict[str, Any],
+    context_sources: list[dict[str, Any]],
+) -> float | None:
+    required = {
+        source_key(judgment)
+        for judgment in topic["judgments"]
+        if judgment["required"]
+    }
+
+    if not required:
+        return None
+
+    visible = {
+        source_key(source)
+        for source in context_sources
+    }
+
+    return len(required & visible) / len(required)
+
+
 def traceability_fraction(
     corpus: dict[str, tuple[str, str]],
     topic_runs: list[dict[str, Any]],
@@ -638,6 +659,8 @@ def evaluate(
     ndcg_scores: list[float] = []
     recall_scores: list[float] = []
     context_precisions: list[float] = []
+    context_required_recalls: list[float] = []
+    context_source_counts: list[int] = []
     latencies: list[float] = []
     evidence_bytes: list[int] = []
     evidence_tokens: list[int] = []
@@ -710,6 +733,15 @@ def evaluate(
         if precision is not None:
             context_precisions.append(precision)
 
+        context_recall = context_required_recall(
+            topic,
+            context_sources,
+        )
+        if context_recall is not None:
+            context_required_recalls.append(context_recall)
+
+        context_source_counts.append(len(context_sources))
+
         topic_diagnostics.append(
             {
                 "topic_id": topic["topic_id"],
@@ -724,6 +756,9 @@ def evaluate(
                 "ndcg_at_5": ndcg,
                 "canonical_required_recall_at_5": recall,
                 "context_precision": precision,
+                "context_required_recall": context_recall,
+                "context_source_count": len(context_sources),
+                "evidence_bytes": topic_run["evidence_bytes"],
                 "required_evidence": required_evidence_diagnostics(
                     topic,
                     results,
@@ -778,6 +813,19 @@ def evaluate(
             recall_scores
         ),
         "context_precision": mean_or_none(context_precisions),
+        "context_required_recall": mean_or_none(
+            context_required_recalls
+        ),
+        "context_source_count_mean": (
+            statistics.fmean(context_source_counts)
+            if context_source_counts
+            else None
+        ),
+        "context_source_count_max": (
+            max(context_source_counts)
+            if context_source_counts
+            else None
+        ),
         "wrong_repository_contamination_at_5": (
             wrong_repository / scoped_results
             if scoped_results
