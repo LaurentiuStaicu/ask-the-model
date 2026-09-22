@@ -48,6 +48,13 @@ namespace AskTheModel.Tests {
         GLib.DirUtils.remove (path);
     }
 
+    private static bool directory_is_empty (
+        string path
+    ) throws GLib.Error {
+        var directory = GLib.Dir.open (path);
+        return directory.read_name () == null;
+    }
+
     private static string create_valid_snapshot (
         string data_root,
         RepositoryDescriptor descriptor,
@@ -352,6 +359,21 @@ namespace AskTheModel.Tests {
             assert (enrolled_seal != null);
             assert ((enrolled_seal ?? "").length == 64);
 
+            remove_tree_best_effort (
+                sealed_cache_root
+            );
+            assert (
+                GLib.DirUtils.create (
+                    sealed_cache_root,
+                    0700
+                ) == 0
+            );
+            assert (
+                directory_is_empty (
+                    sealed_cache_root
+                )
+            );
+
             GLib.FileUtils.set_contents (
                 GLib.Path.build_filename (
                     sealed_snapshot,
@@ -371,6 +393,32 @@ namespace AskTheModel.Tests {
             }
 
             assert (seal_mismatch_rejected);
+            assert (
+                sealed_service.info_for (
+                    sealed_descriptor.id
+                ).integrity_invalid
+            );
+            assert (
+                sealed_service.info_for (
+                    sealed_descriptor.id
+                ).download_required ()
+            );
+            assert (
+                sealed_service.selection_needs_action (
+                    sealed_selection
+                )
+            );
+            assert (
+                sealed_service.action_tooltip (
+                    sealed_selection
+                ) ==
+                "Download selected repositories"
+            );
+            assert (
+                directory_is_empty (
+                    sealed_cache_root
+                )
+            );
 
             var preserved_state =
                 new RepositoryStateStore (
