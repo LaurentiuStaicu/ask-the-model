@@ -105,6 +105,8 @@ namespace AskTheModel {
         private bool assistant_stream_started = false;
         private bool updating_model_selector = false;
         private bool startup_qualification_running = false;
+        private bool startup_qualification_failed = false;
+        private string? startup_qualification_detail = null;
 
         public Application () {
             Object (
@@ -191,8 +193,28 @@ namespace AskTheModel {
             start_startup_qualification ();
         }
 
+        private string installation_qualification_detail (
+            StartupQualificationReport report
+        ) {
+            if (!report.platform_qualified) {
+                return report.platform_detail.length > 0
+                    ? report.platform_detail
+                    : report.platform_reason_code;
+            }
+
+            if (!report.storage_qualified) {
+                return report.storage_detail.length > 0
+                    ? report.storage_detail
+                    : report.storage_reason_code;
+            }
+
+            return "Installation qualification did not pass.";
+        }
+
         private void start_startup_qualification () {
             startup_qualification_running = true;
+            startup_qualification_failed = false;
+            startup_qualification_detail = null;
             update_conversation_ui_state ();
 
             new GLib.Thread<void> ("atm-gs0", () => {
@@ -213,6 +235,18 @@ namespace AskTheModel {
                     startup_qualification_running = false;
 
                     if (completed_report != null) {
+                        repository_lifecycle.apply_installation_qualification (
+                            completed_report.installation_qualified
+                        );
+                        startup_qualification_failed =
+                            !completed_report.installation_qualified;
+                        startup_qualification_detail =
+                            completed_report.installation_qualified
+                                ? null
+                                : installation_qualification_detail (
+                                    completed_report
+                                );
+
                         stdout.printf (
                             "AtM: G-S0 mode=%s platform=%s storage=%s state=%d record=%s\n",
                             completed_report.execution_mode,
@@ -245,6 +279,14 @@ namespace AskTheModel {
                             );
                         }
                     } else {
+                        repository_lifecycle.apply_installation_qualification (
+                            false
+                        );
+                        startup_qualification_failed = true;
+                        startup_qualification_detail =
+                            completed_failure ??
+                            "Startup qualification failed.";
+
                         stderr.printf (
                             "AtM: G-S0 startup qualification failed: %s\n",
                             completed_failure ??
@@ -252,6 +294,7 @@ namespace AskTheModel {
                         );
                     }
 
+                    update_repository_annunciators ();
                     update_repository_selector_label ();
                     update_conversation_ui_state ();
                     discover_local_provider.begin ();
@@ -390,7 +433,17 @@ namespace AskTheModel {
 
             string repository_summary;
 
-            if (repository_error) {
+            if (startup_qualification_running) {
+                repository_summary =
+                    "Qualifying local repository runtime";
+            } else if (startup_qualification_failed) {
+                repository_summary =
+                    startup_qualification_detail != null
+                        ? "Repository runtime blocked: %s".printf (
+                            startup_qualification_detail
+                        )
+                        : "Repository runtime blocked by startup qualification";
+            } else if (repository_error) {
                 repository_summary =
                     repository_status_detail != null
                         ? "Repository operation failed: %s".printf (
@@ -512,6 +565,7 @@ namespace AskTheModel {
             }
 
             bool operation_active =
+                startup_qualification_running ||
                 repository_checking ||
                 repository_downloading ||
                 repository_updating ||
@@ -549,13 +603,15 @@ namespace AskTheModel {
             );
             set_annunciator (
                 repo_validate_annunciator,
+                startup_qualification_running ||
                 repository_validating
             );
             set_annunciator (
                 repo_ready_annunciator,
                 !operation_active &&
                 all_ready &&
-                !repository_error
+                !repository_error &&
+                !startup_qualification_failed
             );
             set_annunciator (
                 repo_offline_annunciator,
@@ -563,7 +619,8 @@ namespace AskTheModel {
             );
             set_annunciator (
                 repo_error_annunciator,
-                repository_error
+                repository_error ||
+                startup_qualification_failed
             );
 
             if (repo_offline_annunciator != null) {
@@ -578,10 +635,13 @@ namespace AskTheModel {
 
             if (repo_error_annunciator != null) {
                 repo_error_annunciator.tooltip_text =
-                    repository_error &&
-                    repository_status_detail != null
-                        ? repository_status_detail
-                        : "Repository operation failed";
+                    startup_qualification_failed
+                        ? startup_qualification_detail ??
+                            "Repository runtime blocked by startup qualification"
+                        : repository_error &&
+                            repository_status_detail != null
+                            ? repository_status_detail
+                            : "Repository operation failed";
             }
 
             update_status_lcd_accessibility ();
@@ -1070,14 +1130,19 @@ namespace AskTheModel {
                     );
                 }
 
+                bool repository_operations_allowed =
+                    repository_lifecycle.repository_operations_allowed ();
+
                 repository_action_button.sensitive =
                     editable &&
                     !repository_busy &&
-                    has_action;
+                    has_action &&
+                    repository_operations_allowed;
                 repository_action_button.can_target =
                     editable &&
                     !repository_busy &&
-                    has_action;
+                    has_action &&
+                    repository_operations_allowed;
                 repository_action_button.opacity =
                     has_action ? 1.0 : 0.0;
                 repository_action_button.update_state (
@@ -1087,9 +1152,13 @@ namespace AskTheModel {
 
                 string? action_tooltip =
                     has_action
-                        ? repository_lifecycle.action_tooltip (
-                            selected
-                        )
+                        ? repository_operations_allowed
+                            ? repository_lifecycle.action_tooltip (
+                                selected
+                            )
+                            : startup_qualification_running
+                                ? "Repository action unavailable while startup qualification runs"
+                                : "Repository action unavailable because startup qualification did not pass"
                         : null;
                 repository_action_button.tooltip_text =
                     action_tooltip;
@@ -1155,6 +1224,10 @@ namespace AskTheModel {
         }
 
         private async void refresh_selected_repositories () {
+            if (startup_qualification_running) {
+                return;
+            }
+
             RepositoryDescriptor[] selected =
                 repository_selection.selected_repositories ();
 
@@ -1244,6 +1317,16 @@ namespace AskTheModel {
         }
 
         private async void download_or_update_selected_repositories () {
+            if (!repository_lifecycle.repository_operations_allowed ()) {
+                finish_repository_operation (
+                    RepositoryOperationOutcome.ERROR,
+                    startup_qualification_detail ??
+                        "Repository action blocked by startup qualification."
+                );
+                update_repository_selector_label ();
+                return;
+            }
+
             RepositoryDescriptor[] selected =
                 repository_selection.selected_repositories ();
 
