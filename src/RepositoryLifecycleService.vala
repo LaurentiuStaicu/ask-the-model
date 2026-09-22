@@ -221,7 +221,8 @@ namespace AskTheModel {
         prepare_snapshot (
             RepositoryDescriptor descriptor,
             string sha,
-            string? archive_path
+            string? archive_path,
+            bool ensure_install_seal
         ) throws RepositoryError {
             SourceFunc callback = prepare_snapshot.callback;
             RepositoryInstallResult? worker_result = null;
@@ -231,6 +232,10 @@ namespace AskTheModel {
                 GLib.Environment.get_user_cache_dir ();
             string expected_snapshot =
                 snapshot_path (descriptor, sha);
+            string seal_root = GLib.Path.build_filename (
+                GLib.Environment.get_user_state_dir (),
+                "snapshot-seals"
+            );
 
             var worker = new GLib.Thread<void*> (
                 "atm-repository-install",
@@ -269,6 +274,35 @@ namespace AskTheModel {
                                     "Repository snapshot validation failed."
                                 );
                             }
+                        }
+
+                        if (ensure_install_seal) {
+                            bool seal_created;
+                            string seal_path;
+                            string seal_root_sha256;
+
+                            if (!RepositoryNative.ensure_install_seal (
+                                    seal_root,
+                                    snapshot,
+                                    descriptor.id,
+                                    sha,
+                                    out seal_created,
+                                    out seal_path,
+                                    out seal_root_sha256
+                                )) {
+                                throw new RepositoryError.STORAGE (
+                                    "Repository snapshot integrity seal could not be established."
+                                );
+                            }
+
+                            stdout.printf (
+                                "AtM: snapshot seal %s repository=%s sha=%s root=%s path=%s\n",
+                                seal_created ? "created" : "validated",
+                                descriptor.id,
+                                sha,
+                                seal_root_sha256,
+                                seal_path
+                            );
                         }
 
                         if (!RepositoryNative.ensure_index (
@@ -347,7 +381,8 @@ namespace AskTheModel {
                     yield prepare_snapshot (
                         descriptor,
                         sha,
-                        null
+                        null,
+                        false
                     );
 
                 if (result.version != local_version) {
@@ -452,7 +487,8 @@ namespace AskTheModel {
                         yield prepare_snapshot (
                             descriptor,
                             sha,
-                            archive_path
+                            archive_path,
+                            true
                         );
 
                     if (result.version != info.remote_version) {
