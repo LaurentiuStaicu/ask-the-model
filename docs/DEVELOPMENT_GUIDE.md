@@ -47,7 +47,8 @@ The first Send freezes model/repository identity for that chat.
 - integrity-invalid runtime state and same-SHA explicit repair;
 - diagnostic quarantine of invalid real-directory snapshots before replacement;
 - index construction/validation;
-- conversation grounding preparation.
+- conversation grounding preparation;
+- an authoritative installation-qualification gate for non-empty repository grounding and repository mutation.
 
 `RepositoryState.vala` owns the backward-compatible v1/v2 persistent state boundary. `snapshot_seal.c` computes the local integrity key; `repository_reconcile.c` performs offline exact-SHA reconciliation for G-S0.
 
@@ -91,6 +92,8 @@ Changes should preserve the following unless a deliberate architecture change is
 12. **Stable preparation.** Snapshot identity must remain stable across index validation/rebuild before persistence or grounding.
 13. **Explicit repair, never silent repin.** A persistent seal mismatch activates repair; same-SHA repair must download the exact archive before quarantining local content and must not replace the expected seal merely because local files changed.
 14. **Quarantine is diagnostic.** Invalid real-directory snapshots may be atomically renamed for diagnosis during explicit repair; symlink/non-directory snapshot paths are never followed as repair sources.
+15. **Installation qualification before repository authority.** Non-empty repository grounding and repository mutation require successful G-S0 platform/storage qualification; ordinary zero-repository chat remains valid and explicit Refresh remains read-only.
+16. **Independent verification is not runtime authority.** G-O0 must remain separately linked from production readiness/seal/repair helpers; it verifies local artifacts in tests/diagnostics but does not become an application READY source.
 
 ## Extension points
 
@@ -133,7 +136,7 @@ Any future execution path must expose the executed model version, inputs, parame
 
 ## Tests and gates
 
-The Meson suite covers startup qualification, storage-boundary checks, repository-state migration, deterministic snapshot sealing, repository lifecycle, archive safety, manifests, retrieval, grounding, citations and conversation pinning.
+The Meson suite covers startup qualification, the fail-closed repository runtime gate, storage-boundary checks, repository-state migration, deterministic snapshot sealing, repository lifecycle, the independent G-O0 state/snapshot/index/provenance oracle, archive safety, manifests, retrieval, grounding, citations and conversation pinning.
 
 The Flatpak workflow validates, in order:
 
