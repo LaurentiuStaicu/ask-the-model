@@ -1,6 +1,7 @@
 #include "grounding_context.h"
 #include "retrieval_conversation.h"
 #include "retrieval_index_lifecycle.h"
+#include "retrieval_policy.h"
 #include "retrieval_scope.h"
 
 #include <gio/gio.h>
@@ -11,9 +12,30 @@
 #include <string.h>
 #include <sys/stat.h>
 
-#define BENCHMARK_MAX_RESULTS_PER_REPOSITORY 10
-#define BENCHMARK_MAX_CONTEXT_SOURCES 8
-#define BENCHMARK_MAX_CONTEXT_BYTES (32 * 1024)
+#define FROZEN_R5_MAX_RESULTS_PER_REPOSITORY 10
+#define FROZEN_R5_MAX_CONTEXT_SOURCES 8
+#define FROZEN_R5_MAX_CONTEXT_BYTES (32 * 1024)
+
+typedef struct {
+    const char *name;
+    guint max_results_per_repository;
+    guint max_context_sources;
+    gsize max_context_bytes;
+} BenchmarkPolicy;
+
+static const BenchmarkPolicy FROZEN_R5_POLICY = {
+    "frozen",
+    FROZEN_R5_MAX_RESULTS_PER_REPOSITORY,
+    FROZEN_R5_MAX_CONTEXT_SOURCES,
+    FROZEN_R5_MAX_CONTEXT_BYTES
+};
+
+static const BenchmarkPolicy PRODUCTION_POLICY = {
+    "production",
+    ATM_PRODUCTION_RETRIEVAL_RESULTS_PER_REPOSITORY,
+    ATM_PRODUCTION_GROUNDING_MAX_SOURCES,
+    ATM_PRODUCTION_GROUNDING_MAX_CONTEXT_BYTES
+};
 
 typedef struct {
     char *repository_id;
@@ -822,6 +844,7 @@ append_topic_run (
     JsonObject *topic,
     GPtrArray *repositories,
     GHashTable *conversations,
+    const BenchmarkPolicy *policy,
     GError **error
 )
 {
@@ -990,7 +1013,7 @@ append_topic_run (
     gboolean ran = atm_retrieval_conversation_run (
         state,
         query,
-        BENCHMARK_MAX_RESULTS_PER_REPOSITORY,
+        policy->max_results_per_repository,
         &turn,
         error
     );
@@ -1032,8 +1055,8 @@ append_topic_run (
 
         if (!atm_grounding_context_build (
                 turn->retrieval,
-                BENCHMARK_MAX_CONTEXT_SOURCES,
-                BENCHMARK_MAX_CONTEXT_BYTES,
+                policy->max_context_sources,
+                policy->max_context_bytes,
                 &context,
                 error
             )) {
@@ -1159,9 +1182,9 @@ append_topic_run (
 int
 main (int argc, char **argv)
 {
-    if (argc != 4) {
+    if (argc != 4 && argc != 5) {
         g_printerr (
-            "Usage: %s BENCHMARK_JSON OUTPUT_JSON RUN_ID\n",
+            "Usage: %s BENCHMARK_JSON OUTPUT_JSON RUN_ID [frozen|production]\n",
             argv[0]
         );
         return 2;
@@ -1170,6 +1193,21 @@ main (int argc, char **argv)
     const char *benchmark_path = argv[1];
     const char *output_path = argv[2];
     const char *run_id = argv[3];
+    const char *policy_name =
+        argc == 5 ? argv[4] : "frozen";
+    const BenchmarkPolicy *policy = NULL;
+
+    if (g_strcmp0 (policy_name, "frozen") == 0) {
+        policy = &FROZEN_R5_POLICY;
+    } else if (g_strcmp0 (policy_name, "production") == 0) {
+        policy = &PRODUCTION_POLICY;
+    } else {
+        g_printerr (
+            "Unknown benchmark policy '%s'; expected frozen or production.\n",
+            policy_name
+        );
+        return 2;
+    }
 
     if (run_id[0] == '\0' ||
         strlen (run_id) > 120) {
@@ -1350,6 +1388,7 @@ main (int argc, char **argv)
                 ),
                 repositories,
                 conversations,
+                policy,
                 &error
             )) {
             goto out;
@@ -1379,7 +1418,11 @@ main (int argc, char **argv)
     }
 
     g_print (
-        "PASS: wrote deterministic R5 benchmark run to %s\n",
+        "PASS: wrote deterministic R5 benchmark run policy=%s results/repository=%u context_sources=%u context_bytes=%" G_GSIZE_FORMAT " to %s\n",
+        policy->name,
+        policy->max_results_per_repository,
+        policy->max_context_sources,
+        policy->max_context_bytes,
         output_path
     );
     exit_code = 0;
