@@ -2522,6 +2522,34 @@ oracle_check (
         goto out;
     }
 
+    if (state.snapshot_seal_sha256 != NULL) {
+        char *actual_snapshot_seal = NULL;
+
+        if (!oracle_compute_snapshot_seal (
+                snapshot_root,
+                &actual_snapshot_seal,
+                error
+            )) {
+            goto out;
+        }
+
+        if (g_strcmp0 (
+                state.snapshot_seal_sha256,
+                actual_snapshot_seal
+            ) != 0) {
+            g_set_error_literal (
+                error,
+                ORACLE_ERROR,
+                ORACLE_ERROR_INTEGRITY,
+                "Persistent snapshot seal differs from the independently recomputed exact snapshot seal."
+            );
+            g_free (actual_snapshot_seal);
+            goto out;
+        }
+
+        g_free (actual_snapshot_seal);
+    }
+
     if (!check_manifest_and_version (
             input,
             &state,
