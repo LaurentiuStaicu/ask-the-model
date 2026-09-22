@@ -25,6 +25,7 @@ Startup Qualification and Snapshot Integrity.
 - verified an enrolled seal before any retrieval-index reuse/rebuild and classified mismatch as `SNAPSHOT_INVALID`;
 - added pre/post seal checks around both startup reconciliation and normal lifecycle index preparation to detect local mutation during preparation;
 - rejected locally modified sealed snapshots before conversation grounding while preserving the expected persistent seal.
+- added explicit same-SHA integrity repair: a snapshot marked invalid is quarantined and Download/Update can re-download and revalidate the exact upstream revision before clearing the integrity-invalid state.
 
 ### Regression coverage
 
