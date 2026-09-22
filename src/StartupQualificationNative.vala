@@ -60,7 +60,6 @@ namespace AskTheModel.StartupQualificationNative {
 
     [CCode (
         cname = "AtmStorageQualification",
-        destroy_function = "",
         has_type_id = false
     )]
     public struct StorageQualification {
