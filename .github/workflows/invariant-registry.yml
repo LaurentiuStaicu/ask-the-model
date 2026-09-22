@@ -1,0 +1,26 @@
+name: Invariant Registry
+
+on:
+  workflow_dispatch:
+  pull_request:
+  push:
+    branches:
+      - main
+
+permissions:
+  contents: read
+
+jobs:
+  validate:
+    runs-on: ubuntu-24.04
+    timeout-minutes: 5
+
+    steps:
+      - name: Checkout AtM
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+
+      - name: Validate invariant registry
+        shell: bash
+        run: |
+          set -euo pipefail
+          python3 scripts/validate_invariant_registry.py
