@@ -31,6 +31,8 @@ namespace AskTheModel {
 
         private string record_path;
         private StartupRepositoryQualification[] repositories = {};
+        private string[] application_extensions = {};
+        private string[] runtime_extensions = {};
 
         public int policy_version { get; construct; }
         public string qualified_at_utc { get; construct; }
@@ -48,6 +50,15 @@ namespace AskTheModel {
         public string? architecture { get; construct; }
         public string? branch { get; construct; }
         public string? flatpak_version { get; construct; }
+
+        public string platform_reason_code { get; set; default = ""; }
+        public string platform_detail { get; set; default = ""; }
+        public string storage_reason_code { get; set; default = ""; }
+        public string storage_detail { get; set; default = ""; }
+        public string? storage_root { get; set; }
+        public bool storage_created { get; set; }
+        public uint32 storage_mode { get; set; }
+        public uint64 storage_owner_uid { get; set; }
 
         public StartupQualificationRecord (
             int policy_version,
@@ -91,6 +102,14 @@ namespace AskTheModel {
                 root,
                 "startup-qualification.json"
             );
+        }
+
+        public void add_application_extension (string value) {
+            application_extensions += value;
+        }
+
+        public void add_runtime_extension (string value) {
+            runtime_extensions += value;
         }
 
         public void add_repository (
@@ -146,6 +165,22 @@ namespace AskTheModel {
                 platform_fingerprint
             );
 
+            builder.set_member_name ("platform_reason_code");
+            builder.add_string_value (platform_reason_code);
+            builder.set_member_name ("platform_detail");
+            builder.add_string_value (platform_detail);
+            builder.set_member_name ("storage_reason_code");
+            builder.add_string_value (storage_reason_code);
+            builder.set_member_name ("storage_detail");
+            builder.add_string_value (storage_detail);
+            add_nullable_string (builder, "storage_root", storage_root);
+            builder.set_member_name ("storage_created");
+            builder.add_boolean_value (storage_created);
+            builder.set_member_name ("storage_mode");
+            builder.add_int_value ((int64) storage_mode);
+            builder.set_member_name ("storage_owner_uid");
+            builder.add_int_value ((int64) storage_owner_uid);
+
             builder.set_member_name ("deployment");
             builder.begin_object ();
             add_nullable_string (builder, "application_id", application_id);
@@ -168,6 +203,20 @@ namespace AskTheModel {
                 "flatpak_version",
                 flatpak_version
             );
+
+            builder.set_member_name ("application_extensions");
+            builder.begin_array ();
+            foreach (string value in application_extensions) {
+                builder.add_string_value (value);
+            }
+            builder.end_array ();
+
+            builder.set_member_name ("runtime_extensions");
+            builder.begin_array ();
+            foreach (string value in runtime_extensions) {
+                builder.add_string_value (value);
+            }
+            builder.end_array ();
             builder.end_object ();
 
             builder.set_member_name ("repositories");
