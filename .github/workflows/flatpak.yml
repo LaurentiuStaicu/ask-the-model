@@ -86,81 +86,141 @@ jobs:
               return;
             }
 
-            let release;
-            let created = false;
+            const body = fs.readFileSync(releasePath, 'utf8');
+            const subtitleMatch = body.match(/\*\*([^*]+)\*\*/);
+            let subtitle = subtitleMatch ? subtitleMatch[1].trim() : 'Release';
+            subtitle = subtitle.replace(/\s+—\s+\d{4}-\d{2}-\d{2}$/, '');
+            const releaseName = `${tag} — ${subtitle}`;
 
-            try {
-              const response = await github.rest.repos.getReleaseByTag({
+            const releases = await github.paginate(
+              github.rest.repos.listReleases,
+              {
                 owner: context.repo.owner,
                 repo: context.repo.repo,
-                tag,
-              });
-              release = response.data;
-              core.info(`GitHub Release ${tag} already exists.`);
-            } catch (error) {
-              if (error.status !== 404) {
-                throw error;
+                per_page: 100,
+              }
+            );
+
+            let release = releases.find((candidate) => candidate.tag_name === tag);
+
+            if (release && !release.draft) {
+              const existingAsset = release.assets.find(
+                (asset) => asset.name === assetName
+              );
+
+              if (existingAsset) {
+                core.info(
+                  `Published GitHub Release ${tag} already contains ${assetName}; leaving it unchanged.`
+                );
+                return;
               }
 
-              const body = fs.readFileSync(releasePath, 'utf8');
-              const subtitleMatch = body.match(/\*\*([^*]+)\*\*/);
-              let subtitle = subtitleMatch ? subtitleMatch[1].trim() : 'Release';
-              subtitle = subtitle.replace(/\s+—\s+\d{4}-\d{2}-\d{2}$/, '');
-
-              const response = await github.rest.repos.createRelease({
-                owner: context.repo.owner,
-                repo: context.repo.repo,
-                tag_name: tag,
-                target_commitish: context.sha,
-                name: `${tag} — ${subtitle}`,
-                body,
-                draft: false,
-                prerelease: false,
-                make_latest: 'true',
-              });
-
-              release = response.data;
-              created = true;
-              core.info(`Published GitHub Release ${tag}.`);
-            }
-
-            const existingAsset = release.assets.find((asset) => asset.name === assetName);
-            if (existingAsset) {
-              core.info(`Release asset ${assetName} already exists; leaving it unchanged.`);
-              return;
-            }
-
-            if (!created) {
               const tagRef = await github.rest.git.getRef({
                 owner: context.repo.owner,
                 repo: context.repo.repo,
                 ref: `tags/${tag}`,
               });
 
-              if (tagRef.data.object.type !== 'commit' || tagRef.data.object.sha !== context.sha) {
-                core.warning(
-                  `Release ${tag} has no ${assetName}, but its tag does not point to this workflow commit. ` +
-                  'Refusing to attach a bundle built from a different commit.'
+              if (
+                tagRef.data.object.type !== 'commit' ||
+                tagRef.data.object.sha !== context.sha
+              ) {
+                core.setFailed(
+                  `Published release ${tag} is missing ${assetName}, but its tag does not point to this workflow commit.`
                 );
                 return;
               }
+
+              if (release.immutable) {
+                core.setFailed(
+                  `Immutable release ${tag} is missing ${assetName}; refusing an impossible post-publication repair.`
+                );
+                return;
+              }
+
+              core.warning(
+                `Published mutable release ${tag} is missing ${assetName}; repairing the legacy release before immutable releases are enabled.`
+              );
             }
 
-            const data = fs.readFileSync(assetPath);
+            if (release && release.draft) {
+              if (
+                release.target_commitish &&
+                release.target_commitish !== context.sha
+              ) {
+                core.setFailed(
+                  `Draft release ${tag} targets ${release.target_commitish}, not ${context.sha}.`
+                );
+                return;
+              }
 
-            await github.rest.repos.uploadReleaseAsset({
+              core.info(`Resuming existing draft GitHub Release ${tag}.`);
+            }
+
+            if (!release) {
+              const response = await github.rest.repos.createRelease({
+                owner: context.repo.owner,
+                repo: context.repo.repo,
+                tag_name: tag,
+                target_commitish: context.sha,
+                name: releaseName,
+                body,
+                draft: true,
+                prerelease: false,
+              });
+
+              release = response.data;
+              core.info(
+                `Created draft GitHub Release ${tag}; assets will be attached before publication.`
+              );
+            }
+
+            let existingAsset = release.assets.find(
+              (asset) => asset.name === assetName
+            );
+
+            if (!existingAsset) {
+              const data = fs.readFileSync(assetPath);
+
+              await github.rest.repos.uploadReleaseAsset({
+                owner: context.repo.owner,
+                repo: context.repo.repo,
+                release_id: release.id,
+                name: assetName,
+                data,
+                headers: {
+                  'content-type': 'application/octet-stream',
+                  'content-length': data.length,
+                },
+              });
+
+              core.info(`Uploaded ${assetName} to GitHub Release ${tag}.`);
+            } else {
+              core.info(
+                `Draft release asset ${assetName} already exists; reusing it.`
+              );
+            }
+
+            if (!release.draft) {
+              return;
+            }
+
+            await github.rest.repos.updateRelease({
               owner: context.repo.owner,
               repo: context.repo.repo,
               release_id: release.id,
-              name: assetName,
-              data,
-              headers: {
-                'content-type': 'application/octet-stream',
-                'content-length': data.length,
-              },
+              tag_name: tag,
+              target_commitish: context.sha,
+              name: releaseName,
+              body,
+              draft: false,
+              prerelease: false,
+              make_latest: 'true',
             });
 
-            core.info(`Uploaded ${assetName} to GitHub Release ${tag}.`);
+            core.info(
+              `Published GitHub Release ${tag} only after all release assets were attached.`
+            );
 
       - name: Finalize AtM development repository
         if: github.event_name == 'push' && github.ref == 'refs/heads/main'
