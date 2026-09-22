@@ -172,6 +172,8 @@ namespace AskTheModel {
         private RepositoryStateStore state_store;
         private RepositoryRuntimeInfo[] repositories = {};
         private string data_root;
+        private bool installation_qualification_complete = false;
+        private bool installation_qualified = false;
 
         public signal void progress (string message);
 
@@ -243,6 +245,18 @@ namespace AskTheModel {
             }
 
             assert_not_reached ();
+        }
+
+        public void apply_installation_qualification (
+            bool qualified
+        ) {
+            installation_qualification_complete = true;
+            installation_qualified = qualified;
+        }
+
+        public bool repository_mutations_allowed () {
+            return installation_qualification_complete &&
+                installation_qualified;
         }
 
         public void apply_local_qualification (
@@ -529,6 +543,12 @@ namespace AskTheModel {
             RepositoryDescriptor[] selected,
             GLib.Cancellable? cancellable = null
         ) throws GLib.Error {
+            if (!repository_mutations_allowed ()) {
+                throw new RepositoryError.NOT_READY (
+                    "Repository download/update is blocked until the installation passes startup qualification."
+                );
+            }
+
             uint changed = 0;
 
             foreach (RepositoryDescriptor descriptor in selected) {
