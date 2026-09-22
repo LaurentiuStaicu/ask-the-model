@@ -1683,11 +1683,282 @@ check_sqlite_integrity (sqlite3 *db, GError **error)
     return TRUE;
 }
 
+static guint
+oracle_role_bit_from_name (const char *role)
+{
+    if (g_strcmp0 (role, "status") == 0) {
+        return ORACLE_ROLE_STATUS;
+    }
+    if (g_strcmp0 (role, "canonical") == 0) {
+        return ORACLE_ROLE_CANONICAL;
+    }
+    if (g_strcmp0 (role, "structural") == 0) {
+        return ORACLE_ROLE_STRUCTURAL;
+    }
+    if (g_strcmp0 (role, "evidence") == 0) {
+        return ORACLE_ROLE_EVIDENCE;
+    }
+    if (g_strcmp0 (role, "tabular") == 0) {
+        return ORACLE_ROLE_TABULAR;
+    }
+    if (g_strcmp0 (role, "implementation") == 0) {
+        return ORACLE_ROLE_IMPLEMENTATION;
+    }
+
+    return 0;
+}
+
+static gboolean
+oracle_check_source_roles (
+    sqlite3 *db,
+    sqlite3_int64 source_id,
+    guint expected_roles,
+    GError **error
+)
+{
+    sqlite3_stmt *statement = NULL;
+
+    if (sqlite3_prepare_v2 (
+            db,
+            "SELECT role FROM source_roles "
+            "WHERE source_id = ?1 ORDER BY role;",
+            -1,
+            &statement,
+            NULL
+        ) != SQLITE_OK) {
+        g_set_error (
+            error,
+            ORACLE_ERROR,
+            ORACLE_ERROR_INDEX,
+            "Oracle could not prepare source-role query: %s",
+            sqlite3_errmsg (db)
+        );
+        return FALSE;
+    }
+
+    sqlite3_bind_int64 (
+        statement,
+        1,
+        source_id
+    );
+
+    guint actual_roles = 0;
+    int rc;
+
+    while ((rc = sqlite3_step (statement)) == SQLITE_ROW) {
+        const char *role =
+            (const char *) sqlite3_column_text (
+                statement,
+                0
+            );
+        guint bit =
+            oracle_role_bit_from_name (role);
+
+        if (bit == 0 || (actual_roles & bit) != 0) {
+            sqlite3_finalize (statement);
+            g_set_error_literal (
+                error,
+                ORACLE_ERROR,
+                ORACLE_ERROR_INTEGRITY,
+                "Oracle found an invalid or duplicate source role."
+            );
+            return FALSE;
+        }
+
+        actual_roles |= bit;
+    }
+
+    sqlite3_finalize (statement);
+
+    if (rc != SQLITE_DONE ||
+        actual_roles != expected_roles) {
+        g_set_error_literal (
+            error,
+            ORACLE_ERROR,
+            ORACLE_ERROR_INTEGRITY,
+            "Retrieval-index source roles differ from the independently derived manifest roles."
+        );
+        return FALSE;
+    }
+
+    return TRUE;
+}
+
+static gboolean
+oracle_check_source_provenance (
+    sqlite3 *db,
+    const OracleInput *input,
+    const char *snapshot_root,
+    const OracleManifestPolicy *policy,
+    GError **error
+)
+{
+    GPtrArray *expected =
+        g_ptr_array_new_with_free_func (
+            (GDestroyNotify) oracle_expected_source_free
+        );
+    sqlite3_stmt *statement = NULL;
+    gboolean ok = FALSE;
+
+    if (!oracle_collect_regular_files (
+            snapshot_root,
+            "",
+            policy,
+            expected,
+            error
+        )) {
+        goto out;
+    }
+
+    g_ptr_array_sort (
+        expected,
+        compare_expected_source_paths
+    );
+
+    if (sqlite3_prepare_v2 (
+            db,
+            "SELECT id, path, sha256, byte_size, media_type, logical_source_id "
+            "FROM source_files ORDER BY path;",
+            -1,
+            &statement,
+            NULL
+        ) != SQLITE_OK) {
+        g_set_error (
+            error,
+            ORACLE_ERROR,
+            ORACLE_ERROR_INDEX,
+            "Oracle could not prepare source provenance query: %s",
+            sqlite3_errmsg (db)
+        );
+        goto out;
+    }
+
+    for (guint i = 0; i < expected->len; i++) {
+        OracleExpectedSource *source =
+            g_ptr_array_index (expected, i);
+
+        if (sqlite3_step (statement) != SQLITE_ROW) {
+            g_set_error (
+                error,
+                ORACLE_ERROR,
+                ORACLE_ERROR_INTEGRITY,
+                "Retrieval index is missing independently derived source '%s'.",
+                source->path
+            );
+            goto out;
+        }
+
+        sqlite3_int64 source_id =
+            sqlite3_column_int64 (statement, 0);
+        const char *path =
+            (const char *) sqlite3_column_text (
+                statement,
+                1
+            );
+        const char *sha256 =
+            (const char *) sqlite3_column_text (
+                statement,
+                2
+            );
+        sqlite3_int64 byte_size =
+            sqlite3_column_int64 (
+                statement,
+                3
+            );
+        const char *media_type =
+            (const char *) sqlite3_column_text (
+                statement,
+                4
+            );
+        const char *logical_source_id =
+            (const char *) sqlite3_column_text (
+                statement,
+                5
+            );
+        char *expected_logical_source_id =
+            g_strdup_printf (
+                "%s:file:%s",
+                input->repository_id,
+                source->path
+            );
+
+        gboolean row_matches =
+            g_strcmp0 (path, source->path) == 0 &&
+            g_strcmp0 (sha256, source->sha256) == 0 &&
+            byte_size ==
+                (sqlite3_int64) source->byte_size &&
+            g_strcmp0 (
+                media_type,
+                source->media_type
+            ) == 0 &&
+            g_strcmp0 (
+                logical_source_id,
+                expected_logical_source_id
+            ) == 0;
+
+        g_free (expected_logical_source_id);
+
+        if (!row_matches) {
+            g_set_error (
+                error,
+                ORACLE_ERROR,
+                ORACLE_ERROR_INTEGRITY,
+                "Retrieval-index provenance differs from exact snapshot source '%s'.",
+                source->path
+            );
+            goto out;
+        }
+
+        if (!oracle_check_source_roles (
+                db,
+                source_id,
+                source->roles,
+                error
+            )) {
+            goto out;
+        }
+    }
+
+    if (sqlite3_step (statement) != SQLITE_DONE) {
+        g_set_error_literal (
+            error,
+            ORACLE_ERROR,
+            ORACLE_ERROR_INTEGRITY,
+            "Retrieval index contains source files not selected by the independent manifest policy."
+        );
+        goto out;
+    }
+
+    sqlite3_finalize (statement);
+    statement = NULL;
+
+    if (!oracle_check_source_provenance (
+            db,
+            input,
+            snapshot_root,
+            policy,
+            error
+        )) {
+        goto out;
+    }
+
+    ok = TRUE;
+
+out:
+    if (statement != NULL) {
+        sqlite3_finalize (statement);
+    }
+    g_ptr_array_unref (expected);
+    return ok;
+}
+
 static gboolean
 check_index (
     const OracleInput *input,
     const OraclePinnedState *state,
+    const char *snapshot_root,
     const char *manifest_hash,
+    const OracleManifestPolicy *policy,
     GError **error
 )
 {
