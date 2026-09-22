@@ -1,6 +1,6 @@
 # Dependencies and compatibility
 
-This document defines the compatibility contract for Ask the Model (AtM) v0.3.0.
+This document defines the compatibility contract for Ask the Model (AtM) v0.4.0.
 
 ## Supported application baseline
 
@@ -26,7 +26,7 @@ The elementary runtime is resolved by Flatpak. Meson, Vala, GTK/Granite developm
 
 ## Local AI provider requirement
 
-AtM v0.3.0 requires an already-running local Ollama-compatible HTTP provider.
+AtM v0.4.0 requires an already-running local Ollama-compatible HTTP provider.
 
 Endpoint order is fixed in this release:
 
@@ -68,13 +68,13 @@ AtM submits:
 
 AtM expects newline-delimited JSON response objects containing assistant `message.content` chunks and a final `done` state.
 
-Providers that do not accept these fields or response semantics are not compatible with v0.3.0.
+Providers that do not accept these fields or response semantics are not compatible with v0.4.0.
 
 ## Model requirements
 
 A chat model must advertise the `completion` capability.
 
-Capabilities such as `vision`, `tools`, `thinking` or `embedding` may be present, but v0.3.0 does not expose those capabilities as separate application features.
+Capabilities such as `vision`, `tools`, `thinking` or `embedding` may be present, but v0.4.0 does not expose those capabilities as separate application features.
 
 The default chat path requests `think: false` to prioritize interactive latency. This does not imply that a selected model lacks reasoning capability.
 
@@ -106,13 +106,13 @@ No particular GPU model, vendor or acceleration backend is required by AtM. Hard
 
 AtM does not own or manage the provider's model store.
 
-The provider may use its default model directory or another provider-configured model location. Moving, downloading, importing, deleting and deduplicating AI model files remain outside the v0.3.0 application boundary; repository snapshots are managed separately by AtM under its dedicated application directory.
+The provider may use its default model directory or another provider-configured model location. Moving, downloading, importing, deleting and deduplicating AI model files remain outside the v0.4.0 application boundary; repository snapshots are managed separately by AtM under its dedicated application directory.
 
 For practical instructions covering model sources, Ollama storage paths, `OLLAMA_MODELS`, GGUF import, model removal and disk/memory management, see [`MODEL_GUIDE.md`](MODEL_GUIDE.md).
 
 ## Flatpak sandbox requirements
 
-The v0.3.0 Flatpak requests:
+The v0.4.0 Flatpak requests:
 
 - `--share=ipc`;
 - `--share=network`;
@@ -122,7 +122,7 @@ The v0.3.0 Flatpak requests:
 
 Network sharing is required so the sandbox can reach the host-local HTTP provider. This permission is broader than loopback at the Flatpak sandbox layer; the current AtM provider implementation itself only addresses `127.0.0.1`.
 
-The v0.3.0 repository-aware release additionally requests only:
+The v0.4.0 repository-aware release additionally requests only:
 
 - `--filesystem=~/Ask the Model:create`.
 
@@ -132,7 +132,7 @@ This narrowly exposes the dedicated user-visible repository directory so AtM can
 
 ### X11
 
-AtM v0.3.0 selects `GSK_RENDERER=cairo` automatically only when:
+AtM v0.4.0 selects `GSK_RENDERER=cairo` automatically only when:
 
 - `XDG_SESSION_TYPE=x11`;
 - no Wayland display is present;
@@ -170,11 +170,11 @@ sudo apt install meson valac build-essential libgtk-4-dev libgranite-7-dev libso
 
 For a Flatpak **development build**, `flatpak-builder` and `io.elementary.Sdk//8` are also required. CI builds against that same elementary SDK baseline and runs the Meson test suite inside the Flatpak build environment.
 
-The SQLite/libarchive/libyaml platform probe verifies implementation prerequisites for the repository-aware layer and enforces that the only development filesystem grant is the dedicated `~/Ask the Model:create` path rather than Home/host access. The v0.3.0 release exposes the fixed EWD/CBD/RMD repository selector, lifecycle controls, deterministic retrieval and provenance UI. Test executables are not installed in the application bundle.
+The SQLite/libarchive/libyaml platform probe verifies implementation prerequisites for the repository-aware layer and enforces that the only development filesystem grant is the dedicated `~/Ask the Model:create` path rather than Home/host access. The v0.4.0 release exposes the fixed EWD/CBD/RMD repository selector, lifecycle controls, deterministic retrieval and provenance UI. Test executables are not installed in the application bundle.
 
 ## Privacy and network boundary
 
-v0.3.0 contains no direct cloud-provider integration.
+v0.4.0 contains no direct cloud-provider integration.
 
 The implemented AtM provider addresses loopback only (`127.0.0.1`). Prompt text is sent to that provider when the user activates **Send**.
 
@@ -186,7 +186,7 @@ Conversation history is stored only in memory for the current application proces
 
 ## Known compatibility limitations
 
-v0.3.0 does not provide:
+v0.4.0 does not provide:
 
 - configurable provider host/port;
 - provider authentication;
