@@ -2314,8 +2314,159 @@ write_text_file (
 }
 
 static gboolean
+fixture_hash_file (
+    const char *path,
+    char **out_sha256,
+    gint64 *out_size
+)
+{
+    char *contents = NULL;
+    gsize length = 0;
+    GError *error = NULL;
+
+    if (!g_file_get_contents (
+            path,
+            &contents,
+            &length,
+            &error
+        )) {
+        g_clear_error (&error);
+        return FALSE;
+    }
+
+    *out_sha256 =
+        g_compute_checksum_for_data (
+            G_CHECKSUM_SHA256,
+            (const guchar *) contents,
+            length
+        );
+    *out_size = (gint64) length;
+    g_free (contents);
+    return *out_sha256 != NULL;
+}
+
+static gboolean
+fixture_insert_source (
+    sqlite3 *db,
+    const char *snapshot_root,
+    const char *repository_id,
+    const char *relative_path,
+    const char *media_type,
+    const char *role_a,
+    const char *role_b
+)
+{
+    char *absolute =
+        g_build_filename (
+            snapshot_root,
+            relative_path,
+            NULL
+        );
+    char *sha256 = NULL;
+    gint64 byte_size = 0;
+    char *logical_source_id =
+        g_strdup_printf (
+            "%s:file:%s",
+            repository_id,
+            relative_path
+        );
+    sqlite3_stmt *statement = NULL;
+    gboolean ok = FALSE;
+
+    if (!fixture_hash_file (
+            absolute,
+            &sha256,
+            &byte_size
+        )) {
+        goto out;
+    }
+
+    if (sqlite3_prepare_v2 (
+            db,
+            "INSERT INTO source_files("
+            "path,sha256,byte_size,media_type,logical_source_id"
+            ") VALUES(?1,?2,?3,?4,?5);",
+            -1,
+            &statement,
+            NULL
+        ) != SQLITE_OK) {
+        goto out;
+    }
+
+    sqlite3_bind_text (
+        statement, 1, relative_path, -1, SQLITE_STATIC
+    );
+    sqlite3_bind_text (
+        statement, 2, sha256, -1, SQLITE_TRANSIENT
+    );
+    sqlite3_bind_int64 (
+        statement, 3, byte_size
+    );
+    sqlite3_bind_text (
+        statement, 4, media_type, -1, SQLITE_STATIC
+    );
+    sqlite3_bind_text (
+        statement, 5, logical_source_id, -1, SQLITE_TRANSIENT
+    );
+
+    if (sqlite3_step (statement) != SQLITE_DONE) {
+        goto out;
+    }
+
+    sqlite3_finalize (statement);
+    statement = NULL;
+    sqlite3_int64 source_id =
+        sqlite3_last_insert_rowid (db);
+
+    const char *roles[2] = { role_a, role_b };
+
+    for (guint i = 0; i < 2; i++) {
+        if (roles[i] == NULL) {
+            continue;
+        }
+
+        if (sqlite3_prepare_v2 (
+                db,
+                "INSERT INTO source_roles(source_id,role) "
+                "VALUES(?1,?2);",
+                -1,
+                &statement,
+                NULL
+            ) != SQLITE_OK) {
+            goto out;
+        }
+
+        sqlite3_bind_int64 (
+            statement, 1, source_id
+        );
+        sqlite3_bind_text (
+            statement, 2, roles[i], -1, SQLITE_STATIC
+        );
+
+        if (sqlite3_step (statement) != SQLITE_DONE) {
+            goto out;
+        }
+
+        sqlite3_finalize (statement);
+        statement = NULL;
+    }
+
+    ok = TRUE;
+
+out:
+    if (statement != NULL) {
+        sqlite3_finalize (statement);
+    }
+    g_free (logical_source_id);
+    g_free (sha256);
+    g_free (absolute);
+    return ok;
+}
+
+static gboolean
 create_fixture_index (
     const char *path,
+    const char *snapshot_root,
     const char *repository_id,
     const char *version,
     const char *sha,
@@ -2347,6 +2498,19 @@ create_fixture_index (
         "manifest_schema_version INTEGER NOT NULL,"
         "manifest_sha256 TEXT NOT NULL,"
         "created_at_utc TEXT NOT NULL"
+        ");"
+        "CREATE TABLE source_files("
+        "id INTEGER PRIMARY KEY,"
+        "path TEXT NOT NULL UNIQUE,"
+        "sha256 TEXT NOT NULL,"
+        "byte_size INTEGER NOT NULL CHECK(byte_size >= 0),"
+        "media_type TEXT NOT NULL,"
+        "logical_source_id TEXT NOT NULL UNIQUE"
+        ");"
+        "CREATE TABLE source_roles("
+        "source_id INTEGER NOT NULL REFERENCES source_files(id) ON DELETE CASCADE,"
+        "role TEXT NOT NULL,"
+        "PRIMARY KEY(source_id,role)"
         ");";
 
     if (sqlite3_exec (
@@ -2388,6 +2552,32 @@ create_fixture_index (
 
     ok = sqlite3_step (statement) == SQLITE_DONE;
     sqlite3_finalize (statement);
+    statement = NULL;
+
+    if (!ok ||
+        !fixture_insert_source (
+            db,
+            snapshot_root,
+            repository_id,
+            "CITATION.cff",
+            "text/yaml",
+            "canonical",
+            NULL
+        ) ||
+        !fixture_insert_source (
+            db,
+            snapshot_root,
+            repository_id,
+            "STATUS.md",
+            "text/markdown",
+            "status",
+            "canonical"
+        )) {
+        ok = FALSE;
+        goto out;
+    }
+
+    ok = TRUE;
 
 out:
     if (db != NULL) {
@@ -2526,6 +2716,7 @@ run_self_test (void)
         fixture_ok &&
         create_fixture_index (
             index_path,
+            snapshot,
             "ewd",
             version,
             sha,
