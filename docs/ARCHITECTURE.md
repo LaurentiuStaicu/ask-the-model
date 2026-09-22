@@ -99,6 +99,10 @@ Validated repository snapshots also receive a deterministic local `snapshot seal
 
 The local seal is deliberately separate from the upstream Git commit SHA. The exact Git SHA remains the repository revision identity; the seal answers only whether the local snapshot content still matches the content previously accepted by AtM.
 
+The G-S0 installation result is authoritative for repository runtime use. Non-empty repository grounding and repository mutation remain fail-closed until platform and storage qualification have passed. Ordinary zero-repository chat remains independent, and explicit repository Refresh remains a separate read-only action.
+
+G-O0 is an independent verification-only oracle used by tests and diagnostics. It parses persistent state and repository artifacts independently, recomputes schema-v2 snapshot seals without linking the production seal implementation, validates SQLite/index/source provenance directly and rejects controlled post-READY perturbations in a separate process. It performs no network or repair action and does not become a second runtime READY authority.
+
 Persistent repository state evolves backward-compatibly from schema v1 to schema v2. Existing v1 state remains valid with no seal. A seal may be enrolled only after strict local snapshot/version/index validation succeeds. Once a seal exists, a mismatch makes the repository locally unusable until an explicit repository lifecycle action replaces or repairs the snapshot; G-S0 does not silently repin content.
 
 Both startup reconciliation and normal repository preparation use pre/post seal checks around index validation/rebuild so a snapshot that changes while it is being prepared cannot become READY.
