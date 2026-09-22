@@ -193,6 +193,8 @@ Possible additional states include:
 
 A failed update must leave the previously valid snapshot usable.
 
+If an enrolled local snapshot seal no longer matches the exact-SHA snapshot, that snapshot is not READY. The existing repository lifecycle action becomes available for repair. When the tracked remote SHA is still the same, AtM downloads the exact-SHA archive first, quarantines the invalid local snapshot without rewriting it in place, then validates and promotes a replacement. The quarantined snapshot is retained for diagnosis. A symlink/non-directory snapshot is not followed or silently replaced.
+
 A repository may be `READY` while inactive for chat.
 
 ## Definition of READY
