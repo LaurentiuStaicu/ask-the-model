@@ -66,11 +66,7 @@ namespace AskTheModel {
             default = RepositoryStateLoadStatus.ABSENT;
         }
 
-        public StartupRepositoryQualification[] repositories {
-            get;
-            set;
-            default = {};
-        }
+        public StartupRepositoryQualification[] repositories = {};
 
         public bool installation_qualified {
             get {
@@ -441,6 +437,8 @@ namespace AskTheModel {
             report.repository_state_status =
                 state_store.load_status;
 
+            StartupRepositoryQualification[] reconciled_repositories = {};
+
             foreach (
                 RepositoryDescriptor descriptor
                 in RepositoryCatalog.all ()
@@ -494,8 +492,10 @@ namespace AskTheModel {
                     );
                 }
 
-                report.repositories += repository;
+                reconciled_repositories += repository;
             }
+
+            report.repositories = reconciled_repositories;
 
             write_record (report);
             return report;
