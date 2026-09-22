@@ -18,7 +18,7 @@ Ask the Model
 
 AtM is not the AI provider, does not own external AI-model files, and is not itself one of the scientific dynamical models it helps explore.
 
-## Current v0.3 architecture
+## Current v0.4 architecture
 
 ### Provider layer
 
@@ -32,7 +32,9 @@ The current implementation addresses loopback endpoints only.
 
 The first Send freezes model/repository identity for that chat.
 
-### Repository lifecycle
+### Startup qualification and repository lifecycle
+
+`StartupQualificationService.vala`, `StartupQualificationRecord.vala`, `startup_qualification.c` and the G-S0 native bridge qualify the effective packaged deployment, the dedicated repository-storage boundary and persistent repository state before local readiness is accepted.
 
 `RepositoryLifecycleService.vala` coordinates:
 
@@ -40,8 +42,12 @@ The first Send freezes model/repository identity for that chat.
 - remote SHA/version refresh;
 - download/update staging;
 - snapshot validation;
+- deterministic local snapshot-seal computation;
+- stable pre/post seal checks around index preparation;
 - index construction/validation;
 - conversation grounding preparation.
+
+`RepositoryState.vala` owns the backward-compatible v1/v2 persistent state boundary. `snapshot_seal.c` computes the local integrity key; `repository_reconcile.c` performs offline exact-SHA reconciliation for G-S0.
 
 Native ingestion and validation helpers live in the corresponding C modules under `src/`.
 
@@ -78,6 +84,9 @@ Changes should preserve the following unless a deliberate architecture change is
 7. **Untrusted repository text.** Retrieved content is data, not instructions.
 8. **Canonical scientific boundary.** AtM does not redefine EWD/CBD/RMD scientific status.
 9. **Narrow Flatpak filesystem permission.** Do not replace the dedicated application directory with broad Home/host access.
+10. **Git SHA and local seal are distinct.** The upstream Git commit SHA is revision provenance; the snapshot seal only detects local content change.
+11. **Seal before trust.** A previously sealed snapshot must match its persistent seal before index rebuild/reuse or conversation grounding.
+12. **Stable preparation.** Snapshot identity must remain stable across index validation/rebuild before persistence or grounding.
 
 ## Extension points
 
@@ -120,7 +129,7 @@ Any future execution path must expose the executed model version, inputs, parame
 
 ## Tests and gates
 
-The Meson suite covers repository lifecycle, archive safety, manifests, storage, retrieval, grounding, citations and conversation pinning.
+The Meson suite covers startup qualification, storage-boundary checks, repository-state migration, deterministic snapshot sealing, repository lifecycle, archive safety, manifests, retrieval, grounding, citations and conversation pinning.
 
 The Flatpak workflow validates, in order:
 
