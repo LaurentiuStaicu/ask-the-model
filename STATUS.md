@@ -33,7 +33,7 @@ v0.4.0 provides:
 - fixed EWD/CBD/RMD repository selection before first Send;
 - exact remote SHA/version Refresh;
 - explicit validated repository Download/Update;
-- immutable local snapshots under `~/Ask the Model/Repositories`;
+- validated immutable EWD/CBD/RMD snapshots under `~/Ask the Model/Repositories`;
 - per-snapshot SQLite/FTS5 retrieval indexes;
 - exact technical-ID and structured entity/relation retrieval;
 - deterministic lexical BM25 and tabular row-key retrieval;
