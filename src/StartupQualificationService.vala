@@ -187,7 +187,8 @@ namespace AskTheModel {
 
         private StartupRepositoryOutcome reconcile_one (
             RepositoryDescriptor descriptor,
-            RepositoryLocalRecord local
+            RepositoryLocalRecord local,
+            RepositoryStateStore state_store
         ) {
             var result = new StartupRepositoryOutcome (
                 descriptor.id
@@ -197,6 +198,55 @@ namespace AskTheModel {
 
             string sha = local.current_sha ?? "";
             string version = local.version ?? "";
+            string snapshot = snapshot_path (
+                descriptor,
+                sha
+            );
+            string? pre_seal = null;
+
+            try {
+                string current_seal;
+                uint64 sealed_files;
+                uint64 sealed_bytes;
+
+                bool sealed =
+                    RepositoryNative.compute_snapshot_seal (
+                        snapshot,
+                        out current_seal,
+                        out sealed_files,
+                        out sealed_bytes
+                    );
+
+                if (!sealed) {
+                    result.status =
+                        StartupRepositoryStatus.SNAPSHOT_INVALID;
+                    result.reason_code =
+                        "snapshot_seal_check_incomplete";
+                    result.detail =
+                        "Snapshot integrity seal could not be computed before reconciliation.";
+                    return result;
+                }
+
+                pre_seal = current_seal;
+
+                if (local.snapshot_seal_sha256 != null &&
+                    local.snapshot_seal_sha256 != current_seal) {
+                    result.status =
+                        StartupRepositoryStatus.SNAPSHOT_INVALID;
+                    result.reason_code =
+                        "snapshot_seal_mismatch";
+                    result.detail =
+                        "Snapshot integrity seal does not match persistent repository state.";
+                    return result;
+                }
+            } catch (GLib.Error error) {
+                result.status =
+                    StartupRepositoryStatus.SNAPSHOT_INVALID;
+                result.reason_code =
+                    "snapshot_seal_check_failed";
+                result.detail = error.message;
+                return result;
+            }
 
             try {
                 int native_status;
@@ -208,7 +258,7 @@ namespace AskTheModel {
                 bool completed =
                     StartupQualificationNative.reconcile_local_values (
                         cache_root,
-                        snapshot_path (descriptor, sha),
+                        snapshot,
                         descriptor.id,
                         descriptor.acronym,
                         descriptor.display_name,
@@ -264,6 +314,73 @@ namespace AskTheModel {
                         result.detail =
                             "Repository reconciler returned an unknown status.";
                         break;
+                }
+
+                if (result.status ==
+                        StartupRepositoryStatus.READY ||
+                    result.status ==
+                        StartupRepositoryStatus.READY_REPAIRED_INDEX) {
+                    string post_seal;
+                    uint64 sealed_files;
+                    uint64 sealed_bytes;
+
+                    if (!RepositoryNative.compute_snapshot_seal (
+                            snapshot,
+                            out post_seal,
+                            out sealed_files,
+                            out sealed_bytes
+                        )) {
+                        result.status =
+                            StartupRepositoryStatus.SNAPSHOT_INVALID;
+                        result.reason_code =
+                            "snapshot_seal_check_incomplete";
+                        result.detail =
+                            "Snapshot integrity seal could not be recomputed after reconciliation.";
+                        result.index_path = null;
+                        return result;
+                    }
+
+                    if (pre_seal == null ||
+                        pre_seal != post_seal) {
+                        result.status =
+                            StartupRepositoryStatus.SNAPSHOT_INVALID;
+                        result.reason_code =
+                            "snapshot_changed_during_reconciliation";
+                        result.detail =
+                            "Snapshot content changed while startup reconciliation was running.";
+                        result.index_path = null;
+                        return result;
+                    }
+
+                    if (local.snapshot_seal_sha256 != null &&
+                        local.snapshot_seal_sha256 != post_seal) {
+                        result.status =
+                            StartupRepositoryStatus.SNAPSHOT_INVALID;
+                        result.reason_code =
+                            "snapshot_seal_mismatch";
+                        result.detail =
+                            "Snapshot integrity seal changed during reconciliation.";
+                        result.index_path = null;
+                        return result;
+                    }
+
+                    if (local.snapshot_seal_sha256 == null) {
+                        try {
+                            state_store.set_snapshot_seal (
+                                descriptor.id,
+                                sha,
+                                post_seal
+                            );
+                        } catch (RepositoryError error) {
+                            result.status =
+                                StartupRepositoryStatus.SNAPSHOT_INVALID;
+                            result.reason_code =
+                                "snapshot_seal_persist_failed";
+                            result.detail = error.message;
+                            result.index_path = null;
+                            return result;
+                        }
+                    }
                 }
             } catch (GLib.Error error) {
                 result.status =
@@ -539,7 +656,8 @@ namespace AskTheModel {
                 } else {
                     outcome = reconcile_one (
                         descriptor,
-                        local
+                        local,
+                        state_store
                     );
                 }
 
