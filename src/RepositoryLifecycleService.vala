@@ -1,18 +1,52 @@
 namespace AskTheModel {
+    public enum RepositoryLocalQualificationStatus {
+        PENDING,
+        BLOCKED,
+        STATE_INVALID,
+        NOT_INSTALLED,
+        SNAPSHOT_MISSING,
+        SNAPSHOT_INVALID,
+        INDEX_ERROR,
+        READY,
+        READY_REPAIRED_INDEX
+    }
+
     public class RepositoryRuntimeInfo : Object {
         public RepositoryDescriptor descriptor { get; construct; }
         public RepositoryLocalRecord local { get; construct; }
         public string? remote_sha { get; set; }
         public string? remote_version { get; set; }
 
+        public RepositoryLocalQualificationStatus local_qualification {
+            get;
+            private set;
+            default = RepositoryLocalQualificationStatus.PENDING;
+        }
+        public string qualification_reason_code {
+            get;
+            private set;
+            default = "startup_pending";
+        }
+        public string qualification_detail {
+            get;
+            private set;
+            default = "";
+        }
+
+        private string data_root;
+        private string? qualified_sha;
+        private string? qualified_version;
+
         public RepositoryRuntimeInfo (
             RepositoryDescriptor descriptor,
-            RepositoryLocalRecord local
+            RepositoryLocalRecord local,
+            string data_root
         ) {
             Object (
                 descriptor: descriptor,
                 local: local
             );
+            this.data_root = data_root;
         }
 
         public void clear_remote_identity () {
@@ -20,26 +54,96 @@ namespace AskTheModel {
             remote_version = null;
         }
 
-        public bool download_required () {
-            if (!local.is_ready ()) {
-                return true;
+        public void apply_local_qualification (
+            RepositoryLocalQualificationStatus status,
+            string? snapshot_sha,
+            string? persisted_version,
+            string? validated_version,
+            string reason_code,
+            string detail
+        ) {
+            local_qualification = status;
+            qualification_reason_code = reason_code;
+            qualification_detail = detail;
+            qualified_sha = null;
+            qualified_version = null;
+
+            if (status != RepositoryLocalQualificationStatus.READY &&
+                status != RepositoryLocalQualificationStatus.READY_REPAIRED_INDEX) {
+                return;
             }
 
-            string sha = local.current_sha ?? "";
+            bool exact_identity =
+                local.is_ready () &&
+                snapshot_sha != null &&
+                persisted_version != null &&
+                validated_version != null &&
+                local.current_sha == snapshot_sha &&
+                local.version == persisted_version &&
+                validated_version == persisted_version;
+
+            if (!exact_identity) {
+                local_qualification =
+                    RepositoryLocalQualificationStatus.SNAPSHOT_INVALID;
+                qualification_reason_code =
+                    "runtime_qualification_identity_mismatch";
+                qualification_detail =
+                    "Startup qualification does not match the current persistent repository identity.";
+                return;
+            }
+
+            qualified_sha = snapshot_sha;
+            qualified_version = validated_version;
+        }
+
+        public void mark_local_ready (
+            string sha,
+            string version
+        ) {
+            local_qualification =
+                RepositoryLocalQualificationStatus.READY;
+            qualification_reason_code = "ready";
+            qualification_detail =
+                "Repository was validated during the explicit install/update operation.";
+            qualified_sha = sha;
+            qualified_version = version;
+        }
+
+        public bool locally_usable () {
+            if (local_qualification !=
+                    RepositoryLocalQualificationStatus.READY &&
+                local_qualification !=
+                    RepositoryLocalQualificationStatus.READY_REPAIRED_INDEX) {
+                return false;
+            }
+
+            if (!local.is_ready () ||
+                qualified_sha == null ||
+                qualified_version == null ||
+                local.current_sha != qualified_sha ||
+                local.version != qualified_version) {
+                return false;
+            }
+
             string path =
-                RepositoryLifecycleService.snapshot_path (
+                RepositoryLifecycleService.snapshot_path_for (
+                    data_root,
                     descriptor,
-                    sha
+                    qualified_sha ?? ""
                 );
 
-            return !GLib.FileUtils.test (
+            return GLib.FileUtils.test (
                 path,
                 GLib.FileTest.IS_DIR
             );
         }
 
+        public bool download_required () {
+            return !locally_usable ();
+        }
+
         public bool update_available () {
-            return !download_required () &&
+            return locally_usable () &&
                 remote_sha != null &&
                 remote_sha != local.current_sha;
         }
@@ -67,13 +171,17 @@ namespace AskTheModel {
         private RepositoryClient client;
         private RepositoryStateStore state_store;
         private RepositoryRuntimeInfo[] repositories = {};
+        private string data_root;
 
         public signal void progress (string message);
 
         public RepositoryLifecycleService (
-            string? state_root = null
+            string? state_root = null,
+            string? data_root = null
         ) {
             client = new RepositoryClient ();
+            this.data_root =
+                data_root ?? visible_data_root ();
             state_store = new RepositoryStateStore (
                 state_root
             );
@@ -84,7 +192,8 @@ namespace AskTheModel {
             ) {
                 repositories += new RepositoryRuntimeInfo (
                     descriptor,
-                    state_store.record_for (descriptor.id)
+                    state_store.record_for (descriptor.id),
+                    this.data_root
                 );
             }
         }
@@ -96,15 +205,27 @@ namespace AskTheModel {
             );
         }
 
-        public static string snapshot_path (
+        public static string snapshot_path_for (
+            string data_root,
             RepositoryDescriptor descriptor,
             string sha
         ) {
             return GLib.Path.build_filename (
-                visible_data_root (),
+                data_root,
                 "Repositories",
                 descriptor.id,
                 "snapshots",
+                sha
+            );
+        }
+
+        public static string snapshot_path (
+            RepositoryDescriptor descriptor,
+            string sha
+        ) {
+            return snapshot_path_for (
+                visible_data_root (),
+                descriptor,
                 sha
             );
         }
@@ -122,6 +243,25 @@ namespace AskTheModel {
             }
 
             assert_not_reached ();
+        }
+
+        public void apply_local_qualification (
+            string repository_id,
+            RepositoryLocalQualificationStatus status,
+            string? snapshot_sha,
+            string? persisted_version,
+            string? validated_version,
+            string reason_code,
+            string detail
+        ) {
+            info_for (repository_id).apply_local_qualification (
+                status,
+                snapshot_sha,
+                persisted_version,
+                validated_version,
+                reason_code,
+                detail
+            );
         }
 
         public void clear_remote_identities (
@@ -226,11 +366,14 @@ namespace AskTheModel {
             SourceFunc callback = prepare_snapshot.callback;
             RepositoryInstallResult? worker_result = null;
             string? failure = null;
-            string data_root = visible_data_root ();
             string cache_root =
                 GLib.Environment.get_user_cache_dir ();
             string expected_snapshot =
-                snapshot_path (descriptor, sha);
+                snapshot_path_for (
+                    data_root,
+                    descriptor,
+                    sha
+                );
 
             var worker = new GLib.Thread<void*> (
                 "atm-repository-install",
@@ -329,7 +472,7 @@ namespace AskTheModel {
                 RepositoryRuntimeInfo info =
                     info_for (descriptor.id);
 
-                if (info.download_required () ||
+                if (!info.locally_usable () ||
                     info.local.current_sha == null ||
                     info.local.version == null) {
                     throw new RepositoryError.NOT_READY (
@@ -417,7 +560,11 @@ namespace AskTheModel {
 
                 string sha = info.remote_sha ?? "";
                 string expected_snapshot =
-                    snapshot_path (descriptor, sha);
+                    snapshot_path_for (
+                        data_root,
+                        descriptor,
+                        sha
+                    );
                 string? archive_path = null;
 
                 try {
@@ -469,6 +616,10 @@ namespace AskTheModel {
 
                     info.remote_sha = sha;
                     info.remote_version = result.version;
+                    info.mark_local_ready (
+                        sha,
+                        result.version
+                    );
                     changed++;
 
                     stdout.printf (
