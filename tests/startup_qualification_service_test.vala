@@ -25,7 +25,7 @@ namespace AskTheModel.Tests {
         string contents =
             "[Application]\n" +
             "name=io.github.laurentiustaicu.ask_the_model\n" +
-            "runtime=io.elementary.Platform/x86_64/8\n" +
+            "runtime=runtime/io.elementary.Platform/x86_64/8\n" +
             "\n" +
             "[Instance]\n" +
             "app-commit=%s\n".printf (
