@@ -8,6 +8,18 @@ v0.4.0 retains the repository-grounded multi-chat capability introduced in v0.3.
 
 The project remains in the `0.x` initial-development series. The public API and repository-management surface are not yet considered stable enough for v1.0.
 
+## Development after v0.4.0
+
+The tagged public release remains v0.4.0. Development on `main` may be newer than that tag and is published separately through the **AtM Development** Flatpak repository.
+
+Post-v0.4.0 work currently remains engineering/measurement-only:
+
+- future GitHub Release publication is hardened for draft-first asset attachment and optional immutable releases;
+- production retrieval/context policy constants are shared between runtime and benchmark tooling without changing their values;
+- a production-policy R5 shadow run measures context efficiency while the frozen R5 gate remains unchanged and blocking.
+
+Development Flatpak publications must expose the exact source `main` commit SHA so a development build can be distinguished reproducibly from the tagged v0.4.0 release artifact.
+
 ## Canonical application role
 
 **Ask the Model (AtM) is a local conversational interface and retrieval/provenance layer for locally managed AI models and repositories of scientific dynamical models. It is not itself a scientific model and does not replace the canonical models maintained in those repositories.**
