@@ -2,9 +2,9 @@
 
 ## Release status
 
-**Current release: Ask the Model (AtM) v0.3.0 — Repository-Grounded Multi-Chat, released 2026-09-21.**
+**Current release: Ask the Model (AtM) v0.4.0 — Startup Qualification and Snapshot Integrity, released 2026-09-22.**
 
-v0.3.0 is the first public repository-aware release. It extends the v0.2 Local Chat Baseline with validated immutable EWD/CBD/RMD snapshots, deterministic local retrieval, per-chat model/repository pinning, grounded source references and inspectable exact-SHA provenance.
+v0.4.0 retains the repository-grounded multi-chat capability introduced in v0.3.0 and adds offline startup qualification, a backward-compatible repository-state v2 integrity field, deterministic local snapshot seals, fail-closed seal comparison before repository use and stable pre/post integrity checks around retrieval-index preparation.
 
 The project remains in the `0.x` initial-development series. The public API and repository-management surface are not yet considered stable enough for v1.0.
 
@@ -22,7 +22,7 @@ Each repository remains authoritative for its own model definitions, data, assum
 
 ## Current functional boundary
 
-v0.3.0 provides:
+v0.4.0 provides:
 
 - GTK 4 / Granite desktop shell packaged for the elementary OS 8 Flatpak runtime;
 - local Ollama-compatible provider discovery on loopback;
@@ -45,6 +45,12 @@ v0.3.0 provides:
 - source-detail windows exposing repository/version, exact snapshot SHA, file/locator, logical source ID, readable excerpt and immutable source permalink;
 - ordinary zero-repository local chat as a separate streaming path;
 - automatic desktop light/dark appearance.
+- asynchronous G-S0 startup qualification before local-provider discovery;
+- effective Flatpak deployment identity and platform fingerprint recording;
+- fail-closed qualification of the dedicated `~/Ask the Model` storage boundary;
+- durable per-startup qualification records separated from volatile AI-provider state;
+- backward-compatible repository-state schema v2 with optional/enrolled local snapshot seals;
+- deterministic local snapshot-integrity verification before repository grounding and around index validation/rebuild.
 
 ## Repository lifecycle contract
 
@@ -58,7 +64,9 @@ For every selected repository, AtM:
 4. applies bounded safe extraction;
 5. validates repository identity, manifest and required paths;
 6. builds and validates a per-snapshot retrieval index;
-7. atomically promotes the immutable snapshot only after validation succeeds.
+7. computes a deterministic local snapshot seal before and after retrieval-index preparation;
+8. requires a stable pre/post seal before accepting the snapshot;
+9. atomically persists the exact Git SHA, repository version and local seal only after validation succeeds.
 
 A failed refresh/update must not:
 
@@ -66,7 +74,7 @@ A failed refresh/update must not:
 - destroy the last valid snapshot;
 - silently change the snapshot pinned to an active chat.
 
-Validated snapshots are immutable. Retrieval indexes are regenerable cache data.
+Validated snapshots are treated as immutable. The exact Git SHA remains the upstream revision identity; the local snapshot seal is a separate deterministic tamper-detection key. Retrieval indexes remain regenerable cache data.
 
 ## Conversation and provenance contract
 
@@ -83,9 +91,9 @@ Grounded evidence is retrieved only for the current turn. Repository text is tre
 
 Temporary model-visible source labels are resolved by AtM into persistent provenance objects. User-visible source details can expose an immutable GitHub permalink tied to the exact evidence revision.
 
-## Local verification for v0.3.0
+## Verification for v0.4.0
 
-Final smoke testing on elementary OS 8 / GTK 4.14 verified the actual development Flatpak rather than only unit tests.
+The v0.4.0 development stack passes the Flatpak/Meson CI gate for startup qualification, repository-state migration, deterministic snapshot seals, G-S0 seal ordering, lifecycle seal enrollment/tamper rejection and stable pre/post snapshot identity across index preparation. The repository-grounded GTK interaction baseline remains inherited from the locally smoke-tested v0.3.0 release on elementary OS 8 / GTK 4.14.
 
 Verified paths include:
 
@@ -100,7 +108,7 @@ Verified paths include:
 - readable Markdown source excerpts;
 - immutable GitHub permalink to the exact EWD snapshot and line range.
 
-The Flatpak/Meson test suite covers repository lifecycle, archive safety, manifests, storage, index integrity, retrieval, grounding, citations and conversation pinning.
+The Flatpak/Meson test suite covers startup qualification, storage-boundary checks, repository-state migration, snapshot integrity, repository lifecycle, archive safety, manifests, index integrity, retrieval, grounding, citations and conversation pinning.
 
 The reviewed frozen R5 deterministic retrieval benchmark remains separate from scientific-validity claims. It validates engineering retrieval behavior, not the scientific validity of EWD, CBD or RMD.
 
@@ -114,7 +122,7 @@ Conversation history is stored only in application memory for the current proces
 
 The Flatpak receives write access only to the dedicated `~/Ask the Model` directory for repository snapshots. It must not request broad Home or host filesystem access.
 
-## Not implemented in v0.3.0
+## Not implemented in v0.4.0
 
 - persistent conversations across application restarts;
 - in-app AI-model download/import/delete;
@@ -127,7 +135,7 @@ The Flatpak receives write access only to the dedicated `~/Ask the Model` direct
 - autonomous modification of scientific repositories;
 - cloud-provider integration owned by AtM.
 
-## What v0.3.0 does not claim
+## What v0.4.0 does not claim
 
 - scientific certification of a repository merely because it is READY;
 - validated scientific inference from AI-generated prose;
@@ -157,5 +165,6 @@ Any such work should preserve the invariants documented in `docs/DEVELOPMENT_GUI
 - `docs/ARCHITECTURE.md` — application architecture;
 - `docs/REPOSITORY_RETRIEVAL_ARCHITECTURE.md` — repository/retrieval architecture;
 - `docs/REPOSITORY_RETRIEVAL_ACCEPTANCE.md` — acceptance gates;
-- `releases/v0.3.0.md` — release description;
+- `releases/v0.4.0.md` — current release description;
+- `releases/v0.3.0.md` — previous repository-grounded release description;
 - `CHANGELOG.md` — release history.
