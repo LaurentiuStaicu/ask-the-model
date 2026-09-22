@@ -1258,3 +1258,102 @@ out:
     g_clear_pointer (&seal_path, g_free);
     return ok;
 }
+
+
+gboolean
+atm_snapshot_seal_ensure_install (
+    const char *seal_root,
+    const char *snapshot_root,
+    const char *repository_id,
+    const char *snapshot_sha,
+    gboolean *out_created,
+    char **out_seal_path,
+    char **out_root_sha256,
+    GError **error
+)
+{
+    AtmSnapshotSealStatus status;
+    char *detail = NULL;
+    char *root_sha256 = NULL;
+    char *seal_path = NULL;
+    gboolean ok = FALSE;
+
+    g_return_val_if_fail (out_created != NULL, FALSE);
+    g_return_val_if_fail (out_seal_path != NULL, FALSE);
+    g_return_val_if_fail (*out_seal_path == NULL, FALSE);
+    g_return_val_if_fail (out_root_sha256 != NULL, FALSE);
+    g_return_val_if_fail (*out_root_sha256 == NULL, FALSE);
+
+    *out_created = FALSE;
+
+    if (!atm_snapshot_seal_check (
+            seal_root,
+            snapshot_root,
+            repository_id,
+            snapshot_sha,
+            &status,
+            &detail,
+            &root_sha256,
+            error
+        )) {
+        goto out;
+    }
+
+    if (status == ATM_SNAPSHOT_SEAL_ABSENT) {
+        g_clear_pointer (&detail, g_free);
+        g_clear_pointer (&root_sha256, g_free);
+
+        if (!atm_snapshot_seal_create (
+                seal_root,
+                snapshot_root,
+                repository_id,
+                snapshot_sha,
+                "ingest",
+                &seal_path,
+                &root_sha256,
+                error
+            )) {
+            goto out;
+        }
+
+        *out_created = TRUE;
+        *out_seal_path = g_steal_pointer (&seal_path);
+        *out_root_sha256 =
+            g_steal_pointer (&root_sha256);
+        ok = TRUE;
+        goto out;
+    }
+
+    if (status == ATM_SNAPSHOT_SEAL_VALID) {
+        seal_path = seal_path_for (
+            seal_root,
+            repository_id,
+            snapshot_sha
+        );
+
+        *out_seal_path = g_steal_pointer (&seal_path);
+        *out_root_sha256 =
+            g_steal_pointer (&root_sha256);
+        ok = TRUE;
+        goto out;
+    }
+
+    g_set_error (
+        error,
+        ATM_SNAPSHOT_SEAL_ERROR,
+        ATM_SNAPSHOT_SEAL_ERROR_INTEGRITY,
+        "Refusing repository installation because the existing snapshot seal is %s: %s",
+        status == ATM_SNAPSHOT_SEAL_INVALID
+            ? "invalid"
+            : "mismatched",
+        detail != NULL
+            ? detail
+            : "no diagnostic detail"
+    );
+
+out:
+    g_clear_pointer (&seal_path, g_free);
+    g_clear_pointer (&root_sha256, g_free);
+    g_clear_pointer (&detail, g_free);
+    return ok;
+}
