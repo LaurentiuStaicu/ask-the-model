@@ -82,6 +82,26 @@ executable(
   install: true
 )
 
+repository_store_oracle = executable(
+  'repository-store-oracle',
+  'tests/repository_store_oracle.c',
+  dependencies: [
+    glib_dep,
+    json_glib_dep,
+    sqlite_dep,
+    yaml_dep
+  ],
+  install: false
+)
+
+test(
+  'repository-store-oracle-core',
+  repository_store_oracle,
+  args: [
+    '--self-test'
+  ]
+)
+
 repository_platform_probe = executable(
   'repository-platform-probe',
   'tests/repository_platform_probe.c',
