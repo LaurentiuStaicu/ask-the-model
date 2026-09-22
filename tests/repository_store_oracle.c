@@ -5,8 +5,10 @@
 #include <yaml.h>
 
 #include <errno.h>
+#include <fcntl.h>
 #include <string.h>
 #include <sys/stat.h>
+#include <unistd.h>
 
 #define ORACLE_STATE_SCHEMA_VERSION 1
 #define ORACLE_MANIFEST_SCHEMA_VERSION 1
@@ -36,6 +38,33 @@ typedef struct {
     char *display_name;
 } OracleInput;
 
+typedef enum {
+    ORACLE_ROLE_STATUS = 1u << 0,
+    ORACLE_ROLE_CANONICAL = 1u << 1,
+    ORACLE_ROLE_STRUCTURAL = 1u << 2,
+    ORACLE_ROLE_EVIDENCE = 1u << 3,
+    ORACLE_ROLE_TABULAR = 1u << 4,
+    ORACLE_ROLE_IMPLEMENTATION = 1u << 5
+} OracleSourceRole;
+
+typedef struct {
+    char *status_source;
+    GPtrArray *canonical;
+    GPtrArray *structural;
+    GPtrArray *evidence;
+    GPtrArray *tabular;
+    GPtrArray *implementation;
+    GPtrArray *exclude;
+} OracleManifestPolicy;
+
+typedef struct {
+    char *path;
+    char *sha256;
+    guint64 byte_size;
+    char *media_type;
+    guint roles;
+} OracleExpectedSource;
+
 static GQuark
 oracle_error_quark (void)
 {
@@ -49,6 +78,35 @@ oracle_pinned_state_clear (OraclePinnedState *state)
 {
     g_clear_pointer (&state->sha, g_free);
     g_clear_pointer (&state->version, g_free);
+}
+
+static void
+oracle_manifest_policy_clear (OracleManifestPolicy *policy)
+{
+    if (policy == NULL) {
+        return;
+    }
+
+    g_clear_pointer (&policy->status_source, g_free);
+    g_clear_pointer (&policy->canonical, g_ptr_array_unref);
+    g_clear_pointer (&policy->structural, g_ptr_array_unref);
+    g_clear_pointer (&policy->evidence, g_ptr_array_unref);
+    g_clear_pointer (&policy->tabular, g_ptr_array_unref);
+    g_clear_pointer (&policy->implementation, g_ptr_array_unref);
+    g_clear_pointer (&policy->exclude, g_ptr_array_unref);
+}
+
+static void
+oracle_expected_source_free (OracleExpectedSource *source)
+{
+    if (source == NULL) {
+        return;
+    }
+
+    g_free (source->path);
+    g_free (source->sha256);
+    g_free (source->media_type);
+    g_free (source);
 }
 
 static gboolean
