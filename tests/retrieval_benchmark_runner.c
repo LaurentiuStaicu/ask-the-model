@@ -65,6 +65,20 @@ static const BenchmarkPolicy CANDIDATE_SOURCES6_POLICY = {
     ATM_PRODUCTION_GROUNDING_MAX_CONTEXT_BYTES
 };
 
+static const BenchmarkPolicy CANDIDATE_SOURCES5_POLICY = {
+    "candidate-sources5",
+    ATM_PRODUCTION_RETRIEVAL_RESULTS_PER_REPOSITORY,
+    5,
+    ATM_PRODUCTION_GROUNDING_MAX_CONTEXT_BYTES
+};
+
+static const BenchmarkPolicy CANDIDATE_SOURCES4_POLICY = {
+    "candidate-sources4",
+    ATM_PRODUCTION_RETRIEVAL_RESULTS_PER_REPOSITORY,
+    4,
+    ATM_PRODUCTION_GROUNDING_MAX_CONTEXT_BYTES
+};
+
 static const BenchmarkPolicy CANDIDATE_BYTES16K_POLICY = {
     "candidate-bytes16k",
     ATM_PRODUCTION_RETRIEVAL_RESULTS_PER_REPOSITORY,
@@ -1228,7 +1242,8 @@ main (int argc, char **argv)
         g_printerr (
             "Usage: %s BENCHMARK_JSON OUTPUT_JSON RUN_ID "
             "[frozen|production|candidate-results5|candidate-sources8|"
-            "candidate-sources7|candidate-sources6|candidate-bytes16k|"
+            "candidate-sources7|candidate-sources6|candidate-sources5|"
+            "candidate-sources4|candidate-bytes16k|"
             "candidate-compact]\n",
             argv[0]
         );
@@ -1266,6 +1281,16 @@ main (int argc, char **argv)
                    "candidate-sources6"
                ) == 0) {
         policy = &CANDIDATE_SOURCES6_POLICY;
+    } else if (g_strcmp0 (
+                   policy_name,
+                   "candidate-sources5"
+               ) == 0) {
+        policy = &CANDIDATE_SOURCES5_POLICY;
+    } else if (g_strcmp0 (
+                   policy_name,
+                   "candidate-sources4"
+               ) == 0) {
+        policy = &CANDIDATE_SOURCES4_POLICY;
     } else if (g_strcmp0 (
                    policy_name,
                    "candidate-bytes16k"
