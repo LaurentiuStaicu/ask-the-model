@@ -281,6 +281,164 @@ index validation/rebuild.
 G-S0 does not scientifically certify EWD, CBD or RMD. The global READY
 definition remains a local AtM compatibility/retrieval state only.
 
+## G-O0 — Independent repository state oracle
+
+G-O0 adds an independent, read-only checker for the local repository store.
+
+Its purpose is not to become another runtime source of truth and not to repair
+state. Its purpose is to detect a class of defects that production lifecycle
+code cannot reliably expose by calling itself again.
+
+A production validation/reconciliation result and the oracle result are two
+separate observations. If production reports a repository READY while the
+oracle rejects the same exact generation, the gate fails.
+
+### Independence boundary
+
+The oracle must not call or link the production helpers that establish or
+repair repository readiness. In particular, it must not obtain its answer by
+calling:
+
+- `RepositoryStateStore`;
+- `RepositoryLifecycleService`;
+- `StartupQualificationService`;
+- `RepositoryNative`;
+- `atm_repository_reconcile_local*`;
+- `atm_repository_validate_snapshot`;
+- `atm_retrieval_index_ensure_for_snapshot`;
+- `atm_retrieval_index_validate_snapshot_sources`;
+- any future production activation, repair or garbage-collection helper.
+
+The oracle may use generic parsing and storage libraries such as GLib,
+JSON-GLib, libyaml and SQLite directly, because the required independence is
+from AtM's production decision path, not from the underlying file-format
+libraries.
+
+Expected repository identity supplied to the oracle comes from the test
+fixture or explicit oracle input rather than from a production runtime object.
+
+The oracle is read-only:
+
+- no network access;
+- no archive extraction;
+- no index rebuild;
+- no state rewrite;
+- no snapshot promotion;
+- no deletion or garbage collection;
+- no implicit recovery.
+
+### State-to-snapshot checks
+
+For each state entry inspected by the oracle:
+
+1. `repository-state.json` is parsed directly;
+2. schema version and repository-entry shape are checked independently;
+3. repository IDs are unique;
+4. the persisted SHA is exactly 40 lowercase hexadecimal characters;
+5. the persisted version is non-empty;
+6. the exact snapshot path is derived as
+   `<data_root>/Repositories/<id>/snapshots/<sha>`;
+7. the exact snapshot is a real directory and no path component used for the
+   inspected generation is a symlink;
+8. the oracle never selects a different snapshot by directory ordering,
+   mtime, lexical order or "latest" heuristics.
+
+An absent repository state entry is a valid NOT_INSTALLED observation. An
+invalid state file is an oracle failure for any READY claim and is never
+rewritten by the oracle.
+
+### Snapshot identity checks
+
+For the exact snapshot selected by persistent state, the oracle independently
+reads the snapshot artifacts required to bind identity:
+
+- `.atm/repository.json` must be a regular non-symlink file;
+- manifest `schema_version` must be the supported value;
+- repository identity fields must match the explicit expected repository;
+- the manifest's version source must resolve to `CITATION.cff`;
+- `CITATION.cff` must expose exactly one non-empty top-level version value;
+- that version must equal the persisted state version;
+- `STATUS.md` and manifest-declared required/retrieval source paths used by
+  the oracle must resolve beneath the same exact snapshot without symlink
+  escape.
+
+The oracle implementation must parse these artifacts independently rather
+than delegating to AtM's production manifest/CFF validators.
+
+### Retrieval-index checks
+
+The exact retrieval-index path is derived independently as:
+
+`<cache_root>/retrieval/<id>/<sha>.sqlite`
+
+The index must be a real regular non-symlink file and is opened read-only.
+
+The oracle must check at least:
+
+1. `PRAGMA user_version` equals the supported retrieval schema version;
+2. `PRAGMA integrity_check` returns exactly one `ok` row;
+3. `PRAGMA foreign_key_check` returns no rows;
+4. `snapshot_metadata` contains exactly the singleton row `id = 1`;
+5. its repository ID, repository version and snapshot SHA match the exact
+   state/snapshot identity;
+6. its manifest schema version matches the supported manifest schema;
+7. its stored manifest SHA-256 equals an independently computed SHA-256 of
+   the exact snapshot `.atm/repository.json`;
+8. every `source_files` row names a safe relative path beneath the exact
+   snapshot;
+9. each indexed source's stored byte size and SHA-256 equal the actual file;
+10. the source-file set and source-role set agree with the source paths/roles
+    independently derived from the snapshot manifest;
+11. logical source IDs are unique and consistent with their recorded
+    repository/path identity;
+12. read-only reference checks detect orphaned or contradictory evidence rows
+    that are not protected by SQLite foreign keys.
+
+The oracle does not rebuild an invalid index. A missing or failing index is an
+oracle failure for a READY claim.
+
+### Required divergence fixtures
+
+Automated coverage must prove that the oracle rejects at least:
+
+1. state SHA points to a missing snapshot;
+2. snapshot path or required path crosses a symlink;
+3. state version differs from `CITATION.cff`;
+4. manifest repository identity differs from the expected repository;
+5. index filename/SHA differs from state;
+6. `snapshot_metadata` repository ID, version or SHA differs from state;
+7. stored manifest hash differs from the snapshot manifest;
+8. indexed source size or SHA-256 differs from the exact source file;
+9. required/indexed source membership differs from the manifest-derived set;
+10. SQLite structural corruption detected by `integrity_check`;
+11. a foreign-key violation detected by `foreign_key_check`;
+12. extra or contradictory singleton metadata rows;
+13. a production READY fixture deliberately corrupted after validation.
+
+At least one fixture must demonstrate the reason for G-O0 explicitly:
+production readiness is established first, the underlying local artifacts are
+then perturbed without invoking production reconciliation, and the independent
+oracle must reject the resulting state.
+
+### Pass condition
+
+G-O0 passes only when:
+
+- a valid exact-SHA repository generation accepted by the production path is
+  also accepted by the independent oracle;
+- every required divergence fixture is rejected by the oracle;
+- oracle execution performs no network or repair action;
+- the oracle's implementation does not call production readiness helpers.
+
+G-O0 is a verification instrument for tests and diagnostics, not a second
+runtime authority.
+
+When later lifecycle work introduces immutable generation records, leases,
+transactional activation, garbage collection or revocation, G-O0 is extended
+to verify the new cross-generation invariants. Its independence constraints
+may be strengthened but must not be relaxed to reuse the production decision
+path it is intended to check.
+
 ## R0 — UX and conversation foundation
 
 ### Required behavior
