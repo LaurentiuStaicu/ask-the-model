@@ -9,6 +9,7 @@ namespace AskTheModel {
         public string repository_id { get; construct; }
         public string? current_sha { get; set; }
         public string? version { get; set; }
+        public string? snapshot_seal_sha256 { get; set; }
 
         public RepositoryLocalRecord (string repository_id) {
             Object (repository_id: repository_id);
@@ -17,10 +18,15 @@ namespace AskTheModel {
         public bool is_ready () {
             return current_sha != null && version != null;
         }
+
+        public bool has_snapshot_seal () {
+            return snapshot_seal_sha256 != null;
+        }
     }
 
     public class RepositoryStateStore : Object {
-        private const int SCHEMA_VERSION = 1;
+        private const int CURRENT_SCHEMA_VERSION = 2;
+        private const int LEGACY_SCHEMA_VERSION = 1;
 
         private string state_path;
         private RepositoryLocalRecord[] records = {};
@@ -29,6 +35,12 @@ namespace AskTheModel {
             get;
             private set;
             default = RepositoryStateLoadStatus.ABSENT;
+        }
+
+        public int loaded_schema_version {
+            get;
+            private set;
+            default = 0;
         }
 
         public RepositoryStateStore (string? state_root = null) {
@@ -76,10 +88,25 @@ namespace AskTheModel {
             assert_not_reached ();
         }
 
+        private static bool sha40_is_valid (string value) {
+            return GLib.Regex.match_simple (
+                "^[0-9a-f]{40}$",
+                value
+            );
+        }
+
+        private static bool seal_is_valid (string value) {
+            return GLib.Regex.match_simple (
+                "^[0-9a-f]{64}$",
+                value
+            );
+        }
+
         public void set_current (
             string repository_id,
             string sha,
-            string version
+            string version,
+            string? snapshot_seal_sha256 = null
         ) throws RepositoryError {
             if (load_status == RepositoryStateLoadStatus.INVALID) {
                 throw new RepositoryError.STORAGE (
@@ -87,10 +114,7 @@ namespace AskTheModel {
                 );
             }
 
-            if (!GLib.Regex.match_simple (
-                    "^[0-9a-f]{40}$",
-                    sha
-                )) {
+            if (!sha40_is_valid (sha)) {
                 throw new RepositoryError.INVALID_RESPONSE (
                     "Repository state SHA is invalid."
                 );
@@ -102,20 +126,80 @@ namespace AskTheModel {
                 );
             }
 
+            if (snapshot_seal_sha256 != null &&
+                !seal_is_valid (snapshot_seal_sha256)) {
+                throw new RepositoryError.INVALID_RESPONSE (
+                    "Repository snapshot seal is invalid."
+                );
+            }
+
             RepositoryLocalRecord record =
                 record_for (repository_id);
             string? previous_sha = record.current_sha;
             string? previous_version = record.version;
+            string? previous_seal =
+                record.snapshot_seal_sha256;
 
             record.current_sha = sha;
             record.version = version;
+            record.snapshot_seal_sha256 =
+                snapshot_seal_sha256;
 
             try {
                 save ();
                 load_status = RepositoryStateLoadStatus.VALID;
+                loaded_schema_version =
+                    CURRENT_SCHEMA_VERSION;
             } catch (RepositoryError error) {
                 record.current_sha = previous_sha;
                 record.version = previous_version;
+                record.snapshot_seal_sha256 =
+                    previous_seal;
+                throw error;
+            }
+        }
+
+        public void set_snapshot_seal (
+            string repository_id,
+            string expected_sha,
+            string snapshot_seal_sha256
+        ) throws RepositoryError {
+            if (load_status == RepositoryStateLoadStatus.INVALID) {
+                throw new RepositoryError.STORAGE (
+                    "Repository state is invalid and cannot be repaired implicitly."
+                );
+            }
+
+            if (!sha40_is_valid (expected_sha) ||
+                !seal_is_valid (snapshot_seal_sha256)) {
+                throw new RepositoryError.INVALID_RESPONSE (
+                    "Repository snapshot identity or seal is invalid."
+                );
+            }
+
+            RepositoryLocalRecord record =
+                record_for (repository_id);
+
+            if (!record.is_ready () ||
+                record.current_sha != expected_sha) {
+                throw new RepositoryError.INVALID_RESPONSE (
+                    "Repository snapshot seal cannot be attached to a different or unready snapshot."
+                );
+            }
+
+            string? previous_seal =
+                record.snapshot_seal_sha256;
+            record.snapshot_seal_sha256 =
+                snapshot_seal_sha256;
+
+            try {
+                save ();
+                load_status = RepositoryStateLoadStatus.VALID;
+                loaded_schema_version =
+                    CURRENT_SCHEMA_VERSION;
+            } catch (RepositoryError error) {
+                record.snapshot_seal_sha256 =
+                    previous_seal;
                 throw error;
             }
         }
@@ -136,8 +220,16 @@ namespace AskTheModel {
                 node.get_value_type () == typeof (int64);
         }
 
+        private static bool node_is_null (
+            Json.Node? node
+        ) {
+            return node != null &&
+                node.get_node_type () == Json.NodeType.NULL;
+        }
+
         private void load_best_effort () {
             load_status = RepositoryStateLoadStatus.ABSENT;
+            loaded_schema_version = 0;
 
             if (!GLib.FileUtils.test (
                     state_path,
@@ -171,10 +263,16 @@ namespace AskTheModel {
                     root.get_member ("repositories");
 
                 if (!node_is_int64 (schema_node) ||
-                    schema_node.get_int () != SCHEMA_VERSION ||
                     repositories_node == null ||
                     repositories_node.get_node_type () !=
                         Json.NodeType.ARRAY) {
+                    return;
+                }
+
+                int schema_version =
+                    (int) schema_node.get_int ();
+                if (schema_version != LEGACY_SCHEMA_VERSION &&
+                    schema_version != CURRENT_SCHEMA_VERSION) {
                     return;
                 }
 
@@ -183,6 +281,7 @@ namespace AskTheModel {
                 string[] ids = {};
                 string[] shas = {};
                 string[] versions = {};
+                string?[] seals = {};
 
                 for (
                     uint i = 0;
@@ -213,12 +312,31 @@ namespace AskTheModel {
                     string id = id_node.get_string ();
                     string sha = sha_node.get_string ();
                     string version = version_node.get_string ();
+                    string? seal = null;
+
+                    if (schema_version ==
+                        CURRENT_SCHEMA_VERSION) {
+                        Json.Node? seal_node =
+                            item.get_member (
+                                "snapshot_seal_sha256"
+                            );
+
+                        if (seal_node == null) {
+                            return;
+                        }
+
+                        if (node_is_string (seal_node)) {
+                            seal = seal_node.get_string ();
+                            if (!seal_is_valid (seal)) {
+                                return;
+                            }
+                        } else if (!node_is_null (seal_node)) {
+                            return;
+                        }
+                    }
 
                     if (record_for_optional (id) == null ||
-                        !GLib.Regex.match_simple (
-                            "^[0-9a-f]{40}$",
-                            sha
-                        ) ||
+                        !sha40_is_valid (sha) ||
                         version.length == 0) {
                         return;
                     }
@@ -232,6 +350,7 @@ namespace AskTheModel {
                     ids += id;
                     shas += sha;
                     versions += version;
+                    seals += seal;
                 }
 
                 for (int i = 0; i < ids.length; i++) {
@@ -244,8 +363,10 @@ namespace AskTheModel {
 
                     record.current_sha = shas[i];
                     record.version = versions[i];
+                    record.snapshot_seal_sha256 = seals[i];
                 }
 
+                loaded_schema_version = schema_version;
                 load_status = RepositoryStateLoadStatus.VALID;
             } catch (GLib.Error error) {
                 stderr.printf (
@@ -273,7 +394,7 @@ namespace AskTheModel {
             var builder = new Json.Builder ();
             builder.begin_object ();
             builder.set_member_name ("schema_version");
-            builder.add_int_value (SCHEMA_VERSION);
+            builder.add_int_value (CURRENT_SCHEMA_VERSION);
             builder.set_member_name ("repositories");
             builder.begin_array ();
 
@@ -295,6 +416,18 @@ namespace AskTheModel {
                 builder.add_string_value (
                     record.version ?? ""
                 );
+                builder.set_member_name (
+                    "snapshot_seal_sha256"
+                );
+
+                if (record.snapshot_seal_sha256 == null) {
+                    builder.add_null_value ();
+                } else {
+                    builder.add_string_value (
+                        record.snapshot_seal_sha256
+                    );
+                }
+
                 builder.end_object ();
             }
 
