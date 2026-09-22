@@ -276,6 +276,27 @@ If Refresh shows an update, this is not an error. Use **Download/Update** to fet
 
 AtM does not overwrite the old snapshot in place. A successful update creates a new immutable snapshot/index pair and may retain the previous one for rollback or active-chat pinning.
 
+## Inspect the v0.4.0 startup-qualification record
+
+G-S0 writes diagnostic state in the Flatpak-private XDG state directory. For the packaged AtM application, the host-side default is:
+
+```text
+~/.var/app/io.github.laurentiustaicu.ask_the_model/.local/state/
+```
+
+The two relevant files are:
+
+```text
+startup-qualification.json
+repository-state.json
+```
+
+`startup-qualification.json` records the effective packaged execution/storage qualification and per-repository startup outcome. `repository-state.json` records the persistent repository SHA/version state and, in schema v2, the enrolled local snapshot seal.
+
+These are diagnostic/state files, not user documents. Do not edit them to force a repository into READY. If repository state is invalid or a seal mismatch is reported, use the normal repository lifecycle/recovery path and preserve the files when collecting a reproducible bug report.
+
+Flatpak documents `XDG_STATE_HOME` for sandboxed applications under `~/.var/app/<app-id>/.local/state` on supported Flatpak versions.
+
 ## Repository Download/Update fails
 
 Start AtM from a terminal:
