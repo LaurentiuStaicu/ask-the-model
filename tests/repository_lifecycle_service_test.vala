@@ -430,6 +430,70 @@ namespace AskTheModel.Tests {
                 ).snapshot_seal_sha256 == enrolled_seal
             );
 
+            string sealed_readme = GLib.Path.build_filename (
+                sealed_snapshot,
+                "README.md"
+            );
+            GLib.FileUtils.set_contents (
+                sealed_readme,
+                "# Test repository\nGrounded evidence.\n"
+            );
+            sealed_service.info_for (
+                sealed_descriptor.id
+            ).clear_integrity_invalid ();
+
+            ConversationGrounding restored_grounding =
+                yield sealed_service.prepare_conversation_grounding (
+                    sealed_selection
+                );
+            assert (restored_grounding.is_frozen ());
+            assert (
+                restored_grounding.repository_count () == 1
+            );
+            assert (
+                !sealed_service.info_for (
+                    sealed_descriptor.id
+                ).integrity_invalid
+            );
+
+            assert (
+                GLib.FileUtils.remove (
+                    sealed_readme
+                ) == 0
+            );
+            var unsafe_link =
+                GLib.File.new_for_path (
+                    sealed_readme
+                );
+            assert (
+                unsafe_link.make_symbolic_link (
+                    "STATUS.md",
+                    null
+                )
+            );
+
+            bool unsafe_entry_rejected = false;
+            try {
+                yield sealed_service.prepare_conversation_grounding (
+                    sealed_selection
+                );
+            } catch (RepositoryError error) {
+                unsafe_entry_rejected =
+                    error.code == RepositoryError.NOT_READY;
+            }
+
+            assert (unsafe_entry_rejected);
+            assert (
+                sealed_service.info_for (
+                    sealed_descriptor.id
+                ).integrity_invalid
+            );
+            assert (
+                sealed_service.info_for (
+                    sealed_descriptor.id
+                ).download_required ()
+            );
+
             remove_tree_best_effort (
                 sealed_state_root
             );
