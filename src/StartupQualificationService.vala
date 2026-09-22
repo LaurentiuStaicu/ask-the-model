@@ -205,6 +205,43 @@ namespace AskTheModel {
             string? pre_seal = null;
 
             try {
+                int root_status;
+                bool root_probed =
+                    StartupQualificationNative.probe_snapshot_root (
+                        snapshot,
+                        out root_status
+                    );
+
+                if (!root_probed) {
+                    result.status =
+                        StartupRepositoryStatus.SNAPSHOT_INVALID;
+                    result.reason_code =
+                        "snapshot_inspection_failed";
+                    result.detail =
+                        "Repository snapshot root could not be inspected.";
+                    return result;
+                }
+
+                if (root_status == 0) {
+                    result.status =
+                        StartupRepositoryStatus.SNAPSHOT_MISSING;
+                    result.reason_code =
+                        "snapshot_missing";
+                    result.detail =
+                        "The persisted repository snapshot directory does not exist.";
+                    return result;
+                }
+
+                if (root_status == 1) {
+                    result.status =
+                        StartupRepositoryStatus.SNAPSHOT_INVALID;
+                    result.reason_code =
+                        "snapshot_root_invalid";
+                    result.detail =
+                        "The persisted snapshot path is not a real directory.";
+                    return result;
+                }
+
                 string current_seal;
                 uint64 sealed_files;
                 uint64 sealed_bytes;
