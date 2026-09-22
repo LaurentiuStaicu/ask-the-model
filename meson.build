@@ -55,6 +55,8 @@ executable(
     'src/retrieval_index.c',
     'src/retrieval_index_lifecycle.c',
     'src/retrieval_query.c',
+    'src/scientific_profile.c',
+    'src/scientific_evidence.c',
     'src/retrieval_rank.c',
     'src/retrieval_scope.c',
     'src/retrieval_router.c',
@@ -597,6 +599,25 @@ retrieval_query_test = executable(
 test(
   'retrieval-query',
   retrieval_query_test
+)
+
+scientific_evidence_test = executable(
+  'scientific-evidence-test',
+  [
+    'src/scientific_profile.c',
+    'src/scientific_evidence.c',
+    'tests/scientific_evidence_test.c'
+  ],
+  include_directories: include_directories('src'),
+  dependencies: [
+    glib_dep
+  ],
+  install: false
+)
+
+test(
+  'scientific-evidence',
+  scientific_evidence_test
 )
 
 retrieval_rank_test = executable(
