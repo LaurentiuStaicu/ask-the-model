@@ -301,6 +301,21 @@ namespace AskTheModel {
                             }
                         }
 
+                        string pre_snapshot_seal;
+                        uint64 pre_sealed_files;
+                        uint64 pre_sealed_bytes;
+
+                        if (!RepositoryNative.compute_snapshot_seal (
+                                snapshot,
+                                out pre_snapshot_seal,
+                                out pre_sealed_files,
+                                out pre_sealed_bytes
+                            )) {
+                            throw new RepositoryError.STORAGE (
+                                "Repository snapshot integrity seal could not be computed before indexing."
+                            );
+                        }
+
                         if (!RepositoryNative.ensure_index (
                                 cache_root,
                                 snapshot,
@@ -314,18 +329,26 @@ namespace AskTheModel {
                             );
                         }
 
-                        string snapshot_seal;
-                        uint64 sealed_files;
-                        uint64 sealed_bytes;
+                        string post_snapshot_seal;
+                        uint64 post_sealed_files;
+                        uint64 post_sealed_bytes;
 
                         if (!RepositoryNative.compute_snapshot_seal (
                                 snapshot,
-                                out snapshot_seal,
-                                out sealed_files,
-                                out sealed_bytes
+                                out post_snapshot_seal,
+                                out post_sealed_files,
+                                out post_sealed_bytes
                             )) {
                             throw new RepositoryError.STORAGE (
-                                "Repository snapshot integrity seal could not be computed."
+                                "Repository snapshot integrity seal could not be computed after indexing."
+                            );
+                        }
+
+                        if (pre_snapshot_seal != post_snapshot_seal ||
+                            pre_sealed_files != post_sealed_files ||
+                            pre_sealed_bytes != post_sealed_bytes) {
+                            throw new RepositoryError.NOT_READY (
+                                "Repository snapshot changed while it was being prepared."
                             );
                         }
 
@@ -334,7 +357,7 @@ namespace AskTheModel {
                                 index_version,
                                 snapshot,
                                 index_path,
-                                snapshot_seal
+                                post_snapshot_seal
                             );
                     } catch (GLib.Error error) {
                         failure = error.message;
