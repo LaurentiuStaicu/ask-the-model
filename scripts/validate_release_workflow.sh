@@ -53,4 +53,17 @@ for needle in "${required[@]}"; do
   fi
 done
 
-printf '%s\n'   'Release workflow contract OK: draft-first asset publication is enforced.'
+development_traceability=(
+  '"$PUBLISH_DIR/SOURCE_COMMIT"'
+  'Source main commit:'
+  'Publish Ask the Model development Flatpak from ${GITHUB_SHA}'
+)
+
+for needle in "${development_traceability[@]}"; do
+  if ! grep -Fq -- "$needle" "$workflow"; then
+    printf 'Missing development-repository source traceability guard: %s\n' "$needle" >&2
+    exit 1
+  fi
+done
+
+printf '%s\n' 'Release workflow contract OK: draft-first asset publication and development source traceability are enforced.'
