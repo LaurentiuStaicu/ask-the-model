@@ -14,7 +14,8 @@ Startup Qualification and Snapshot Integrity.
 - added deterministic effective Flatpak deployment qualification and platform fingerprinting;
 - added fail-closed qualification of the dedicated `~/Ask the Model` storage boundary using no-follow descriptor checks;
 - added durable startup-qualification records while keeping volatile provider availability outside installation qualification;
-- preserved explicit development/unpackaged execution as unqualified rather than presenting it as a release installation.
+- preserved explicit development/unpackaged execution as unqualified rather than presenting it as a release installation;
+- made successful platform/storage startup qualification an authoritative runtime gate for non-empty repository grounding and repository mutation, while retaining ordinary zero-repository chat and keeping explicit read-only Refresh separate.
 
 ### Repository snapshot integrity
 
@@ -35,7 +36,10 @@ Startup Qualification and Snapshot Integrity.
 - added deterministic seal tests for file order, content, executable mode, mtime stability, symlink rejection and add/remove behavior;
 - added schema-v1 to schema-v2 seal migration, malformed-seal and wrong-SHA enrollment tests;
 - added isolated lifecycle tests proving legacy seal enrollment, pre-index seal rejection, repair-action activation and fail-closed grounding after local snapshot modification;
-- added storage regressions proving invalid snapshot quarantine preserves diagnostic content and rejects symlink snapshots.
+- added storage regressions proving invalid snapshot quarantine preserves diagnostic content and rejects symlink snapshots;
+- added fail-closed lifecycle coverage for repository grounding/mutation before or after negative installation qualification;
+- added an independently linked G-O0 oracle for persistent state, exact snapshot identity, schema-v2 snapshot seals, SQLite integrity/foreign keys and source provenance;
+- added a separate-process production-READY divergence harness and controlled corruption matrix so production readiness is not verified by calling the same readiness path again.
 
 ### Build / repository security
 
