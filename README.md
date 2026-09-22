@@ -5,7 +5,7 @@
 <h2 align="center">Ask the Model (AtM)</h2>
 
 <p align="center">
-  <a href="https://github.com/LaurentiuStaicu/ask-the-model/releases/latest"><img alt="Version: 0.3.0" src="https://img.shields.io/github/v/tag/LaurentiuStaicu/ask-the-model?sort=semver&style=flat-square&label=release&color=333333"></a>
+  <a href="https://github.com/LaurentiuStaicu/ask-the-model/releases/latest"><img alt="Version: 0.4.0" src="https://img.shields.io/github/v/tag/LaurentiuStaicu/ask-the-model?sort=semver&style=flat-square&label=release&color=333333"></a>
   <a href="LICENSE"><img alt="MIT License" src="https://img.shields.io/badge/license-MIT-707070?style=flat-square"></a>
   <a href="#supported-platform-and-compatibility"><img alt="Linux / Flatpak" src="https://img.shields.io/badge/platform-Linux%20%2F%20Flatpak-a0a0a0?style=flat-square"></a>
 </p>
@@ -32,7 +32,7 @@
 
 <small><strong>Ask the Model</strong> provides the interface and retrieval/provenance layer. A <strong>local provider</strong>, such as Ollama, loads and runs AI models. The <strong>AI model</strong> remains a separate artifact that must currently be downloaded and managed through the provider rather than AtM.</small>
 
-<small>Version 0.3.0 adds repository selection, exact-SHA refresh/download/update, immutable validated local snapshots, deterministic local retrieval, independent multi-chat state and compact numbered citations with inspectable provenance. EWD, CBD and RMD remain authoritative for their own code, data, assumptions, provenance and validation.</small>
+<small>Version 0.4.0 retains repository-grounded multi-chat and adds offline startup qualification plus deterministic local snapshot-integrity seals. AtM now verifies the effective packaged deployment, its dedicated repository-storage boundary and persisted repository state before accepting local repository readiness, while keeping upstream Git SHA provenance distinct from local integrity checks. EWD, CBD and RMD remain authoritative for their own code, data, assumptions, provenance and validation.</small>
 
 ### Repository-grounded scientific-model chat
 
@@ -148,13 +148,13 @@ flatpak run io.github.laurentiustaicu.ask_the_model
 
 <small>A raw GGUF file does not become visible to AtM merely because it exists on disk; it must first be registered with a compatible provider. For model sources, GGUF import, parameter scales, quantization, context windows, starter examples, storage, CPU/GPU checks and Ollama management commands, see <a href="docs/MODEL_GUIDE.md">Choosing, installing and managing AI models</a>.</small>
 
-<small><strong>Model capability does not automatically become AtM capability.</strong> AtM v0.3.0 currently provides text chat and repository-grounded text retrieval. Image input and tool-calling controls are not part of this release, and the default chat path requests <code>think: false</code>.</small>
+<small><strong>Model capability does not automatically become AtM capability.</strong> AtM v0.4.0 currently provides text chat and repository-grounded text retrieval. Image input and tool-calling controls are not part of this release, and the default chat path requests <code>think: false</code>.</small>
 
 <small>If a model is too slow, consumes too much memory or does not appear in AtM, use <a href="docs/TROUBLESHOOTING.md">Troubleshooting</a> for symptom-by-symptom checks rather than treating model size or download success as proof of compatibility.</small>
 
 ### Privacy and the local-provider boundary
 
-<small>AtM v0.3.0 connects only to loopback provider addresses on the same machine and sends prompt content when you activate <strong>Send</strong>. Conversation history is held in AtM memory for the current application process and is not persisted by AtM across restarts. Repository-grounded evidence comes from validated local snapshots; network access is used for explicit repository Refresh/Download/Update and for immutable GitHub links opened by the user.</small>
+<small>AtM v0.4.0 connects only to loopback provider addresses on the same machine and sends prompt content when you activate <strong>Send</strong>. Conversation history is held in AtM memory for the current application process and is not persisted by AtM across restarts. Repository-grounded evidence comes from validated local snapshots; network access is used for explicit repository Refresh/Download/Update and for immutable GitHub links opened by the user.</small>
 
 <small>A loopback connection does not by itself prove that every model is local. The external provider decides how a selected model is executed. Modern Ollama versions can also expose cloud features. If strict local-only operation is required, choose a locally installed model and configure the provider accordingly; Ollama documents a local-only mode using <code>OLLAMA_NO_CLOUD=1</code> or <code>disable_ollama_cloud</code> in its server configuration.</small>
 
@@ -188,7 +188,7 @@ flatpak run io.github.laurentiustaicu.ask_the_model
 - <small>shows compact numbered citations with exact repository/version/SHA/source/locator provenance and immutable source links;</small>
 - <small>follows desktop light/dark appearance and runs as a GTK 4 / Granite Flatpak for the elementary OS 8 runtime.</small>
 
-### What v0.3.0 still does not do
+### What v0.4.0 still does not do
 
 - <small>download, import, move, update or delete AI model files through AtM;</small>
 - <small>install, start, stop or update the external provider through AtM;</small>
