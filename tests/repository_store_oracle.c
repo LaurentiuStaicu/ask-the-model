@@ -1929,19 +1929,6 @@ oracle_check_source_provenance (
         goto out;
     }
 
-    sqlite3_finalize (statement);
-    statement = NULL;
-
-    if (!oracle_check_source_provenance (
-            db,
-            input,
-            snapshot_root,
-            policy,
-            error
-        )) {
-        goto out;
-    }
-
     ok = TRUE;
 
 out:
@@ -2135,6 +2122,19 @@ check_index (
             ORACLE_ERROR_INTEGRITY,
             "Retrieval index metadata does not match the exact pinned generation."
         );
+        goto out;
+    }
+
+    sqlite3_finalize (statement);
+    statement = NULL;
+
+    if (!oracle_check_source_provenance (
+            db,
+            input,
+            snapshot_root,
+            policy,
+            error
+        )) {
         goto out;
     }
 
