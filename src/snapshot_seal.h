@@ -14,7 +14,8 @@ typedef enum {
 typedef enum {
     ATM_SNAPSHOT_SEAL_ERROR_ARGUMENT,
     ATM_SNAPSHOT_SEAL_ERROR_IO,
-    ATM_SNAPSHOT_SEAL_ERROR_EXISTS
+    ATM_SNAPSHOT_SEAL_ERROR_EXISTS,
+    ATM_SNAPSHOT_SEAL_ERROR_INTEGRITY
 } AtmSnapshotSealError;
 
 #define ATM_SNAPSHOT_SEAL_ERROR \
@@ -40,6 +41,17 @@ gboolean atm_snapshot_seal_check (
     const char *snapshot_sha,
     AtmSnapshotSealStatus *out_status,
     char **out_detail,
+    char **out_root_sha256,
+    GError **error
+);
+
+gboolean atm_snapshot_seal_ensure_install (
+    const char *seal_root,
+    const char *snapshot_root,
+    const char *repository_id,
+    const char *snapshot_sha,
+    gboolean *out_created,
+    char **out_seal_path,
     char **out_root_sha256,
     GError **error
 );
