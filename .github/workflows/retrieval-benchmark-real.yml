@@ -298,6 +298,133 @@ jobs:
           )
           PY
 
+      - name: Execute candidate context-policy sweep
+        shell: bash
+        run: |
+          set -euo pipefail
+
+          for policy in             candidate-results5             candidate-sources8             candidate-bytes16k             candidate-compact
+          do
+            stem="/tmp/atm-retrieval-${policy}"
+
+            /tmp/atm-retrieval-benchmark-runner               benchmarks/retrieval-v1/benchmark.json               "${stem}-run.json"               "github-${policy}-${GITHUB_RUN_ID}-${GITHUB_RUN_ATTEMPT}"               "${policy}"
+
+            python3 scripts/evaluate_retrieval_benchmark.py               benchmarks/retrieval-v1/benchmark.json               "${stem}-run.json"               --pretty               > "${stem}-evaluation.json"
+          done
+
+          python3 - <<'PY'
+          import json
+
+          policies = [
+              "production",
+              "candidate-results5",
+              "candidate-sources8",
+              "candidate-bytes16k",
+              "candidate-compact",
+          ]
+
+          def load(policy):
+              if policy == "production":
+                  path = (
+                      "/tmp/atm-retrieval-production-policy-"
+                      "evaluation.json"
+                  )
+              else:
+                  path = f"/tmp/atm-retrieval-{policy}-evaluation.json"
+
+              with open(path, encoding="utf-8") as handle:
+                  return json.load(handle)
+
+          baseline = load("production")
+          baseline_metrics = baseline["metrics"]
+          rows = []
+
+          for policy in policies:
+              evaluation = load(policy)
+              metrics = evaluation["metrics"]
+
+              rows.append(
+                  {
+                      "policy": policy,
+                      "context_precision": metrics.get(
+                          "context_precision"
+                      ),
+                      "context_required_recall": metrics.get(
+                          "context_required_recall"
+                      ),
+                      "context_source_count_mean": metrics.get(
+                          "context_source_count_mean"
+                      ),
+                      "context_source_count_max": metrics.get(
+                          "context_source_count_max"
+                      ),
+                      "evidence_bytes_mean": metrics.get(
+                          "evidence_bytes_mean"
+                      ),
+                      "evidence_bytes_max": metrics.get(
+                          "evidence_bytes_max"
+                      ),
+                      "canonical_required_recall_at_5": metrics.get(
+                          "canonical_required_recall_at_5"
+                      ),
+                      "ndcg_at_5": metrics.get("ndcg_at_5"),
+                      "exact_id_success_at_1": metrics.get(
+                          "exact_id_success_at_1"
+                      ),
+                      "passes_existing_quality_gates": evaluation[
+                          "passes_provisional_targets"
+                      ],
+                      "delta_context_precision": (
+                          metrics.get("context_precision")
+                          - baseline_metrics.get("context_precision")
+                      ),
+                      "delta_context_required_recall": (
+                          metrics.get("context_required_recall")
+                          - baseline_metrics.get(
+                              "context_required_recall"
+                          )
+                      ),
+                      "delta_evidence_bytes_mean": (
+                          metrics.get("evidence_bytes_mean")
+                          - baseline_metrics.get(
+                              "evidence_bytes_mean"
+                          )
+                      ),
+                  }
+              )
+
+          with open(
+              "/tmp/atm-retrieval-policy-sweep-summary.json",
+              "w",
+              encoding="utf-8",
+          ) as handle:
+              json.dump(
+                  {
+                      "schema_version": 1,
+                      "baseline": "production",
+                      "policies": rows,
+                  },
+                  handle,
+                  indent=2,
+                  sort_keys=True,
+              )
+              handle.write("\n")
+
+          print("Candidate context-policy sweep:")
+          for row in rows:
+              print(
+                  "  "
+                  f"{row['policy']}: "
+                  f"precision={row['context_precision']:.6f} "
+                  f"context_recall={row['context_required_recall']:.6f} "
+                  f"sources_mean={row['context_source_count_mean']:.3f} "
+                  f"sources_max={row['context_source_count_max']} "
+                  f"bytes_mean={row['evidence_bytes_mean']:.1f} "
+                  f"bytes_max={row['evidence_bytes_max']} "
+                  f"quality_gates={row['passes_existing_quality_gates']}"
+              )
+          PY
+
       - name: Enforce provisional R5 gates
         shell: bash
         run: |
@@ -335,5 +462,14 @@ jobs:
             /tmp/atm-retrieval-benchmark-evaluation.json
             /tmp/atm-retrieval-production-policy-run.json
             /tmp/atm-retrieval-production-policy-evaluation.json
+            /tmp/atm-retrieval-candidate-results5-run.json
+            /tmp/atm-retrieval-candidate-results5-evaluation.json
+            /tmp/atm-retrieval-candidate-sources8-run.json
+            /tmp/atm-retrieval-candidate-sources8-evaluation.json
+            /tmp/atm-retrieval-candidate-bytes16k-run.json
+            /tmp/atm-retrieval-candidate-bytes16k-evaluation.json
+            /tmp/atm-retrieval-candidate-compact-run.json
+            /tmp/atm-retrieval-candidate-compact-evaluation.json
+            /tmp/atm-retrieval-policy-sweep-summary.json
           if-no-files-found: warn
           retention-days: 14
