@@ -395,26 +395,31 @@ namespace AskTheModel {
             }
 
             try {
-                StartupQualificationNative.StorageQualification
-                    storage;
+                bool storage_qualified;
+                bool storage_created;
+                uint32 storage_mode;
+                uint64 storage_owner_uid;
 
                 bool completed =
-                    StartupQualificationNative.qualify_storage_root (
+                    StartupQualificationNative.qualify_storage_root_values (
                         data_root,
-                        out storage
+                        out storage_qualified,
+                        out storage_created,
+                        out storage_mode,
+                        out storage_owner_uid
                     );
 
                 if (completed) {
                     report.storage_qualified =
-                        storage.qualified;
+                        storage_qualified;
                     report.storage_created =
-                        storage.created;
+                        storage_created;
                     report.storage_mode =
-                        storage.mode;
+                        storage_mode;
                     report.storage_owner_uid =
-                        storage.owner_uid;
+                        storage_owner_uid;
                     report.storage_reason_code =
-                        storage.qualified
+                        storage_qualified
                             ? "qualified"
                             : "storage_unqualified";
                 } else {
