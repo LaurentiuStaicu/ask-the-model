@@ -1,4 +1,10 @@
 namespace AskTheModel {
+    public enum RepositoryStateLoadStatus {
+        ABSENT,
+        VALID,
+        INVALID
+    }
+
     public class RepositoryLocalRecord : Object {
         public string repository_id { get; construct; }
         public string? current_sha { get; set; }
@@ -18,6 +24,12 @@ namespace AskTheModel {
 
         private string state_path;
         private RepositoryLocalRecord[] records = {};
+
+        public RepositoryStateLoadStatus load_status {
+            get;
+            private set;
+            default = RepositoryStateLoadStatus.ABSENT;
+        }
 
         public RepositoryStateStore (string? state_root = null) {
             string root = state_root ??
@@ -39,13 +51,26 @@ namespace AskTheModel {
             load_best_effort ();
         }
 
-        public RepositoryLocalRecord record_for (
+        private RepositoryLocalRecord? record_for_optional (
             string repository_id
         ) {
             foreach (RepositoryLocalRecord record in records) {
                 if (record.repository_id == repository_id) {
                     return record;
                 }
+            }
+
+            return null;
+        }
+
+        public RepositoryLocalRecord record_for (
+            string repository_id
+        ) {
+            RepositoryLocalRecord? record =
+                record_for_optional (repository_id);
+
+            if (record != null) {
+                return record;
             }
 
             assert_not_reached ();
@@ -56,12 +81,24 @@ namespace AskTheModel {
             string sha,
             string version
         ) throws RepositoryError {
+            if (load_status == RepositoryStateLoadStatus.INVALID) {
+                throw new RepositoryError.STORAGE (
+                    "Repository state is invalid and cannot be overwritten implicitly."
+                );
+            }
+
             if (!GLib.Regex.match_simple (
                     "^[0-9a-f]{40}$",
                     sha
                 )) {
                 throw new RepositoryError.INVALID_RESPONSE (
                     "Repository state SHA is invalid."
+                );
+            }
+
+            if (version.length == 0) {
+                throw new RepositoryError.INVALID_RESPONSE (
+                    "Repository state version is empty."
                 );
             }
 
@@ -75,6 +112,7 @@ namespace AskTheModel {
 
             try {
                 save ();
+                load_status = RepositoryStateLoadStatus.VALID;
             } catch (RepositoryError error) {
                 record.current_sha = previous_sha;
                 record.version = previous_version;
@@ -82,13 +120,33 @@ namespace AskTheModel {
             }
         }
 
+        private static bool node_is_string (
+            Json.Node? node
+        ) {
+            return node != null &&
+                node.get_node_type () == Json.NodeType.VALUE &&
+                node.get_value_type () == typeof (string);
+        }
+
+        private static bool node_is_int64 (
+            Json.Node? node
+        ) {
+            return node != null &&
+                node.get_node_type () == Json.NodeType.VALUE &&
+                node.get_value_type () == typeof (int64);
+        }
+
         private void load_best_effort () {
+            load_status = RepositoryStateLoadStatus.ABSENT;
+
             if (!GLib.FileUtils.test (
                     state_path,
                     GLib.FileTest.EXISTS
                 )) {
                 return;
             }
+
+            load_status = RepositoryStateLoadStatus.INVALID;
 
             try {
                 string contents;
@@ -107,56 +165,91 @@ namespace AskTheModel {
                 }
 
                 Json.Object root = root_node.get_object ();
-                if (!root.has_member ("schema_version") ||
-                    root.get_int_member ("schema_version") !=
-                        SCHEMA_VERSION ||
-                    !root.has_member ("repositories")) {
+                Json.Node? schema_node =
+                    root.get_member ("schema_version");
+                Json.Node? repositories_node =
+                    root.get_member ("repositories");
+
+                if (!node_is_int64 (schema_node) ||
+                    schema_node.get_int () != SCHEMA_VERSION ||
+                    repositories_node == null ||
+                    repositories_node.get_node_type () !=
+                        Json.NodeType.ARRAY) {
                     return;
                 }
 
                 Json.Array repositories =
-                    root.get_array_member ("repositories");
+                    repositories_node.get_array ();
+                string[] ids = {};
+                string[] shas = {};
+                string[] versions = {};
 
                 for (
                     uint i = 0;
                     i < repositories.get_length ();
                     i++
                 ) {
-                    Json.Object item =
-                        repositories.get_object_element (i);
+                    Json.Node? item_node =
+                        repositories.get_element (i);
 
-                    if (!item.has_member ("id") ||
-                        !item.has_member ("sha") ||
-                        !item.has_member ("version")) {
-                        continue;
+                    if (item_node == null ||
+                        item_node.get_node_type () !=
+                            Json.NodeType.OBJECT) {
+                        return;
                     }
 
-                    string id = item.get_string_member ("id");
-                    string sha = item.get_string_member ("sha");
-                    string version =
-                        item.get_string_member ("version");
+                    Json.Object item = item_node.get_object ();
+                    Json.Node? id_node = item.get_member ("id");
+                    Json.Node? sha_node = item.get_member ("sha");
+                    Json.Node? version_node =
+                        item.get_member ("version");
 
-                    if (!GLib.Regex.match_simple (
+                    if (!node_is_string (id_node) ||
+                        !node_is_string (sha_node) ||
+                        !node_is_string (version_node)) {
+                        return;
+                    }
+
+                    string id = id_node.get_string ();
+                    string sha = sha_node.get_string ();
+                    string version = version_node.get_string ();
+
+                    if (record_for_optional (id) == null ||
+                        !GLib.Regex.match_simple (
                             "^[0-9a-f]{40}$",
                             sha
-                        )) {
-                        continue;
+                        ) ||
+                        version.length == 0) {
+                        return;
                     }
 
-                    foreach (
-                        RepositoryLocalRecord record
-                        in records
-                    ) {
-                        if (record.repository_id == id) {
-                            record.current_sha = sha;
-                            record.version = version;
-                            break;
+                    foreach (string seen_id in ids) {
+                        if (seen_id == id) {
+                            return;
                         }
                     }
+
+                    ids += id;
+                    shas += sha;
+                    versions += version;
                 }
+
+                for (int i = 0; i < ids.length; i++) {
+                    RepositoryLocalRecord? record =
+                        record_for_optional (ids[i]);
+
+                    if (record == null) {
+                        return;
+                    }
+
+                    record.current_sha = shas[i];
+                    record.version = versions[i];
+                }
+
+                load_status = RepositoryStateLoadStatus.VALID;
             } catch (GLib.Error error) {
                 stderr.printf (
-                    "AtM: repository state ignored: %s\n",
+                    "AtM: repository state invalid: %s\n",
                     error.message
                 );
             }
