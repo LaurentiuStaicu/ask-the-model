@@ -4,15 +4,18 @@ namespace AskTheModel {
         public RepositoryLocalRecord local { get; construct; }
         public string? remote_sha { get; set; }
         public string? remote_version { get; set; }
+        private string data_root;
 
         public RepositoryRuntimeInfo (
             RepositoryDescriptor descriptor,
-            RepositoryLocalRecord local
+            RepositoryLocalRecord local,
+            string data_root
         ) {
             Object (
                 descriptor: descriptor,
                 local: local
             );
+            this.data_root = data_root;
         }
 
         public void clear_remote_identity () {
@@ -27,7 +30,8 @@ namespace AskTheModel {
 
             string sha = local.current_sha ?? "";
             string path =
-                RepositoryLifecycleService.snapshot_path (
+                RepositoryLifecycleService.snapshot_path_for_root (
+                    data_root,
                     descriptor,
                     sha
                 );
@@ -70,13 +74,22 @@ namespace AskTheModel {
         private RepositoryClient client;
         private RepositoryStateStore state_store;
         private RepositoryRuntimeInfo[] repositories = {};
+        private string data_root;
+        private string cache_root;
 
         public signal void progress (string message);
 
         public RepositoryLifecycleService (
-            string? state_root = null
+            string? state_root = null,
+            string? data_root = null,
+            string? cache_root = null
         ) {
             client = new RepositoryClient ();
+            this.data_root =
+                data_root ?? visible_data_root ();
+            this.cache_root =
+                cache_root ??
+                GLib.Environment.get_user_cache_dir ();
             state_store = new RepositoryStateStore (
                 state_root
             );
@@ -87,7 +100,8 @@ namespace AskTheModel {
             ) {
                 repositories += new RepositoryRuntimeInfo (
                     descriptor,
-                    state_store.record_for (descriptor.id)
+                    state_store.record_for (descriptor.id),
+                    this.data_root
                 );
             }
         }
@@ -99,15 +113,27 @@ namespace AskTheModel {
             );
         }
 
-        public static string snapshot_path (
+        public static string snapshot_path_for_root (
+            string data_root,
             RepositoryDescriptor descriptor,
             string sha
         ) {
             return GLib.Path.build_filename (
-                visible_data_root (),
+                data_root,
                 "Repositories",
                 descriptor.id,
                 "snapshots",
+                sha
+            );
+        }
+
+        public static string snapshot_path (
+            RepositoryDescriptor descriptor,
+            string sha
+        ) {
+            return snapshot_path_for_root (
+                visible_data_root (),
+                descriptor,
                 sha
             );
         }
@@ -229,11 +255,12 @@ namespace AskTheModel {
             SourceFunc callback = prepare_snapshot.callback;
             RepositoryInstallResult? worker_result = null;
             string? failure = null;
-            string data_root = visible_data_root ();
-            string cache_root =
-                GLib.Environment.get_user_cache_dir ();
             string expected_snapshot =
-                snapshot_path (descriptor, sha);
+                snapshot_path_for_root (
+                    data_root,
+                    descriptor,
+                    sha
+                );
 
             var worker = new GLib.Thread<void*> (
                 "atm-repository-install",
@@ -456,7 +483,11 @@ namespace AskTheModel {
 
                 string sha = info.remote_sha ?? "";
                 string expected_snapshot =
-                    snapshot_path (descriptor, sha);
+                    snapshot_path_for_root (
+                        data_root,
+                        descriptor,
+                        sha
+                    );
                 string? archive_path = null;
 
                 try {
