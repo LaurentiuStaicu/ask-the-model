@@ -27,6 +27,20 @@ namespace AskTheModel.RepositoryNative {
     ) throws GLib.Error;
 
     [CCode (
+        cname = "atm_snapshot_seal_ensure_install",
+        cheader_filename = "snapshot_seal.h"
+    )]
+    public static extern bool ensure_install_seal (
+        string seal_root,
+        string snapshot_root,
+        string repository_id,
+        string snapshot_sha,
+        out bool created,
+        out string seal_path,
+        out string root_sha256
+    ) throws GLib.Error;
+
+    [CCode (
         cname = "atm_repository_ui_ensure_index",
         cheader_filename = "repository_ui_bridge.h"
     )]
