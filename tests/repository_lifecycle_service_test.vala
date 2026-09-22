@@ -107,6 +107,125 @@ namespace AskTheModel.Tests {
             }
 
             assert (not_ready_rejected);
+
+            string qualified_state_root =
+                new_temp_root ();
+            string qualified_data_root =
+                new_temp_root ();
+            RepositoryDescriptor qualified_descriptor =
+                catalog[0];
+            string qualified_sha =
+                "4444444444444444444444444444444444444444";
+            string qualified_version = "4.4.4";
+
+            var seed_store =
+                new RepositoryStateStore (
+                    qualified_state_root
+                );
+            seed_store.set_current (
+                qualified_descriptor.id,
+                qualified_sha,
+                qualified_version
+            );
+
+            var qualified_service =
+                new RepositoryLifecycleService (
+                    qualified_state_root,
+                    qualified_data_root
+                );
+            RepositoryRuntimeInfo qualified_info =
+                qualified_service.info_for (
+                    qualified_descriptor.id
+                );
+
+            assert (
+                qualified_info.local_qualification ==
+                RepositoryLocalQualificationStatus.PENDING
+            );
+            assert (!qualified_info.locally_usable ());
+            assert (qualified_info.download_required ());
+
+            qualified_service.apply_local_qualification (
+                qualified_descriptor.id,
+                RepositoryLocalQualificationStatus.READY,
+                qualified_sha,
+                qualified_version,
+                qualified_version,
+                "ready",
+                "Exact startup qualification."
+            );
+
+            assert (
+                qualified_info.local_qualification ==
+                RepositoryLocalQualificationStatus.READY
+            );
+            assert (!qualified_info.locally_usable ());
+            assert (qualified_info.download_required ());
+
+            string qualified_snapshot =
+                RepositoryLifecycleService.snapshot_path_for (
+                    qualified_data_root,
+                    qualified_descriptor,
+                    qualified_sha
+                );
+            assert (
+                GLib.DirUtils.create_with_parents (
+                    qualified_snapshot,
+                    0700
+                ) == 0
+            );
+
+            assert (qualified_info.locally_usable ());
+            assert (!qualified_info.download_required ());
+
+            qualified_service.apply_local_qualification (
+                qualified_descriptor.id,
+                RepositoryLocalQualificationStatus.READY,
+                qualified_sha,
+                qualified_version,
+                "wrong-version",
+                "Mismatched startup qualification."
+            );
+
+            assert (
+                qualified_info.local_qualification ==
+                RepositoryLocalQualificationStatus.SNAPSHOT_INVALID
+            );
+            assert (
+                qualified_info.qualification_reason_code ==
+                "runtime_qualification_identity_mismatch"
+            );
+            assert (!qualified_info.locally_usable ());
+            assert (qualified_info.download_required ());
+
+            qualified_service.apply_local_qualification (
+                qualified_descriptor.id,
+                RepositoryLocalQualificationStatus.SNAPSHOT_INVALID,
+                qualified_sha,
+                qualified_version,
+                null,
+                "snapshot_invalid",
+                "Startup reconciler rejected the snapshot."
+            );
+
+            assert (
+                qualified_info.local_qualification ==
+                RepositoryLocalQualificationStatus.SNAPSHOT_INVALID
+            );
+            assert (!qualified_info.locally_usable ());
+            assert (qualified_info.download_required ());
+
+            qualified_info.mark_local_ready (
+                qualified_sha,
+                qualified_version
+            );
+
+            assert (
+                qualified_info.local_qualification ==
+                RepositoryLocalQualificationStatus.READY
+            );
+            assert (qualified_info.locally_usable ());
+            assert (!qualified_info.download_required ());
         } catch (GLib.Error error) {
             stderr.printf ("%s\n", error.message);
             result_code = 1;
