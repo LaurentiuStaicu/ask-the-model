@@ -45,6 +45,7 @@ executable(
     'src/archive_extract.c',
     'src/repository_manifest.c',
     'src/repository_reconcile.c',
+    'src/snapshot_seal.c',
     'src/repository_storage.c',
     'src/repository_ingest.c',
     'src/repository_ui_bridge.c',
