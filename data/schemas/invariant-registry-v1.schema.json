@@ -1,0 +1,134 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://github.com/LaurentiuStaicu/ask-the-model/data/schemas/invariant-registry-v1.schema.json",
+  "title": "AtM Invariant Registry v1",
+  "type": "object",
+  "additionalProperties": false,
+  "required": [
+    "schema_version",
+    "registry_id",
+    "scope",
+    "qualification_policy",
+    "invariants"
+  ],
+  "properties": {
+    "schema_version": {
+      "const": 1
+    },
+    "registry_id": {
+      "const": "atm-invariants/v1"
+    },
+    "scope": {
+      "type": "string",
+      "minLength": 1
+    },
+    "qualification_policy": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["blocking_severities", "scoring"],
+      "properties": {
+        "blocking_severities": {
+          "type": "array",
+          "const": ["S0", "S1"]
+        },
+        "scoring": {
+          "const": "none"
+        }
+      }
+    },
+    "invariants": {
+      "type": "array",
+      "minItems": 1,
+      "items": {
+        "$ref": "#/$defs/invariant"
+      }
+    }
+  },
+  "$defs": {
+    "referenceList": {
+      "type": "array",
+      "items": {
+        "type": "string",
+        "minLength": 1
+      },
+      "uniqueItems": true
+    },
+    "invariant": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "id",
+        "category",
+        "severity",
+        "lifecycle",
+        "statement",
+        "enforced_by",
+        "tested_by"
+      ],
+      "properties": {
+        "id": {
+          "type": "string",
+          "pattern": "^[A-Z][A-Z0-9-]*-(S0|S1)-[0-9]{3}$"
+        },
+        "category": {
+          "enum": [
+            "STARTUP",
+            "REPOSITORY",
+            "INGEST",
+            "RETRIEVAL",
+            "SESSION",
+            "SCIENTIFIC",
+            "STATE",
+            "TRUST",
+            "AUDIT",
+            "RECOVERY",
+            "LIFECYCLE",
+            "RESOURCE",
+            "RELEASE"
+          ]
+        },
+        "severity": {
+          "enum": ["S0", "S1"]
+        },
+        "lifecycle": {
+          "enum": ["enforced", "planned", "retired"]
+        },
+        "statement": {
+          "type": "string",
+          "minLength": 1
+        },
+        "enforced_by": {
+          "$ref": "#/$defs/referenceList"
+        },
+        "tested_by": {
+          "$ref": "#/$defs/referenceList"
+        },
+        "notes": {
+          "type": "string"
+        }
+      },
+      "allOf": [
+        {
+          "if": {
+            "properties": {
+              "lifecycle": {
+                "const": "enforced"
+              }
+            },
+            "required": ["lifecycle"]
+          },
+          "then": {
+            "properties": {
+              "enforced_by": {
+                "minItems": 1
+              },
+              "tested_by": {
+                "minItems": 1
+              }
+            }
+          }
+        }
+      ]
+    }
+  }
+}

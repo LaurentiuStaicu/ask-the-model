@@ -1,0 +1,113 @@
+{
+  "schema_version": 1,
+  "registry_id": "atm-invariants/v1",
+  "scope": "System invariants already enforced by the current AtM baseline; future v1 invariants are added by the PR that implements them.",
+  "qualification_policy": {
+    "blocking_severities": ["S0", "S1"],
+    "scoring": "none"
+  },
+  "invariants": [
+    {
+      "id": "STARTUP-S0-001",
+      "category": "STARTUP",
+      "severity": "S0",
+      "lifecycle": "enforced",
+      "statement": "Startup qualification must fail closed when the Flatpak application/runtime identity required by the current qualification policy cannot be established.",
+      "enforced_by": [
+        "src/startup_qualification.c",
+        "src/StartupQualificationService.vala"
+      ],
+      "tested_by": [
+        "meson:startup-qualification",
+        "meson:startup-qualification-service"
+      ]
+    },
+    {
+      "id": "REPOSITORY-S0-001",
+      "category": "REPOSITORY",
+      "severity": "S0",
+      "lifecycle": "enforced",
+      "statement": "Invalid persisted repository state must not be overwritten or repaired implicitly by normal repository-state mutations.",
+      "enforced_by": [
+        "src/RepositoryState.vala"
+      ],
+      "tested_by": [
+        "meson:repository-state"
+      ]
+    },
+    {
+      "id": "REPOSITORY-S0-002",
+      "category": "REPOSITORY",
+      "severity": "S0",
+      "lifecycle": "enforced",
+      "statement": "A persisted repository snapshot may be reported ready only when the snapshot path is bound to the persisted SHA, manifest identity validates, the repository version matches, and the retrieval index is valid or is rebuilt from that same snapshot.",
+      "enforced_by": [
+        "src/repository_reconcile.c",
+        "src/retrieval_index_lifecycle.c"
+      ],
+      "tested_by": [
+        "meson:repository-reconcile",
+        "meson:retrieval-index-lifecycle"
+      ]
+    },
+    {
+      "id": "REPOSITORY-S0-003",
+      "category": "REPOSITORY",
+      "severity": "S0",
+      "lifecycle": "enforced",
+      "statement": "A repository snapshot whose integrity seal no longer matches its contents must not remain usable as ready current state.",
+      "enforced_by": [
+        "src/snapshot_seal.c",
+        "src/RepositoryLifecycleService.vala"
+      ],
+      "tested_by": [
+        "meson:snapshot-seal",
+        "meson:repository-lifecycle-service"
+      ]
+    },
+    {
+      "id": "INGEST-S0-001",
+      "category": "INGEST",
+      "severity": "S0",
+      "lifecycle": "enforced",
+      "statement": "Repository archive ingestion must enforce bounded extraction and reject unsafe paths or link-like archive entries before a snapshot can be promoted.",
+      "enforced_by": [
+        "src/archive_extract.c",
+        "src/repository_ingest.c"
+      ],
+      "tested_by": [
+        "meson:archive-extract",
+        "meson:repository-ingest"
+      ]
+    },
+    {
+      "id": "RETRIEVAL-S1-001",
+      "category": "RETRIEVAL",
+      "severity": "S1",
+      "lifecycle": "enforced",
+      "statement": "A retrieval index may be reused only when it validates against the exact repository and snapshot sources; an invalid derived index must be rejected and rebuilt or surface an error.",
+      "enforced_by": [
+        "src/retrieval_index_lifecycle.c",
+        "src/retrieval_index.c"
+      ],
+      "tested_by": [
+        "meson:retrieval-index-lifecycle",
+        "meson:repository-reconcile"
+      ]
+    },
+    {
+      "id": "SESSION-S0-001",
+      "category": "SESSION",
+      "severity": "S0",
+      "lifecycle": "enforced",
+      "statement": "A conversation session may start only from frozen grounding and must keep the selected AI model identity, including its digest when available, pinned until the session is reset.",
+      "enforced_by": [
+        "src/ConversationSession.vala",
+        "src/ConversationGrounding.vala"
+      ],
+      "tested_by": [
+        "meson:conversation-session"
+      ]
+    }
+  ]
+}
