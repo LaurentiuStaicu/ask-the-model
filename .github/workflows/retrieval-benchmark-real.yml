@@ -32,6 +32,7 @@ on:
       - 'src/retrieval_router.h'
       - 'src/retrieval_conversation.c'
       - 'src/retrieval_conversation.h'
+      - 'src/retrieval_policy.h'
       - 'src/grounding_context.c'
       - 'src/grounding_context.h'
       - 'data/schemas/retrieval-index-v2.sql'
@@ -243,6 +244,59 @@ jobs:
             --pretty \
             | tee /tmp/atm-retrieval-benchmark-evaluation.json
 
+      - name: Execute production-policy shadow benchmark
+        shell: bash
+        run: |
+          set -euo pipefail
+
+          /tmp/atm-retrieval-benchmark-runner \
+            benchmarks/retrieval-v1/benchmark.json \
+            /tmp/atm-retrieval-production-policy-run.json \
+            "github-production-${GITHUB_RUN_ID}-${GITHUB_RUN_ATTEMPT}" \
+            production
+
+          python3 -m json.tool \
+            /tmp/atm-retrieval-production-policy-run.json \
+            >/dev/null
+
+          python3 scripts/evaluate_retrieval_benchmark.py \
+            benchmarks/retrieval-v1/benchmark.json \
+            /tmp/atm-retrieval-production-policy-run.json \
+            --pretty \
+            | tee /tmp/atm-retrieval-production-policy-evaluation.json
+
+          python3 - <<'PY'
+          import json
+
+          with open(
+              "/tmp/atm-retrieval-production-policy-evaluation.json",
+              encoding="utf-8",
+          ) as handle:
+              evaluation = json.load(handle)
+
+          metrics = evaluation["metrics"]
+          print("Production-policy shadow metrics:")
+          for name in (
+              "exact_id_success_at_1",
+              "ndcg_at_5",
+              "canonical_required_recall_at_5",
+              "context_precision",
+              "context_required_recall",
+              "context_source_count_mean",
+              "context_source_count_max",
+              "evidence_bytes_mean",
+              "evidence_bytes_max",
+              "retrieval_latency_ms_median",
+              "retrieval_latency_ms_p95",
+          ):
+              print(f"  {name}: {metrics.get(name)}")
+
+          print(
+              "  existing_quality_gates_pass: "
+              f"{evaluation['passes_provisional_targets']}"
+          )
+          PY
+
       - name: Enforce provisional R5 gates
         shell: bash
         run: |
@@ -278,5 +332,7 @@ jobs:
           path: |
             /tmp/atm-retrieval-benchmark-run.json
             /tmp/atm-retrieval-benchmark-evaluation.json
+            /tmp/atm-retrieval-production-policy-run.json
+            /tmp/atm-retrieval-production-policy-evaluation.json
           if-no-files-found: warn
           retention-days: 14
