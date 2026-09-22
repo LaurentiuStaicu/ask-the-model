@@ -49,16 +49,19 @@ namespace AskTheModel {
         public string version { get; construct; }
         public string snapshot_path { get; construct; }
         public string index_path { get; construct; }
+        public string? seal_sha256 { get; construct; }
 
         public RepositoryInstallResult (
             string version,
             string snapshot_path,
-            string index_path
+            string index_path,
+            string? seal_sha256
         ) {
             Object (
                 version: version,
                 snapshot_path: snapshot_path,
-                index_path: index_path
+                index_path: index_path,
+                seal_sha256: seal_sha256
             );
         }
     }
@@ -245,6 +248,7 @@ namespace AskTheModel {
                         string ingest_version = "";
                         string index_path;
                         string index_version;
+                        string? prepared_seal_sha256 = null;
                         if (!GLib.FileUtils.test (
                                 snapshot,
                                 GLib.FileTest.IS_DIR
@@ -295,6 +299,9 @@ namespace AskTheModel {
                                 );
                             }
 
+                            prepared_seal_sha256 =
+                                seal_root_sha256;
+
                             stdout.printf (
                                 "AtM: snapshot seal %s repository=%s sha=%s root=%s path=%s\n",
                                 seal_created ? "created" : "validated",
@@ -322,7 +329,8 @@ namespace AskTheModel {
                             new RepositoryInstallResult (
                                 index_version,
                                 snapshot,
-                                index_path
+                                index_path,
+                                prepared_seal_sha256
                             );
                     } catch (GLib.Error error) {
                         failure = error.message;
@@ -500,7 +508,8 @@ namespace AskTheModel {
                     state_store.set_current (
                         descriptor.id,
                         sha,
-                        result.version
+                        result.version,
+                        result.seal_sha256
                     );
 
                     info.remote_sha = sha;
