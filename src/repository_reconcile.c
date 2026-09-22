@@ -123,6 +123,47 @@ out:
 }
 
 gboolean
+atm_repository_probe_snapshot_root (
+    const char *snapshot_root,
+    AtmRepositorySnapshotRootStatus *out_status,
+    GError **error
+)
+{
+    GStatBuf stat_buffer;
+
+    g_return_val_if_fail (snapshot_root != NULL, FALSE);
+    g_return_val_if_fail (out_status != NULL, FALSE);
+
+    if (g_lstat (snapshot_root, &stat_buffer) != 0) {
+        if (errno == ENOENT) {
+            *out_status =
+                ATM_REPOSITORY_SNAPSHOT_ROOT_MISSING;
+            return TRUE;
+        }
+
+        g_set_error (
+            error,
+            ATM_REPOSITORY_RECONCILE_ERROR,
+            ATM_REPOSITORY_RECONCILE_ERROR_ARGUMENT,
+            "Could not inspect repository snapshot root: %s.",
+            g_strerror (errno)
+        );
+        return FALSE;
+    }
+
+    if (!S_ISDIR (stat_buffer.st_mode) ||
+        S_ISLNK (stat_buffer.st_mode)) {
+        *out_status =
+            ATM_REPOSITORY_SNAPSHOT_ROOT_INVALID;
+        return TRUE;
+    }
+
+    *out_status =
+        ATM_REPOSITORY_SNAPSHOT_ROOT_DIRECTORY;
+    return TRUE;
+}
+
+gboolean
 atm_repository_reconcile_local (
     const char *cache_root,
     const char *snapshot_root,
