@@ -325,6 +325,18 @@ class RetrievalBenchmarkEvaluatorTest(unittest.TestCase):
             (1.0 + 0.5 + 1.0) / 3.0,
         )
         self.assertAlmostEqual(
+            metrics["context_required_recall"],
+            (1.0 + 0.0 + 1.0) / 3.0,
+        )
+        self.assertAlmostEqual(
+            metrics["context_source_count_mean"],
+            0.8,
+        )
+        self.assertEqual(
+            metrics["context_source_count_max"],
+            2,
+        )
+        self.assertAlmostEqual(
             metrics["wrong_repository_contamination_at_5"],
             1.0 / 6.0,
         )
@@ -411,6 +423,18 @@ class RetrievalBenchmarkEvaluatorTest(unittest.TestCase):
             1.0,
         )
         self.assertEqual(
+            english["context_required_recall"],
+            1.0,
+        )
+        self.assertEqual(
+            english["context_source_count"],
+            1,
+        )
+        self.assertEqual(
+            english["evidence_bytes"],
+            400,
+        )
+        self.assertEqual(
             english["required_evidence"],
             [
                 {
@@ -432,6 +456,14 @@ class RetrievalBenchmarkEvaluatorTest(unittest.TestCase):
             1.0,
         )
         self.assertEqual(
+            romanian["context_required_recall"],
+            0.0,
+        )
+        self.assertEqual(
+            romanian["context_source_count"],
+            2,
+        )
+        self.assertEqual(
             romanian["required_evidence"][0]["rank"],
             3,
         )
@@ -442,6 +474,13 @@ class RetrievalBenchmarkEvaluatorTest(unittest.TestCase):
         unsupported = diagnostics["unsupported-ewd"]
         self.assertIsNone(
             unsupported["canonical_required_recall_at_5"]
+        )
+        self.assertIsNone(
+            unsupported["context_required_recall"]
+        )
+        self.assertEqual(
+            unsupported["context_source_count"],
+            0,
         )
         self.assertEqual(
             unsupported["required_evidence"],
