@@ -89,6 +89,20 @@ Implemented in the repository lifecycle, index, query, ranking, normalization, s
 
 The backend preserves immutable snapshot identity and returns evidence objects rather than generated scientific conclusions. The scientific repositories remain canonical; AtM does not rewrite their state or convert AI-generated text into canonical project data.
 
+### Development hardening — G-S0 startup qualification and local snapshot integrity
+
+The current development line adds a non-visual startup qualification layer above the released v0.3.0 repository path. This work is not yet a release claim.
+
+G-S0 qualifies the effective Flatpak deployment identity, the dedicated `~/Ask the Model` storage boundary and persisted repository state before local repository readiness is accepted. Startup reconciliation is offline and does not perform repository Refresh or Download/Update.
+
+Validated repository snapshots also receive a deterministic local `snapshot seal v1`. The seal is a SHA-256 comparison key over sorted repository-relative paths, semantic regular/executable file mode, file size and per-file SHA-256 content hashes. Timestamps, UID and GID are excluded so irrelevant filesystem metadata changes do not change the seal.
+
+The local seal is deliberately separate from the upstream Git commit SHA. The exact Git SHA remains the repository revision identity; the seal answers only whether the local snapshot content still matches the content previously accepted by AtM.
+
+Persistent repository state evolves backward-compatibly from schema v1 to schema v2. Existing v1 state remains valid with no seal. A seal may be enrolled only after strict local snapshot/version/index validation succeeds. Once a seal exists, a mismatch makes the repository locally unusable until an explicit repository lifecycle action replaces or repairs the snapshot; G-S0 does not silently repin content.
+
+Both startup reconciliation and normal repository preparation use pre/post seal checks around index validation/rebuild so a snapshot that changes while it is being prepared cannot become READY.
+
 ### R4 grounding and citation backend
 
 Implemented across the grounding-context, conversation-grounding, grounded request-builder and citation-label components under `src/`.
