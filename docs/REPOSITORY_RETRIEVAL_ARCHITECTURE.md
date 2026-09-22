@@ -39,8 +39,9 @@ The canonical terminology in `docs/TERMINOLOGY.md` applies.
 - **Snapshot** means the exact local repository state associated with one Git commit SHA.
 - **Repository version** means the version declared by the scientific repository itself, initially read from `CITATION.cff`.
 - **Retrieval index** means a derived local SQLite database built for one exact snapshot.
+- **Snapshot seal** means AtM's deterministic local SHA-256 integrity key for the files inside one validated snapshot. It is not the upstream Git commit SHA and does not replace upstream revision provenance.
 
-Repository version and snapshot SHA are deliberately separate concepts.
+Repository version, snapshot SHA and snapshot seal are deliberately separate concepts. The Git SHA identifies the upstream revision; the seal detects local content change after acceptance.
 
 ## Repository selector
 
@@ -147,11 +148,15 @@ write to staging
     ↓
 validate snapshot
     ↓
-build retrieval index
+compute pre-index local snapshot seal
     ↓
-validate retrieval index
+build or validate retrieval index
     ↓
-atomically make the snapshot current for future chats
+compute post-index local snapshot seal
+    ↓
+require stable pre/post seal
+    ↓
+atomically persist SHA + version + seal as current
 ```
 
 AtM does not download “whatever main contains at the end of the transfer”. The archive request is tied to the resolved SHA.
@@ -204,6 +209,9 @@ A repository is ready only when all applicable checks pass:
 - AtM repository manifest is supported;
 - required paths are present;
 - snapshot validation succeeds;
+- a deterministic local snapshot seal can be computed without following symlinks or accepting unsupported filesystem entry types;
+- when a persistent seal already exists, the current seal matches it before repository use;
+- snapshot content remains stable across index validation/rebuild, proven by matching pre/post seals;
 - retrieval index exists;
 - index schema is supported;
 - index snapshot SHA equals repository snapshot SHA;
@@ -244,7 +252,7 @@ Application state remains private:
 
 ```text
 $XDG_STATE_HOME/
-    repository-state.json
+    repository-state.json   # schema v2: SHA + version + optional/enrolled snapshot seal
 ```
 
 Archive downloads may use XDG cache staging, while extraction/validation staging is kept beneath `~/Ask the Model/Repositories/.staging` so atomic promotion into the final snapshot tree remains on the same filesystem.
