@@ -87,13 +87,18 @@ namespace AskTheModel.Tests {
                 "1111111111111111111111111111111111111111";
             string new_sha =
                 "2222222222222222222222222222222222222222";
+            string old_seal =
+                "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa";
+            string new_seal =
+                "bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb";
 
             var rollback_store =
                 new RepositoryStateStore (rollback_root);
             rollback_store.set_current (
                 "rmd",
                 old_sha,
-                "0.1.0"
+                "0.1.0",
+                old_seal
             );
 
             GLib.FileUtils.remove (rollback_state_file);
@@ -108,7 +113,8 @@ namespace AskTheModel.Tests {
                 rollback_store.set_current (
                     "rmd",
                     new_sha,
-                    "0.2.0"
+                    "0.2.0",
+                    new_seal
                 );
             } catch (RepositoryError error) {
                 storage_failed =
@@ -123,6 +129,10 @@ namespace AskTheModel.Tests {
             assert (
                 rollback_store.record_for ("rmd").version ==
                     "0.1.0"
+            );
+            assert (
+                rollback_store.record_for ("rmd").seal_sha256 ==
+                    old_seal
             );
 
             GLib.FileUtils.remove (rollback_root);
@@ -239,6 +249,81 @@ namespace AskTheModel.Tests {
                 !duplicate_store.record_for ("rmd").is_ready ()
             );
             remove_state_root (duplicate_root);
+
+            string sealed_root = new_temp_root ();
+            string seal_sha =
+                "cccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccc";
+            var sealed_store =
+                new RepositoryStateStore (sealed_root);
+
+            sealed_store.set_current (
+                "ewd",
+                sha,
+                "0.1.0",
+                seal_sha
+            );
+
+            var sealed_reloaded =
+                new RepositoryStateStore (sealed_root);
+            assert (
+                sealed_reloaded.load_status ==
+                RepositoryStateLoadStatus.VALID
+            );
+            assert (
+                sealed_reloaded.record_for ("ewd").seal_sha256 ==
+                    seal_sha
+            );
+            remove_state_root (sealed_root);
+
+            string invalid_seal_root = new_temp_root ();
+            var invalid_seal_store =
+                new RepositoryStateStore (invalid_seal_root);
+            bool invalid_seal_rejected = false;
+
+            try {
+                invalid_seal_store.set_current (
+                    "ewd",
+                    sha,
+                    "0.1.0",
+                    "bad-seal"
+                );
+            } catch (RepositoryError error) {
+                invalid_seal_rejected =
+                    error.code ==
+                    RepositoryError.INVALID_RESPONSE;
+            }
+
+            assert (invalid_seal_rejected);
+            remove_state_root (invalid_seal_root);
+
+            string malformed_seal_root = new_temp_root ();
+            GLib.FileUtils.set_contents (
+                state_path (malformed_seal_root),
+                """
+{
+  "schema_version": 1,
+  "repositories": [
+    {
+      "id": "ewd",
+      "sha": "0123456789abcdef0123456789abcdef01234567",
+      "version": "0.1.0",
+      "seal_sha256": "not-a-valid-seal"
+    }
+  ]
+}
+"""
+            );
+
+            var malformed_seal_store =
+                new RepositoryStateStore (malformed_seal_root);
+            assert (
+                malformed_seal_store.load_status ==
+                RepositoryStateLoadStatus.INVALID
+            );
+            assert (
+                !malformed_seal_store.record_for ("ewd").is_ready ()
+            );
+            remove_state_root (malformed_seal_root);
 
             string empty_valid_root = new_temp_root ();
             GLib.FileUtils.set_contents (
