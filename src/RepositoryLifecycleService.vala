@@ -326,17 +326,18 @@ namespace AskTheModel {
                         uint64 pre_sealed_files;
                         uint64 pre_sealed_bytes;
 
+                        integrity_failure = true;
                         if (!RepositoryNative.compute_snapshot_seal (
                                 snapshot,
                                 out pre_snapshot_seal,
                                 out pre_sealed_files,
                                 out pre_sealed_bytes
                             )) {
-                            integrity_failure = true;
                             throw new RepositoryError.NOT_READY (
                                 "Repository snapshot integrity seal could not be computed before indexing."
                             );
                         }
+                        integrity_failure = false;
 
                         if (expected_seal != null &&
                             expected_seal != pre_snapshot_seal) {
@@ -363,17 +364,18 @@ namespace AskTheModel {
                         uint64 post_sealed_files;
                         uint64 post_sealed_bytes;
 
+                        integrity_failure = true;
                         if (!RepositoryNative.compute_snapshot_seal (
                                 snapshot,
                                 out post_snapshot_seal,
                                 out post_sealed_files,
                                 out post_sealed_bytes
                             )) {
-                            integrity_failure = true;
                             throw new RepositoryError.NOT_READY (
                                 "Repository snapshot integrity seal could not be computed after indexing."
                             );
                         }
+                        integrity_failure = false;
 
                         if (pre_snapshot_seal != post_snapshot_seal ||
                             pre_sealed_files != post_sealed_files ||
