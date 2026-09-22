@@ -511,6 +511,115 @@ out:
 }
 
 gboolean
+atm_startup_qualify_deployment_values (
+    const char *flatpak_info_path,
+    const char *expected_application_id,
+    const char *expected_runtime_id,
+    const char *expected_runtime_branch,
+    guint policy_version,
+    gint *out_execution_mode,
+    gboolean *out_platform_qualified,
+    char **out_application_id,
+    char **out_application_ref,
+    char **out_application_commit,
+    char **out_runtime_ref,
+    char **out_runtime_commit,
+    char **out_architecture,
+    char **out_branch,
+    char **out_flatpak_version,
+    char **out_application_extensions,
+    char **out_runtime_extensions,
+    char **out_platform_fingerprint,
+    GError **error
+)
+{
+    AtmDeploymentQualification *qualification = NULL;
+    gboolean ok = FALSE;
+
+    g_return_val_if_fail (out_execution_mode != NULL, FALSE);
+    g_return_val_if_fail (out_platform_qualified != NULL, FALSE);
+    g_return_val_if_fail (out_application_id != NULL, FALSE);
+    g_return_val_if_fail (*out_application_id == NULL, FALSE);
+    g_return_val_if_fail (out_application_ref != NULL, FALSE);
+    g_return_val_if_fail (*out_application_ref == NULL, FALSE);
+    g_return_val_if_fail (out_application_commit != NULL, FALSE);
+    g_return_val_if_fail (*out_application_commit == NULL, FALSE);
+    g_return_val_if_fail (out_runtime_ref != NULL, FALSE);
+    g_return_val_if_fail (*out_runtime_ref == NULL, FALSE);
+    g_return_val_if_fail (out_runtime_commit != NULL, FALSE);
+    g_return_val_if_fail (*out_runtime_commit == NULL, FALSE);
+    g_return_val_if_fail (out_architecture != NULL, FALSE);
+    g_return_val_if_fail (*out_architecture == NULL, FALSE);
+    g_return_val_if_fail (out_branch != NULL, FALSE);
+    g_return_val_if_fail (*out_branch == NULL, FALSE);
+    g_return_val_if_fail (out_flatpak_version != NULL, FALSE);
+    g_return_val_if_fail (*out_flatpak_version == NULL, FALSE);
+    g_return_val_if_fail (out_application_extensions != NULL, FALSE);
+    g_return_val_if_fail (*out_application_extensions == NULL, FALSE);
+    g_return_val_if_fail (out_runtime_extensions != NULL, FALSE);
+    g_return_val_if_fail (*out_runtime_extensions == NULL, FALSE);
+    g_return_val_if_fail (out_platform_fingerprint != NULL, FALSE);
+    g_return_val_if_fail (*out_platform_fingerprint == NULL, FALSE);
+
+    *out_execution_mode = ATM_EXECUTION_MODE_DEVELOPMENT;
+    *out_platform_qualified = FALSE;
+
+    if (!atm_startup_qualify_deployment (
+            flatpak_info_path,
+            expected_application_id,
+            expected_runtime_id,
+            expected_runtime_branch,
+            policy_version,
+            &qualification,
+            error
+        )) {
+        goto out;
+    }
+
+    *out_execution_mode = (gint) qualification->execution_mode;
+    *out_platform_qualified = qualification->platform_qualified;
+    *out_application_id = g_strdup (qualification->application_id);
+    *out_application_ref = g_strdup (qualification->application_ref);
+    *out_application_commit = g_strdup (qualification->application_commit);
+    *out_runtime_ref = g_strdup (qualification->runtime_ref);
+    *out_runtime_commit = g_strdup (qualification->runtime_commit);
+    *out_architecture = g_strdup (qualification->architecture);
+    *out_branch = g_strdup (qualification->branch);
+    *out_flatpak_version = g_strdup (qualification->flatpak_version);
+    *out_application_extensions = qualification->application_extensions != NULL
+        ? g_strjoinv ("\n", qualification->application_extensions)
+        : g_strdup ("");
+    *out_runtime_extensions = qualification->runtime_extensions != NULL
+        ? g_strjoinv ("\n", qualification->runtime_extensions)
+        : g_strdup ("");
+    *out_platform_fingerprint =
+        g_strdup (qualification->platform_fingerprint);
+
+    ok = TRUE;
+
+out:
+    if (!ok) {
+        g_clear_pointer (out_application_id, g_free);
+        g_clear_pointer (out_application_ref, g_free);
+        g_clear_pointer (out_application_commit, g_free);
+        g_clear_pointer (out_runtime_ref, g_free);
+        g_clear_pointer (out_runtime_commit, g_free);
+        g_clear_pointer (out_architecture, g_free);
+        g_clear_pointer (out_branch, g_free);
+        g_clear_pointer (out_flatpak_version, g_free);
+        g_clear_pointer (out_application_extensions, g_free);
+        g_clear_pointer (out_runtime_extensions, g_free);
+        g_clear_pointer (out_platform_fingerprint, g_free);
+    }
+
+    g_clear_pointer (
+        &qualification,
+        atm_deployment_qualification_free
+    );
+    return ok;
+}
+
+gboolean
 atm_startup_qualify_storage_root (
     const char *storage_root,
     AtmStorageQualification *out_qualification,
@@ -702,4 +811,42 @@ out:
     }
 
     return ok;
+}
+
+
+gboolean
+atm_startup_qualify_storage_root_values (
+    const char *storage_root,
+    gboolean *out_qualified,
+    gboolean *out_created,
+    guint32 *out_mode,
+    guint64 *out_owner_uid,
+    GError **error
+)
+{
+    AtmStorageQualification qualification = { 0 };
+
+    g_return_val_if_fail (out_qualified != NULL, FALSE);
+    g_return_val_if_fail (out_created != NULL, FALSE);
+    g_return_val_if_fail (out_mode != NULL, FALSE);
+    g_return_val_if_fail (out_owner_uid != NULL, FALSE);
+
+    *out_qualified = FALSE;
+    *out_created = FALSE;
+    *out_mode = 0;
+    *out_owner_uid = 0;
+
+    if (!atm_startup_qualify_storage_root (
+            storage_root,
+            &qualification,
+            error
+        )) {
+        return FALSE;
+    }
+
+    *out_qualified = qualification.qualified;
+    *out_created = qualification.created;
+    *out_mode = qualification.mode;
+    *out_owner_uid = qualification.owner_uid;
+    return TRUE;
 }
