@@ -49,16 +49,19 @@ namespace AskTheModel {
         public string version { get; construct; }
         public string snapshot_path { get; construct; }
         public string index_path { get; construct; }
+        public string snapshot_seal_sha256 { get; construct; }
 
         public RepositoryInstallResult (
             string version,
             string snapshot_path,
-            string index_path
+            string index_path,
+            string snapshot_seal_sha256
         ) {
             Object (
                 version: version,
                 snapshot_path: snapshot_path,
-                index_path: index_path
+                index_path: index_path,
+                snapshot_seal_sha256: snapshot_seal_sha256
             );
         }
     }
@@ -284,11 +287,27 @@ namespace AskTheModel {
                             );
                         }
 
+                        string snapshot_seal;
+                        uint64 sealed_files;
+                        uint64 sealed_bytes;
+
+                        if (!RepositoryNative.compute_snapshot_seal (
+                                snapshot,
+                                out snapshot_seal,
+                                out sealed_files,
+                                out sealed_bytes
+                            )) {
+                            throw new RepositoryError.STORAGE (
+                                "Repository snapshot integrity seal could not be computed."
+                            );
+                        }
+
                         worker_result =
                             new RepositoryInstallResult (
                                 index_version,
                                 snapshot,
-                                index_path
+                                index_path,
+                                snapshot_seal
                             );
                     } catch (GLib.Error error) {
                         failure = error.message;
@@ -355,6 +374,26 @@ namespace AskTheModel {
                         "Repository %s local state version does not match the validated snapshot.".printf (
                             descriptor.acronym
                         )
+                    );
+                }
+
+                string? expected_seal =
+                    info.local.snapshot_seal_sha256;
+
+                if (expected_seal != null &&
+                    expected_seal != result.snapshot_seal_sha256) {
+                    throw new RepositoryError.NOT_READY (
+                        "Repository %s local snapshot integrity seal does not match persistent state.".printf (
+                            descriptor.acronym
+                        )
+                    );
+                }
+
+                if (expected_seal == null) {
+                    state_store.set_snapshot_seal (
+                        descriptor.id,
+                        sha,
+                        result.snapshot_seal_sha256
                     );
                 }
 
@@ -464,7 +503,8 @@ namespace AskTheModel {
                     state_store.set_current (
                         descriptor.id,
                         sha,
-                        result.version
+                        result.version,
+                        result.snapshot_seal_sha256
                     );
 
                     info.remote_sha = sha;
@@ -472,12 +512,13 @@ namespace AskTheModel {
                     changed++;
 
                     stdout.printf (
-                        "AtM: repository %s ready version=%s sha=%s snapshot=%s index=%s\n",
+                        "AtM: repository %s ready version=%s sha=%s snapshot=%s index=%s seal=%s\n",
                         descriptor.acronym,
                         result.version,
                         sha,
                         result.snapshot_path,
-                        result.index_path
+                        result.index_path,
+                        result.snapshot_seal_sha256
                     );
                 } finally {
                     if (archive_path != null) {
