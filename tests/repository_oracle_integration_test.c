@@ -1,4 +1,5 @@
 #include "repository_reconcile.h"
+#include "snapshot_seal.h"
 
 #include <glib.h>
 #include <glib/gstdio.h>
@@ -256,6 +257,7 @@ reconcile_ready (
 static void
 write_state (
     const char *state_root,
+    const char *snapshot_root,
     const char *sha
 )
 {
@@ -266,15 +268,33 @@ write_state (
             "repository-state.json",
             NULL
         );
+    char *snapshot_seal = NULL;
+    guint64 sealed_files = 0;
+    guint64 sealed_bytes = 0;
+
+    g_assert_true (
+        atm_snapshot_seal_compute (
+            snapshot_root,
+            &snapshot_seal,
+            &sealed_files,
+            &sealed_bytes,
+            &error
+        )
+    );
+    g_assert_no_error (error);
+    g_assert_nonnull (snapshot_seal);
+
     char *contents = g_strdup_printf (
         "{\n"
-        "  \"schema_version\": 1,\n"
+        "  \"schema_version\": 2,\n"
         "  \"repositories\": [\n"
         "    {\"id\": \"ewd\", \"sha\": \"%s\", "
-        "\"version\": \"0.1.0\"}\n"
+        "\"version\": \"0.1.0\", "
+        "\"snapshot_seal_sha256\": \"%s\"}\n"
         "  ]\n"
         "}\n",
-        sha
+        sha,
+        snapshot_seal
     );
 
     g_assert_cmpint (
@@ -293,6 +313,7 @@ write_state (
     g_assert_no_error (error);
 
     g_free (contents);
+    g_free (snapshot_seal);
     g_free (path);
 }
 
@@ -576,7 +597,11 @@ test_production_ready_then_perturbed (void)
     );
     atm_repository_reconcile_result_free (second);
 
-    write_state (state_root, sha);
+    write_state (
+        state_root,
+        snapshot,
+        sha
+    );
 
     /* Independent oracle agrees with the production READY generation. */
     assert_oracle (
