@@ -1,6 +1,6 @@
 {
-  "contract_version": "1.1",
-  "frozen_on": "2026-09-21",
+  "contract_version": "1.2",
+  "frozen_on": "2026-09-22",
   "purpose": "Prevent partial Ask the Model release/version updates by requiring the public version and release date to move atomically across all version-bearing public metadata before Flatpak build or GitHub Release publication.",
   "versioning_basis": {
     "scheme": "Semantic Versioning",
@@ -9,10 +9,10 @@
     "policy": "Release version changes are deliberate. A minor release is appropriate when substantial backward-compatible user-facing functionality is added; patch releases are reserved for compatible corrections."
   },
   "current_public_release": {
-    "version": "0.3.0",
-    "date": "2026-09-21",
+    "version": "0.4.0",
+    "date": "2026-09-22",
     "version_bump_required_now": false,
-    "reason": "The repository-aware GTK path is now user-facing and locally smoke-tested: fixed EWD/CBD/RMD lifecycle, deterministic retrieval, per-chat pinning, grounded citations and exact-SHA provenance materially extend the v0.2 local-chat baseline."
+    "reason": "G-S0 startup qualification, persistent repository-state v2 integrity metadata and deterministic local snapshot-seal verification materially extend the v0.3.0 repository-grounded baseline while preserving backward compatibility."
   },
   "canonical_sources": {
     "version": "meson.build project() version",
@@ -64,6 +64,7 @@
     "repository_grounded_chat": "Repository selection, exact-SHA snapshots, grounded context and inspectable citations are public v0.3.0 functionality and must remain covered by release documentation and regression gates.",
     "patch_documentation": "Documentation-only or compatible bug corrections may use a patch release when deliberately published as a new immutable release.",
     "new_capability": "Substantial new user-facing capability should normally prepare a new 0.x minor release while the public API remains pre-1.0.",
-    "released_versions_are_immutable": true
+    "released_versions_are_immutable": true,
+    "startup_integrity": "v0.4.0 adds offline startup qualification and local snapshot-integrity verification; future changes must preserve the distinction between upstream Git revision identity and AtM local integrity seals."
   }
 }

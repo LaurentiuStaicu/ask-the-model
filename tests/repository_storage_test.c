@@ -5,6 +5,7 @@
 
 #include <string.h>
 #include <sys/stat.h>
+#include <unistd.h>
 
 static void
 remove_tree_best_effort (const char *path)
@@ -268,6 +269,160 @@ test_existing_snapshot_not_overwritten (void)
 }
 
 static void
+test_invalid_snapshot_quarantine (void)
+{
+    char *root = new_data_root ();
+    char *snapshot = atm_repository_snapshot_path (
+        root,
+        "ewd",
+        valid_sha ()
+    );
+    char *file = g_build_filename (
+        snapshot,
+        "tampered.txt",
+        NULL
+    );
+    char *quarantine = NULL;
+    GError *error = NULL;
+
+    g_assert_cmpint (
+        g_mkdir_with_parents (snapshot, 0700),
+        ==,
+        0
+    );
+    g_assert_true (
+        g_file_set_contents (
+            file,
+            "preserve for diagnosis\n",
+            -1,
+            &error
+        )
+    );
+    g_assert_no_error (error);
+
+    g_assert_true (
+        atm_repository_quarantine_snapshot (
+            root,
+            "ewd",
+            valid_sha (),
+            &quarantine,
+            &error
+        )
+    );
+    g_assert_no_error (error);
+    g_assert_nonnull (quarantine);
+    g_assert_false (
+        g_file_test (
+            snapshot,
+            G_FILE_TEST_EXISTS
+        )
+    );
+    g_assert_true (
+        g_file_test (
+            quarantine,
+            G_FILE_TEST_IS_DIR
+        )
+    );
+
+    char *preserved = g_build_filename (
+        quarantine,
+        "tampered.txt",
+        NULL
+    );
+    char *contents = NULL;
+    g_assert_true (
+        g_file_get_contents (
+            preserved,
+            &contents,
+            NULL,
+            &error
+        )
+    );
+    g_assert_no_error (error);
+    g_assert_cmpstr (
+        contents,
+        ==,
+        "preserve for diagnosis\n"
+    );
+
+    g_free (contents);
+    g_free (preserved);
+    g_free (quarantine);
+    g_free (file);
+    g_free (snapshot);
+    remove_tree_best_effort (root);
+    g_free (root);
+}
+
+static void
+test_symlink_snapshot_not_quarantined (void)
+{
+    char *root = new_data_root ();
+    char *target = g_build_filename (
+        root,
+        "target",
+        NULL
+    );
+    char *snapshot = atm_repository_snapshot_path (
+        root,
+        "ewd",
+        valid_sha ()
+    );
+    char *snapshot_parent =
+        g_path_get_dirname (snapshot);
+    char *quarantine = NULL;
+    GError *error = NULL;
+
+    g_assert_cmpint (
+        g_mkdir_with_parents (
+            snapshot_parent,
+            0700
+        ),
+        ==,
+        0
+    );
+    g_assert_cmpint (
+        g_mkdir (target, 0700),
+        ==,
+        0
+    );
+    g_assert_cmpint (
+        symlink (target, snapshot),
+        ==,
+        0
+    );
+
+    g_assert_false (
+        atm_repository_quarantine_snapshot (
+            root,
+            "ewd",
+            valid_sha (),
+            &quarantine,
+            &error
+        )
+    );
+    g_assert_error (
+        error,
+        ATM_STORAGE_ERROR,
+        ATM_STORAGE_ERROR_INVALID_SNAPSHOT
+    );
+    g_assert_null (quarantine);
+    g_assert_true (
+        g_file_test (
+            snapshot,
+            G_FILE_TEST_IS_DIR
+        )
+    );
+
+    g_clear_error (&error);
+    g_free (snapshot_parent);
+    g_free (snapshot);
+    g_free (target);
+    remove_tree_best_effort (root);
+    g_free (root);
+}
+
+static void
 test_wrong_staging_path_rejected (void)
 {
     char *root = new_data_root ();
@@ -510,6 +665,14 @@ main (int argc, char **argv)
     g_test_add_func (
         "/storage/distinct-snapshots-coexist",
         test_distinct_snapshots_coexist
+    );
+    g_test_add_func (
+        "/storage/quarantine-invalid-snapshot",
+        test_invalid_snapshot_quarantine
+    );
+    g_test_add_func (
+        "/storage/quarantine-rejects-symlink",
+        test_symlink_snapshot_not_quarantined
     );
     g_test_add_func (
         "/storage/wrong-staging-rejected",

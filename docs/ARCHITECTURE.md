@@ -1,10 +1,10 @@
 # Application architecture boundary
 
-## Released state — v0.3.0
+## Released state — v0.4.0
 
-AtM v0.3.0 provides a functional GTK 4 / Granite local-chat application, desktop integration, AppStream metadata, elementary OS 8 Flatpak packaging, an implemented local AI-provider layer and the first public repository-grounded EWD/CBD/RMD conversation path.
+AtM v0.4.0 provides a functional GTK 4 / Granite local-chat application, desktop integration, AppStream metadata, elementary OS 8 Flatpak packaging, an implemented local AI-provider layer, repository-grounded EWD/CBD/RMD conversation paths and a non-visual startup qualification/snapshot-integrity layer.
 
-Repository selection, validated immutable snapshots, deterministic retrieval, per-chat repository/model pinning, grounded citations and on-demand provenance inspection are part of the v0.3.0 release.
+Repository selection, validated exact-SHA snapshots, deterministic retrieval, per-chat repository/model pinning, grounded citations and on-demand provenance inspection remain part of the released capability boundary; v0.4.0 additionally qualifies the effective deployment/storage state and verifies local snapshot integrity before repository readiness is accepted.
 
 ## Repository-aware implementation — released in v0.3.0
 
@@ -67,7 +67,7 @@ Conversation state is not persisted across application restarts.
 
 ### User interface
 
-The v0.3.0 UI provides:
+The v0.4.0 UI provides:
 
 - elementary-style GTK/Granite shell and system color-scheme following;
 - separate AI-model and multi-repository selectors with explicit refresh/download/update lifecycle controls;
@@ -88,6 +88,24 @@ On X11 sessions with no explicit `GSK_RENDERER` and no Wayland display, AtM sele
 Implemented in the repository lifecycle, index, query, ranking, normalization, scope and router modules under `src/`.
 
 The backend preserves immutable snapshot identity and returns evidence objects rather than generated scientific conclusions. The scientific repositories remain canonical; AtM does not rewrite their state or convert AI-generated text into canonical project data.
+
+### G-S0 startup qualification and local snapshot integrity — released in v0.4.0
+
+v0.4.0 adds a non-visual startup qualification layer above the repository-grounded path introduced in v0.3.0.
+
+G-S0 qualifies the effective Flatpak deployment identity, the dedicated `~/Ask the Model` storage boundary and persisted repository state before local repository readiness is accepted. Startup reconciliation is offline and does not perform repository Refresh or Download/Update.
+
+Validated repository snapshots also receive a deterministic local `snapshot seal v1`. The seal is a SHA-256 comparison key over sorted repository-relative paths, semantic regular/executable file mode, file size and per-file SHA-256 content hashes. Timestamps, UID and GID are excluded so irrelevant filesystem metadata changes do not change the seal.
+
+The local seal is deliberately separate from the upstream Git commit SHA. The exact Git SHA remains the repository revision identity; the seal answers only whether the local snapshot content still matches the content previously accepted by AtM.
+
+The G-S0 installation result is authoritative for repository runtime use. Non-empty repository grounding and repository mutation remain fail-closed until platform and storage qualification have passed. Ordinary zero-repository chat remains independent, and explicit repository Refresh remains a separate read-only action.
+
+G-O0 is an independent verification-only oracle used by tests and diagnostics. It parses persistent state and repository artifacts independently, recomputes schema-v2 snapshot seals without linking the production seal implementation, validates SQLite/index/source provenance directly and rejects controlled post-READY perturbations in a separate process. It performs no network or repair action and does not become a second runtime READY authority.
+
+Persistent repository state evolves backward-compatibly from schema v1 to schema v2. Existing v1 state remains valid with no seal. A seal may be enrolled only after strict local snapshot/version/index validation succeeds. Once a seal exists, a mismatch makes the repository locally unusable until an explicit repository lifecycle action replaces or repairs the snapshot; G-S0 does not silently repin content.
+
+Both startup reconciliation and normal repository preparation use pre/post seal checks around index validation/rebuild so a snapshot that changes while it is being prepared cannot become READY.
 
 ### R4 grounding and citation backend
 
@@ -125,7 +143,7 @@ Responsible for future durable local conversation storage, conversation navigati
 
 Responsible for future provider endpoint configuration, preferred AI model and application-level preferences. Repository source snapshots use the fixed visible location `~/Ask the Model/Repositories`; derived indexes and application state remain in AtM's private XDG cache/state locations. Arbitrary repository storage locations are not a v1 setting.
 
-## Explicitly outside the v0.3.0 boundary
+## Explicitly outside the v0.4.0 boundary
 
 - persistent conversation storage across application restarts;
 - arbitrary unreviewed repository origins beyond the fixed EWD/CBD/RMD catalog;
@@ -165,4 +183,4 @@ The repository-aware architecture and staged acceptance gates are defined in:
 - `docs/REPOSITORY_RETRIEVAL_ARCHITECTURE.md`;
 - `docs/REPOSITORY_RETRIEVAL_ACCEPTANCE.md`.
 
-Those documents remain the governing design/acceptance contracts. These documents remain the governing contracts for the repository-grounded functionality released in v0.3.0 and for later extensions.
+Those documents remain the governing design/acceptance contracts for the repository-grounded functionality introduced in v0.3.0, the v0.4.0 startup/integrity hardening and later extensions.

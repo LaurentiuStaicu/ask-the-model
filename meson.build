@@ -2,7 +2,7 @@ project(
   'io.github.laurentiustaicu.ask_the_model',
   'vala',
   'c',
-  version: '0.3.0',
+  version: '0.4.0',
   meson_version: '>= 1.0.0',
   license: 'MIT'
 )
@@ -37,12 +37,18 @@ executable(
     'src/RepositoryNative.vala',
     'src/RepositorySelection.vala',
     'src/RepositoryState.vala',
+    'src/StartupQualificationRecord.vala',
+    'src/StartupQualificationNative.vapi',
+    'src/StartupQualificationService.vala',
+    'src/startup_qualification.c',
+    'src/snapshot_seal.c',
     'src/RepositoryLifecycleService.vala',
     'src/ConversationGrounding.vala',
     'src/ConversationSession.vala',
     'src/cff_version.c',
     'src/archive_extract.c',
     'src/repository_manifest.c',
+    'src/repository_reconcile.c',
     'src/repository_storage.c',
     'src/repository_ingest.c',
     'src/repository_ui_bridge.c',
@@ -78,6 +84,26 @@ executable(
   install: true
 )
 
+repository_store_oracle = executable(
+  'repository-store-oracle',
+  'tests/repository_store_oracle.c',
+  dependencies: [
+    glib_dep,
+    json_glib_dep,
+    sqlite_dep,
+    yaml_dep
+  ],
+  install: false
+)
+
+test(
+  'repository-store-oracle-core',
+  repository_store_oracle,
+  args: [
+    '--self-test'
+  ]
+)
+
 repository_platform_probe = executable(
   'repository-platform-probe',
   'tests/repository_platform_probe.c',
@@ -96,6 +122,114 @@ test(
   env: {
     'ATM_FLATPAK_MANIFEST': meson.project_source_root() / 'io.github.laurentiustaicu.ask_the_model.yml'
   }
+)
+
+
+startup_qualification_test = executable(
+  'startup-qualification-test',
+  [
+    'src/startup_qualification.c',
+    'tests/startup_qualification_test.c'
+  ],
+  include_directories: include_directories('src'),
+  dependencies: [
+    glib_dep
+  ],
+  install: false
+)
+
+test(
+  'startup-qualification',
+  startup_qualification_test
+)
+
+
+snapshot_seal_test = executable(
+  'snapshot-seal-test',
+  [
+    'src/snapshot_seal.c',
+    'tests/snapshot_seal_test.c'
+  ],
+  include_directories: include_directories('src'),
+  dependencies: [
+    glib_dep
+  ],
+  install: false
+)
+
+test(
+  'snapshot-seal',
+  snapshot_seal_test
+)
+
+
+startup_qualification_record_test = executable(
+  'startup-qualification-record-test',
+  [
+    'src/RepositoryService.vala',
+    'src/RepositoryNative.vala',
+    'src/StartupQualificationRecord.vala',
+    'src/cff_version.c',
+    'tests/startup_qualification_record_test.vala'
+  ],
+  include_directories: include_directories('src'),
+  dependencies: [
+    glib_dep,
+    soup_dep,
+    json_glib_dep
+  ],
+  link_args: [
+    '-lyaml'
+  ],
+  install: false
+)
+
+test(
+  'startup-qualification-record',
+  startup_qualification_record_test
+)
+
+
+startup_qualification_service_test = executable(
+  'startup-qualification-service-test',
+  [
+    'src/RepositoryService.vala',
+    'src/RepositoryNative.vala',
+    'src/RepositoryState.vala',
+    'src/StartupQualificationRecord.vala',
+    'src/StartupQualificationNative.vapi',
+    'src/StartupQualificationService.vala',
+    'src/startup_qualification.c',
+    'src/cff_version.c',
+    'src/repository_manifest.c',
+    'src/repository_sources.c',
+    'src/markdown_sections.c',
+    'src/csv_table.c',
+    'src/structured_json.c',
+    'src/retrieval_index.c',
+    'src/retrieval_index_lifecycle.c',
+    'src/repository_reconcile.c',
+    'src/snapshot_seal.c',
+    'tests/startup_qualification_service_test.vala',
+    resources
+  ],
+  include_directories: include_directories('src'),
+  dependencies: [
+    glib_dep,
+    gio_dep,
+    soup_dep,
+    json_glib_dep,
+    sqlite_dep
+  ],
+  link_args: [
+    '-lyaml'
+  ],
+  install: false
+)
+
+test(
+  'startup-qualification-service',
+  startup_qualification_service_test
 )
 
 repository_catalog_test = executable(
@@ -369,6 +503,73 @@ retrieval_index_lifecycle_test = executable(
 test(
   'retrieval-index-lifecycle',
   retrieval_index_lifecycle_test
+)
+
+
+repository_reconcile_test = executable(
+  'repository-reconcile-test',
+  [
+    'src/cff_version.c',
+    'src/repository_manifest.c',
+    'src/repository_sources.c',
+    'src/markdown_sections.c',
+    'src/csv_table.c',
+    'src/structured_json.c',
+    'src/retrieval_index.c',
+    'src/retrieval_index_lifecycle.c',
+    'src/repository_reconcile.c',
+    'tests/repository_reconcile_test.c',
+    resources
+  ],
+  include_directories: include_directories('src'),
+  dependencies: [
+    glib_dep,
+    gio_dep,
+    json_glib_dep,
+    sqlite_dep,
+    yaml_dep
+  ],
+  install: false
+)
+
+test(
+  'repository-reconcile',
+  repository_reconcile_test
+)
+
+repository_oracle_integration_test = executable(
+  'repository-oracle-integration-test',
+  [
+    'src/cff_version.c',
+    'src/repository_manifest.c',
+    'src/repository_sources.c',
+    'src/markdown_sections.c',
+    'src/csv_table.c',
+    'src/structured_json.c',
+    'src/retrieval_index.c',
+    'src/retrieval_index_lifecycle.c',
+    'src/repository_reconcile.c',
+    'src/snapshot_seal.c',
+    'tests/repository_oracle_integration_test.c',
+    resources
+  ],
+  include_directories: include_directories('src'),
+  dependencies: [
+    glib_dep,
+    gio_dep,
+    json_glib_dep,
+    sqlite_dep,
+    yaml_dep
+  ],
+  install: false
+)
+
+test(
+  'repository-oracle-production-divergence',
+  repository_oracle_integration_test,
+  env: {
+    'ATM_REPOSITORY_ORACLE': meson.current_build_dir() / 'repository-store-oracle'
+  }
 )
 
 retrieval_query_test = executable(
@@ -688,6 +889,7 @@ repository_lifecycle_service_test = executable(
     'src/repository_manifest.c',
     'src/repository_storage.c',
     'src/repository_ingest.c',
+    'src/snapshot_seal.c',
     'src/repository_ui_bridge.c',
     'src/repository_sources.c',
     'src/markdown_sections.c',

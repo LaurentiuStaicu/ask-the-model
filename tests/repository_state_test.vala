@@ -9,6 +9,18 @@ namespace AskTheModel.Tests {
         }
     }
 
+    private static string state_path (string root) {
+        return GLib.Path.build_filename (
+            root,
+            "repository-state.json"
+        );
+    }
+
+    private static void remove_state_root (string root) {
+        GLib.FileUtils.remove (state_path (root));
+        GLib.DirUtils.remove (root);
+    }
+
     public static int main (string[] args) {
         string root = new_temp_root ();
         string sha =
@@ -16,6 +28,10 @@ namespace AskTheModel.Tests {
 
         try {
             var store = new RepositoryStateStore (root);
+            assert (
+                store.load_status ==
+                RepositoryStateLoadStatus.ABSENT
+            );
             assert (!store.record_for ("rmd").is_ready ());
 
             store.set_current (
@@ -24,6 +40,10 @@ namespace AskTheModel.Tests {
                 "0.1.0"
             );
 
+            assert (
+                store.load_status ==
+                RepositoryStateLoadStatus.VALID
+            );
             assert (store.record_for ("rmd").is_ready ());
             assert (
                 store.record_for ("rmd").current_sha == sha
@@ -33,6 +53,10 @@ namespace AskTheModel.Tests {
             );
 
             var reloaded = new RepositoryStateStore (root);
+            assert (
+                reloaded.load_status ==
+                RepositoryStateLoadStatus.VALID
+            );
             assert (reloaded.record_for ("rmd").is_ready ());
             assert (
                 reloaded.record_for ("rmd").current_sha == sha
@@ -40,6 +64,69 @@ namespace AskTheModel.Tests {
             assert (
                 reloaded.record_for ("rmd").version == "0.1.0"
             );
+            assert (
+                reloaded.loaded_schema_version == 2
+            );
+            assert (
+                reloaded.record_for ("rmd").snapshot_seal_sha256 ==
+                null
+            );
+
+            string seal =
+                "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa";
+            reloaded.set_snapshot_seal (
+                "rmd",
+                sha,
+                seal
+            );
+            assert (
+                reloaded.record_for ("rmd").snapshot_seal_sha256 ==
+                seal
+            );
+
+            var sealed_reloaded =
+                new RepositoryStateStore (root);
+            assert (
+                sealed_reloaded.loaded_schema_version == 2
+            );
+            assert (
+                sealed_reloaded.record_for (
+                    "rmd"
+                ).snapshot_seal_sha256 == seal
+            );
+
+            bool wrong_seal_sha_rejected = false;
+            try {
+                sealed_reloaded.set_snapshot_seal (
+                    "rmd",
+                    "1111111111111111111111111111111111111111",
+                    seal
+                );
+            } catch (RepositoryError error) {
+                wrong_seal_sha_rejected =
+                    error.code ==
+                    RepositoryError.INVALID_RESPONSE;
+            }
+            assert (wrong_seal_sha_rejected);
+            assert (
+                sealed_reloaded.record_for (
+                    "rmd"
+                ).snapshot_seal_sha256 == seal
+            );
+
+            bool invalid_seal_rejected = false;
+            try {
+                sealed_reloaded.set_snapshot_seal (
+                    "rmd",
+                    sha,
+                    "invalid"
+                );
+            } catch (RepositoryError error) {
+                invalid_seal_rejected =
+                    error.code ==
+                    RepositoryError.INVALID_RESPONSE;
+            }
+            assert (invalid_seal_rejected);
 
             bool rejected = false;
             try {
@@ -55,12 +142,10 @@ namespace AskTheModel.Tests {
             }
 
             assert (rejected);
+
             string rollback_root = new_temp_root ();
             string rollback_state_file =
-                GLib.Path.build_filename (
-                    rollback_root,
-                    "repository-state.json"
-                );
+                state_path (rollback_root);
             string old_sha =
                 "1111111111111111111111111111111111111111";
             string new_sha =
@@ -105,17 +190,253 @@ namespace AskTheModel.Tests {
 
             GLib.FileUtils.remove (rollback_root);
 
+            string invalid_root = new_temp_root ();
+            string invalid_state = state_path (invalid_root);
+            string malformed = "{ this is not json";
+            GLib.FileUtils.set_contents (
+                invalid_state,
+                malformed
+            );
+
+            var invalid_store =
+                new RepositoryStateStore (invalid_root);
+            assert (
+                invalid_store.load_status ==
+                RepositoryStateLoadStatus.INVALID
+            );
+            assert (
+                !invalid_store.record_for ("ewd").is_ready ()
+            );
+            assert (
+                !invalid_store.record_for ("cbd").is_ready ()
+            );
+            assert (
+                !invalid_store.record_for ("rmd").is_ready ()
+            );
+
+            bool invalid_overwrite_rejected = false;
+            try {
+                invalid_store.set_current (
+                    "rmd",
+                    sha,
+                    "0.1.0"
+                );
+            } catch (RepositoryError error) {
+                invalid_overwrite_rejected =
+                    error.code == RepositoryError.STORAGE;
+            }
+
+            assert (invalid_overwrite_rejected);
+
+            string preserved;
+            GLib.FileUtils.get_contents (
+                invalid_state,
+                out preserved
+            );
+            assert (preserved == malformed);
+            remove_state_root (invalid_root);
+
+            string partial_root = new_temp_root ();
+            string partial_state = state_path (partial_root);
+            GLib.FileUtils.set_contents (
+                partial_state,
+                """
+{
+  "schema_version": 1,
+  "repositories": [
+    {
+      "id": "rmd",
+      "sha": "0123456789abcdef0123456789abcdef01234567",
+      "version": "0.1.0"
+    },
+    {
+      "id": "unknown",
+      "sha": "1111111111111111111111111111111111111111",
+      "version": "0.1.0"
+    }
+  ]
+}
+"""
+            );
+
+            var partial_store =
+                new RepositoryStateStore (partial_root);
+            assert (
+                partial_store.load_status ==
+                RepositoryStateLoadStatus.INVALID
+            );
+            assert (
+                !partial_store.record_for ("rmd").is_ready ()
+            );
+            remove_state_root (partial_root);
+
+            string duplicate_root = new_temp_root ();
+            GLib.FileUtils.set_contents (
+                state_path (duplicate_root),
+                """
+{
+  "schema_version": 1,
+  "repositories": [
+    {
+      "id": "rmd",
+      "sha": "0123456789abcdef0123456789abcdef01234567",
+      "version": "0.1.0"
+    },
+    {
+      "id": "rmd",
+      "sha": "1111111111111111111111111111111111111111",
+      "version": "0.1.0"
+    }
+  ]
+}
+"""
+            );
+
+            var duplicate_store =
+                new RepositoryStateStore (duplicate_root);
+            assert (
+                duplicate_store.load_status ==
+                RepositoryStateLoadStatus.INVALID
+            );
+            assert (
+                !duplicate_store.record_for ("rmd").is_ready ()
+            );
+            remove_state_root (duplicate_root);
+
+            string legacy_root = new_temp_root ();
+            GLib.FileUtils.set_contents (
+                state_path (legacy_root),
+                """
+{
+  "schema_version": 1,
+  "repositories": [
+    {
+      "id": "rmd",
+      "sha": "0123456789abcdef0123456789abcdef01234567",
+      "version": "0.1.0"
+    }
+  ]
+}
+"""
+            );
+
+            var legacy =
+                new RepositoryStateStore (legacy_root);
+            assert (
+                legacy.load_status ==
+                RepositoryStateLoadStatus.VALID
+            );
+            assert (legacy.loaded_schema_version == 1);
+            assert (legacy.record_for ("rmd").is_ready ());
+            assert (
+                legacy.record_for (
+                    "rmd"
+                ).snapshot_seal_sha256 == null
+            );
+
+            legacy.set_snapshot_seal (
+                "rmd",
+                sha,
+                seal
+            );
+            assert (legacy.loaded_schema_version == 2);
+
+            var migrated =
+                new RepositoryStateStore (legacy_root);
+            assert (
+                migrated.load_status ==
+                RepositoryStateLoadStatus.VALID
+            );
+            assert (migrated.loaded_schema_version == 2);
+            assert (
+                migrated.record_for (
+                    "rmd"
+                ).snapshot_seal_sha256 == seal
+            );
+            remove_state_root (legacy_root);
+
+            string invalid_v2_root = new_temp_root ();
+            GLib.FileUtils.set_contents (
+                state_path (invalid_v2_root),
+                """
+{
+  "schema_version": 2,
+  "repositories": [
+    {
+      "id": "rmd",
+      "sha": "0123456789abcdef0123456789abcdef01234567",
+      "version": "0.1.0",
+      "snapshot_seal_sha256": "bad"
+    }
+  ]
+}
+"""
+            );
+
+            var invalid_v2 =
+                new RepositoryStateStore (invalid_v2_root);
+            assert (
+                invalid_v2.load_status ==
+                RepositoryStateLoadStatus.INVALID
+            );
+            assert (
+                !invalid_v2.record_for ("rmd").is_ready ()
+            );
+            remove_state_root (invalid_v2_root);
+
+            string missing_seal_v2_root = new_temp_root ();
+            GLib.FileUtils.set_contents (
+                state_path (missing_seal_v2_root),
+                """
+{
+  "schema_version": 2,
+  "repositories": [
+    {
+      "id": "rmd",
+      "sha": "0123456789abcdef0123456789abcdef01234567",
+      "version": "0.1.0"
+    }
+  ]
+}
+"""
+            );
+
+            var missing_seal_v2 =
+                new RepositoryStateStore (
+                    missing_seal_v2_root
+                );
+            assert (
+                missing_seal_v2.load_status ==
+                RepositoryStateLoadStatus.INVALID
+            );
+            remove_state_root (missing_seal_v2_root);
+
+            string empty_valid_root = new_temp_root ();
+            GLib.FileUtils.set_contents (
+                state_path (empty_valid_root),
+                """
+{
+  "schema_version": 1,
+  "repositories": []
+}
+"""
+            );
+
+            var empty_valid =
+                new RepositoryStateStore (empty_valid_root);
+            assert (
+                empty_valid.load_status ==
+                RepositoryStateLoadStatus.VALID
+            );
+            assert (!empty_valid.record_for ("rmd").is_ready ());
+            remove_state_root (empty_valid_root);
+
         } catch (GLib.Error error) {
             stderr.printf ("%s\n", error.message);
             return 1;
         }
 
-        string state_file = GLib.Path.build_filename (
-            root,
-            "repository-state.json"
-        );
-        GLib.FileUtils.remove (state_file);
-        GLib.DirUtils.remove (root);
+        remove_state_root (root);
         return 0;
     }
 }
