@@ -5,6 +5,12 @@
 G_BEGIN_DECLS
 
 typedef enum {
+    ATM_REPOSITORY_SNAPSHOT_ROOT_MISSING,
+    ATM_REPOSITORY_SNAPSHOT_ROOT_INVALID,
+    ATM_REPOSITORY_SNAPSHOT_ROOT_DIRECTORY
+} AtmRepositorySnapshotRootStatus;
+
+typedef enum {
     ATM_REPOSITORY_RECONCILE_SNAPSHOT_MISSING,
     ATM_REPOSITORY_RECONCILE_SNAPSHOT_INVALID,
     ATM_REPOSITORY_RECONCILE_INDEX_ERROR,
@@ -28,6 +34,12 @@ typedef struct {
     char *repository_version;
     char *index_path;
 } AtmRepositoryReconcileResult;
+
+gboolean atm_repository_probe_snapshot_root (
+    const char *snapshot_root,
+    AtmRepositorySnapshotRootStatus *out_status,
+    GError **error
+);
 
 gboolean atm_repository_reconcile_local (
     const char *cache_root,
