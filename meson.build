@@ -37,6 +37,7 @@ executable(
     'src/RepositoryNative.vala',
     'src/RepositorySelection.vala',
     'src/RepositoryState.vala',
+    'src/startup_qualification.c',
     'src/RepositoryLifecycleService.vala',
     'src/ConversationGrounding.vala',
     'src/ConversationSession.vala',
@@ -96,6 +97,25 @@ test(
   env: {
     'ATM_FLATPAK_MANIFEST': meson.project_source_root() / 'io.github.laurentiustaicu.ask_the_model.yml'
   }
+)
+
+
+startup_qualification_test = executable(
+  'startup-qualification-test',
+  [
+    'src/startup_qualification.c',
+    'tests/startup_qualification_test.c'
+  ],
+  include_directories: include_directories('src'),
+  dependencies: [
+    glib_dep
+  ],
+  install: false
+)
+
+test(
+  'startup-qualification',
+  startup_qualification_test
 )
 
 repository_catalog_test = executable(
