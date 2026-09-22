@@ -41,6 +41,7 @@ executable(
     'src/StartupQualificationNative.vapi',
     'src/StartupQualificationService.vala',
     'src/startup_qualification.c',
+    'src/snapshot_seal.c',
     'src/RepositoryLifecycleService.vala',
     'src/ConversationGrounding.vala',
     'src/ConversationSession.vala',
@@ -120,6 +121,25 @@ startup_qualification_test = executable(
 test(
   'startup-qualification',
   startup_qualification_test
+)
+
+
+snapshot_seal_test = executable(
+  'snapshot-seal-test',
+  [
+    'src/snapshot_seal.c',
+    'tests/snapshot_seal_test.c'
+  ],
+  include_directories: include_directories('src'),
+  dependencies: [
+    glib_dep
+  ],
+  install: false
+)
+
+test(
+  'snapshot-seal',
+  snapshot_seal_test
 )
 
 
