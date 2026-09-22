@@ -48,6 +48,7 @@ executable(
     'src/snapshot_seal.c',
     'src/repository_storage.c',
     'src/repository_ingest.c',
+    'src/snapshot_seal.c',
     'src/repository_ui_bridge.c',
     'src/retrieval_index.c',
     'src/retrieval_index_lifecycle.c',
