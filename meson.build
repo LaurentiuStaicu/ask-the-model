@@ -149,8 +149,10 @@ startup_qualification_service_test = executable(
     gio_dep,
     soup_dep,
     json_glib_dep,
-    sqlite_dep,
-    yaml_dep
+    sqlite_dep
+  ],
+  link_args: [
+    '-lyaml'
   ],
   install: false
 )
