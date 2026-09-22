@@ -1,10 +1,10 @@
 # Application architecture boundary
 
-## Released state — v0.3.0
+## Released state — v0.4.0
 
-AtM v0.3.0 provides a functional GTK 4 / Granite local-chat application, desktop integration, AppStream metadata, elementary OS 8 Flatpak packaging, an implemented local AI-provider layer and the first public repository-grounded EWD/CBD/RMD conversation path.
+AtM v0.4.0 provides a functional GTK 4 / Granite local-chat application, desktop integration, AppStream metadata, elementary OS 8 Flatpak packaging, an implemented local AI-provider layer, repository-grounded EWD/CBD/RMD conversation paths and a non-visual startup qualification/snapshot-integrity layer.
 
-Repository selection, validated immutable snapshots, deterministic retrieval, per-chat repository/model pinning, grounded citations and on-demand provenance inspection are part of the v0.3.0 release.
+Repository selection, validated exact-SHA snapshots, deterministic retrieval, per-chat repository/model pinning, grounded citations and on-demand provenance inspection remain part of the released capability boundary; v0.4.0 additionally qualifies the effective deployment/storage state and verifies local snapshot integrity before repository readiness is accepted.
 
 ## Repository-aware implementation — released in v0.3.0
 
@@ -67,7 +67,7 @@ Conversation state is not persisted across application restarts.
 
 ### User interface
 
-The v0.3.0 UI provides:
+The v0.4.0 UI provides:
 
 - elementary-style GTK/Granite shell and system color-scheme following;
 - separate AI-model and multi-repository selectors with explicit refresh/download/update lifecycle controls;
@@ -89,9 +89,9 @@ Implemented in the repository lifecycle, index, query, ranking, normalization, s
 
 The backend preserves immutable snapshot identity and returns evidence objects rather than generated scientific conclusions. The scientific repositories remain canonical; AtM does not rewrite their state or convert AI-generated text into canonical project data.
 
-### Development hardening — G-S0 startup qualification and local snapshot integrity
+### G-S0 startup qualification and local snapshot integrity — released in v0.4.0
 
-The current development line adds a non-visual startup qualification layer above the released v0.3.0 repository path. This work is not yet a release claim.
+v0.4.0 adds a non-visual startup qualification layer above the repository-grounded path introduced in v0.3.0.
 
 G-S0 qualifies the effective Flatpak deployment identity, the dedicated `~/Ask the Model` storage boundary and persisted repository state before local repository readiness is accepted. Startup reconciliation is offline and does not perform repository Refresh or Download/Update.
 
@@ -139,7 +139,7 @@ Responsible for future durable local conversation storage, conversation navigati
 
 Responsible for future provider endpoint configuration, preferred AI model and application-level preferences. Repository source snapshots use the fixed visible location `~/Ask the Model/Repositories`; derived indexes and application state remain in AtM's private XDG cache/state locations. Arbitrary repository storage locations are not a v1 setting.
 
-## Explicitly outside the v0.3.0 boundary
+## Explicitly outside the v0.4.0 boundary
 
 - persistent conversation storage across application restarts;
 - arbitrary unreviewed repository origins beyond the fixed EWD/CBD/RMD catalog;
@@ -179,4 +179,4 @@ The repository-aware architecture and staged acceptance gates are defined in:
 - `docs/REPOSITORY_RETRIEVAL_ARCHITECTURE.md`;
 - `docs/REPOSITORY_RETRIEVAL_ACCEPTANCE.md`.
 
-Those documents remain the governing design/acceptance contracts. These documents remain the governing contracts for the repository-grounded functionality released in v0.3.0 and for later extensions.
+Those documents remain the governing design/acceptance contracts for the repository-grounded functionality introduced in v0.3.0, the v0.4.0 startup/integrity hardening and later extensions.
