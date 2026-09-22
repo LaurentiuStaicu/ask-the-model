@@ -44,6 +44,8 @@ The first Send freezes model/repository identity for that chat.
 - snapshot validation;
 - deterministic local snapshot-seal computation;
 - stable pre/post seal checks around index preparation;
+- integrity-invalid runtime state and same-SHA explicit repair;
+- diagnostic quarantine of invalid real-directory snapshots before replacement;
 - index construction/validation;
 - conversation grounding preparation.
 
@@ -87,6 +89,8 @@ Changes should preserve the following unless a deliberate architecture change is
 10. **Git SHA and local seal are distinct.** The upstream Git commit SHA is revision provenance; the snapshot seal only detects local content change.
 11. **Seal before trust.** A previously sealed snapshot must match its persistent seal before index rebuild/reuse or conversation grounding.
 12. **Stable preparation.** Snapshot identity must remain stable across index validation/rebuild before persistence or grounding.
+13. **Explicit repair, never silent repin.** A persistent seal mismatch activates repair; same-SHA repair must download the exact archive before quarantining local content and must not replace the expected seal merely because local files changed.
+14. **Quarantine is diagnostic.** Invalid real-directory snapshots may be atomically renamed for diagnosis during explicit repair; symlink/non-directory snapshot paths are never followed as repair sources.
 
 ## Extension points
 
