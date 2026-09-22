@@ -189,6 +189,7 @@ startup_qualification_service_test = executable(
     'src/retrieval_index.c',
     'src/retrieval_index_lifecycle.c',
     'src/repository_reconcile.c',
+    'src/snapshot_seal.c',
     'tests/startup_qualification_service_test.vala',
     resources
   ],
