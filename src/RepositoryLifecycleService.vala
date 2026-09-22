@@ -332,7 +332,8 @@ namespace AskTheModel {
                                 out pre_sealed_files,
                                 out pre_sealed_bytes
                             )) {
-                            throw new RepositoryError.STORAGE (
+                            integrity_failure = true;
+                            throw new RepositoryError.NOT_READY (
                                 "Repository snapshot integrity seal could not be computed before indexing."
                             );
                         }
@@ -368,7 +369,8 @@ namespace AskTheModel {
                                 out post_sealed_files,
                                 out post_sealed_bytes
                             )) {
-                            throw new RepositoryError.STORAGE (
+                            integrity_failure = true;
+                            throw new RepositoryError.NOT_READY (
                                 "Repository snapshot integrity seal could not be computed after indexing."
                             );
                         }
