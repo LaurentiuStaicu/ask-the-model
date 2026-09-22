@@ -50,7 +50,8 @@ v0.4.0 provides:
 - fail-closed qualification of the dedicated `~/Ask the Model` storage boundary;
 - durable per-startup qualification records separated from volatile AI-provider state;
 - backward-compatible repository-state schema v2 with optional/enrolled local snapshot seals;
-- deterministic local snapshot-integrity verification before repository grounding and around index validation/rebuild.
+- deterministic local snapshot-integrity verification before repository grounding and around index validation/rebuild;
+- explicit same-SHA recovery through the existing Download/Update action, with invalid real-directory snapshots quarantined for diagnosis before a revalidated exact-SHA replacement is promoted.
 
 ## Repository lifecycle contract
 
@@ -74,7 +75,7 @@ A failed refresh/update must not:
 - destroy the last valid snapshot;
 - silently change the snapshot pinned to an active chat.
 
-Validated snapshots are treated as immutable. The exact Git SHA remains the upstream revision identity; the local snapshot seal is a separate deterministic tamper-detection key. Retrieval indexes remain regenerable cache data.
+Validated snapshots are treated as immutable. The exact Git SHA remains the upstream revision identity; the local snapshot seal is a separate deterministic tamper-detection key. Retrieval indexes remain regenerable cache data. If a sealed snapshot becomes locally invalid, AtM marks Download as required; for the same remote SHA it obtains the exact archive first, quarantines the invalid real directory without following symlinks, then validates and promotes the replacement.
 
 ## Conversation and provenance contract
 
@@ -93,7 +94,7 @@ Temporary model-visible source labels are resolved by AtM into persistent proven
 
 ## Verification for v0.4.0
 
-The v0.4.0 development stack passes the Flatpak/Meson CI gate for startup qualification, repository-state migration, deterministic snapshot seals, G-S0 seal ordering, lifecycle seal enrollment/tamper rejection and stable pre/post snapshot identity across index preparation. The repository-grounded GTK interaction baseline remains inherited from the locally smoke-tested v0.3.0 release on elementary OS 8 / GTK 4.14.
+The v0.4.0 development stack passes the Flatpak/Meson CI gate for startup qualification, repository-state migration, deterministic snapshot seals, G-S0 seal ordering, lifecycle seal enrollment/tamper rejection, explicit invalid-snapshot quarantine and stable pre/post snapshot identity across index preparation. The repository-grounded GTK interaction baseline remains inherited from the locally smoke-tested v0.3.0 release on elementary OS 8 / GTK 4.14.
 
 Verified paths include:
 
