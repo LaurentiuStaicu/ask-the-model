@@ -909,11 +909,34 @@ provenance/traceability and the required evidence visible to the model.
 Retrieval latency is reported but is not initially gated because CI runner
 variance can dominate millisecond-scale local SQLite measurements.
 
+### Candidate policy sweep
+
+Candidate policies may be measured alongside production only as observational
+benchmark modes. They must not alter `src/retrieval_policy.h` or application
+behavior.
+
+The first controlled sweep isolates:
+
+- ranked results per repository: 6 -> 5;
+- model-visible context-source cap: 12 -> 8;
+- model-visible byte cap: 32 KiB -> 16 KiB;
+- the combined 5-results / 8-sources / 16-KiB policy.
+
+Each axis is measured separately before the combined policy so a regression can
+be attributed to the responsible constraint rather than to an opaque bundle of
+changes.
+
+A candidate is not eligible for production promotion merely because it reduces
+mean bytes or raises context precision. At minimum, it must preserve the
+existing frozen R5 gates and must not reduce required-evidence recall visible to
+the model relative to the production-policy baseline. Any topic-level recall
+loss must be investigated explicitly rather than hidden by aggregate means.
+
 ### Pass condition
 
 The frozen R5 benchmark remains unchanged and continues to pass its existing
-gates; the production-policy shadow is reproducible from the same corpus,
-uses the shared runtime policy constants and produces the required
+gates; the production-policy shadow and any candidate sweep are reproducible
+from the same corpus, use explicit named policies and produce the required
 context-efficiency diagnostics without changing application behavior.
 
 ## R6 — Optional semantic retrieval
