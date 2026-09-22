@@ -308,6 +308,8 @@ jobs:
             candidate-sources8 \
             candidate-sources7 \
             candidate-sources6 \
+            candidate-sources5 \
+            candidate-sources4 \
             candidate-bytes16k \
             candidate-compact
           do
@@ -327,6 +329,8 @@ jobs:
               "candidate-sources8",
               "candidate-sources7",
               "candidate-sources6",
+              "candidate-sources5",
+              "candidate-sources4",
               "candidate-bytes16k",
               "candidate-compact",
           ]
@@ -478,6 +482,10 @@ jobs:
             /tmp/atm-retrieval-candidate-sources7-evaluation.json
             /tmp/atm-retrieval-candidate-sources6-run.json
             /tmp/atm-retrieval-candidate-sources6-evaluation.json
+            /tmp/atm-retrieval-candidate-sources5-run.json
+            /tmp/atm-retrieval-candidate-sources5-evaluation.json
+            /tmp/atm-retrieval-candidate-sources4-run.json
+            /tmp/atm-retrieval-candidate-sources4-evaluation.json
             /tmp/atm-retrieval-candidate-bytes16k-run.json
             /tmp/atm-retrieval-candidate-bytes16k-evaluation.json
             /tmp/atm-retrieval-candidate-compact-run.json
