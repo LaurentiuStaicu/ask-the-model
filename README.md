@@ -32,7 +32,7 @@
 
 <small><strong>Ask the Model</strong> provides the interface and retrieval/provenance layer. A <strong>local provider</strong>, such as Ollama, loads and runs AI models. The <strong>AI model</strong> remains a separate artifact that must currently be downloaded and managed through the provider rather than AtM.</small>
 
-<small>Version 0.4.0 retains repository-grounded multi-chat and adds offline startup qualification plus deterministic local snapshot-integrity seals. AtM now verifies the effective packaged deployment, its dedicated repository-storage boundary and persisted repository state before accepting local repository readiness, while keeping upstream Git SHA provenance distinct from local integrity checks. EWD, CBD and RMD remain authoritative for their own code, data, assumptions, provenance and validation.</small>
+<small>Version 0.4.0 retains repository-grounded multi-chat and adds offline startup qualification plus deterministic local snapshot-integrity seals. AtM now verifies the effective packaged deployment, its dedicated repository-storage boundary and persisted repository state before accepting local repository readiness, while keeping upstream Git SHA provenance distinct from local integrity checks. Successful installation qualification gates repository-grounded use and Download/Update; ordinary zero-repository chat remains a separate valid path. EWD, CBD and RMD remain authoritative for their own code, data, assumptions, provenance and validation.</small>
 
 ### Repository-grounded scientific-model chat
 
