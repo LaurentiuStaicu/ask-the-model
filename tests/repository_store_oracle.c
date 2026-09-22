@@ -299,6 +299,529 @@ path_beneath_root_is_safe (
 }
 
 static gboolean
+path_beneath_root_exists_no_symlink (
+    const char *root,
+    const char *relative,
+    GError **error
+)
+{
+    if (!relative_path_is_safe (relative) ||
+        !root_is_real_directory (root, error)) {
+        if (error != NULL && *error == NULL) {
+            g_set_error_literal (
+                error,
+                ORACLE_ERROR,
+                ORACLE_ERROR_SNAPSHOT,
+                "Manifest path is unsafe."
+            );
+        }
+        return FALSE;
+    }
+
+    char **parts = g_strsplit (relative, "/", -1);
+    char *current = g_strdup (root);
+    gboolean ok = TRUE;
+
+    for (gsize i = 0; parts[i] != NULL; i++) {
+        char *next = g_build_filename (current, parts[i], NULL);
+        GStatBuf st;
+        gboolean is_last = parts[i + 1] == NULL;
+
+        g_free (current);
+        current = next;
+
+        if (g_lstat (current, &st) != 0 ||
+            S_ISLNK (st.st_mode) ||
+            (!S_ISDIR (st.st_mode) &&
+             !S_ISREG (st.st_mode))) {
+            g_set_error (
+                error,
+                ORACLE_ERROR,
+                ORACLE_ERROR_SNAPSHOT,
+                "Manifest path is missing, unsafe or unsupported: %s",
+                current
+            );
+            ok = FALSE;
+            break;
+        }
+
+        if (!is_last && !S_ISDIR (st.st_mode)) {
+            g_set_error (
+                error,
+                ORACLE_ERROR,
+                ORACLE_ERROR_SNAPSHOT,
+                "Manifest path crosses a non-directory component: %s",
+                current
+            );
+            ok = FALSE;
+            break;
+        }
+    }
+
+    g_free (current);
+    g_strfreev (parts);
+    return ok;
+}
+
+static gboolean
+copy_manifest_path_array (
+    JsonObject *owner,
+    const char *member_name,
+    const char *snapshot_root,
+    gboolean require_exists,
+    GPtrArray **out_values,
+    GError **error
+)
+{
+    JsonNode *node =
+        json_object_get_member (owner, member_name);
+
+    if (node == NULL ||
+        json_node_get_node_type (node) != JSON_NODE_ARRAY) {
+        g_set_error (
+            error,
+            ORACLE_ERROR,
+            ORACLE_ERROR_MANIFEST,
+            "Manifest member '%s' is not an array.",
+            member_name
+        );
+        return FALSE;
+    }
+
+    JsonArray *array = json_node_get_array (node);
+    GPtrArray *values =
+        g_ptr_array_new_with_free_func (g_free);
+    GHashTable *seen =
+        g_hash_table_new_full (
+            g_str_hash,
+            g_str_equal,
+            g_free,
+            NULL
+        );
+
+    for (guint i = 0;
+         i < json_array_get_length (array);
+         i++) {
+        JsonNode *item =
+            json_array_get_element (array, i);
+
+        if (!is_nonempty_string_node (item)) {
+            g_set_error (
+                error,
+                ORACLE_ERROR,
+                ORACLE_ERROR_MANIFEST,
+                "Manifest array '%s' contains a non-string or empty item.",
+                member_name
+            );
+            g_hash_table_unref (seen);
+            g_ptr_array_unref (values);
+            return FALSE;
+        }
+
+        const char *value = json_node_get_string (item);
+
+        if (!relative_path_is_safe (value) ||
+            g_hash_table_contains (seen, value) ||
+            (require_exists &&
+             !path_beneath_root_exists_no_symlink (
+                 snapshot_root,
+                 value,
+                 error
+             ))) {
+            if (error != NULL && *error == NULL) {
+                g_set_error (
+                    error,
+                    ORACLE_ERROR,
+                    ORACLE_ERROR_MANIFEST,
+                    "Manifest array '%s' contains an unsafe or duplicate path '%s'.",
+                    member_name,
+                    value
+                );
+            }
+            g_hash_table_unref (seen);
+            g_ptr_array_unref (values);
+            return FALSE;
+        }
+
+        g_hash_table_add (seen, g_strdup (value));
+        g_ptr_array_add (values, g_strdup (value));
+    }
+
+    g_hash_table_unref (seen);
+    *out_values = values;
+    return TRUE;
+}
+
+static gboolean
+path_matches_prefix_independently (
+    const char *path,
+    const char *prefix
+)
+{
+    if (g_strcmp0 (path, prefix) == 0) {
+        return TRUE;
+    }
+
+    gsize length = strlen (prefix);
+    return g_str_has_prefix (path, prefix) &&
+        path[length] == '/';
+}
+
+static gboolean
+array_matches_path_independently (
+    GPtrArray *values,
+    const char *path
+)
+{
+    for (guint i = 0; i < values->len; i++) {
+        const char *prefix =
+            g_ptr_array_index (values, i);
+
+        if (path_matches_prefix_independently (
+                path,
+                prefix
+            )) {
+            return TRUE;
+        }
+    }
+
+    return FALSE;
+}
+
+static guint
+oracle_roles_for_path (
+    const OracleManifestPolicy *policy,
+    const char *path
+)
+{
+    guint roles = 0;
+
+    if (g_strcmp0 (path, policy->status_source) == 0) {
+        roles |= ORACLE_ROLE_STATUS;
+    }
+    if (array_matches_path_independently (
+            policy->canonical,
+            path
+        )) {
+        roles |= ORACLE_ROLE_CANONICAL;
+    }
+    if (array_matches_path_independently (
+            policy->structural,
+            path
+        )) {
+        roles |= ORACLE_ROLE_STRUCTURAL;
+    }
+    if (array_matches_path_independently (
+            policy->evidence,
+            path
+        )) {
+        roles |= ORACLE_ROLE_EVIDENCE;
+    }
+    if (array_matches_path_independently (
+            policy->tabular,
+            path
+        )) {
+        roles |= ORACLE_ROLE_TABULAR;
+    }
+    if (array_matches_path_independently (
+            policy->implementation,
+            path
+        )) {
+        roles |= ORACLE_ROLE_IMPLEMENTATION;
+    }
+
+    return roles;
+}
+
+static gboolean
+oracle_path_is_excluded (
+    const OracleManifestPolicy *policy,
+    const char *path
+)
+{
+    return array_matches_path_independently (
+        policy->exclude,
+        path
+    );
+}
+
+static gint
+compare_expected_source_paths (
+    gconstpointer a,
+    gconstpointer b
+)
+{
+    const OracleExpectedSource *left =
+        *(OracleExpectedSource * const *) a;
+    const OracleExpectedSource *right =
+        *(OracleExpectedSource * const *) b;
+
+    return g_strcmp0 (left->path, right->path);
+}
+
+static const char *
+oracle_media_type_for_path (const char *path)
+{
+    if (g_str_has_suffix (path, ".json")) {
+        return "application/json";
+    }
+    if (g_str_has_suffix (path, ".csv")) {
+        return "text/csv";
+    }
+    if (g_str_has_suffix (path, ".md")) {
+        return "text/markdown";
+    }
+    if (g_str_has_suffix (path, ".cff") ||
+        g_str_has_suffix (path, ".yaml") ||
+        g_str_has_suffix (path, ".yml")) {
+        return "text/yaml";
+    }
+    if (g_str_has_suffix (path, ".py")) {
+        return "text/x-python";
+    }
+    if (g_str_has_suffix (path, ".vala")) {
+        return "text/x-vala";
+    }
+    if (g_str_has_suffix (path, ".c") ||
+        g_str_has_suffix (path, ".h")) {
+        return "text/x-c";
+    }
+    if (g_str_has_suffix (path, ".sql")) {
+        return "text/x-sql";
+    }
+    if (g_str_has_suffix (path, ".txt") ||
+        g_str_has_suffix (path, ".toml") ||
+        g_str_has_suffix (path, ".sha256")) {
+        return "text/plain";
+    }
+
+    return "application/octet-stream";
+}
+
+static gboolean
+oracle_hash_file (
+    const char *path,
+    char **out_sha256,
+    guint64 *out_size,
+    GError **error
+)
+{
+    int fd = g_open (
+        path,
+        O_RDONLY | O_CLOEXEC | O_NOFOLLOW,
+        0
+    );
+    GChecksum *checksum = NULL;
+    guint64 total = 0;
+    guint8 buffer[64 * 1024];
+    gboolean ok = FALSE;
+
+    if (fd < 0) {
+        g_set_error (
+            error,
+            ORACLE_ERROR,
+            ORACLE_ERROR_SNAPSHOT,
+            "Oracle could not open source file without following symlinks: %s",
+            path
+        );
+        return FALSE;
+    }
+
+    checksum = g_checksum_new (G_CHECKSUM_SHA256);
+    if (checksum == NULL) {
+        g_set_error_literal (
+            error,
+            ORACLE_ERROR,
+            ORACLE_ERROR_INTEGRITY,
+            "Oracle SHA-256 support is unavailable."
+        );
+        goto out;
+    }
+
+    while (TRUE) {
+        ssize_t count = read (
+            fd,
+            buffer,
+            sizeof buffer
+        );
+
+        if (count == 0) {
+            break;
+        }
+
+        if (count < 0) {
+            if (errno == EINTR) {
+                continue;
+            }
+
+            g_set_error (
+                error,
+                ORACLE_ERROR,
+                ORACLE_ERROR_SNAPSHOT,
+                "Oracle could not read source file: %s",
+                path
+            );
+            goto out;
+        }
+
+        g_checksum_update (
+            checksum,
+            buffer,
+            (gsize) count
+        );
+        total += (guint64) count;
+    }
+
+    *out_sha256 =
+        g_strdup (g_checksum_get_string (checksum));
+    *out_size = total;
+    ok = *out_sha256 != NULL;
+
+out:
+    if (fd >= 0) {
+        close (fd);
+    }
+    g_clear_pointer (&checksum, g_checksum_free);
+
+    if (!ok) {
+        g_clear_pointer (out_sha256, g_free);
+    }
+
+    return ok;
+}
+
+static gboolean
+oracle_collect_regular_files (
+    const char *snapshot_root,
+    const char *relative_directory,
+    const OracleManifestPolicy *policy,
+    GPtrArray *out_sources,
+    GError **error
+)
+{
+    char *absolute_directory =
+        relative_directory[0] == '\0'
+            ? g_strdup (snapshot_root)
+            : g_build_filename (
+                snapshot_root,
+                relative_directory,
+                NULL
+            );
+    GDir *directory =
+        g_dir_open (absolute_directory, 0, error);
+
+    if (directory == NULL) {
+        g_free (absolute_directory);
+        return FALSE;
+    }
+
+    const char *name;
+
+    while ((name = g_dir_read_name (directory)) != NULL) {
+        char *relative =
+            relative_directory[0] == '\0'
+                ? g_strdup (name)
+                : g_build_filename (
+                    relative_directory,
+                    name,
+                    NULL
+                );
+        char *absolute =
+            g_build_filename (
+                snapshot_root,
+                relative,
+                NULL
+            );
+        GStatBuf st;
+
+        if (g_lstat (absolute, &st) != 0 ||
+            S_ISLNK (st.st_mode) ||
+            (!S_ISDIR (st.st_mode) &&
+             !S_ISREG (st.st_mode))) {
+            g_set_error (
+                error,
+                ORACLE_ERROR,
+                ORACLE_ERROR_SNAPSHOT,
+                "Oracle found an unsafe snapshot entry: %s",
+                relative
+            );
+            g_free (absolute);
+            g_free (relative);
+            g_dir_close (directory);
+            g_free (absolute_directory);
+            return FALSE;
+        }
+
+        if (S_ISDIR (st.st_mode)) {
+            if (!oracle_collect_regular_files (
+                    snapshot_root,
+                    relative,
+                    policy,
+                    out_sources,
+                    error
+                )) {
+                g_free (absolute);
+                g_free (relative);
+                g_dir_close (directory);
+                g_free (absolute_directory);
+                return FALSE;
+            }
+        } else if (!oracle_path_is_excluded (
+                       policy,
+                       relative
+                   )) {
+            guint roles =
+                oracle_roles_for_path (
+                    policy,
+                    relative
+                );
+
+            if (roles != 0) {
+                OracleExpectedSource *source =
+                    g_new0 (
+                        OracleExpectedSource,
+                        1
+                    );
+                source->path = g_strdup (relative);
+                source->roles = roles;
+                source->media_type =
+                    g_strdup (
+                        oracle_media_type_for_path (
+                            relative
+                        )
+                    );
+
+                if (!oracle_hash_file (
+                        absolute,
+                        &source->sha256,
+                        &source->byte_size,
+                        error
+                    )) {
+                    oracle_expected_source_free (source);
+                    g_free (absolute);
+                    g_free (relative);
+                    g_dir_close (directory);
+                    g_free (absolute_directory);
+                    return FALSE;
+                }
+
+                g_ptr_array_add (
+                    out_sources,
+                    source
+                );
+            }
+        }
+
+        g_free (absolute);
+        g_free (relative);
+    }
+
+    g_dir_close (directory);
+    g_free (absolute_directory);
+    return TRUE;
+}
+
+static gboolean
 load_json_object (
     const char *path,
     JsonParser **out_parser,
