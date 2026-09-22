@@ -38,6 +38,8 @@ executable(
     'src/RepositorySelection.vala',
     'src/RepositoryState.vala',
     'src/StartupQualificationRecord.vala',
+    'src/StartupQualificationNative.vapi',
+    'src/StartupQualificationService.vala',
     'src/startup_qualification.c',
     'src/RepositoryLifecycleService.vala',
     'src/ConversationGrounding.vala',
@@ -145,6 +147,48 @@ startup_qualification_record_test = executable(
 test(
   'startup-qualification-record',
   startup_qualification_record_test
+)
+
+
+startup_qualification_service_test = executable(
+  'startup-qualification-service-test',
+  [
+    'src/RepositoryService.vala',
+    'src/RepositoryNative.vala',
+    'src/RepositoryState.vala',
+    'src/StartupQualificationRecord.vala',
+    'src/StartupQualificationNative.vapi',
+    'src/StartupQualificationService.vala',
+    'src/startup_qualification.c',
+    'src/cff_version.c',
+    'src/repository_manifest.c',
+    'src/repository_sources.c',
+    'src/markdown_sections.c',
+    'src/csv_table.c',
+    'src/structured_json.c',
+    'src/retrieval_index.c',
+    'src/retrieval_index_lifecycle.c',
+    'src/repository_reconcile.c',
+    'tests/startup_qualification_service_test.vala',
+    resources
+  ],
+  include_directories: include_directories('src'),
+  dependencies: [
+    glib_dep,
+    gio_dep,
+    soup_dep,
+    json_glib_dep,
+    sqlite_dep
+  ],
+  link_args: [
+    '-lyaml'
+  ],
+  install: false
+)
+
+test(
+  'startup-qualification-service',
+  startup_qualification_service_test
 )
 
 repository_catalog_test = executable(
