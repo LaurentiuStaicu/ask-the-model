@@ -104,6 +104,7 @@ namespace AskTheModel {
         private string? repository_status_detail = null;
         private bool assistant_stream_started = false;
         private bool updating_model_selector = false;
+        private bool startup_qualification_running = false;
 
         public Application () {
             Object (
@@ -187,7 +188,69 @@ namespace AskTheModel {
                 }
             });
 
-            discover_local_provider.begin ();
+            start_startup_qualification ();
+        }
+
+        private void start_startup_qualification () {
+            startup_qualification_running = true;
+            update_conversation_ui_state ();
+
+            new GLib.Thread<void> ("atm-gs0", () => {
+                StartupQualificationReport? report = null;
+                string? failure = null;
+
+                try {
+                    var service = new StartupQualificationService ();
+                    report = service.run ();
+                } catch (GLib.Error error) {
+                    failure = error.message;
+                }
+
+                StartupQualificationReport? completed_report = report;
+                string? completed_failure = failure;
+
+                GLib.Idle.add (() => {
+                    startup_qualification_running = false;
+
+                    if (completed_report != null) {
+                        stdout.printf (
+                            "AtM: G-S0 mode=%s platform=%s storage=%s state=%d record=%s\n",
+                            completed_report.execution_mode,
+                            completed_report.platform_qualified
+                                ? "qualified"
+                                : "unqualified",
+                            completed_report.storage_qualified
+                                ? "qualified"
+                                : "unqualified",
+                            (int) completed_report.repository_state_status,
+                            completed_report.record_path
+                        );
+
+                        foreach (
+                            StartupRepositoryOutcome repository
+                            in completed_report.repositories
+                        ) {
+                            stdout.printf (
+                                "AtM: G-S0 repository %s status=%d reason=%s\n",
+                                repository.repository_id,
+                                (int) repository.status,
+                                repository.reason_code
+                            );
+                        }
+                    } else {
+                        stderr.printf (
+                            "AtM: G-S0 startup qualification failed: %s\n",
+                            completed_failure ??
+                                "unknown qualification error"
+                        );
+                    }
+
+                    update_repository_selector_label ();
+                    update_conversation_ui_state ();
+                    discover_local_provider.begin ();
+                    return false;
+                });
+            });
         }
 
         private async void discover_local_provider () {
@@ -807,6 +870,7 @@ namespace AskTheModel {
             if (repository_menu_button != null) {
                 repository_menu_button.sensitive =
                     editable &&
+                    !startup_qualification_running &&
                     !repository_checking &&
                     !repository_downloading &&
                     !repository_updating &&
@@ -814,7 +878,8 @@ namespace AskTheModel {
             }
 
             foreach (Gtk.CheckButton check in repository_check_buttons) {
-                check.sensitive = editable;
+                check.sensitive =
+                    editable && !startup_qualification_running;
             }
 
             foreach (ChatTabState state in chat_states) {
@@ -942,6 +1007,7 @@ namespace AskTheModel {
                 !active_chat.locked &&
                 !generation_active;
             bool repository_busy =
+                startup_qualification_running ||
                 repository_checking ||
                 repository_downloading ||
                 repository_updating ||
