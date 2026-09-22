@@ -413,6 +413,16 @@ An update:
 
 A failed update leaves the previous snapshot usable.
 
+A repository whose enrolled local snapshot seal no longer matches must expose an explicit repair path through the existing Download/Update lifecycle action. For a repair where the tracked remote SHA is unchanged, AtM must:
+
+1. obtain the exact-SHA archive successfully before moving the invalid local snapshot;
+2. quarantine the invalid real-directory snapshot rather than rewriting it in place;
+3. validate the downloaded snapshot using the normal bounded ingestion contract;
+4. promote the validated replacement at the exact SHA;
+5. persist the replacement SHA/version/seal only after validation succeeds;
+6. retain the quarantined invalid snapshot for diagnosis;
+7. fail closed on symlink/non-directory snapshot paths rather than following them.
+
 ### Compact-header cancellation and retry boundary
 
 The repository lifecycle backend accepts a `GLib.Cancellable` for remote refresh/download operations and propagates it through the network path. The approved compact v1 header does not require a separate visible Cancel control. A failed or cancelled repository operation may be retried through the existing Refresh or Download/Update action after the operation returns to an idle state.
@@ -724,7 +734,10 @@ The automated suite should include:
 15. schema-v1 ready snapshot → conversation preparation revalidates it and enrolls a schema-v2 local snapshot seal;
 16. locally modified snapshot after seal enrollment → conversation grounding fails closed with NOT_READY and preserves the expected seal;
 17. snapshot content changes during index validation/rebuild → pre/post seal mismatch and preparation fails before persistence or grounding;
-18. snapshot mtime-only change → local snapshot seal remains stable, while content or executable-mode change changes the seal.
+18. snapshot mtime-only change → local snapshot seal remains stable, while content or executable-mode change changes the seal;
+19. enrolled seal mismatch → grounding rejects the snapshot before a missing index can be rebuilt and the existing Download action becomes required;
+20. explicit same-SHA repair → exact archive is obtained first, invalid snapshot is quarantined, validated replacement is promoted and persistent seal is replaced only after success;
+21. invalid snapshot symlink → repair refuses to follow or quarantine it as a real snapshot directory.
 
 Future repository-management regression gate, when removal/history is implemented:
 
