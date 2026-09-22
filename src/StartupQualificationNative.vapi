@@ -1,86 +1,25 @@
 [CCode (cheader_filename = "startup_qualification.h,repository_reconcile.h")]
 namespace AskTheModel.StartupQualificationNative {
-    [CCode (
-        cname = "AtmExecutionMode",
-        cprefix = "ATM_EXECUTION_MODE_",
-        has_type_id = false
-    )]
-    public enum ExecutionMode {
-        DEVELOPMENT,
-        FLATPAK
-    }
-
-    [CCode (
-        cname = "AtmRepositoryReconcileStatus",
-        cprefix = "ATM_REPOSITORY_RECONCILE_",
-        has_type_id = false
-    )]
-    public enum RepositoryReconcileStatus {
-        SNAPSHOT_MISSING,
-        SNAPSHOT_INVALID,
-        INDEX_ERROR,
-        READY,
-        READY_REPAIRED_INDEX
-    }
-
-    [CCode (
-        cname = "AtmDeploymentQualification",
-        free_function = "atm_deployment_qualification_free",
-        has_type_id = false
-    )]
-    [Compact]
-    public class DeploymentQualification {
-        public ExecutionMode execution_mode;
-        public bool platform_qualified;
-
-        public unowned string? application_id;
-        public unowned string? application_ref;
-        public unowned string? application_commit;
-
-        public unowned string? runtime_ref;
-        public unowned string? runtime_commit;
-
-        public unowned string? architecture;
-        public unowned string? branch;
-        public unowned string? flatpak_version;
-
-        [CCode (
-            array_length = false,
-            array_null_terminated = true
-        )]
-        public unowned string[]? application_extensions;
-
-        [CCode (
-            array_length = false,
-            array_null_terminated = true
-        )]
-        public unowned string[]? runtime_extensions;
-
-        public unowned string? platform_fingerprint;
-    }
-
-    [CCode (
-        cname = "AtmRepositoryReconcileResult",
-        free_function = "atm_repository_reconcile_result_free",
-        has_type_id = false
-    )]
-    [Compact]
-    public class RepositoryReconcileResult {
-        public RepositoryReconcileStatus status;
-        public unowned string? reason_code;
-        public unowned string? detail;
-        public unowned string? repository_version;
-        public unowned string? index_path;
-    }
-
-    [CCode (cname = "atm_startup_qualify_deployment")]
-    public static bool qualify_deployment (
+    [CCode (cname = "atm_startup_qualify_deployment_values")]
+    public static bool qualify_deployment_values (
         string flatpak_info_path,
         string expected_application_id,
         string expected_runtime_id,
         string expected_runtime_branch,
         uint policy_version,
-        out DeploymentQualification qualification
+        out int execution_mode,
+        out bool platform_qualified,
+        out string? application_id,
+        out string? application_ref,
+        out string? application_commit,
+        out string? runtime_ref,
+        out string? runtime_commit,
+        out string? architecture,
+        out string? branch,
+        out string? flatpak_version,
+        out string application_extensions,
+        out string runtime_extensions,
+        out string? platform_fingerprint
     ) throws GLib.Error;
 
     [CCode (cname = "atm_startup_qualify_storage_root_values")]
@@ -92,8 +31,8 @@ namespace AskTheModel.StartupQualificationNative {
         out uint64 owner_uid
     ) throws GLib.Error;
 
-    [CCode (cname = "atm_repository_reconcile_local")]
-    public static bool reconcile_local (
+    [CCode (cname = "atm_repository_reconcile_local_values")]
+    public static bool reconcile_local_values (
         string cache_root,
         string snapshot_root,
         string repository_id,
@@ -101,6 +40,10 @@ namespace AskTheModel.StartupQualificationNative {
         string repository_display_name,
         string snapshot_sha,
         string persisted_version,
-        out RepositoryReconcileResult result
+        out int status,
+        out string reason_code,
+        out string detail,
+        out string? repository_version,
+        out string? index_path
     ) throws GLib.Error;
 }
