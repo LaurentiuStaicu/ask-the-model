@@ -68,4 +68,13 @@ gboolean atm_startup_qualify_storage_root (
     GError **error
 );
 
+gboolean atm_startup_qualify_storage_root_values (
+    const char *storage_root,
+    gboolean *out_qualified,
+    gboolean *out_created,
+    guint32 *out_mode,
+    guint64 *out_owner_uid,
+    GError **error
+);
+
 G_END_DECLS
