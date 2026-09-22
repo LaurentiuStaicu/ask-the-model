@@ -703,3 +703,41 @@ out:
 
     return ok;
 }
+
+
+gboolean
+atm_startup_qualify_storage_root_values (
+    const char *storage_root,
+    gboolean *out_qualified,
+    gboolean *out_created,
+    guint32 *out_mode,
+    guint64 *out_owner_uid,
+    GError **error
+)
+{
+    AtmStorageQualification qualification = { 0 };
+
+    g_return_val_if_fail (out_qualified != NULL, FALSE);
+    g_return_val_if_fail (out_created != NULL, FALSE);
+    g_return_val_if_fail (out_mode != NULL, FALSE);
+    g_return_val_if_fail (out_owner_uid != NULL, FALSE);
+
+    *out_qualified = FALSE;
+    *out_created = FALSE;
+    *out_mode = 0;
+    *out_owner_uid = 0;
+
+    if (!atm_startup_qualify_storage_root (
+            storage_root,
+            &qualification,
+            error
+        )) {
+        return FALSE;
+    }
+
+    *out_qualified = qualification.qualified;
+    *out_created = qualification.created;
+    *out_mode = qualification.mode;
+    *out_owner_uid = qualification.owner_uid;
+    return TRUE;
+}
