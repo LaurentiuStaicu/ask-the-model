@@ -833,6 +833,7 @@ repository_lifecycle_service_test = executable(
     'src/repository_manifest.c',
     'src/repository_storage.c',
     'src/repository_ingest.c',
+    'src/snapshot_seal.c',
     'src/repository_ui_bridge.c',
     'src/repository_sources.c',
     'src/markdown_sections.c',
