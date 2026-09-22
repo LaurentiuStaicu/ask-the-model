@@ -104,7 +104,10 @@ namespace AskTheModel {
                 flatpak_info_path ?? "/.flatpak-info";
             this.data_root =
                 data_root ??
-                RepositoryLifecycleService.visible_data_root ();
+                GLib.Path.build_filename (
+                    GLib.Environment.get_home_dir (),
+                    "Ask the Model"
+                );
             this.cache_root =
                 cache_root ??
                 GLib.Environment.get_user_cache_dir ();
