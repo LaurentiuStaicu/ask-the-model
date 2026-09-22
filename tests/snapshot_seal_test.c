@@ -751,6 +751,158 @@ test_snapshot_path_must_match_sha (void)
     g_free (parent);
 }
 
+static void
+test_ensure_install_creates_then_reuses (void)
+{
+    GError *error = NULL;
+    const char *sha =
+        "9999999999999999999999999999999999999999";
+    char *parent = new_temp_root (
+        "atm-seal-ensure-XXXXXX"
+    );
+    char *snapshot = create_snapshot (
+        parent,
+        sha,
+        FALSE
+    );
+    char *seal_root = new_temp_root (
+        "atm-seal-ensure-state-XXXXXX"
+    );
+    gboolean created = FALSE;
+    char *path_one = NULL;
+    char *digest_one = NULL;
+
+    g_assert_true (
+        atm_snapshot_seal_ensure_install (
+            seal_root,
+            snapshot,
+            "ewd",
+            sha,
+            &created,
+            &path_one,
+            &digest_one,
+            &error
+        )
+    );
+    g_assert_no_error (error);
+    g_assert_true (created);
+    g_assert_nonnull (path_one);
+    g_assert_nonnull (digest_one);
+
+    gboolean created_again = TRUE;
+    char *path_two = NULL;
+    char *digest_two = NULL;
+
+    g_assert_true (
+        atm_snapshot_seal_ensure_install (
+            seal_root,
+            snapshot,
+            "ewd",
+            sha,
+            &created_again,
+            &path_two,
+            &digest_two,
+            &error
+        )
+    );
+    g_assert_no_error (error);
+    g_assert_false (created_again);
+    g_assert_cmpstr (path_two, ==, path_one);
+    g_assert_cmpstr (digest_two, ==, digest_one);
+
+    g_free (digest_two);
+    g_free (path_two);
+    g_free (digest_one);
+    g_free (path_one);
+    remove_tree_best_effort (seal_root);
+    remove_tree_best_effort (parent);
+    g_free (seal_root);
+    g_free (snapshot);
+    g_free (parent);
+}
+
+static void
+test_ensure_install_rejects_mismatch (void)
+{
+    GError *error = NULL;
+    const char *sha =
+        "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa";
+    char *parent = new_temp_root (
+        "atm-seal-ensure-mismatch-XXXXXX"
+    );
+    char *snapshot = create_snapshot (
+        parent,
+        sha,
+        FALSE
+    );
+    char *seal_root = new_temp_root (
+        "atm-seal-ensure-mismatch-state-XXXXXX"
+    );
+    gboolean created = FALSE;
+    char *path = NULL;
+    char *digest = NULL;
+
+    g_assert_true (
+        atm_snapshot_seal_ensure_install (
+            seal_root,
+            snapshot,
+            "ewd",
+            sha,
+            &created,
+            &path,
+            &digest,
+            &error
+        )
+    );
+    g_assert_no_error (error);
+    g_assert_true (created);
+
+    char *readme = g_build_filename (
+        snapshot,
+        "README.md",
+        NULL
+    );
+    write_text (
+        readme,
+        "# Snapshot\nTampered after sealing.\n"
+    );
+
+    gboolean retry_created = FALSE;
+    char *retry_path = NULL;
+    char *retry_digest = NULL;
+
+    g_assert_false (
+        atm_snapshot_seal_ensure_install (
+            seal_root,
+            snapshot,
+            "ewd",
+            sha,
+            &retry_created,
+            &retry_path,
+            &retry_digest,
+            &error
+        )
+    );
+    g_assert_error (
+        error,
+        ATM_SNAPSHOT_SEAL_ERROR,
+        ATM_SNAPSHOT_SEAL_ERROR_INTEGRITY
+    );
+    g_assert_false (retry_created);
+    g_assert_null (retry_path);
+    g_assert_null (retry_digest);
+
+    g_clear_error (&error);
+    g_free (readme);
+    g_free (digest);
+    g_free (path);
+    remove_tree_best_effort (seal_root);
+    remove_tree_best_effort (parent);
+    g_free (seal_root);
+    g_free (snapshot);
+    g_free (parent);
+}
+
 int
 main (int argc, char **argv)
 {
@@ -783,6 +935,14 @@ main (int argc, char **argv)
     g_test_add_func (
         "/snapshot-seal/path-sha-binding",
         test_snapshot_path_must_match_sha
+    );
+    g_test_add_func (
+        "/snapshot-seal/ensure-install-create-reuse",
+        test_ensure_install_creates_then_reuses
+    );
+    g_test_add_func (
+        "/snapshot-seal/ensure-install-reject-mismatch",
+        test_ensure_install_rejects_mismatch
     );
 
     return g_test_run ();
