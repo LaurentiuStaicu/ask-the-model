@@ -79,6 +79,27 @@ static const BenchmarkPolicy CANDIDATE_SOURCES4_POLICY = {
     ATM_PRODUCTION_GROUNDING_MAX_CONTEXT_BYTES
 };
 
+static const BenchmarkPolicy CANDIDATE_SOURCES3_POLICY = {
+    "candidate-sources3",
+    ATM_PRODUCTION_RETRIEVAL_RESULTS_PER_REPOSITORY,
+    3,
+    ATM_PRODUCTION_GROUNDING_MAX_CONTEXT_BYTES
+};
+
+static const BenchmarkPolicy CANDIDATE_SOURCES2_POLICY = {
+    "candidate-sources2",
+    ATM_PRODUCTION_RETRIEVAL_RESULTS_PER_REPOSITORY,
+    2,
+    ATM_PRODUCTION_GROUNDING_MAX_CONTEXT_BYTES
+};
+
+static const BenchmarkPolicy CANDIDATE_SOURCES1_POLICY = {
+    "candidate-sources1",
+    ATM_PRODUCTION_RETRIEVAL_RESULTS_PER_REPOSITORY,
+    1,
+    ATM_PRODUCTION_GROUNDING_MAX_CONTEXT_BYTES
+};
+
 static const BenchmarkPolicy CANDIDATE_BYTES16K_POLICY = {
     "candidate-bytes16k",
     ATM_PRODUCTION_RETRIEVAL_RESULTS_PER_REPOSITORY,
@@ -1243,7 +1264,8 @@ main (int argc, char **argv)
             "Usage: %s BENCHMARK_JSON OUTPUT_JSON RUN_ID "
             "[frozen|production|candidate-results5|candidate-sources8|"
             "candidate-sources7|candidate-sources6|candidate-sources5|"
-            "candidate-sources4|candidate-bytes16k|"
+            "candidate-sources4|candidate-sources3|candidate-sources2|"
+            "candidate-sources1|candidate-bytes16k|"
             "candidate-compact]\n",
             argv[0]
         );
@@ -1291,6 +1313,21 @@ main (int argc, char **argv)
                    "candidate-sources4"
                ) == 0) {
         policy = &CANDIDATE_SOURCES4_POLICY;
+    } else if (g_strcmp0 (
+                   policy_name,
+                   "candidate-sources3"
+               ) == 0) {
+        policy = &CANDIDATE_SOURCES3_POLICY;
+    } else if (g_strcmp0 (
+                   policy_name,
+                   "candidate-sources2"
+               ) == 0) {
+        policy = &CANDIDATE_SOURCES2_POLICY;
+    } else if (g_strcmp0 (
+                   policy_name,
+                   "candidate-sources1"
+               ) == 0) {
+        policy = &CANDIDATE_SOURCES1_POLICY;
     } else if (g_strcmp0 (
                    policy_name,
                    "candidate-bytes16k"
