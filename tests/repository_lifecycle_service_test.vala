@@ -22,6 +22,25 @@ namespace AskTheModel.Tests {
 
             assert (catalog.length == 3);
 
+            assert (!service.repository_mutations_allowed ());
+
+            bool mutation_gate_rejected = false;
+
+            try {
+                yield service.download_or_update (one);
+            } catch (RepositoryError error) {
+                mutation_gate_rejected =
+                    error.code == RepositoryError.NOT_READY;
+            }
+
+            assert (mutation_gate_rejected);
+
+            service.apply_installation_qualification (false);
+            assert (!service.repository_mutations_allowed ());
+
+            service.apply_installation_qualification (true);
+            assert (service.repository_mutations_allowed ());
+
             RepositoryRuntimeInfo freshness =
                 service.info_for (catalog[0].id);
             freshness.remote_sha =
