@@ -3111,9 +3111,11 @@ run_self_test (void)
     }
 
     /*
-     * Exercise PRAGMA integrity_check deterministically with a stored CHECK
-     * violation. SQLite permits the fixture to be created while CHECK
-     * enforcement is temporarily disabled.
+     * Exercise PRAGMA integrity_check with a deterministic b-tree/schema
+     * inconsistency instead of relying on CHECK-constraint diagnostics,
+     * which vary across SQLite builds. The fixture creates a real index,
+     * removes only its sqlite_schema entry through writable_schema, and
+     * requires integrity_check to detect the now-unreferenced index page.
      */
     if (sqlite3_open_v2 (
             index_path,
@@ -3123,12 +3125,15 @@ run_self_test (void)
         ) != SQLITE_OK ||
         sqlite3_exec (
             db,
-            "CREATE TABLE oracle_integrity_probe("
-            "value INTEGER CHECK(value=1)"
-            ");"
-            "PRAGMA ignore_check_constraints=ON;"
-            "INSERT INTO oracle_integrity_probe(value) VALUES(2);"
-            "PRAGMA ignore_check_constraints=OFF;",
+            "CREATE TABLE oracle_integrity_probe(value INTEGER);"
+            "CREATE INDEX oracle_integrity_probe_idx "
+            "ON oracle_integrity_probe(value);"
+            "INSERT INTO oracle_integrity_probe(value) VALUES(1),(2),(3);"
+            "PRAGMA writable_schema=ON;"
+            "DELETE FROM sqlite_schema "
+            "WHERE type='index' "
+            "AND name='oracle_integrity_probe_idx';"
+            "PRAGMA writable_schema=OFF;",
             NULL,
             NULL,
             NULL
@@ -3142,36 +3147,33 @@ run_self_test (void)
     sqlite3_close (db);
 
     if (oracle_check (&input, NULL, &error)) {
-        g_printerr ("oracle accepted integrity_check CHECK violation\n");
+        g_printerr ("oracle accepted integrity_check b-tree/schema divergence\n");
         valid = FALSE;
         goto out;
     }
     g_clear_error (&error);
 
-    if (sqlite3_open_v2 (
+    /*
+     * The deliberately orphaned index page cannot be repaired safely by
+     * DDL after its schema row has been removed. Recreate the fixture index
+     * from the original valid source rather than mutating the broken file.
+     */
+    g_assert_cmpint (g_remove (index_path), ==, 0);
+    if (!create_fixture_index (
             index_path,
-            &db,
-            SQLITE_OPEN_READWRITE,
-            NULL
-        ) != SQLITE_OK ||
-        sqlite3_exec (
-            db,
-            "DROP TABLE oracle_integrity_probe;",
-            NULL,
-            NULL,
-            NULL
-        ) != SQLITE_OK) {
-        if (db != NULL) {
-            sqlite3_close (db);
-        }
+            snapshot,
+            "ewd",
+            version,
+            sha,
+            manifest_hash
+        )) {
         valid = FALSE;
         goto out;
     }
-    sqlite3_close (db);
 
     if (!oracle_check (&input, NULL, &error)) {
         g_printerr (
-            "oracle did not recover after integrity fixture restoration: %s\n",
+            "oracle did not recover after integrity fixture recreation: %s\n",
             error != NULL ? error->message : "unknown error"
         );
         g_clear_error (&error);
