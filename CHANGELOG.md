@@ -4,6 +4,18 @@ All notable public releases of Ask the Model are recorded here.
 
 ## Unreleased
 
+### Release/distribution hardening
+
+- changed future GitHub Release publication to draft-first `create → attach asset → publish` ordering so future immutable releases can be enabled without losing the Flatpak asset;
+- added a release-workflow contract test for draft resumption, exact-commit guards and immutable-release fail-closed behavior;
+- made the generated `flatpak-repo` development channel record the exact source `main` Git SHA in a machine-readable `SOURCE_COMMIT` marker, its README and publication commit message.
+
+### Retrieval measurement
+
+- centralized the unchanged production retrieval/context limits in `src/retrieval_policy.h` so runtime code and measurement tooling share one policy definition;
+- added a measurement-only production-policy companion to frozen R5, including context precision, required-evidence context recall, model-visible source count, evidence bytes and latency diagnostics;
+- retained frozen R5 as the blocking retrieval-quality gate; the production-policy run remains observational and does not change runtime limits.
+
 ## 0.4.0 - 2026-09-22
 
 Startup Qualification and Snapshot Integrity.
