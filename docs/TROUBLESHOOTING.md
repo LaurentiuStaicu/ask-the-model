@@ -295,6 +295,23 @@ Useful checks:
 
 Do not manually move partial content from `Repositories/.staging` into a snapshot directory. Promotion to READY is intentionally application-controlled.
 
+## A repository was ready but now requires Download again
+
+In v0.4.0 this can be an intentional integrity response rather than a newly published repository revision.
+
+If the enrolled local snapshot seal no longer matches the files under the exact persisted SHA, AtM refuses to ground that snapshot and marks the existing **Download/Update** action as required.
+
+For an unchanged remote SHA, repair works as follows:
+
+1. AtM downloads the exact-SHA archive first.
+2. If the existing invalid snapshot is a real directory, AtM moves it to a diagnostic sibling name instead of rewriting it in place.
+3. The downloaded archive is extracted and validated through the normal bounded ingestion path.
+4. The replacement must pass manifest/version checks, stable pre/post snapshot seals and retrieval-index validation before its new local seal is persisted.
+
+If the local snapshot path is a symlink or is not a real directory, AtM fails closed instead of following it. Remove or inspect that unexpected filesystem object manually before retrying; do not point it at another directory to bypass the check.
+
+A quarantined `.invalid-<sha>-...` directory is retained for diagnosis. It is not selected heuristically as a current repository snapshot.
+
 ## A grounded answer has no numbered sources
 
 Check that:
