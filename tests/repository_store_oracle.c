@@ -2491,7 +2491,7 @@ create_fixture_index (
         "PRAGMA user_version = 2;"
         "PRAGMA foreign_keys = ON;"
         "CREATE TABLE snapshot_metadata("
-        "id INTEGER PRIMARY KEY CHECK(id=1),"
+        "id INTEGER PRIMARY KEY,"
         "repository_id TEXT NOT NULL,"
         "repository_version TEXT NOT NULL,"
         "snapshot_sha TEXT NOT NULL,"
