@@ -60,6 +60,7 @@ on:
       - 'src/retrieval_normalize.c'
       - 'src/retrieval_router.c'
       - 'src/retrieval_conversation.c'
+      - 'src/retrieval_policy.h'
       - 'src/grounding_context.c'
       - 'data/schemas/retrieval-index-v2.sql'
       - 'data/schemas/retrieval-benchmark-v1.schema.json'
