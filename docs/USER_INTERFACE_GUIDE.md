@@ -30,7 +30,7 @@ Refresh does not silently replace local snapshots.
 
 ### Download / Update
 
-The repository action button downloads a repository that is not installed or updates one whose exact remote SHA differs from the current local snapshot.
+The repository action button downloads a repository that is not installed, updates one whose exact remote SHA differs from the current local snapshot, or repairs a locally integrity-invalid snapshot. A same-SHA integrity repair still requires a fresh exact-SHA download before the invalid local directory is quarantined and replaced.
 
 The update path is fail-closed:
 
@@ -41,7 +41,7 @@ The update path is fail-closed:
 5. build and validate the retrieval index;
 6. atomically promote the new immutable snapshot.
 
-A failed update leaves the last valid snapshot available.
+A failed update leaves the last valid snapshot available. When repairing a locally invalid same-SHA snapshot, AtM preserves the invalid directory under a diagnostic quarantine name rather than silently rewriting it in place.
 
 ## Status LCD
 
