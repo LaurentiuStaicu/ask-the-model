@@ -122,6 +122,33 @@
       "tested_by": [
         "meson:retrieval-query"
       ]
+    },
+    {
+      "id": "SCIENTIFIC-S0-001",
+      "category": "SCIENTIFIC",
+      "severity": "S0",
+      "lifecycle": "enforced",
+      "statement": "Only an explicit frozen AtM scientific profile rule matching the evidence repository and structural selector may produce TYPED_VALIDATED; repository payload text cannot grant itself scientific authority.",
+      "enforced_by": [
+        "src/scientific_profile.c",
+        "src/scientific_evidence.c"
+      ],
+      "tested_by": [
+        "meson:scientific-evidence"
+      ]
+    },
+    {
+      "id": "SCIENTIFIC-S0-002",
+      "category": "SCIENTIFIC",
+      "severity": "S0",
+      "lifecycle": "enforced",
+      "statement": "Textual, unsupported, provenance-incomplete, or profile-recognized malformed evidence must fail closed as a non-typed scientific classification and must never be silently promoted to TYPED_VALIDATED.",
+      "enforced_by": [
+        "src/scientific_evidence.c"
+      ],
+      "tested_by": [
+        "meson:scientific-evidence"
+      ]
     }
   ]
 }
