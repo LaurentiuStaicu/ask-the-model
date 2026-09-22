@@ -9,6 +9,7 @@ namespace AskTheModel {
         public string repository_id { get; construct; }
         public string? current_sha { get; set; }
         public string? version { get; set; }
+        public string? seal_sha256 { get; set; }
 
         public RepositoryLocalRecord (string repository_id) {
             Object (repository_id: repository_id);
@@ -79,7 +80,8 @@ namespace AskTheModel {
         public void set_current (
             string repository_id,
             string sha,
-            string version
+            string version,
+            string? seal_sha256 = null
         ) throws RepositoryError {
             if (load_status == RepositoryStateLoadStatus.INVALID) {
                 throw new RepositoryError.STORAGE (
@@ -102,13 +104,26 @@ namespace AskTheModel {
                 );
             }
 
+            if (seal_sha256 != null &&
+                !GLib.Regex.match_simple (
+                    "^[0-9a-f]{64}$",
+                    seal_sha256
+                )) {
+                throw new RepositoryError.INVALID_RESPONSE (
+                    "Repository snapshot seal digest is invalid."
+                );
+            }
+
             RepositoryLocalRecord record =
                 record_for (repository_id);
             string? previous_sha = record.current_sha;
             string? previous_version = record.version;
+            string? previous_seal_sha256 =
+                record.seal_sha256;
 
             record.current_sha = sha;
             record.version = version;
+            record.seal_sha256 = seal_sha256;
 
             try {
                 save ();
@@ -116,6 +131,8 @@ namespace AskTheModel {
             } catch (RepositoryError error) {
                 record.current_sha = previous_sha;
                 record.version = previous_version;
+                record.seal_sha256 =
+                    previous_seal_sha256;
                 throw error;
             }
         }
@@ -183,6 +200,7 @@ namespace AskTheModel {
                 string[] ids = {};
                 string[] shas = {};
                 string[] versions = {};
+                string[] seal_shas = {};
 
                 for (
                     uint i = 0;
@@ -203,23 +221,36 @@ namespace AskTheModel {
                     Json.Node? sha_node = item.get_member ("sha");
                     Json.Node? version_node =
                         item.get_member ("version");
+                    Json.Node? seal_node =
+                        item.get_member ("seal_sha256");
 
                     if (!node_is_string (id_node) ||
                         !node_is_string (sha_node) ||
-                        !node_is_string (version_node)) {
+                        !node_is_string (version_node) ||
+                        (seal_node != null &&
+                         !node_is_string (seal_node))) {
                         return;
                     }
 
                     string id = id_node.get_string ();
                     string sha = sha_node.get_string ();
                     string version = version_node.get_string ();
+                    string seal_sha256 =
+                        seal_node != null
+                            ? seal_node.get_string ()
+                            : "";
 
                     if (record_for_optional (id) == null ||
                         !GLib.Regex.match_simple (
                             "^[0-9a-f]{40}$",
                             sha
                         ) ||
-                        version.length == 0) {
+                        version.length == 0 ||
+                        (seal_sha256.length > 0 &&
+                         !GLib.Regex.match_simple (
+                            "^[0-9a-f]{64}$",
+                            seal_sha256
+                         ))) {
                         return;
                     }
 
@@ -232,6 +263,7 @@ namespace AskTheModel {
                     ids += id;
                     shas += sha;
                     versions += version;
+                    seal_shas += seal_sha256;
                 }
 
                 for (int i = 0; i < ids.length; i++) {
@@ -244,6 +276,10 @@ namespace AskTheModel {
 
                     record.current_sha = shas[i];
                     record.version = versions[i];
+                    record.seal_sha256 =
+                        seal_shas[i].length > 0
+                            ? seal_shas[i]
+                            : null;
                 }
 
                 load_status = RepositoryStateLoadStatus.VALID;
@@ -295,6 +331,14 @@ namespace AskTheModel {
                 builder.add_string_value (
                     record.version ?? ""
                 );
+
+                if (record.seal_sha256 != null) {
+                    builder.set_member_name ("seal_sha256");
+                    builder.add_string_value (
+                        record.seal_sha256 ?? ""
+                    );
+                }
+
                 builder.end_object ();
             }
 
