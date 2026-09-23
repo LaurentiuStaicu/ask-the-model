@@ -260,7 +260,9 @@ Do not wire GTK or persist live chats yet.
 
 Add a conversation-domain store and atomic committed-turn writes.
 
-Change provider-history handling so both grounded and ungrounded turns can defer `OllamaConversation.commit_exchange()` until durable persistence succeeds.
+CONV-02a implements and qualifies the native write boundary only. Conversation creation plus repository pins are atomic, and each turn is one store-owned transaction containing the paired user/assistant messages, optional citations and metadata update. The store allocates local identities and turn/sequence numbers and rolls back the complete turn on any failure.
+
+CONV-02b will expose that qualified mutation boundary to the Vala conversation domain and change provider-history handling so both grounded and ungrounded turns defer `OllamaConversation.commit_exchange()` until durable persistence succeeds.
 
 Still no restart restore UI.
 

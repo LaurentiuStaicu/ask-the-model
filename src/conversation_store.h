@@ -22,6 +22,25 @@ typedef enum {
 
 typedef struct AtmConversationStore AtmConversationStore;
 
+typedef struct {
+    const char *repository_id;
+    const char *repository_version;
+    const char *snapshot_sha;
+} AtmConversationRepositoryInput;
+
+typedef struct {
+    const char *label;
+    const char *repository_id;
+    const char *repository_version;
+    const char *snapshot_sha;
+    const char *logical_source_id;
+    const char *source_path;
+    const char *locator;
+    const char *title;
+    const char *excerpt;
+    const char *immutable_permalink;
+} AtmConversationCitationInput;
+
 GQuark atm_conversation_store_error_quark (void);
 
 gboolean atm_conversation_store_open (
@@ -49,6 +68,33 @@ gint64 atm_conversation_store_application_id (
 
 gint atm_conversation_store_schema_version (
     const AtmConversationStore *store
+);
+
+gboolean atm_conversation_store_create_conversation (
+    AtmConversationStore *store,
+    const char *title,
+    gint64 created_at_us,
+    const char *model_name,
+    const char *model_digest,
+    gint64 repository_generation_id,
+    const AtmConversationRepositoryInput *repositories,
+    gsize repository_count,
+    char **out_conversation_id,
+    GError **error
+);
+
+gboolean atm_conversation_store_commit_turn (
+    AtmConversationStore *store,
+    const char *conversation_id,
+    const char *user_content,
+    const char *assistant_provider_content,
+    const char *assistant_display_content,
+    gboolean grounded,
+    gint64 created_at_us,
+    const AtmConversationCitationInput *citations,
+    gsize citation_count,
+    gint64 *out_turn_no,
+    GError **error
 );
 
 G_END_DECLS

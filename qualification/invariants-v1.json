@@ -469,6 +469,20 @@
       "tested_by": [
         "meson:conversation-store"
       ]
+    },
+    {
+      "id": "SESSION-S0-003",
+      "category": "SESSION",
+      "severity": "S0",
+      "lifecycle": "enforced",
+      "statement": "Conversation-store mutation primitives must create a conversation and its pinned repository set atomically, and must commit each durable turn as one SQLite transaction containing exactly one user message, one assistant message, optional assistant citations and the conversation updated_at advance. Turn and sequence numbers plus local message/conversation identifiers are allocated by the store. Citation repository/version/SHA must match the conversation's pinned repository set before persistence. Any failure, including one after message/citation inserts but before COMMIT, must roll back the entire turn and leave the previous durable boundary unchanged.",
+      "enforced_by": [
+        "src/conversation_store.c",
+        "src/conversation_store.h"
+      ],
+      "tested_by": [
+        "meson:conversation-store"
+      ]
     }
   ]
 }
