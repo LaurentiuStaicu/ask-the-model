@@ -1018,6 +1018,439 @@ test_invalid_legacy_imports_fail_closed (void)
     );
 }
 
+
+static char *
+control_state_path_for_root (
+    const char *root
+)
+{
+    return g_build_filename (
+        root,
+        "control-state.sqlite3",
+        NULL
+    );
+}
+
+static void
+assert_no_cutover_candidates (
+    const char *root
+)
+{
+    GError *error = NULL;
+    GDir *directory = g_dir_open (
+        root,
+        0,
+        &error
+    );
+
+    g_assert_no_error (error);
+    g_assert_nonnull (directory);
+
+    const char *name;
+
+    while ((name = g_dir_read_name (directory)) != NULL) {
+        g_assert_false (
+            g_str_has_prefix (
+                name,
+                ".control-state-cutover-"
+            )
+        );
+    }
+
+    g_dir_close (directory);
+}
+
+static void
+test_atomic_cutover_imports_and_activates (void)
+{
+    const char *legacy_json =
+        "{"
+        "\"schema_version\":2,"
+        "\"repositories\":["
+        "{\"id\":\"rmd\",\"sha\":\"0123456789abcdef0123456789abcdef01234567\",\"version\":\"0.1.0\",\"snapshot_seal_sha256\":\"aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa\"},"
+        "{\"id\":\"cbd\",\"sha\":\"2222222222222222222222222222222222222222\",\"version\":\"0.3.0\",\"snapshot_seal_sha256\":null}"
+        "]"
+        "}";
+
+    char *root = new_temp_root (
+        "atm-control-state-cutover-XXXXXX"
+    );
+    char *control =
+        control_state_path_for_root (root);
+    char *legacy = legacy_state_path (
+        root,
+        "repository-state.json"
+    );
+    write_legacy_state (
+        legacy,
+        legacy_json
+    );
+
+    char *before = NULL;
+    gsize before_length = 0;
+    GError *error = NULL;
+
+    g_assert_true (
+        g_file_get_contents (
+            legacy,
+            &before,
+            &before_length,
+            &error
+        )
+    );
+    g_assert_no_error (error);
+
+    AtmControlStateCutoverDisposition disposition =
+        ATM_CONTROL_STATE_CUTOVER_EMPTY;
+
+    g_assert_true (
+        atm_control_state_publish_cutover (
+            control,
+            legacy,
+            &disposition,
+            &error
+        )
+    );
+    g_assert_no_error (error);
+    g_assert_cmpint (
+        disposition,
+        ==,
+        ATM_CONTROL_STATE_CUTOVER_IMPORTED_LEGACY
+    );
+    g_assert_true (
+        g_file_test (
+            control,
+            G_FILE_TEST_IS_REGULAR
+        )
+    );
+
+    char *wal = g_strconcat (
+        control,
+        "-wal",
+        NULL
+    );
+    char *shm = g_strconcat (
+        control,
+        "-shm",
+        NULL
+    );
+    g_assert_false (
+        g_file_test (
+            wal,
+            G_FILE_TEST_EXISTS
+        )
+    );
+    g_assert_false (
+        g_file_test (
+            shm,
+            G_FILE_TEST_EXISTS
+        )
+    );
+    g_free (wal);
+    g_free (shm);
+
+    char *after = NULL;
+    gsize after_length = 0;
+
+    g_assert_true (
+        g_file_get_contents (
+            legacy,
+            &after,
+            &after_length,
+            &error
+        )
+    );
+    g_assert_no_error (error);
+    g_assert_cmpuint (
+        before_length,
+        ==,
+        after_length
+    );
+    g_assert_cmpmem (
+        before,
+        before_length,
+        after,
+        after_length
+    );
+
+    g_assert_cmpint (
+        raw_pragma_int64 (
+            control,
+            "SELECT active_repository_generation FROM active_state WHERE singleton_id=1;"
+        ),
+        ==,
+        1
+    );
+    g_assert_cmpint (
+        raw_pragma_int64 (
+            control,
+            "SELECT count(*) FROM migration_ledger WHERE migration_id='state-03a-cutover-v1';"
+        ),
+        ==,
+        1
+    );
+
+    char *origin = raw_pragma_text (
+        control,
+        "SELECT applied_origin FROM migration_ledger WHERE migration_id='state-03a-cutover-v1';"
+    );
+    g_assert_cmpstr (
+        origin,
+        ==,
+        "repository-state.json/schema=2"
+    );
+    g_free (origin);
+
+    AtmControlStateStore *store = NULL;
+    g_assert_true (
+        atm_control_state_open (
+            control,
+            &store,
+            &error
+        )
+    );
+    g_assert_no_error (error);
+
+    gboolean matches = FALSE;
+    g_assert_true (
+        atm_control_state_generation_matches_legacy_json (
+            store,
+            1,
+            legacy,
+            &matches,
+            &error
+        )
+    );
+    g_assert_no_error (error);
+    g_assert_true (matches);
+    atm_control_state_close (store);
+
+    assert_no_cutover_candidates (root);
+
+    AtmControlStateCutoverDisposition second =
+        ATM_CONTROL_STATE_CUTOVER_EMPTY;
+    g_assert_false (
+        atm_control_state_publish_cutover (
+            control,
+            legacy,
+            &second,
+            &error
+        )
+    );
+    g_assert_error (
+        error,
+        ATM_CONTROL_STATE_ERROR,
+        ATM_CONTROL_STATE_ERROR_CONFLICT
+    );
+    g_clear_error (&error);
+
+    g_free (before);
+    g_free (after);
+    g_free (legacy);
+    g_free (control);
+    remove_tree_best_effort (root);
+    g_free (root);
+}
+
+static void
+test_atomic_cutover_invalid_legacy_publishes_nothing (void)
+{
+    char *root = new_temp_root (
+        "atm-control-state-cutover-invalid-XXXXXX"
+    );
+    char *control =
+        control_state_path_for_root (root);
+    char *legacy = legacy_state_path (
+        root,
+        "repository-state.json"
+    );
+    write_legacy_state (
+        legacy,
+        "{ this is not json"
+    );
+
+    AtmControlStateCutoverDisposition disposition =
+        ATM_CONTROL_STATE_CUTOVER_EMPTY;
+    GError *error = NULL;
+
+    g_assert_false (
+        atm_control_state_publish_cutover (
+            control,
+            legacy,
+            &disposition,
+            &error
+        )
+    );
+    g_assert_error (
+        error,
+        ATM_CONTROL_STATE_ERROR,
+        ATM_CONTROL_STATE_ERROR_LEGACY_STATE
+    );
+    g_clear_error (&error);
+
+    g_assert_false (
+        g_file_test (
+            control,
+            G_FILE_TEST_EXISTS
+        )
+    );
+    assert_no_cutover_candidates (root);
+
+    g_free (legacy);
+    g_free (control);
+    remove_tree_best_effort (root);
+    g_free (root);
+}
+
+static void
+test_atomic_cutover_empty_bootstrap (void)
+{
+    char *root = new_temp_root (
+        "atm-control-state-cutover-empty-XXXXXX"
+    );
+    char *control =
+        control_state_path_for_root (root);
+    char *legacy = legacy_state_path (
+        root,
+        "repository-state.json"
+    );
+
+    AtmControlStateCutoverDisposition disposition =
+        ATM_CONTROL_STATE_CUTOVER_IMPORTED_LEGACY;
+    GError *error = NULL;
+
+    g_assert_true (
+        atm_control_state_publish_cutover (
+            control,
+            legacy,
+            &disposition,
+            &error
+        )
+    );
+    g_assert_no_error (error);
+    g_assert_cmpint (
+        disposition,
+        ==,
+        ATM_CONTROL_STATE_CUTOVER_EMPTY
+    );
+    g_assert_cmpint (
+        raw_pragma_int64 (
+            control,
+            "SELECT active_repository_generation IS NULL FROM active_state WHERE singleton_id=1;"
+        ),
+        ==,
+        1
+    );
+    g_assert_cmpint (
+        raw_pragma_int64 (
+            control,
+            "SELECT count(*) FROM repository_generations;"
+        ),
+        ==,
+        0
+    );
+
+    char *origin = raw_pragma_text (
+        control,
+        "SELECT applied_origin FROM migration_ledger WHERE migration_id='state-03a-cutover-v1';"
+    );
+    g_assert_cmpstr (
+        origin,
+        ==,
+        "empty-bootstrap"
+    );
+    g_free (origin);
+
+    assert_no_cutover_candidates (root);
+
+    g_free (legacy);
+    g_free (control);
+    remove_tree_best_effort (root);
+    g_free (root);
+}
+
+static void
+test_atomic_cutover_never_replaces_existing_db (void)
+{
+    char *root = new_temp_root (
+        "atm-control-state-cutover-existing-XXXXXX"
+    );
+    char *control =
+        control_state_path_for_root (root);
+    char *legacy = legacy_state_path (
+        root,
+        "repository-state.json"
+    );
+
+    AtmControlStateStore *store = NULL;
+    GError *error = NULL;
+    g_assert_true (
+        atm_control_state_open (
+            control,
+            &store,
+            &error
+        )
+    );
+    g_assert_no_error (error);
+    atm_control_state_close (store);
+
+    gint64 application_id_before =
+        raw_pragma_int64 (
+            control,
+            "PRAGMA application_id;"
+        );
+
+    write_legacy_state (
+        legacy,
+        "{"
+        "\"schema_version\":1,"
+        "\"repositories\":["
+        "{\"id\":\"rmd\",\"sha\":\"0123456789abcdef0123456789abcdef01234567\",\"version\":\"0.1.0\"}"
+        "]"
+        "}"
+    );
+
+    AtmControlStateCutoverDisposition disposition =
+        ATM_CONTROL_STATE_CUTOVER_EMPTY;
+    g_assert_false (
+        atm_control_state_publish_cutover (
+            control,
+            legacy,
+            &disposition,
+            &error
+        )
+    );
+    g_assert_error (
+        error,
+        ATM_CONTROL_STATE_ERROR,
+        ATM_CONTROL_STATE_ERROR_CONFLICT
+    );
+    g_clear_error (&error);
+
+    g_assert_cmpint (
+        raw_pragma_int64 (
+            control,
+            "PRAGMA application_id;"
+        ),
+        ==,
+        application_id_before
+    );
+    g_assert_cmpint (
+        raw_pragma_int64 (
+            control,
+            "SELECT count(*) FROM migration_ledger;"
+        ),
+        ==,
+        0
+    );
+    assert_no_cutover_candidates (root);
+
+    g_free (legacy);
+    g_free (control);
+    remove_tree_best_effort (root);
+    g_free (root);
+}
+
 int
 main (int argc, char **argv)
 {
@@ -1062,6 +1495,22 @@ main (int argc, char **argv)
     g_test_add_func (
         "/control-state/legacy-invalid-fail-closed",
         test_invalid_legacy_imports_fail_closed
+    );
+    g_test_add_func (
+        "/control-state/cutover-import-activate",
+        test_atomic_cutover_imports_and_activates
+    );
+    g_test_add_func (
+        "/control-state/cutover-invalid-no-publish",
+        test_atomic_cutover_invalid_legacy_publishes_nothing
+    );
+    g_test_add_func (
+        "/control-state/cutover-empty-bootstrap",
+        test_atomic_cutover_empty_bootstrap
+    );
+    g_test_add_func (
+        "/control-state/cutover-no-replace",
+        test_atomic_cutover_never_replaces_existing_db
     );
 
     return g_test_run ();

@@ -24,6 +24,11 @@ typedef enum {
 
 typedef struct AtmControlStateStore AtmControlStateStore;
 
+typedef enum {
+    ATM_CONTROL_STATE_CUTOVER_EMPTY,
+    ATM_CONTROL_STATE_CUTOVER_IMPORTED_LEGACY
+} AtmControlStateCutoverDisposition;
+
 GQuark atm_control_state_error_quark (void);
 
 gboolean atm_control_state_open (
@@ -38,6 +43,13 @@ void atm_control_state_close (
 
 gboolean atm_control_state_validate (
     AtmControlStateStore *store,
+    GError **error
+);
+
+gboolean atm_control_state_publish_cutover (
+    const char *control_path,
+    const char *legacy_json_path,
+    AtmControlStateCutoverDisposition *out_disposition,
     GError **error
 );
 

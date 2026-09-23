@@ -277,6 +277,19 @@
       "tested_by": [
         "meson:control-state"
       ]
+    },
+    {
+      "id": "STATE-S0-003",
+      "category": "STATE",
+      "severity": "S0",
+      "lifecycle": "enforced",
+      "statement": "The STATE-03a cutover primitive may publish control-state.sqlite3 only when that authoritative path is absent. It must validate legacy state before candidate creation, build and fully validate the candidate privately in the same state directory, import and semantically verify legacy state when present, activate only the verified COMPLETE generation, record cutover provenance, checkpoint and close WAL cleanly, fsync the database, publish without replacing a concurrent/existing authority, fsync the directory, leave repository-state.json byte-for-byte untouched, and remove unpublished candidates on failure. STATE-03a remains runtime-dormant and does not itself switch application authority.",
+      "enforced_by": [
+        "src/control_state.c"
+      ],
+      "tested_by": [
+        "meson:control-state"
+      ]
     }
   ]
 }
