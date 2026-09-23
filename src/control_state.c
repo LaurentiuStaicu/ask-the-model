@@ -14,7 +14,11 @@
 #include <unistd.h>
 
 #define ATM_CONTROL_STATE_SCHEMA_RESOURCE \
-    "/io/github/laurentiustaicu/ask_the_model/schemas/control-state-v1.sql"
+    "/io/github/laurentiustaicu/ask_the_model/schemas/control-state-v2.sql"
+#define ATM_CONTROL_STATE_MIGRATION_V1_V2_RESOURCE \
+    "/io/github/laurentiustaicu/ask_the_model/schemas/control-state-v1-to-v2.sql"
+#define ATM_CONTROL_STATE_SCHEMA_V1_ID "atm-control-state/1"
+#define ATM_CONTROL_STATE_SCHEMA_V1_VERSION 1
 
 struct AtmControlStateStore {
     sqlite3 *db;
@@ -238,14 +242,27 @@ database_has_user_objects (
 }
 
 static gboolean
-load_schema_sql (
+load_sql_resource (
+    const char *resource_path,
     char **out_sql,
     GError **error
 )
 {
+    if (!nonempty (resource_path) ||
+        out_sql == NULL ||
+        *out_sql != NULL) {
+        g_set_error_literal (
+            error,
+            ATM_CONTROL_STATE_ERROR,
+            ATM_CONTROL_STATE_ERROR_ARGUMENT,
+            "Control-state SQL resource load received invalid arguments."
+        );
+        return FALSE;
+    }
+
     GError *resource_error = NULL;
     GBytes *bytes = g_resources_lookup_data (
-        ATM_CONTROL_STATE_SCHEMA_RESOURCE,
+        resource_path,
         G_RESOURCE_LOOKUP_FLAGS_NONE,
         &resource_error
     );
@@ -255,7 +272,8 @@ load_schema_sql (
             error,
             ATM_CONTROL_STATE_ERROR,
             ATM_CONTROL_STATE_ERROR_SCHEMA,
-            "Could not load control-state schema resource: %s",
+            "Could not load control-state SQL resource %s: %s",
+            resource_path,
             resource_error != NULL
                 ? resource_error->message
                 : "unknown resource error"
@@ -272,11 +290,12 @@ load_schema_sql (
 
     if (data == NULL || size == 0) {
         g_bytes_unref (bytes);
-        g_set_error_literal (
+        g_set_error (
             error,
             ATM_CONTROL_STATE_ERROR,
             ATM_CONTROL_STATE_ERROR_SCHEMA,
-            "Control-state schema resource is empty."
+            "Control-state SQL resource %s is empty.",
+            resource_path
         );
         return FALSE;
     }
@@ -377,7 +396,8 @@ bootstrap_schema (
 {
     char *schema_sql = NULL;
 
-    if (!load_schema_sql (
+    if (!load_sql_resource (
+            ATM_CONTROL_STATE_SCHEMA_RESOURCE,
             &schema_sql,
             error
         )) {
@@ -589,6 +609,412 @@ validate_integrity (
     }
 
     return TRUE;
+}
+
+
+static gboolean
+required_trigger_exists (
+    sqlite3 *db,
+    const char *name,
+    GError **error
+)
+{
+    sqlite3_stmt *statement = NULL;
+
+    if (sqlite3_prepare_v2 (
+            db,
+            "SELECT 1 FROM sqlite_master "
+            "WHERE type='trigger' AND name=?1;",
+            -1,
+            &statement,
+            NULL
+        ) != SQLITE_OK) {
+        set_sqlite_error (
+            db,
+            error,
+            ATM_CONTROL_STATE_ERROR_SQLITE,
+            "Could not prepare control-state trigger query"
+        );
+        return FALSE;
+    }
+
+    sqlite3_bind_text (
+        statement,
+        1,
+        name,
+        -1,
+        SQLITE_STATIC
+    );
+
+    gboolean exists =
+        sqlite3_step (statement) == SQLITE_ROW;
+    sqlite3_finalize (statement);
+
+    if (!exists) {
+        g_set_error (
+            error,
+            ATM_CONTROL_STATE_ERROR,
+            ATM_CONTROL_STATE_ERROR_SCHEMA,
+            "Control-state required trigger '%s' is missing.",
+            name
+        );
+        return FALSE;
+    }
+
+    return TRUE;
+}
+
+static gboolean
+validate_schema_id_value (
+    sqlite3 *db,
+    const char *expected_schema_id,
+    GError **error
+)
+{
+    char *schema_id = NULL;
+
+    if (!query_single_text (
+            db,
+            "SELECT schema_id FROM installation "
+            "WHERE singleton_id=1;",
+            &schema_id,
+            error
+        )) {
+        return FALSE;
+    }
+
+    gboolean matches =
+        g_strcmp0 (
+            schema_id,
+            expected_schema_id
+        ) == 0;
+    g_free (schema_id);
+
+    if (!matches) {
+        g_set_error (
+            error,
+            ATM_CONTROL_STATE_ERROR,
+            ATM_CONTROL_STATE_ERROR_SCHEMA,
+            "Control-state installation schema identity does not match %s.",
+            expected_schema_id
+        );
+        return FALSE;
+    }
+
+    return TRUE;
+}
+
+static gboolean
+validate_persisted_generation_semantics (
+    sqlite3 *db,
+    GError **error
+)
+{
+    gint64 active_rows = 0;
+    gint64 candidate_rows = 0;
+    gint64 invalid_active_rows = 0;
+
+    if (!query_single_int64 (
+            db,
+            "SELECT count(*) FROM active_state "
+            "WHERE singleton_id=1;",
+            &active_rows,
+            error
+        ) ||
+        !query_single_int64 (
+            db,
+            "SELECT count(*) FROM repository_generations "
+            "WHERE lifecycle='CANDIDATE';",
+            &candidate_rows,
+            error
+        ) ||
+        !query_single_int64 (
+            db,
+            "SELECT count(*) "
+            "FROM active_state a "
+            "LEFT JOIN repository_generations g "
+            "ON g.generation_id=a.active_repository_generation "
+            "WHERE a.singleton_id=1 "
+            "AND a.active_repository_generation IS NOT NULL "
+            "AND (g.generation_id IS NULL OR g.lifecycle!='COMPLETE');",
+            &invalid_active_rows,
+            error
+        )) {
+        return FALSE;
+    }
+
+    if (active_rows != 1) {
+        g_set_error_literal (
+            error,
+            ATM_CONTROL_STATE_ERROR,
+            ATM_CONTROL_STATE_ERROR_SCHEMA,
+            "Control-state active_state singleton row is missing."
+        );
+        return FALSE;
+    }
+
+    if (candidate_rows != 0) {
+        g_set_error_literal (
+            error,
+            ATM_CONTROL_STATE_ERROR,
+            ATM_CONTROL_STATE_ERROR_INTEGRITY,
+            "Control-state contains a persisted CANDIDATE repository generation."
+        );
+        return FALSE;
+    }
+
+    if (invalid_active_rows != 0) {
+        g_set_error_literal (
+            error,
+            ATM_CONTROL_STATE_ERROR,
+            ATM_CONTROL_STATE_ERROR_INTEGRITY,
+            "Control-state active repository generation is not COMPLETE."
+        );
+        return FALSE;
+    }
+
+    return TRUE;
+}
+
+static gboolean
+validate_v1_for_migration (
+    sqlite3 *db,
+    GError **error
+)
+{
+    static const char *required_tables[] = {
+        "installation",
+        "repository_generations",
+        "generation_repositories",
+        "active_state",
+        "migration_ledger"
+    };
+
+    for (gsize i = 0;
+         i < G_N_ELEMENTS (required_tables);
+         i++) {
+        if (!required_table_exists (
+                db,
+                required_tables[i],
+                error
+            )) {
+            return FALSE;
+        }
+    }
+
+    return validate_schema_id_value (
+            db,
+            ATM_CONTROL_STATE_SCHEMA_V1_ID,
+            error
+        ) &&
+        validate_integrity (
+            db,
+            error
+        ) &&
+        validate_persisted_generation_semantics (
+            db,
+            error
+        );
+}
+
+static gboolean
+migrate_v1_to_v2 (
+    AtmControlStateStore *store,
+    GError **error
+)
+{
+    if (store == NULL ||
+        store->db == NULL) {
+        g_set_error_literal (
+            error,
+            ATM_CONTROL_STATE_ERROR,
+            ATM_CONTROL_STATE_ERROR_ARGUMENT,
+            "Control-state schema migration requires an open store."
+        );
+        return FALSE;
+    }
+
+    if (!validate_v1_for_migration (
+            store->db,
+            error
+        )) {
+        return FALSE;
+    }
+
+    char *migration_sql = NULL;
+
+    if (!load_sql_resource (
+            ATM_CONTROL_STATE_MIGRATION_V1_V2_RESOURCE,
+            &migration_sql,
+            error
+        )) {
+        return FALSE;
+    }
+
+    if (!exec_sql (
+            store->db,
+            "BEGIN IMMEDIATE;",
+            error
+        )) {
+        g_free (migration_sql);
+        return FALSE;
+    }
+
+    gboolean ok = FALSE;
+
+    if (!exec_sql (
+            store->db,
+            migration_sql,
+            error
+        )) {
+        goto rollback;
+    }
+
+    char *version_sql = g_strdup_printf (
+        "PRAGMA user_version=%d;",
+        ATM_CONTROL_STATE_SCHEMA_VERSION
+    );
+
+    if (!exec_sql (
+            store->db,
+            version_sql,
+            error
+        )) {
+        g_free (version_sql);
+        goto rollback;
+    }
+
+    g_free (version_sql);
+
+    if (!atm_control_state_validate (
+            store,
+            error
+        )) {
+        goto rollback;
+    }
+
+    if (!exec_sql (
+            store->db,
+            "COMMIT;",
+            error
+        )) {
+        goto rollback;
+    }
+
+    ok = TRUE;
+
+rollback:
+    if (!ok) {
+        sqlite3_exec (
+            store->db,
+            "ROLLBACK;",
+            NULL,
+            NULL,
+            NULL
+        );
+    }
+
+    g_free (migration_sql);
+    return ok;
+}
+
+static gboolean
+ensure_control_state_schema (
+    AtmControlStateStore *store,
+    gboolean allow_bootstrap,
+    GError **error
+)
+{
+    gboolean has_objects = FALSE;
+
+    if (!database_has_user_objects (
+            store->db,
+            &has_objects,
+            error
+        )) {
+        return FALSE;
+    }
+
+    gint64 application_id = 0;
+    gint64 user_version = 0;
+
+    if (!query_single_int64 (
+            store->db,
+            "PRAGMA application_id;",
+            &application_id,
+            error
+        ) ||
+        !query_single_int64 (
+            store->db,
+            "PRAGMA user_version;",
+            &user_version,
+            error
+        )) {
+        return FALSE;
+    }
+
+    if (!has_objects &&
+        application_id == 0 &&
+        user_version == 0) {
+        if (!allow_bootstrap) {
+            g_set_error_literal (
+                error,
+                ATM_CONTROL_STATE_ERROR,
+                ATM_CONTROL_STATE_ERROR_SCHEMA,
+                "Existing control-state authority is empty and cannot be bootstrapped implicitly."
+            );
+            return FALSE;
+        }
+
+        if (!bootstrap_schema (
+                store->db,
+                error
+            )) {
+            return FALSE;
+        }
+    } else if (
+        application_id !=
+            (gint64) ATM_CONTROL_STATE_APPLICATION_ID
+    ) {
+        g_set_error (
+            error,
+            ATM_CONTROL_STATE_ERROR,
+            ATM_CONTROL_STATE_ERROR_IDENTITY,
+            "Refusing SQLite file with application_id %" G_GINT64_FORMAT
+            " as AtM control state.",
+            application_id
+        );
+        return FALSE;
+    } else if (
+        user_version ==
+            ATM_CONTROL_STATE_SCHEMA_V1_VERSION
+    ) {
+        if (!migrate_v1_to_v2 (
+                store,
+                error
+            )) {
+            return FALSE;
+        }
+
+        return TRUE;
+    } else if (
+        user_version !=
+            ATM_CONTROL_STATE_SCHEMA_VERSION
+    ) {
+        g_set_error (
+            error,
+            ATM_CONTROL_STATE_ERROR,
+            ATM_CONTROL_STATE_ERROR_SCHEMA,
+            "Unsupported AtM control-state user_version %" G_GINT64_FORMAT ".",
+            user_version
+        );
+        return FALSE;
+    }
+
+    return atm_control_state_validate (
+        store,
+        error
+    );
 }
 
 
@@ -2094,8 +2520,9 @@ open_existing_control_state (
             db,
             error
         ) ||
-        !atm_control_state_validate (
+        !ensure_control_state_schema (
             store,
+            FALSE,
             error
         )) {
         atm_control_state_close (store);
@@ -3753,39 +4180,46 @@ atm_control_state_validate (
         }
     }
 
-    char *schema_id = NULL;
+    static const char *required_triggers[] = {
+        "trg_installation_immutable_update",
+        "trg_installation_immutable_delete",
+        "trg_repository_generations_no_complete_insert",
+        "trg_repository_generations_complete_update",
+        "trg_repository_generations_complete_delete",
+        "trg_generation_repositories_complete_insert",
+        "trg_generation_repositories_complete_update",
+        "trg_generation_repositories_complete_delete",
+        "trg_active_state_guard_update",
+        "trg_active_state_no_delete",
+        "trg_migration_ledger_append_only_update",
+        "trg_migration_ledger_append_only_delete"
+    };
 
-    if (!query_single_text (
+    for (gsize i = 0;
+         i < G_N_ELEMENTS (required_triggers);
+         i++) {
+        if (!required_trigger_exists (
+                store->db,
+                required_triggers[i],
+                error
+            )) {
+            return FALSE;
+        }
+    }
+
+    return validate_schema_id_value (
             store->db,
-            "SELECT schema_id FROM installation "
-            "WHERE singleton_id=1;",
-            &schema_id,
+            ATM_CONTROL_STATE_SCHEMA_ID,
             error
-        )) {
-        return FALSE;
-    }
-
-    gboolean schema_id_ok =
-        g_strcmp0 (
-            schema_id,
-            ATM_CONTROL_STATE_SCHEMA_ID
-        ) == 0;
-    g_free (schema_id);
-
-    if (!schema_id_ok) {
-        g_set_error_literal (
-            error,
-            ATM_CONTROL_STATE_ERROR,
-            ATM_CONTROL_STATE_ERROR_SCHEMA,
-            "Control-state installation schema identity is invalid."
+        ) &&
+        validate_integrity (
+            store->db,
+            error
+        ) &&
+        validate_persisted_generation_semantics (
+            store->db,
+            error
         );
-        return FALSE;
-    }
-
-    return validate_integrity (
-        store->db,
-        error
-    );
 }
 
 gboolean
@@ -3864,77 +4298,9 @@ atm_control_state_open (
         return FALSE;
     }
 
-    gboolean has_objects = FALSE;
-
-    if (!database_has_user_objects (
-            db,
-            &has_objects,
-            error
-        )) {
-        atm_control_state_close (store);
-        return FALSE;
-    }
-
-    gint64 application_id = 0;
-    gint64 user_version = 0;
-
-    if (!query_single_int64 (
-            db,
-            "PRAGMA application_id;",
-            &application_id,
-            error
-        ) ||
-        !query_single_int64 (
-            db,
-            "PRAGMA user_version;",
-            &user_version,
-            error
-        )) {
-        atm_control_state_close (store);
-        return FALSE;
-    }
-
-    if (!has_objects &&
-        application_id == 0 &&
-        user_version == 0) {
-        if (!bootstrap_schema (
-                db,
-                error
-            )) {
-            atm_control_state_close (store);
-            return FALSE;
-        }
-    } else if (
-        application_id !=
-            (gint64) ATM_CONTROL_STATE_APPLICATION_ID
-    ) {
-        g_set_error (
-            error,
-            ATM_CONTROL_STATE_ERROR,
-            ATM_CONTROL_STATE_ERROR_IDENTITY,
-            "Refusing SQLite file with application_id %" G_GINT64_FORMAT
-            " as AtM control state.",
-            application_id
-        );
-        atm_control_state_close (store);
-        return FALSE;
-    } else if (
-        user_version !=
-            ATM_CONTROL_STATE_SCHEMA_VERSION
-    ) {
-        g_set_error (
-            error,
-            ATM_CONTROL_STATE_ERROR,
-            ATM_CONTROL_STATE_ERROR_SCHEMA,
-            "Unsupported AtM control-state user_version %" G_GINT64_FORMAT ".",
-            user_version
-        );
-        atm_control_state_close (store);
-        return FALSE;
-    }
-
-    if (!atm_control_state_validate (
+    if (!ensure_control_state_schema (
             store,
+            TRUE,
             error
         )) {
         atm_control_state_close (store);

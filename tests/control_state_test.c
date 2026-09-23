@@ -1,5 +1,6 @@
 #include <glib.h>
 #include <glib/gstdio.h>
+#include <gio/gio.h>
 #include <sqlite3.h>
 
 #include "control_state.h"
@@ -163,6 +164,163 @@ raw_pragma_text (
     sqlite3_finalize (statement);
     sqlite3_close (db);
     return value;
+}
+
+
+static int
+raw_exec (
+    const char *path,
+    const char *sql,
+    char **out_message
+)
+{
+    sqlite3 *db = NULL;
+    char *message = NULL;
+
+    g_assert_cmpint (
+        sqlite3_open (
+            path,
+            &db
+        ),
+        ==,
+        SQLITE_OK
+    );
+
+    int rc = sqlite3_exec (
+        db,
+        sql,
+        NULL,
+        NULL,
+        &message
+    );
+
+    if (out_message != NULL) {
+        *out_message = g_strdup (
+            message != NULL
+                ? message
+                : ""
+        );
+    }
+
+    sqlite3_free (message);
+    sqlite3_close (db);
+    return rc;
+}
+
+static void
+create_v1_control_db (
+    const char *path,
+    gboolean with_repository_state,
+    gboolean with_persisted_candidate
+)
+{
+    GError *resource_error = NULL;
+    GBytes *bytes = g_resources_lookup_data (
+        "/io/github/laurentiustaicu/ask_the_model/schemas/control-state-v1.sql",
+        G_RESOURCE_LOOKUP_FLAGS_NONE,
+        &resource_error
+    );
+
+    g_assert_no_error (resource_error);
+    g_assert_nonnull (bytes);
+
+    gsize size = 0;
+    const char *schema = g_bytes_get_data (
+        bytes,
+        &size
+    );
+    g_assert_nonnull (schema);
+    g_assert_cmpuint (size, >, 0);
+
+    sqlite3 *db = NULL;
+    g_assert_cmpint (
+        sqlite3_open (
+            path,
+            &db
+        ),
+        ==,
+        SQLITE_OK
+    );
+
+    char *schema_sql = g_strndup (
+        schema,
+        size
+    );
+    char *bootstrap = g_strdup_printf (
+        "BEGIN IMMEDIATE;"
+        "%s"
+        "PRAGMA application_id=%u;"
+        "PRAGMA user_version=1;"
+        "COMMIT;",
+        schema_sql,
+        (guint) ATM_CONTROL_STATE_APPLICATION_ID
+    );
+
+    g_assert_cmpint (
+        sqlite3_exec (
+            db,
+            bootstrap,
+            NULL,
+            NULL,
+            NULL
+        ),
+        ==,
+        SQLITE_OK
+    );
+
+    if (with_repository_state) {
+        g_assert_cmpint (
+            sqlite3_exec (
+                db,
+                "BEGIN IMMEDIATE;"
+                "INSERT INTO repository_generations("
+                "generation_id,lifecycle,origin"
+                ") VALUES(1,'COMPLETE','v1-fixture');"
+                "INSERT INTO generation_repositories("
+                "generation_id,repository_id,snapshot_sha,"
+                "repository_version,snapshot_seal_sha256"
+                ") VALUES("
+                "1,'rmd',"
+                "'0123456789abcdef0123456789abcdef01234567',"
+                "'0.1.0',"
+                "'aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa'"
+                ");"
+                "UPDATE active_state "
+                "SET active_repository_generation=1 "
+                "WHERE singleton_id=1;"
+                "INSERT INTO migration_ledger("
+                "migration_id,schema_version,applied_origin"
+                ") VALUES('v1-fixture-ledger',1,'test-fixture');"
+                "COMMIT;",
+                NULL,
+                NULL,
+                NULL
+            ),
+            ==,
+            SQLITE_OK
+        );
+    }
+
+    if (with_persisted_candidate) {
+        g_assert_cmpint (
+            sqlite3_exec (
+                db,
+                "INSERT INTO repository_generations("
+                "generation_id,lifecycle,origin"
+                ") VALUES(99,'CANDIDATE','invalid-persisted-candidate');",
+                NULL,
+                NULL,
+                NULL
+            ),
+            ==,
+            SQLITE_OK
+        );
+    }
+
+    g_free (bootstrap);
+    g_free (schema_sql);
+    sqlite3_close (db);
+    g_bytes_unref (bytes);
 }
 
 static void
@@ -1736,10 +1894,10 @@ test_runtime_mutations_are_copy_on_write (void)
 
 
 static void
-test_orphan_generation_without_active_is_rejected (void)
+test_direct_complete_insert_is_rejected (void)
 {
     char *root = new_temp_root (
-        "atm-control-state-orphan-XXXXXX"
+        "atm-control-state-direct-complete-XXXXXX"
     );
     char *control =
         control_state_path_for_root (root);
@@ -1756,10 +1914,425 @@ test_orphan_generation_without_active_is_rejected (void)
     g_assert_no_error (error);
     atm_control_state_close (store);
 
+    char *message = NULL;
+    int rc = raw_exec (
+        control,
+        "INSERT INTO repository_generations("
+        "generation_id,lifecycle,origin"
+        ") VALUES(1,'COMPLETE','direct-complete');",
+        &message
+    );
+
+    g_assert_cmpint (
+        rc,
+        ==,
+        SQLITE_CONSTRAINT
+    );
+    g_assert_nonnull (
+        strstr (
+            message,
+            "must be completed from CANDIDATE"
+        )
+    );
+    g_free (message);
+
+    g_assert_cmpint (
+        raw_pragma_int64 (
+            control,
+            "SELECT count(*) FROM repository_generations;"
+        ),
+        ==,
+        0
+    );
+
+    g_free (control);
+    remove_tree_best_effort (root);
+    g_free (root);
+}
+
+static void
+test_v1_auto_migration_preserves_state (void)
+{
+    char *root = new_temp_root (
+        "atm-control-state-v1-migrate-XXXXXX"
+    );
+    char *path = db_path (root);
+
+    create_v1_control_db (
+        path,
+        TRUE,
+        FALSE
+    );
+
+    g_assert_cmpint (
+        raw_pragma_int64 (
+            path,
+            "PRAGMA user_version;"
+        ),
+        ==,
+        1
+    );
+    char *before_schema = raw_pragma_text (
+        path,
+        "SELECT schema_id FROM installation "
+        "WHERE singleton_id=1;"
+    );
+    g_assert_cmpstr (
+        before_schema,
+        ==,
+        "atm-control-state/1"
+    );
+    g_free (before_schema);
+
+    AtmControlStateStore *store = NULL;
+    GError *error = NULL;
+    g_assert_true (
+        atm_control_state_open (
+            path,
+            &store,
+            &error
+        )
+    );
+    g_assert_no_error (error);
+    g_assert_cmpint (
+        atm_control_state_schema_version (
+            store
+        ),
+        ==,
+        2
+    );
+    atm_control_state_close (store);
+
+    g_assert_cmpint (
+        raw_pragma_int64 (
+            path,
+            "PRAGMA user_version;"
+        ),
+        ==,
+        2
+    );
+
+    char *schema_id = raw_pragma_text (
+        path,
+        "SELECT schema_id FROM installation "
+        "WHERE singleton_id=1;"
+    );
+    g_assert_cmpstr (
+        schema_id,
+        ==,
+        "atm-control-state/2"
+    );
+    g_free (schema_id);
+
+    g_assert_cmpint (
+        raw_pragma_int64 (
+            path,
+            "SELECT active_repository_generation "
+            "FROM active_state WHERE singleton_id=1;"
+        ),
+        ==,
+        1
+    );
+
+    char *sha = raw_pragma_text (
+        path,
+        "SELECT snapshot_sha "
+        "FROM generation_repositories "
+        "WHERE generation_id=1 "
+        "AND repository_id='rmd';"
+    );
+    g_assert_cmpstr (
+        sha,
+        ==,
+        "0123456789abcdef0123456789abcdef01234567"
+    );
+    g_free (sha);
+
+    char *seal = raw_pragma_text (
+        path,
+        "SELECT snapshot_seal_sha256 "
+        "FROM generation_repositories "
+        "WHERE generation_id=1 "
+        "AND repository_id='rmd';"
+    );
+    g_assert_cmpstr (
+        seal,
+        ==,
+        "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa"
+    );
+    g_free (seal);
+
+    g_assert_cmpint (
+        raw_pragma_int64 (
+            path,
+            "SELECT count(*) FROM migration_ledger "
+            "WHERE migration_id='v1-fixture-ledger';"
+        ),
+        ==,
+        1
+    );
+    g_assert_cmpint (
+        raw_pragma_int64 (
+            path,
+            "SELECT count(*) FROM migration_ledger "
+            "WHERE migration_id='state-schema-v1-to-v2' "
+            "AND schema_version=2 "
+            "AND applied_origin='automatic-open-migration';"
+        ),
+        ==,
+        1
+    );
+    g_assert_cmpint (
+        raw_pragma_int64 (
+            path,
+            "SELECT count(*) FROM sqlite_master "
+            "WHERE type='trigger' "
+            "AND name LIKE 'trg_%';"
+        ),
+        ==,
+        12
+    );
+
+    g_assert_true (
+        atm_control_state_set_current_values (
+            path,
+            "rmd",
+            "1111111111111111111111111111111111111111",
+            "0.2.0",
+            NULL,
+            &error
+        )
+    );
+    g_assert_no_error (error);
+
+    g_assert_cmpint (
+        raw_pragma_int64 (
+            path,
+            "SELECT active_repository_generation "
+            "FROM active_state WHERE singleton_id=1;"
+        ),
+        ==,
+        2
+    );
+
+    char *historical_sha = raw_pragma_text (
+        path,
+        "SELECT snapshot_sha "
+        "FROM generation_repositories "
+        "WHERE generation_id=1 "
+        "AND repository_id='rmd';"
+    );
+    g_assert_cmpstr (
+        historical_sha,
+        ==,
+        "0123456789abcdef0123456789abcdef01234567"
+    );
+    g_free (historical_sha);
+
+    g_free (path);
+    remove_tree_best_effort (root);
+    g_free (root);
+}
+
+static void
+test_v1_invalid_state_rolls_back_migration (void)
+{
+    char *root = new_temp_root (
+        "atm-control-state-v1-invalid-XXXXXX"
+    );
+    char *path = db_path (root);
+
+    create_v1_control_db (
+        path,
+        TRUE,
+        TRUE
+    );
+
+    AtmControlStateStore *store = NULL;
+    GError *error = NULL;
+
+    g_assert_false (
+        atm_control_state_open (
+            path,
+            &store,
+            &error
+        )
+    );
+    g_assert_error (
+        error,
+        ATM_CONTROL_STATE_ERROR,
+        ATM_CONTROL_STATE_ERROR_INTEGRITY
+    );
+    g_assert_null (store);
+    g_clear_error (&error);
+
+    g_assert_cmpint (
+        raw_pragma_int64 (
+            path,
+            "PRAGMA user_version;"
+        ),
+        ==,
+        1
+    );
+
+    char *schema_id = raw_pragma_text (
+        path,
+        "SELECT schema_id FROM installation "
+        "WHERE singleton_id=1;"
+    );
+    g_assert_cmpstr (
+        schema_id,
+        ==,
+        "atm-control-state/1"
+    );
+    g_free (schema_id);
+
+    g_assert_cmpint (
+        raw_pragma_int64 (
+            path,
+            "SELECT count(*) FROM sqlite_master "
+            "WHERE type='trigger' "
+            "AND name LIKE 'trg_%';"
+        ),
+        ==,
+        0
+    );
+    g_assert_cmpint (
+        raw_pragma_int64 (
+            path,
+            "SELECT count(*) FROM migration_ledger "
+            "WHERE migration_id='state-schema-v1-to-v2';"
+        ),
+        ==,
+        0
+    );
+
+    g_free (path);
+    remove_tree_best_effort (root);
+    g_free (root);
+}
+
+static void
+test_schema_v2_direct_sql_guards (void)
+{
+    char *root = new_temp_root (
+        "atm-control-state-v2-guards-XXXXXX"
+    );
+    char *path = db_path (root);
+    GError *error = NULL;
+
+    AtmControlStateStore *store = NULL;
+    g_assert_true (
+        atm_control_state_open (
+            path,
+            &store,
+            &error
+        )
+    );
+    g_assert_no_error (error);
+    atm_control_state_close (store);
+
+    g_assert_true (
+        atm_control_state_set_current_values (
+            path,
+            "rmd",
+            "0123456789abcdef0123456789abcdef01234567",
+            "0.1.0",
+            NULL,
+            &error
+        )
+    );
+    g_assert_no_error (error);
+
+    char *message = NULL;
+    g_assert_cmpint (
+        raw_exec (
+            path,
+            "UPDATE generation_repositories "
+            "SET repository_version='tampered' "
+            "WHERE generation_id=1 "
+            "AND repository_id='rmd';",
+            &message
+        ),
+        ==,
+        SQLITE_CONSTRAINT
+    );
+    g_assert_nonnull (
+        strstr (
+            message,
+            "generation rows are immutable"
+        )
+    );
+    g_clear_pointer (&message, g_free);
+
+    g_assert_cmpint (
+        raw_exec (
+            path,
+            "DELETE FROM generation_repositories "
+            "WHERE generation_id=1 "
+            "AND repository_id='rmd';",
+            NULL
+        ),
+        ==,
+        SQLITE_CONSTRAINT
+    );
+
+    g_assert_cmpint (
+        raw_exec (
+            path,
+            "INSERT INTO generation_repositories("
+            "generation_id,repository_id,snapshot_sha,"
+            "repository_version,snapshot_seal_sha256"
+            ") VALUES("
+            "1,'ewd',"
+            "'1111111111111111111111111111111111111111',"
+            "'0.1.0',NULL"
+            ");",
+            NULL
+        ),
+        ==,
+        SQLITE_CONSTRAINT
+    );
+
+    g_assert_cmpint (
+        raw_exec (
+            path,
+            "UPDATE repository_generations "
+            "SET origin='tampered' "
+            "WHERE generation_id=1;",
+            NULL
+        ),
+        ==,
+        SQLITE_CONSTRAINT
+    );
+
+    g_assert_cmpint (
+        raw_exec (
+            path,
+            "DELETE FROM repository_generations "
+            "WHERE generation_id=1;",
+            NULL
+        ),
+        ==,
+        SQLITE_CONSTRAINT
+    );
+
+    g_assert_cmpint (
+        raw_exec (
+            path,
+            "INSERT INTO repository_generations("
+            "generation_id,lifecycle,origin"
+            ") VALUES(2,'COMPLETE','direct-complete');",
+            NULL
+        ),
+        ==,
+        SQLITE_CONSTRAINT
+    );
+
     sqlite3 *db = NULL;
     g_assert_cmpint (
         sqlite3_open (
-            control,
+            path,
             &db
         ),
         ==,
@@ -1768,9 +2341,34 @@ test_orphan_generation_without_active_is_rejected (void)
     g_assert_cmpint (
         sqlite3_exec (
             db,
+            "BEGIN IMMEDIATE;"
             "INSERT INTO repository_generations("
-            "generation_id, lifecycle, origin"
-            ") VALUES(1, 'COMPLETE', 'orphan-test');",
+            "generation_id,lifecycle,origin"
+            ") VALUES(2,'CANDIDATE','candidate-test');",
+            NULL,
+            NULL,
+            NULL
+        ),
+        ==,
+        SQLITE_OK
+    );
+    g_assert_cmpint (
+        sqlite3_exec (
+            db,
+            "UPDATE active_state "
+            "SET active_repository_generation=2 "
+            "WHERE singleton_id=1;",
+            NULL,
+            NULL,
+            NULL
+        ),
+        ==,
+        SQLITE_CONSTRAINT
+    );
+    g_assert_cmpint (
+        sqlite3_exec (
+            db,
+            "ROLLBACK;",
             NULL,
             NULL,
             NULL
@@ -1780,69 +2378,126 @@ test_orphan_generation_without_active_is_rejected (void)
     );
     sqlite3_close (db);
 
-    gboolean present = TRUE;
-    char *sha = NULL;
-    char *version = NULL;
-    char *seal = NULL;
-
-    g_assert_false (
-        atm_control_state_load_repository_values (
-            control,
-            "rmd",
-            &present,
-            &sha,
-            &version,
-            &seal,
-            &error
-        )
-    );
-    g_assert_error (
-        error,
-        ATM_CONTROL_STATE_ERROR,
-        ATM_CONTROL_STATE_ERROR_CONFLICT
-    );
-    g_assert_false (present);
-    g_assert_null (sha);
-    g_assert_null (version);
-    g_assert_null (seal);
-    g_clear_error (&error);
-
-    g_assert_false (
+    g_assert_true (
         atm_control_state_set_current_values (
-            control,
-            "rmd",
-            "1111111111111111111111111111111111111111",
-            "0.1.0",
+            path,
+            "ewd",
+            "2222222222222222222222222222222222222222",
+            "0.2.0",
             NULL,
             &error
         )
     );
-    g_assert_error (
-        error,
-        ATM_CONTROL_STATE_ERROR,
-        ATM_CONTROL_STATE_ERROR_CONFLICT
-    );
-    g_clear_error (&error);
+    g_assert_no_error (error);
 
     g_assert_cmpint (
         raw_pragma_int64 (
-            control,
-            "SELECT count(*) FROM repository_generations;"
-        ),
-        ==,
-        1
-    );
-    g_assert_cmpint (
-        raw_pragma_int64 (
-            control,
-            "SELECT active_repository_generation IS NULL "
+            path,
+            "SELECT active_repository_generation "
             "FROM active_state WHERE singleton_id=1;"
         ),
         ==,
-        1
+        2
     );
 
-    g_free (control);
+    g_assert_cmpint (
+        raw_exec (
+            path,
+            "UPDATE active_state "
+            "SET active_repository_generation=1 "
+            "WHERE singleton_id=1;",
+            NULL
+        ),
+        ==,
+        SQLITE_CONSTRAINT
+    );
+
+    g_assert_cmpint (
+        raw_exec (
+            path,
+            "UPDATE migration_ledger "
+            "SET applied_origin='tampered' "
+            "WHERE migration_id='state-03a-cutover-v1';",
+            NULL
+        ),
+        ==,
+        SQLITE_OK
+    );
+
+    // Empty update above may touch zero rows. Create a ledger row and prove append-only.
+    g_assert_cmpint (
+        raw_exec (
+            path,
+            "INSERT INTO migration_ledger("
+            "migration_id,schema_version,applied_origin"
+            ") VALUES('guard-test',2,'test');",
+            NULL
+        ),
+        ==,
+        SQLITE_OK
+    );
+    g_assert_cmpint (
+        raw_exec (
+            path,
+            "UPDATE migration_ledger "
+            "SET applied_origin='tampered' "
+            "WHERE migration_id='guard-test';",
+            NULL
+        ),
+        ==,
+        SQLITE_CONSTRAINT
+    );
+    g_assert_cmpint (
+        raw_exec (
+            path,
+            "DELETE FROM migration_ledger "
+            "WHERE migration_id='guard-test';",
+            NULL
+        ),
+        ==,
+        SQLITE_CONSTRAINT
+    );
+
+    g_assert_cmpint (
+        raw_exec (
+            path,
+            "DELETE FROM installation "
+            "WHERE singleton_id=1;",
+            NULL
+        ),
+        ==,
+        SQLITE_CONSTRAINT
+    );
+
+    g_assert_cmpint (
+        raw_exec (
+            path,
+            "INSERT INTO repository_generations("
+            "generation_id,lifecycle,origin"
+            ") VALUES(99,'CANDIDATE','persisted-candidate');",
+            NULL
+        ),
+        ==,
+        SQLITE_OK
+    );
+
+    store = NULL;
+    g_assert_false (
+        atm_control_state_open (
+            path,
+            &store,
+            &error
+        )
+    );
+    g_assert_error (
+        error,
+        ATM_CONTROL_STATE_ERROR,
+        ATM_CONTROL_STATE_ERROR_INTEGRITY
+    );
+    g_assert_null (store);
+    g_clear_error (&error);
+
+    g_free (path);
     remove_tree_best_effort (root);
     g_free (root);
 }
@@ -1913,8 +2568,20 @@ main (int argc, char **argv)
         test_runtime_mutations_are_copy_on_write
     );
     g_test_add_func (
-        "/control-state/orphan-generation-no-active",
-        test_orphan_generation_without_active_is_rejected
+        "/control-state/direct-complete-insert-rejected",
+        test_direct_complete_insert_is_rejected
+    );
+    g_test_add_func (
+        "/control-state/schema-v1-auto-migration",
+        test_v1_auto_migration_preserves_state
+    );
+    g_test_add_func (
+        "/control-state/schema-v1-invalid-rollback",
+        test_v1_invalid_state_rolls_back_migration
+    );
+    g_test_add_func (
+        "/control-state/schema-v2-direct-sql-guards",
+        test_schema_v2_direct_sql_guards
     );
 
     return g_test_run ();

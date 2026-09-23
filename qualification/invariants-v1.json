@@ -360,6 +360,23 @@
         "meson:conversation-grounding-vala",
         "meson:conversation-session"
       ]
+    },
+    {
+      "id": "STATE-S0-008",
+      "category": "STATE",
+      "severity": "S0",
+      "lifecycle": "enforced",
+      "statement": "Control DB schema v2 must migrate a valid schema-v1 database atomically and preserve its repository generations, active pointer and ledger history while coherently advancing installation schema_id and user_version. Persistent schema triggers must prevent direct insertion of COMPLETE generations, mutation or deletion of COMPLETE generation identity/repository rows, activation of non-COMPLETE or non-forward generations, deletion of active_state, mutation/deletion of installation identity and mutation/deletion of migration-ledger history. Opening v2 must fail closed when required triggers are missing or a CANDIDATE generation is persistently committed, while normal copy-on-write API transitions remain valid.",
+      "enforced_by": [
+        "data/schemas/control-state-v2.sql",
+        "data/schemas/control-state-v1-to-v2.sql",
+        "src/control_state.c"
+      ],
+      "tested_by": [
+        "meson:control-state",
+        "meson:control-repository-state",
+        "meson:repository-lifecycle-service"
+      ]
     }
   ]
 }
