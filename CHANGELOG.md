@@ -21,6 +21,13 @@ All notable public releases of Ask the Model are recorded here.
 - corrected the effective SQLite compatibility floor from 3.31.0 to 3.37.0 because Control DB schema v1/v2 uses STRICT tables; build-time, runtime, tests and documentation now agree;
 - added `STATE-S0-001` through `STATE-S0-013` qualification invariants plus Flatpak/Meson regression coverage for foundation, import, cutover, authority precedence, copy-on-write history, stale-writer rejection, session generation pinning, schema-level immutability, connection hardening, no-follow authority opens, writable-authority qualification and state-root qualification.
 
+### Conversation persistence foundation
+
+- defined a separate application-owned `conversations.sqlite3` schema and hardened validation layer without wiring persistence into GTK or live chat yet;
+- added STRICT tables for conversation identity/model/repository generation, pinned repository snapshots, committed provider-history messages and durable citation provenance;
+- added fail-closed semantic validation for repository-scope mismatch, incomplete committed turn pairs, invalid grounded-role state and citation provenance that does not match the conversation's pinned repository set;
+- added `SESSION-S0-002` plus Meson regression coverage for bootstrap/reopen, foreign/newer database rejection, valid grounded persistence semantics, invalid citation semantics and symlink rejection.
+
 ### Startup qualification fixes
 
 - accept the effective Flatpak runtime identity in both `runtime/ID/ARCH/BRANCH` and legacy `ID/ARCH/BRANCH` forms while still rejecting wrong ref kinds, IDs, architectures and branches;

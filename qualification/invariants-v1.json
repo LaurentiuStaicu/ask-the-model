@@ -454,6 +454,21 @@
       "tested_by": [
         "meson:control-state"
       ]
+    },
+    {
+      "id": "SESSION-S0-002",
+      "category": "SESSION",
+      "severity": "S0",
+      "lifecycle": "enforced",
+      "statement": "The durable conversation-store foundation must remain a SQLite authority distinct from repository Control DB, use its own application/schema identity and SQLite >= 3.37.0 STRICT schema, open with the hardened no-follow/read-write/defensive/untrusted-schema/DQS-off/trigger-enabled/foreign-key/WAL/FULL contract, and fail closed on foreign/newer/structurally invalid or semantically invalid persisted conversation data. Semantic validation must reject repository-scope mismatch, incomplete committed user/assistant turn pairs, grounded user messages, citations attached to non-grounded assistant messages, and citation repository/version/SHA provenance not present in the conversation's pinned repository set.",
+      "enforced_by": [
+        "data/schemas/conversation-store-v1.sql",
+        "src/conversation_store.c",
+        "src/conversation_store.h"
+      ],
+      "tested_by": [
+        "meson:conversation-store"
+      ]
     }
   ]
 }
