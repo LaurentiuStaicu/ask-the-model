@@ -85,8 +85,9 @@ namespace AskTheModel {
 
     public class RepositoryLifecycleService : Object {
         private RepositoryClient client;
-        private RepositoryStateStore state_store;
+        private ControlRepositoryStateStore state_store;
         private RepositoryRuntimeInfo[] repositories = {};
+        private string state_root;
         private string data_root;
         private string cache_root;
         private bool installation_qualification_complete = false;
@@ -100,14 +101,23 @@ namespace AskTheModel {
             string? cache_root = null
         ) {
             client = new RepositoryClient ();
+            this.state_root =
+                state_root ??
+                GLib.Environment.get_user_state_dir ();
             this.data_root =
                 data_root ?? visible_data_root ();
             this.cache_root =
                 cache_root ??
                 GLib.Environment.get_user_cache_dir ();
-            state_store = new RepositoryStateStore (
-                state_root
-            );
+            state_store =
+                new ControlRepositoryStateStore (
+                    this.state_root
+                );
+            rebuild_repository_runtime ();
+        }
+
+        private void rebuild_repository_runtime () {
+            repositories = {};
 
             foreach (
                 RepositoryDescriptor descriptor
@@ -119,6 +129,24 @@ namespace AskTheModel {
                     this.data_root
                 );
             }
+        }
+
+        public bool reload_control_state () {
+            state_store =
+                new ControlRepositoryStateStore (
+                    state_root
+                );
+            rebuild_repository_runtime ();
+            installation_qualification_complete = false;
+            installation_qualified = false;
+
+            return state_store.load_status ==
+                RepositoryStateLoadStatus.VALID;
+        }
+
+        public RepositoryStateLoadStatus
+        repository_state_status () {
+            return state_store.load_status;
         }
 
         public static string visible_data_root () {
@@ -172,7 +200,10 @@ namespace AskTheModel {
             bool qualified
         ) {
             installation_qualification_complete = true;
-            installation_qualified = qualified;
+            installation_qualified =
+                qualified &&
+                state_store.load_status ==
+                    RepositoryStateLoadStatus.VALID;
         }
 
         public bool repository_operations_allowed () {

@@ -207,6 +207,23 @@ namespace AskTheModel.Tests {
         );
     }
 
+    private static void publish_control_state (
+        string state_root
+    ) throws GLib.Error {
+        int disposition;
+        ControlStateNative.publish_cutover (
+            GLib.Path.build_filename (
+                state_root,
+                "control-state.sqlite3"
+            ),
+            GLib.Path.build_filename (
+                state_root,
+                "repository-state.json"
+            ),
+            out disposition
+        );
+    }
+
     private static async void run_checks (GLib.MainLoop loop) {
         string root = new_temp_root ();
 
@@ -219,8 +236,21 @@ namespace AskTheModel.Tests {
             assert (catalog.length == 3);
 
             assert (!service.repository_operations_allowed ());
+            assert (
+                service.repository_state_status () ==
+                RepositoryStateLoadStatus.ABSENT
+            );
             service.apply_installation_qualification (false);
             assert (!service.repository_operations_allowed ());
+            service.apply_installation_qualification (true);
+            assert (!service.repository_operations_allowed ());
+
+            publish_control_state (root);
+            assert (service.reload_control_state ());
+            assert (
+                service.repository_state_status () ==
+                RepositoryStateLoadStatus.VALID
+            );
             service.apply_installation_qualification (true);
             assert (service.repository_operations_allowed ());
 
@@ -330,6 +360,9 @@ namespace AskTheModel.Tests {
                 sealed_sha,
                 "0.1.0"
             );
+            publish_control_state (
+                sealed_state_root
+            );
 
             var sealed_service =
                 new RepositoryLifecycleService (
@@ -365,11 +398,11 @@ namespace AskTheModel.Tests {
             );
 
             var enrolled_state =
-                new RepositoryStateStore (
+                new ControlRepositoryStateStore (
                     sealed_state_root
                 );
             assert (
-                enrolled_state.loaded_schema_version == 2
+                enrolled_state.control_schema_version == 1
             );
             string? enrolled_seal =
                 enrolled_state.record_for (
@@ -440,7 +473,7 @@ namespace AskTheModel.Tests {
             );
 
             var preserved_state =
-                new RepositoryStateStore (
+                new ControlRepositoryStateStore (
                     sealed_state_root
                 );
             assert (
