@@ -200,6 +200,7 @@ For repository/retrieval changes, report the exact repository SHAs or test fixtu
 - `STATUS.md` — current release and capability boundary;
 - `docs/USER_INTERFACE_GUIDE.md` — user-facing controls and state behavior;
 - `docs/ARCHITECTURE.md` — application architecture;
+- `docs/CONVERSATION_PERSISTENCE_ARCHITECTURE.md` — planned durable conversation storage, transaction and restore contract;
 - `docs/REPOSITORY_RETRIEVAL_ARCHITECTURE.md` — repository/retrieval design;
 - `docs/REPOSITORY_RETRIEVAL_ACCEPTANCE.md` — acceptance gates;
 - `docs/DEPENDENCIES_AND_COMPATIBILITY.md` — build/runtime/provider compatibility;

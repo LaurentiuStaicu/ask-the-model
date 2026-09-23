@@ -163,6 +163,8 @@ Current-turn grounding context, grounded Ollama request construction, temporary 
 
 Responsible for future durable local conversation storage, conversation navigation and recording which repository context and AI model were active.
 
+The planned persistence boundary is specified in `docs/CONVERSATION_PERSISTENCE_ARCHITECTURE.md`. Conversation history is user data in a separate application-owned SQLite database, not an extension of repository Control DB authority. The design preserves exact model/repository identity, committed provider history and citation provenance while keeping conversation-store failure isolated from repository readiness.
+
 ### Application settings
 
 Responsible for future provider endpoint configuration, preferred AI model and application-level preferences. Repository source snapshots use the fixed visible location `~/Ask the Model/Repositories`; derived indexes and application state remain in AtM's private XDG cache/state locations. Arbitrary repository storage locations are not a v1 setting.
