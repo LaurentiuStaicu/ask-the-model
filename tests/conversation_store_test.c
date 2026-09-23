@@ -1466,6 +1466,261 @@ test_snapshot_read_api (void)
 }
 
 static void
+test_archive_delete_lifecycle (void)
+{
+    char *root = new_temp_root (
+        "atm-conversation-lifecycle-XXXXXX"
+    );
+    char *path = store_path (root);
+    AtmConversationStore *store = NULL;
+    GError *error = NULL;
+
+    g_assert_true (
+        atm_conversation_store_open (
+            path,
+            &store,
+            &error
+        )
+    );
+    g_assert_no_error (error);
+
+    AtmConversationRepositoryInput repository = {
+        .repository_id = "rmd",
+        .repository_version = "0.1.0",
+        .snapshot_sha =
+            "0123456789abcdef0123456789abcdef01234567"
+    };
+    char *conversation_id = NULL;
+
+    g_assert_true (
+        atm_conversation_store_create_conversation (
+            store,
+            "Lifecycle",
+            100,
+            "model-a",
+            "digest-a",
+            7,
+            &repository,
+            1,
+            &conversation_id,
+            &error
+        )
+    );
+    g_assert_no_error (error);
+
+    AtmConversationCitationInput citation = {
+        .label = "S1",
+        .repository_id = "rmd",
+        .repository_version = "0.1.0",
+        .snapshot_sha =
+            "0123456789abcdef0123456789abcdef01234567",
+        .logical_source_id = "source-1",
+        .source_path = "README.md",
+        .locator = "lines 1-2",
+        .title = "Title",
+        .excerpt = "Excerpt",
+        .immutable_permalink =
+            "https://example.invalid/rmd/README.md#L1-L2"
+    };
+    gint64 turn_no = -1;
+
+    g_assert_true (
+        atm_conversation_store_commit_turn (
+            store,
+            conversation_id,
+            "question",
+            "answer [S1]",
+            "answer",
+            TRUE,
+            101,
+            &citation,
+            1,
+            &turn_no,
+            &error
+        )
+    );
+    g_assert_no_error (error);
+
+    g_assert_true (
+        atm_conversation_store_set_archived (
+            store,
+            conversation_id,
+            TRUE,
+            102,
+            &error
+        )
+    );
+    g_assert_no_error (error);
+
+    AtmConversationSnapshot *snapshot = NULL;
+    g_assert_true (
+        atm_conversation_store_load_snapshot (
+            store,
+            conversation_id,
+            &snapshot,
+            &error
+        )
+    );
+    g_assert_no_error (error);
+    g_assert_true (
+        atm_conversation_snapshot_archived (
+            snapshot
+        )
+    );
+    g_assert_cmpint (
+        atm_conversation_snapshot_updated_at_us (
+            snapshot
+        ),
+        ==,
+        102
+    );
+    atm_conversation_snapshot_free (snapshot);
+
+    g_assert_true (
+        atm_conversation_store_set_archived (
+            store,
+            conversation_id,
+            FALSE,
+            103,
+            &error
+        )
+    );
+    g_assert_no_error (error);
+
+    snapshot = NULL;
+    g_assert_true (
+        atm_conversation_store_load_snapshot (
+            store,
+            conversation_id,
+            &snapshot,
+            &error
+        )
+    );
+    g_assert_no_error (error);
+    g_assert_false (
+        atm_conversation_snapshot_archived (
+            snapshot
+        )
+    );
+    atm_conversation_snapshot_free (snapshot);
+
+    g_assert_cmpint (
+        count_for_conversation (
+            path,
+            "conversation_repositories",
+            conversation_id
+        ),
+        ==,
+        1
+    );
+    g_assert_cmpint (
+        count_for_conversation (
+            path,
+            "messages",
+            conversation_id
+        ),
+        ==,
+        2
+    );
+
+    char *citation_count_sql = g_strdup_printf (
+        "SELECT count(*) FROM citations c "
+        "JOIN messages m ON m.message_id=c.message_id "
+        "WHERE m.conversation_id='%s';",
+        conversation_id
+    );
+    g_assert_cmpint (
+        raw_int64 (
+            path,
+            citation_count_sql
+        ),
+        ==,
+        1
+    );
+    g_free (citation_count_sql);
+
+    g_assert_true (
+        atm_conversation_store_delete_conversation (
+            store,
+            conversation_id,
+            &error
+        )
+    );
+    g_assert_no_error (error);
+
+    snapshot = NULL;
+    g_assert_false (
+        atm_conversation_store_load_snapshot (
+            store,
+            conversation_id,
+            &snapshot,
+            &error
+        )
+    );
+    g_assert_error (
+        error,
+        ATM_CONVERSATION_STORE_ERROR,
+        ATM_CONVERSATION_STORE_ERROR_NOT_FOUND
+    );
+    g_clear_error (&error);
+    g_assert_null (snapshot);
+
+    g_assert_cmpint (
+        count_for_conversation (
+            path,
+            "conversation_repositories",
+            conversation_id
+        ),
+        ==,
+        0
+    );
+    g_assert_cmpint (
+        count_for_conversation (
+            path,
+            "messages",
+            conversation_id
+        ),
+        ==,
+        0
+    );
+    citation_count_sql = g_strdup_printf (
+        "SELECT count(*) FROM citations c "
+        "JOIN messages m ON m.message_id=c.message_id "
+        "WHERE m.conversation_id='%s';",
+        conversation_id
+    );
+    g_assert_cmpint (
+        raw_int64 (
+            path,
+            citation_count_sql
+        ),
+        ==,
+        0
+    );
+    g_free (citation_count_sql);
+
+    g_assert_false (
+        atm_conversation_store_delete_conversation (
+            store,
+            conversation_id,
+            &error
+        )
+    );
+    g_assert_error (
+        error,
+        ATM_CONVERSATION_STORE_ERROR,
+        ATM_CONVERSATION_STORE_ERROR_NOT_FOUND
+    );
+    g_clear_error (&error);
+
+    atm_conversation_store_close (store);
+    g_free (conversation_id);
+    g_free (path);
+    remove_tree_best_effort (root);
+    g_free (root);
+}
+
+static void
 test_symlink_rejected (void)
 {
     char *root = new_temp_root (
@@ -1557,6 +1812,10 @@ main (int argc, char **argv)
     g_test_add_func (
         "/conversation-store/snapshot-read-api",
         test_snapshot_read_api
+    );
+    g_test_add_func (
+        "/conversation-store/archive-delete-lifecycle",
+        test_archive_delete_lifecycle
     );
     g_test_add_func (
         "/conversation-store/nofollow-symlink",

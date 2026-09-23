@@ -60,6 +60,20 @@ namespace AskTheModel.ConversationStoreNative {
         string title,
         int64 updated_at_us
     ) throws GLib.Error;
+
+    [CCode (cname = "atm_conversation_store_set_archived")]
+    public static bool set_archived (
+        Store store,
+        string conversation_id,
+        bool archived,
+        int64 updated_at_us
+    ) throws GLib.Error;
+
+    [CCode (cname = "atm_conversation_store_delete_conversation")]
+    public static bool delete_conversation (
+        Store store,
+        string conversation_id
+    ) throws GLib.Error;
     [Compact]
     [CCode (
         cname = "AtmConversationList",

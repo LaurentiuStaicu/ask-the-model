@@ -2258,6 +2258,220 @@ out:
 }
 
 gboolean
+atm_conversation_store_set_archived (
+    AtmConversationStore *store,
+    const char *conversation_id,
+    gboolean archived,
+    gint64 updated_at_us,
+    GError **error
+)
+{
+    if (store == NULL ||
+        store->db == NULL ||
+        !nonempty (conversation_id) ||
+        updated_at_us < 0) {
+        g_set_error_literal (
+            error,
+            ATM_CONVERSATION_STORE_ERROR,
+            ATM_CONVERSATION_STORE_ERROR_ARGUMENT,
+            "Conversation archive update received invalid arguments."
+        );
+        return FALSE;
+    }
+
+    if (!exec_sql (
+            store->db,
+            "BEGIN IMMEDIATE;",
+            error
+        )) {
+        return FALSE;
+    }
+
+    gboolean ok = FALSE;
+    sqlite3_stmt *statement = NULL;
+
+    if (!prepare_statement (
+            store->db,
+            "UPDATE conversations "
+            "SET archived=?2,updated_at_us=?3 "
+            "WHERE conversation_id=?1;",
+            &statement,
+            error
+        )) {
+        goto out;
+    }
+
+    sqlite3_bind_text (
+        statement,
+        1,
+        conversation_id,
+        -1,
+        SQLITE_TRANSIENT
+    );
+    sqlite3_bind_int (
+        statement,
+        2,
+        archived ? 1 : 0
+    );
+    sqlite3_bind_int64 (
+        statement,
+        3,
+        updated_at_us
+    );
+
+    if (!step_done (
+            store->db,
+            statement,
+            "Could not update conversation archive state",
+            error
+        )) {
+        goto out;
+    }
+
+    if (sqlite3_changes (
+            store->db
+        ) != 1) {
+        g_set_error_literal (
+            error,
+            ATM_CONVERSATION_STORE_ERROR,
+            ATM_CONVERSATION_STORE_ERROR_NOT_FOUND,
+            "Conversation archive update did not match exactly one conversation."
+        );
+        goto out;
+    }
+
+    sqlite3_finalize (
+        statement
+    );
+    statement = NULL;
+
+    if (!exec_sql (
+            store->db,
+            "COMMIT;",
+            error
+        )) {
+        goto out;
+    }
+
+    ok = TRUE;
+
+out:
+    if (statement != NULL) {
+        sqlite3_finalize (
+            statement
+        );
+    }
+
+    if (!ok) {
+        rollback_best_effort (
+            store->db
+        );
+    }
+
+    return ok;
+}
+
+gboolean
+atm_conversation_store_delete_conversation (
+    AtmConversationStore *store,
+    const char *conversation_id,
+    GError **error
+)
+{
+    if (store == NULL ||
+        store->db == NULL ||
+        !nonempty (conversation_id)) {
+        g_set_error_literal (
+            error,
+            ATM_CONVERSATION_STORE_ERROR,
+            ATM_CONVERSATION_STORE_ERROR_ARGUMENT,
+            "Conversation delete received invalid arguments."
+        );
+        return FALSE;
+    }
+
+    if (!exec_sql (
+            store->db,
+            "BEGIN IMMEDIATE;",
+            error
+        )) {
+        return FALSE;
+    }
+
+    gboolean ok = FALSE;
+    sqlite3_stmt *statement = NULL;
+
+    if (!prepare_statement (
+            store->db,
+            "DELETE FROM conversations "
+            "WHERE conversation_id=?1;",
+            &statement,
+            error
+        )) {
+        goto out;
+    }
+
+    sqlite3_bind_text (
+        statement,
+        1,
+        conversation_id,
+        -1,
+        SQLITE_TRANSIENT
+    );
+
+    if (!step_done (
+            store->db,
+            statement,
+            "Could not delete conversation",
+            error
+        )) {
+        goto out;
+    }
+
+    if (sqlite3_changes (
+            store->db
+        ) != 1) {
+        g_set_error_literal (
+            error,
+            ATM_CONVERSATION_STORE_ERROR,
+            ATM_CONVERSATION_STORE_ERROR_NOT_FOUND,
+            "Conversation delete did not match exactly one conversation."
+        );
+        goto out;
+    }
+
+    sqlite3_finalize (
+        statement
+    );
+    statement = NULL;
+
+    if (!exec_sql (
+            store->db,
+            "COMMIT;",
+            error
+        )) {
+        goto out;
+    }
+
+    ok = TRUE;
+
+out:
+    if (statement != NULL) {
+        sqlite3_finalize (
+            statement
+        );
+    }
+
+    if (!ok) {
+        rollback_best_effort (
+            store->db
+        );
+    }
+
+    return ok;
+}
+
+gboolean
 atm_conversation_store_create_conversation_values (
     AtmConversationStore *store,
     const char *title,

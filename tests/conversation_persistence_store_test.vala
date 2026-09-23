@@ -479,6 +479,89 @@ test_snapshot_restore_provider_history ()
     }
 }
 
+private static void
+test_archive_delete_domain_lifecycle ()
+{
+    string root = new_temp_root ();
+
+    try {
+        var store =
+            new AskTheModel.ConversationPersistenceStore (
+                root
+            );
+
+        string conversation_id =
+            store.create_conversation (
+                "Lifecycle",
+                100,
+                "model-a",
+                "digest-a",
+                0,
+                {}
+            );
+
+        assert (
+            store.commit_turn (
+                conversation_id,
+                "hello",
+                "world",
+                "world",
+                false,
+                101,
+                {}
+            ) == 0
+        );
+
+        store.set_archived (
+            conversation_id,
+            true,
+            102
+        );
+
+        var archived =
+            store.load_snapshot (
+                conversation_id
+            );
+        assert (archived.archived);
+        assert (archived.updated_at_us == 102);
+
+        store.set_archived (
+            conversation_id,
+            false,
+            103
+        );
+
+        var restored =
+            store.load_snapshot (
+                conversation_id
+            );
+        assert (!restored.archived);
+        assert (restored.updated_at_us == 103);
+
+        store.delete_conversation (
+            conversation_id
+        );
+
+        bool missing = false;
+
+        try {
+            store.load_snapshot (
+                conversation_id
+            );
+        } catch (Error error) {
+            missing = true;
+        }
+
+        assert (missing);
+        assert (
+            store.list_conversations ().length == 0
+        );
+    } catch (Error error) {
+        critical ("%s", error.message);
+        assert_not_reached ();
+    }
+}
+
 public static int
 main (string[] args)
 {
@@ -495,6 +578,10 @@ main (string[] args)
     Test.add_func (
         "/conversation-persistence/snapshot-restore-provider-history",
         test_snapshot_restore_provider_history
+    );
+    Test.add_func (
+        "/conversation-persistence/archive-delete-lifecycle",
+        test_archive_delete_domain_lifecycle
     );
 
     return Test.run ();
