@@ -68,6 +68,7 @@ executable(
     'src/scientific_derivation.c',
     'src/scientific_realization.c',
     'src/scientific_operation.c',
+    'src/control_state.c',
     'src/retrieval_rank.c',
     'src/retrieval_scope.c',
     'src/retrieval_router.c',
@@ -321,6 +322,27 @@ repository_state_test = executable(
 test(
   'repository-state',
   repository_state_test
+)
+
+control_state_test = executable(
+  'control-state-test',
+  [
+    'src/control_state.c',
+    'tests/control_state_test.c',
+    resources
+  ],
+  include_directories: include_directories('src'),
+  dependencies: [
+    glib_dep,
+    gio_dep,
+    sqlite_dep
+  ],
+  install: false
+)
+
+test(
+  'control-state',
+  control_state_test
 )
 
 chat_request_builder_test = executable(

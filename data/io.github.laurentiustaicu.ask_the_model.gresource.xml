@@ -4,5 +4,6 @@
     <file alias="style.css">style.css</file>
     <file alias="schemas/repository-manifest-v1.schema.json">schemas/repository-manifest-v1.schema.json</file>
     <file alias="schemas/retrieval-index-v2.sql">schemas/retrieval-index-v2.sql</file>
+    <file alias="schemas/control-state-v1.sql">schemas/control-state-v1.sql</file>
   </gresource>
 </gresources>
