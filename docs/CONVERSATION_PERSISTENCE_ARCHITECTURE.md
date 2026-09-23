@@ -2,15 +2,15 @@
 
 ## Status and scope
 
-This document defines the planned durable local conversation-storage boundary for Ask the Model after the completed Control State hardening work.
+This document defines the durable local conversation-storage boundary for Ask the Model after the completed Control State hardening work.
 
-It is an architecture contract only. CONV-00 does not add runtime persistence, change the public release version, or make conversations survive application restart.
+The contract was introduced as CONV-00 and is now implemented on development `main` through CONV-04c. The tagged public release remains v0.4.0, so this document describes unreleased development capability rather than retroactively changing the v0.4.0 release boundary.
 
 Conversation persistence is intentionally **not** part of the repository Control DB. The Control DB is authoritative repository state with its own S0 invariants and generation lifecycle. Conversation history is user data with independent retention, deletion, navigation and recovery semantics.
 
 ## Goals
 
-The persistence layer must eventually provide:
+The development-main persistence layer provides:
 
 - durable local conversations across application restarts;
 - stable conversation identity, title and ordering metadata;
@@ -79,7 +79,8 @@ Required identity/state:
 - pinned model name;
 - optional pinned provider model digest;
 - pinned repository generation ID, where `0` means no repository-backed scope;
-- lifecycle state sufficient for normal/open/archived or non-continuable historical presentation.
+- lifecycle state sufficient for normal/open/archived or non-continuable historical presentation;
+- explicit archive and permanent-delete mutations that remain distinct from in-memory tab Close.
 
 A repository-backed conversation must not be persisted as continuable unless its generation ID is positive.
 
@@ -224,7 +225,7 @@ A foreign, newer, corrupt or semantically invalid conversation database fails th
 
 At the same time, that failure does not downgrade repository Control DB authority. The application may still provide explicitly unsaved in-memory chat when the provider is available.
 
-A future repair/export workflow must be explicit. Automatic destructive recovery is outside the initial persistence scope.
+Any future repair/export workflow must be explicit. Automatic destructive recovery remains outside the persistence scope.
 
 ## Privacy boundary
 
