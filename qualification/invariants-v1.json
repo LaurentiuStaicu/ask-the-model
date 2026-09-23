@@ -208,6 +208,19 @@
         "meson:scientific-result",
         "meson:scientific-gold-v0"
       ]
+    },
+    {
+      "id": "SCIENTIFIC-S0-007",
+      "category": "SCIENTIFIC",
+      "severity": "S0",
+      "lifecycle": "enforced",
+      "statement": "Scientific executable transformations are deny-by-default: only versioned operations compiled into the AtM Scientific Operation Registry may execute; repository equations, formula strings, LLM output and arbitrary user code are not executable authority. Registered operations must enforce fixed input roles, finite numeric inputs, explicit unit rules and operation-specific preconditions, and undefined safe-ratio results must remain explicit missing values rather than being forced to zero.",
+      "enforced_by": [
+        "src/scientific_operation.c"
+      ],
+      "tested_by": [
+        "meson:scientific-operation"
+      ]
     }
   ]
 }
