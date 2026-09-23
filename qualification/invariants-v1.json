@@ -407,6 +407,19 @@
       "tested_by": [
         "meson:control-state"
       ]
+    },
+    {
+      "id": "STATE-S0-011",
+      "category": "STATE",
+      "severity": "S0",
+      "lifecycle": "enforced",
+      "statement": "Every production AtM Control DB connection must verify sqlite3_db_readonly(db, 'main') == 0 immediately after open. A read-only fallback or unavailable main database handle must fail closed before connection hardening, bootstrap, migration, validation, repository-state read or mutation.",
+      "enforced_by": [
+        "src/control_state.c"
+      ],
+      "tested_by": [
+        "meson:control-state"
+      ]
     }
   ]
 }

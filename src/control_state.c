@@ -357,6 +357,23 @@ configure_connection (
         return FALSE;
     }
 
+    int main_readonly = sqlite3_db_readonly (
+        db,
+        "main"
+    );
+
+    if (main_readonly != 0) {
+        g_set_error (
+            error,
+            ATM_CONTROL_STATE_ERROR,
+            ATM_CONTROL_STATE_ERROR_IO,
+            main_readonly > 0
+                ? "Control-state main database opened read-only."
+                : "Control-state main database handle is unavailable."
+        );
+        return FALSE;
+    }
+
     if (sqlite3_busy_timeout (db, 5000) != SQLITE_OK) {
         set_sqlite_error (
             db,
