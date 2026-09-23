@@ -151,3 +151,24 @@ Consequently, normal AtM mutation APIs no longer modify rows belonging to a prev
 This is API-level immutability under schema v1. A future schema migration may add SQL triggers for defense-in-depth against out-of-band direct SQL writes; STATE-04a does not silently change `user_version` or retrofit triggers into an already deployed schema.
 
 Session pinning to an explicit generation ID remains STATE-04b.
+
+
+## STATE-04b — generation-consistent reads and conversation pinning
+
+STATE-04b makes the copy-on-write generation identity explicit from Control DB read through conversation lifetime.
+
+A `ControlRepositoryStateStore` now captures the active COMPLETE `generation_id` once and loads every repository row from that immutable generation. It therefore cannot assemble one in-memory state from repository rows belonging to different active generations.
+
+Normal Vala mutations use an expected-generation guard. A stale store cannot publish a copy-on-write successor if `active_state` has advanced since that store was loaded. Successful mutation returns the new generation ID and advances the in-memory store to that exact successor.
+
+Conversation grounding is read-only with respect to repository authority. For any non-empty repository scope it:
+
+- opens a fresh generation-consistent Control DB view;
+- requires a positive COMPLETE generation and already-persisted snapshot seals;
+- validates exact SHA/version/seal and retrieval index against that generation;
+- records the generation ID on `ConversationGrounding`;
+- freezes the repository scope and generation together.
+
+`ConversationSession.begin()` copies that generation ID into the active session. Later repository downloads, updates, seal changes, or other Control DB mutations may advance `active_state`, but the conversation continues to identify the immutable generation from which its repository scope was prepared.
+
+Zero-repository conversations remain valid with generation ID `0`.

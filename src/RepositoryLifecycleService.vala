@@ -482,14 +482,39 @@ namespace AskTheModel {
             }
 
             var grounding = new ConversationGrounding ();
+            ControlRepositoryStateStore? pinned_state_store = null;
+
+            if (selected.length > 0) {
+                pinned_state_store =
+                    new ControlRepositoryStateStore (
+                        state_root
+                    );
+
+                if (pinned_state_store.load_status !=
+                        RepositoryStateLoadStatus.VALID ||
+                    pinned_state_store.repository_generation_id <= 0) {
+                    throw new RepositoryError.NOT_READY (
+                        "Repository grounding requires one valid active Control DB generation."
+                    );
+                }
+            }
 
             foreach (RepositoryDescriptor descriptor in selected) {
+                if (pinned_state_store == null) {
+                    assert_not_reached ();
+                }
+
                 RepositoryRuntimeInfo info =
                     info_for (descriptor.id);
+                RepositoryLocalRecord local =
+                    pinned_state_store.record_for (
+                        descriptor.id
+                    );
 
-                if (info.download_required () ||
-                    info.local.current_sha == null ||
-                    info.local.version == null) {
+                if (info.integrity_invalid ||
+                    !local.is_ready () ||
+                    local.current_sha == null ||
+                    local.version == null) {
                     throw new RepositoryError.NOT_READY (
                         "Repository %s is not ready for this conversation.".printf (
                             descriptor.acronym
@@ -497,11 +522,36 @@ namespace AskTheModel {
                     );
                 }
 
-                string sha = info.local.current_sha ?? "";
+                string sha = local.current_sha ?? "";
                 string local_version =
-                    info.local.version ?? "";
+                    local.version ?? "";
                 string? expected_seal =
-                    info.local.snapshot_seal_sha256;
+                    local.snapshot_seal_sha256;
+                string expected_snapshot =
+                    snapshot_path_for_root (
+                        data_root,
+                        descriptor,
+                        sha
+                    );
+
+                if (!GLib.FileUtils.test (
+                        expected_snapshot,
+                        GLib.FileTest.IS_DIR
+                    )) {
+                    throw new RepositoryError.NOT_READY (
+                        "Repository %s pinned snapshot is missing.".printf (
+                            descriptor.acronym
+                        )
+                    );
+                }
+
+                if (expected_seal == null) {
+                    throw new RepositoryError.NOT_READY (
+                        "Repository %s has no persistent snapshot integrity seal in the pinned Control DB generation.".printf (
+                            descriptor.acronym
+                        )
+                    );
+                }
 
                 RepositoryInstallResult result;
                 try {
@@ -520,27 +570,19 @@ namespace AskTheModel {
 
                 if (result.version != local_version) {
                     throw new RepositoryError.INVALID_RESPONSE (
-                        "Repository %s local state version does not match the validated snapshot.".printf (
+                        "Repository %s pinned state version does not match the validated snapshot.".printf (
                             descriptor.acronym
                         )
                     );
                 }
 
-                if (expected_seal != null &&
-                    expected_seal != result.snapshot_seal_sha256) {
+                if (expected_seal !=
+                    result.snapshot_seal_sha256) {
                     info.mark_integrity_invalid ();
                     throw new RepositoryError.NOT_READY (
-                        "Repository %s local snapshot integrity seal does not match persistent state.".printf (
+                        "Repository %s local snapshot integrity seal does not match the pinned Control DB generation.".printf (
                             descriptor.acronym
                         )
-                    );
-                }
-
-                if (expected_seal == null) {
-                    state_store.set_snapshot_seal (
-                        descriptor.id,
-                        sha,
-                        result.snapshot_seal_sha256
                     );
                 }
 
@@ -557,6 +599,12 @@ namespace AskTheModel {
                         )
                     );
                 }
+            }
+
+            if (pinned_state_store != null) {
+                grounding.pin_repository_generation (
+                    pinned_state_store.repository_generation_id
+                );
             }
 
             if (!grounding.freeze ()) {

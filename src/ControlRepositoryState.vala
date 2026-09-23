@@ -17,6 +17,12 @@ namespace AskTheModel {
             default = 0;
         }
 
+        public int64 repository_generation_id {
+            get;
+            private set;
+            default = 0;
+        }
+
         public ControlRepositoryStateStore (
             string? state_root = null
         ) {
@@ -89,6 +95,7 @@ namespace AskTheModel {
         private void load_best_effort () {
             load_status = RepositoryStateLoadStatus.ABSENT;
             control_schema_version = 0;
+            repository_generation_id = 0;
             clear_records ();
 
             if (!GLib.FileUtils.test (
@@ -101,45 +108,59 @@ namespace AskTheModel {
             load_status = RepositoryStateLoadStatus.INVALID;
 
             try {
-                foreach (
-                    RepositoryDescriptor descriptor
-                    in RepositoryCatalog.all ()
-                ) {
-                    bool present;
-                    string? sha;
-                    string? version;
-                    string? seal;
+                int64 generation_id;
+                ControlStateNative.active_generation_id (
+                    state_path,
+                    out generation_id
+                );
 
-                    ControlStateNative.load_repository_values (
-                        state_path,
-                        descriptor.id,
-                        out present,
-                        out sha,
-                        out version,
-                        out seal
-                    );
+                repository_generation_id =
+                    generation_id;
 
-                    if (!present) {
-                        continue;
+                if (generation_id > 0) {
+                    foreach (
+                        RepositoryDescriptor descriptor
+                        in RepositoryCatalog.all ()
+                    ) {
+                        bool present;
+                        string? sha;
+                        string? version;
+                        string? seal;
+
+                        ControlStateNative.load_repository_values_at_generation (
+                            state_path,
+                            generation_id,
+                            descriptor.id,
+                            out present,
+                            out sha,
+                            out version,
+                            out seal
+                        );
+
+                        if (!present) {
+                            continue;
+                        }
+
+                        if (sha == null ||
+                            version == null) {
+                            clear_records ();
+                            repository_generation_id = 0;
+                            return;
+                        }
+
+                        RepositoryLocalRecord record =
+                            record_for (descriptor.id);
+                        record.current_sha = sha;
+                        record.version = version;
+                        record.snapshot_seal_sha256 = seal;
                     }
-
-                    if (sha == null ||
-                        version == null) {
-                        clear_records ();
-                        return;
-                    }
-
-                    RepositoryLocalRecord record =
-                        record_for (descriptor.id);
-                    record.current_sha = sha;
-                    record.version = version;
-                    record.snapshot_seal_sha256 = seal;
                 }
 
                 load_status = RepositoryStateLoadStatus.VALID;
                 control_schema_version =
                     CONTROL_SCHEMA_VERSION;
             } catch (GLib.Error error) {
+                repository_generation_id = 0;
                 clear_records ();
                 stderr.printf (
                     "AtM: control repository state invalid: %s\n",
@@ -184,32 +205,28 @@ namespace AskTheModel {
 
             RepositoryLocalRecord record =
                 record_for (repository_id);
-            string? previous_sha = record.current_sha;
-            string? previous_version = record.version;
-            string? previous_seal =
-                record.snapshot_seal_sha256;
-
-            record.current_sha = sha;
-            record.version = version;
-            record.snapshot_seal_sha256 =
-                snapshot_seal_sha256;
 
             try {
-                ControlStateNative.set_current_values (
+                int64 new_generation_id;
+                ControlStateNative.set_current_values_guarded (
                     state_path,
+                    repository_generation_id,
                     repository_id,
                     sha,
                     version,
-                    snapshot_seal_sha256
+                    snapshot_seal_sha256,
+                    out new_generation_id
                 );
-            } catch (GLib.Error error) {
-                record.current_sha = previous_sha;
-                record.version = previous_version;
-                record.snapshot_seal_sha256 =
-                    previous_seal;
 
+                record.current_sha = sha;
+                record.version = version;
+                record.snapshot_seal_sha256 =
+                    snapshot_seal_sha256;
+                repository_generation_id =
+                    new_generation_id;
+            } catch (GLib.Error error) {
                 throw new RepositoryError.STORAGE (
-                    "Control repository state could not be written: %s".printf (
+                    "Control repository state could not be written from the pinned generation: %s".printf (
                         error.message
                     )
                 );
@@ -247,24 +264,30 @@ namespace AskTheModel {
                 );
             }
 
-            string? previous_seal =
-                record.snapshot_seal_sha256;
-            record.snapshot_seal_sha256 =
-                snapshot_seal_sha256;
+            if (repository_generation_id <= 0) {
+                throw new RepositoryError.STORAGE (
+                    "Control repository state has no active generation for snapshot-seal mutation."
+                );
+            }
 
             try {
-                ControlStateNative.set_snapshot_seal_values (
+                int64 new_generation_id;
+                ControlStateNative.set_snapshot_seal_values_guarded (
                     state_path,
+                    repository_generation_id,
                     repository_id,
                     expected_sha,
-                    snapshot_seal_sha256
+                    snapshot_seal_sha256,
+                    out new_generation_id
                 );
-            } catch (GLib.Error error) {
-                record.snapshot_seal_sha256 =
-                    previous_seal;
 
+                record.snapshot_seal_sha256 =
+                    snapshot_seal_sha256;
+                repository_generation_id =
+                    new_generation_id;
+            } catch (GLib.Error error) {
                 throw new RepositoryError.STORAGE (
-                    "Control repository snapshot seal could not be written: %s".printf (
+                    "Control repository snapshot seal could not be written from the pinned generation: %s".printf (
                         error.message
                     )
                 );
