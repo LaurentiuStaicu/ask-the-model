@@ -1174,6 +1174,7 @@ repository_lifecycle_service_test = executable(
     'src/RepositoryLifecycleService.vala',
     'src/control_state.c',
     'src/ConversationGrounding.vala',
+    'src/ConversationSession.vala',
     'src/cff_version.c',
     'src/archive_extract.c',
     'src/repository_manifest.c',

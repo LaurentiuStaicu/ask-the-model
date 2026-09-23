@@ -340,6 +340,26 @@
         "meson:control-repository-state",
         "meson:repository-lifecycle-service"
       ]
+    },
+    {
+      "id": "STATE-S0-007",
+      "category": "STATE",
+      "severity": "S0",
+      "lifecycle": "enforced",
+      "statement": "Repository-backed conversations must be prepared from exactly one immutable COMPLETE Control DB generation and must retain that generation identity for the lifetime of the conversation. ControlRepositoryStateStore must capture one active generation before loading repository rows, Vala mutations must reject stale expected-generation writes, grounding must not mutate repository authority while pinning, all selected repositories must have persisted seals in the pinned generation, and ConversationSession must retain the grounding generation even if active_state later advances.",
+      "enforced_by": [
+        "src/control_state.c",
+        "src/ControlRepositoryState.vala",
+        "src/RepositoryLifecycleService.vala",
+        "src/ConversationGrounding.vala",
+        "src/ConversationSession.vala"
+      ],
+      "tested_by": [
+        "meson:control-repository-state",
+        "meson:repository-lifecycle-service",
+        "meson:conversation-grounding-vala",
+        "meson:conversation-session"
+      ]
     }
   ]
 }

@@ -11,6 +11,7 @@ namespace AskTheModel {
         private ConversationGrounding? grounding = null;
         private string? pinned_model = null;
         private string? pinned_model_digest = null;
+        private int64 pinned_repository_generation_id = 0;
 
         public bool is_active () {
             return grounding != null;
@@ -41,6 +42,13 @@ namespace AskTheModel {
                 );
             }
 
+            if (prepared_grounding.repository_count () > 0 &&
+                prepared_grounding.repository_generation_id () <= 0) {
+                throw new ConversationSessionError.INVALID_GROUNDING (
+                    "Repository-backed conversation grounding has no pinned Control DB generation."
+                );
+            }
+
             string normalized_model = model_name.strip ();
 
             if (normalized_model.length == 0) {
@@ -51,6 +59,8 @@ namespace AskTheModel {
 
             grounding = prepared_grounding;
             pinned_model = normalized_model;
+            pinned_repository_generation_id =
+                prepared_grounding.repository_generation_id ();
 
             if (model_digest != null &&
                 model_digest.strip ().length > 0) {
@@ -58,6 +68,10 @@ namespace AskTheModel {
             } else {
                 pinned_model_digest = null;
             }
+        }
+
+        public int64 repository_generation_id () {
+            return pinned_repository_generation_id;
         }
 
         public string? model_name () {
@@ -158,6 +172,7 @@ namespace AskTheModel {
 
             pinned_model = null;
             pinned_model_digest = null;
+            pinned_repository_generation_id = 0;
         }
     }
 }

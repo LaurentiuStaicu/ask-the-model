@@ -364,6 +364,34 @@ namespace AskTheModel.Tests {
                 sealed_state_root
             );
 
+            string enrolled_seal_value;
+            uint64 enrolled_files;
+            uint64 enrolled_bytes;
+            assert (
+                RepositoryNative.compute_snapshot_seal (
+                    sealed_snapshot,
+                    out enrolled_seal_value,
+                    out enrolled_files,
+                    out enrolled_bytes
+                )
+            );
+
+            var presealed_state =
+                new ControlRepositoryStateStore (
+                    sealed_state_root
+                );
+            assert (
+                presealed_state.repository_generation_id == 1
+            );
+            presealed_state.set_snapshot_seal (
+                sealed_descriptor.id,
+                sealed_sha,
+                enrolled_seal_value
+            );
+            assert (
+                presealed_state.repository_generation_id == 2
+            );
+
             var sealed_service =
                 new RepositoryLifecycleService (
                     sealed_state_root,
@@ -396,6 +424,38 @@ namespace AskTheModel.Tests {
             assert (
                 sealed_grounding.repository_count () == 1
             );
+            assert (
+                sealed_grounding.repository_generation_id () == 2
+            );
+
+            var pinned_session =
+                new ConversationSession ();
+            pinned_session.begin (
+                sealed_grounding,
+                "test-model"
+            );
+            assert (
+                pinned_session.repository_generation_id () == 2
+            );
+
+            var advancing_writer =
+                new ControlRepositoryStateStore (
+                    sealed_state_root
+                );
+            advancing_writer.set_current (
+                "ewd",
+                "6666666666666666666666666666666666666666",
+                "0.2.0"
+            );
+            assert (
+                advancing_writer.repository_generation_id == 3
+            );
+            assert (
+                sealed_grounding.repository_generation_id () == 2
+            );
+            assert (
+                pinned_session.repository_generation_id () == 2
+            );
 
             var enrolled_state =
                 new ControlRepositoryStateStore (
@@ -409,7 +469,10 @@ namespace AskTheModel.Tests {
                     sealed_descriptor.id
                 ).snapshot_seal_sha256;
             assert (enrolled_seal != null);
-            assert ((enrolled_seal ?? "").length == 64);
+            assert (enrolled_seal == enrolled_seal_value);
+            assert (
+                enrolled_state.repository_generation_id == 3
+            );
 
             remove_tree_best_effort (
                 sealed_cache_root

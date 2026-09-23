@@ -256,6 +256,37 @@ test_empty_model_is_rejected ()
     assert (session.model_name () == null);
 }
 
+private static void
+test_repository_generation_is_pinned_until_reset ()
+{
+    var grounding = new AskTheModel.ConversationGrounding ();
+    var session = new AskTheModel.ConversationSession ();
+
+    try {
+        grounding.pin_repository_generation (42);
+        assert (grounding.freeze ());
+        session.begin (
+            grounding,
+            "test-model"
+        );
+    } catch (Error error) {
+        critical ("%s", error.message);
+        assert_not_reached ();
+    }
+
+    assert (
+        grounding.repository_generation_id () == 42
+    );
+    assert (
+        session.repository_generation_id () == 42
+    );
+
+    session.reset ();
+    assert (
+        session.repository_generation_id () == 0
+    );
+}
+
 public static int
 main (string[] args)
 {
@@ -284,6 +315,10 @@ main (string[] args)
     Test.add_func (
         "/conversation-session/empty-model-rejected",
         test_empty_model_is_rejected
+    );
+    Test.add_func (
+        "/conversation-session/repository-generation-pinned",
+        test_repository_generation_is_pinned_until_reset
     );
 
     return Test.run ();

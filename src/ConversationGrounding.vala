@@ -280,6 +280,7 @@ namespace AskTheModel {
 
     public class ConversationGrounding : Object {
         private void* state = null;
+        private int64 pinned_repository_generation_id = 0;
 
         public ConversationGrounding () {
             state = ConversationGroundingNative.state_new ();
@@ -309,7 +310,45 @@ namespace AskTheModel {
             );
         }
 
+        public void pin_repository_generation (
+            int64 generation_id
+        ) throws GLib.Error {
+            if (is_frozen ()) {
+                throw new GLib.IOError.FAILED (
+                    "Repository generation cannot change after conversation grounding is frozen."
+                );
+            }
+
+            if (generation_id <= 0) {
+                throw new GLib.IOError.INVALID_DATA (
+                    "Repository generation identifier must be positive."
+                );
+            }
+
+            if (pinned_repository_generation_id != 0 &&
+                pinned_repository_generation_id !=
+                    generation_id) {
+                throw new GLib.IOError.INVALID_DATA (
+                    "Conversation grounding already has a different repository generation."
+                );
+            }
+
+            pinned_repository_generation_id =
+                generation_id;
+        }
+
+        public int64 repository_generation_id () {
+            return pinned_repository_generation_id;
+        }
+
         public bool freeze () throws GLib.Error {
+            if (repository_count () > 0 &&
+                pinned_repository_generation_id <= 0) {
+                throw new GLib.IOError.INVALID_DATA (
+                    "Repository-backed conversation grounding requires a pinned Control DB generation."
+                );
+            }
+
             return ConversationGroundingNative.freeze (state);
         }
 

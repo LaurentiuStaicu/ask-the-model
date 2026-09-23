@@ -106,6 +106,42 @@ test_zero_scope_has_no_citation_map ()
     assert (rejected);
 }
 
+private static void
+test_generation_pin_is_immutable_after_freeze ()
+{
+    var grounding =
+        new AskTheModel.ConversationGrounding ();
+
+    try {
+        grounding.pin_repository_generation (7);
+        assert (grounding.freeze ());
+    } catch (Error error) {
+        critical ("%s", error.message);
+        assert_not_reached ();
+    }
+
+    assert (
+        grounding.repository_generation_id () == 7
+    );
+
+    bool rejected = false;
+
+    try {
+        grounding.pin_repository_generation (8);
+    } catch (Error error) {
+        rejected = true;
+        assert (
+            error.message ==
+            "Repository generation cannot change after conversation grounding is frozen."
+        );
+    }
+
+    assert (rejected);
+    assert (
+        grounding.repository_generation_id () == 7
+    );
+}
+
 public static int
 main (string[] args)
 {
@@ -122,6 +158,10 @@ main (string[] args)
     Test.add_func (
         "/conversation-grounding-vala/zero-scope-no-citation-map",
         test_zero_scope_has_no_citation_map
+    );
+    Test.add_func (
+        "/conversation-grounding-vala/generation-pin-immutable",
+        test_generation_pin_is_immutable_after_freeze
     );
 
     return Test.run ();

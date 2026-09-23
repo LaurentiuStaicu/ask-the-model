@@ -46,6 +46,23 @@ gboolean atm_control_state_validate (
     GError **error
 );
 
+gboolean atm_control_state_active_generation_id (
+    const char *path,
+    gint64 *out_generation_id,
+    GError **error
+);
+
+gboolean atm_control_state_load_repository_values_at_generation (
+    const char *path,
+    gint64 generation_id,
+    const char *repository_id,
+    gboolean *out_present,
+    char **out_snapshot_sha,
+    char **out_repository_version,
+    char **out_snapshot_seal_sha256,
+    GError **error
+);
+
 gboolean atm_control_state_load_repository_values (
     const char *path,
     const char *repository_id,
@@ -65,11 +82,32 @@ gboolean atm_control_state_set_current_values (
     GError **error
 );
 
+gboolean atm_control_state_set_current_values_guarded (
+    const char *path,
+    gint64 expected_generation_id,
+    const char *repository_id,
+    const char *snapshot_sha,
+    const char *repository_version,
+    const char *snapshot_seal_sha256,
+    gint64 *out_generation_id,
+    GError **error
+);
+
 gboolean atm_control_state_set_snapshot_seal_values (
     const char *path,
     const char *repository_id,
     const char *expected_snapshot_sha,
     const char *snapshot_seal_sha256,
+    GError **error
+);
+
+gboolean atm_control_state_set_snapshot_seal_values_guarded (
+    const char *path,
+    gint64 expected_generation_id,
+    const char *repository_id,
+    const char *expected_snapshot_sha,
+    const char *snapshot_seal_sha256,
+    gint64 *out_generation_id,
     GError **error
 );
 
