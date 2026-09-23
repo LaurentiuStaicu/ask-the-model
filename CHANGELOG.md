@@ -46,6 +46,9 @@ All notable public releases of Ask the Model are recorded here.
 - CONV-04a adds startup restore of non-archived durable conversations into the existing scrollable Gtk.Notebook as explicitly view-only tabs; transcript text, grounded citation buttons and persisted immutable permalinks are restored while prompt/Send remain disabled;
 - startup restore removes the default pristine `New` tab only when it is still completely untouched, so asynchronous qualification cannot discard user input begun during startup;
 - added `SESSION-S0-008`; continuation qualification/Send enablement remain CONV-04b and archive/delete lifecycle remains CONV-04c.
+- CONV-04b now requalifies restored tabs against the exact durable AI model name/digest and historical repository generation/version/SHA context before enabling continuation; successful qualification starts the ConversationSession on the reconstructed historical grounding while leaving selectors locked to that context;
+- failed or temporarily unavailable continuation context remains explicitly read-only and can be retried after local model discovery/refresh, repository refresh/update, or completion of another active generation without changing durable history or current repository authority;
+- added `SESSION-S0-009`; archive/delete lifecycle remains CONV-04c.
 
 ### Startup qualification fixes
 

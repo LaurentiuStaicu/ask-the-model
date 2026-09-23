@@ -31,6 +31,7 @@ Post-v0.4.0 development currently extends engineering hardening without changing
 - CONV-03b adds exact continuation-qualification primitives for historical repository generation/version/SHA and local AI model name/digest without changing current repository authority; GTK restore/navigation still remains CONV-04.
 - live grounded-turn persistence now carries canonical immutable source permalinks through the Vala/native bridge, so durable provenance restored later is not weaker than the provenance shown at commit time.
 - CONV-04a restores non-archived durable conversations into the existing GTK notebook as view-only tabs with transcript and citation provenance; restored prompt/Send controls remain disabled until CONV-04b exact continuation qualification.
+- CONV-04b enables continuation only after the restored snapshot's exact Ollama model name/digest and historical repository generation/version/SHA context are requalified; unavailable or mismatched context stays view-only and can be retried without repinning.
 
 Legacy `repository-state.json` remains migration/recovery evidence after cutover and is not rewritten by normal development-runtime repository operations.
 
