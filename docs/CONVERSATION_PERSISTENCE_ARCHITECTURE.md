@@ -250,6 +250,10 @@ Define storage ownership, schema concepts, transaction boundaries, restore seman
 
 Add the separate conversation SQLite schema, hardened open/validation layer and tests.
 
+The foundation uses `atm-conversation-store/1` with its own SQLite `application_id`, STRICT tables and the same hardened SQLite connection baseline as Control State. Structural and semantic validation are independent of repository Control DB validation.
+
+CONV-01 deliberately exposes no live-chat write or restore path. GTK and `Application` do not open the conversation database yet, so public behavior remains in-memory-only until later gates.
+
 Do not wire GTK or persist live chats yet.
 
 ### CONV-02 — durable write path

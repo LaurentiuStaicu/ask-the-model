@@ -329,6 +329,27 @@ test(
   repository_state_test
 )
 
+conversation_store_test = executable(
+  'conversation-store-test',
+  [
+    'src/conversation_store.c',
+    'tests/conversation_store_test.c',
+    resources
+  ],
+  include_directories: include_directories('src'),
+  dependencies: [
+    glib_dep,
+    gio_dep,
+    sqlite_dep
+  ],
+  install: false
+)
+
+test(
+  'conversation-store',
+  conversation_store_test
+)
+
 control_state_test = executable(
   'control-state-test',
   [
