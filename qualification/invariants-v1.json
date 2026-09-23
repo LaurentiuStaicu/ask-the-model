@@ -607,6 +607,21 @@
         "meson:conversation-store",
         "meson:conversation-persistence-store"
       ]
+    },
+    {
+      "id": "SESSION-S0-011",
+      "category": "SESSION",
+      "severity": "S0",
+      "lifecycle": "enforced",
+      "statement": "Conversation History must reopen only durable conversations that are not already open and must reuse the existing persisted-snapshot restore boundary. Closed conversations may be made startup-open before tab reconstruction. Archived conversations must make startup-open state durable while still archived and only then clear archive state, so a failed unarchive leaves them excluded from startup restore. Every history-opened tab must begin in restored view-only mode and may become continuable only through the same exact persisted model name/digest and repository generation/version/SHA qualification used by startup restoration; current model or repository authority must never be silently substituted.",
+      "enforced_by": [
+        "src/Application.vala",
+        "src/ConversationPersistenceStore.vala"
+      ],
+      "tested_by": [
+        "meson:conversation-persistence-store",
+        "meson:repository-lifecycle-service"
+      ]
     }
   ]
 }

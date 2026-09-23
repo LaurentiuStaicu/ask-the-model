@@ -551,6 +551,26 @@ test_archive_delete_domain_lifecycle ()
                 .open_on_startup
         );
 
+        /*
+         * History reopen makes startup-open durable while the
+         * conversation is still archived. If unarchive were to fail,
+         * startup restore would continue to exclude the row.
+         */
+        store.set_open_on_startup (
+            conversation_id,
+            true
+        );
+
+        var archived_reopen =
+            store.load_snapshot (
+                conversation_id
+            );
+        assert (archived_reopen.archived);
+        assert (
+            store.list_conversations ()[0]
+                .open_on_startup
+        );
+
         store.set_archived (
             conversation_id,
             false,
@@ -563,6 +583,10 @@ test_archive_delete_domain_lifecycle ()
             );
         assert (!restored.archived);
         assert (restored.updated_at_us == 103);
+        assert (
+            store.list_conversations ()[0]
+                .open_on_startup
+        );
 
         store.delete_conversation (
             conversation_id

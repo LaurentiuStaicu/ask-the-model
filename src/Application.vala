@@ -96,6 +96,7 @@ namespace AskTheModel {
             new RepositoryLifecycleService ();
         private GLib.SimpleAction? new_chat_action;
         private Gtk.Button? new_chat_button;
+        private Gtk.Button? history_button;
         private Gtk.Notebook? chat_notebook;
         private ChatTabState[] chat_states = {};
         private ChatTabState? active_chat;
@@ -940,6 +941,270 @@ namespace AskTheModel {
             chat_states = updated;
         }
 
+        private bool durable_conversation_is_open (
+            string conversation_id
+        ) {
+            foreach (ChatTabState state in chat_states) {
+                if (state.persistent_id == conversation_id) {
+                    return true;
+                }
+            }
+
+            return false;
+        }
+
+        private void show_conversation_history_error (
+            Gtk.Window? parent,
+            string detail
+        ) {
+            var dialog = new Gtk.AlertDialog (
+                "Conversation history action failed"
+            ) {
+                detail = detail,
+                modal = true
+            };
+            dialog.show (parent);
+        }
+
+        private void open_history_conversation (
+            ConversationPersistenceSummary summary,
+            Gtk.Window history_window
+        ) {
+            if (generation_active ||
+                conversation_store == null ||
+                chat_notebook == null) {
+                return;
+            }
+
+            if (durable_conversation_is_open (
+                    summary.conversation_id
+                )) {
+                history_window.close ();
+                return;
+            }
+
+            try {
+                ConversationPersistenceSnapshot initial_snapshot =
+                    conversation_store.load_snapshot (
+                        summary.conversation_id
+                    );
+
+                /*
+                 * Make startup-open state durable before clearing archive.
+                 * If unarchive then fails, the conversation remains archived
+                 * and therefore still excluded from startup restore.
+                 */
+                conversation_store.set_open_on_startup (
+                    summary.conversation_id,
+                    true
+                );
+
+                if (initial_snapshot.archived) {
+                    conversation_store.set_archived (
+                        summary.conversation_id,
+                        false,
+                        GLib.get_real_time ()
+                    );
+                }
+
+                ConversationPersistenceSnapshot snapshot =
+                    conversation_store.load_snapshot (
+                        summary.conversation_id
+                    );
+
+                ChatTabState? restored =
+                    create_restored_chat_tab (
+                        snapshot
+                    );
+
+                if (restored == null) {
+                    throw new GLib.IOError.FAILED (
+                        "Conversation could not be opened in the current notebook."
+                    );
+                }
+
+                history_window.close ();
+
+                stdout.printf (
+                    "AtM: conversation %s reopened from history%s\n",
+                    summary.conversation_id,
+                    initial_snapshot.archived
+                        ? " after unarchive"
+                        : ""
+                );
+
+                qualify_restored_conversations.begin ();
+            } catch (GLib.Error error) {
+                show_conversation_history_error (
+                    history_window,
+                    error.message
+                );
+            }
+        }
+
+        private Gtk.Widget build_conversation_history_row (
+            ConversationPersistenceSummary summary,
+            Gtk.Window history_window
+        ) {
+            var title = new Gtk.Label (summary.title) {
+                halign = Gtk.Align.START,
+                xalign = 0.0f,
+                hexpand = true,
+                ellipsize = Pango.EllipsizeMode.END
+            };
+
+            string lifecycle =
+                summary.archived
+                    ? "Archived"
+                    : summary.open_on_startup
+                        ? "Saved"
+                        : "Closed";
+
+            var state_label = new Gtk.Label (lifecycle) {
+                halign = Gtk.Align.START,
+                xalign = 0.0f
+            };
+
+            var labels = new Gtk.Box (
+                Gtk.Orientation.VERTICAL,
+                2
+            ) {
+                hexpand = true
+            };
+            labels.append (title);
+            labels.append (state_label);
+
+            var open_button =
+                new Gtk.Button.with_label (
+                    summary.archived
+                        ? "Unarchive & Open"
+                        : "Open"
+                ) {
+                    valign = Gtk.Align.CENTER
+                };
+
+            ConversationPersistenceSummary item = summary;
+            open_button.clicked.connect (() => {
+                open_history_conversation (
+                    item,
+                    history_window
+                );
+            });
+
+            var row = new Gtk.Box (
+                Gtk.Orientation.HORIZONTAL,
+                12
+            ) {
+                margin_top = 8,
+                margin_bottom = 8,
+                margin_start = 10,
+                margin_end = 10
+            };
+            row.append (labels);
+            row.append (open_button);
+
+            return row;
+        }
+
+        private void show_conversation_history () {
+            if (conversation_store == null ||
+                generation_active) {
+                return;
+            }
+
+            ConversationPersistenceSummary[] summaries;
+
+            try {
+                summaries =
+                    conversation_store.list_conversations ();
+            } catch (GLib.Error error) {
+                show_conversation_history_error (
+                    this.active_window,
+                    error.message
+                );
+                return;
+            }
+
+            var content = new Gtk.Box (
+                Gtk.Orientation.VERTICAL,
+                10
+            ) {
+                margin_top = 12,
+                margin_bottom = 12,
+                margin_start = 12,
+                margin_end = 12
+            };
+
+            var description = new Gtk.Label (
+                "Closed and archived conversations remain local. Opening one restores its saved transcript and then rechecks the exact saved AI model and repository context before continuation."
+            ) {
+                halign = Gtk.Align.START,
+                xalign = 0.0f,
+                wrap = true
+            };
+            content.append (description);
+
+            var history_window = new Gtk.Window () {
+                application = this,
+                title = "Conversation History",
+                transient_for = this.active_window,
+                modal = true,
+                destroy_with_parent = true,
+                resizable = true,
+                default_width = 640,
+                default_height = 420
+            };
+            history_window.add_css_class ("atm-window");
+
+            var list = new Gtk.ListBox () {
+                selection_mode = Gtk.SelectionMode.NONE,
+                show_separators = true
+            };
+
+            uint visible_count = 0;
+
+            foreach (
+                ConversationPersistenceSummary summary
+                in summaries
+            ) {
+                if (durable_conversation_is_open (
+                        summary.conversation_id
+                    )) {
+                    continue;
+                }
+
+                list.append (
+                    build_conversation_history_row (
+                        summary,
+                        history_window
+                    )
+                );
+                visible_count++;
+            }
+
+            if (visible_count == 0) {
+                var empty = new Gtk.Label (
+                    "No closed or archived conversations."
+                ) {
+                    halign = Gtk.Align.CENTER,
+                    margin_top = 24,
+                    margin_bottom = 24
+                };
+                content.append (empty);
+            } else {
+                var scroller = new Gtk.ScrolledWindow () {
+                    hscrollbar_policy = Gtk.PolicyType.NEVER,
+                    vscrollbar_policy = Gtk.PolicyType.AUTOMATIC,
+                    vexpand = true
+                };
+                scroller.set_child (list);
+                content.append (scroller);
+            }
+
+            history_window.child = content;
+            history_window.present ();
+        }
+
         private void configure_conversation_lifecycle_menu (
             ChatTabState state
         ) {
@@ -1208,6 +1473,12 @@ namespace AskTheModel {
 
             if (new_chat_action != null) {
                 new_chat_action.set_enabled (can_start_new_chat);
+            }
+
+            if (history_button != null) {
+                history_button.sensitive =
+                    conversation_store != null &&
+                    !generation_active;
             }
         }
 
@@ -3716,6 +3987,31 @@ namespace AskTheModel {
             chat_tabs.set_action_widget (
                 new_chat_button,
                 Gtk.PackType.START
+            );
+
+            history_button =
+                new Gtk.Button.with_label (
+                    "History"
+                ) {
+                    tooltip_text = "Open conversation history",
+                    sensitive = false,
+                    valign = Gtk.Align.FILL,
+                    halign = Gtk.Align.END
+                };
+            history_button.add_css_class (
+                "atm-new-chat-tab"
+            );
+            history_button.update_property (
+                Gtk.AccessibleProperty.LABEL,
+                "Conversation History"
+            );
+            history_button.clicked.connect (() => {
+                show_conversation_history ();
+            });
+
+            chat_tabs.set_action_widget (
+                history_button,
+                Gtk.PackType.END
             );
 
             var content = new Gtk.Box (
