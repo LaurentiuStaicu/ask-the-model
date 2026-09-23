@@ -57,6 +57,9 @@ executable(
     'src/retrieval_query.c',
     'src/scientific_profile.c',
     'src/scientific_evidence.c',
+    'src/scientific_profile_ewd.c',
+    'src/scientific_profile_cbd.c',
+    'src/scientific_profile_rmd.c',
     'src/retrieval_rank.c',
     'src/retrieval_scope.c',
     'src/retrieval_router.c',
@@ -618,6 +621,28 @@ scientific_evidence_test = executable(
 test(
   'scientific-evidence',
   scientific_evidence_test
+)
+
+scientific_profiles_test = executable(
+  'scientific-profiles-test',
+  [
+    'src/scientific_profile.c',
+    'src/scientific_evidence.c',
+    'src/scientific_profile_ewd.c',
+    'src/scientific_profile_cbd.c',
+    'src/scientific_profile_rmd.c',
+    'tests/scientific_profiles_test.c'
+  ],
+  include_directories: include_directories('src'),
+  dependencies: [
+    glib_dep
+  ],
+  install: false
+)
+
+test(
+  'scientific-profiles',
+  scientific_profiles_test
 )
 
 retrieval_rank_test = executable(

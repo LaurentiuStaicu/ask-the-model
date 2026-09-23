@@ -149,6 +149,21 @@
       "tested_by": [
         "meson:scientific-evidence"
       ]
+    },
+    {
+      "id": "SCIENTIFIC-S1-003",
+      "category": "SCIENTIFIC",
+      "severity": "S1",
+      "lifecycle": "enforced",
+      "statement": "The EWD, CBD, and RMD v1 production profile factories are deny-by-default allowlists: only explicitly declared structural selectors and exact dataset logical source IDs may be recognized, and unlisted or near-match evidence remains unsupported.",
+      "enforced_by": [
+        "src/scientific_profile_ewd.c",
+        "src/scientific_profile_cbd.c",
+        "src/scientific_profile_rmd.c"
+      ],
+      "tested_by": [
+        "meson:scientific-profiles"
+      ]
     }
   ]
 }
