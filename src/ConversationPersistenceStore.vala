@@ -27,6 +27,7 @@ namespace AskTheModel {
         public string locator { get; construct; }
         public string? title { get; construct; }
         public string? excerpt { get; construct; }
+        public string? immutable_permalink { get; construct; }
 
         public ConversationPersistenceCitation (
             string label,
@@ -37,7 +38,8 @@ namespace AskTheModel {
             string source_path,
             string locator,
             string? title = null,
-            string? excerpt = null
+            string? excerpt = null,
+            string? immutable_permalink = null
         ) {
             Object (
                 label: label,
@@ -48,8 +50,148 @@ namespace AskTheModel {
                 source_path: source_path,
                 locator: locator,
                 title: title,
-                excerpt: excerpt
+                excerpt: excerpt,
+                immutable_permalink: immutable_permalink
             );
+        }
+    }
+
+    public class ConversationPersistenceSummary : Object {
+        public string conversation_id { get; construct; }
+        public string title { get; construct; }
+        public int64 created_at_us { get; construct; }
+        public int64 updated_at_us { get; construct; }
+        public bool archived { get; construct; }
+
+        public ConversationPersistenceSummary (
+            string conversation_id,
+            string title,
+            int64 created_at_us,
+            int64 updated_at_us,
+            bool archived
+        ) {
+            Object (
+                conversation_id: conversation_id,
+                title: title,
+                created_at_us: created_at_us,
+                updated_at_us: updated_at_us,
+                archived: archived
+            );
+        }
+    }
+
+    public class ConversationPersistenceMessage : Object {
+        public int64 sequence_no { get; construct; }
+        public int64 turn_no { get; construct; }
+        public string role { get; construct; }
+        public string provider_content { get; construct; }
+        public string display_content { get; construct; }
+        public bool grounded { get; construct; }
+        public int64 created_at_us { get; construct; }
+        public ConversationPersistenceCitation[] citations;
+
+        public ConversationPersistenceMessage (
+            int64 sequence_no,
+            int64 turn_no,
+            string role,
+            string provider_content,
+            string display_content,
+            bool grounded,
+            int64 created_at_us,
+            ConversationPersistenceCitation[] citations
+        ) {
+            Object (
+                sequence_no: sequence_no,
+                turn_no: turn_no,
+                role: role,
+                provider_content: provider_content,
+                display_content: display_content,
+                grounded: grounded,
+                created_at_us: created_at_us
+            );
+
+            this.citations = citations;
+        }
+    }
+
+    public class ConversationPersistenceSnapshot : Object {
+        public string conversation_id { get; construct; }
+        public string title { get; construct; }
+        public int64 created_at_us { get; construct; }
+        public int64 updated_at_us { get; construct; }
+        public string model_name { get; construct; }
+        public string? model_digest { get; construct; }
+        public int64 repository_generation_id { get; construct; }
+        public bool archived { get; construct; }
+        public ConversationPersistenceRepository[] repositories;
+        public ConversationPersistenceMessage[] messages;
+
+        public ConversationPersistenceSnapshot (
+            string conversation_id,
+            string title,
+            int64 created_at_us,
+            int64 updated_at_us,
+            string model_name,
+            string? model_digest,
+            int64 repository_generation_id,
+            bool archived,
+            ConversationPersistenceRepository[] repositories,
+            ConversationPersistenceMessage[] messages
+        ) {
+            Object (
+                conversation_id: conversation_id,
+                title: title,
+                created_at_us: created_at_us,
+                updated_at_us: updated_at_us,
+                model_name: model_name,
+                model_digest: model_digest,
+                repository_generation_id: repository_generation_id,
+                archived: archived
+            );
+
+            this.repositories = repositories;
+            this.messages = messages;
+        }
+
+        public void restore_provider_history (
+            OllamaConversation conversation
+        ) throws GLib.Error {
+            if ((messages.length % 2) != 0) {
+                throw new GLib.IOError.INVALID_DATA (
+                    "Durable conversation snapshot has an incomplete provider-history turn."
+                );
+            }
+
+            conversation.reset ();
+
+            for (
+                int i = 0;
+                i < messages.length;
+                i += 2
+            ) {
+                ConversationPersistenceMessage user =
+                    messages[i];
+                ConversationPersistenceMessage assistant =
+                    messages[i + 1];
+
+                if (user.role != "user" ||
+                    assistant.role != "assistant" ||
+                    user.sequence_no + 1 !=
+                        assistant.sequence_no ||
+                    user.turn_no !=
+                        assistant.turn_no ||
+                    user.grounded) {
+                    conversation.reset ();
+                    throw new GLib.IOError.INVALID_DATA (
+                        "Durable conversation snapshot cannot rebuild provider history."
+                    );
+                }
+
+                conversation.commit_exchange (
+                    user.provider_content,
+                    assistant.provider_content
+                );
+            }
         }
     }
 
@@ -80,6 +222,325 @@ namespace AskTheModel {
             }
 
             native_store = (owned) opened;
+        }
+
+        private static string require_native_text (
+            string? value,
+            string field_name
+        ) throws GLib.Error {
+            if (value == null) {
+                throw new GLib.IOError.INVALID_DATA (
+                    "Durable conversation snapshot is missing %s.".printf (
+                        field_name
+                    )
+                );
+            }
+
+            return value;
+        }
+
+        public ConversationPersistenceSummary[]
+        list_conversations () throws GLib.Error {
+            ConversationStoreNative.ConversationList native_list;
+
+            if (!ConversationStoreNative.list_conversations (
+                    native_store,
+                    out native_list
+                )) {
+                throw new GLib.IOError.FAILED (
+                    "Durable conversations could not be listed."
+                );
+            }
+
+            ConversationPersistenceSummary[] result = {};
+
+            for (
+                uint i = 0;
+                i < ConversationStoreNative.list_count (
+                    native_list
+                );
+                i++
+            ) {
+                string conversation_id =
+                    require_native_text (
+                        ConversationStoreNative.list_id_at (
+                            native_list,
+                            i
+                        ),
+                        "conversation id"
+                    );
+                string title =
+                    require_native_text (
+                        ConversationStoreNative.list_title_at (
+                            native_list,
+                            i
+                        ),
+                        "conversation title"
+                    );
+
+                result +=
+                    new ConversationPersistenceSummary (
+                        conversation_id,
+                        title,
+                        ConversationStoreNative.list_created_at_us_at (
+                            native_list,
+                            i
+                        ),
+                        ConversationStoreNative.list_updated_at_us_at (
+                            native_list,
+                            i
+                        ),
+                        ConversationStoreNative.list_archived_at (
+                            native_list,
+                            i
+                        )
+                    );
+            }
+
+            return result;
+        }
+
+        public ConversationPersistenceSnapshot load_snapshot (
+            string conversation_id
+        ) throws GLib.Error {
+            ConversationStoreNative.ConversationSnapshot native_snapshot;
+
+            if (!ConversationStoreNative.load_snapshot (
+                    native_store,
+                    conversation_id,
+                    out native_snapshot
+                )) {
+                throw new GLib.IOError.FAILED (
+                    "Durable conversation snapshot could not be loaded."
+                );
+            }
+
+            string loaded_id =
+                require_native_text (
+                    ConversationStoreNative.snapshot_id (
+                        native_snapshot
+                    ),
+                    "conversation id"
+                );
+            string title =
+                require_native_text (
+                    ConversationStoreNative.snapshot_title (
+                        native_snapshot
+                    ),
+                    "conversation title"
+                );
+            string model_name =
+                require_native_text (
+                    ConversationStoreNative.snapshot_model_name (
+                        native_snapshot
+                    ),
+                    "model name"
+                );
+            string? model_digest =
+                ConversationStoreNative.snapshot_model_digest (
+                    native_snapshot
+                );
+
+            ConversationPersistenceRepository[] repositories = {};
+
+            for (
+                uint i = 0;
+                i < ConversationStoreNative.snapshot_repository_count (
+                    native_snapshot
+                );
+                i++
+            ) {
+                repositories +=
+                    new ConversationPersistenceRepository (
+                        require_native_text (
+                            ConversationStoreNative.snapshot_repository_id_at (
+                                native_snapshot,
+                                i
+                            ),
+                            "repository id"
+                        ),
+                        require_native_text (
+                            ConversationStoreNative.snapshot_repository_version_at (
+                                native_snapshot,
+                                i
+                            ),
+                            "repository version"
+                        ),
+                        require_native_text (
+                            ConversationStoreNative.snapshot_repository_sha_at (
+                                native_snapshot,
+                                i
+                            ),
+                            "repository snapshot SHA"
+                        )
+                    );
+            }
+
+            ConversationPersistenceMessage[] messages = {};
+
+            for (
+                uint message_index = 0;
+                message_index <
+                    ConversationStoreNative.snapshot_message_count (
+                        native_snapshot
+                    );
+                message_index++
+            ) {
+                ConversationPersistenceCitation[] citations = {};
+
+                for (
+                    uint citation_index = 0;
+                    citation_index <
+                        ConversationStoreNative.snapshot_message_citation_count_at (
+                            native_snapshot,
+                            message_index
+                        );
+                    citation_index++
+                ) {
+                    citations +=
+                        new ConversationPersistenceCitation (
+                            require_native_text (
+                                ConversationStoreNative.snapshot_citation_label_at (
+                                    native_snapshot,
+                                    message_index,
+                                    citation_index
+                                ),
+                                "citation label"
+                            ),
+                            require_native_text (
+                                ConversationStoreNative.snapshot_citation_repository_id_at (
+                                    native_snapshot,
+                                    message_index,
+                                    citation_index
+                                ),
+                                "citation repository id"
+                            ),
+                            require_native_text (
+                                ConversationStoreNative.snapshot_citation_repository_version_at (
+                                    native_snapshot,
+                                    message_index,
+                                    citation_index
+                                ),
+                                "citation repository version"
+                            ),
+                            require_native_text (
+                                ConversationStoreNative.snapshot_citation_snapshot_sha_at (
+                                    native_snapshot,
+                                    message_index,
+                                    citation_index
+                                ),
+                                "citation snapshot SHA"
+                            ),
+                            require_native_text (
+                                ConversationStoreNative.snapshot_citation_logical_source_id_at (
+                                    native_snapshot,
+                                    message_index,
+                                    citation_index
+                                ),
+                                "citation logical source id"
+                            ),
+                            require_native_text (
+                                ConversationStoreNative.snapshot_citation_source_path_at (
+                                    native_snapshot,
+                                    message_index,
+                                    citation_index
+                                ),
+                                "citation source path"
+                            ),
+                            require_native_text (
+                                ConversationStoreNative.snapshot_citation_locator_at (
+                                    native_snapshot,
+                                    message_index,
+                                    citation_index
+                                ),
+                                "citation locator"
+                            ),
+                            ConversationStoreNative.snapshot_citation_title_at (
+                                native_snapshot,
+                                message_index,
+                                citation_index
+                            ),
+                            ConversationStoreNative.snapshot_citation_excerpt_at (
+                                native_snapshot,
+                                message_index,
+                                citation_index
+                            ),
+                            ConversationStoreNative.snapshot_citation_immutable_permalink_at (
+                                native_snapshot,
+                                message_index,
+                                citation_index
+                            )
+                        );
+                }
+
+                messages +=
+                    new ConversationPersistenceMessage (
+                        ConversationStoreNative.snapshot_message_sequence_no_at (
+                            native_snapshot,
+                            message_index
+                        ),
+                        ConversationStoreNative.snapshot_message_turn_no_at (
+                            native_snapshot,
+                            message_index
+                        ),
+                        require_native_text (
+                            ConversationStoreNative.snapshot_message_role_at (
+                                native_snapshot,
+                                message_index
+                            ),
+                            "message role"
+                        ),
+                        require_native_text (
+                            ConversationStoreNative.snapshot_message_provider_content_at (
+                                native_snapshot,
+                                message_index
+                            ),
+                            "provider content"
+                        ),
+                        require_native_text (
+                            ConversationStoreNative.snapshot_message_display_content_at (
+                                native_snapshot,
+                                message_index
+                            ),
+                            "display content"
+                        ),
+                        ConversationStoreNative.snapshot_message_grounded_at (
+                            native_snapshot,
+                            message_index
+                        ),
+                        ConversationStoreNative.snapshot_message_created_at_us_at (
+                            native_snapshot,
+                            message_index
+                        ),
+                        citations
+                    );
+            }
+
+            string? digest_copy =
+                model_digest != null
+                    ? model_digest
+                    : null;
+
+            return new ConversationPersistenceSnapshot (
+                loaded_id,
+                title,
+                ConversationStoreNative.snapshot_created_at_us (
+                    native_snapshot
+                ),
+                ConversationStoreNative.snapshot_updated_at_us (
+                    native_snapshot
+                ),
+                model_name,
+                digest_copy,
+                ConversationStoreNative.snapshot_repository_generation_id (
+                    native_snapshot
+                ),
+                ConversationStoreNative.snapshot_archived (
+                    native_snapshot
+                ),
+                repositories,
+                messages
+            );
         }
 
         public string create_conversation (
