@@ -17,7 +17,8 @@ All notable public releases of Ask the Model are recorded here.
 - hardened every Control DB connection with SQLite defensive mode, untrusted-schema mode, disabled legacy double-quoted strings and explicitly enabled triggers, and established SQLite 3.31.0 as the minimum supported library version for this path;
 - required `SQLITE_OPEN_NOFOLLOW` on every production Control DB open so a symlinked authority path fails closed before bootstrap, migration, validation or repository-state access;
 - required every opened Control DB authority to be genuinely read/write via `sqlite3_db_readonly()`, preventing SQLite's historical read-only fallback from qualifying as writable runtime authority;
-- added `STATE-S0-001` through `STATE-S0-011` qualification invariants plus Flatpak/Meson regression coverage for foundation, import, cutover, authority precedence, copy-on-write history, stale-writer rejection, session generation pinning, schema-level immutability, connection hardening, no-follow authority opens and writable-authority qualification.
+- qualified the XDG Control DB state root with the same real-directory, current-owner, no-group-or-other-write and exclusive write-probe boundary used for startup storage, aborting startup qualification before authority resolution when that state root is unsafe;
+- added `STATE-S0-001` through `STATE-S0-012` qualification invariants plus Flatpak/Meson regression coverage for foundation, import, cutover, authority precedence, copy-on-write history, stale-writer rejection, session generation pinning, schema-level immutability, connection hardening, no-follow authority opens, writable-authority qualification and state-root qualification.
 
 ### Startup qualification fixes
 

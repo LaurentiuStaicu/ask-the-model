@@ -235,3 +235,19 @@ SQLite documents a historical behavior in which `SQLITE_OPEN_READWRITE` may fall
 A Control DB connection is accepted only when SQLite reports exactly read/write (`0`). A read-only result or an unavailable `main` handle fails closed.
 
 This prevents a repository authority from appearing valid during startup and only failing later when a seal, generation or repository update needs to be persisted. Both create/bootstrap-capable opens and existing-authority opens use the same connection-qualification path.
+
+
+## STATE-05e — Control DB state-root qualification
+
+STATE-05e extends the startup storage boundary to the XDG state directory that owns `control-state.sqlite3`.
+
+Before AtM checks whether Control DB exists, publishes a legacy cutover candidate, or opens repository authority, startup now runs the existing storage-root qualification against `state_root`. The qualified state root must therefore be:
+
+- a real directory opened with `O_DIRECTORY | O_NOFOLLOW`;
+- owned by the current user;
+- not writable by group or others;
+- writable by AtM through an exclusive no-follow write probe.
+
+An absent state root may be created by the qualifier with private creation mode. A state root that fails qualification aborts startup qualification before Control DB existence checks, cutover or open. The application therefore keeps repository runtime fail-closed. No startup qualification record is promised for this failure because the record itself is persisted under the state root that has just been rejected.
+
+This deliberately reuses the already-qualified G-S0 storage primitive rather than introducing a second filesystem policy for Control DB authority.

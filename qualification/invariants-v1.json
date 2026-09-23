@@ -420,6 +420,21 @@
       "tested_by": [
         "meson:control-state"
       ]
+    },
+    {
+      "id": "STATE-S0-012",
+      "category": "STATE",
+      "severity": "S0",
+      "lifecycle": "enforced",
+      "statement": "Startup must qualify the XDG state_root that contains control-state.sqlite3 with the same real-directory, current-owner, no-group-or-other-write and exclusive write-probe policy used for AtM storage before any Control DB existence test, cutover publication or authority open. An unsafe state_root must abort startup qualification before authority resolution and keep repository runtime fail-closed; no qualification-record persistence is required into a state root that was itself rejected.",
+      "enforced_by": [
+        "src/StartupQualificationService.vala",
+        "src/startup_qualification.c"
+      ],
+      "tested_by": [
+        "meson:startup-qualification",
+        "meson:startup-qualification-service"
+      ]
     }
   ]
 }

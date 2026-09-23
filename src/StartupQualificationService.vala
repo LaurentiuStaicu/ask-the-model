@@ -642,6 +642,29 @@ namespace AskTheModel {
                 report.storage_detail = error.message;
             }
 
+            bool state_storage_qualified;
+            bool state_storage_created;
+            uint32 state_storage_mode;
+            uint64 state_storage_owner_uid;
+
+            bool state_storage_completed =
+                StartupQualificationNative.qualify_storage_root_values (
+                    state_root,
+                    out state_storage_qualified,
+                    out state_storage_created,
+                    out state_storage_mode,
+                    out state_storage_owner_uid
+                );
+
+            if (!state_storage_completed ||
+                !state_storage_qualified) {
+                throw new GLib.IOError.FAILED (
+                    "Control DB state root did not pass storage qualification."
+                );
+            }
+
+            string? authority_failure = null;
+
             string control_state_path =
                 GLib.Path.build_filename (
                     state_root,
@@ -652,9 +675,8 @@ namespace AskTheModel {
                     state_root,
                     "repository-state.json"
                 );
-            string? authority_failure = null;
-
-            if (!GLib.FileUtils.test (
+            if (authority_failure == null &&
+                !GLib.FileUtils.test (
                     control_state_path,
                     GLib.FileTest.EXISTS
                 )) {

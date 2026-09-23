@@ -418,6 +418,65 @@ namespace AskTheModel.Tests {
         }
     }
 
+    private static void test_unsafe_state_root_blocks_authority ()
+        throws GLib.Error {
+        string fixture_root = new_temp_root (
+            "atm-gs0-state-root-fixture-XXXXXX"
+        );
+        string data_parent = new_temp_root (
+            "atm-gs0-state-root-data-XXXXXX"
+        );
+        string data_root = GLib.Path.build_filename (
+            data_parent,
+            "Ask the Model"
+        );
+        string cache_root = new_temp_root (
+            "atm-gs0-state-root-cache-XXXXXX"
+        );
+        string state_parent = new_temp_root (
+            "atm-gs0-state-root-parent-XXXXXX"
+        );
+        string state_root = GLib.Path.build_filename (
+            state_parent,
+            "state-root"
+        );
+        string flatpak_info =
+            write_flatpak_fixture (fixture_root);
+        string sentinel = "unsafe-state-root\n";
+
+        GLib.FileUtils.set_contents (
+            state_root,
+            sentinel
+        );
+
+        var service = new StartupQualificationService (
+            flatpak_info,
+            data_root,
+            cache_root,
+            state_root
+        );
+
+        bool rejected = false;
+        try {
+            service.run ();
+        } catch (GLib.Error error) {
+            rejected = true;
+            assert (
+                error.message.has_prefix (
+                    "AtM storage root is not a safe real directory:"
+                )
+            );
+        }
+        assert (rejected);
+
+        string preserved;
+        GLib.FileUtils.get_contents (
+            state_root,
+            out preserved
+        );
+        assert (preserved == sentinel);
+    }
+
     private static void test_invalid_state_is_preserved ()
         throws GLib.Error {
         string fixture_root = new_temp_root (
@@ -953,6 +1012,16 @@ namespace AskTheModel.Tests {
             () => {
                 try {
                     test_development_is_unqualified ();
+                } catch (GLib.Error error) {
+                    GLib.error ("%s", error.message);
+                }
+            }
+        );
+        GLib.Test.add_func (
+            "/gs0/authority/unsafe-state-root",
+            () => {
+                try {
+                    test_unsafe_state_root_blocks_authority ();
                 } catch (GLib.Error error) {
                     GLib.error ("%s", error.message);
                 }
