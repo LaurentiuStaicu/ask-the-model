@@ -1,3 +1,5 @@
+#define _GNU_SOURCE
+
 #include "control_state.h"
 
 #include <gio/gio.h>
@@ -6,7 +8,10 @@
 #include <sqlite3.h>
 
 #include <errno.h>
+#include <fcntl.h>
+#include <stdio.h>
 #include <string.h>
+#include <unistd.h>
 
 #define ATM_CONTROL_STATE_SCHEMA_RESOURCE \
     "/io/github/laurentiustaicu/ask_the_model/schemas/control-state-v1.sql"
@@ -1627,6 +1632,652 @@ rollback:
     }
 
     legacy_state_free (state);
+    return ok;
+}
+
+
+static gboolean
+fsync_regular_file (
+    const char *path,
+    GError **error
+)
+{
+    int fd = g_open (
+        path,
+        O_RDONLY | O_CLOEXEC,
+        0
+    );
+
+    if (fd < 0) {
+        g_set_error (
+            error,
+            ATM_CONTROL_STATE_ERROR,
+            ATM_CONTROL_STATE_ERROR_IO,
+            "Could not open cutover candidate for fsync: %s",
+            g_strerror (errno)
+        );
+        return FALSE;
+    }
+
+    if (fsync (fd) != 0) {
+        int saved_errno = errno;
+        close (fd);
+        g_set_error (
+            error,
+            ATM_CONTROL_STATE_ERROR,
+            ATM_CONTROL_STATE_ERROR_IO,
+            "Could not fsync cutover candidate: %s",
+            g_strerror (saved_errno)
+        );
+        return FALSE;
+    }
+
+    close (fd);
+    return TRUE;
+}
+
+static gboolean
+fsync_directory (
+    const char *path,
+    GError **error
+)
+{
+    int fd = g_open (
+        path,
+        O_RDONLY | O_DIRECTORY | O_CLOEXEC,
+        0
+    );
+
+    if (fd < 0) {
+        g_set_error (
+            error,
+            ATM_CONTROL_STATE_ERROR,
+            ATM_CONTROL_STATE_ERROR_IO,
+            "Could not open control-state directory for fsync: %s",
+            g_strerror (errno)
+        );
+        return FALSE;
+    }
+
+    if (fsync (fd) != 0) {
+        int saved_errno = errno;
+        close (fd);
+        g_set_error (
+            error,
+            ATM_CONTROL_STATE_ERROR,
+            ATM_CONTROL_STATE_ERROR_IO,
+            "Could not fsync control-state directory: %s",
+            g_strerror (saved_errno)
+        );
+        return FALSE;
+    }
+
+    close (fd);
+    return TRUE;
+}
+
+static void
+remove_cutover_candidate (
+    const char *candidate_path
+)
+{
+    if (candidate_path == NULL) {
+        return;
+    }
+
+    char *wal_path = g_strconcat (
+        candidate_path,
+        "-wal",
+        NULL
+    );
+    char *shm_path = g_strconcat (
+        candidate_path,
+        "-shm",
+        NULL
+    );
+
+    g_remove (wal_path);
+    g_remove (shm_path);
+    g_remove (candidate_path);
+
+    g_free (wal_path);
+    g_free (shm_path);
+}
+
+static gboolean
+candidate_has_sidecars (
+    const char *candidate_path
+)
+{
+    char *wal_path = g_strconcat (
+        candidate_path,
+        "-wal",
+        NULL
+    );
+    char *shm_path = g_strconcat (
+        candidate_path,
+        "-shm",
+        NULL
+    );
+
+    gboolean has_sidecars =
+        g_file_test (
+            wal_path,
+            G_FILE_TEST_EXISTS
+        ) ||
+        g_file_test (
+            shm_path,
+            G_FILE_TEST_EXISTS
+        );
+
+    g_free (wal_path);
+    g_free (shm_path);
+    return has_sidecars;
+}
+
+static gboolean
+record_cutover_state (
+    AtmControlStateStore *store,
+    gboolean imported_legacy,
+    gint legacy_schema_version,
+    GError **error
+)
+{
+    if (store == NULL ||
+        store->db == NULL) {
+        g_set_error_literal (
+            error,
+            ATM_CONTROL_STATE_ERROR,
+            ATM_CONTROL_STATE_ERROR_ARGUMENT,
+            "Cutover finalization requires an open control-state store."
+        );
+        return FALSE;
+    }
+
+    if (!exec_sql (
+            store->db,
+            "BEGIN IMMEDIATE;",
+            error
+        )) {
+        return FALSE;
+    }
+
+    gboolean ok = FALSE;
+    sqlite3_stmt *ledger = NULL;
+
+    if (imported_legacy) {
+        char *lifecycle = NULL;
+
+        if (!query_single_text (
+                store->db,
+                "SELECT lifecycle "
+                "FROM repository_generations "
+                "WHERE generation_id=1;",
+                &lifecycle,
+                error
+            )) {
+            goto rollback;
+        }
+
+        gboolean complete =
+            g_strcmp0 (
+                lifecycle,
+                "COMPLETE"
+            ) == 0;
+        g_free (lifecycle);
+
+        if (!complete) {
+            g_set_error_literal (
+                error,
+                ATM_CONTROL_STATE_ERROR,
+                ATM_CONTROL_STATE_ERROR_CONFLICT,
+                "Cutover candidate generation is not COMPLETE."
+            );
+            goto rollback;
+        }
+
+        if (!exec_sql (
+                store->db,
+                "UPDATE active_state "
+                "SET active_repository_generation=1 "
+                "WHERE singleton_id=1 "
+                "AND active_repository_generation IS NULL;",
+                error
+            )) {
+            goto rollback;
+        }
+
+        if (sqlite3_changes (store->db) != 1) {
+            g_set_error_literal (
+                error,
+                ATM_CONTROL_STATE_ERROR,
+                ATM_CONTROL_STATE_ERROR_CONFLICT,
+                "Cutover candidate could not activate generation 1."
+            );
+            goto rollback;
+        }
+    }
+
+    if (!prepare_statement (
+            store->db,
+            "INSERT INTO migration_ledger("
+            "migration_id, schema_version, applied_origin"
+            ") VALUES(?1, ?2, ?3);",
+            &ledger,
+            error
+        )) {
+        goto rollback;
+    }
+
+    sqlite3_bind_text (
+        ledger,
+        1,
+        "state-03a-cutover-v1",
+        -1,
+        SQLITE_STATIC
+    );
+    sqlite3_bind_int (
+        ledger,
+        2,
+        ATM_CONTROL_STATE_SCHEMA_VERSION
+    );
+
+    char *origin = imported_legacy
+        ? g_strdup_printf (
+            "repository-state.json/schema=%d",
+            legacy_schema_version
+        )
+        : g_strdup ("empty-bootstrap");
+
+    sqlite3_bind_text (
+        ledger,
+        3,
+        origin,
+        -1,
+        SQLITE_TRANSIENT
+    );
+
+    if (sqlite3_step (ledger) != SQLITE_DONE) {
+        g_free (origin);
+        set_sqlite_error (
+            store->db,
+            error,
+            ATM_CONTROL_STATE_ERROR_SQLITE,
+            "Could not record control-state cutover"
+        );
+        goto rollback;
+    }
+
+    g_free (origin);
+    sqlite3_finalize (ledger);
+    ledger = NULL;
+
+    if (!exec_sql (
+            store->db,
+            "COMMIT;",
+            error
+        )) {
+        goto rollback;
+    }
+
+    ok = TRUE;
+
+rollback:
+    if (ledger != NULL) {
+        sqlite3_finalize (ledger);
+    }
+
+    if (!ok) {
+        sqlite3_exec (
+            store->db,
+            "ROLLBACK;",
+            NULL,
+            NULL,
+            NULL
+        );
+    }
+
+    return ok;
+}
+
+static gboolean
+checkpoint_cutover_candidate (
+    AtmControlStateStore *store,
+    GError **error
+)
+{
+    int log_frames = -1;
+    int checkpointed_frames = -1;
+    int rc = sqlite3_wal_checkpoint_v2 (
+        store->db,
+        NULL,
+        SQLITE_CHECKPOINT_TRUNCATE,
+        &log_frames,
+        &checkpointed_frames
+    );
+
+    if (rc != SQLITE_OK) {
+        set_sqlite_error (
+            store->db,
+            error,
+            ATM_CONTROL_STATE_ERROR_SQLITE,
+            "Could not checkpoint control-state cutover candidate"
+        );
+        return FALSE;
+    }
+
+    return TRUE;
+}
+
+static gboolean
+publish_no_replace (
+    const char *candidate_path,
+    const char *control_path,
+    GError **error
+)
+{
+    if (renameat2 (
+            AT_FDCWD,
+            candidate_path,
+            AT_FDCWD,
+            control_path,
+            RENAME_NOREPLACE
+        ) == 0) {
+        return TRUE;
+    }
+
+    int rename_errno = errno;
+
+    if (rename_errno == EEXIST) {
+        g_set_error_literal (
+            error,
+            ATM_CONTROL_STATE_ERROR,
+            ATM_CONTROL_STATE_ERROR_CONFLICT,
+            "Refusing to replace an existing control-state database during cutover."
+        );
+        return FALSE;
+    }
+
+    if (rename_errno != ENOSYS &&
+        rename_errno != EINVAL &&
+        rename_errno != EOPNOTSUPP) {
+        g_set_error (
+            error,
+            ATM_CONTROL_STATE_ERROR,
+            ATM_CONTROL_STATE_ERROR_IO,
+            "Could not publish control-state database: %s",
+            g_strerror (rename_errno)
+        );
+        return FALSE;
+    }
+
+    if (link (
+            candidate_path,
+            control_path
+        ) != 0) {
+        int link_errno = errno;
+
+        if (link_errno == EEXIST) {
+            g_set_error_literal (
+                error,
+                ATM_CONTROL_STATE_ERROR,
+                ATM_CONTROL_STATE_ERROR_CONFLICT,
+                "Refusing to replace an existing control-state database during cutover."
+            );
+        } else {
+            g_set_error (
+                error,
+                ATM_CONTROL_STATE_ERROR,
+                ATM_CONTROL_STATE_ERROR_IO,
+                "Could not publish control-state database with no-replace fallback: %s",
+                g_strerror (link_errno)
+            );
+        }
+
+        return FALSE;
+    }
+
+    g_remove (candidate_path);
+    return TRUE;
+}
+
+gboolean
+atm_control_state_publish_cutover (
+    const char *control_path,
+    const char *legacy_json_path,
+    AtmControlStateCutoverDisposition *out_disposition,
+    GError **error
+)
+{
+    if (!nonempty (control_path) ||
+        !nonempty (legacy_json_path) ||
+        out_disposition == NULL) {
+        g_set_error_literal (
+            error,
+            ATM_CONTROL_STATE_ERROR,
+            ATM_CONTROL_STATE_ERROR_ARGUMENT,
+            "Control-state cutover received invalid arguments."
+        );
+        return FALSE;
+    }
+
+    *out_disposition =
+        ATM_CONTROL_STATE_CUTOVER_EMPTY;
+
+    if (g_file_test (
+            control_path,
+            G_FILE_TEST_EXISTS
+        )) {
+        g_set_error_literal (
+            error,
+            ATM_CONTROL_STATE_ERROR,
+            ATM_CONTROL_STATE_ERROR_CONFLICT,
+            "Control-state cutover requires the authoritative database path to be absent."
+        );
+        return FALSE;
+    }
+
+    gboolean legacy_exists =
+        g_file_test (
+            legacy_json_path,
+            G_FILE_TEST_EXISTS
+        );
+    AtmLegacyState *legacy_state = NULL;
+
+    if (legacy_exists &&
+        !legacy_state_parse (
+            legacy_json_path,
+            &legacy_state,
+            error
+        )) {
+        return FALSE;
+    }
+
+    char *parent =
+        g_path_get_dirname (control_path);
+
+    if (g_mkdir_with_parents (
+            parent,
+            0700
+        ) != 0) {
+        g_set_error (
+            error,
+            ATM_CONTROL_STATE_ERROR,
+            ATM_CONTROL_STATE_ERROR_IO,
+            "Could not create control-state cutover directory: %s",
+            g_strerror (errno)
+        );
+        legacy_state_free (legacy_state);
+        g_free (parent);
+        return FALSE;
+    }
+
+    char *candidate_path =
+        g_build_filename (
+            parent,
+            ".control-state-cutover-XXXXXX",
+            NULL
+        );
+    int candidate_fd =
+        g_mkstemp (candidate_path);
+
+    if (candidate_fd < 0) {
+        g_set_error (
+            error,
+            ATM_CONTROL_STATE_ERROR,
+            ATM_CONTROL_STATE_ERROR_IO,
+            "Could not create control-state cutover candidate: %s",
+            g_strerror (errno)
+        );
+        legacy_state_free (legacy_state);
+        g_free (candidate_path);
+        g_free (parent);
+        return FALSE;
+    }
+
+    close (candidate_fd);
+
+    AtmControlStateStore *store = NULL;
+    gboolean published = FALSE;
+    gboolean ok = FALSE;
+
+    if (!atm_control_state_open (
+            candidate_path,
+            &store,
+            error
+        )) {
+        goto done;
+    }
+
+    gint64 generation_id = 0;
+
+    if (legacy_exists) {
+        if (!atm_control_state_import_legacy_json (
+                store,
+                legacy_json_path,
+                &generation_id,
+                error
+            )) {
+            goto done;
+        }
+
+        if (generation_id != 1) {
+            g_set_error_literal (
+                error,
+                ATM_CONTROL_STATE_ERROR,
+                ATM_CONTROL_STATE_ERROR_CONFLICT,
+                "Cutover legacy import did not create generation 1."
+            );
+            goto done;
+        }
+    }
+
+    if (!record_cutover_state (
+            store,
+            legacy_exists,
+            legacy_state != NULL
+                ? legacy_state->schema_version
+                : 0,
+            error
+        )) {
+        goto done;
+    }
+
+    if (legacy_exists) {
+        gboolean matches = FALSE;
+
+        if (!generation_matches_state (
+                store->db,
+                1,
+                legacy_state,
+                &matches,
+                error
+            )) {
+            goto done;
+        }
+
+        if (!matches) {
+            g_set_error_literal (
+                error,
+                ATM_CONTROL_STATE_ERROR,
+                ATM_CONTROL_STATE_ERROR_LEGACY_STATE,
+                "Activated cutover generation is not semantically equivalent to legacy repository state."
+            );
+            goto done;
+        }
+    }
+
+    if (!atm_control_state_validate (
+            store,
+            error
+        ) ||
+        !checkpoint_cutover_candidate (
+            store,
+            error
+        )) {
+        goto done;
+    }
+
+    atm_control_state_close (store);
+    store = NULL;
+
+    if (candidate_has_sidecars (
+            candidate_path
+        )) {
+        g_set_error_literal (
+            error,
+            ATM_CONTROL_STATE_ERROR,
+            ATM_CONTROL_STATE_ERROR_INTEGRITY,
+            "Cutover candidate still has SQLite WAL sidecars after clean checkpoint and close."
+        );
+        goto done;
+    }
+
+    if (!fsync_regular_file (
+            candidate_path,
+            error
+        )) {
+        goto done;
+    }
+
+    if (!publish_no_replace (
+            candidate_path,
+            control_path,
+            error
+        )) {
+        goto done;
+    }
+
+    published = TRUE;
+
+    if (!fsync_directory (
+            parent,
+            error
+        )) {
+        goto done;
+    }
+
+    *out_disposition = legacy_exists
+        ? ATM_CONTROL_STATE_CUTOVER_IMPORTED_LEGACY
+        : ATM_CONTROL_STATE_CUTOVER_EMPTY;
+    ok = TRUE;
+
+done:
+    if (store != NULL) {
+        atm_control_state_close (store);
+    }
+
+    if (!published) {
+        remove_cutover_candidate (
+            candidate_path
+        );
+    } else {
+        g_remove (candidate_path);
+    }
+
+    legacy_state_free (legacy_state);
+    g_free (candidate_path);
+    g_free (parent);
     return ok;
 }
 

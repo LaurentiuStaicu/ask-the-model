@@ -64,3 +64,25 @@ A second import into a non-empty generation store is refused. STATE-02 therefore
 The application does not call this import path yet. `repository-state.json` remains authoritative throughout STATE-02.
 
 STATE-03 remains the only planned point where SQLite can become authoritative, and only after a verified one-time cutover.
+
+
+## STATE-03a — atomic cutover publication primitive
+
+STATE-03a adds the **publication primitive only**. It is intentionally not called by application startup yet, so repository authority remains unchanged until the later STATE-03 wiring gate.
+
+For a previously absent authoritative `control-state.sqlite3`, the primitive:
+
+- validates legacy `repository-state.json` before creating a candidate database;
+- builds the SQLite candidate in the same state directory under a private temporary name;
+- when legacy state exists, reuses the STATE-02 deterministic import, verifies semantic equivalence, activates generation `1`, and records `state-03a-cutover-v1` in `migration_ledger`;
+- when no legacy state exists, records an empty-bootstrap cutover with no active generation;
+- validates the complete candidate and forces a WAL `TRUNCATE` checkpoint;
+- closes the only SQLite connection and refuses publication if WAL/SHM sidecars remain;
+- fsyncs the candidate database;
+- publishes with Linux `renameat2(..., RENAME_NOREPLACE)`, with a no-clobber hard-link fallback only when the filesystem/kernel does not support that flag;
+- fsyncs the containing directory after publication;
+- never overwrites an existing authoritative database and never mutates the legacy JSON file.
+
+A failure before publication removes the private candidate and sidecars. If publication has already happened but the final directory fsync reports an error, the final database is left intact rather than being destructively rolled back.
+
+STATE-03a still does **not** make SQLite authoritative in the running application. STATE-03b/03c will separately qualify the DB-backed repository-state adapter and startup authority switch.
