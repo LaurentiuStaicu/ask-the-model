@@ -53,6 +53,9 @@ All notable public releases of Ask the Model are recorded here.
 - Archive remains distinct from Close and now also clears startup-open state atomically; permanent Delete still requires explicit confirmation and relies on foreign-key cascades so repository pins, messages and citations are removed in the same transaction, while failed close/archive/delete persistence leaves the open tab and durable history intact;
 - added a compact per-tab conversation-actions menu, archive/unarchive storage APIs for future history management, permanent-delete APIs and `SESSION-S0-010` regression coverage.
 - reconciled STATUS and architecture documentation after CONV-04c so the tagged v0.4.0 release boundary remains historical while development `main` is accurately described as having the complete CONV-01→CONV-04c persistence lifecycle; archived-history browsing/export/import remain future work.
+- CONV-05a adds a modal Conversation History surface for durable chats that are no longer open: closed chats can be reopened and archived chats can be unarchived and reopened; history reopen deliberately reuses the restored read-only tab path and exact continuation qualification rather than repinning to current model/repository authority.
+- history reopen persists startup-open state before clearing archive state so a failed unarchive leaves the conversation archived and excluded from startup restore; regression coverage now qualifies that ordering and retained startup-open state after unarchive.
+- added `SESSION-S0-011`; export/import, retention policy and bulk history management remain future work.
 
 
 ### Startup qualification fixes
