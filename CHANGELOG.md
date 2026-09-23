@@ -4,6 +4,17 @@ All notable public releases of Ask the Model are recorded here.
 
 ## Unreleased
 
+### Control State and repository-generation hardening
+
+- added an application-owned SQLite `control-state.sqlite3` foundation with AtM identity/schema checks, foreign-key enforcement, WAL + FULL durability and fail-closed integrity validation;
+- added deterministic import of legacy repository-state v1/v2 into a candidate generation and a verified one-time no-replace cutover that never rewrites the legacy JSON source;
+- switched development runtime repository-state authority to Control DB: a valid existing DB wins, while an invalid existing DB fails closed without JSON fallback;
+- changed normal repository-state mutation to atomic copy-on-write generations, preserving previously COMPLETE generations and rejecting stale expected-generation writers;
+- made repository-state reads generation-consistent so one in-memory view cannot mix rows from different active generations;
+- pinned non-empty repository-backed conversation grounding and active sessions to the exact immutable repository generation used for validation, while leaving ordinary zero-repository chat independent;
+- kept repository grounding read-only with respect to repository authority and required snapshot seals to be persisted before a repository can be pinned for a conversation;
+- added `STATE-S0-001` through `STATE-S0-007` qualification invariants plus Flatpak/Meson regression coverage for foundation, import, cutover, authority precedence, copy-on-write history, stale-writer rejection and session generation pinning.
+
 ### Startup qualification fixes
 
 - accept the effective Flatpak runtime identity in both `runtime/ID/ARCH/BRANCH` and legacy `ID/ARCH/BRANCH` forms while still rejecting wrong ref kinds, IDs, architectures and branches;

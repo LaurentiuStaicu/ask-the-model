@@ -115,6 +115,27 @@ The R4 backend can freeze validated repository snapshots for a conversation, bui
 
 These capabilities are wired into the released v0.3.0 GTK path. Grounded answers are held until current-turn citation labels are resolved; unknown labels fail closed. Successful grounded answers retain turn-owned provenance and render compact source-reference controls in the transcript.
 
+### Development Control State after v0.4.0 — current `main`
+
+The tagged v0.4.0 release continues to use the repository-state behavior documented above. Current development `main` adds a separately qualified application-owned SQLite Control State for repository authority without retroactively changing the release description.
+
+The development Control State path:
+
+- identifies the database with an AtM-specific SQLite `application_id` and supported `user_version`;
+- enforces foreign keys, WAL journaling, FULL synchronous durability, schema/integrity checks and fail-closed handling of foreign, newer, corrupt or incomplete databases;
+- can deterministically import validated legacy repository-state schema v1/v2 into a private candidate generation;
+- publishes the first authoritative database through a verified no-replace cutover only when the authoritative path is absent;
+- treats an existing valid Control DB as the sole repository-state authority and never falls back to legacy JSON when an existing DB is invalid;
+- retains legacy `repository-state.json` as migration/recovery evidence instead of normal runtime authority;
+- represents repository mutations as copy-on-write generations so previously COMPLETE generations remain unchanged;
+- guards mutation with the generation a caller actually read, rejecting stale writers after another transaction advances `active_state`;
+- loads all repository rows for one store from one captured immutable generation;
+- pins a non-empty repository-backed `ConversationGrounding` and `ConversationSession` to the exact generation used for validation, while zero-repository chat remains valid with no repository-generation dependency.
+
+Conversation grounding does not mutate repository authority while pinning. Required snapshot seals must already exist in the pinned generation, and a later repository update may advance the active generation without changing the generation identity retained by an already-started conversation.
+
+The detailed state contract and staged qualification history are maintained in `docs/CONTROL_STATE.md` and the `STATE-S0-001` through `STATE-S0-007` invariant registry entries.
+
 ### R5 retrieval-conversation and benchmark framework
 
 The retrieval-conversation backend can preserve relevant repository scope, intent and exact anchors across deterministic follow-up turns, while returning an explicit clarification outcome when a follow-up is too ambiguous to retrieve safely.

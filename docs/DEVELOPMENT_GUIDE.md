@@ -50,9 +50,16 @@ The first Send freezes model/repository identity for that chat.
 - conversation grounding preparation;
 - an authoritative installation-qualification gate for non-empty repository grounding and repository mutation.
 
-`RepositoryState.vala` owns the backward-compatible v1/v2 persistent state boundary. `snapshot_seal.c` computes the local integrity key; `repository_reconcile.c` performs offline exact-SHA reconciliation for G-S0.
+Current development runtime repository-state authority is owned by the Control State stack:
 
-Native ingestion and validation helpers live in the corresponding C modules under `src/`.
+- `control_state.c` and `data/schemas/control-state-v1.sql` define and validate the application-owned SQLite authority;
+- `ControlStateNative.vala` exposes the narrow native bridge;
+- `ControlRepositoryState.vala` provides generation-consistent Vala reads and guarded copy-on-write mutation;
+- `RepositoryState.vala` remains the legacy v1/v2 JSON parser/store used for migration compatibility, regression coverage and recovery evidence, but it is no longer normal runtime authority once the Control DB exists.
+
+The one-time cutover accepts legacy JSON only when `control-state.sqlite3` is absent. A valid existing Control DB wins unconditionally; an invalid existing Control DB fails closed and must not silently fall back to JSON. Normal repository mutations create fresh immutable COMPLETE generations, and repository-backed conversations retain the exact generation from which their repository scope was prepared.
+
+`snapshot_seal.c` computes the local integrity key; `repository_reconcile.c` performs offline exact-SHA reconciliation for G-S0. Native ingestion and validation helpers live in the corresponding C modules under `src/`.
 
 ### Retrieval
 
@@ -94,6 +101,10 @@ Changes should preserve the following unless a deliberate architecture change is
 14. **Quarantine is diagnostic.** Invalid real-directory snapshots may be atomically renamed for diagnosis during explicit repair; symlink/non-directory snapshot paths are never followed as repair sources.
 15. **Installation qualification before repository authority.** Non-empty repository grounding and repository mutation require successful G-S0 platform/storage qualification; ordinary zero-repository chat remains valid and explicit Refresh remains read-only.
 16. **Independent verification is not runtime authority.** G-O0 must remain separately linked from production readiness/seal/repair helpers; it verifies local artifacts in tests/diagnostics but does not become an application READY source.
+17. **Single Control DB authority after cutover.** If `control-state.sqlite3` exists, it is the only runtime repository-state authority; invalid Control DB state fails closed and must not fall back to legacy JSON.
+18. **Copy-on-write repository history.** Normal repository-state mutations never edit an already COMPLETE generation; they create and validate a successor generation and atomically advance the active pointer.
+19. **Generation-consistent access.** A state reader captures one COMPLETE generation before loading repository rows, and a stale writer must be rejected if the active generation has advanced.
+20. **Conversation generation pinning.** A repository-backed conversation is prepared read-only from exactly one immutable repository generation and retains that generation identity for its lifetime; later repository updates belong to future conversations.
 
 ## Extension points
 
@@ -136,7 +147,7 @@ Any future execution path must expose the executed model version, inputs, parame
 
 ## Tests and gates
 
-The Meson suite covers startup qualification, the fail-closed repository runtime gate, storage-boundary checks, repository-state migration, deterministic snapshot sealing, repository lifecycle, the independent G-O0 state/snapshot/index/provenance oracle, archive safety, manifests, retrieval, grounding, citations and conversation pinning.
+The Meson suite covers startup qualification, the fail-closed repository runtime gate, storage-boundary checks, Control DB identity/integrity, deterministic legacy import and cutover, copy-on-write repository generations, generation-consistent reads and stale-writer rejection, deterministic snapshot sealing, repository lifecycle, repository-generation conversation pinning, the independent G-O0 state/snapshot/index/provenance oracle, archive safety, manifests, retrieval, grounding and citations.
 
 The Flatpak workflow validates, in order:
 
