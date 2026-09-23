@@ -2,6 +2,7 @@
 
 #include <gio/gio.h>
 #include <glib/gstdio.h>
+#include <json-glib/json-glib.h>
 #include <sqlite3.h>
 
 #include <errno.h>
@@ -583,6 +584,1050 @@ validate_integrity (
     }
 
     return TRUE;
+}
+
+
+typedef struct {
+    char *repository_id;
+    char *snapshot_sha;
+    char *repository_version;
+    char *snapshot_seal_sha256;
+} AtmLegacyRepositoryState;
+
+typedef struct {
+    gint schema_version;
+    GPtrArray *repositories;
+} AtmLegacyState;
+
+static void
+legacy_repository_state_free (
+    AtmLegacyRepositoryState *record
+)
+{
+    if (record == NULL) {
+        return;
+    }
+
+    g_free (record->repository_id);
+    g_free (record->snapshot_sha);
+    g_free (record->repository_version);
+    g_free (record->snapshot_seal_sha256);
+    g_free (record);
+}
+
+static void
+legacy_state_free (
+    AtmLegacyState *state
+)
+{
+    if (state == NULL) {
+        return;
+    }
+
+    g_clear_pointer (
+        &state->repositories,
+        g_ptr_array_unref
+    );
+    g_free (state);
+}
+
+static gboolean
+legacy_node_is_string (
+    JsonNode *node
+)
+{
+    return node != NULL &&
+        json_node_get_node_type (node) == JSON_NODE_VALUE &&
+        json_node_get_value_type (node) == G_TYPE_STRING;
+}
+
+static gboolean
+legacy_node_is_int64 (
+    JsonNode *node
+)
+{
+    return node != NULL &&
+        json_node_get_node_type (node) == JSON_NODE_VALUE &&
+        json_node_get_value_type (node) == G_TYPE_INT64;
+}
+
+static gboolean
+legacy_node_is_null (
+    JsonNode *node
+)
+{
+    return node != NULL &&
+        json_node_get_node_type (node) == JSON_NODE_NULL;
+}
+
+static gboolean
+lower_hex_exact (
+    const char *value,
+    gsize expected_length
+)
+{
+    if (value == NULL ||
+        strlen (value) != expected_length) {
+        return FALSE;
+    }
+
+    for (gsize i = 0; i < expected_length; i++) {
+        char c = value[i];
+
+        if (!((c >= '0' && c <= '9') ||
+              (c >= 'a' && c <= 'f'))) {
+            return FALSE;
+        }
+    }
+
+    return TRUE;
+}
+
+static gboolean
+legacy_repository_id_known (
+    const char *repository_id
+)
+{
+    return g_strcmp0 (repository_id, "ewd") == 0 ||
+        g_strcmp0 (repository_id, "cbd") == 0 ||
+        g_strcmp0 (repository_id, "rmd") == 0;
+}
+
+static AtmLegacyRepositoryState *
+legacy_state_find (
+    const AtmLegacyState *state,
+    const char *repository_id
+)
+{
+    if (state == NULL ||
+        state->repositories == NULL) {
+        return NULL;
+    }
+
+    for (guint i = 0;
+         i < state->repositories->len;
+         i++) {
+        AtmLegacyRepositoryState *record =
+            g_ptr_array_index (
+                state->repositories,
+                i
+            );
+
+        if (g_strcmp0 (
+                record->repository_id,
+                repository_id
+            ) == 0) {
+            return record;
+        }
+    }
+
+    return NULL;
+}
+
+static gboolean
+legacy_state_parse (
+    const char *path,
+    AtmLegacyState **out_state,
+    GError **error
+)
+{
+    if (!nonempty (path) ||
+        out_state == NULL ||
+        *out_state != NULL) {
+        g_set_error_literal (
+            error,
+            ATM_CONTROL_STATE_ERROR,
+            ATM_CONTROL_STATE_ERROR_ARGUMENT,
+            "Legacy-state parser received invalid arguments."
+        );
+        return FALSE;
+    }
+
+    char *contents = NULL;
+    gsize contents_length = 0;
+    GError *read_error = NULL;
+
+    if (!g_file_get_contents (
+            path,
+            &contents,
+            &contents_length,
+            &read_error
+        )) {
+        g_set_error (
+            error,
+            ATM_CONTROL_STATE_ERROR,
+            ATM_CONTROL_STATE_ERROR_LEGACY_STATE,
+            "Could not read legacy repository state: %s",
+            read_error != NULL
+                ? read_error->message
+                : "unknown read error"
+        );
+        g_clear_error (&read_error);
+        return FALSE;
+    }
+
+    JsonParser *parser = json_parser_new ();
+    GError *parse_error = NULL;
+
+    if (!json_parser_load_from_data (
+            parser,
+            contents,
+            (gssize) contents_length,
+            &parse_error
+        )) {
+        g_set_error (
+            error,
+            ATM_CONTROL_STATE_ERROR,
+            ATM_CONTROL_STATE_ERROR_LEGACY_STATE,
+            "Legacy repository state is not valid JSON: %s",
+            parse_error != NULL
+                ? parse_error->message
+                : "unknown parse error"
+        );
+        g_clear_error (&parse_error);
+        g_object_unref (parser);
+        g_free (contents);
+        return FALSE;
+    }
+
+    JsonNode *root_node = json_parser_get_root (parser);
+    const char *problem = NULL;
+
+    if (root_node == NULL ||
+        json_node_get_node_type (root_node) !=
+            JSON_NODE_OBJECT) {
+        problem =
+            "Legacy repository state root must be an object.";
+        goto invalid;
+    }
+
+    JsonObject *root =
+        json_node_get_object (root_node);
+    JsonNode *schema_node =
+        json_object_get_member (
+            root,
+            "schema_version"
+        );
+    JsonNode *repositories_node =
+        json_object_get_member (
+            root,
+            "repositories"
+        );
+
+    if (!legacy_node_is_int64 (schema_node) ||
+        repositories_node == NULL ||
+        json_node_get_node_type (
+            repositories_node
+        ) != JSON_NODE_ARRAY) {
+        problem =
+            "Legacy repository state requires integer schema_version and repositories array.";
+        goto invalid;
+    }
+
+    gint64 schema_version =
+        json_node_get_int (schema_node);
+
+    if (schema_version != 1 &&
+        schema_version != 2) {
+        problem =
+            "Legacy repository state schema_version is unsupported.";
+        goto invalid;
+    }
+
+    AtmLegacyState *state = g_new0 (
+        AtmLegacyState,
+        1
+    );
+    state->schema_version =
+        (gint) schema_version;
+    state->repositories =
+        g_ptr_array_new_with_free_func (
+            (GDestroyNotify)
+                legacy_repository_state_free
+        );
+
+    JsonArray *repositories =
+        json_node_get_array (
+            repositories_node
+        );
+
+    for (guint i = 0;
+         i < json_array_get_length (repositories);
+         i++) {
+        JsonNode *item_node =
+            json_array_get_element (
+                repositories,
+                i
+            );
+
+        if (item_node == NULL ||
+            json_node_get_node_type (item_node) !=
+                JSON_NODE_OBJECT) {
+            problem =
+                "Legacy repository entry must be an object.";
+            legacy_state_free (state);
+            goto invalid;
+        }
+
+        JsonObject *item =
+            json_node_get_object (item_node);
+        JsonNode *id_node =
+            json_object_get_member (item, "id");
+        JsonNode *sha_node =
+            json_object_get_member (item, "sha");
+        JsonNode *version_node =
+            json_object_get_member (
+                item,
+                "version"
+            );
+
+        if (!legacy_node_is_string (id_node) ||
+            !legacy_node_is_string (sha_node) ||
+            !legacy_node_is_string (
+                version_node
+            )) {
+            problem =
+                "Legacy repository entry requires string id, sha and version.";
+            legacy_state_free (state);
+            goto invalid;
+        }
+
+        const char *repository_id =
+            json_node_get_string (id_node);
+        const char *snapshot_sha =
+            json_node_get_string (sha_node);
+        const char *repository_version =
+            json_node_get_string (
+                version_node
+            );
+        const char *snapshot_seal = NULL;
+
+        if (state->schema_version == 2) {
+            JsonNode *seal_node =
+                json_object_get_member (
+                    item,
+                    "snapshot_seal_sha256"
+                );
+
+            if (seal_node == NULL) {
+                problem =
+                    "Legacy v2 repository entry requires snapshot_seal_sha256.";
+                legacy_state_free (state);
+                goto invalid;
+            }
+
+            if (legacy_node_is_string (
+                    seal_node
+                )) {
+                snapshot_seal =
+                    json_node_get_string (
+                        seal_node
+                    );
+
+                if (!lower_hex_exact (
+                        snapshot_seal,
+                        64
+                    )) {
+                    problem =
+                        "Legacy repository snapshot seal is invalid.";
+                    legacy_state_free (state);
+                    goto invalid;
+                }
+            } else if (!legacy_node_is_null (
+                           seal_node
+                       )) {
+                problem =
+                    "Legacy repository snapshot seal must be string or null.";
+                legacy_state_free (state);
+                goto invalid;
+            }
+        }
+
+        if (!legacy_repository_id_known (
+                repository_id
+            ) ||
+            !lower_hex_exact (
+                snapshot_sha,
+                40
+            ) ||
+            repository_version == NULL ||
+            repository_version[0] == '\0') {
+            problem =
+                "Legacy repository identity is invalid.";
+            legacy_state_free (state);
+            goto invalid;
+        }
+
+        if (legacy_state_find (
+                state,
+                repository_id
+            ) != NULL) {
+            problem =
+                "Legacy repository state contains a duplicate repository id.";
+            legacy_state_free (state);
+            goto invalid;
+        }
+
+        AtmLegacyRepositoryState *record =
+            g_new0 (
+                AtmLegacyRepositoryState,
+                1
+            );
+        record->repository_id =
+            g_strdup (repository_id);
+        record->snapshot_sha =
+            g_strdup (snapshot_sha);
+        record->repository_version =
+            g_strdup (repository_version);
+        record->snapshot_seal_sha256 =
+            g_strdup (snapshot_seal);
+
+        g_ptr_array_add (
+            state->repositories,
+            record
+        );
+    }
+
+    g_object_unref (parser);
+    g_free (contents);
+    *out_state = state;
+    return TRUE;
+
+invalid:
+    g_set_error_literal (
+        error,
+        ATM_CONTROL_STATE_ERROR,
+        ATM_CONTROL_STATE_ERROR_LEGACY_STATE,
+        problem != NULL
+            ? problem
+            : "Legacy repository state is invalid."
+    );
+    g_object_unref (parser);
+    g_free (contents);
+    return FALSE;
+}
+
+static gboolean
+prepare_statement (
+    sqlite3 *db,
+    const char *sql,
+    sqlite3_stmt **out_statement,
+    GError **error
+)
+{
+    if (sqlite3_prepare_v2 (
+            db,
+            sql,
+            -1,
+            out_statement,
+            NULL
+        ) != SQLITE_OK) {
+        set_sqlite_error (
+            db,
+            error,
+            ATM_CONTROL_STATE_ERROR_SQLITE,
+            "Could not prepare control-state statement"
+        );
+        return FALSE;
+    }
+
+    return TRUE;
+}
+
+static gboolean
+generation_matches_state (
+    sqlite3 *db,
+    gint64 generation_id,
+    const AtmLegacyState *state,
+    gboolean *out_matches,
+    GError **error
+)
+{
+    *out_matches = FALSE;
+
+    sqlite3_stmt *generation_statement = NULL;
+
+    if (!prepare_statement (
+            db,
+            "SELECT count(*) "
+            "FROM repository_generations "
+            "WHERE generation_id=?1;",
+            &generation_statement,
+            error
+        )) {
+        return FALSE;
+    }
+
+    sqlite3_bind_int64 (
+        generation_statement,
+        1,
+        generation_id
+    );
+
+    if (sqlite3_step (generation_statement) !=
+        SQLITE_ROW) {
+        sqlite3_finalize (generation_statement);
+        set_sqlite_error (
+            db,
+            error,
+            ATM_CONTROL_STATE_ERROR_SQLITE,
+            "Could not verify repository generation"
+        );
+        return FALSE;
+    }
+
+    gint64 generation_count =
+        sqlite3_column_int64 (
+            generation_statement,
+            0
+        );
+    sqlite3_finalize (generation_statement);
+
+    if (generation_count != 1) {
+        g_set_error_literal (
+            error,
+            ATM_CONTROL_STATE_ERROR,
+            ATM_CONTROL_STATE_ERROR_CONFLICT,
+            "Repository generation does not exist."
+        );
+        return FALSE;
+    }
+
+    sqlite3_stmt *count_statement = NULL;
+
+    if (!prepare_statement (
+            db,
+            "SELECT count(*) "
+            "FROM generation_repositories "
+            "WHERE generation_id=?1;",
+            &count_statement,
+            error
+        )) {
+        return FALSE;
+    }
+
+    sqlite3_bind_int64 (
+        count_statement,
+        1,
+        generation_id
+    );
+
+    if (sqlite3_step (count_statement) !=
+        SQLITE_ROW) {
+        sqlite3_finalize (count_statement);
+        set_sqlite_error (
+            db,
+            error,
+            ATM_CONTROL_STATE_ERROR_SQLITE,
+            "Could not count generation repositories"
+        );
+        return FALSE;
+    }
+
+    gint64 count =
+        sqlite3_column_int64 (
+            count_statement,
+            0
+        );
+    sqlite3_finalize (count_statement);
+
+    if (count !=
+        (gint64) state->repositories->len) {
+        return TRUE;
+    }
+
+    sqlite3_stmt *statement = NULL;
+
+    if (!prepare_statement (
+            db,
+            "SELECT snapshot_sha, "
+            "repository_version, "
+            "snapshot_seal_sha256 "
+            "FROM generation_repositories "
+            "WHERE generation_id=?1 "
+            "AND repository_id=?2;",
+            &statement,
+            error
+        )) {
+        return FALSE;
+    }
+
+    for (guint i = 0;
+         i < state->repositories->len;
+         i++) {
+        AtmLegacyRepositoryState *record =
+            g_ptr_array_index (
+                state->repositories,
+                i
+            );
+
+        sqlite3_reset (statement);
+        sqlite3_clear_bindings (statement);
+        sqlite3_bind_int64 (
+            statement,
+            1,
+            generation_id
+        );
+        sqlite3_bind_text (
+            statement,
+            2,
+            record->repository_id,
+            -1,
+            SQLITE_STATIC
+        );
+
+        int rc = sqlite3_step (statement);
+
+        if (rc == SQLITE_DONE) {
+            sqlite3_finalize (statement);
+            return TRUE;
+        }
+
+        if (rc != SQLITE_ROW) {
+            sqlite3_finalize (statement);
+            set_sqlite_error (
+                db,
+                error,
+                ATM_CONTROL_STATE_ERROR_SQLITE,
+                "Could not read generation repository"
+            );
+            return FALSE;
+        }
+
+        const char *snapshot_sha =
+            (const char *) sqlite3_column_text (
+                statement,
+                0
+            );
+        const char *repository_version =
+            (const char *) sqlite3_column_text (
+                statement,
+                1
+            );
+        gboolean seal_matches;
+
+        if (record->snapshot_seal_sha256 ==
+            NULL) {
+            seal_matches =
+                sqlite3_column_type (
+                    statement,
+                    2
+                ) == SQLITE_NULL;
+        } else {
+            const char *snapshot_seal =
+                (const char *)
+                    sqlite3_column_text (
+                        statement,
+                        2
+                    );
+            seal_matches =
+                g_strcmp0 (
+                    snapshot_seal,
+                    record->
+                        snapshot_seal_sha256
+                ) == 0;
+        }
+
+        gboolean row_matches =
+            g_strcmp0 (
+                snapshot_sha,
+                record->snapshot_sha
+            ) == 0 &&
+            g_strcmp0 (
+                repository_version,
+                record->repository_version
+            ) == 0 &&
+            seal_matches;
+
+        if (!row_matches) {
+            sqlite3_finalize (statement);
+            return TRUE;
+        }
+
+        if (sqlite3_step (statement) !=
+            SQLITE_DONE) {
+            sqlite3_finalize (statement);
+            g_set_error_literal (
+                error,
+                ATM_CONTROL_STATE_ERROR,
+                ATM_CONTROL_STATE_ERROR_SQLITE,
+                "Generation repository query returned multiple rows."
+            );
+            return FALSE;
+        }
+    }
+
+    sqlite3_finalize (statement);
+    *out_matches = TRUE;
+    return TRUE;
+}
+
+gboolean
+atm_control_state_generation_matches_legacy_json (
+    AtmControlStateStore *store,
+    gint64 generation_id,
+    const char *legacy_json_path,
+    gboolean *out_matches,
+    GError **error
+)
+{
+    if (store == NULL ||
+        store->db == NULL ||
+        generation_id <= 0 ||
+        !nonempty (legacy_json_path) ||
+        out_matches == NULL) {
+        g_set_error_literal (
+            error,
+            ATM_CONTROL_STATE_ERROR,
+            ATM_CONTROL_STATE_ERROR_ARGUMENT,
+            "Control-state equivalence check received invalid arguments."
+        );
+        return FALSE;
+    }
+
+    *out_matches = FALSE;
+    AtmLegacyState *state = NULL;
+
+    if (!legacy_state_parse (
+            legacy_json_path,
+            &state,
+            error
+        )) {
+        return FALSE;
+    }
+
+    gboolean ok = generation_matches_state (
+        store->db,
+        generation_id,
+        state,
+        out_matches,
+        error
+    );
+
+    legacy_state_free (state);
+    return ok;
+}
+
+gboolean
+atm_control_state_import_legacy_json (
+    AtmControlStateStore *store,
+    const char *legacy_json_path,
+    gint64 *out_generation_id,
+    GError **error
+)
+{
+    static const char *repository_order[] = {
+        "cbd",
+        "ewd",
+        "rmd"
+    };
+    const gint64 generation_id = 1;
+
+    if (store == NULL ||
+        store->db == NULL ||
+        !nonempty (legacy_json_path) ||
+        out_generation_id == NULL) {
+        g_set_error_literal (
+            error,
+            ATM_CONTROL_STATE_ERROR,
+            ATM_CONTROL_STATE_ERROR_ARGUMENT,
+            "Control-state legacy import received invalid arguments."
+        );
+        return FALSE;
+    }
+
+    *out_generation_id = 0;
+
+    if (!atm_control_state_validate (
+            store,
+            error
+        )) {
+        return FALSE;
+    }
+
+    AtmLegacyState *state = NULL;
+
+    if (!legacy_state_parse (
+            legacy_json_path,
+            &state,
+            error
+        )) {
+        return FALSE;
+    }
+
+    if (!exec_sql (
+            store->db,
+            "BEGIN IMMEDIATE;",
+            error
+        )) {
+        legacy_state_free (state);
+        return FALSE;
+    }
+
+    gboolean ok = FALSE;
+    sqlite3_stmt *generation_statement = NULL;
+    sqlite3_stmt *repository_statement = NULL;
+    sqlite3_stmt *complete_statement = NULL;
+    gint64 generation_count = 0;
+    gint64 active_is_null = 0;
+
+    if (!query_single_int64 (
+            store->db,
+            "SELECT count(*) "
+            "FROM repository_generations;",
+            &generation_count,
+            error
+        ) ||
+        !query_single_int64 (
+            store->db,
+            "SELECT active_repository_generation IS NULL "
+            "FROM active_state "
+            "WHERE singleton_id=1;",
+            &active_is_null,
+            error
+        )) {
+        goto rollback;
+    }
+
+    if (generation_count != 0 ||
+        active_is_null != 1) {
+        g_set_error_literal (
+            error,
+            ATM_CONTROL_STATE_ERROR,
+            ATM_CONTROL_STATE_ERROR_CONFLICT,
+            "Control-state legacy import requires an empty, inactive repository-generation store."
+        );
+        goto rollback;
+    }
+
+    if (!prepare_statement (
+            store->db,
+            "INSERT INTO repository_generations("
+            "generation_id, lifecycle, origin"
+            ") VALUES(?1, 'CANDIDATE', ?2);",
+            &generation_statement,
+            error
+        )) {
+        goto rollback;
+    }
+
+    char *origin = g_strdup_printf (
+        "repository-state.json/schema=%d",
+        state->schema_version
+    );
+    sqlite3_bind_int64 (
+        generation_statement,
+        1,
+        generation_id
+    );
+    sqlite3_bind_text (
+        generation_statement,
+        2,
+        origin,
+        -1,
+        SQLITE_TRANSIENT
+    );
+
+    if (sqlite3_step (generation_statement) !=
+        SQLITE_DONE) {
+        g_free (origin);
+        set_sqlite_error (
+            store->db,
+            error,
+            ATM_CONTROL_STATE_ERROR_SQLITE,
+            "Could not create legacy candidate generation"
+        );
+        goto rollback;
+    }
+
+    g_free (origin);
+    sqlite3_finalize (generation_statement);
+    generation_statement = NULL;
+
+    if (!prepare_statement (
+            store->db,
+            "INSERT INTO generation_repositories("
+            "generation_id, repository_id, "
+            "snapshot_sha, repository_version, "
+            "snapshot_seal_sha256"
+            ") VALUES(?1, ?2, ?3, ?4, ?5);",
+            &repository_statement,
+            error
+        )) {
+        goto rollback;
+    }
+
+    for (gsize i = 0;
+         i < G_N_ELEMENTS (repository_order);
+         i++) {
+        AtmLegacyRepositoryState *record =
+            legacy_state_find (
+                state,
+                repository_order[i]
+            );
+
+        if (record == NULL) {
+            continue;
+        }
+
+        sqlite3_reset (repository_statement);
+        sqlite3_clear_bindings (
+            repository_statement
+        );
+        sqlite3_bind_int64 (
+            repository_statement,
+            1,
+            generation_id
+        );
+        sqlite3_bind_text (
+            repository_statement,
+            2,
+            record->repository_id,
+            -1,
+            SQLITE_STATIC
+        );
+        sqlite3_bind_text (
+            repository_statement,
+            3,
+            record->snapshot_sha,
+            -1,
+            SQLITE_STATIC
+        );
+        sqlite3_bind_text (
+            repository_statement,
+            4,
+            record->repository_version,
+            -1,
+            SQLITE_STATIC
+        );
+
+        if (record->snapshot_seal_sha256 ==
+            NULL) {
+            sqlite3_bind_null (
+                repository_statement,
+                5
+            );
+        } else {
+            sqlite3_bind_text (
+                repository_statement,
+                5,
+                record->snapshot_seal_sha256,
+                -1,
+                SQLITE_STATIC
+            );
+        }
+
+        if (sqlite3_step (
+                repository_statement
+            ) != SQLITE_DONE) {
+            set_sqlite_error (
+                store->db,
+                error,
+                ATM_CONTROL_STATE_ERROR_SQLITE,
+                "Could not import legacy repository state"
+            );
+            goto rollback;
+        }
+    }
+
+    sqlite3_finalize (repository_statement);
+    repository_statement = NULL;
+
+    gboolean matches = FALSE;
+
+    if (!generation_matches_state (
+            store->db,
+            generation_id,
+            state,
+            &matches,
+            error
+        )) {
+        goto rollback;
+    }
+
+    if (!matches) {
+        g_set_error_literal (
+            error,
+            ATM_CONTROL_STATE_ERROR,
+            ATM_CONTROL_STATE_ERROR_LEGACY_STATE,
+            "Imported candidate generation is not semantically equivalent to legacy repository state."
+        );
+        goto rollback;
+    }
+
+    if (!prepare_statement (
+            store->db,
+            "UPDATE repository_generations "
+            "SET lifecycle='COMPLETE' "
+            "WHERE generation_id=?1 "
+            "AND lifecycle='CANDIDATE';",
+            &complete_statement,
+            error
+        )) {
+        goto rollback;
+    }
+
+    sqlite3_bind_int64 (
+        complete_statement,
+        1,
+        generation_id
+    );
+
+    if (sqlite3_step (complete_statement) !=
+            SQLITE_DONE ||
+        sqlite3_changes (store->db) != 1) {
+        g_set_error_literal (
+            error,
+            ATM_CONTROL_STATE_ERROR,
+            ATM_CONTROL_STATE_ERROR_SQLITE,
+            "Could not complete imported repository generation."
+        );
+        goto rollback;
+    }
+
+    sqlite3_finalize (complete_statement);
+    complete_statement = NULL;
+
+    if (!exec_sql (
+            store->db,
+            "COMMIT;",
+            error
+        )) {
+        goto rollback;
+    }
+
+    ok = TRUE;
+    *out_generation_id = generation_id;
+
+rollback:
+    if (generation_statement != NULL) {
+        sqlite3_finalize (
+            generation_statement
+        );
+    }
+    if (repository_statement != NULL) {
+        sqlite3_finalize (
+            repository_statement
+        );
+    }
+    if (complete_statement != NULL) {
+        sqlite3_finalize (
+            complete_statement
+        );
+    }
+
+    if (!ok) {
+        sqlite3_exec (
+            store->db,
+            "ROLLBACK;",
+            NULL,
+            NULL,
+            NULL
+        );
+    }
+
+    legacy_state_free (state);
+    return ok;
 }
 
 gboolean

@@ -264,6 +264,19 @@
       "tested_by": [
         "meson:control-state"
       ]
+    },
+    {
+      "id": "STATE-S0-002",
+      "category": "STATE",
+      "severity": "S0",
+      "lifecycle": "enforced",
+      "statement": "Legacy repository-state import must accept only the same validated v1/v2 repository semantics as RepositoryStateStore, preserve SHA/version/seal values exactly, reject duplicates and unknown repositories, write a fresh inactive Control DB generation atomically and in deterministic repository-id order, verify semantic equivalence before marking the generation COMPLETE, roll back on any failure, refuse replacement of an existing generation, leave active_state unset, and never mutate repository-state.json; the import path remains dormant until the separately qualified cutover.",
+      "enforced_by": [
+        "src/control_state.c"
+      ],
+      "tested_by": [
+        "meson:control-state"
+      ]
     }
   ]
 }
