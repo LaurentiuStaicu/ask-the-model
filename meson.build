@@ -346,6 +346,38 @@ test(
   control_state_test
 )
 
+control_repository_state_test = executable(
+  'control-repository-state-test',
+  [
+    'src/RepositoryService.vala',
+    'src/RepositoryNative.vala',
+    'src/RepositoryState.vala',
+    'src/ControlStateNative.vala',
+    'src/ControlRepositoryState.vala',
+    'src/control_state.c',
+    'src/cff_version.c',
+    'tests/control_repository_state_test.vala',
+    resources
+  ],
+  include_directories: include_directories('src'),
+  dependencies: [
+    glib_dep,
+    gio_dep,
+    soup_dep,
+    json_glib_dep,
+    sqlite_dep
+  ],
+  link_args: [
+    '-lyaml'
+  ],
+  install: false
+)
+
+test(
+  'control-repository-state',
+  control_repository_state_test
+)
+
 chat_request_builder_test = executable(
   'chat-request-builder-test',
   [
