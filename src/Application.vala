@@ -28,6 +28,7 @@ namespace AskTheModel {
         public bool persistence_failed = false;
         public bool unsaved_notice_shown = false;
         public bool restored_view_only = false;
+        public string? restored_read_only_reason = null;
 
         public ChatTabState (
             Gtk.Box page,
@@ -114,6 +115,8 @@ namespace AskTheModel {
         private ConversationPersistenceStore? conversation_store = null;
         private string? conversation_store_failure = null;
         private bool durable_restore_attempted = false;
+        private bool restored_qualification_running = false;
+        private bool restored_qualification_pending = false;
 
         public Application () {
             Object (
@@ -390,6 +393,8 @@ namespace AskTheModel {
                     "AtM: local Ollama provider not detected on 127.0.0.1 ports 11434 or 11435.\n"
                 );
             }
+
+            qualify_restored_conversations.begin ();
         }
 
         private Gtk.Label build_annunciator_label (
@@ -772,6 +777,8 @@ namespace AskTheModel {
                 refresh_models_ring,
                 false
             );
+
+            qualify_restored_conversations.begin ();
         }
 
         private string[] selected_repository_ids () {
@@ -1373,6 +1380,7 @@ namespace AskTheModel {
             );
             update_repository_option_labels ();
             update_repository_selector_label ();
+            qualify_restored_conversations.begin ();
         }
 
         private async void download_or_update_selected_repositories () {
@@ -1482,6 +1490,7 @@ namespace AskTheModel {
             );
             update_repository_option_labels ();
             update_repository_selector_label ();
+            qualify_restored_conversations.begin ();
         }
 
         private Gtk.CheckButton build_repository_check_button (
@@ -2671,6 +2680,7 @@ namespace AskTheModel {
             }
 
             restore_durable_conversations_if_ready ();
+            qualify_restored_conversations.begin ();
         }
 
         private Gtk.Widget build_chat_tab_label (
@@ -2989,6 +2999,230 @@ namespace AskTheModel {
             }
         }
 
+        private ConversationPersistenceRepository[]
+        persistence_repositories_from_grounding (
+            ConversationGrounding grounding
+        ) throws GLib.Error {
+            ConversationPersistenceRepository[] repositories = {};
+
+            for (
+                uint i = 0;
+                i < grounding.repository_count ();
+                i++
+            ) {
+                ConversationRepositoryPin? pin =
+                    grounding.repository_pin_at (i);
+
+                if (pin == null) {
+                    throw new GLib.IOError.INVALID_DATA (
+                        "Qualified historical repository pin is unavailable."
+                    );
+                }
+
+                repositories +=
+                    new ConversationPersistenceRepository (
+                        pin.repository_id,
+                        pin.repository_version,
+                        pin.snapshot_sha
+                    );
+            }
+
+            return repositories;
+        }
+
+        private void keep_restored_state_read_only (
+            ChatTabState state,
+            string reason
+        ) {
+            state.restored_view_only = true;
+            state.restored_read_only_reason = reason;
+            state.placeholder.label =
+                "Read-only: " + reason;
+        }
+
+        private async bool qualify_restored_chat_state (
+            ChatTabState state
+        ) throws GLib.Error {
+            if (!chat_state_is_open (state) ||
+                !state.restored_view_only ||
+                state.persistence_failed ||
+                state.persistent_id == null ||
+                conversation_store == null) {
+                return false;
+            }
+
+            string persistent_id =
+                state.persistent_id ?? "";
+
+            if (persistent_id.length == 0) {
+                return false;
+            }
+
+            ConversationPersistenceSnapshot snapshot =
+                conversation_store.load_snapshot (
+                    persistent_id
+                );
+
+            string[] available_models =
+                ollama_provider.get_completion_models ();
+            string[] available_digests =
+                ollama_provider.get_completion_model_digests ();
+
+            if (!snapshot.model_identity_available (
+                    available_models,
+                    available_digests
+                )) {
+                throw new GLib.IOError.NOT_FOUND (
+                    "exact pinned AI model is unavailable"
+                );
+            }
+
+            string[] repository_ids =
+                repository_ids_from_snapshot (
+                    snapshot
+                );
+            RepositoryDescriptor[] descriptors =
+                repository_descriptors_for_ids (
+                    repository_ids
+                );
+
+            if (descriptors.length !=
+                snapshot.repositories.length) {
+                throw new GLib.IOError.INVALID_DATA (
+                    "durable repository scope contains an unknown repository"
+                );
+            }
+
+            ConversationGrounding grounding =
+                yield repository_lifecycle
+                    .prepare_conversation_grounding_at_generation (
+                        descriptors,
+                        snapshot.repository_generation_id
+                    );
+
+            if (!chat_state_is_open (state) ||
+                state.persistent_id != persistent_id ||
+                snapshot.conversation_id != persistent_id ||
+                !state.restored_view_only ||
+                generation_active) {
+                return false;
+            }
+
+            ConversationPersistenceRepository[]
+                qualified_repositories =
+                    persistence_repositories_from_grounding (
+                        grounding
+                    );
+
+            snapshot.require_continuation_identity (
+                available_models,
+                available_digests,
+                grounding.repository_generation_id (),
+                qualified_repositories
+            );
+
+            snapshot.restore_provider_history (
+                state.conversation
+            );
+
+            state.session.reset ();
+            state.session.begin (
+                grounding,
+                snapshot.model_name,
+                snapshot.model_digest
+            );
+            state.session.require_model (
+                snapshot.model_name,
+                snapshot.model_digest
+            );
+
+            state.model_name = snapshot.model_name;
+            state.model_digest = snapshot.model_digest;
+            state.repository_ids = repository_ids;
+            state.locked = true;
+            state.restored_view_only = false;
+            state.restored_read_only_reason = null;
+            state.placeholder.label = "Ask something…";
+
+            return true;
+        }
+
+        private async void qualify_restored_conversations () {
+            if (restored_qualification_running) {
+                restored_qualification_pending = true;
+                return;
+            }
+
+            if (generation_active ||
+                conversation_store == null) {
+                return;
+            }
+
+            restored_qualification_running = true;
+            restored_qualification_pending = false;
+            ChatTabState[] candidates = {};
+
+            foreach (ChatTabState state in chat_states) {
+                if (state.restored_view_only &&
+                    !state.persistence_failed &&
+                    state.persistent_id != null) {
+                    candidates += state;
+                }
+            }
+
+            foreach (ChatTabState state in candidates) {
+                if (!chat_state_is_open (state)) {
+                    continue;
+                }
+
+                try {
+                    bool qualified =
+                        yield qualify_restored_chat_state (
+                            state
+                        );
+
+                    if (qualified) {
+                        stdout.printf (
+                            "AtM: restored conversation %s qualified for continuation\n",
+                            state.persistent_id ?? "unknown"
+                        );
+                    }
+                } catch (GLib.Error error) {
+                    if (chat_state_is_open (state) &&
+                        state.restored_view_only) {
+                        keep_restored_state_read_only (
+                            state,
+                            error.message
+                        );
+                    }
+
+                    stdout.printf (
+                        "AtM: restored conversation %s remains read-only: %s\n",
+                        state.persistent_id ?? "unknown",
+                        error.message
+                    );
+                }
+            }
+
+            restored_qualification_running = false;
+            update_conversation_ui_state ();
+
+            if (active_chat != null) {
+                restore_chat_controls (
+                    active_chat
+                );
+            }
+
+            bool retry =
+                restored_qualification_pending &&
+                !generation_active;
+            restored_qualification_pending = false;
+
+            if (retry) {
+                qualify_restored_conversations.begin ();
+            }
+        }
+
         private ChatTabState? create_restored_chat_tab (
             ConversationPersistenceSnapshot snapshot
         ) {
@@ -3006,6 +3240,8 @@ namespace AskTheModel {
             }
 
             state.restored_view_only = true;
+            state.restored_read_only_reason =
+                "continuation context is being qualified";
             state.locked = true;
             state.persistent_id = snapshot.conversation_id;
             state.model_name = snapshot.model_name;
@@ -3126,6 +3362,10 @@ namespace AskTheModel {
                 restored_count,
                 restored_count == 1 ? "" : "s"
             );
+
+            if (restored_count > 0) {
+                qualify_restored_conversations.begin ();
+            }
         }
 
         private Gtk.Widget build_main_content () {

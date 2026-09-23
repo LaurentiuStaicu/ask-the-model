@@ -292,7 +292,11 @@ CONV-04a restores non-archived durable conversations into the existing scrollabl
 
 Startup restore is idempotent and runs only after both the conversation store and notebook exist. The initial `New` tab is removed only when at least one durable conversation was restored and that tab remains completely pristine; user input started during asynchronous startup is never discarded.
 
-CONV-04b will orchestrate the already-qualified CONV-03 model/repository checks and enable continuation only for tabs whose exact historical context passes. CONV-04c will add explicit archive/delete lifecycle. Closing a tab in CONV-04a remains an in-memory UI action and does not archive or delete durable history.
+CONV-04b orchestrates the CONV-03 qualification primitives. A restored tab remains view-only while the durable snapshot is reloaded, its persisted model name/digest is matched against the discovered local Ollama inventory, and its exact historical repository generation is reconstructed and revalidated. The reconstructed repository ID/version/SHA set must match the durable pins exactly. Only after all checks pass is `ConversationSession.begin()` called on that historical grounding and the restored prompt/Send boundary enabled. Model and repository selectors remain locked, so continuation cannot silently repin the conversation.
+
+Qualification is re-entrant and retryable. A tab that cannot currently satisfy its exact context remains readable with an explicit read-only reason; model discovery/refresh, repository refresh/update and completion of another active generation can request a new qualification attempt. Failures never replace the historical context with current authority.
+
+CONV-04c will add explicit archive/delete lifecycle. Closing a tab before 04c remains an in-memory UI action and does not archive or delete durable history.
 
 Retention policy, export/import and bulk history management remain later work.
 

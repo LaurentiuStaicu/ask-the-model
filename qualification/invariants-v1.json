@@ -569,6 +569,24 @@
       "tested_by": [
         "meson:conversation-persistence-store"
       ]
+    },
+    {
+      "id": "SESSION-S0-009",
+      "category": "SESSION",
+      "severity": "S0",
+      "lifecycle": "enforced",
+      "statement": "A restored GTK conversation may leave view-only mode only after the durable snapshot's exact model identity and exact repository context have been requalified. The local model inventory must satisfy persisted name/digest identity; repository-backed conversations must reconstruct grounding from the persisted COMPLETE repository_generation_id, and the reconstructed repository ID/version/SHA set must equal the durable pins exactly. Only then may a ConversationSession begin on that historical grounding and prompt/Send become available. Qualification failure must leave the transcript inspectable and the tab read-only, without substituting current model/repository authority.",
+      "enforced_by": [
+        "src/Application.vala",
+        "src/ConversationPersistenceStore.vala",
+        "src/RepositoryLifecycleService.vala",
+        "src/OllamaProvider.vala",
+        "src/ConversationSession.vala"
+      ],
+      "tested_by": [
+        "meson:repository-lifecycle-service",
+        "meson:conversation-persistence-store"
+      ]
     }
   ]
 }
