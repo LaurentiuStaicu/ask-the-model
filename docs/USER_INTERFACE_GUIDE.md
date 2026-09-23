@@ -49,7 +49,7 @@ The narrow status strip reports compact model/repository lifecycle states such a
 
 It is intentionally subdued rather than a bright LED-style display.
 
-## Chat tabs
+## Chat tabs and conversation history
 
 Each tab owns its own:
 
@@ -58,7 +58,16 @@ Each tab owns its own:
 - retrieval state;
 - grounded citation objects.
 
-The **+** control creates a new chat. The tab close control removes only that in-memory conversation; it does not delete downloaded repositories or indexes.
+The **+** control creates a new chat.
+
+For a durable chat, the tab **Close** control closes the current tab and records that it should not reopen automatically at the next startup. It does not archive or delete the conversation.
+
+The per-tab conversation menu keeps lifecycle actions separate:
+
+- **Archive** preserves transcript, repository pins and citation provenance but removes the conversation from normal startup restore;
+- **Delete permanently** requires confirmation and removes the durable conversation and its dependent local history.
+
+The **History** control at the opposite end of the tab strip lists durable conversations that are not currently open. A closed conversation can be **Open**ed again; an archived conversation can be **Unarchive & Open**ed. History-opened conversations first return as restored read-only tabs and become continuable only after AtM requalifies the exact saved AI-model identity and repository generation/version/SHA context.
 
 ## First-Send freeze
 
