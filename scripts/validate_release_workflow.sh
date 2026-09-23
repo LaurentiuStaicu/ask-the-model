@@ -21,6 +21,26 @@ first_line() {
   printf '%s\n' "$line"
 }
 
+first_line_after() {
+  local after_line="$1"
+  local needle="$2"
+  local line
+
+  line="$(awk -v after_line="$after_line" -v needle="$needle" '
+    NR > after_line && index($0, needle) {
+      print NR
+      exit
+    }
+  ' "$workflow")"
+
+  if [[ -z "$line" ]]; then
+    printf 'Missing release-workflow contract text after line %s: %s\n' "$after_line" "$needle" >&2
+    exit 1
+  fi
+
+  printf '%s\n' "$line"
+}
+
 create_line="$(first_line 'github.rest.repos.createRelease({')"
 draft_line="$(first_line 'draft: true,')"
 upload_line="$(first_line 'github.rest.repos.uploadReleaseAsset({')"
@@ -70,10 +90,10 @@ verification_job_line="$(first_line '  flatpak:')"
 workflow_read_line="$(first_line '  contents: read')"
 stage_line="$(first_line '      - name: Stage verified publication inputs')"
 publish_job_line="$(first_line '  publish:')"
-publish_if_line="$(first_line "    if: github.event_name == 'push' && github.ref == 'refs/heads/main'")"
-publish_needs_line="$(first_line '    needs: flatpak')"
-publish_write_line="$(first_line '      contents: write')"
-download_line="$(first_line '      - name: Download verified publication inputs')"
+publish_if_line="$(first_line_after "$publish_job_line" "    if: github.event_name == 'push' && github.ref == 'refs/heads/main'")"
+publish_needs_line="$(first_line_after "$publish_if_line" '    needs: flatpak')"
+publish_write_line="$(first_line_after "$publish_needs_line" '      contents: write')"
+download_line="$(first_line_after "$publish_write_line" '      - name: Download verified publication inputs')"
 
 if ! (( workflow_read_line < verification_job_line &&
         verification_job_line < stage_line &&
