@@ -377,6 +377,23 @@
         "meson:control-repository-state",
         "meson:repository-lifecycle-service"
       ]
+    },
+    {
+      "id": "STATE-S0-009",
+      "category": "STATE",
+      "severity": "S0",
+      "lifecycle": "enforced",
+      "statement": "Every AtM Control DB connection must use SQLite >= 3.31.0 and fail closed unless connection hardening is active before bootstrap, migration or validation: SQLITE_DBCONFIG_DEFENSIVE=1, SQLITE_DBCONFIG_TRUSTED_SCHEMA=0, SQLITE_DBCONFIG_DQS_DML=0, SQLITE_DBCONFIG_DQS_DDL=0 and SQLITE_DBCONFIG_ENABLE_TRIGGER=1. Existing foreign-key, WAL, FULL synchronous and busy-timeout requirements remain mandatory.",
+      "enforced_by": [
+        "src/control_state.c",
+        "meson.build"
+      ],
+      "tested_by": [
+        "meson:control-state",
+        "meson:control-repository-state",
+        "meson:startup-qualification-service",
+        "meson:repository-lifecycle-service"
+      ]
     }
   ]
 }

@@ -14,7 +14,8 @@ All notable public releases of Ask the Model are recorded here.
 - pinned non-empty repository-backed conversation grounding and active sessions to the exact immutable repository generation used for validation, while leaving ordinary zero-repository chat independent;
 - kept repository grounding read-only with respect to repository authority and required snapshot seals to be persisted before a repository can be pinned for a conversation;
 - added Control DB schema v2 with atomic v1→v2 migration and persistent trigger defense-in-depth against direct mutation of COMPLETE generations, invalid active-generation transitions and rewrite of migration history;
-- added `STATE-S0-001` through `STATE-S0-008` qualification invariants plus Flatpak/Meson regression coverage for foundation, import, cutover, authority precedence, copy-on-write history, stale-writer rejection, session generation pinning and schema-level immutability.
+- hardened every Control DB connection with SQLite defensive mode, untrusted-schema mode, disabled legacy double-quoted strings and explicitly enabled triggers, and established SQLite 3.31.0 as the minimum supported library version for this path;
+- added `STATE-S0-001` through `STATE-S0-009` qualification invariants plus Flatpak/Meson regression coverage for foundation, import, cutover, authority precedence, copy-on-write history, stale-writer rejection, session generation pinning, schema-level immutability and connection hardening.
 
 ### Startup qualification fixes
 

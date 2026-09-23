@@ -306,11 +306,57 @@ load_sql_resource (
 }
 
 static gboolean
+configure_db_flag (
+    sqlite3 *db,
+    int option,
+    int requested,
+    const char *name,
+    GError **error
+)
+{
+    int effective = -1;
+    int rc = sqlite3_db_config (
+        db,
+        option,
+        requested,
+        &effective
+    );
+
+    if (rc != SQLITE_OK ||
+        effective != requested) {
+        g_set_error (
+            error,
+            ATM_CONTROL_STATE_ERROR,
+            ATM_CONTROL_STATE_ERROR_SCHEMA,
+            "Could not enforce SQLite connection setting %s=%d (rc=%d, effective=%d).",
+            name,
+            requested,
+            rc,
+            effective
+        );
+        return FALSE;
+    }
+
+    return TRUE;
+}
+
+static gboolean
 configure_connection (
     sqlite3 *db,
     GError **error
 )
 {
+    if (sqlite3_libversion_number () < 3031000) {
+        g_set_error (
+            error,
+            ATM_CONTROL_STATE_ERROR,
+            ATM_CONTROL_STATE_ERROR_SCHEMA,
+            "Control-state requires SQLite >= 3.31.0; runtime is %s.",
+            sqlite3_libversion ()
+        );
+        return FALSE;
+    }
+
     if (sqlite3_busy_timeout (db, 5000) != SQLITE_OK) {
         set_sqlite_error (
             db,
@@ -318,6 +364,44 @@ configure_connection (
             ATM_CONTROL_STATE_ERROR_SQLITE,
             "Could not configure control-state busy timeout"
         );
+        return FALSE;
+    }
+
+    if (!configure_db_flag (
+            db,
+            SQLITE_DBCONFIG_DEFENSIVE,
+            1,
+            "defensive",
+            error
+        ) ||
+        !configure_db_flag (
+            db,
+            SQLITE_DBCONFIG_TRUSTED_SCHEMA,
+            0,
+            "trusted_schema",
+            error
+        ) ||
+        !configure_db_flag (
+            db,
+            SQLITE_DBCONFIG_DQS_DML,
+            0,
+            "dqs_dml",
+            error
+        ) ||
+        !configure_db_flag (
+            db,
+            SQLITE_DBCONFIG_DQS_DDL,
+            0,
+            "dqs_ddl",
+            error
+        ) ||
+        !configure_db_flag (
+            db,
+            SQLITE_DBCONFIG_ENABLE_TRIGGER,
+            1,
+            "enable_trigger",
+            error
+        )) {
         return FALSE;
     }
 

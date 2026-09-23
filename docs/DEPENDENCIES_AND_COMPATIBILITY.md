@@ -155,7 +155,7 @@ These packages are required only when building the native application and its re
 - libsoup 3.0 development files;
 - json-glib development files;
 - GLib development files;
-- SQLite 3 development files;
+- SQLite >= 3.31.0 development files;
 - libarchive development files;
 - libyaml development files for `CITATION.cff` parsing;
 - a C compiler for the non-installed platform probe and repository-validation helpers;
