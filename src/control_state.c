@@ -346,12 +346,12 @@ configure_connection (
     GError **error
 )
 {
-    if (sqlite3_libversion_number () < 3031000) {
+    if (sqlite3_libversion_number () < 3037000) {
         g_set_error (
             error,
             ATM_CONTROL_STATE_ERROR,
             ATM_CONTROL_STATE_ERROR_SCHEMA,
-            "Control-state requires SQLite >= 3.31.0; runtime is %s.",
+            "Control-state requires SQLite >= 3.37.0; runtime is %s.",
             sqlite3_libversion ()
         );
         return FALSE;

@@ -132,7 +132,7 @@ The development Control State path:
 - loads all repository rows for one store from one captured immutable generation;
 - pins a non-empty repository-backed `ConversationGrounding` and `ConversationSession` to the exact generation used for validation, while zero-repository chat remains valid with no repository-generation dependency;
 - migrates valid Control DB schema v1 state atomically to schema v2 and uses persistent triggers to defend COMPLETE-generation immutability, forward-only COMPLETE activation and append-only migration history;
-- requires SQLite >= 3.31.0 and configures each Control DB connection with defensive mode, untrusted-schema mode, disabled legacy DQS parsing and explicit trigger enablement before schema work;
+- requires SQLite >= 3.37.0 and configures each Control DB connection with defensive mode, untrusted-schema mode, disabled legacy DQS parsing and explicit trigger enablement before schema work;
 - opens Control DB authority with `SQLITE_OPEN_NOFOLLOW`, verifies the `main` database is genuinely read/write and rejects unsafe XDG state roots before authority resolution.
 
 Conversation grounding does not mutate repository authority while pinning. Required snapshot seals must already exist in the pinned generation, and a later repository update may advance the active generation without changing the generation identity retained by an already-started conversation.
