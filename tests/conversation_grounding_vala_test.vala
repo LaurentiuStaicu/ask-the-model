@@ -107,6 +107,66 @@ test_zero_scope_has_no_citation_map ()
 }
 
 private static void
+test_repository_identity_accessors ()
+{
+    const string sha =
+        "0123456789abcdef0123456789abcdef01234567";
+    string snapshot_root = "";
+    string cache_root = "";
+    string index_path = "";
+    string detected_version = "";
+    var grounding =
+        new AskTheModel.ConversationGrounding ();
+
+    try {
+        assert (
+            AskTheModelTest.ConversationFixtureNative.create (
+                "rmd",
+                "RMD",
+                "Romanian Monetary Dynamics",
+                "0.1.0",
+                sha,
+                out snapshot_root,
+                out cache_root,
+                out index_path,
+                out detected_version
+            )
+        );
+        assert (detected_version == "0.1.0");
+        assert (
+            grounding.add_ready_repository (
+                "rmd",
+                detected_version,
+                sha,
+                snapshot_root,
+                index_path
+            )
+        );
+        grounding.pin_repository_generation (9);
+        assert (grounding.freeze ());
+    } catch (Error error) {
+        critical ("%s", error.message);
+        assert_not_reached ();
+    }
+
+    assert (grounding.repository_count () == 1);
+    assert (grounding.repository_id_at (0) == "rmd");
+    assert (grounding.repository_version_at (0) == "0.1.0");
+    assert (
+        grounding.repository_sha_at (0) ==
+        sha
+    );
+    assert (grounding.repository_id_at (1) == null);
+    assert (grounding.repository_version_at (1) == null);
+    assert (grounding.repository_sha_at (1) == null);
+
+    AskTheModelTest.ConversationFixtureNative.remove (
+        snapshot_root,
+        cache_root
+    );
+}
+
+private static void
 test_generation_pin_is_immutable_after_freeze ()
 {
     var grounding =
@@ -158,6 +218,10 @@ main (string[] args)
     Test.add_func (
         "/conversation-grounding-vala/zero-scope-no-citation-map",
         test_zero_scope_has_no_citation_map
+    );
+    Test.add_func (
+        "/conversation-grounding-vala/repository-identity-accessors",
+        test_repository_identity_accessors
     );
     Test.add_func (
         "/conversation-grounding-vala/generation-pin-immutable",

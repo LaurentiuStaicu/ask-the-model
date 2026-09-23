@@ -29,6 +29,9 @@ Post-v0.4.0 development currently extends engineering hardening without changing
 
 Legacy `repository-state.json` remains migration/recovery evidence after cutover and is not rewritten by normal development-runtime repository operations.
 
+- conversation persistence now has a separate `conversations.sqlite3` schema and atomic live-turn write path on development `main`; committed provider history, pinned model/repository identity and grounded citation provenance are written locally before provider conversation history advances;
+- restart restore, durable navigation and title/archive lifecycle are not yet enabled and remain CONV-03/CONV-04 work.
+
 Development Flatpak publications must expose the exact source `main` commit SHA so a development build can be distinguished reproducibly from the tagged v0.4.0 release artifact.
 
 ## Canonical application role

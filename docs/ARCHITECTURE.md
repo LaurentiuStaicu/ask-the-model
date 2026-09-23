@@ -163,7 +163,7 @@ Current-turn grounding context, grounded Ollama request construction, temporary 
 
 Responsible for future durable local conversation storage, conversation navigation and recording which repository context and AI model were active.
 
-The planned persistence boundary is specified in `docs/CONVERSATION_PERSISTENCE_ARCHITECTURE.md`. Conversation history is user data in a separate application-owned SQLite database, not an extension of repository Control DB authority. The design preserves exact model/repository identity, committed provider history and citation provenance while keeping conversation-store failure isolated from repository readiness.
+The persistence boundary is specified in `docs/CONVERSATION_PERSISTENCE_ARCHITECTURE.md`. Conversation history is user data in a separate application-owned SQLite database, not an extension of repository Control DB authority. Current development `main` now includes the qualified schema plus atomic live-turn write path: exact model/repository pins are persisted from the frozen session, and provider history advances only after the SQLite turn commit. Restart restore/navigation is not yet wired and remains CONV-03/CONV-04 work.
 
 ### Application settings
 

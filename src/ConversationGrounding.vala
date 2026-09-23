@@ -46,6 +46,33 @@ namespace AskTheModel {
         public static extern uint repository_count (void* state);
 
         [CCode (
+            cname = "atm_conversation_grounding_repository_id_at",
+            cheader_filename = "conversation_grounding.h"
+        )]
+        public static extern unowned string? repository_id_at (
+            void* state,
+            uint index
+        );
+
+        [CCode (
+            cname = "atm_conversation_grounding_repository_version_at",
+            cheader_filename = "conversation_grounding.h"
+        )]
+        public static extern unowned string? repository_version_at (
+            void* state,
+            uint index
+        );
+
+        [CCode (
+            cname = "atm_conversation_grounding_repository_sha_at",
+            cheader_filename = "conversation_grounding.h"
+        )]
+        public static extern unowned string? repository_sha_at (
+            void* state,
+            uint index
+        );
+
+        [CCode (
             cname = "atm_conversation_grounding_prepare_turn",
             cheader_filename = "conversation_grounding.h"
         )]
@@ -360,6 +387,48 @@ namespace AskTheModel {
             return ConversationGroundingNative.repository_count (
                 state
             );
+        }
+
+        public string? repository_id_at (
+            uint index
+        ) {
+            unowned string? value =
+                ConversationGroundingNative.repository_id_at (
+                    state,
+                    index
+                );
+
+            return value != null
+                ? value
+                : null;
+        }
+
+        public string? repository_version_at (
+            uint index
+        ) {
+            unowned string? value =
+                ConversationGroundingNative.repository_version_at (
+                    state,
+                    index
+                );
+
+            return value != null
+                ? value
+                : null;
+        }
+
+        public string? repository_sha_at (
+            uint index
+        ) {
+            unowned string? value =
+                ConversationGroundingNative.repository_sha_at (
+                    state,
+                    index
+                );
+
+            return value != null
+                ? value
+                : null;
         }
 
         public bool prepare_turn (

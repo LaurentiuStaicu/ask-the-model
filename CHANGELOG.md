@@ -23,6 +23,11 @@ All notable public releases of Ask the Model are recorded here.
 
 ### Conversation persistence foundation
 
+- added the Vala conversation-persistence bridge over the qualified native store, sourcing durable model/repository identity only from the active frozen `ConversationSession`;
+- live grounded and ungrounded provider calls now defer `OllamaConversation.commit_exchange()` until the corresponding SQLite turn commit succeeds, and ungrounded response streaming is withheld until that durable boundary;
+- conversation persistence is enabled only after startup storage-root qualification; a grounded session/SQLite divergence fails closed by blocking further continuation of that tab, while provider history remains unadvanced;
+- added `SESSION-S0-004` plus Vala bridge/session/grounding regression coverage. Restore/navigation remain future CONV-03/CONV-04 work.
+
 - added a native atomic mutation API that generates local conversation/message identity, writes repository pins transactionally, allocates turn/sequence numbers inside the store and commits each complete user/assistant turn with its citations and metadata in one SQLite transaction;
 - citation provenance is checked against the conversation's exact pinned repository/version/SHA set before write, and late failures roll back already-inserted messages/citations so the previous durable boundary remains unchanged;
 - added `SESSION-S0-003` and regression coverage for ordinary and grounded commits, raw-vs-display grounded content, turn sequencing, pre-write provenance rejection and late transactional rollback.

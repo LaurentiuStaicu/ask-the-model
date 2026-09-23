@@ -443,6 +443,58 @@ atm_conversation_grounding_repository_at (
     );
 }
 
+const char *
+atm_conversation_grounding_repository_id_at (
+    const AtmConversationGroundingState *state,
+    guint index
+)
+{
+    const AtmConversationRepositoryPin *pin =
+        atm_conversation_grounding_repository_at (
+            state,
+            index
+        );
+
+    return pin != NULL
+        ? pin->repository_id
+        : NULL;
+}
+
+const char *
+atm_conversation_grounding_repository_version_at (
+    const AtmConversationGroundingState *state,
+    guint index
+)
+{
+    const AtmConversationRepositoryPin *pin =
+        atm_conversation_grounding_repository_at (
+            state,
+            index
+        );
+
+    return pin != NULL
+        ? pin->repository_version
+        : NULL;
+}
+
+const char *
+atm_conversation_grounding_repository_sha_at (
+    const AtmConversationGroundingState *state,
+    guint index
+)
+{
+    const AtmConversationRepositoryPin *pin =
+        atm_conversation_grounding_repository_at (
+            state,
+            index
+        );
+
+    return pin != NULL
+        ? pin->snapshot_sha
+        : NULL;
+}
+
+
 gboolean
 atm_conversation_grounding_create_retrieval_scopes (
     const AtmConversationGroundingState *state,

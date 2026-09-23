@@ -257,6 +257,75 @@ test_empty_model_is_rejected ()
 }
 
 private static void
+test_repository_identity_is_exposed_by_session ()
+{
+    const string sha =
+        "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa";
+    string snapshot_root = "";
+    string cache_root = "";
+    string index_path = "";
+    string detected_version = "";
+    var grounding =
+        new AskTheModel.ConversationGrounding ();
+    var session =
+        new AskTheModel.ConversationSession ();
+
+    try {
+        assert (
+            AskTheModelTest.ConversationFixtureNative.create (
+                "cbd",
+                "CBD",
+                "Cognitive Belief Dynamics",
+                "0.2.0",
+                sha,
+                out snapshot_root,
+                out cache_root,
+                out index_path,
+                out detected_version
+            )
+        );
+        assert (detected_version == "0.2.0");
+        assert (
+            grounding.add_ready_repository (
+                "cbd",
+                detected_version,
+                sha,
+                snapshot_root,
+                index_path
+            )
+        );
+        grounding.pin_repository_generation (17);
+        assert (grounding.freeze ());
+        session.begin (
+            grounding,
+            "test-model",
+            "test-digest"
+        );
+    } catch (Error error) {
+        critical ("%s", error.message);
+        assert_not_reached ();
+    }
+
+    assert (session.repository_count () == 1);
+    assert (session.repository_generation_id () == 17);
+    assert (session.repository_id_at (0) == "cbd");
+    assert (session.repository_version_at (0) == "0.2.0");
+    assert (
+        session.repository_sha_at (0) ==
+        sha
+    );
+    assert (session.repository_id_at (1) == null);
+
+    session.reset ();
+    assert (session.repository_id_at (0) == null);
+
+    AskTheModelTest.ConversationFixtureNative.remove (
+        snapshot_root,
+        cache_root
+    );
+}
+
+private static void
 test_repository_generation_is_pinned_until_reset ()
 {
     var grounding = new AskTheModel.ConversationGrounding ();
@@ -315,6 +384,10 @@ main (string[] args)
     Test.add_func (
         "/conversation-session/empty-model-rejected",
         test_empty_model_is_rejected
+    );
+    Test.add_func (
+        "/conversation-session/repository-identity-exposed",
+        test_repository_identity_is_exposed_by_session
     );
     Test.add_func (
         "/conversation-session/repository-generation-pinned",

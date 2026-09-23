@@ -74,6 +74,30 @@ namespace AskTheModel {
             return pinned_repository_generation_id;
         }
 
+        public string? repository_id_at (
+            uint index
+        ) {
+            return grounding != null
+                ? grounding.repository_id_at (index)
+                : null;
+        }
+
+        public string? repository_version_at (
+            uint index
+        ) {
+            return grounding != null
+                ? grounding.repository_version_at (index)
+                : null;
+        }
+
+        public string? repository_sha_at (
+            uint index
+        ) {
+            return grounding != null
+                ? grounding.repository_sha_at (index)
+                : null;
+        }
+
         public string? model_name () {
             return pinned_model;
         }

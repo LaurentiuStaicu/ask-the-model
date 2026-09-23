@@ -97,4 +97,41 @@ gboolean atm_conversation_store_commit_turn (
     GError **error
 );
 
+gboolean atm_conversation_store_create_conversation_values (
+    const char *path,
+    const char *title,
+    gint64 created_at_us,
+    const char *model_name,
+    const char *model_digest,
+    gint64 repository_generation_id,
+    const char *const *repository_ids,
+    const char *const *repository_versions,
+    const char *const *repository_shas,
+    gsize repository_count,
+    char **out_conversation_id,
+    GError **error
+);
+
+gboolean atm_conversation_store_commit_turn_values (
+    const char *path,
+    const char *conversation_id,
+    const char *user_content,
+    const char *assistant_provider_content,
+    const char *assistant_display_content,
+    gboolean grounded,
+    gint64 created_at_us,
+    const char *const *citation_labels,
+    const char *const *citation_repository_ids,
+    const char *const *citation_repository_versions,
+    const char *const *citation_snapshot_shas,
+    const char *const *citation_logical_source_ids,
+    const char *const *citation_source_paths,
+    const char *const *citation_locators,
+    const char *const *citation_titles,
+    const char *const *citation_excerpts,
+    gsize citation_count,
+    gint64 *out_turn_no,
+    GError **error
+);
+
 G_END_DECLS

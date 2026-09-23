@@ -483,6 +483,27 @@
       "tested_by": [
         "meson:conversation-store"
       ]
+    },
+    {
+      "id": "SESSION-S0-004",
+      "category": "SESSION",
+      "severity": "S0",
+      "lifecycle": "enforced",
+      "statement": "Live conversation persistence must use only the startup-qualified XDG state root and exact pinned session identity. For provider-backed turns, both grounded and ungrounded provider calls must defer OllamaConversation history mutation until the complete turn has been committed to conversations.sqlite3. Repository pins used for durable identity must come from the frozen ConversationSession rather than current repository authority. A grounded turn whose retrieval/session commit succeeds but durable SQLite commit fails must block further continuation of that tab; provider history must not advance and the failure must remain explicit.",
+      "enforced_by": [
+        "src/Application.vala",
+        "src/OllamaProvider.vala",
+        "src/ConversationPersistenceStore.vala",
+        "src/ConversationStoreNative.vapi",
+        "src/conversation_store.c",
+        "src/ConversationSession.vala",
+        "src/ConversationGrounding.vala"
+      ],
+      "tested_by": [
+        "meson:conversation-persistence-store",
+        "meson:conversation-session",
+        "meson:conversation-grounding-vala"
+      ]
     }
   ]
 }

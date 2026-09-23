@@ -47,6 +47,9 @@ executable(
     'src/RepositoryLifecycleService.vala',
     'src/ConversationGrounding.vala',
     'src/ConversationSession.vala',
+    'src/ConversationStoreNative.vapi',
+    'src/ConversationPersistenceStore.vala',
+    'src/conversation_store.c',
     'src/cff_version.c',
     'src/archive_extract.c',
     'src/repository_manifest.c',
@@ -90,7 +93,10 @@ executable(
     gtk_dep,
     granite_dep,
     soup_dep,
-    json_glib_dep
+    json_glib_dep,
+    glib_dep,
+    gio_dep,
+    sqlite_dep
   ],
   link_args: [
     '-larchive',
@@ -1121,10 +1127,12 @@ conversation_grounding_vala_test = executable(
     'src/grounding_context.c',
     'src/citation_labels.c',
     'src/conversation_grounding.c',
+    'tests/ConversationFixture.vapi',
+    'tests/conversation_fixture.c',
     'tests/conversation_grounding_vala_test.vala',
     resources
   ],
-  include_directories: include_directories('src'),
+  include_directories: include_directories('src', 'tests'),
   dependencies: [
     glib_dep,
     gio_dep,
@@ -1163,10 +1171,12 @@ conversation_session_test = executable(
     'src/grounding_context.c',
     'src/citation_labels.c',
     'src/conversation_grounding.c',
+    'tests/ConversationFixture.vapi',
+    'tests/conversation_fixture.c',
     'tests/conversation_session_test.vala',
     resources
   ],
-  include_directories: include_directories('src'),
+  include_directories: include_directories('src', 'tests'),
   dependencies: [
     glib_dep,
     gio_dep,
@@ -1182,6 +1192,53 @@ conversation_session_test = executable(
 test(
   'conversation-session',
   conversation_session_test
+)
+
+conversation_persistence_store_test = executable(
+  'conversation-persistence-store-test',
+  [
+    'src/ConversationGrounding.vala',
+    'src/ConversationSession.vala',
+    'src/ConversationStoreNative.vapi',
+    'src/ConversationPersistenceStore.vala',
+    'src/conversation_store.c',
+    'src/cff_version.c',
+    'src/repository_sources.c',
+    'src/markdown_sections.c',
+    'src/csv_table.c',
+    'src/structured_json.c',
+    'src/retrieval_index.c',
+    'src/retrieval_index_lifecycle.c',
+    'src/retrieval_query.c',
+    'src/retrieval_rank.c',
+    'src/retrieval_scope.c',
+    'src/retrieval_normalize.c',
+    'src/retrieval_router.c',
+    'src/retrieval_conversation.c',
+    'src/grounding_context.c',
+    'src/citation_labels.c',
+    'src/conversation_grounding.c',
+    'tests/ConversationFixture.vapi',
+    'tests/conversation_fixture.c',
+    'tests/conversation_persistence_store_test.vala',
+    resources
+  ],
+  include_directories: include_directories('src', 'tests'),
+  dependencies: [
+    glib_dep,
+    gio_dep,
+    json_glib_dep,
+    sqlite_dep
+  ],
+  link_args: [
+    '-lyaml'
+  ],
+  install: false
+)
+
+test(
+  'conversation-persistence-store',
+  conversation_persistence_store_test
 )
 
 repository_lifecycle_service_test = executable(

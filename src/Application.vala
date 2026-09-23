@@ -24,6 +24,8 @@ namespace AskTheModel {
         public string[] repository_ids = {};
         public string[] grounded_answers = {};
         public CitationResolution[] grounded_citations = {};
+        public string? persistence_id = null;
+        public bool continuation_blocked = false;
 
         public ChatTabState (
             Gtk.Box page,
@@ -86,6 +88,8 @@ namespace AskTheModel {
             new RepositorySelection ();
         private RepositoryLifecycleService repository_lifecycle =
             new RepositoryLifecycleService ();
+        private ConversationPersistenceStore conversation_persistence =
+            new ConversationPersistenceStore ();
         private GLib.SimpleAction? new_chat_action;
         private Gtk.Button? new_chat_button;
         private Gtk.Notebook? chat_notebook;
@@ -106,6 +110,7 @@ namespace AskTheModel {
         private bool updating_model_selector = false;
         private bool startup_qualification_running = false;
         private bool startup_qualification_failed = false;
+        private bool conversation_storage_qualified = false;
         private string? startup_qualification_detail = null;
 
         public Application () {
@@ -230,6 +235,7 @@ namespace AskTheModel {
         private void start_startup_qualification () {
             startup_qualification_running = true;
             startup_qualification_failed = false;
+            conversation_storage_qualified = false;
             startup_qualification_detail = null;
             update_conversation_ui_state ();
 
@@ -251,6 +257,9 @@ namespace AskTheModel {
                     startup_qualification_running = false;
 
                     if (completed_report != null) {
+                        conversation_storage_qualified =
+                            completed_report.storage_qualified;
+
                         bool lifecycle_state_ready =
                             repository_lifecycle.reload_control_state ();
                         bool runtime_qualified =
@@ -303,6 +312,7 @@ namespace AskTheModel {
                             );
                         }
                     } else {
+                        conversation_storage_qualified = false;
                         repository_lifecycle.apply_installation_qualification (
                             false
                         );
@@ -971,9 +981,12 @@ namespace AskTheModel {
             }
 
             foreach (ChatTabState state in chat_states) {
-                state.prompt.sensitive = !generation_active;
-                state.send_button.sensitive =
+                state.prompt.sensitive =
                     !generation_active &&
+                    conversation_storage_qualified &&
+                    !state.continuation_blocked;
+                state.send_button.sensitive =
+                    state.prompt.sensitive &&
                     state.prompt.buffer.text.strip ().length > 0;
                 state.close_button.sensitive =
                     !state.generating;
@@ -2252,8 +2265,23 @@ namespace AskTheModel {
             bool should_generate_title =
                 state.title_label.label == "New";
             bool grounded_turn_prepared = false;
+            bool grounded_session_committed = false;
+            bool durable_turn_committed = false;
+            bool user_published = false;
 
             try {
+                if (!conversation_storage_qualified) {
+                    throw new ConversationPersistenceError.INVALID_SESSION (
+                        "Conversation storage has not passed startup storage qualification."
+                    );
+                }
+
+                if (state.continuation_blocked) {
+                    throw new ConversationPersistenceError.INVALID_SESSION (
+                        "This conversation cannot continue because its last grounded turn could not be saved."
+                    );
+                }
+
                 if (state.model_name == null ||
                     state.model_name.strip ().length == 0) {
                     throw new ConversationSessionError.INVALID_MODEL (
@@ -2300,6 +2328,14 @@ namespace AskTheModel {
                     ollama_provider.model_digest
                 );
 
+                if (state.persistence_id == null) {
+                    state.persistence_id =
+                        conversation_persistence.create_for_session (
+                            state.session,
+                            state.title_label.label
+                        );
+                }
+
                 bool needs_clarification;
                 string? system_instructions;
                 string? evidence_text;
@@ -2315,6 +2351,11 @@ namespace AskTheModel {
                     );
 
                 if (needs_clarification) {
+                    append_transcript (
+                        state.transcript,
+                        "You: " + prompt
+                    );
+                    user_published = true;
                     append_transcript (
                         state.transcript,
                         "Assistant: Please restate the question with the repository, variable, source, or topic you mean."
@@ -2362,6 +2403,19 @@ namespace AskTheModel {
                             );
                         }
 
+                        grounded_turn_prepared = false;
+                        grounded_session_committed = true;
+
+                        conversation_persistence.commit_turn (
+                            state.persistence_id ?? "",
+                            prompt,
+                            answer,
+                            visible_answer,
+                            true,
+                            citation_resolution
+                        );
+                        durable_turn_committed = true;
+
                         state.conversation.commit_exchange (
                             prompt,
                             answer
@@ -2369,8 +2423,12 @@ namespace AskTheModel {
                         state.grounded_answers += answer;
                         state.grounded_citations +=
                             citation_resolution;
-                        grounded_turn_prepared = false;
 
+                        append_transcript (
+                            state.transcript,
+                            "You: " + prompt
+                        );
+                        user_published = true;
                         append_grounded_answer (
                             state.transcript,
                             visible_answer,
@@ -2379,21 +2437,41 @@ namespace AskTheModel {
                         assistant_stream_started = true;
                         title_answer = visible_answer;
                     } else {
-                        streaming_transcript = state.transcript;
                         answer = yield ollama_provider.chat (
                             prompt,
-                            state.conversation
+                            state.conversation,
+                            false
                         );
-                        title_answer = answer;
 
-                        if (!assistant_stream_started &&
-                            answer.length > 0) {
+                        conversation_persistence.commit_turn (
+                            state.persistence_id ?? "",
+                            prompt,
+                            answer,
+                            answer,
+                            false
+                        );
+                        durable_turn_committed = true;
+
+                        state.conversation.commit_exchange (
+                            prompt,
+                            answer
+                        );
+
+                        append_transcript (
+                            state.transcript,
+                            "You: " + prompt
+                        );
+                        user_published = true;
+
+                        if (answer.length > 0) {
                             append_transcript (
                                 state.transcript,
                                 "Assistant: " + answer
                             );
                             assistant_stream_started = true;
                         }
+
+                        title_answer = answer;
                     }
 
                     if (should_generate_title &&
@@ -2411,20 +2489,41 @@ namespace AskTheModel {
                     state.session.abort_turn ();
                 }
 
+                if (grounded_session_committed &&
+                    !durable_turn_committed) {
+                    state.continuation_blocked = true;
+                }
+
                 if (!state.session.is_active ()) {
                     state.locked = false;
+                }
+
+                if (state.continuation_blocked &&
+                    !user_published) {
+                    append_transcript (
+                        state.transcript,
+                        "You: " + prompt
+                    );
+                    user_published = true;
+                } else if (!state.continuation_blocked &&
+                           chat_state_is_open (state)) {
+                    state.prompt.buffer.text = prompt;
                 }
 
                 append_transcript (
                     state.transcript,
                     "System: " + error.message
                 );
+
+                if (state.continuation_blocked) {
+                    append_transcript (
+                        state.transcript,
+                        "System: Conversation continuation is blocked until durable state can be reloaded."
+                    );
+                }
             }
 
-            if (streaming_transcript == state.transcript) {
-                streaming_transcript = null;
-            }
-
+            streaming_transcript = null;
             state.generating = false;
             generation_active = false;
 
@@ -2435,7 +2534,8 @@ namespace AskTheModel {
             update_conversation_ui_state ();
 
             if (chat_state_is_open (state) &&
-                active_chat == state) {
+                active_chat == state &&
+                !state.continuation_blocked) {
                 state.prompt.grab_focus ();
             }
         }
@@ -2612,11 +2712,6 @@ namespace AskTheModel {
                     state.locked = true;
                     update_conversation_ui_state ();
                 }
-
-                append_transcript (
-                    transcript,
-                    "You: " + prompt
-                );
 
                 prompt_view.buffer.text = "";
                 send_button.sensitive = false;

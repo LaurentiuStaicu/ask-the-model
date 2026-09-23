@@ -260,11 +260,13 @@ Do not wire GTK or persist live chats yet.
 
 Add a conversation-domain store and atomic committed-turn writes.
 
-CONV-02a implements and qualifies the native write boundary only. Conversation creation plus repository pins are atomic, and each turn is one store-owned transaction containing the paired user/assistant messages, optional citations and metadata update. The store allocates local identities and turn/sequence numbers and rolls back the complete turn on any failure.
+CONV-02a implements and qualifies the native write boundary. Conversation creation plus repository pins are atomic, and each turn is one store-owned transaction containing the paired user/assistant messages, optional citations and metadata update. The store allocates local identities and turn/sequence numbers and rolls back the complete turn on any failure.
 
-CONV-02b will expose that qualified mutation boundary to the Vala conversation domain and change provider-history handling so both grounded and ungrounded turns defer `OllamaConversation.commit_exchange()` until durable persistence succeeds.
+CONV-02b wires that boundary into live chat. The Vala domain bridge reads model/digest, repository generation and exact repository version/SHA pins from the frozen `ConversationSession`. Both grounded and ungrounded provider calls defer provider-history mutation until SQLite commit succeeds. Grounded retrieval/session state is committed before durable persistence; if that later durable write fails, the tab becomes explicitly non-continuable rather than allowing in-memory/provider history to diverge silently.
 
-Still no restart restore UI.
+Provider output is published to the transcript only after the durable turn boundary. Local clarification prompts remain transient because they are not provider-history turns. Generated titles remain presentation metadata for now.
+
+There is still no restart restore/navigation UI; that begins with CONV-03.
 
 ### CONV-03 — restore and continuation qualification
 

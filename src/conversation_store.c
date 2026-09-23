@@ -1814,6 +1814,215 @@ out:
     return ok;
 }
 
+
+static const char *
+nullable_array_value (
+    const char *const *values,
+    gsize index
+)
+{
+    if (values == NULL ||
+        values[index] == NULL ||
+        values[index][0] == '\0') {
+        return NULL;
+    }
+
+    return values[index];
+}
+
+gboolean
+atm_conversation_store_create_conversation_values (
+    const char *path,
+    const char *title,
+    gint64 created_at_us,
+    const char *model_name,
+    const char *model_digest,
+    gint64 repository_generation_id,
+    const char *const *repository_ids,
+    const char *const *repository_versions,
+    const char *const *repository_shas,
+    gsize repository_count,
+    char **out_conversation_id,
+    GError **error
+)
+{
+    if (!nonempty (path) ||
+        (repository_count > 0 &&
+         (repository_ids == NULL ||
+          repository_versions == NULL ||
+          repository_shas == NULL))) {
+        g_set_error_literal (
+            error,
+            ATM_CONVERSATION_STORE_ERROR,
+            ATM_CONVERSATION_STORE_ERROR_ARGUMENT,
+            "Conversation-store values create received invalid array arguments."
+        );
+        return FALSE;
+    }
+
+    AtmConversationRepositoryInput *repositories =
+        repository_count > 0
+            ? g_new0 (
+                AtmConversationRepositoryInput,
+                repository_count
+              )
+            : NULL;
+
+    for (gsize i = 0;
+         i < repository_count;
+         i++) {
+        repositories[i].repository_id =
+            repository_ids[i];
+        repositories[i].repository_version =
+            repository_versions[i];
+        repositories[i].snapshot_sha =
+            repository_shas[i];
+    }
+
+    AtmConversationStore *store = NULL;
+    gboolean ok = FALSE;
+
+    if (!atm_conversation_store_open (
+            path,
+            &store,
+            error
+        )) {
+        goto out;
+    }
+
+    ok =
+        atm_conversation_store_create_conversation (
+            store,
+            title,
+            created_at_us,
+            model_name,
+            model_digest,
+            repository_generation_id,
+            repositories,
+            repository_count,
+            out_conversation_id,
+            error
+        );
+
+out:
+    atm_conversation_store_close (store);
+    g_free (repositories);
+    return ok;
+}
+
+gboolean
+atm_conversation_store_commit_turn_values (
+    const char *path,
+    const char *conversation_id,
+    const char *user_content,
+    const char *assistant_provider_content,
+    const char *assistant_display_content,
+    gboolean grounded,
+    gint64 created_at_us,
+    const char *const *citation_labels,
+    const char *const *citation_repository_ids,
+    const char *const *citation_repository_versions,
+    const char *const *citation_snapshot_shas,
+    const char *const *citation_logical_source_ids,
+    const char *const *citation_source_paths,
+    const char *const *citation_locators,
+    const char *const *citation_titles,
+    const char *const *citation_excerpts,
+    gsize citation_count,
+    gint64 *out_turn_no,
+    GError **error
+)
+{
+    if (!nonempty (path) ||
+        (citation_count > 0 &&
+         (citation_labels == NULL ||
+          citation_repository_ids == NULL ||
+          citation_repository_versions == NULL ||
+          citation_snapshot_shas == NULL ||
+          citation_logical_source_ids == NULL ||
+          citation_source_paths == NULL ||
+          citation_locators == NULL ||
+          citation_titles == NULL ||
+          citation_excerpts == NULL))) {
+        g_set_error_literal (
+            error,
+            ATM_CONVERSATION_STORE_ERROR,
+            ATM_CONVERSATION_STORE_ERROR_ARGUMENT,
+            "Conversation-store values commit received invalid citation arrays."
+        );
+        return FALSE;
+    }
+
+    AtmConversationCitationInput *citations =
+        citation_count > 0
+            ? g_new0 (
+                AtmConversationCitationInput,
+                citation_count
+              )
+            : NULL;
+
+    for (gsize i = 0;
+         i < citation_count;
+         i++) {
+        citations[i].label =
+            citation_labels[i];
+        citations[i].repository_id =
+            citation_repository_ids[i];
+        citations[i].repository_version =
+            citation_repository_versions[i];
+        citations[i].snapshot_sha =
+            citation_snapshot_shas[i];
+        citations[i].logical_source_id =
+            citation_logical_source_ids[i];
+        citations[i].source_path =
+            citation_source_paths[i];
+        citations[i].locator =
+            citation_locators[i];
+        citations[i].title =
+            nullable_array_value (
+                citation_titles,
+                i
+            );
+        citations[i].excerpt =
+            nullable_array_value (
+                citation_excerpts,
+                i
+            );
+        citations[i].immutable_permalink = NULL;
+    }
+
+    AtmConversationStore *store = NULL;
+    gboolean ok = FALSE;
+
+    if (!atm_conversation_store_open (
+            path,
+            &store,
+            error
+        )) {
+        goto out;
+    }
+
+    ok =
+        atm_conversation_store_commit_turn (
+            store,
+            conversation_id,
+            user_content,
+            assistant_provider_content,
+            assistant_display_content,
+            grounded,
+            created_at_us,
+            citations,
+            citation_count,
+            out_turn_no,
+            error
+        );
+
+out:
+    atm_conversation_store_close (store);
+    g_free (citations);
+    return ok;
+}
+
 gboolean
 atm_conversation_store_validate (
     AtmConversationStore *store,

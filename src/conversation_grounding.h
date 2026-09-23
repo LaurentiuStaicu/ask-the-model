@@ -68,6 +68,21 @@ atm_conversation_grounding_repository_at (
     guint index
 );
 
+const char *atm_conversation_grounding_repository_id_at (
+    const AtmConversationGroundingState *state,
+    guint index
+);
+
+const char *atm_conversation_grounding_repository_version_at (
+    const AtmConversationGroundingState *state,
+    guint index
+);
+
+const char *atm_conversation_grounding_repository_sha_at (
+    const AtmConversationGroundingState *state,
+    guint index
+);
+
 gboolean atm_conversation_grounding_create_retrieval_scopes (
     const AtmConversationGroundingState *state,
     GPtrArray **out_scopes,
