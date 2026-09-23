@@ -288,6 +288,12 @@ Before entering CONV-04, the live Vala committed-turn bridge also preserves the 
 
 Add startup loading, durable conversation navigation and explicit archive/delete behavior to the existing multi-chat notebook without changing repository authority semantics.
 
+CONV-04a restores non-archived durable conversations into the existing scrollable `Gtk.Notebook`. Restored tabs reconstruct provider history from durable `provider_content`, render user-visible transcript from durable `display_content`, and rebuild grounded citation buttons from durable provenance including the persisted immutable permalink. These tabs are explicitly view-only: prompt and Send remain disabled regardless of local model/repository availability.
+
+Startup restore is idempotent and runs only after both the conversation store and notebook exist. The initial `New` tab is removed only when at least one durable conversation was restored and that tab remains completely pristine; user input started during asynchronous startup is never discarded.
+
+CONV-04b will orchestrate the already-qualified CONV-03 model/repository checks and enable continuation only for tabs whose exact historical context passes. CONV-04c will add explicit archive/delete lifecycle. Closing a tab in CONV-04a remains an in-memory UI action and does not archive or delete durable history.
+
 Retention policy, export/import and bulk history management remain later work.
 
 ## Acceptance rules for later implementation

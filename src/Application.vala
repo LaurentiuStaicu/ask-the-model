@@ -27,6 +27,7 @@ namespace AskTheModel {
         public string? persistent_id = null;
         public bool persistence_failed = false;
         public bool unsaved_notice_shown = false;
+        public bool restored_view_only = false;
 
         public ChatTabState (
             Gtk.Box page,
@@ -112,6 +113,7 @@ namespace AskTheModel {
         private string? startup_qualification_detail = null;
         private ConversationPersistenceStore? conversation_store = null;
         private string? conversation_store_failure = null;
+        private bool durable_restore_attempted = false;
 
         public Application () {
             Object (
@@ -244,6 +246,8 @@ namespace AskTheModel {
                     "AtM: conversation persistence ready path=%s\n",
                     conversation_store.path
                 );
+
+                restore_durable_conversations_if_ready ();
             } catch (GLib.Error error) {
                 conversation_store_failure = error.message;
 
@@ -1002,10 +1006,12 @@ namespace AskTheModel {
             foreach (ChatTabState state in chat_states) {
                 state.prompt.sensitive =
                     !generation_active &&
-                    !state.persistence_failed;
+                    !state.persistence_failed &&
+                    !state.restored_view_only;
                 state.send_button.sensitive =
                     !generation_active &&
                     !state.persistence_failed &&
+                    !state.restored_view_only &&
                     state.prompt.buffer.text.strip ().length > 0;
                 state.close_button.sensitive =
                     !state.generating;
@@ -2044,27 +2050,35 @@ namespace AskTheModel {
                 content.append (excerpt);
             }
 
-            if (descriptor != null) {
+            string? permalink =
+                citation.immutable_permalink;
+
+            if ((permalink == null ||
+                 permalink.strip ().length == 0) &&
+                descriptor != null) {
                 try {
-                    string permalink =
+                    permalink =
                         descriptor.immutable_file_permalink (
                             citation.snapshot_sha,
                             citation.source_path,
                             citation.locator
                         );
-
-                    var link =
-                        new Gtk.LinkButton.with_label (
-                            permalink,
-                            "Open immutable source"
-                        ) {
-                            halign = Gtk.Align.START
-                        };
-                    link.add_css_class ("atm-source-link");
-                    content.append (link);
                 } catch (GLib.Error error) {
-                    /* Provenance remains visible even if a URL cannot be built. */
+                    permalink = null;
                 }
+            }
+
+            if (permalink != null &&
+                permalink.strip ().length > 0) {
+                var link =
+                    new Gtk.LinkButton.with_label (
+                        permalink,
+                        "Open immutable source"
+                    ) {
+                        halign = Gtk.Align.START
+                    };
+                link.add_css_class ("atm-source-link");
+                content.append (link);
             }
 
             return content;
@@ -2655,6 +2669,8 @@ namespace AskTheModel {
                 active_chat == state) {
                 state.prompt.grab_focus ();
             }
+
+            restore_durable_conversations_if_ready ();
         }
 
         private Gtk.Widget build_chat_tab_label (
@@ -2865,6 +2881,253 @@ namespace AskTheModel {
             activate_chat_state (state);
         }
 
+        private bool chat_state_is_pristine_new (
+            ChatTabState state
+        ) {
+            return state.persistent_id == null &&
+                !state.locked &&
+                !state.generating &&
+                !state.persistence_failed &&
+                state.title_label.label == "New" &&
+                state.conversation.message_count () == 0 &&
+                state.transcript.buffer.get_char_count () == 0 &&
+                state.prompt.buffer.get_char_count () == 0;
+        }
+
+        private string[] repository_ids_from_snapshot (
+            ConversationPersistenceSnapshot snapshot
+        ) {
+            string[] result = {};
+
+            foreach (
+                ConversationPersistenceRepository repository
+                in snapshot.repositories
+            ) {
+                result += repository.repository_id;
+            }
+
+            return result;
+        }
+
+        private CitationResolution
+        citation_resolution_from_persistence_message (
+            ConversationPersistenceMessage message
+        ) {
+            var resolution = new CitationResolution ();
+
+            foreach (
+                ConversationPersistenceCitation citation
+                in message.citations
+            ) {
+                resolution.add_citation (
+                    new CitationReference (
+                        citation.label,
+                        citation.repository_id,
+                        citation.repository_version,
+                        citation.snapshot_sha,
+                        citation.logical_source_id,
+                        citation.source_path,
+                        citation.locator,
+                        citation.title,
+                        citation.excerpt,
+                        citation.immutable_permalink
+                    )
+                );
+            }
+
+            return resolution;
+        }
+
+        private void render_restored_snapshot (
+            ChatTabState state,
+            ConversationPersistenceSnapshot snapshot
+        ) throws GLib.Error {
+            for (
+                uint i = 0;
+                i < snapshot.messages.length;
+                i++
+            ) {
+                ConversationPersistenceMessage message =
+                    snapshot.messages[i];
+
+                if (message.role == "user") {
+                    append_transcript (
+                        state.transcript,
+                        "You: " + message.display_content
+                    );
+                    continue;
+                }
+
+                if (message.role != "assistant") {
+                    throw new GLib.IOError.INVALID_DATA (
+                        "Durable conversation contains an unsupported message role."
+                    );
+                }
+
+                if (message.grounded) {
+                    CitationResolution resolution =
+                        citation_resolution_from_persistence_message (
+                            message
+                        );
+
+                    append_grounded_answer (
+                        state.transcript,
+                        message.display_content,
+                        resolution
+                    );
+
+                    state.grounded_answers +=
+                        message.provider_content;
+                    state.grounded_citations +=
+                        resolution;
+                } else {
+                    append_transcript (
+                        state.transcript,
+                        "Assistant: " + message.display_content
+                    );
+                }
+            }
+        }
+
+        private ChatTabState? create_restored_chat_tab (
+            ConversationPersistenceSnapshot snapshot
+        ) {
+            if (generation_active ||
+                chat_notebook == null) {
+                return null;
+            }
+
+            create_chat_tab ();
+
+            ChatTabState? state = active_chat;
+
+            if (state == null) {
+                return null;
+            }
+
+            state.restored_view_only = true;
+            state.locked = true;
+            state.persistent_id = snapshot.conversation_id;
+            state.model_name = snapshot.model_name;
+            state.model_digest = snapshot.model_digest;
+            state.repository_ids =
+                repository_ids_from_snapshot (
+                    snapshot
+                );
+            state.title_label.label = snapshot.title;
+            state.placeholder.label =
+                "Restored conversation (read-only)";
+            state.prompt.buffer.text = "";
+
+            try {
+                snapshot.restore_provider_history (
+                    state.conversation
+                );
+                render_restored_snapshot (
+                    state,
+                    snapshot
+                );
+            } catch (GLib.Error error) {
+                state.persistence_failed = true;
+                append_transcript (
+                    state.transcript,
+                    "System: Durable conversation restore failed: " +
+                    error.message
+                );
+            }
+
+            update_conversation_ui_state ();
+            return state;
+        }
+
+        private void restore_durable_conversations_if_ready () {
+            if (durable_restore_attempted ||
+                generation_active ||
+                conversation_store == null ||
+                chat_notebook == null) {
+                return;
+            }
+
+            durable_restore_attempted = true;
+            ChatTabState? pristine_new = active_chat;
+            int first_restored_page = -1;
+            uint restored_count = 0;
+
+            try {
+                ConversationPersistenceSummary[] summaries =
+                    conversation_store.list_conversations ();
+
+                foreach (
+                    ConversationPersistenceSummary summary
+                    in summaries
+                ) {
+                    if (summary.archived) {
+                        continue;
+                    }
+
+                    ConversationPersistenceSnapshot snapshot =
+                        conversation_store.load_snapshot (
+                            summary.conversation_id
+                        );
+
+                    ChatTabState? restored =
+                        create_restored_chat_tab (
+                            snapshot
+                        );
+
+                    if (restored == null) {
+                        continue;
+                    }
+
+                    int page_num =
+                        chat_notebook.page_num (
+                            restored.page
+                        );
+
+                    if (first_restored_page < 0 &&
+                        page_num >= 0) {
+                        first_restored_page = page_num;
+                    }
+
+                    restored_count++;
+                }
+            } catch (GLib.Error error) {
+                stderr.printf (
+                    "AtM: durable conversation restore failed: %s\n",
+                    error.message
+                );
+            }
+
+            if (restored_count > 0 &&
+                pristine_new != null &&
+                chat_state_is_open (pristine_new) &&
+                chat_state_is_pristine_new (
+                    pristine_new
+                )) {
+                close_chat_tab (
+                    pristine_new
+                );
+
+                if (first_restored_page > 0) {
+                    first_restored_page--;
+                }
+            }
+
+            if (first_restored_page >= 0 &&
+                chat_notebook.get_n_pages () >
+                    first_restored_page) {
+                chat_notebook.set_current_page (
+                    first_restored_page
+                );
+            }
+
+            stdout.printf (
+                "AtM: restored %u durable conversation%s in read-only mode\n",
+                restored_count,
+                restored_count == 1 ? "" : "s"
+            );
+        }
+
         private Gtk.Widget build_main_content () {
             no_ai_annunciator =
                 build_annunciator_label (
@@ -3027,6 +3290,7 @@ namespace AskTheModel {
             content.append (chat_tabs);
 
             create_chat_tab ();
+            restore_durable_conversations_if_ready ();
 
             return content;
         }

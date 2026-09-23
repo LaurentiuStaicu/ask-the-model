@@ -554,6 +554,21 @@
         "meson:conversation-persistence-store",
         "meson:conversation-store"
       ]
+    },
+    {
+      "id": "SESSION-S0-008",
+      "category": "SESSION",
+      "severity": "S0",
+      "lifecycle": "enforced",
+      "statement": "Startup durable-conversation restore must remain view-only until exact continuation qualification is explicitly completed. Only non-archived durable conversations are restored into GTK tabs; restored transcript rendering must use durable display_content while provider history is rebuilt only from durable provider_content, grounded citation provenance including any persisted immutable permalink must remain inspectable, and restored prompt/Send controls must remain disabled. Startup restore must not discard a user-started pristine New tab unless it is still completely untouched.",
+      "enforced_by": [
+        "src/Application.vala",
+        "src/ConversationPersistenceStore.vala",
+        "src/ConversationGrounding.vala"
+      ],
+      "tested_by": [
+        "meson:conversation-persistence-store"
+      ]
     }
   ]
 }
