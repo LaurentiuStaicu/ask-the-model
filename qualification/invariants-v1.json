@@ -178,6 +178,21 @@
       "tested_by": [
         "meson:scientific-control"
       ]
+    },
+    {
+      "id": "SCIENTIFIC-S0-005",
+      "category": "SCIENTIFIC",
+      "severity": "S0",
+      "lifecycle": "enforced",
+      "statement": "SCI-04 must keep ScientificContentId, QualifiedArtifactId, and StorageDigest distinct: semantic content is canonically identified independently of storage/provenance, qualification binds that content to pinned provenance and semantic-profile identity, and storage digest covers the complete stored artifact; only TYPED_VALIDATED evidence or recognized deterministic controls may enter the artifact layer, and mutation or incomplete provenance must fail validation.",
+      "enforced_by": [
+        "src/scientific_canonical.c",
+        "src/scientific_artifact.c"
+      ],
+      "tested_by": [
+        "meson:scientific-canonical",
+        "meson:scientific-artifact"
+      ]
     }
   ]
 }
