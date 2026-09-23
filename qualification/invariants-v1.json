@@ -394,6 +394,19 @@
         "meson:startup-qualification-service",
         "meson:repository-lifecycle-service"
       ]
+    },
+    {
+      "id": "STATE-S0-010",
+      "category": "STATE",
+      "severity": "S0",
+      "lifecycle": "enforced",
+      "statement": "Every production sqlite3_open_v2 used for AtM Control DB authority must include SQLITE_OPEN_NOFOLLOW. A symbolic link at the Control DB filename must fail closed before bootstrap, migration, schema validation, repository-state read or mutation, and AtM must not follow or replace the symlink target.",
+      "enforced_by": [
+        "src/control_state.c"
+      ],
+      "tested_by": [
+        "meson:control-state"
+      ]
     }
   ]
 }

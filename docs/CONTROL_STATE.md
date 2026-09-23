@@ -213,3 +213,14 @@ Every configuration call is checked for both SQLite return status and the result
 The existing connection contract remains in force after those flags are applied: foreign keys ON, WAL journal mode, FULL synchronous durability and a bounded busy timeout.
 
 This layer is complementary to schema v2. Persistent triggers protect COMPLETE-generation semantics in the database file; per-connection hardening prevents AtM's own SQLite handles from enabling dangerous legacy/schema-trust behavior and explicitly guarantees that the v2 trigger layer is active.
+
+
+## STATE-05c — no-follow Control DB open
+
+STATE-05c applies `SQLITE_OPEN_NOFOLLOW` to every production `sqlite3_open_v2()` used for the Control DB, both for create/bootstrap-capable opens and for existing-authority opens used by repository-state reads and mutations.
+
+SQLite 3.31.0 introduced this flag specifically to prevent a database filename from containing a symbolic link. Because STATE-05b already established SQLite 3.31.0 as the minimum supported version, no additional compatibility floor is required.
+
+A symlink at the authoritative `control-state.sqlite3` path is therefore rejected by SQLite before schema bootstrap, migration, validation or repository-state access. AtM does not follow the link, replace its target or reinterpret the target as Control DB authority.
+
+This complements the storage-boundary and connection hardening layers: filesystem indirection is rejected at the SQLite open primitive itself, while schema identity, generation invariants and per-connection security continue to apply to genuinely opened Control DB files.

@@ -15,7 +15,8 @@ All notable public releases of Ask the Model are recorded here.
 - kept repository grounding read-only with respect to repository authority and required snapshot seals to be persisted before a repository can be pinned for a conversation;
 - added Control DB schema v2 with atomic v1→v2 migration and persistent trigger defense-in-depth against direct mutation of COMPLETE generations, invalid active-generation transitions and rewrite of migration history;
 - hardened every Control DB connection with SQLite defensive mode, untrusted-schema mode, disabled legacy double-quoted strings and explicitly enabled triggers, and established SQLite 3.31.0 as the minimum supported library version for this path;
-- added `STATE-S0-001` through `STATE-S0-009` qualification invariants plus Flatpak/Meson regression coverage for foundation, import, cutover, authority precedence, copy-on-write history, stale-writer rejection, session generation pinning, schema-level immutability and connection hardening.
+- required `SQLITE_OPEN_NOFOLLOW` on every production Control DB open so a symlinked authority path fails closed before bootstrap, migration, validation or repository-state access;
+- added `STATE-S0-001` through `STATE-S0-010` qualification invariants plus Flatpak/Meson regression coverage for foundation, import, cutover, authority precedence, copy-on-write history, stale-writer rejection, session generation pinning, schema-level immutability, connection hardening and no-follow authority opens.
 
 ### Startup qualification fixes
 

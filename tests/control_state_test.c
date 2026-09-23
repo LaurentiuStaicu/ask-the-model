@@ -6,6 +6,7 @@
 #include "control_state.h"
 
 #include <sys/stat.h>
+#include <unistd.h>
 
 static void
 remove_tree_best_effort (const char *path)
@@ -331,6 +332,97 @@ test_sqlite_security_floor (void)
         >=,
         3031000
     );
+}
+
+static void
+test_control_state_symlink_is_rejected (void)
+{
+    char *root = new_temp_root (
+        "atm-control-state-nofollow-XXXXXX"
+    );
+    char *target = g_build_filename (
+        root,
+        "real-control-state.sqlite3",
+        NULL
+    );
+    char *link_path = db_path (root);
+
+    AtmControlStateStore *store = NULL;
+    GError *error = NULL;
+
+    g_assert_true (
+        atm_control_state_open (
+            target,
+            &store,
+            &error
+        )
+    );
+    g_assert_no_error (error);
+    g_assert_nonnull (store);
+    atm_control_state_close (store);
+    store = NULL;
+
+    g_assert_cmpint (
+        symlink (
+            target,
+            link_path
+        ),
+        ==,
+        0
+    );
+
+    g_assert_false (
+        atm_control_state_open (
+            link_path,
+            &store,
+            &error
+        )
+    );
+    g_assert_error (
+        error,
+        ATM_CONTROL_STATE_ERROR,
+        ATM_CONTROL_STATE_ERROR_SQLITE
+    );
+    g_assert_null (store);
+    g_clear_error (&error);
+
+    gint64 generation_id = -1;
+    g_assert_false (
+        atm_control_state_active_generation_id (
+            link_path,
+            &generation_id,
+            &error
+        )
+    );
+    g_assert_error (
+        error,
+        ATM_CONTROL_STATE_ERROR,
+        ATM_CONTROL_STATE_ERROR_IO
+    );
+    g_assert_cmpint (generation_id, ==, 0);
+    g_clear_error (&error);
+
+    GStatBuf st;
+    g_assert_cmpint (
+        g_lstat (
+            link_path,
+            &st
+        ),
+        ==,
+        0
+    );
+    g_assert_true (S_ISLNK (st.st_mode));
+    g_assert_true (
+        g_file_test (
+            target,
+            G_FILE_TEST_IS_REGULAR
+        )
+    );
+
+    g_free (link_path);
+    g_free (target);
+    remove_tree_best_effort (root);
+    g_free (root);
 }
 
 static void
@@ -2520,6 +2612,10 @@ main (int argc, char **argv)
     g_test_add_func (
         "/control-state/sqlite-security-floor",
         test_sqlite_security_floor
+    );
+    g_test_add_func (
+        "/control-state/nofollow-symlink",
+        test_control_state_symlink_is_rejected
     );
     g_test_add_func (
         "/control-state/bootstrap-reopen",
