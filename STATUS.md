@@ -27,7 +27,8 @@ Post-v0.4.0 development currently extends engineering hardening without changing
 - every production Control DB open rejects symbolic-link authority paths and verifies that SQLite actually opened the main database read/write;
 - the XDG state root that owns `control-state.sqlite3` is qualified with the same real-directory, current-owner, no-group-or-other-write and exclusive write-probe boundary used by G-S0 storage qualification before authority resolution.
 - development `main` now has a separate hardened `conversations.sqlite3` write path: committed turns persist pinned model/repository identity, raw/display assistant content and citation provenance before provider history advances;
-- CONV-03a adds a read-only durable list/snapshot boundary and exact provider-history rebuild from committed `provider_content`; UI restore/navigation and continuation qualification are not enabled yet.
+- CONV-03a adds a read-only durable list/snapshot boundary and exact provider-history rebuild from committed `provider_content`;
+- CONV-03b adds exact continuation-qualification primitives for historical repository generation/version/SHA and local AI model name/digest without changing current repository authority; GTK restore/navigation still remains CONV-04.
 
 Legacy `repository-state.json` remains migration/recovery evidence after cutover and is not rewritten by normal development-runtime repository operations.
 

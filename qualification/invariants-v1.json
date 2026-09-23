@@ -518,6 +518,24 @@
         "meson:conversation-store",
         "meson:conversation-persistence-store"
       ]
+    },
+    {
+      "id": "SESSION-S0-006",
+      "category": "SESSION",
+      "severity": "S0",
+      "lifecycle": "enforced",
+      "statement": "A durable conversation may be qualified for continuation only against its exact persisted context. Repository-backed restore must reconstruct grounding from the exact saved COMPLETE repository_generation_id without substituting or mutating current active repository authority, validate the local snapshot/version/seal/index for every selected repository, and then require the reconstructed repository ID/version/SHA set to equal the durable conversation pins. Model qualification must require the exact persisted model name and, when a digest was persisted, the exact local provider digest. Generation 0 is valid only for zero-repository conversations.",
+      "enforced_by": [
+        "src/RepositoryLifecycleService.vala",
+        "src/ConversationPersistenceStore.vala",
+        "src/OllamaProvider.vala",
+        "src/ControlStateNative.vala",
+        "src/control_state.c"
+      ],
+      "tested_by": [
+        "meson:repository-lifecycle-service",
+        "meson:conversation-persistence-store"
+      ]
     }
   ]
 }

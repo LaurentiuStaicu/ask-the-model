@@ -276,7 +276,11 @@ CONV-03a provides the read-only restore boundary. Conversation summaries and com
 
 Snapshot loading alone never enables continuation.
 
-CONV-03b must separately prove that the exact pinned model identity and repository snapshots are still locally available and valid before Send can be enabled. Historical conversations whose exact context is unavailable remain viewable but non-continuable.
+CONV-03b provides that continuation-qualification boundary. Repository-backed restore can reconstruct frozen grounding from the exact persisted COMPLETE `repository_generation_id`, validating its local snapshot, version, persistent seal and retrieval index without replacing or mutating current `active_state`. The reconstructed repository ID/version/SHA set must then match the durable conversation pins exactly.
+
+Model qualification uses the locally discovered provider inventory. The model name must match exactly and, when the conversation persisted a provider digest, that digest must also match exactly. A conversation persisted without a digest remains name-pinned only.
+
+These primitives do not themselves enable Send or create restored GTK tabs. CONV-04 must invoke both exact repository and model qualification before making a restored conversation continuable. Historical conversations whose exact context is unavailable remain viewable but non-continuable.
 
 ### CONV-04 — GTK lifecycle
 

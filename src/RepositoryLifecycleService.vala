@@ -469,9 +469,11 @@ namespace AskTheModel {
             return worker_result;
         }
 
-        public async ConversationGrounding
-        prepare_conversation_grounding (
+        private async ConversationGrounding
+        prepare_conversation_grounding_for_generation (
             RepositoryDescriptor[] selected,
+            int64 generation_id,
+            bool mark_runtime_integrity_failure,
             GLib.Cancellable? cancellable = null
         ) throws GLib.Error {
             if (selected.length > 0 &&
@@ -481,40 +483,47 @@ namespace AskTheModel {
                 );
             }
 
-            var grounding = new ConversationGrounding ();
-            ControlRepositoryStateStore? pinned_state_store = null;
-
-            if (selected.length > 0) {
-                pinned_state_store =
-                    new ControlRepositoryStateStore (
-                        state_root
-                    );
-
-                if (pinned_state_store.load_status !=
-                        RepositoryStateLoadStatus.VALID ||
-                    pinned_state_store.repository_generation_id <= 0) {
-                    throw new RepositoryError.NOT_READY (
-                        "Repository grounding requires one valid active Control DB generation."
+            if (selected.length == 0) {
+                if (generation_id != 0) {
+                    throw new RepositoryError.INVALID_RESPONSE (
+                        "Zero-repository conversation grounding must use repository generation 0."
                     );
                 }
+
+                var zero_grounding =
+                    new ConversationGrounding ();
+
+                if (!zero_grounding.freeze ()) {
+                    throw new RepositoryError.INVALID_RESPONSE (
+                        "Conversation repository scope could not be frozen."
+                    );
+                }
+
+                return zero_grounding;
             }
 
-            foreach (RepositoryDescriptor descriptor in selected) {
-                if (pinned_state_store == null) {
-                    assert_not_reached ();
-                }
+            if (generation_id <= 0) {
+                throw new RepositoryError.INVALID_RESPONSE (
+                    "Repository-backed conversation grounding requires a positive repository generation identifier."
+                );
+            }
 
+            string control_state_path =
+                GLib.Path.build_filename (
+                    state_root,
+                    "control-state.sqlite3"
+                );
+            var grounding = new ConversationGrounding ();
+
+            foreach (
+                RepositoryDescriptor descriptor
+                in selected
+            ) {
                 RepositoryRuntimeInfo info =
                     info_for (descriptor.id);
-                RepositoryLocalRecord local =
-                    pinned_state_store.record_for (
-                        descriptor.id
-                    );
 
-                if (info.integrity_invalid ||
-                    !local.is_ready () ||
-                    local.current_sha == null ||
-                    local.version == null) {
+                if (mark_runtime_integrity_failure &&
+                    info.integrity_invalid) {
                     throw new RepositoryError.NOT_READY (
                         "Repository %s is not ready for this conversation.".printf (
                             descriptor.acronym
@@ -522,11 +531,36 @@ namespace AskTheModel {
                     );
                 }
 
-                string sha = local.current_sha ?? "";
+                bool present;
+                string? sha_value;
+                string? version_value;
+                string? seal_value;
+
+                ControlStateNative.load_repository_values_at_generation (
+                    control_state_path,
+                    generation_id,
+                    descriptor.id,
+                    out present,
+                    out sha_value,
+                    out version_value,
+                    out seal_value
+                );
+
+                if (!present ||
+                    sha_value == null ||
+                    version_value == null) {
+                    throw new RepositoryError.NOT_READY (
+                        "Repository %s is absent from the pinned repository generation.".printf (
+                            descriptor.acronym
+                        )
+                    );
+                }
+
+                string sha = sha_value ?? "";
                 string local_version =
-                    local.version ?? "";
+                    version_value ?? "";
                 string? expected_seal =
-                    local.snapshot_seal_sha256;
+                    seal_value;
                 string expected_snapshot =
                     snapshot_path_for_root (
                         data_root,
@@ -554,6 +588,7 @@ namespace AskTheModel {
                 }
 
                 RepositoryInstallResult result;
+
                 try {
                     result = yield prepare_snapshot (
                         descriptor,
@@ -562,9 +597,12 @@ namespace AskTheModel {
                         expected_seal
                     );
                 } catch (RepositoryError error) {
-                    if (error.code == RepositoryError.NOT_READY) {
+                    if (mark_runtime_integrity_failure &&
+                        error.code ==
+                            RepositoryError.NOT_READY) {
                         info.mark_integrity_invalid ();
                     }
+
                     throw error;
                 }
 
@@ -578,7 +616,10 @@ namespace AskTheModel {
 
                 if (expected_seal !=
                     result.snapshot_seal_sha256) {
-                    info.mark_integrity_invalid ();
+                    if (mark_runtime_integrity_failure) {
+                        info.mark_integrity_invalid ();
+                    }
+
                     throw new RepositoryError.NOT_READY (
                         "Repository %s local snapshot integrity seal does not match the pinned Control DB generation.".printf (
                             descriptor.acronym
@@ -601,11 +642,9 @@ namespace AskTheModel {
                 }
             }
 
-            if (pinned_state_store != null) {
-                grounding.pin_repository_generation (
-                    pinned_state_store.repository_generation_id
-                );
-            }
+            grounding.pin_repository_generation (
+                generation_id
+            );
 
             if (!grounding.freeze ()) {
                 throw new RepositoryError.INVALID_RESPONSE (
@@ -614,6 +653,64 @@ namespace AskTheModel {
             }
 
             return grounding;
+        }
+
+        public async ConversationGrounding
+        prepare_conversation_grounding (
+            RepositoryDescriptor[] selected,
+            GLib.Cancellable? cancellable = null
+        ) throws GLib.Error {
+            if (selected.length == 0) {
+                return yield
+                    prepare_conversation_grounding_for_generation (
+                        selected,
+                        0,
+                        false,
+                        cancellable
+                    );
+            }
+
+            if (!repository_operations_allowed ()) {
+                throw new RepositoryError.NOT_READY (
+                    "Repository grounding is blocked until the installation passes startup qualification."
+                );
+            }
+
+            var pinned_state_store =
+                new ControlRepositoryStateStore (
+                    state_root
+                );
+
+            if (pinned_state_store.load_status !=
+                    RepositoryStateLoadStatus.VALID ||
+                pinned_state_store.repository_generation_id <= 0) {
+                throw new RepositoryError.NOT_READY (
+                    "Repository grounding requires one valid active Control DB generation."
+                );
+            }
+
+            return yield
+                prepare_conversation_grounding_for_generation (
+                    selected,
+                    pinned_state_store.repository_generation_id,
+                    true,
+                    cancellable
+                );
+        }
+
+        public async ConversationGrounding
+        prepare_conversation_grounding_at_generation (
+            RepositoryDescriptor[] selected,
+            int64 generation_id,
+            GLib.Cancellable? cancellable = null
+        ) throws GLib.Error {
+            return yield
+                prepare_conversation_grounding_for_generation (
+                    selected,
+                    generation_id,
+                    false,
+                    cancellable
+                );
         }
 
         public async uint download_or_update (

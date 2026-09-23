@@ -153,6 +153,112 @@ namespace AskTheModel {
             this.messages = messages;
         }
 
+        public bool model_identity_available (
+            string[] available_names,
+            string[] available_digests
+        ) {
+            if (available_names.length !=
+                available_digests.length) {
+                return false;
+            }
+
+            string expected_name =
+                model_name.strip ();
+
+            if (expected_name.length == 0) {
+                return false;
+            }
+
+            string expected_digest =
+                model_digest != null
+                    ? model_digest.strip ()
+                    : "";
+
+            for (
+                int i = 0;
+                i < available_names.length;
+                i++
+            ) {
+                if (available_names[i] !=
+                    expected_name) {
+                    continue;
+                }
+
+                if (expected_digest.length == 0 ||
+                    available_digests[i] ==
+                        expected_digest) {
+                    return true;
+                }
+            }
+
+            return false;
+        }
+
+        public void require_continuation_identity (
+            string[] available_model_names,
+            string[] available_model_digests,
+            int64 qualified_repository_generation_id,
+            ConversationPersistenceRepository[]
+                qualified_repositories
+        ) throws GLib.Error {
+            if (!model_identity_available (
+                    available_model_names,
+                    available_model_digests
+                )) {
+                throw new GLib.IOError.NOT_FOUND (
+                    "The exact AI model pinned to this conversation is not available."
+                );
+            }
+
+            if (qualified_repository_generation_id !=
+                repository_generation_id) {
+                throw new GLib.IOError.INVALID_DATA (
+                    "The qualified repository generation differs from the conversation's pinned generation."
+                );
+            }
+
+            if (qualified_repositories.length !=
+                repositories.length) {
+                throw new GLib.IOError.INVALID_DATA (
+                    "The qualified repository scope differs from the conversation's pinned scope."
+                );
+            }
+
+            foreach (
+                ConversationPersistenceRepository expected
+                in repositories
+            ) {
+                uint matches = 0;
+
+                foreach (
+                    ConversationPersistenceRepository qualified
+                    in qualified_repositories
+                ) {
+                    if (qualified.repository_id !=
+                        expected.repository_id) {
+                        continue;
+                    }
+
+                    if (qualified.repository_version !=
+                            expected.repository_version ||
+                        qualified.snapshot_sha !=
+                            expected.snapshot_sha) {
+                        throw new GLib.IOError.INVALID_DATA (
+                            "A qualified repository pin differs from the durable conversation identity."
+                        );
+                    }
+
+                    matches++;
+                }
+
+                if (matches != 1) {
+                    throw new GLib.IOError.INVALID_DATA (
+                        "The qualified repository set does not uniquely match the durable conversation identity."
+                    );
+                }
+            }
+        }
+
         public void restore_provider_history (
             OllamaConversation conversation
         ) throws GLib.Error {
