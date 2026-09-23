@@ -637,6 +637,366 @@ test_invalid_citation_semantics_fail_closed (void)
     g_free (root);
 }
 
+static gint64
+count_for_conversation (
+    const char *path,
+    const char *table,
+    const char *conversation_id
+)
+{
+    char *sql = g_strdup_printf (
+        "SELECT count(*) FROM %s WHERE conversation_id='%s';",
+        table,
+        conversation_id
+    );
+    gint64 count = raw_int64 (
+        path,
+        sql
+    );
+    g_free (sql);
+    return count;
+}
+
+static void
+test_atomic_write_api (void)
+{
+    char *root = new_temp_root (
+        "atm-conversation-write-api-XXXXXX"
+    );
+    char *path = store_path (root);
+    AtmConversationStore *store = NULL;
+    GError *error = NULL;
+
+    g_assert_true (
+        atm_conversation_store_open (
+            path,
+            &store,
+            &error
+        )
+    );
+    g_assert_no_error (error);
+
+    char *plain_id = NULL;
+
+    g_assert_true (
+        atm_conversation_store_create_conversation (
+            store,
+            "Plain",
+            10,
+            "model-a",
+            NULL,
+            0,
+            NULL,
+            0,
+            &plain_id,
+            &error
+        )
+    );
+    g_assert_no_error (error);
+    g_assert_nonnull (plain_id);
+
+    gint64 turn_no = -1;
+
+    g_assert_true (
+        atm_conversation_store_commit_turn (
+            store,
+            plain_id,
+            "hello",
+            "world",
+            "world",
+            FALSE,
+            11,
+            NULL,
+            0,
+            &turn_no,
+            &error
+        )
+    );
+    g_assert_no_error (error);
+    g_assert_cmpint (
+        turn_no,
+        ==,
+        0
+    );
+    g_assert_cmpint (
+        count_for_conversation (
+            path,
+            "messages",
+            plain_id
+        ),
+        ==,
+        2
+    );
+
+    AtmConversationRepositoryInput repository = {
+        .repository_id = "rmd",
+        .repository_version = "0.1.0",
+        .snapshot_sha =
+            "0123456789abcdef0123456789abcdef01234567"
+    };
+    char *grounded_id = NULL;
+
+    g_assert_true (
+        atm_conversation_store_create_conversation (
+            store,
+            "Grounded",
+            20,
+            "model-b",
+            "digest-b",
+            7,
+            &repository,
+            1,
+            &grounded_id,
+            &error
+        )
+    );
+    g_assert_no_error (error);
+    g_assert_nonnull (grounded_id);
+
+    AtmConversationCitationInput wrong_citation = {
+        .label = "S1",
+        .repository_id = "rmd",
+        .repository_version = "0.1.0",
+        .snapshot_sha =
+            "1111111111111111111111111111111111111111",
+        .logical_source_id = "source-1",
+        .source_path = "README.md",
+        .locator = "lines 1-2",
+        .title = "Title",
+        .excerpt = "Excerpt",
+        .immutable_permalink = NULL
+    };
+
+    turn_no = -1;
+    g_assert_false (
+        atm_conversation_store_commit_turn (
+            store,
+            grounded_id,
+            "question",
+            "answer [S1]",
+            "answer",
+            TRUE,
+            21,
+            &wrong_citation,
+            1,
+            &turn_no,
+            &error
+        )
+    );
+    g_assert_error (
+        error,
+        ATM_CONVERSATION_STORE_ERROR,
+        ATM_CONVERSATION_STORE_ERROR_INTEGRITY
+    );
+    g_assert_cmpint (
+        turn_no,
+        ==,
+        -1
+    );
+    g_clear_error (&error);
+    g_assert_cmpint (
+        count_for_conversation (
+            path,
+            "messages",
+            grounded_id
+        ),
+        ==,
+        0
+    );
+
+    AtmConversationCitationInput citation = {
+        .label = "S1",
+        .repository_id = "rmd",
+        .repository_version = "0.1.0",
+        .snapshot_sha =
+            "0123456789abcdef0123456789abcdef01234567",
+        .logical_source_id = "source-1",
+        .source_path = "README.md",
+        .locator = "lines 1-2",
+        .title = "Title",
+        .excerpt = "Excerpt",
+        .immutable_permalink = NULL
+    };
+
+    turn_no = -1;
+    g_assert_false (
+        atm_conversation_store_commit_turn (
+            store,
+            grounded_id,
+            "question",
+            "answer [S1]",
+            "answer",
+            TRUE,
+            19,
+            &citation,
+            1,
+            &turn_no,
+            &error
+        )
+    );
+    g_assert_nonnull (error);
+    g_assert_cmpint (
+        turn_no,
+        ==,
+        -1
+    );
+    g_clear_error (&error);
+
+    g_assert_cmpint (
+        count_for_conversation (
+            path,
+            "messages",
+            grounded_id
+        ),
+        ==,
+        0
+    );
+
+    char *updated_sql = g_strdup_printf (
+        "SELECT updated_at_us FROM conversations "
+        "WHERE conversation_id='%s';",
+        grounded_id
+    );
+    g_assert_cmpint (
+        raw_int64 (
+            path,
+            updated_sql
+        ),
+        ==,
+        20
+    );
+    g_free (updated_sql);
+
+    turn_no = -1;
+    g_assert_true (
+        atm_conversation_store_commit_turn (
+            store,
+            grounded_id,
+            "question",
+            "answer [S1]",
+            "answer",
+            TRUE,
+            21,
+            &citation,
+            1,
+            &turn_no,
+            &error
+        )
+    );
+    g_assert_no_error (error);
+    g_assert_cmpint (
+        turn_no,
+        ==,
+        0
+    );
+    g_assert_cmpint (
+        count_for_conversation (
+            path,
+            "messages",
+            grounded_id
+        ),
+        ==,
+        2
+    );
+
+    char *provider_sql = g_strdup_printf (
+        "SELECT provider_content FROM messages "
+        "WHERE conversation_id='%s' AND role='assistant';",
+        grounded_id
+    );
+    char *provider_content = raw_text (
+        path,
+        provider_sql
+    );
+    g_free (provider_sql);
+    g_assert_cmpstr (
+        provider_content,
+        ==,
+        "answer [S1]"
+    );
+    g_free (provider_content);
+
+    char *display_sql = g_strdup_printf (
+        "SELECT display_content FROM messages "
+        "WHERE conversation_id='%s' AND role='assistant';",
+        grounded_id
+    );
+    char *display_content = raw_text (
+        path,
+        display_sql
+    );
+    g_free (display_sql);
+    g_assert_cmpstr (
+        display_content,
+        ==,
+        "answer"
+    );
+    g_free (display_content);
+
+    char *citation_sql = g_strdup_printf (
+        "SELECT count(*) FROM citations c "
+        "JOIN messages m ON m.message_id=c.message_id "
+        "WHERE m.conversation_id='%s';",
+        grounded_id
+    );
+    g_assert_cmpint (
+        raw_int64 (
+            path,
+            citation_sql
+        ),
+        ==,
+        1
+    );
+    g_free (citation_sql);
+
+    turn_no = -1;
+    g_assert_true (
+        atm_conversation_store_commit_turn (
+            store,
+            grounded_id,
+            "follow-up",
+            "plain follow-up",
+            "plain follow-up",
+            FALSE,
+            22,
+            NULL,
+            0,
+            &turn_no,
+            &error
+        )
+    );
+    g_assert_no_error (error);
+    g_assert_cmpint (
+        turn_no,
+        ==,
+        1
+    );
+    g_assert_cmpint (
+        count_for_conversation (
+            path,
+            "messages",
+            grounded_id
+        ),
+        ==,
+        4
+    );
+
+    g_assert_true (
+        atm_conversation_store_validate (
+            store,
+            &error
+        )
+    );
+    g_assert_no_error (error);
+
+    atm_conversation_store_close (store);
+    g_free (grounded_id);
+    g_free (plain_id);
+    g_free (path);
+    remove_tree_best_effort (root);
+    g_free (root);
+}
+
 static void
 test_symlink_rejected (void)
 {
@@ -721,6 +1081,10 @@ main (int argc, char **argv)
     g_test_add_func (
         "/conversation-store/invalid-citation-semantics",
         test_invalid_citation_semantics_fail_closed
+    );
+    g_test_add_func (
+        "/conversation-store/atomic-write-api",
+        test_atomic_write_api
     );
     g_test_add_func (
         "/conversation-store/nofollow-symlink",

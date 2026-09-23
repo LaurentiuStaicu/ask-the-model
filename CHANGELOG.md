@@ -23,6 +23,10 @@ All notable public releases of Ask the Model are recorded here.
 
 ### Conversation persistence foundation
 
+- added a native atomic mutation API that generates local conversation/message identity, writes repository pins transactionally, allocates turn/sequence numbers inside the store and commits each complete user/assistant turn with its citations and metadata in one SQLite transaction;
+- citation provenance is checked against the conversation's exact pinned repository/version/SHA set before write, and late failures roll back already-inserted messages/citations so the previous durable boundary remains unchanged;
+- added `SESSION-S0-003` and regression coverage for ordinary and grounded commits, raw-vs-display grounded content, turn sequencing, pre-write provenance rejection and late transactional rollback.
+
 - defined a separate application-owned `conversations.sqlite3` schema and hardened validation layer without wiring persistence into GTK or live chat yet;
 - added STRICT tables for conversation identity/model/repository generation, pinned repository snapshots, committed provider-history messages and durable citation provenance;
 - added fail-closed semantic validation for repository-scope mismatch, incomplete committed turn pairs, invalid grounded-role state and citation provenance that does not match the conversation's pinned repository set;

@@ -840,6 +840,980 @@ validate_semantics (
     return TRUE;
 }
 
+
+static gboolean
+is_sha40 (
+    const char *value
+)
+{
+    if (value == NULL ||
+        strlen (value) != 40) {
+        return FALSE;
+    }
+
+    for (const char *cursor = value;
+         *cursor != '\0';
+         cursor++) {
+        if (!((*cursor >= '0' && *cursor <= '9') ||
+              (*cursor >= 'a' && *cursor <= 'f'))) {
+            return FALSE;
+        }
+    }
+
+    return TRUE;
+}
+
+static gboolean
+prepare_statement (
+    sqlite3 *db,
+    const char *sql,
+    sqlite3_stmt **out_statement,
+    GError **error
+)
+{
+    if (out_statement == NULL ||
+        *out_statement != NULL ||
+        sqlite3_prepare_v2 (
+            db,
+            sql,
+            -1,
+            out_statement,
+            NULL
+        ) != SQLITE_OK) {
+        set_sqlite_error (
+            db,
+            error,
+            ATM_CONVERSATION_STORE_ERROR_SQLITE,
+            "Could not prepare conversation-store mutation"
+        );
+        return FALSE;
+    }
+
+    return TRUE;
+}
+
+static gboolean
+step_done (
+    sqlite3 *db,
+    sqlite3_stmt *statement,
+    const char *prefix,
+    GError **error
+)
+{
+    if (sqlite3_step (statement) !=
+        SQLITE_DONE) {
+        set_sqlite_error (
+            db,
+            error,
+            ATM_CONVERSATION_STORE_ERROR_SQLITE,
+            prefix
+        );
+        return FALSE;
+    }
+
+    return TRUE;
+}
+
+static void
+rollback_best_effort (
+    sqlite3 *db
+)
+{
+    sqlite3_exec (
+        db,
+        "ROLLBACK;",
+        NULL,
+        NULL,
+        NULL
+    );
+}
+
+static gboolean
+repository_input_is_valid (
+    const AtmConversationRepositoryInput *repository
+)
+{
+    return repository != NULL &&
+        nonempty (repository->repository_id) &&
+        nonempty (repository->repository_version) &&
+        is_sha40 (repository->snapshot_sha);
+}
+
+static gboolean
+citation_input_is_valid (
+    const AtmConversationCitationInput *citation
+)
+{
+    return citation != NULL &&
+        nonempty (citation->label) &&
+        nonempty (citation->repository_id) &&
+        nonempty (citation->repository_version) &&
+        is_sha40 (citation->snapshot_sha) &&
+        nonempty (citation->logical_source_id) &&
+        nonempty (citation->source_path) &&
+        nonempty (citation->locator);
+}
+
+gboolean
+atm_conversation_store_create_conversation (
+    AtmConversationStore *store,
+    const char *title,
+    gint64 created_at_us,
+    const char *model_name,
+    const char *model_digest,
+    gint64 repository_generation_id,
+    const AtmConversationRepositoryInput *repositories,
+    gsize repository_count,
+    char **out_conversation_id,
+    GError **error
+)
+{
+    if (store == NULL ||
+        store->db == NULL ||
+        !nonempty (title) ||
+        created_at_us < 0 ||
+        !nonempty (model_name) ||
+        (model_digest != NULL &&
+         !nonempty (model_digest)) ||
+        repository_generation_id < 0 ||
+        (repository_count > 0 &&
+         repositories == NULL) ||
+        out_conversation_id == NULL ||
+        *out_conversation_id != NULL ||
+        (repository_generation_id == 0 &&
+         repository_count != 0) ||
+        (repository_generation_id > 0 &&
+         repository_count == 0)) {
+        g_set_error_literal (
+            error,
+            ATM_CONVERSATION_STORE_ERROR,
+            ATM_CONVERSATION_STORE_ERROR_ARGUMENT,
+            "Conversation creation received invalid arguments."
+        );
+        return FALSE;
+    }
+
+    for (gsize i = 0;
+         i < repository_count;
+         i++) {
+        if (!repository_input_is_valid (
+                &repositories[i]
+            )) {
+            g_set_error_literal (
+                error,
+                ATM_CONVERSATION_STORE_ERROR,
+                ATM_CONVERSATION_STORE_ERROR_ARGUMENT,
+                "Conversation repository identity is invalid."
+            );
+            return FALSE;
+        }
+    }
+
+    if (!exec_sql (
+            store->db,
+            "BEGIN IMMEDIATE;",
+            error
+        )) {
+        return FALSE;
+    }
+
+    gboolean ok = FALSE;
+    sqlite3_stmt *statement = NULL;
+    char *conversation_id =
+        g_uuid_string_random ();
+
+    if (!prepare_statement (
+            store->db,
+            "INSERT INTO conversations("
+            "conversation_id,title,created_at_us,updated_at_us,"
+            "model_name,model_digest,repository_generation_id,archived"
+            ") VALUES(?1,?2,?3,?3,?4,?5,?6,0);",
+            &statement,
+            error
+        )) {
+        goto out;
+    }
+
+    sqlite3_bind_text (
+        statement,
+        1,
+        conversation_id,
+        -1,
+        SQLITE_TRANSIENT
+    );
+    sqlite3_bind_text (
+        statement,
+        2,
+        title,
+        -1,
+        SQLITE_TRANSIENT
+    );
+    sqlite3_bind_int64 (
+        statement,
+        3,
+        created_at_us
+    );
+    sqlite3_bind_text (
+        statement,
+        4,
+        model_name,
+        -1,
+        SQLITE_TRANSIENT
+    );
+
+    if (model_digest != NULL) {
+        sqlite3_bind_text (
+            statement,
+            5,
+            model_digest,
+            -1,
+            SQLITE_TRANSIENT
+        );
+    } else {
+        sqlite3_bind_null (
+            statement,
+            5
+        );
+    }
+
+    sqlite3_bind_int64 (
+        statement,
+        6,
+        repository_generation_id
+    );
+
+    if (!step_done (
+            store->db,
+            statement,
+            "Could not create conversation",
+            error
+        )) {
+        goto out;
+    }
+
+    sqlite3_finalize (statement);
+    statement = NULL;
+
+    if (repository_count > 0) {
+        if (!prepare_statement (
+                store->db,
+                "INSERT INTO conversation_repositories("
+                "conversation_id,repository_id,repository_version,snapshot_sha"
+                ") VALUES(?1,?2,?3,?4);",
+                &statement,
+                error
+            )) {
+            goto out;
+        }
+
+        for (gsize i = 0;
+             i < repository_count;
+             i++) {
+            sqlite3_reset (statement);
+            sqlite3_clear_bindings (
+                statement
+            );
+
+            sqlite3_bind_text (
+                statement,
+                1,
+                conversation_id,
+                -1,
+                SQLITE_TRANSIENT
+            );
+            sqlite3_bind_text (
+                statement,
+                2,
+                repositories[i].repository_id,
+                -1,
+                SQLITE_TRANSIENT
+            );
+            sqlite3_bind_text (
+                statement,
+                3,
+                repositories[i].repository_version,
+                -1,
+                SQLITE_TRANSIENT
+            );
+            sqlite3_bind_text (
+                statement,
+                4,
+                repositories[i].snapshot_sha,
+                -1,
+                SQLITE_TRANSIENT
+            );
+
+            if (!step_done (
+                    store->db,
+                    statement,
+                    "Could not pin conversation repository",
+                    error
+                )) {
+                goto out;
+            }
+        }
+
+        sqlite3_finalize (statement);
+        statement = NULL;
+    }
+
+    if (!exec_sql (
+            store->db,
+            "COMMIT;",
+            error
+        )) {
+        goto out;
+    }
+
+    *out_conversation_id =
+        g_steal_pointer (
+            &conversation_id
+        );
+    ok = TRUE;
+
+out:
+    if (statement != NULL) {
+        sqlite3_finalize (
+            statement
+        );
+    }
+
+    if (!ok) {
+        rollback_best_effort (
+            store->db
+        );
+    }
+
+    g_free (conversation_id);
+    return ok;
+}
+
+static gboolean
+load_conversation_write_state (
+    sqlite3 *db,
+    const char *conversation_id,
+    gint64 *out_repository_generation_id,
+    gint64 *out_turn_no,
+    gint64 *out_sequence_no,
+    GError **error
+)
+{
+    sqlite3_stmt *statement = NULL;
+
+    if (!prepare_statement (
+            db,
+            "SELECT "
+            "c.repository_generation_id,"
+            "COALESCE(MAX(m.turn_no)+1,0),"
+            "COALESCE(MAX(m.sequence_no)+1,0) "
+            "FROM conversations c "
+            "LEFT JOIN messages m "
+            "ON m.conversation_id=c.conversation_id "
+            "WHERE c.conversation_id=?1 "
+            "GROUP BY c.conversation_id,c.repository_generation_id;",
+            &statement,
+            error
+        )) {
+        return FALSE;
+    }
+
+    sqlite3_bind_text (
+        statement,
+        1,
+        conversation_id,
+        -1,
+        SQLITE_TRANSIENT
+    );
+
+    int rc = sqlite3_step (
+        statement
+    );
+
+    if (rc != SQLITE_ROW) {
+        sqlite3_finalize (
+            statement
+        );
+        g_set_error_literal (
+            error,
+            ATM_CONVERSATION_STORE_ERROR,
+            ATM_CONVERSATION_STORE_ERROR_INTEGRITY,
+            "Conversation does not exist in the durable store."
+        );
+        return FALSE;
+    }
+
+    *out_repository_generation_id =
+        sqlite3_column_int64 (
+            statement,
+            0
+        );
+    *out_turn_no =
+        sqlite3_column_int64 (
+            statement,
+            1
+        );
+    *out_sequence_no =
+        sqlite3_column_int64 (
+            statement,
+            2
+        );
+
+    sqlite3_finalize (
+        statement
+    );
+    return TRUE;
+}
+
+static gboolean
+citation_matches_conversation_scope (
+    sqlite3 *db,
+    const char *conversation_id,
+    const AtmConversationCitationInput *citation,
+    GError **error
+)
+{
+    sqlite3_stmt *statement = NULL;
+
+    if (!prepare_statement (
+            db,
+            "SELECT 1 "
+            "FROM conversation_repositories "
+            "WHERE conversation_id=?1 "
+            "AND repository_id=?2 "
+            "AND repository_version=?3 "
+            "AND snapshot_sha=?4;",
+            &statement,
+            error
+        )) {
+        return FALSE;
+    }
+
+    sqlite3_bind_text (
+        statement,
+        1,
+        conversation_id,
+        -1,
+        SQLITE_TRANSIENT
+    );
+    sqlite3_bind_text (
+        statement,
+        2,
+        citation->repository_id,
+        -1,
+        SQLITE_TRANSIENT
+    );
+    sqlite3_bind_text (
+        statement,
+        3,
+        citation->repository_version,
+        -1,
+        SQLITE_TRANSIENT
+    );
+    sqlite3_bind_text (
+        statement,
+        4,
+        citation->snapshot_sha,
+        -1,
+        SQLITE_TRANSIENT
+    );
+
+    gboolean matches =
+        sqlite3_step (statement) ==
+        SQLITE_ROW;
+    sqlite3_finalize (
+        statement
+    );
+
+    if (!matches) {
+        g_set_error_literal (
+            error,
+            ATM_CONVERSATION_STORE_ERROR,
+            ATM_CONVERSATION_STORE_ERROR_INTEGRITY,
+            "Citation provenance does not match the conversation repository scope."
+        );
+        return FALSE;
+    }
+
+    return TRUE;
+}
+
+gboolean
+atm_conversation_store_commit_turn (
+    AtmConversationStore *store,
+    const char *conversation_id,
+    const char *user_content,
+    const char *assistant_provider_content,
+    const char *assistant_display_content,
+    gboolean grounded,
+    gint64 created_at_us,
+    const AtmConversationCitationInput *citations,
+    gsize citation_count,
+    gint64 *out_turn_no,
+    GError **error
+)
+{
+    if (store == NULL ||
+        store->db == NULL ||
+        !nonempty (conversation_id) ||
+        user_content == NULL ||
+        assistant_provider_content == NULL ||
+        assistant_display_content == NULL ||
+        created_at_us < 0 ||
+        (citation_count > 0 &&
+         citations == NULL) ||
+        (!grounded &&
+         citation_count > 0) ||
+        out_turn_no == NULL) {
+        g_set_error_literal (
+            error,
+            ATM_CONVERSATION_STORE_ERROR,
+            ATM_CONVERSATION_STORE_ERROR_ARGUMENT,
+            "Conversation turn commit received invalid arguments."
+        );
+        return FALSE;
+    }
+
+    *out_turn_no = -1;
+
+    for (gsize i = 0;
+         i < citation_count;
+         i++) {
+        if (!citation_input_is_valid (
+                &citations[i]
+            )) {
+            g_set_error_literal (
+                error,
+                ATM_CONVERSATION_STORE_ERROR,
+                ATM_CONVERSATION_STORE_ERROR_ARGUMENT,
+                "Conversation citation input is invalid."
+            );
+            return FALSE;
+        }
+    }
+
+    if (!exec_sql (
+            store->db,
+            "BEGIN IMMEDIATE;",
+            error
+        )) {
+        return FALSE;
+    }
+
+    gboolean ok = FALSE;
+    gint64 repository_generation_id = 0;
+    gint64 turn_no = 0;
+    gint64 sequence_no = 0;
+    sqlite3_stmt *statement = NULL;
+    char *user_message_id =
+        g_uuid_string_random ();
+    char *assistant_message_id =
+        g_uuid_string_random ();
+
+    if (!load_conversation_write_state (
+            store->db,
+            conversation_id,
+            &repository_generation_id,
+            &turn_no,
+            &sequence_no,
+            error
+        )) {
+        goto out;
+    }
+
+    if (grounded &&
+        repository_generation_id <= 0) {
+        g_set_error_literal (
+            error,
+            ATM_CONVERSATION_STORE_ERROR,
+            ATM_CONVERSATION_STORE_ERROR_INTEGRITY,
+            "A grounded turn requires a repository-backed conversation."
+        );
+        goto out;
+    }
+
+    for (gsize i = 0;
+         i < citation_count;
+         i++) {
+        if (!citation_matches_conversation_scope (
+                store->db,
+                conversation_id,
+                &citations[i],
+                error
+            )) {
+            goto out;
+        }
+    }
+
+    if (!prepare_statement (
+            store->db,
+            "INSERT INTO messages("
+            "message_id,conversation_id,sequence_no,turn_no,role,"
+            "provider_content,display_content,grounded,created_at_us"
+            ") VALUES(?1,?2,?3,?4,?5,?6,?7,?8,?9);",
+            &statement,
+            error
+        )) {
+        goto out;
+    }
+
+    sqlite3_bind_text (
+        statement,
+        1,
+        user_message_id,
+        -1,
+        SQLITE_TRANSIENT
+    );
+    sqlite3_bind_text (
+        statement,
+        2,
+        conversation_id,
+        -1,
+        SQLITE_TRANSIENT
+    );
+    sqlite3_bind_int64 (
+        statement,
+        3,
+        sequence_no
+    );
+    sqlite3_bind_int64 (
+        statement,
+        4,
+        turn_no
+    );
+    sqlite3_bind_text (
+        statement,
+        5,
+        "user",
+        -1,
+        SQLITE_STATIC
+    );
+    sqlite3_bind_text (
+        statement,
+        6,
+        user_content,
+        -1,
+        SQLITE_TRANSIENT
+    );
+    sqlite3_bind_text (
+        statement,
+        7,
+        user_content,
+        -1,
+        SQLITE_TRANSIENT
+    );
+    sqlite3_bind_int (
+        statement,
+        8,
+        0
+    );
+    sqlite3_bind_int64 (
+        statement,
+        9,
+        created_at_us
+    );
+
+    if (!step_done (
+            store->db,
+            statement,
+            "Could not persist conversation user message",
+            error
+        )) {
+        goto out;
+    }
+
+    sqlite3_reset (
+        statement
+    );
+    sqlite3_clear_bindings (
+        statement
+    );
+
+    sqlite3_bind_text (
+        statement,
+        1,
+        assistant_message_id,
+        -1,
+        SQLITE_TRANSIENT
+    );
+    sqlite3_bind_text (
+        statement,
+        2,
+        conversation_id,
+        -1,
+        SQLITE_TRANSIENT
+    );
+    sqlite3_bind_int64 (
+        statement,
+        3,
+        sequence_no + 1
+    );
+    sqlite3_bind_int64 (
+        statement,
+        4,
+        turn_no
+    );
+    sqlite3_bind_text (
+        statement,
+        5,
+        "assistant",
+        -1,
+        SQLITE_STATIC
+    );
+    sqlite3_bind_text (
+        statement,
+        6,
+        assistant_provider_content,
+        -1,
+        SQLITE_TRANSIENT
+    );
+    sqlite3_bind_text (
+        statement,
+        7,
+        assistant_display_content,
+        -1,
+        SQLITE_TRANSIENT
+    );
+    sqlite3_bind_int (
+        statement,
+        8,
+        grounded ? 1 : 0
+    );
+    sqlite3_bind_int64 (
+        statement,
+        9,
+        created_at_us
+    );
+
+    if (!step_done (
+            store->db,
+            statement,
+            "Could not persist conversation assistant message",
+            error
+        )) {
+        goto out;
+    }
+
+    sqlite3_finalize (
+        statement
+    );
+    statement = NULL;
+
+    if (citation_count > 0) {
+        if (!prepare_statement (
+                store->db,
+                "INSERT INTO citations("
+                "message_id,ordinal,label,repository_id,repository_version,"
+                "snapshot_sha,logical_source_id,source_path,locator,title,"
+                "excerpt,immutable_permalink"
+                ") VALUES("
+                "?1,?2,?3,?4,?5,?6,?7,?8,?9,?10,?11,?12"
+                ");",
+                &statement,
+                error
+            )) {
+            goto out;
+        }
+
+        for (gsize i = 0;
+             i < citation_count;
+             i++) {
+            sqlite3_reset (
+                statement
+            );
+            sqlite3_clear_bindings (
+                statement
+            );
+
+            sqlite3_bind_text (
+                statement,
+                1,
+                assistant_message_id,
+                -1,
+                SQLITE_TRANSIENT
+            );
+            sqlite3_bind_int64 (
+                statement,
+                2,
+                (gint64) i + 1
+            );
+            sqlite3_bind_text (
+                statement,
+                3,
+                citations[i].label,
+                -1,
+                SQLITE_TRANSIENT
+            );
+            sqlite3_bind_text (
+                statement,
+                4,
+                citations[i].repository_id,
+                -1,
+                SQLITE_TRANSIENT
+            );
+            sqlite3_bind_text (
+                statement,
+                5,
+                citations[i].repository_version,
+                -1,
+                SQLITE_TRANSIENT
+            );
+            sqlite3_bind_text (
+                statement,
+                6,
+                citations[i].snapshot_sha,
+                -1,
+                SQLITE_TRANSIENT
+            );
+            sqlite3_bind_text (
+                statement,
+                7,
+                citations[i].logical_source_id,
+                -1,
+                SQLITE_TRANSIENT
+            );
+            sqlite3_bind_text (
+                statement,
+                8,
+                citations[i].source_path,
+                -1,
+                SQLITE_TRANSIENT
+            );
+            sqlite3_bind_text (
+                statement,
+                9,
+                citations[i].locator,
+                -1,
+                SQLITE_TRANSIENT
+            );
+
+            if (citations[i].title != NULL) {
+                sqlite3_bind_text (
+                    statement,
+                    10,
+                    citations[i].title,
+                    -1,
+                    SQLITE_TRANSIENT
+                );
+            } else {
+                sqlite3_bind_null (
+                    statement,
+                    10
+                );
+            }
+
+            if (citations[i].excerpt != NULL) {
+                sqlite3_bind_text (
+                    statement,
+                    11,
+                    citations[i].excerpt,
+                    -1,
+                    SQLITE_TRANSIENT
+                );
+            } else {
+                sqlite3_bind_null (
+                    statement,
+                    11
+                );
+            }
+
+            if (citations[i].immutable_permalink != NULL) {
+                sqlite3_bind_text (
+                    statement,
+                    12,
+                    citations[i].immutable_permalink,
+                    -1,
+                    SQLITE_TRANSIENT
+                );
+            } else {
+                sqlite3_bind_null (
+                    statement,
+                    12
+                );
+            }
+
+            if (!step_done (
+                    store->db,
+                    statement,
+                    "Could not persist conversation citation",
+                    error
+                )) {
+                goto out;
+            }
+        }
+
+        sqlite3_finalize (
+            statement
+        );
+        statement = NULL;
+    }
+
+    if (!prepare_statement (
+            store->db,
+            "UPDATE conversations "
+            "SET updated_at_us=?2 "
+            "WHERE conversation_id=?1;",
+            &statement,
+            error
+        )) {
+        goto out;
+    }
+
+    sqlite3_bind_text (
+        statement,
+        1,
+        conversation_id,
+        -1,
+        SQLITE_TRANSIENT
+    );
+    sqlite3_bind_int64 (
+        statement,
+        2,
+        created_at_us
+    );
+
+    if (!step_done (
+            store->db,
+            statement,
+            "Could not update conversation commit metadata",
+            error
+        )) {
+        goto out;
+    }
+
+    sqlite3_finalize (
+        statement
+    );
+    statement = NULL;
+
+    if (!exec_sql (
+            store->db,
+            "COMMIT;",
+            error
+        )) {
+        goto out;
+    }
+
+    *out_turn_no = turn_no;
+    ok = TRUE;
+
+out:
+    if (statement != NULL) {
+        sqlite3_finalize (
+            statement
+        );
+    }
+
+    if (!ok) {
+        rollback_best_effort (
+            store->db
+        );
+    }
+
+    g_free (user_message_id);
+    g_free (assistant_message_id);
+    return ok;
+}
+
 gboolean
 atm_conversation_store_validate (
     AtmConversationStore *store,
