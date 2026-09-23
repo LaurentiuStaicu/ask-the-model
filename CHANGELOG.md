@@ -52,6 +52,7 @@ All notable public releases of Ask the Model are recorded here.
 - CONV-04c separates tab Close from durable Archive and permanent Delete: Close remains an in-memory UI operation, Archive atomically marks the conversation before closing the tab, and Delete requires explicit confirmation before removing the durable parent row;
 - conversation deletion relies on the schema-v1 foreign-key cascades so repository pins, messages and citations are removed in the same transaction, while failed archive/delete operations leave the open tab and durable history intact;
 - added a compact per-tab conversation-actions menu, archive/unarchive storage APIs for future history management, permanent-delete APIs and `SESSION-S0-010` regression coverage.
+- reconciled STATUS and architecture documentation after CONV-04c so the tagged v0.4.0 release boundary remains historical while development `main` is accurately described as having the complete CONV-01→CONV-04c persistence lifecycle; archived-history browsing/export/import remain future work.
 
 
 ### Startup qualification fixes

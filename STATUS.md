@@ -12,7 +12,7 @@ The project remains in the `0.x` initial-development series. The public API and 
 
 The tagged public release remains v0.4.0. Development on `main` may be newer than that tag and is published separately through the **AtM Development** Flatpak repository.
 
-Post-v0.4.0 development currently extends engineering hardening without changing the tagged public release:
+Post-v0.4.0 development now combines engineering hardening with unreleased product capability, without changing the tagged public release:
 
 - future GitHub Release publication is hardened for draft-first asset attachment and optional immutable releases;
 - production retrieval/context policy constants are shared between runtime and benchmark tooling without changing their values;
@@ -28,7 +28,7 @@ Post-v0.4.0 development currently extends engineering hardening without changing
 - the XDG state root that owns `control-state.sqlite3` is qualified with the same real-directory, current-owner, no-group-or-other-write and exclusive write-probe boundary used by G-S0 storage qualification before authority resolution.
 - development `main` now has a separate hardened `conversations.sqlite3` write path: committed turns persist pinned model/repository identity, raw/display assistant content and citation provenance before provider history advances;
 - CONV-03a adds a read-only durable list/snapshot boundary and exact provider-history rebuild from committed `provider_content`;
-- CONV-03b adds exact continuation-qualification primitives for historical repository generation/version/SHA and local AI model name/digest without changing current repository authority; GTK restore/navigation still remains CONV-04.
+- CONV-03b adds exact continuation-qualification primitives for historical repository generation/version/SHA and local AI model name/digest without changing current repository authority;
 - live grounded-turn persistence now carries canonical immutable source permalinks through the Vala/native bridge, so durable provenance restored later is not weaker than the provenance shown at commit time.
 - CONV-04a restores non-archived durable conversations into the existing GTK notebook as view-only tabs with transcript and citation provenance; restored prompt/Send controls remain disabled until CONV-04b exact continuation qualification.
 - CONV-04b enables continuation only after the restored snapshot's exact Ollama model name/digest and historical repository generation/version/SHA context are requalified; unavailable or mismatched context stays view-only and can be retried without repinning.
@@ -150,7 +150,7 @@ AtM does not bundle, install, start, stop or update the local AI provider.
 
 The current provider implementation addresses loopback endpoints only. GPU acceleration, remote/cloud behavior and model execution semantics belong to the external provider.
 
-The tagged v0.4.0 release stores conversation history only in application memory for the current process. Development `main` after CONV-02 can write committed turns to the separate local conversation store, but it does not yet reload or navigate those persisted conversations after restart.
+The tagged v0.4.0 release stores conversation history only in application memory for the current process. Development `main` now has the complete CONV-01→CONV-04c lifecycle: committed turns are persisted in a separate local conversation store, non-archived conversations are restored across restart, exact model/repository context is requalified before continuation, immutable citation provenance survives restore, and durable Archive/Delete are explicit operations distinct from tab Close.
 
 The Flatpak receives write access only to the dedicated `~/Ask the Model` directory for repository snapshots. It must not request broad Home or host filesystem access.
 
@@ -179,7 +179,7 @@ The Flatpak receives write access only to the dedicated `~/Ask the Model` direct
 
 Likely extension areas include:
 
-- persistent conversations and persisted per-chat provenance;
+- archived-conversation browsing, unarchive UI, export/import and bulk conversation-history management;
 - a dedicated repository-management surface for snapshot history/removal;
 - additional reviewed repository families;
 - optional semantic retrieval/reranking only where benchmark evidence justifies the local cost;
