@@ -66,4 +66,41 @@ for needle in "${development_traceability[@]}"; do
   fi
 done
 
-printf '%s\n' 'Release workflow contract OK: draft-first asset publication and development source traceability are enforced.'
+verification_job_line="$(first_line '  flatpak:')"
+workflow_read_line="$(first_line '  contents: read')"
+stage_line="$(first_line '      - name: Stage verified publication inputs')"
+publish_job_line="$(first_line '  publish:')"
+publish_needs_line="$(first_line '    needs: flatpak')"
+publish_write_line="$(first_line '      contents: write')"
+download_line="$(first_line '      - name: Download verified publication inputs')"
+
+if ! (( workflow_read_line < verification_job_line &&
+        verification_job_line < stage_line &&
+        stage_line < publish_job_line &&
+        publish_job_line < publish_needs_line &&
+        publish_needs_line < publish_write_line &&
+        publish_write_line < download_line )); then
+  printf '%s\n' 'Flatpak workflow privilege split/order is invalid.' >&2
+  exit 1
+fi
+
+if [[ "$(grep -Fc -- 'contents: write' "$workflow")" -ne 1 ]]; then
+  printf '%s\n' 'Flatpak workflow must grant contents: write exactly once, in the publication job.' >&2
+  exit 1
+fi
+
+least_privilege=(
+  'actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02'
+  'actions/download-artifact@d3f86a106a0bac45b974a628896c90dbdf5c8093'
+  'name: atm-flatpak-publication'
+  "if: github.event_name == 'push' && github.ref == 'refs/heads/main'"
+)
+
+for needle in "${least_privilege[@]}"; do
+  if ! grep -Fq -- "$needle" "$workflow"; then
+    printf 'Missing Flatpak least-privilege publication guard: %s\n' "$needle" >&2
+    exit 1
+  fi
+done
+
+printf '%s\n' 'Release workflow contract OK: draft-first publication, source traceability and least-privilege verification/publication separation are enforced.'
