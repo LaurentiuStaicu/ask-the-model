@@ -49,4 +49,8 @@ The initial registry uses `atm-numeric/binary64-basic-v1`: finite binary64 input
 
 ## SRA boundary
 
-SCI-06a does not make `derived_facts[]` writable and does not permit operation claims in an SRA. SCI-06b will bind registered operations to established input facts and qualified support before that gate is opened.
+SCI-06a introduced the executor while keeping `derived_facts[]` closed.
+
+SCI-06b opens derived SRA facts only through explicit `role → established_fact_id` bindings. Final SRA validation re-executes every derivation, verifies exact inherited support, checks operation/profile/repository/numeric-policy qualification and rejects operation claims that are not backed by derived facts.
+
+Only registry operations with class `DERIVATION` are admitted in SCI-06b. `RMD_FINANCIAL_STOCK_IDENTITY_CHECK@1` remains registered and directly executable, but its SRA constraint binding is intentionally deferred until a versioned tolerance policy exists.

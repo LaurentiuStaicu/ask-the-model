@@ -3,6 +3,7 @@
 #include <glib.h>
 
 #include "scientific_artifact.h"
+#include "scientific_operation.h"
 
 G_BEGIN_DECLS
 
@@ -44,6 +45,31 @@ typedef struct {
     char *qualifiers_content_id;
     GPtrArray *support;
 } AtmSraEstablishedFact;
+
+typedef struct {
+    char *role;
+    char *fact_id;
+} AtmSraOperationBinding;
+
+typedef struct {
+    char *fact_id;
+    char *fact_type;
+    char *subject_id;
+    char *attribute;
+
+    AtmScientificOperationOutcome outcome;
+    char *value;
+    char *unit;
+    char *dimension;
+    char *reason_code;
+    gboolean has_binary64_bits;
+    guint64 binary64_bits;
+
+    char *operation;
+    char *operation_numeric_profile;
+    GPtrArray *input_bindings;
+    GPtrArray *support;
+} AtmSraDerivedFact;
 
 typedef struct {
     char *constraint_id;
@@ -119,6 +145,29 @@ gboolean atm_sra_result_add_fact (
     AtmSraResult *result,
     AtmSraEstablishedFact *fact,
     GError **error
+);
+
+gboolean atm_sra_result_derive_fact (
+    AtmSraResult *result,
+    const char *qualified_operation,
+    const AtmSraOperationBinding *bindings,
+    gsize binding_count,
+    const char *fact_id,
+    const char *fact_type,
+    const char *subject_id,
+    const char *attribute,
+    const char *dimension,
+    GError **error
+);
+
+gboolean atm_sra_derived_fact_validate (
+    const AtmSraResult *result,
+    const AtmSraDerivedFact *derived,
+    GError **error
+);
+
+void atm_sra_derived_fact_free (
+    AtmSraDerivedFact *fact
 );
 
 AtmSraConstraintResult *atm_sra_constraint_new (

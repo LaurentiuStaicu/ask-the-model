@@ -569,7 +569,7 @@ test_unqualified_support_fails_closed (void)
 }
 
 static void
-test_derived_facts_forbidden_before_sci06 (void)
+test_forged_derived_fact_fails_closed (void)
 {
     GError *error = NULL;
     ArtifactPair pair = new_artifact_pair ();
@@ -581,15 +581,27 @@ test_derived_facts_forbidden_before_sci06 (void)
     g_assert_true (
         atm_sra_result_add_fact (
             result,
-            new_fact ("fact", "value", pair.a->qualified_artifact_id),
+            new_fact (
+                "fact",
+                "value",
+                pair.a->qualified_artifact_id
+            ),
             &error
         )
     );
     g_assert_no_error (error);
 
+    AtmSraDerivedFact *forged = g_new0 (
+        AtmSraDerivedFact,
+        1
+    );
+    forged->fact_id = g_strdup (
+        "forged-derived"
+    );
+
     g_ptr_array_add (
         result->derived_facts,
-        g_strdup ("forbidden-derived-fact")
+        forged
     );
 
     g_assert_false (
@@ -915,8 +927,8 @@ main (int argc, char **argv)
         test_unqualified_support_fails_closed
     );
     g_test_add_func (
-        "/scientific-result/no-derived-before-sci06",
-        test_derived_facts_forbidden_before_sci06
+        "/scientific-result/forged-derived-fact",
+        test_forged_derived_fact_fails_closed
     );
     g_test_add_func (
         "/scientific-result/no-operations-before-sci06",
