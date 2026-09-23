@@ -2342,6 +2342,7 @@ atm_conversation_store_commit_turn_values (
     const char * const *locators,
     const char * const *titles,
     const char * const *excerpts,
+    const char * const *immutable_permalinks,
     gsize citation_count,
     gint64 *out_turn_no,
     GError **error
@@ -2356,7 +2357,8 @@ atm_conversation_store_commit_turn_values (
          source_paths == NULL ||
          locators == NULL ||
          titles == NULL ||
-         excerpts == NULL)) {
+         excerpts == NULL ||
+         immutable_permalinks == NULL)) {
         g_set_error_literal (
             error,
             ATM_CONVERSATION_STORE_ERROR,
@@ -2399,7 +2401,9 @@ atm_conversation_store_commit_turn_values (
                     ? excerpts[i]
                     : NULL;
             citations[i].immutable_permalink =
-                NULL;
+                nonempty (immutable_permalinks[i])
+                    ? immutable_permalinks[i]
+                    : NULL;
         }
     }
 

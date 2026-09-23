@@ -48,6 +48,7 @@ namespace AskTheModel.ConversationStoreNative {
         [CCode (array_length = false)] string[] locators,
         [CCode (array_length = false)] string[] titles,
         [CCode (array_length = false)] string[] excerpts,
+        [CCode (array_length = false)] string[] immutable_permalinks,
         size_t citation_count,
         out int64 turn_no
     ) throws GLib.Error;

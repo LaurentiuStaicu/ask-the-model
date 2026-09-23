@@ -2295,6 +2295,31 @@ namespace AskTheModel {
             return true;
         }
 
+        private string? immutable_permalink_for_citation (
+            CitationReference citation
+        ) {
+            foreach (
+                RepositoryDescriptor descriptor
+                in RepositoryCatalog.all ()
+            ) {
+                if (descriptor.id != citation.repository_id) {
+                    continue;
+                }
+
+                try {
+                    return descriptor.immutable_file_permalink (
+                        citation.snapshot_sha,
+                        citation.source_path,
+                        citation.locator
+                    );
+                } catch (GLib.Error error) {
+                    return null;
+                }
+            }
+
+            return null;
+        }
+
         private ConversationPersistenceCitation[]
         persistence_citations (
             CitationResolution resolution
@@ -2325,7 +2350,10 @@ namespace AskTheModel {
                         citation.source_path,
                         citation.locator,
                         citation.title,
-                        citation.excerpt
+                        citation.excerpt,
+                        immutable_permalink_for_citation (
+                            citation
+                        )
                     );
             }
 
