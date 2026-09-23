@@ -65,6 +65,7 @@ executable(
     'src/scientific_canonical.c',
     'src/scientific_artifact.c',
     'src/scientific_result.c',
+    'src/scientific_derivation.c',
     'src/scientific_operation.c',
     'src/retrieval_rank.c',
     'src/retrieval_scope.c',
@@ -733,7 +734,9 @@ scientific_result_test = executable(
   [
     'src/scientific_canonical.c',
     'src/scientific_artifact.c',
+    'src/scientific_operation.c',
     'src/scientific_result.c',
+    'src/scientific_derivation.c',
     'tests/scientific_result_test.c'
   ],
   include_directories: include_directories('src'),
@@ -754,7 +757,9 @@ scientific_gold_v0_test = executable(
   [
     'src/scientific_canonical.c',
     'src/scientific_artifact.c',
+    'src/scientific_operation.c',
     'src/scientific_result.c',
+    'src/scientific_derivation.c',
     'tests/scientific_gold_v0_test.c'
   ],
   include_directories: include_directories('src'),
@@ -771,6 +776,29 @@ test(
   env: {
     'ATM_SCIENTIFIC_GOLD_V0': meson.current_source_dir() / 'qualification/scientific-gold-v0.json'
   }
+)
+
+scientific_derivation_test = executable(
+  'scientific-derivation-test',
+  [
+    'src/scientific_canonical.c',
+    'src/scientific_artifact.c',
+    'src/scientific_operation.c',
+    'src/scientific_result.c',
+    'src/scientific_derivation.c',
+    'tests/scientific_derivation_test.c'
+  ],
+  include_directories: include_directories('src'),
+  dependencies: [
+    glib_dep,
+    json_glib_dep
+  ],
+  install: false
+)
+
+test(
+  'scientific-derivation',
+  scientific_derivation_test
 )
 
 retrieval_rank_test = executable(

@@ -176,7 +176,11 @@ atm_sra_result_new (
             (GDestroyNotify)
                 atm_sra_established_fact_free
         );
-    result->derived_facts = string_array_new ();
+    result->derived_facts =
+        g_ptr_array_new_with_free_func (
+            (GDestroyNotify)
+                atm_sra_derived_fact_free
+        );
     result->constraint_results =
         g_ptr_array_new_with_free_func (
             (GDestroyNotify)
@@ -791,6 +795,20 @@ compare_facts (
 }
 
 static gint
+compare_derived_facts (
+    gconstpointer left,
+    gconstpointer right
+)
+{
+    const AtmSraDerivedFact *a =
+        *(AtmSraDerivedFact *const *) left;
+    const AtmSraDerivedFact *b =
+        *(AtmSraDerivedFact *const *) right;
+
+    return strcmp (a->fact_id, b->fact_id);
+}
+
+static gint
 compare_constraints (
     gconstpointer left,
     gconstpointer right
@@ -853,6 +871,21 @@ constraint_status_name (
             return "DENY";
         case ATM_SRA_CONSTRAINT_NOT_EVALUATED:
             return "NOT_EVALUATED";
+        default:
+            return NULL;
+    }
+}
+
+static const char *
+operation_outcome_name (
+    AtmScientificOperationOutcome value
+)
+{
+    switch (value) {
+        case ATM_SCIENTIFIC_OPERATION_OUTCOME_NUMERIC:
+            return "NUMERIC";
+        case ATM_SCIENTIFIC_OPERATION_OUTCOME_MISSING:
+            return "MISSING";
         default:
             return NULL;
     }
@@ -992,11 +1025,117 @@ content_json (const AtmSraResult *result)
     }
 
     json_builder_end_array (builder);
-    json_add_string_array (
+    json_builder_set_member_name (
         builder,
-        "derived_facts",
-        result->derived_facts
+        "derived_facts"
     );
+    json_builder_begin_array (builder);
+
+    for (guint i = 0;
+         i < result->derived_facts->len;
+         i++) {
+        AtmSraDerivedFact *fact =
+            g_ptr_array_index (
+                result->derived_facts,
+                i
+            );
+        char bits[17] = { 0 };
+
+        json_builder_begin_object (builder);
+
+        json_builder_set_member_name (
+            builder,
+            "fact_id"
+        );
+        json_builder_add_string_value (
+            builder,
+            fact->fact_id
+        );
+        json_builder_set_member_name (
+            builder,
+            "fact_type"
+        );
+        json_builder_add_string_value (
+            builder,
+            fact->fact_type
+        );
+        json_builder_set_member_name (
+            builder,
+            "subject_id"
+        );
+        json_builder_add_string_value (
+            builder,
+            fact->subject_id
+        );
+        json_builder_set_member_name (
+            builder,
+            "attribute"
+        );
+        json_builder_add_string_value (
+            builder,
+            fact->attribute
+        );
+        json_builder_set_member_name (
+            builder,
+            "outcome"
+        );
+        json_builder_add_string_value (
+            builder,
+            operation_outcome_name (
+                fact->outcome
+            )
+        );
+        json_builder_set_member_name (
+            builder,
+            "unit"
+        );
+        json_builder_add_string_value (
+            builder,
+            fact->unit
+        );
+
+        if (fact->dimension != NULL) {
+            json_builder_set_member_name (
+                builder,
+                "dimension"
+            );
+            json_builder_add_string_value (
+                builder,
+                fact->dimension
+            );
+        }
+
+        if (fact->outcome ==
+            ATM_SCIENTIFIC_OPERATION_OUTCOME_NUMERIC) {
+            g_snprintf (
+                bits,
+                sizeof bits,
+                "%016" G_GINT64_MODIFIER "x",
+                fact->binary64_bits
+            );
+            json_builder_set_member_name (
+                builder,
+                "binary64_bits"
+            );
+            json_builder_add_string_value (
+                builder,
+                bits
+            );
+        } else {
+            json_builder_set_member_name (
+                builder,
+                "reason_code"
+            );
+            json_builder_add_string_value (
+                builder,
+                fact->reason_code
+            );
+        }
+
+        json_builder_end_object (builder);
+    }
+
+    json_builder_end_array (builder);
 
     json_builder_set_member_name (
         builder,
@@ -1211,6 +1350,97 @@ qualification_json (
     }
     json_builder_end_array (builder);
 
+    if (result->derived_facts->len > 0) {
+        json_builder_set_member_name (
+            builder,
+            "derived_provenance"
+        );
+        json_builder_begin_array (builder);
+
+        for (guint i = 0;
+             i < result->derived_facts->len;
+             i++) {
+            AtmSraDerivedFact *fact =
+                g_ptr_array_index (
+                    result->derived_facts,
+                    i
+                );
+
+            json_builder_begin_object (builder);
+            json_builder_set_member_name (
+                builder,
+                "fact_id"
+            );
+            json_builder_add_string_value (
+                builder,
+                fact->fact_id
+            );
+            json_builder_set_member_name (
+                builder,
+                "operation"
+            );
+            json_builder_add_string_value (
+                builder,
+                fact->operation
+            );
+            json_builder_set_member_name (
+                builder,
+                "operation_numeric_profile"
+            );
+            json_builder_add_string_value (
+                builder,
+                fact->operation_numeric_profile
+            );
+
+            json_builder_set_member_name (
+                builder,
+                "inputs"
+            );
+            json_builder_begin_array (builder);
+
+            for (guint j = 0;
+                 j < fact->input_bindings->len;
+                 j++) {
+                AtmSraOperationBinding *binding =
+                    g_ptr_array_index (
+                        fact->input_bindings,
+                        j
+                    );
+
+                json_builder_begin_object (
+                    builder
+                );
+                json_builder_set_member_name (
+                    builder,
+                    "role"
+                );
+                json_builder_add_string_value (
+                    builder,
+                    binding->role
+                );
+                json_builder_set_member_name (
+                    builder,
+                    "fact_id"
+                );
+                json_builder_add_string_value (
+                    builder,
+                    binding->fact_id
+                );
+                json_builder_end_object (builder);
+            }
+
+            json_builder_end_array (builder);
+            json_add_string_array (
+                builder,
+                "support",
+                fact->support
+            );
+            json_builder_end_object (builder);
+        }
+
+        json_builder_end_array (builder);
+    }
+
     json_builder_set_member_name (
         builder,
         "constraint_support"
@@ -1318,6 +1548,151 @@ has_duplicate_fact_ids (AtmSraResult *result)
     }
 
     return FALSE;
+}
+
+static gboolean
+has_duplicate_derived_fact_ids (AtmSraResult *result)
+{
+    for (guint i = 1;
+         i < result->derived_facts->len;
+         i++) {
+        AtmSraDerivedFact *previous =
+            g_ptr_array_index (
+                result->derived_facts,
+                i - 1
+            );
+        AtmSraDerivedFact *current =
+            g_ptr_array_index (
+                result->derived_facts,
+                i
+            );
+
+        if (strcmp (
+                previous->fact_id,
+                current->fact_id
+            ) == 0) {
+            return TRUE;
+        }
+    }
+
+    return FALSE;
+}
+
+static gboolean
+has_cross_fact_id_collision (AtmSraResult *result)
+{
+    guint established = 0;
+    guint derived = 0;
+
+    while (established <
+               result->established_facts->len &&
+           derived <
+               result->derived_facts->len) {
+        AtmSraEstablishedFact *left =
+            g_ptr_array_index (
+                result->established_facts,
+                established
+            );
+        AtmSraDerivedFact *right =
+            g_ptr_array_index (
+                result->derived_facts,
+                derived
+            );
+        gint comparison = strcmp (
+            left->fact_id,
+            right->fact_id
+        );
+
+        if (comparison == 0) {
+            return TRUE;
+        }
+
+        if (comparison < 0) {
+            established++;
+        } else {
+            derived++;
+        }
+    }
+
+    return FALSE;
+}
+
+static gboolean
+operation_claims_match_derived (
+    AtmSraResult *result,
+    GError **error
+)
+{
+    GPtrArray *expected =
+        g_ptr_array_new_with_free_func (g_free);
+
+    for (guint i = 0;
+         i < result->derived_facts->len;
+         i++) {
+        AtmSraDerivedFact *fact =
+            g_ptr_array_index (
+                result->derived_facts,
+                i
+            );
+
+        if (!nonempty_utf8 (fact->operation)) {
+            g_ptr_array_unref (expected);
+            g_set_error_literal (
+                error,
+                ATM_SRA_ERROR,
+                ATM_SRA_ERROR_DERIVATION,
+                "Derived SRA fact has no registered operation identity."
+            );
+            return FALSE;
+        }
+
+        g_ptr_array_add (
+            expected,
+            g_strdup (fact->operation)
+        );
+    }
+
+    sort_deduplicate_strings (expected);
+
+    gboolean matches =
+        expected->len ==
+            result->qualification
+                ->operations->len;
+
+    if (matches) {
+        for (guint i = 0;
+             i < expected->len;
+             i++) {
+            if (g_strcmp0 (
+                    g_ptr_array_index (
+                        expected,
+                        i
+                    ),
+                    g_ptr_array_index (
+                        result->qualification
+                            ->operations,
+                        i
+                    )
+                ) != 0) {
+                matches = FALSE;
+                break;
+            }
+        }
+    }
+
+    g_ptr_array_unref (expected);
+
+    if (!matches) {
+        g_set_error_literal (
+            error,
+            ATM_SRA_ERROR,
+            ATM_SRA_ERROR_DERIVATION,
+            "SRA operation claims must exactly match operations used by derived facts."
+        );
+        return FALSE;
+    }
+
+    return TRUE;
 }
 
 static gboolean
@@ -1445,7 +1820,7 @@ support_is_qualified (
 }
 
 static gboolean
-pre_sci06_shape_valid (
+sra_shape_valid (
     AtmSraResult *result,
     GError **error
 )
@@ -1482,17 +1857,6 @@ pre_sci06_shape_valid (
             );
             return FALSE;
         }
-    }
-
-    if (result->derived_facts->len != 0 ||
-        result->qualification->operations->len != 0) {
-        g_set_error_literal (
-            error,
-            ATM_SRA_ERROR,
-            ATM_SRA_ERROR_DERIVATION,
-            "SCI-05 forbids derived facts and operation claims before SCI-06."
-        );
-        return FALSE;
     }
 
     if (!nonempty_utf8 (
@@ -1542,6 +1906,36 @@ pre_sci06_shape_valid (
             )) {
             return FALSE;
         }
+    }
+
+    for (guint i = 0;
+         i < result->derived_facts->len;
+         i++) {
+        AtmSraDerivedFact *fact =
+            g_ptr_array_index (
+                result->derived_facts,
+                i
+            );
+
+        if (!support_is_qualified (
+                result,
+                fact->support,
+                error
+            ) ||
+            !atm_sra_derived_fact_validate (
+                result,
+                fact,
+                error
+            )) {
+            return FALSE;
+        }
+    }
+
+    if (!operation_claims_match_derived (
+            result,
+            error
+        )) {
+        return FALSE;
     }
 
     for (guint i = 0;
@@ -1621,6 +2015,39 @@ atm_sra_result_finalize (
     }
 
     for (guint i = 0;
+         i < result->derived_facts->len;
+         i++) {
+        AtmSraDerivedFact *fact =
+            g_ptr_array_index (
+                result->derived_facts,
+                i
+            );
+
+        if (fact == NULL ||
+            fact->support == NULL) {
+            g_set_error_literal (
+                error,
+                ATM_SRA_ERROR,
+                ATM_SRA_ERROR_DERIVATION,
+                "Derived SRA fact has invalid mutable state."
+            );
+            return FALSE;
+        }
+
+        sort_deduplicate_strings (fact->support);
+
+        if (fact->support->len == 0) {
+            g_set_error_literal (
+                error,
+                ATM_SRA_ERROR,
+                ATM_SRA_ERROR_SUPPORT,
+                "Derived SRA fact lost all inherited support."
+            );
+            return FALSE;
+        }
+    }
+
+    for (guint i = 0;
          i < result->constraint_results->len;
          i++) {
         AtmSraConstraintResult *constraint =
@@ -1649,6 +2076,10 @@ atm_sra_result_finalize (
     g_ptr_array_sort (
         result->established_facts,
         compare_facts
+    );
+    g_ptr_array_sort (
+        result->derived_facts,
+        compare_derived_facts
     );
     g_ptr_array_sort (
         result->constraint_results,
@@ -1688,9 +2119,11 @@ atm_sra_result_finalize (
     );
 
     if (has_duplicate_fact_ids (result) ||
+        has_duplicate_derived_fact_ids (result) ||
+        has_cross_fact_id_collision (result) ||
         has_duplicate_constraint_ids (result) ||
         has_duplicate_conflict_ids (result) ||
-        !pre_sci06_shape_valid (
+        !sra_shape_valid (
             result,
             error
         )) {
@@ -1793,7 +2226,7 @@ atm_sra_result_validate (
     AtmSraResult *mutable_result =
         (AtmSraResult *) result;
 
-    if (!pre_sci06_shape_valid (
+    if (!sra_shape_valid (
             mutable_result,
             error
         )) {

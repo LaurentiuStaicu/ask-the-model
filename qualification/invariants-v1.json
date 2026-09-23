@@ -199,7 +199,7 @@
       "category": "SCIENTIFIC",
       "severity": "S0",
       "lifecycle": "enforced",
-      "statement": "SCI-05 scientific results must be finalized deterministically from established typed facts and deterministic constraints: support provenance, including exact per-fact/per-constraint/per-conflict bindings, belongs to QualifiedArtifactId rather than ScientificContentId; qualification support sets may admit only SCI-04 artifacts that pass canonical artifact validation and match the expected evidence/control kind, all support IDs must be qualified, retrieval order must not affect result identities, duplicate semantic record IDs must fail closed, and derived facts or operation claims are forbidden before SCI-06; Gold Set v0 must pass all seven pinned cases without an LLM or network.",
+      "statement": "SCI-05 scientific results must be finalized deterministically from established typed facts and deterministic constraints: support provenance, including exact per-fact/per-constraint/per-conflict bindings, belongs to QualifiedArtifactId rather than ScientificContentId; qualification support sets may admit only SCI-04 artifacts that pass canonical artifact validation and match the expected evidence/control kind, all support IDs must be qualified, retrieval order must not affect result identities, duplicate semantic record IDs must fail closed, and Gold Set v0 must pass all seven pinned non-derived cases without an LLM or network; SCI-06 derivation admission is governed separately by later invariants.",
       "enforced_by": [
         "src/scientific_result.c",
         "qualification/scientific-gold-v0.json"
@@ -220,6 +220,22 @@
       ],
       "tested_by": [
         "meson:scientific-operation"
+      ]
+    },
+    {
+      "id": "SCIENTIFIC-S0-008",
+      "category": "SCIENTIFIC",
+      "severity": "S0",
+      "lifecycle": "enforced",
+      "statement": "SRA derived facts may be created only by deterministic re-execution of registered DERIVATION operations over explicitly role-bound established facts: input values and units must come from qualified established facts, inherited support must equal the exact union of input support, the SRA numeric policy must explicitly authorize the operation numeric profile, operation/profile/repository qualification must be present, operation claims must exactly match used derivations, and output value, binary64 bits, missing-state reason and input bindings must validate against re-execution; CHECK operations remain inadmissible as derived facts until a versioned constraint/tolerance policy is bound.",
+      "enforced_by": [
+        "src/scientific_derivation.c",
+        "src/scientific_result.c"
+      ],
+      "tested_by": [
+        "meson:scientific-derivation",
+        "meson:scientific-result",
+        "meson:scientific-gold-v0"
       ]
     }
   ]
