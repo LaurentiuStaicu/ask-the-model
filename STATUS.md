@@ -12,11 +12,18 @@ The project remains in the `0.x` initial-development series. The public API and 
 
 The tagged public release remains v0.4.0. Development on `main` may be newer than that tag and is published separately through the **AtM Development** Flatpak repository.
 
-Post-v0.4.0 work currently remains engineering/measurement-only:
+Post-v0.4.0 development currently extends engineering hardening without changing the tagged public release:
 
 - future GitHub Release publication is hardened for draft-first asset attachment and optional immutable releases;
 - production retrieval/context policy constants are shared between runtime and benchmark tooling without changing their values;
-- a production-policy R5 shadow run measures context efficiency while the frozen R5 gate remains unchanged and blocking.
+- a production-policy R5 shadow run measures context efficiency while the frozen R5 gate remains unchanged and blocking;
+- repository-state runtime authority has moved on `main` from legacy `repository-state.json` to the application-owned SQLite `control-state.sqlite3` through a verified one-time cutover;
+- a valid existing Control DB is the sole runtime repository-state authority, while an invalid existing DB fails closed instead of falling back to legacy JSON;
+- normal repository-state mutation is copy-on-write: each change creates a fresh COMPLETE generation and atomically advances `active_state`, preserving earlier generations;
+- generation-consistent reads and expected-generation guards prevent mixed-generation state and stale-writer overwrite;
+- non-empty repository-backed conversations pin the exact immutable repository generation used to prepare their grounding, so later repository updates apply only to future conversations.
+
+Legacy `repository-state.json` remains migration/recovery evidence after cutover and is not rewritten by normal development-runtime repository operations.
 
 Development Flatpak publications must expose the exact source `main` commit SHA so a development build can be distinguished reproducibly from the tagged v0.4.0 release artifact.
 
