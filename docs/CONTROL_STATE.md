@@ -172,3 +172,25 @@ Conversation grounding is read-only with respect to repository authority. For an
 `ConversationSession.begin()` copies that generation ID into the active session. Later repository downloads, updates, seal changes, or other Control DB mutations may advance `active_state`, but the conversation continues to identify the immutable generation from which its repository scope was prepared.
 
 Zero-repository conversations remain valid with generation ID `0`.
+
+
+## STATE-05a — Control DB schema v2 defense-in-depth
+
+STATE-05a upgrades the application-owned Control DB format from schema v1 to schema v2 without changing the AtM application release version.
+
+New Control DBs bootstrap directly as `atm-control-state/2` with `PRAGMA user_version=2`. Existing valid v1 databases are migrated automatically on open inside one `BEGIN IMMEDIATE` transaction after v1 identity, required-table, integrity, foreign-key and persisted-generation checks pass. The migration rebuilds the installation identity coherently, installs the v2 triggers, records `state-schema-v1-to-v2` in the append-only migration ledger, advances `user_version`, validates the full v2 state before commit, and rolls back on any failure.
+
+Schema v2 adds persistent SQLite trigger defense-in-depth:
+
+- a generation cannot be inserted directly as `COMPLETE`;
+- once a generation is `COMPLETE`, its generation row and repository rows cannot be inserted into, updated or deleted;
+- `active_state` cannot move to a non-COMPLETE generation, cannot be cleared after activation and cannot move backward or sideways to an older/equal generation;
+- the `active_state` singleton cannot be deleted;
+- installation schema identity cannot be updated or deleted;
+- migration-ledger rows are append-only.
+
+Normal copy-on-write remains compatible because repository rows are written while the successor is `CANDIDATE`, then the successor is changed once to `COMPLETE`, and only afterwards may `active_state` advance to it.
+
+Validation now requires every v2 defense trigger to exist and rejects a persisted `CANDIDATE` generation. This does not conflict with in-flight transactions because uncommitted candidates are not visible as committed database state.
+
+Legacy `control-state-v1.sql` remains bundled solely to qualify deterministic migration compatibility; it is not the bootstrap format for new databases.
