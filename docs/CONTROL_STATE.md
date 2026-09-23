@@ -41,4 +41,26 @@ STATE-01 exposes no API to activate a generation or mutate repository authority.
 
 Creating or validating `control-state.sqlite3` must not read, rewrite, repair or otherwise mutate `repository-state.json`.
 
-STATE-02 will add a deterministic legacy importer and semantic equivalence tests. STATE-03 is the only planned point where SQLite becomes authoritative after a verified one-time cutover.
+## STATE-02 — deterministic legacy import
+
+STATE-02 adds an explicit, test-only/runtime-dormant import API from the existing `repository-state.json` format into the Control DB.
+
+The importer:
+
+- accepts exactly the same legacy schema versions currently accepted by `RepositoryStateStore` (v1 and v2);
+- preserves the same repository-id, SHA, version, duplicate-id and snapshot-seal validation rules;
+- creates only generation `1` in an otherwise empty and inactive Control DB;
+- inserts repository rows in fixed repository-id order so JSON array ordering cannot affect the imported state;
+- performs the whole import under one `BEGIN IMMEDIATE` transaction;
+- verifies semantic equivalence against the parsed legacy state before marking the generation `COMPLETE`;
+- rolls back on parse, validation, SQL or equivalence failure;
+- never writes, repairs, renames or deletes the legacy JSON file;
+- leaves `active_state.active_repository_generation` as `NULL`.
+
+A semantically equivalent JSON file may differ in whitespace, member ordering and repository-array ordering and still compare equal after import. Byte identity is deliberately not the equivalence criterion.
+
+A second import into a non-empty generation store is refused. STATE-02 therefore cannot silently replace or reinterpret a previously imported candidate.
+
+The application does not call this import path yet. `repository-state.json` remains authoritative throughout STATE-02.
+
+STATE-03 remains the only planned point where SQLite can become authoritative, and only after a verified one-time cutover.

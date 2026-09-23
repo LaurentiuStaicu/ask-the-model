@@ -510,6 +510,514 @@ test_shadow_store_does_not_touch_legacy_json (void)
     g_free (root);
 }
 
+
+static char *
+legacy_state_path (
+    const char *root,
+    const char *name
+)
+{
+    return g_build_filename (
+        root,
+        name,
+        NULL
+    );
+}
+
+static void
+write_legacy_state (
+    const char *path,
+    const char *contents
+)
+{
+    GError *error = NULL;
+
+    g_assert_true (
+        g_file_set_contents (
+            path,
+            contents,
+            -1,
+            &error
+        )
+    );
+    g_assert_no_error (error);
+}
+
+static void
+test_legacy_v2_import_and_equivalence (void)
+{
+    const char *legacy_json =
+        "{\n"
+        "  \"schema_version\": 2,\n"
+        "  \"repositories\": [\n"
+        "    {\"id\":\"rmd\",\"sha\":\"0123456789abcdef0123456789abcdef01234567\",\"version\":\"0.1.0\",\"snapshot_seal_sha256\":\"aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa\"},\n"
+        "    {\"id\":\"ewd\",\"sha\":\"1111111111111111111111111111111111111111\",\"version\":\"0.2.0\",\"snapshot_seal_sha256\":null},\n"
+        "    {\"id\":\"cbd\",\"sha\":\"2222222222222222222222222222222222222222\",\"version\":\"0.3.0\",\"snapshot_seal_sha256\":\"bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb\"}\n"
+        "  ]\n"
+        "}\n";
+    const char *equivalent_json =
+        "{\"repositories\":["
+        "{\"version\":\"0.3.0\",\"snapshot_seal_sha256\":\"bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb\",\"sha\":\"2222222222222222222222222222222222222222\",\"id\":\"cbd\"},"
+        "{\"snapshot_seal_sha256\":null,\"id\":\"ewd\",\"version\":\"0.2.0\",\"sha\":\"1111111111111111111111111111111111111111\"},"
+        "{\"sha\":\"0123456789abcdef0123456789abcdef01234567\",\"id\":\"rmd\",\"snapshot_seal_sha256\":\"aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa\",\"version\":\"0.1.0\"}"
+        "],\"schema_version\":2}";
+
+    char *root = new_temp_root (
+        "atm-control-state-import-v2-XXXXXX"
+    );
+    char *path = db_path (root);
+    char *legacy = legacy_state_path (
+        root,
+        "repository-state.json"
+    );
+    char *equivalent = legacy_state_path (
+        root,
+        "repository-state-equivalent.json"
+    );
+
+    write_legacy_state (
+        legacy,
+        legacy_json
+    );
+    write_legacy_state (
+        equivalent,
+        equivalent_json
+    );
+
+    char *before = NULL;
+    gsize before_length = 0;
+    GError *error = NULL;
+
+    g_assert_true (
+        g_file_get_contents (
+            legacy,
+            &before,
+            &before_length,
+            &error
+        )
+    );
+    g_assert_no_error (error);
+
+    AtmControlStateStore *store = NULL;
+    g_assert_true (
+        atm_control_state_open (
+            path,
+            &store,
+            &error
+        )
+    );
+    g_assert_no_error (error);
+
+    gint64 generation_id = 0;
+    g_assert_true (
+        atm_control_state_import_legacy_json (
+            store,
+            legacy,
+            &generation_id,
+            &error
+        )
+    );
+    g_assert_no_error (error);
+    g_assert_cmpint (
+        generation_id,
+        ==,
+        1
+    );
+
+    gboolean matches = FALSE;
+    g_assert_true (
+        atm_control_state_generation_matches_legacy_json (
+            store,
+            generation_id,
+            legacy,
+            &matches,
+            &error
+        )
+    );
+    g_assert_no_error (error);
+    g_assert_true (matches);
+
+    matches = FALSE;
+    g_assert_true (
+        atm_control_state_generation_matches_legacy_json (
+            store,
+            generation_id,
+            equivalent,
+            &matches,
+            &error
+        )
+    );
+    g_assert_no_error (error);
+    g_assert_true (matches);
+
+    gint64 second_generation = 0;
+    g_assert_false (
+        atm_control_state_import_legacy_json (
+            store,
+            equivalent,
+            &second_generation,
+            &error
+        )
+    );
+    g_assert_error (
+        error,
+        ATM_CONTROL_STATE_ERROR,
+        ATM_CONTROL_STATE_ERROR_CONFLICT
+    );
+    g_assert_cmpint (
+        second_generation,
+        ==,
+        0
+    );
+    g_clear_error (&error);
+
+    char *after = NULL;
+    gsize after_length = 0;
+    g_assert_true (
+        g_file_get_contents (
+            legacy,
+            &after,
+            &after_length,
+            &error
+        )
+    );
+    g_assert_no_error (error);
+    g_assert_cmpuint (
+        before_length,
+        ==,
+        after_length
+    );
+    g_assert_cmpmem (
+        before,
+        before_length,
+        after,
+        after_length
+    );
+
+    atm_control_state_close (store);
+
+    char *lifecycle = raw_pragma_text (
+        path,
+        "SELECT lifecycle FROM repository_generations WHERE generation_id=1;"
+    );
+    g_assert_cmpstr (
+        lifecycle,
+        ==,
+        "COMPLETE"
+    );
+    g_free (lifecycle);
+
+    char *origin = raw_pragma_text (
+        path,
+        "SELECT origin FROM repository_generations WHERE generation_id=1;"
+    );
+    g_assert_cmpstr (
+        origin,
+        ==,
+        "repository-state.json/schema=2"
+    );
+    g_free (origin);
+
+    g_assert_cmpint (
+        raw_pragma_int64 (
+            path,
+            "SELECT active_repository_generation IS NULL FROM active_state WHERE singleton_id=1;"
+        ),
+        ==,
+        1
+    );
+    g_assert_cmpint (
+        raw_pragma_int64 (
+            path,
+            "SELECT count(*) FROM generation_repositories WHERE generation_id=1;"
+        ),
+        ==,
+        3
+    );
+
+    char *rmd_version = raw_pragma_text (
+        path,
+        "SELECT repository_version FROM generation_repositories WHERE generation_id=1 AND repository_id='rmd';"
+    );
+    g_assert_cmpstr (
+        rmd_version,
+        ==,
+        "0.1.0"
+    );
+    g_free (rmd_version);
+
+    char *rmd_seal = raw_pragma_text (
+        path,
+        "SELECT snapshot_seal_sha256 FROM generation_repositories WHERE generation_id=1 AND repository_id='rmd';"
+    );
+    g_assert_cmpstr (
+        rmd_seal,
+        ==,
+        "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa"
+    );
+    g_free (rmd_seal);
+
+    g_free (before);
+    g_free (after);
+    g_free (equivalent);
+    g_free (legacy);
+    g_free (path);
+    remove_tree_best_effort (root);
+    g_free (root);
+}
+
+static void
+test_equivalence_rejects_missing_generation (void)
+{
+    const char *legacy_json =
+        "{\"schema_version\":1,\"repositories\":[]}";
+
+    char *root = new_temp_root (
+        "atm-control-state-equivalence-missing-XXXXXX"
+    );
+    char *path = db_path (root);
+    char *legacy = legacy_state_path (
+        root,
+        "repository-state.json"
+    );
+    write_legacy_state (
+        legacy,
+        legacy_json
+    );
+
+    AtmControlStateStore *store = NULL;
+    GError *error = NULL;
+    g_assert_true (
+        atm_control_state_open (
+            path,
+            &store,
+            &error
+        )
+    );
+    g_assert_no_error (error);
+
+    gboolean matches = TRUE;
+    g_assert_false (
+        atm_control_state_generation_matches_legacy_json (
+            store,
+            1,
+            legacy,
+            &matches,
+            &error
+        )
+    );
+    g_assert_error (
+        error,
+        ATM_CONTROL_STATE_ERROR,
+        ATM_CONTROL_STATE_ERROR_CONFLICT
+    );
+    g_assert_false (matches);
+    g_clear_error (&error);
+
+    atm_control_state_close (store);
+    g_free (legacy);
+    g_free (path);
+    remove_tree_best_effort (root);
+    g_free (root);
+}
+
+static void
+test_legacy_v1_import_preserves_null_seal (void)
+{
+    const char *legacy_json =
+        "{"
+        "\"schema_version\":1,"
+        "\"repositories\":["
+        "{\"id\":\"rmd\",\"sha\":\"0123456789abcdef0123456789abcdef01234567\",\"version\":\"0.1.0\"}"
+        "]"
+        "}";
+
+    char *root = new_temp_root (
+        "atm-control-state-import-v1-XXXXXX"
+    );
+    char *path = db_path (root);
+    char *legacy = legacy_state_path (
+        root,
+        "repository-state.json"
+    );
+    write_legacy_state (
+        legacy,
+        legacy_json
+    );
+
+    AtmControlStateStore *store = NULL;
+    GError *error = NULL;
+    g_assert_true (
+        atm_control_state_open (
+            path,
+            &store,
+            &error
+        )
+    );
+    g_assert_no_error (error);
+
+    gint64 generation_id = 0;
+    g_assert_true (
+        atm_control_state_import_legacy_json (
+            store,
+            legacy,
+            &generation_id,
+            &error
+        )
+    );
+    g_assert_no_error (error);
+
+    gboolean matches = FALSE;
+    g_assert_true (
+        atm_control_state_generation_matches_legacy_json (
+            store,
+            generation_id,
+            legacy,
+            &matches,
+            &error
+        )
+    );
+    g_assert_no_error (error);
+    g_assert_true (matches);
+    atm_control_state_close (store);
+
+    g_assert_cmpint (
+        raw_pragma_int64 (
+            path,
+            "SELECT snapshot_seal_sha256 IS NULL FROM generation_repositories WHERE generation_id=1 AND repository_id='rmd';"
+        ),
+        ==,
+        1
+    );
+
+    char *origin = raw_pragma_text (
+        path,
+        "SELECT origin FROM repository_generations WHERE generation_id=1;"
+    );
+    g_assert_cmpstr (
+        origin,
+        ==,
+        "repository-state.json/schema=1"
+    );
+    g_free (origin);
+
+    g_free (legacy);
+    g_free (path);
+    remove_tree_best_effort (root);
+    g_free (root);
+}
+
+static void
+assert_invalid_legacy_import (
+    const char *legacy_json
+)
+{
+    char *root = new_temp_root (
+        "atm-control-state-import-invalid-XXXXXX"
+    );
+    char *path = db_path (root);
+    char *legacy = legacy_state_path (
+        root,
+        "repository-state.json"
+    );
+    write_legacy_state (
+        legacy,
+        legacy_json
+    );
+
+    AtmControlStateStore *store = NULL;
+    GError *error = NULL;
+    g_assert_true (
+        atm_control_state_open (
+            path,
+            &store,
+            &error
+        )
+    );
+    g_assert_no_error (error);
+
+    gint64 generation_id = 0;
+    g_assert_false (
+        atm_control_state_import_legacy_json (
+            store,
+            legacy,
+            &generation_id,
+            &error
+        )
+    );
+    g_assert_error (
+        error,
+        ATM_CONTROL_STATE_ERROR,
+        ATM_CONTROL_STATE_ERROR_LEGACY_STATE
+    );
+    g_clear_error (&error);
+    g_assert_cmpint (
+        generation_id,
+        ==,
+        0
+    );
+
+    atm_control_state_close (store);
+
+    g_assert_cmpint (
+        raw_pragma_int64 (
+            path,
+            "SELECT count(*) FROM repository_generations;"
+        ),
+        ==,
+        0
+    );
+    g_assert_cmpint (
+        raw_pragma_int64 (
+            path,
+            "SELECT active_repository_generation IS NULL FROM active_state WHERE singleton_id=1;"
+        ),
+        ==,
+        1
+    );
+
+    g_free (legacy);
+    g_free (path);
+    remove_tree_best_effort (root);
+    g_free (root);
+}
+
+static void
+test_invalid_legacy_imports_fail_closed (void)
+{
+    assert_invalid_legacy_import (
+        "{ this is not json"
+    );
+
+    assert_invalid_legacy_import (
+        "{"
+        "\"schema_version\":2,"
+        "\"repositories\":["
+        "{\"id\":\"rmd\",\"sha\":\"0123456789abcdef0123456789abcdef01234567\",\"version\":\"0.1.0\"}"
+        "]"
+        "}"
+    );
+
+    assert_invalid_legacy_import (
+        "{"
+        "\"schema_version\":1,"
+        "\"repositories\":["
+        "{\"id\":\"rmd\",\"sha\":\"0123456789abcdef0123456789abcdef01234567\",\"version\":\"0.1.0\"},"
+        "{\"id\":\"rmd\",\"sha\":\"1111111111111111111111111111111111111111\",\"version\":\"0.2.0\"}"
+        "]"
+        "}"
+    );
+
+    assert_invalid_legacy_import (
+        "{"
+        "\"schema_version\":1,"
+        "\"repositories\":["
+        "{\"id\":\"unknown\",\"sha\":\"0123456789abcdef0123456789abcdef01234567\",\"version\":\"0.1.0\"}"
+        "]"
+        "}"
+    );
+}
+
 int
 main (int argc, char **argv)
 {
@@ -538,6 +1046,22 @@ main (int argc, char **argv)
     g_test_add_func (
         "/control-state/shadow-does-not-touch-json",
         test_shadow_store_does_not_touch_legacy_json
+    );
+    g_test_add_func (
+        "/control-state/legacy-v2-import-equivalence",
+        test_legacy_v2_import_and_equivalence
+    );
+    g_test_add_func (
+        "/control-state/equivalence-missing-generation",
+        test_equivalence_rejects_missing_generation
+    );
+    g_test_add_func (
+        "/control-state/legacy-v1-null-seal",
+        test_legacy_v1_import_preserves_null_seal
+    );
+    g_test_add_func (
+        "/control-state/legacy-invalid-fail-closed",
+        test_invalid_legacy_imports_fail_closed
     );
 
     return g_test_run ();

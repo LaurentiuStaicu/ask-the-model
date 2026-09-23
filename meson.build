@@ -335,6 +335,7 @@ control_state_test = executable(
   dependencies: [
     glib_dep,
     gio_dep,
+    json_glib_dep,
     sqlite_dep
   ],
   install: false
