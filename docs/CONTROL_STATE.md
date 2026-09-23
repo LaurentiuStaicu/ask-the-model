@@ -200,7 +200,7 @@ Legacy `control-state-v1.sql` remains bundled solely to qualify deterministic mi
 
 STATE-05b hardens every Control DB connection independently of persistent schema v2.
 
-AtM now requires SQLite 3.31.0 or newer, which is the oldest version needed for the full connection-security set used here. Immediately after opening a Control DB handle, before schema bootstrap, migration or validation, AtM requires:
+AtM now requires SQLite 3.37.0 or newer. The connection-security flags used below are available by SQLite 3.31.0, but Control DB schema v1/v2 uses STRICT tables, which require SQLite 3.37.0. Immediately after opening a Control DB handle, before schema bootstrap, migration or validation, AtM requires:
 
 - `SQLITE_DBCONFIG_DEFENSIVE = 1`;
 - `SQLITE_DBCONFIG_TRUSTED_SCHEMA = 0`;
@@ -219,7 +219,7 @@ This layer is complementary to schema v2. Persistent triggers protect COMPLETE-g
 
 STATE-05c applies `SQLITE_OPEN_NOFOLLOW` to every production `sqlite3_open_v2()` used for the Control DB, both for create/bootstrap-capable opens and for existing-authority opens used by repository-state reads and mutations.
 
-SQLite 3.31.0 introduced this flag specifically to prevent a database filename from containing a symbolic link. Because STATE-05b already established SQLite 3.31.0 as the minimum supported version, no additional compatibility floor is required.
+SQLite 3.31.0 introduced this flag specifically to prevent a database filename from containing a symbolic link. STATE-05b/05f establish SQLite 3.37.0 as the effective minimum because the Control DB schema also requires STRICT-table support, so no additional compatibility floor is required here.
 
 A symlink at the authoritative `control-state.sqlite3` path is therefore rejected by SQLite before schema bootstrap, migration, validation or repository-state access. AtM does not follow the link, replace its target or reinterpret the target as Control DB authority.
 

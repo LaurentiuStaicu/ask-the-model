@@ -3,7 +3,10 @@
   "registry_id": "atm-invariants/v1",
   "scope": "System invariants already enforced by the current AtM baseline; future v1 invariants are added by the PR that implements them.",
   "qualification_policy": {
-    "blocking_severities": ["S0", "S1"],
+    "blocking_severities": [
+      "S0",
+      "S1"
+    ],
     "scoring": "none"
   },
   "invariants": [
@@ -383,7 +386,7 @@
       "category": "STATE",
       "severity": "S0",
       "lifecycle": "enforced",
-      "statement": "Every AtM Control DB connection must use SQLite >= 3.31.0 and fail closed unless connection hardening is active before bootstrap, migration or validation: SQLITE_DBCONFIG_DEFENSIVE=1, SQLITE_DBCONFIG_TRUSTED_SCHEMA=0, SQLITE_DBCONFIG_DQS_DML=0, SQLITE_DBCONFIG_DQS_DDL=0 and SQLITE_DBCONFIG_ENABLE_TRIGGER=1. Existing foreign-key, WAL, FULL synchronous and busy-timeout requirements remain mandatory.",
+      "statement": "Every AtM Control DB connection must use SQLite >= 3.37.0 and fail closed unless connection hardening is active before bootstrap, migration or validation: SQLITE_DBCONFIG_DEFENSIVE=1, SQLITE_DBCONFIG_TRUSTED_SCHEMA=0, SQLITE_DBCONFIG_DQS_DML=0, SQLITE_DBCONFIG_DQS_DDL=0 and SQLITE_DBCONFIG_ENABLE_TRIGGER=1. Existing foreign-key, WAL, FULL synchronous and busy-timeout requirements remain mandatory.",
       "enforced_by": [
         "src/control_state.c",
         "meson.build"
@@ -434,6 +437,22 @@
       "tested_by": [
         "meson:startup-qualification",
         "meson:startup-qualification-service"
+      ]
+    },
+    {
+      "id": "STATE-S0-013",
+      "category": "STATE",
+      "severity": "S0",
+      "lifecycle": "enforced",
+      "statement": "The Control DB build/runtime SQLite compatibility floor must be at least 3.37.0 because both supported Control DB schema generations use STRICT tables. Meson, runtime version checks, tests and developer-facing compatibility documentation must declare the same minimum; the lower 3.31.0 floor is insufficient even though it covers the connection-security flags and SQLITE_OPEN_NOFOLLOW.",
+      "enforced_by": [
+        "meson.build",
+        "src/control_state.c",
+        "data/schemas/control-state-v1.sql",
+        "data/schemas/control-state-v2.sql"
+      ],
+      "tested_by": [
+        "meson:control-state"
       ]
     }
   ]

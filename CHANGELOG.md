@@ -14,11 +14,12 @@ All notable public releases of Ask the Model are recorded here.
 - pinned non-empty repository-backed conversation grounding and active sessions to the exact immutable repository generation used for validation, while leaving ordinary zero-repository chat independent;
 - kept repository grounding read-only with respect to repository authority and required snapshot seals to be persisted before a repository can be pinned for a conversation;
 - added Control DB schema v2 with atomic v1→v2 migration and persistent trigger defense-in-depth against direct mutation of COMPLETE generations, invalid active-generation transitions and rewrite of migration history;
-- hardened every Control DB connection with SQLite defensive mode, untrusted-schema mode, disabled legacy double-quoted strings and explicitly enabled triggers, and established SQLite 3.31.0 as the minimum supported library version for this path;
+- hardened every Control DB connection with SQLite defensive mode, untrusted-schema mode, disabled legacy double-quoted strings and explicitly enabled triggers, and established SQLite 3.37.0 as the minimum supported library version for this path;
 - required `SQLITE_OPEN_NOFOLLOW` on every production Control DB open so a symlinked authority path fails closed before bootstrap, migration, validation or repository-state access;
 - required every opened Control DB authority to be genuinely read/write via `sqlite3_db_readonly()`, preventing SQLite's historical read-only fallback from qualifying as writable runtime authority;
 - qualified the XDG Control DB state root with the same real-directory, current-owner, no-group-or-other-write and exclusive write-probe boundary used for startup storage, aborting startup qualification before authority resolution when that state root is unsafe;
-- added `STATE-S0-001` through `STATE-S0-012` qualification invariants plus Flatpak/Meson regression coverage for foundation, import, cutover, authority precedence, copy-on-write history, stale-writer rejection, session generation pinning, schema-level immutability, connection hardening, no-follow authority opens, writable-authority qualification and state-root qualification.
+- corrected the effective SQLite compatibility floor from 3.31.0 to 3.37.0 because Control DB schema v1/v2 uses STRICT tables; build-time, runtime, tests and documentation now agree;
+- added `STATE-S0-001` through `STATE-S0-013` qualification invariants plus Flatpak/Meson regression coverage for foundation, import, cutover, authority precedence, copy-on-write history, stale-writer rejection, session generation pinning, schema-level immutability, connection hardening, no-follow authority opens, writable-authority qualification and state-root qualification.
 
 ### Startup qualification fixes
 

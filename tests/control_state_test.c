@@ -330,7 +330,7 @@ test_sqlite_security_floor (void)
     g_assert_cmpint (
         sqlite3_libversion_number (),
         >=,
-        3031000
+        3037000
     );
 }
 
