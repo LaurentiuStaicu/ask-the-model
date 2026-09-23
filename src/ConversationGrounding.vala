@@ -226,6 +226,7 @@ namespace AskTheModel {
         public string locator;
         public string? title;
         public string? excerpt;
+        public string? immutable_permalink;
 
         public CitationReference (
             string label,
@@ -236,7 +237,8 @@ namespace AskTheModel {
             string source_path,
             string locator,
             string? title,
-            string? excerpt
+            string? excerpt,
+            string? immutable_permalink = null
         ) {
             Object ();
             this.label = label;
@@ -248,6 +250,7 @@ namespace AskTheModel {
             this.locator = locator;
             this.title = title;
             this.excerpt = excerpt;
+            this.immutable_permalink = immutable_permalink;
         }
     }
 

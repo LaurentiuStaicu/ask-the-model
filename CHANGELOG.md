@@ -43,6 +43,9 @@ All notable public releases of Ask the Model are recorded here.
 - added `SESSION-S0-006` with regression coverage for historical-generation restore, active-authority non-mutation, missing-generation fail-closed behavior, exact model digest checks and durable repository-pin equality.
 - closed the remaining citation-provenance write gap before GTK restore: the Vala/native committed-turn bridge now persists the canonical immutable permalink derived from the pinned repository SHA/source locator and snapshot restore returns it unchanged;
 - added `SESSION-S0-007` regression coverage for immutable-permalink round-trip through the durable conversation store.
+- CONV-04a adds startup restore of non-archived durable conversations into the existing scrollable Gtk.Notebook as explicitly view-only tabs; transcript text, grounded citation buttons and persisted immutable permalinks are restored while prompt/Send remain disabled;
+- startup restore removes the default pristine `New` tab only when it is still completely untouched, so asynchronous qualification cannot discard user input begun during startup;
+- added `SESSION-S0-008`; continuation qualification/Send enablement remain CONV-04b and archive/delete lifecycle remains CONV-04c.
 
 ### Startup qualification fixes
 
