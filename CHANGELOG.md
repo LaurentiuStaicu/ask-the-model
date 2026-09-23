@@ -4,6 +4,13 @@ All notable public releases of Ask the Model are recorded here.
 
 ## Unreleased
 
+### CI and publication hardening
+
+- split the Flatpak workflow into a read-only verification/build job and a main-only publication job, so pull-request verification no longer receives repository-content write permission;
+- preserved the existing `flatpak` verification job identity while transferring only the verified bundle/repository outputs to publication through pinned GitHub artifact actions;
+- extended the release-workflow contract validator to enforce the single scoped `contents: write` grant, the build-to-publication dependency and the verified-artifact handoff.
+
+
 ### Control State and repository-generation hardening
 
 - added an application-owned SQLite `control-state.sqlite3` foundation with AtM identity/schema checks, foreign-key enforcement, WAL + FULL durability and fail-closed integrity validation;
