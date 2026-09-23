@@ -3248,6 +3248,9 @@ namespace AskTheModel {
                     sensitive = false
                 };
             lifecycle_button.add_css_class ("flat");
+            lifecycle_button.add_css_class (
+                "atm-tab-lifecycle"
+            );
             lifecycle_button.update_property (
                 Gtk.AccessibleProperty.LABEL,
                 "Conversation actions"
