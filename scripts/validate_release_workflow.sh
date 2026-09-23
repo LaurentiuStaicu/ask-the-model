@@ -70,6 +70,7 @@ verification_job_line="$(first_line '  flatpak:')"
 workflow_read_line="$(first_line '  contents: read')"
 stage_line="$(first_line '      - name: Stage verified publication inputs')"
 publish_job_line="$(first_line '  publish:')"
+publish_if_line="$(first_line "    if: github.event_name == 'push' && github.ref == 'refs/heads/main'")"
 publish_needs_line="$(first_line '    needs: flatpak')"
 publish_write_line="$(first_line '      contents: write')"
 download_line="$(first_line '      - name: Download verified publication inputs')"
@@ -77,7 +78,8 @@ download_line="$(first_line '      - name: Download verified publication inputs'
 if ! (( workflow_read_line < verification_job_line &&
         verification_job_line < stage_line &&
         stage_line < publish_job_line &&
-        publish_job_line < publish_needs_line &&
+        publish_job_line < publish_if_line &&
+        publish_if_line < publish_needs_line &&
         publish_needs_line < publish_write_line &&
         publish_write_line < download_line )); then
   printf '%s\n' 'Flatpak workflow privilege split/order is invalid.' >&2
@@ -93,7 +95,7 @@ least_privilege=(
   'actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02'
   'actions/download-artifact@d3f86a106a0bac45b974a628896c90dbdf5c8093'
   'name: atm-flatpak-publication'
-  "if: github.event_name == 'push' && github.ref == 'refs/heads/main'"
+  'include-hidden-files: true'
 )
 
 for needle in "${least_privilege[@]}"; do
