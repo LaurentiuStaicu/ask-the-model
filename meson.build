@@ -65,6 +65,7 @@ executable(
     'src/scientific_canonical.c',
     'src/scientific_artifact.c',
     'src/scientific_result.c',
+    'src/scientific_operation.c',
     'src/retrieval_rank.c',
     'src/retrieval_scope.c',
     'src/retrieval_router.c',
@@ -707,6 +708,24 @@ scientific_artifact_test = executable(
 test(
   'scientific-artifact',
   scientific_artifact_test
+)
+
+scientific_operation_test = executable(
+  'scientific-operation-test',
+  [
+    'src/scientific_operation.c',
+    'tests/scientific_operation_test.c'
+  ],
+  include_directories: include_directories('src'),
+  dependencies: [
+    glib_dep
+  ],
+  install: false
+)
+
+test(
+  'scientific-operation',
+  scientific_operation_test
 )
 
 scientific_result_test = executable(
