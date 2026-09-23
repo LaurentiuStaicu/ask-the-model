@@ -536,6 +536,24 @@
         "meson:repository-lifecycle-service",
         "meson:conversation-persistence-store"
       ]
+    },
+    {
+      "id": "SESSION-S0-007",
+      "category": "SESSION",
+      "severity": "S0",
+      "lifecycle": "enforced",
+      "statement": "Durable grounded citation provenance written through the live Vala conversation path must preserve the canonical immutable source permalink when it can be derived from the pinned repository ID, exact snapshot SHA, source path and locator. The native value bridge must carry that permalink into the same atomic turn transaction, and durable snapshot restore must return it unchanged; absence is permitted only when no canonical permalink can be constructed.",
+      "enforced_by": [
+        "src/Application.vala",
+        "src/ConversationPersistenceStore.vala",
+        "src/ConversationStoreNative.vapi",
+        "src/conversation_store.c",
+        "src/conversation_store.h"
+      ],
+      "tested_by": [
+        "meson:conversation-persistence-store",
+        "meson:conversation-store"
+      ]
     }
   ]
 }

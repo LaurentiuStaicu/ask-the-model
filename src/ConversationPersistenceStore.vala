@@ -712,6 +712,7 @@ namespace AskTheModel {
             string[] locators = {};
             string[] titles = {};
             string[] excerpts = {};
+            string[] immutable_permalinks = {};
 
             foreach (
                 ConversationPersistenceCitation citation
@@ -728,6 +729,8 @@ namespace AskTheModel {
                 locators += citation.locator;
                 titles += citation.title ?? "";
                 excerpts += citation.excerpt ?? "";
+                immutable_permalinks +=
+                    citation.immutable_permalink ?? "";
             }
 
             int64 turn_no;
@@ -749,6 +752,7 @@ namespace AskTheModel {
                     locators,
                     titles,
                     excerpts,
+                    immutable_permalinks,
                     (size_t) citations.length,
                     out turn_no
                 )) {

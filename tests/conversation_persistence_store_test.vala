@@ -82,7 +82,8 @@ test_domain_write_bridge ()
                 "README.md",
                 "lines 1-2",
                 "Title",
-                "Excerpt"
+                "Excerpt",
+                "https://example.invalid/rmd/README.md#L1-L2"
             );
 
         int64 grounded_turn =
@@ -262,7 +263,8 @@ test_snapshot_restore_provider_history ()
                 "README.md",
                 "lines 1-2",
                 "Title",
-                "Excerpt"
+                "Excerpt",
+                "https://example.invalid/rmd/README.md#L1-L2"
             );
 
         assert (
@@ -352,6 +354,10 @@ test_snapshot_restore_provider_history ()
         assert (
             snapshot.messages[1].citations[0].label ==
             "S1"
+        );
+        assert (
+            snapshot.messages[1].citations[0].immutable_permalink ==
+            "https://example.invalid/rmd/README.md#L1-L2"
         );
 
         string[] available_names = {

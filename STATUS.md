@@ -29,6 +29,7 @@ Post-v0.4.0 development currently extends engineering hardening without changing
 - development `main` now has a separate hardened `conversations.sqlite3` write path: committed turns persist pinned model/repository identity, raw/display assistant content and citation provenance before provider history advances;
 - CONV-03a adds a read-only durable list/snapshot boundary and exact provider-history rebuild from committed `provider_content`;
 - CONV-03b adds exact continuation-qualification primitives for historical repository generation/version/SHA and local AI model name/digest without changing current repository authority; GTK restore/navigation still remains CONV-04.
+- live grounded-turn persistence now carries canonical immutable source permalinks through the Vala/native bridge, so durable provenance restored later is not weaker than the provenance shown at commit time.
 
 Legacy `repository-state.json` remains migration/recovery evidence after cutover and is not rewritten by normal development-runtime repository operations.
 

@@ -141,6 +141,7 @@ gboolean atm_conversation_store_commit_turn_values (
     const char * const *locators,
     const char * const *titles,
     const char * const *excerpts,
+    const char * const *immutable_permalinks,
     gsize citation_count,
     gint64 *out_turn_no,
     GError **error

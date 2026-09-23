@@ -41,6 +41,8 @@ All notable public releases of Ask the Model are recorded here.
 - local model inventory now exposes name+digest pairs for restore qualification; a persisted digest must match exactly, while conversations created without a digest remain name-pinned only;
 - historical restore failures do not mark the current runtime repository invalid, and generation 0 remains valid only for zero-repository conversations;
 - added `SESSION-S0-006` with regression coverage for historical-generation restore, active-authority non-mutation, missing-generation fail-closed behavior, exact model digest checks and durable repository-pin equality.
+- closed the remaining citation-provenance write gap before GTK restore: the Vala/native committed-turn bridge now persists the canonical immutable permalink derived from the pinned repository SHA/source locator and snapshot restore returns it unchanged;
+- added `SESSION-S0-007` regression coverage for immutable-permalink round-trip through the durable conversation store.
 
 ### Startup qualification fixes
 

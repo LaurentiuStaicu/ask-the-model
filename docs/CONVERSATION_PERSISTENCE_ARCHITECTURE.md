@@ -282,6 +282,8 @@ Model qualification uses the locally discovered provider inventory. The model na
 
 These primitives do not themselves enable Send or create restored GTK tabs. CONV-04 must invoke both exact repository and model qualification before making a restored conversation continuable. Historical conversations whose exact context is unavailable remain viewable but non-continuable.
 
+Before entering CONV-04, the live Vala committed-turn bridge also preserves the canonical immutable permalink for grounded citations when it can be constructed from the pinned repository revision and locator. This closes the remaining provenance write asymmetry between native storage and live GTK-originated turns.
+
 ### CONV-04 — GTK lifecycle
 
 Add startup loading, durable conversation navigation and explicit archive/delete behavior to the existing multi-chat notebook without changing repository authority semantics.
