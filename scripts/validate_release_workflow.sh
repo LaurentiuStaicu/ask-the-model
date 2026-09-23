@@ -75,6 +75,7 @@ done
 
 development_traceability=(
   'WORKSPACE="$GITHUB_WORKSPACE"'
+  'git config --global --add safe.directory "$WORKSPACE"'
   'cp -a "$WORKSPACE/repo" "$PUBLISH_DIR/repo"'
   '"$PUBLISH_DIR/SOURCE_COMMIT"'
   'Source main commit:'
