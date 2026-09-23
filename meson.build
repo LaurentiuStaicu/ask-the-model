@@ -66,6 +66,7 @@ executable(
     'src/scientific_artifact.c',
     'src/scientific_result.c',
     'src/scientific_derivation.c',
+    'src/scientific_realization.c',
     'src/scientific_operation.c',
     'src/retrieval_rank.c',
     'src/retrieval_scope.c',
@@ -799,6 +800,30 @@ scientific_derivation_test = executable(
 test(
   'scientific-derivation',
   scientific_derivation_test
+)
+
+scientific_realization_test = executable(
+  'scientific-realization-test',
+  [
+    'src/scientific_canonical.c',
+    'src/scientific_artifact.c',
+    'src/scientific_operation.c',
+    'src/scientific_result.c',
+    'src/scientific_derivation.c',
+    'src/scientific_realization.c',
+    'tests/scientific_realization_test.c'
+  ],
+  include_directories: include_directories('src'),
+  dependencies: [
+    glib_dep,
+    json_glib_dep
+  ],
+  install: false
+)
+
+test(
+  'scientific-realization',
+  scientific_realization_test
 )
 
 retrieval_rank_test = executable(

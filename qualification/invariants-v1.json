@@ -237,6 +237,19 @@
         "meson:scientific-result",
         "meson:scientific-gold-v0"
       ]
+    },
+    {
+      "id": "SCIENTIFIC-S0-009",
+      "category": "SCIENTIFIC",
+      "severity": "S0",
+      "lifecycle": "enforced",
+      "statement": "Scientific presentation may be created only from a finalized SRA that still passes deterministic validation. SCI-07a RealizationView must preserve every answerability, established-fact, derived-fact, constraint, conflict and limitation block as mandatory; Direct Render must emit every mandatory block exactly once, preserve scientific values, units, status/reason codes and operation identities verbatim, derive support metadata only from SRA support, escape control characters, and have no LLM dependency.",
+      "enforced_by": [
+        "src/scientific_realization.c"
+      ],
+      "tested_by": [
+        "meson:scientific-realization"
+      ]
     }
   ]
 }
