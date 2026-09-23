@@ -2109,7 +2109,6 @@ open_existing_control_state (
 static gboolean
 active_complete_generation (
     sqlite3 *db,
-    gboolean create_if_absent,
     gint64 *out_generation_id,
     GError **error
 )
@@ -2168,11 +2167,6 @@ active_complete_generation (
     sqlite3_finalize (active_statement);
 
     if (generation_id == 0) {
-        if (!create_if_absent) {
-            *out_generation_id = 0;
-            return TRUE;
-        }
-
         gint64 generation_count = 0;
 
         if (!query_single_int64 (
@@ -2195,21 +2189,8 @@ active_complete_generation (
             return FALSE;
         }
 
-        if (!exec_sql (
-                db,
-                "INSERT INTO repository_generations("
-                "generation_id, lifecycle, origin"
-                ") VALUES(1, 'COMPLETE', 'runtime-state-v1');"
-                "UPDATE active_state "
-                "SET active_repository_generation=1 "
-                "WHERE singleton_id=1 "
-                "AND active_repository_generation IS NULL;",
-                error
-            )) {
-            return FALSE;
-        }
-
-        generation_id = 1;
+        *out_generation_id = 0;
+        return TRUE;
     }
 
     sqlite3_stmt *lifecycle_statement = NULL;
@@ -2283,6 +2264,244 @@ active_complete_generation (
     return TRUE;
 }
 
+static gboolean
+create_candidate_generation (
+    sqlite3 *db,
+    gint64 active_generation_id,
+    const char *origin,
+    gint64 *out_generation_id,
+    GError **error
+)
+{
+    gint64 max_generation_id = 0;
+
+    if (!query_single_int64 (
+            db,
+            "SELECT COALESCE(MAX(generation_id), 0) "
+            "FROM repository_generations;",
+            &max_generation_id,
+            error
+        )) {
+        return FALSE;
+    }
+
+    if (max_generation_id == G_MAXINT64) {
+        g_set_error_literal (
+            error,
+            ATM_CONTROL_STATE_ERROR,
+            ATM_CONTROL_STATE_ERROR_CONFLICT,
+            "Control-state generation identifier space is exhausted."
+        );
+        return FALSE;
+    }
+
+    gint64 generation_id =
+        max_generation_id + 1;
+    sqlite3_stmt *generation_statement = NULL;
+
+    if (!prepare_statement (
+            db,
+            "INSERT INTO repository_generations("
+            "generation_id, lifecycle, origin"
+            ") VALUES(?1, 'CANDIDATE', ?2);",
+            &generation_statement,
+            error
+        )) {
+        return FALSE;
+    }
+
+    sqlite3_bind_int64 (
+        generation_statement,
+        1,
+        generation_id
+    );
+    sqlite3_bind_text (
+        generation_statement,
+        2,
+        origin,
+        -1,
+        SQLITE_STATIC
+    );
+
+    if (sqlite3_step (generation_statement) !=
+        SQLITE_DONE) {
+        sqlite3_finalize (generation_statement);
+        set_sqlite_error (
+            db,
+            error,
+            ATM_CONTROL_STATE_ERROR_SQLITE,
+            "Could not create copy-on-write repository generation"
+        );
+        return FALSE;
+    }
+
+    sqlite3_finalize (generation_statement);
+
+    if (active_generation_id != 0) {
+        sqlite3_stmt *copy_statement = NULL;
+
+        if (!prepare_statement (
+                db,
+                "INSERT INTO generation_repositories("
+                "generation_id, repository_id, "
+                "snapshot_sha, repository_version, "
+                "snapshot_seal_sha256"
+                ") "
+                "SELECT ?1, repository_id, "
+                "snapshot_sha, repository_version, "
+                "snapshot_seal_sha256 "
+                "FROM generation_repositories "
+                "WHERE generation_id=?2;",
+                &copy_statement,
+                error
+            )) {
+            return FALSE;
+        }
+
+        sqlite3_bind_int64 (
+            copy_statement,
+            1,
+            generation_id
+        );
+        sqlite3_bind_int64 (
+            copy_statement,
+            2,
+            active_generation_id
+        );
+
+        if (sqlite3_step (copy_statement) !=
+            SQLITE_DONE) {
+            sqlite3_finalize (copy_statement);
+            set_sqlite_error (
+                db,
+                error,
+                ATM_CONTROL_STATE_ERROR_SQLITE,
+                "Could not copy active repository generation"
+            );
+            return FALSE;
+        }
+
+        sqlite3_finalize (copy_statement);
+    }
+
+    *out_generation_id = generation_id;
+    return TRUE;
+}
+
+static gboolean
+complete_and_activate_candidate (
+    sqlite3 *db,
+    gint64 previous_generation_id,
+    gint64 candidate_generation_id,
+    GError **error
+)
+{
+    sqlite3_stmt *complete_statement = NULL;
+
+    if (!prepare_statement (
+            db,
+            "UPDATE repository_generations "
+            "SET lifecycle='COMPLETE' "
+            "WHERE generation_id=?1 "
+            "AND lifecycle='CANDIDATE';",
+            &complete_statement,
+            error
+        )) {
+        return FALSE;
+    }
+
+    sqlite3_bind_int64 (
+        complete_statement,
+        1,
+        candidate_generation_id
+    );
+
+    if (sqlite3_step (complete_statement) !=
+        SQLITE_DONE) {
+        sqlite3_finalize (complete_statement);
+        set_sqlite_error (
+            db,
+            error,
+            ATM_CONTROL_STATE_ERROR_SQLITE,
+            "Could not complete copy-on-write repository generation"
+        );
+        return FALSE;
+    }
+
+    sqlite3_finalize (complete_statement);
+
+    if (sqlite3_changes (db) != 1) {
+        g_set_error_literal (
+            error,
+            ATM_CONTROL_STATE_ERROR,
+            ATM_CONTROL_STATE_ERROR_CONFLICT,
+            "Copy-on-write repository generation was not CANDIDATE."
+        );
+        return FALSE;
+    }
+
+    sqlite3_stmt *activate_statement = NULL;
+    const char *sql =
+        previous_generation_id == 0
+            ? "UPDATE active_state "
+              "SET active_repository_generation=?1 "
+              "WHERE singleton_id=1 "
+              "AND active_repository_generation IS NULL;"
+            : "UPDATE active_state "
+              "SET active_repository_generation=?1 "
+              "WHERE singleton_id=1 "
+              "AND active_repository_generation=?2;";
+
+    if (!prepare_statement (
+            db,
+            sql,
+            &activate_statement,
+            error
+        )) {
+        return FALSE;
+    }
+
+    sqlite3_bind_int64 (
+        activate_statement,
+        1,
+        candidate_generation_id
+    );
+
+    if (previous_generation_id != 0) {
+        sqlite3_bind_int64 (
+            activate_statement,
+            2,
+            previous_generation_id
+        );
+    }
+
+    if (sqlite3_step (activate_statement) !=
+        SQLITE_DONE) {
+        sqlite3_finalize (activate_statement);
+        set_sqlite_error (
+            db,
+            error,
+            ATM_CONTROL_STATE_ERROR_SQLITE,
+            "Could not activate copy-on-write repository generation"
+        );
+        return FALSE;
+    }
+
+    sqlite3_finalize (activate_statement);
+
+    if (sqlite3_changes (db) != 1) {
+        g_set_error_literal (
+            error,
+            ATM_CONTROL_STATE_ERROR,
+            ATM_CONTROL_STATE_ERROR_CONFLICT,
+            "Active repository generation changed during copy-on-write publication."
+        );
+        return FALSE;
+    }
+
+    return TRUE;
+}
+
 gboolean
 atm_control_state_load_repository_values (
     const char *path,
@@ -2331,7 +2550,6 @@ atm_control_state_load_repository_values (
 
     if (!active_complete_generation (
             store->db,
-            FALSE,
             &generation_id,
             error
         )) {
@@ -2545,12 +2763,19 @@ atm_control_state_set_current_values (
 
     gboolean ok = FALSE;
     sqlite3_stmt *statement = NULL;
-    gint64 generation_id = 0;
+    gint64 previous_generation_id = 0;
+    gint64 candidate_generation_id = 0;
 
     if (!active_complete_generation (
             store->db,
-            TRUE,
-            &generation_id,
+            &previous_generation_id,
+            error
+        ) ||
+        !create_candidate_generation (
+            store->db,
+            previous_generation_id,
+            "runtime-cow:set-current",
+            &candidate_generation_id,
             error
         )) {
         goto rollback;
@@ -2577,7 +2802,7 @@ atm_control_state_set_current_values (
     sqlite3_bind_int64 (
         statement,
         1,
-        generation_id
+        candidate_generation_id
     );
     sqlite3_bind_text (
         statement,
@@ -2622,7 +2847,7 @@ atm_control_state_set_current_values (
             store->db,
             error,
             ATM_CONTROL_STATE_ERROR_SQLITE,
-            "Could not update active repository state"
+            "Could not write copy-on-write repository state"
         );
         goto rollback;
     }
@@ -2630,7 +2855,13 @@ atm_control_state_set_current_values (
     sqlite3_finalize (statement);
     statement = NULL;
 
-    if (!exec_sql (
+    if (!complete_and_activate_candidate (
+            store->db,
+            previous_generation_id,
+            candidate_generation_id,
+            error
+        ) ||
+        !exec_sql (
             store->db,
             "COMMIT;",
             error
@@ -2710,24 +2941,34 @@ atm_control_state_set_snapshot_seal_values (
 
     gboolean ok = FALSE;
     sqlite3_stmt *statement = NULL;
-    gint64 generation_id = 0;
+    gint64 previous_generation_id = 0;
+    gint64 candidate_generation_id = 0;
 
     if (!active_complete_generation (
             store->db,
-            FALSE,
-            &generation_id,
+            &previous_generation_id,
             error
         )) {
         goto rollback;
     }
 
-    if (generation_id == 0) {
+    if (previous_generation_id == 0) {
         g_set_error_literal (
             error,
             ATM_CONTROL_STATE_ERROR,
             ATM_CONTROL_STATE_ERROR_CONFLICT,
             "No active repository generation exists for snapshot-seal update."
         );
+        goto rollback;
+    }
+
+    if (!create_candidate_generation (
+            store->db,
+            previous_generation_id,
+            "runtime-cow:set-seal",
+            &candidate_generation_id,
+            error
+        )) {
         goto rollback;
     }
 
@@ -2754,7 +2995,7 @@ atm_control_state_set_snapshot_seal_values (
     sqlite3_bind_int64 (
         statement,
         2,
-        generation_id
+        candidate_generation_id
     );
     sqlite3_bind_text (
         statement,
@@ -2777,7 +3018,7 @@ atm_control_state_set_snapshot_seal_values (
             store->db,
             error,
             ATM_CONTROL_STATE_ERROR_SQLITE,
-            "Could not update active repository snapshot seal"
+            "Could not write copy-on-write repository snapshot seal"
         );
         goto rollback;
     }
@@ -2795,7 +3036,13 @@ atm_control_state_set_snapshot_seal_values (
     sqlite3_finalize (statement);
     statement = NULL;
 
-    if (!exec_sql (
+    if (!complete_and_activate_candidate (
+            store->db,
+            previous_generation_id,
+            candidate_generation_id,
+            error
+        ) ||
+        !exec_sql (
             store->db,
             "COMMIT;",
             error

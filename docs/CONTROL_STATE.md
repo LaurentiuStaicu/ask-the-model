@@ -125,3 +125,29 @@ Startup authority resolution now follows a single rule:
 The legacy JSON file is retained as migration/recovery evidence and is no longer written by normal production repository-state operations.
 
 STATE-03 therefore ends dual authority: after a successful cutover, Control DB is authoritative. STATE-04 remains responsible for making repository generations immutable and pinning sessions to explicit generation IDs.
+
+
+## STATE-04a — copy-on-write repository generations
+
+STATE-04a changes normal repository-state mutation from in-place updates to copy-on-write generations while keeping the existing Control DB schema version unchanged.
+
+Every production `set_current` now executes one `BEGIN IMMEDIATE` transaction that:
+
+1. reads and validates the current active `COMPLETE` generation;
+2. allocates a new generation ID;
+3. creates the new generation as `CANDIDATE`;
+4. copies every repository row from the previously active generation;
+5. applies the requested repository identity only to the candidate;
+6. marks the candidate `COMPLETE`;
+7. moves `active_state` from the expected previous generation to the new generation with a guarded update;
+8. commits the entire transition atomically.
+
+For an empty-bootstrap Control DB, the first `set_current` creates generation `1` through the same candidate-to-complete protocol.
+
+`set_snapshot_seal` uses the same copy-on-write transition and updates the seal only in the candidate after verifying the expected active snapshot SHA. A failed identity check rolls back the whole candidate, leaving no orphan `CANDIDATE` generation.
+
+Consequently, normal AtM mutation APIs no longer modify rows belonging to a previously `COMPLETE` generation. Historical generations remain queryable and byte-for-byte unchanged by later normal mutations.
+
+This is API-level immutability under schema v1. A future schema migration may add SQL triggers for defense-in-depth against out-of-band direct SQL writes; STATE-04a does not silently change `user_version` or retrofit triggers into an already deployed schema.
+
+Session pinning to an explicit generation ID remains STATE-04b.
