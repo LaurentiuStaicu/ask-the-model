@@ -192,7 +192,7 @@ window.atm-window notebook.atm-chat-tabs > header.top menubutton.atm-tab-lifecyc
     min-height: 0;
     padding: 0;
     -gtk-icon-size: 0.80em;
-    transform: translateX(1mm);
+    transform: translateX(calc(1mm + 1px));
 }
 
 window.atm-window notebook.atm-chat-tabs > header.top button.atm-tab-close {
@@ -200,7 +200,7 @@ window.atm-window notebook.atm-chat-tabs > header.top button.atm-tab-close {
     min-height: 12px;
     padding: 0;
     margin: 0 0 0 -1px;
-    transform: translateX(2px);
+    transform: translateX(4px);
     background-image: none;
     background-color: rgba(255, 255, 255, 0);
     border: none;
