@@ -297,9 +297,9 @@ CONV-04b orchestrates the CONV-03 qualification primitives. A restored tab remai
 
 Qualification is re-entrant and retryable. A tab that cannot currently satisfy its exact context remains readable with an explicit read-only reason; model discovery/refresh, repository refresh/update and completion of another active generation can request a new qualification attempt. Failures never replace the historical context with current authority.
 
-CONV-04c adds explicit archive/delete lifecycle without overloading the tab close affordance. Close remains an in-memory UI operation and never mutates durable history. A separate per-tab actions menu exposes Archive and Delete only for conversations that already have durable identity.
+CONV-04c keeps tab Close, Archive and Delete as distinct lifecycle operations. Conversation-store schema v2 adds a durable `open_on_startup` flag, migrated from v1 with a default of true so existing non-archived conversations preserve their prior restore behavior. Explicit tab Close atomically clears only `open_on_startup` before removing the tab; application shutdown does not change that flag. Startup restores only conversations with `archived=0` and `open_on_startup=1`, so chats left open across application shutdown return while chats explicitly closed by the user do not.
 
-Archive atomically sets the durable `archived` flag and advances `updated_at_us` before the tab is removed from the current notebook. Archived conversations are excluded from normal startup restore but remain present in the conversation store; the storage API also supports unarchive for future history-management UI.
+Archive atomically sets the durable `archived` flag, clears `open_on_startup`, and advances `updated_at_us` before the tab is removed from the current notebook. Archived conversations remain present in the conversation store; the storage API also supports unarchive and independent startup-open state for future history-management UI.
 
 Delete is a distinct destructive action with explicit confirmation. The store deletes exactly one conversation inside one write transaction; schema-v1 foreign-key cascades remove its repository pins, messages and citation rows. If archive or delete fails, the tab remains open and no successful lifecycle transition is presented.
 

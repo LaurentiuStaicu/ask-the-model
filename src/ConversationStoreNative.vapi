@@ -69,6 +69,13 @@ namespace AskTheModel.ConversationStoreNative {
         int64 updated_at_us
     ) throws GLib.Error;
 
+    [CCode (cname = "atm_conversation_store_set_open_on_startup")]
+    public static bool set_open_on_startup (
+        Store store,
+        string conversation_id,
+        bool open_on_startup
+    ) throws GLib.Error;
+
     [CCode (cname = "atm_conversation_store_delete_conversation")]
     public static bool delete_conversation (
         Store store,
@@ -129,6 +136,12 @@ namespace AskTheModel.ConversationStoreNative {
 
     [CCode (cname = "atm_conversation_list_archived_at")]
     public static bool list_archived_at (
+        ConversationList list,
+        uint index
+    );
+
+    [CCode (cname = "atm_conversation_list_open_on_startup_at")]
+    public static bool list_open_on_startup_at (
         ConversationList list,
         uint index
     );

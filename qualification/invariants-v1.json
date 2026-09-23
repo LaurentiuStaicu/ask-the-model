@@ -462,7 +462,8 @@
       "lifecycle": "enforced",
       "statement": "The durable conversation-store foundation must remain a SQLite authority distinct from repository Control DB, use its own application/schema identity and SQLite >= 3.37.0 STRICT schema, open with the hardened no-follow/read-write/defensive/untrusted-schema/DQS-off/trigger-enabled/foreign-key/WAL/FULL contract, and fail closed on foreign/newer/structurally invalid or semantically invalid persisted conversation data. Semantic validation must reject repository-scope mismatch, incomplete committed user/assistant turn pairs, grounded user messages, citations attached to non-grounded assistant messages, and citation repository/version/SHA provenance not present in the conversation's pinned repository set.",
       "enforced_by": [
-        "data/schemas/conversation-store-v1.sql",
+        "data/schemas/conversation-store-v2.sql",
+        "data/schemas/conversation-store-v1-to-v2.sql",
         "src/conversation_store.c",
         "src/conversation_store.h"
       ],
@@ -593,7 +594,7 @@
       "category": "SESSION",
       "severity": "S0",
       "lifecycle": "enforced",
-      "statement": "Conversation tab closing, durable archive and durable deletion must remain distinct operations. Closing a tab must not mutate durable history. Archive must atomically update only the conversation archive metadata before the tab is removed from the current UI. Permanent deletion must require an explicit user choice and atomically delete exactly one durable conversation; repository pins, messages and citations must disappear only through the conversation-store foreign-key cascade. Failed archive/delete operations must leave the tab open and durable history unchanged.",
+      "statement": "Conversation tab closing, durable archive and durable deletion must remain distinct operations. Explicit tab Close may mutate only durable startup-open metadata: it must atomically clear open_on_startup before removing a durable tab, without archiving or deleting conversation history, while application shutdown must not clear that flag. Startup restore must include only conversations with archived=0 and open_on_startup=1. Archive must atomically set archived and clear open_on_startup before the tab is removed. Permanent deletion must require an explicit user choice and atomically delete exactly one durable conversation; repository pins, messages and citations must disappear only through the conversation-store foreign-key cascade. Failed close/archive/delete persistence must leave the tab open and durable history unchanged.",
       "enforced_by": [
         "src/Application.vala",
         "src/ConversationPersistenceStore.vala",

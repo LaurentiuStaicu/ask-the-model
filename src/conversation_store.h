@@ -5,8 +5,8 @@
 G_BEGIN_DECLS
 
 #define ATM_CONVERSATION_STORE_APPLICATION_ID 0x41544331
-#define ATM_CONVERSATION_STORE_SCHEMA_VERSION 1
-#define ATM_CONVERSATION_STORE_SCHEMA_ID "atm-conversation-store/1"
+#define ATM_CONVERSATION_STORE_SCHEMA_VERSION 2
+#define ATM_CONVERSATION_STORE_SCHEMA_ID "atm-conversation-store/2"
 
 typedef enum {
     ATM_CONVERSATION_STORE_ERROR_ARGUMENT,
@@ -117,6 +117,13 @@ gboolean atm_conversation_store_set_archived (
     GError **error
 );
 
+gboolean atm_conversation_store_set_open_on_startup (
+    AtmConversationStore *store,
+    const char *conversation_id,
+    gboolean open_on_startup,
+    GError **error
+);
+
 gboolean atm_conversation_store_delete_conversation (
     AtmConversationStore *store,
     const char *conversation_id,
@@ -196,6 +203,11 @@ gint64 atm_conversation_list_updated_at_us_at (
 );
 
 gboolean atm_conversation_list_archived_at (
+    const AtmConversationList *list,
+    guint index
+);
+
+gboolean atm_conversation_list_open_on_startup_at (
     const AtmConversationList *list,
     guint index
 );
