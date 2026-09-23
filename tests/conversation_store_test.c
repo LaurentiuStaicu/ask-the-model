@@ -1,5 +1,6 @@
 #include <glib.h>
 #include <glib/gstdio.h>
+#include <gio/gio.h>
 #include <sqlite3.h>
 
 #include "conversation_store.h"
@@ -298,6 +299,131 @@ test_bootstrap_and_reopen (void)
 }
 
 static void
+create_v1_store (
+    const char *path
+)
+{
+    GError *error = NULL;
+    GBytes *bytes = g_resources_lookup_data (
+        "/io/github/laurentiustaicu/ask_the_model/schemas/conversation-store-v1.sql",
+        G_RESOURCE_LOOKUP_FLAGS_NONE,
+        &error
+    );
+    g_assert_no_error (error);
+    g_assert_nonnull (bytes);
+
+    gsize size = 0;
+    const char *data = g_bytes_get_data (
+        bytes,
+        &size
+    );
+    g_assert_nonnull (data);
+    g_assert_cmpuint (size, >, 0);
+
+    char *schema = g_strndup (
+        data,
+        size
+    );
+    char *sql = g_strdup_printf (
+        "BEGIN IMMEDIATE;%s"
+        "PRAGMA application_id=%u;"
+        "PRAGMA user_version=1;"
+        "COMMIT;",
+        schema,
+        (guint) ATM_CONVERSATION_STORE_APPLICATION_ID
+    );
+
+    raw_exec (
+        path,
+        sql
+    );
+
+    g_free (sql);
+    g_free (schema);
+    g_bytes_unref (bytes);
+}
+
+static void
+test_v1_to_v2_migration (void)
+{
+    char *root = new_temp_root (
+        "atm-conversation-migration-XXXXXX"
+    );
+    char *path = store_path (root);
+
+    create_v1_store (
+        path
+    );
+
+    raw_exec (
+        path,
+        "INSERT INTO conversations("
+        "conversation_id,title,created_at_us,updated_at_us,"
+        "model_name,model_digest,repository_generation_id,archived"
+        ") VALUES("
+        "'legacy','Legacy',1,1,'model-a',NULL,0,0"
+        ");"
+    );
+
+    AtmConversationStore *store = NULL;
+    GError *error = NULL;
+
+    g_assert_true (
+        atm_conversation_store_open (
+            path,
+            &store,
+            &error
+        )
+    );
+    g_assert_no_error (error);
+    g_assert_nonnull (store);
+
+    g_assert_cmpint (
+        raw_int64 (
+            path,
+            "PRAGMA user_version;"
+        ),
+        ==,
+        ATM_CONVERSATION_STORE_SCHEMA_VERSION
+    );
+
+    char *schema_id = raw_text (
+        path,
+        "SELECT schema_id FROM installation "
+        "WHERE singleton_id=1;"
+    );
+    g_assert_cmpstr (
+        schema_id,
+        ==,
+        ATM_CONVERSATION_STORE_SCHEMA_ID
+    );
+    g_free (schema_id);
+
+    g_assert_cmpint (
+        raw_int64 (
+            path,
+            "SELECT open_on_startup FROM conversations "
+            "WHERE conversation_id='legacy';"
+        ),
+        ==,
+        1
+    );
+
+    g_assert_true (
+        atm_conversation_store_validate (
+            store,
+            &error
+        )
+    );
+    g_assert_no_error (error);
+
+    atm_conversation_store_close (store);
+    g_free (path);
+    remove_tree_best_effort (root);
+    g_free (root);
+}
+
+static void
 test_foreign_database_rejected (void)
 {
     char *root = new_temp_root (
@@ -368,7 +494,7 @@ test_newer_schema_rejected (void)
 
     raw_exec (
         path,
-        "PRAGMA user_version=2;"
+        "PRAGMA user_version=3;"
     );
 
     store = NULL;
@@ -1542,6 +1668,41 @@ test_archive_delete_lifecycle (void)
     g_assert_no_error (error);
 
     g_assert_true (
+        atm_conversation_store_set_open_on_startup (
+            store,
+            conversation_id,
+            FALSE,
+            &error
+        )
+    );
+    g_assert_no_error (error);
+
+    char *open_sql = g_strdup_printf (
+        "SELECT open_on_startup FROM conversations "
+        "WHERE conversation_id='%s';",
+        conversation_id
+    );
+    g_assert_cmpint (
+        raw_int64 (
+            path,
+            open_sql
+        ),
+        ==,
+        0
+    );
+    g_free (open_sql);
+
+    g_assert_true (
+        atm_conversation_store_set_open_on_startup (
+            store,
+            conversation_id,
+            TRUE,
+            &error
+        )
+    );
+    g_assert_no_error (error);
+
+    g_assert_true (
         atm_conversation_store_set_archived (
             store,
             conversation_id,
@@ -1575,6 +1736,21 @@ test_archive_delete_lifecycle (void)
         102
     );
     atm_conversation_snapshot_free (snapshot);
+
+    open_sql = g_strdup_printf (
+        "SELECT open_on_startup FROM conversations "
+        "WHERE conversation_id='%s';",
+        conversation_id
+    );
+    g_assert_cmpint (
+        raw_int64 (
+            path,
+            open_sql
+        ),
+        ==,
+        0
+    );
+    g_free (open_sql);
 
     g_assert_true (
         atm_conversation_store_set_archived (
@@ -1784,6 +1960,10 @@ main (int argc, char **argv)
     g_test_add_func (
         "/conversation-store/bootstrap-reopen",
         test_bootstrap_and_reopen
+    );
+    g_test_add_func (
+        "/conversation-store/v1-to-v2-migration",
+        test_v1_to_v2_migration
     );
     g_test_add_func (
         "/conversation-store/foreign-database",

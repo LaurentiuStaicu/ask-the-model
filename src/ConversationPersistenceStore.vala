@@ -62,20 +62,23 @@ namespace AskTheModel {
         public int64 created_at_us { get; construct; }
         public int64 updated_at_us { get; construct; }
         public bool archived { get; construct; }
+        public bool open_on_startup { get; construct; }
 
         public ConversationPersistenceSummary (
             string conversation_id,
             string title,
             int64 created_at_us,
             int64 updated_at_us,
-            bool archived
+            bool archived,
+            bool open_on_startup
         ) {
             Object (
                 conversation_id: conversation_id,
                 title: title,
                 created_at_us: created_at_us,
                 updated_at_us: updated_at_us,
-                archived: archived
+                archived: archived,
+                open_on_startup: open_on_startup
             );
         }
     }
@@ -397,6 +400,10 @@ namespace AskTheModel {
                             i
                         ),
                         ConversationStoreNative.list_archived_at (
+                            native_list,
+                            i
+                        ),
+                        ConversationStoreNative.list_open_on_startup_at (
                             native_list,
                             i
                         )
@@ -794,6 +801,21 @@ namespace AskTheModel {
                 )) {
                 throw new GLib.IOError.FAILED (
                     "Conversation archive state could not be persisted."
+                );
+            }
+        }
+
+        public void set_open_on_startup (
+            string conversation_id,
+            bool open_on_startup
+        ) throws GLib.Error {
+            if (!ConversationStoreNative.set_open_on_startup (
+                    native_store,
+                    conversation_id,
+                    open_on_startup
+                )) {
+                throw new GLib.IOError.FAILED (
+                    "Conversation startup-open state could not be persisted."
                 );
             }
         }

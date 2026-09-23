@@ -7,7 +7,11 @@
 #include <string.h>
 
 #define ATM_CONVERSATION_STORE_SCHEMA_RESOURCE \
-    "/io/github/laurentiustaicu/ask_the_model/schemas/conversation-store-v1.sql"
+    "/io/github/laurentiustaicu/ask_the_model/schemas/conversation-store-v2.sql"
+#define ATM_CONVERSATION_STORE_MIGRATION_V1_V2_RESOURCE \
+    "/io/github/laurentiustaicu/ask_the_model/schemas/conversation-store-v1-to-v2.sql"
+#define ATM_CONVERSATION_STORE_SCHEMA_V1_ID "atm-conversation-store/1"
+#define ATM_CONVERSATION_STORE_SCHEMA_V1_VERSION 1
 
 struct AtmConversationStore {
     sqlite3 *db;
@@ -22,6 +26,7 @@ typedef struct {
     gint64 created_at_us;
     gint64 updated_at_us;
     gboolean archived;
+    gboolean open_on_startup;
 } AtmConversationListEntry;
 
 struct AtmConversationList {
@@ -277,25 +282,29 @@ query_single_text (
 }
 
 static gboolean
-load_schema_sql (
+load_sql_resource (
+    const char *resource_path,
+    const char *label,
     char **out_sql,
     GError **error
 )
 {
-    if (out_sql == NULL ||
+    if (!nonempty (resource_path) ||
+        !nonempty (label) ||
+        out_sql == NULL ||
         *out_sql != NULL) {
         g_set_error_literal (
             error,
             ATM_CONVERSATION_STORE_ERROR,
             ATM_CONVERSATION_STORE_ERROR_ARGUMENT,
-            "Conversation-store schema loader received invalid arguments."
+            "Conversation-store SQL resource loader received invalid arguments."
         );
         return FALSE;
     }
 
     GError *resource_error = NULL;
     GBytes *bytes = g_resources_lookup_data (
-        ATM_CONVERSATION_STORE_SCHEMA_RESOURCE,
+        resource_path,
         G_RESOURCE_LOOKUP_FLAGS_NONE,
         &resource_error
     );
@@ -305,7 +314,8 @@ load_schema_sql (
             error,
             ATM_CONVERSATION_STORE_ERROR,
             ATM_CONVERSATION_STORE_ERROR_SCHEMA,
-            "Could not load conversation-store schema resource: %s",
+            "Could not load conversation-store %s resource: %s",
+            label,
             resource_error != NULL
                 ? resource_error->message
                 : "unknown resource error"
@@ -322,11 +332,12 @@ load_schema_sql (
 
     if (data == NULL || size == 0) {
         g_bytes_unref (bytes);
-        g_set_error_literal (
+        g_set_error (
             error,
             ATM_CONVERSATION_STORE_ERROR,
             ATM_CONVERSATION_STORE_ERROR_SCHEMA,
-            "Conversation-store schema resource is empty."
+            "Conversation-store %s resource is empty.",
+            label
         );
         return FALSE;
     }
@@ -337,6 +348,34 @@ load_schema_sql (
     );
     g_bytes_unref (bytes);
     return TRUE;
+}
+
+static gboolean
+load_schema_sql (
+    char **out_sql,
+    GError **error
+)
+{
+    return load_sql_resource (
+        ATM_CONVERSATION_STORE_SCHEMA_RESOURCE,
+        "schema",
+        out_sql,
+        error
+    );
+}
+
+static gboolean
+load_migration_v1_v2_sql (
+    char **out_sql,
+    GError **error
+)
+{
+    return load_sql_resource (
+        ATM_CONVERSATION_STORE_MIGRATION_V1_V2_RESOURCE,
+        "v1-to-v2 migration",
+        out_sql,
+        error
+    );
 }
 
 static gboolean
@@ -1954,6 +1993,170 @@ atm_conversation_store_validate (
         );
 }
 
+static gboolean
+validate_v1_for_migration (
+    sqlite3 *db,
+    GError **error
+)
+{
+    static const char *required_tables[] = {
+        "installation",
+        "conversations",
+        "conversation_repositories",
+        "messages",
+        "citations"
+    };
+
+    for (gsize i = 0;
+         i < G_N_ELEMENTS (required_tables);
+         i++) {
+        if (!required_table_exists (
+                db,
+                required_tables[i],
+                error
+            )) {
+            return FALSE;
+        }
+    }
+
+    char *schema_id = NULL;
+
+    if (!query_single_text (
+            db,
+            "SELECT schema_id FROM installation "
+            "WHERE singleton_id=1;",
+            &schema_id,
+            error
+        )) {
+        return FALSE;
+    }
+
+    gboolean schema_id_ok =
+        g_strcmp0 (
+            schema_id,
+            ATM_CONVERSATION_STORE_SCHEMA_V1_ID
+        ) == 0;
+    g_free (schema_id);
+
+    if (!schema_id_ok) {
+        g_set_error_literal (
+            error,
+            ATM_CONVERSATION_STORE_ERROR,
+            ATM_CONVERSATION_STORE_ERROR_SCHEMA,
+            "Conversation-store v1 schema identity is invalid."
+        );
+        return FALSE;
+    }
+
+    return validate_integrity (
+            db,
+            error
+        ) &&
+        validate_semantics (
+            db,
+            error
+        );
+}
+
+static gboolean
+migrate_v1_to_v2 (
+    AtmConversationStore *store,
+    GError **error
+)
+{
+    if (store == NULL ||
+        store->db == NULL) {
+        g_set_error_literal (
+            error,
+            ATM_CONVERSATION_STORE_ERROR,
+            ATM_CONVERSATION_STORE_ERROR_ARGUMENT,
+            "Conversation-store schema migration requires an open store."
+        );
+        return FALSE;
+    }
+
+    if (!validate_v1_for_migration (
+            store->db,
+            error
+        )) {
+        return FALSE;
+    }
+
+    char *migration_sql = NULL;
+
+    if (!load_migration_v1_v2_sql (
+            &migration_sql,
+            error
+        )) {
+        return FALSE;
+    }
+
+    if (!exec_sql (
+            store->db,
+            "BEGIN IMMEDIATE;",
+            error
+        )) {
+        g_free (migration_sql);
+        return FALSE;
+    }
+
+    gboolean ok = FALSE;
+
+    if (!exec_sql (
+            store->db,
+            migration_sql,
+            error
+        )) {
+        goto rollback;
+    }
+
+    char *version_sql = g_strdup_printf (
+        "PRAGMA user_version=%d;",
+        ATM_CONVERSATION_STORE_SCHEMA_VERSION
+    );
+
+    if (!exec_sql (
+            store->db,
+            version_sql,
+            error
+        )) {
+        g_free (version_sql);
+        goto rollback;
+    }
+    g_free (version_sql);
+
+    if (!atm_conversation_store_validate (
+            store,
+            error
+        )) {
+        goto rollback;
+    }
+
+    if (!exec_sql (
+            store->db,
+            "COMMIT;",
+            error
+        )) {
+        goto rollback;
+    }
+
+    ok = TRUE;
+
+rollback:
+    if (!ok) {
+        sqlite3_exec (
+            store->db,
+            "ROLLBACK;",
+            NULL,
+            NULL,
+            NULL
+        );
+    }
+
+    g_free (migration_sql);
+    return ok;
+}
+
 gboolean
 atm_conversation_store_open (
     const char *path,
@@ -2098,6 +2301,19 @@ atm_conversation_store_open (
             store
         );
         return FALSE;
+    } else if (
+        user_version ==
+            ATM_CONVERSATION_STORE_SCHEMA_V1_VERSION
+    ) {
+        if (!migrate_v1_to_v2 (
+                store,
+                error
+            )) {
+            atm_conversation_store_close (
+                store
+            );
+            return FALSE;
+        }
     } else if (
         user_version !=
             ATM_CONVERSATION_STORE_SCHEMA_VERSION
@@ -2293,7 +2509,9 @@ atm_conversation_store_set_archived (
     if (!prepare_statement (
             store->db,
             "UPDATE conversations "
-            "SET archived=?2,updated_at_us=?3 "
+            "SET archived=?2,"
+            "open_on_startup=CASE WHEN ?2=1 THEN 0 ELSE open_on_startup END,"
+            "updated_at_us=?3 "
             "WHERE conversation_id=?1;",
             &statement,
             error
@@ -2336,6 +2554,113 @@ atm_conversation_store_set_archived (
             ATM_CONVERSATION_STORE_ERROR,
             ATM_CONVERSATION_STORE_ERROR_NOT_FOUND,
             "Conversation archive update did not match exactly one conversation."
+        );
+        goto out;
+    }
+
+    sqlite3_finalize (
+        statement
+    );
+    statement = NULL;
+
+    if (!exec_sql (
+            store->db,
+            "COMMIT;",
+            error
+        )) {
+        goto out;
+    }
+
+    ok = TRUE;
+
+out:
+    if (statement != NULL) {
+        sqlite3_finalize (
+            statement
+        );
+    }
+
+    if (!ok) {
+        rollback_best_effort (
+            store->db
+        );
+    }
+
+    return ok;
+}
+
+gboolean
+atm_conversation_store_set_open_on_startup (
+    AtmConversationStore *store,
+    const char *conversation_id,
+    gboolean open_on_startup,
+    GError **error
+)
+{
+    if (store == NULL ||
+        store->db == NULL ||
+        !nonempty (conversation_id)) {
+        g_set_error_literal (
+            error,
+            ATM_CONVERSATION_STORE_ERROR,
+            ATM_CONVERSATION_STORE_ERROR_ARGUMENT,
+            "Conversation startup-open update received invalid arguments."
+        );
+        return FALSE;
+    }
+
+    if (!exec_sql (
+            store->db,
+            "BEGIN IMMEDIATE;",
+            error
+        )) {
+        return FALSE;
+    }
+
+    gboolean ok = FALSE;
+    sqlite3_stmt *statement = NULL;
+
+    if (!prepare_statement (
+            store->db,
+            "UPDATE conversations "
+            "SET open_on_startup=?2 "
+            "WHERE conversation_id=?1;",
+            &statement,
+            error
+        )) {
+        goto out;
+    }
+
+    sqlite3_bind_text (
+        statement,
+        1,
+        conversation_id,
+        -1,
+        SQLITE_TRANSIENT
+    );
+    sqlite3_bind_int (
+        statement,
+        2,
+        open_on_startup ? 1 : 0
+    );
+
+    if (!step_done (
+            store->db,
+            statement,
+            "Could not update conversation startup-open state",
+            error
+        )) {
+        goto out;
+    }
+
+    if (sqlite3_changes (
+            store->db
+        ) != 1) {
+        g_set_error_literal (
+            error,
+            ATM_CONVERSATION_STORE_ERROR,
+            ATM_CONVERSATION_STORE_ERROR_NOT_FOUND,
+            "Conversation startup-open update did not match exactly one conversation."
         );
         goto out;
     }
@@ -2922,7 +3247,7 @@ atm_conversation_store_list_conversations (
     if (!prepare_statement (
             store->db,
             "SELECT "
-            "conversation_id,title,created_at_us,updated_at_us,archived "
+            "conversation_id,title,created_at_us,updated_at_us,archived,open_on_startup "
             "FROM conversations "
             "ORDER BY updated_at_us DESC,conversation_id ASC;",
             &statement,
@@ -2966,6 +3291,11 @@ atm_conversation_store_list_conversations (
             sqlite3_column_int (
                 statement,
                 4
+            ) != 0;
+        entry->open_on_startup =
+            sqlite3_column_int (
+                statement,
+                5
             ) != 0;
 
         g_ptr_array_add (
@@ -3620,6 +3950,22 @@ atm_conversation_list_archived_at (
 
     return entry != NULL &&
         entry->archived;
+}
+
+gboolean
+atm_conversation_list_open_on_startup_at (
+    const AtmConversationList *list,
+    guint index
+)
+{
+    AtmConversationListEntry *entry =
+        conversation_list_entry_at (
+            list,
+            index
+        );
+
+    return entry != NULL &&
+        entry->open_on_startup;
 }
 
 const char *

@@ -512,6 +512,28 @@ test_archive_delete_domain_lifecycle ()
             ) == 0
         );
 
+        var initial_summary =
+            store.list_conversations ()[0];
+        assert (initial_summary.open_on_startup);
+
+        store.set_open_on_startup (
+            conversation_id,
+            false
+        );
+        assert (
+            !store.list_conversations ()[0]
+                .open_on_startup
+        );
+
+        store.set_open_on_startup (
+            conversation_id,
+            true
+        );
+        assert (
+            store.list_conversations ()[0]
+                .open_on_startup
+        );
+
         store.set_archived (
             conversation_id,
             true,
@@ -524,6 +546,10 @@ test_archive_delete_domain_lifecycle ()
             );
         assert (archived.archived);
         assert (archived.updated_at_us == 102);
+        assert (
+            !store.list_conversations ()[0]
+                .open_on_startup
+        );
 
         store.set_archived (
             conversation_id,

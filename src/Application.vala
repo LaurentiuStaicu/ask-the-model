@@ -1016,7 +1016,8 @@ namespace AskTheModel {
             }
 
             close_chat_tab (
-                state
+                state,
+                false
             );
         }
 
@@ -1081,7 +1082,8 @@ namespace AskTheModel {
         }
 
         private void close_chat_tab (
-            ChatTabState state
+            ChatTabState state,
+            bool persist_closed = true
         ) {
             if (state.generating || chat_notebook == null) {
                 return;
@@ -1090,6 +1092,31 @@ namespace AskTheModel {
             int page_num = chat_notebook.page_num (state.page);
             if (page_num < 0) {
                 return;
+            }
+
+            if (persist_closed &&
+                state.persistent_id != null) {
+                if (conversation_store == null) {
+                    append_transcript (
+                        state.transcript,
+                        "System: Conversation could not be closed durably because persistence is unavailable."
+                    );
+                    return;
+                }
+
+                try {
+                    conversation_store.set_open_on_startup (
+                        state.persistent_id,
+                        false
+                    );
+                } catch (GLib.Error error) {
+                    append_transcript (
+                        state.transcript,
+                        "System: Conversation could not be closed durably: " +
+                        error.message
+                    );
+                    return;
+                }
             }
 
             bool was_active = active_chat == state;
@@ -3465,7 +3492,8 @@ namespace AskTheModel {
                     ConversationPersistenceSummary summary
                     in summaries
                 ) {
-                    if (summary.archived) {
+                    if (summary.archived ||
+                        !summary.open_on_startup) {
                         continue;
                     }
 
