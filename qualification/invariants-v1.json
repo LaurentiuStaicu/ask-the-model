@@ -250,6 +250,20 @@
       "tested_by": [
         "meson:scientific-realization"
       ]
+    },
+    {
+      "id": "STATE-S0-001",
+      "category": "STATE",
+      "severity": "S0",
+      "lifecycle": "enforced",
+      "statement": "The AtM SQLite Control State foundation must accept only the AtM application ID and supported schema version, run with foreign keys enabled, WAL journaling and FULL synchronous durability, validate required schema/integrity/foreign keys, fail closed for foreign, newer, corrupt or incomplete databases, and remain shadow-only without reading or mutating repository-state.json.",
+      "enforced_by": [
+        "src/control_state.c",
+        "data/schemas/control-state-v1.sql"
+      ],
+      "tested_by": [
+        "meson:control-state"
+      ]
     }
   ]
 }
