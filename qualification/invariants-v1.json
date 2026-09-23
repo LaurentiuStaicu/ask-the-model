@@ -587,6 +587,25 @@
         "meson:repository-lifecycle-service",
         "meson:conversation-persistence-store"
       ]
+    },
+    {
+      "id": "SESSION-S0-010",
+      "category": "SESSION",
+      "severity": "S0",
+      "lifecycle": "enforced",
+      "statement": "Conversation tab closing, durable archive and durable deletion must remain distinct operations. Closing a tab must not mutate durable history. Archive must atomically update only the conversation archive metadata before the tab is removed from the current UI. Permanent deletion must require an explicit user choice and atomically delete exactly one durable conversation; repository pins, messages and citations must disappear only through the conversation-store foreign-key cascade. Failed archive/delete operations must leave the tab open and durable history unchanged.",
+      "enforced_by": [
+        "src/Application.vala",
+        "src/ConversationPersistenceStore.vala",
+        "src/ConversationStoreNative.vapi",
+        "src/conversation_store.c",
+        "src/conversation_store.h",
+        "data/schemas/conversation-store-v1.sql"
+      ],
+      "tested_by": [
+        "meson:conversation-store",
+        "meson:conversation-persistence-store"
+      ]
     }
   ]
 }

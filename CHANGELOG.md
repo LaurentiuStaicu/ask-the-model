@@ -49,6 +49,10 @@ All notable public releases of Ask the Model are recorded here.
 - CONV-04b now requalifies restored tabs against the exact durable AI model name/digest and historical repository generation/version/SHA context before enabling continuation; successful qualification starts the ConversationSession on the reconstructed historical grounding while leaving selectors locked to that context;
 - failed or temporarily unavailable continuation context remains explicitly read-only and can be retried after local model discovery/refresh, repository refresh/update, or completion of another active generation without changing durable history or current repository authority;
 - added `SESSION-S0-009`; archive/delete lifecycle remains CONV-04c.
+- CONV-04c separates tab Close from durable Archive and permanent Delete: Close remains an in-memory UI operation, Archive atomically marks the conversation before closing the tab, and Delete requires explicit confirmation before removing the durable parent row;
+- conversation deletion relies on the schema-v1 foreign-key cascades so repository pins, messages and citations are removed in the same transaction, while failed archive/delete operations leave the open tab and durable history intact;
+- added a compact per-tab conversation-actions menu, archive/unarchive storage APIs for future history management, permanent-delete APIs and `SESSION-S0-010` regression coverage.
+
 
 ### Startup qualification fixes
 

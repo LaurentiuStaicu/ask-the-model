@@ -12,6 +12,7 @@ namespace AskTheModel {
         public Gtk.Button send_button;
         public Gtk.Label placeholder;
         public Gtk.Label title_label;
+        public Gtk.MenuButton lifecycle_button;
         public Gtk.Button close_button;
         public OllamaConversation conversation;
         public ConversationSession session =
@@ -37,6 +38,7 @@ namespace AskTheModel {
             Gtk.Button send_button,
             Gtk.Label placeholder,
             Gtk.Label title_label,
+            Gtk.MenuButton lifecycle_button,
             Gtk.Button close_button,
             OllamaConversation conversation,
             uint serial
@@ -48,6 +50,7 @@ namespace AskTheModel {
             this.send_button = send_button;
             this.placeholder = placeholder;
             this.title_label = title_label;
+            this.lifecycle_button = lifecycle_button;
             this.close_button = close_button;
             this.conversation = conversation;
             this.serial = serial;
@@ -937,6 +940,146 @@ namespace AskTheModel {
             chat_states = updated;
         }
 
+        private void configure_conversation_lifecycle_menu (
+            ChatTabState state
+        ) {
+            var actions = new Gtk.Box (
+                Gtk.Orientation.VERTICAL,
+                2
+            ) {
+                margin_top = 6,
+                margin_bottom = 6,
+                margin_start = 6,
+                margin_end = 6
+            };
+
+            var archive_button =
+                new Gtk.Button.with_label (
+                    "Archive"
+                );
+            archive_button.halign = Gtk.Align.FILL;
+
+            var delete_button =
+                new Gtk.Button.with_label (
+                    "Delete permanently"
+                );
+            delete_button.halign = Gtk.Align.FILL;
+            delete_button.add_css_class (
+                "destructive-action"
+            );
+
+            archive_button.clicked.connect (() => {
+                archive_chat_tab (
+                    state
+                );
+            });
+            delete_button.clicked.connect (() => {
+                confirm_delete_chat_tab.begin (
+                    state
+                );
+            });
+
+            actions.append (archive_button);
+            actions.append (delete_button);
+
+            var popover = new Gtk.Popover () {
+                child = actions,
+                has_arrow = true
+            };
+
+            state.lifecycle_button.popover =
+                popover;
+        }
+
+        private void archive_chat_tab (
+            ChatTabState state
+        ) {
+            if (state.generating ||
+                conversation_store == null ||
+                state.persistent_id == null) {
+                return;
+            }
+
+            try {
+                conversation_store.set_archived (
+                    state.persistent_id,
+                    true,
+                    GLib.get_real_time ()
+                );
+            } catch (GLib.Error error) {
+                append_transcript (
+                    state.transcript,
+                    "System: Conversation could not be archived: " +
+                    error.message
+                );
+                return;
+            }
+
+            close_chat_tab (
+                state
+            );
+        }
+
+        private async void confirm_delete_chat_tab (
+            ChatTabState state
+        ) {
+            if (state.generating ||
+                conversation_store == null ||
+                state.persistent_id == null) {
+                return;
+            }
+
+            var dialog = new Gtk.AlertDialog (
+                "Delete this conversation permanently?"
+            ) {
+                detail =
+                    "The transcript, repository pins and citation provenance will be removed from local conversation history.",
+                buttons = {
+                    "Cancel",
+                    "Delete"
+                },
+                cancel_button = 0,
+                default_button = 0,
+                modal = true
+            };
+
+            int response;
+
+            try {
+                response = yield dialog.choose (
+                    this.active_window,
+                    null
+                );
+            } catch (GLib.Error error) {
+                return;
+            }
+
+            if (response != 1 ||
+                conversation_store == null ||
+                state.persistent_id == null ||
+                state.generating) {
+                return;
+            }
+
+            try {
+                conversation_store.delete_conversation (
+                    state.persistent_id
+                );
+            } catch (GLib.Error error) {
+                append_transcript (
+                    state.transcript,
+                    "System: Conversation could not be deleted: " +
+                    error.message
+                );
+                return;
+            }
+
+            state.persistent_id = null;
+            close_chat_tab (
+                state
+            );
+        }
+
         private void close_chat_tab (
             ChatTabState state
         ) {
@@ -1020,6 +1163,10 @@ namespace AskTheModel {
                     !state.persistence_failed &&
                     !state.restored_view_only &&
                     state.prompt.buffer.text.strip ().length > 0;
+                state.lifecycle_button.sensitive =
+                    !state.generating &&
+                    !state.persistence_failed &&
+                    state.persistent_id != null;
                 state.close_button.sensitive =
                     !state.generating;
             }
@@ -2685,6 +2832,7 @@ namespace AskTheModel {
 
         private Gtk.Widget build_chat_tab_label (
             Gtk.Label title_label,
+            Gtk.MenuButton lifecycle_button,
             Gtk.Button close_button
         ) {
             var box = new Gtk.Box (
@@ -2695,6 +2843,7 @@ namespace AskTheModel {
             };
 
             box.append (title_label);
+            box.append (lifecycle_button);
             box.append (close_button);
             return box;
         }
@@ -2793,6 +2942,19 @@ namespace AskTheModel {
                 ellipsize = Pango.EllipsizeMode.NONE
             };
 
+            var lifecycle_button =
+                new Gtk.MenuButton () {
+                    icon_name = "open-menu-symbolic",
+                    tooltip_text = "Conversation actions",
+                    valign = Gtk.Align.CENTER,
+                    sensitive = false
+                };
+            lifecycle_button.add_css_class ("flat");
+            lifecycle_button.update_property (
+                Gtk.AccessibleProperty.LABEL,
+                "Conversation actions"
+            );
+
             var close_button =
                 new Gtk.Button.from_icon_name (
                     "window-close-symbolic"
@@ -2815,6 +2977,7 @@ namespace AskTheModel {
                 send_button,
                 prompt_placeholder,
                 title_label,
+                lifecycle_button,
                 close_button,
                 ollama_provider.create_conversation (),
                 conversation_serial
@@ -2823,6 +2986,10 @@ namespace AskTheModel {
             state.model_digest = ollama_provider.model_digest;
             state.repository_ids =
                 selected_repository_ids ();
+
+            configure_conversation_lifecycle_menu (
+                state
+            );
 
             prompt_view.buffer.changed.connect (() => {
                 prompt_placeholder.visible =
@@ -2879,6 +3046,7 @@ namespace AskTheModel {
             Gtk.Widget tab_label =
                 build_chat_tab_label (
                     title_label,
+                    lifecycle_button,
                     close_button
                 );
 

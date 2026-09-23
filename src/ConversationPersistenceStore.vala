@@ -780,6 +780,36 @@ namespace AskTheModel {
                 );
             }
         }
+
+        public void set_archived (
+            string conversation_id,
+            bool archived,
+            int64 updated_at_us
+        ) throws GLib.Error {
+            if (!ConversationStoreNative.set_archived (
+                    native_store,
+                    conversation_id,
+                    archived,
+                    updated_at_us
+                )) {
+                throw new GLib.IOError.FAILED (
+                    "Conversation archive state could not be persisted."
+                );
+            }
+        }
+
+        public void delete_conversation (
+            string conversation_id
+        ) throws GLib.Error {
+            if (!ConversationStoreNative.delete_conversation (
+                    native_store,
+                    conversation_id
+                )) {
+                throw new GLib.IOError.FAILED (
+                    "Conversation could not be deleted."
+                );
+            }
+        }
     }
 
     public class ConversationTurnCommitter : Object {

@@ -296,9 +296,13 @@ CONV-04b orchestrates the CONV-03 qualification primitives. A restored tab remai
 
 Qualification is re-entrant and retryable. A tab that cannot currently satisfy its exact context remains readable with an explicit read-only reason; model discovery/refresh, repository refresh/update and completion of another active generation can request a new qualification attempt. Failures never replace the historical context with current authority.
 
-CONV-04c will add explicit archive/delete lifecycle. Closing a tab before 04c remains an in-memory UI action and does not archive or delete durable history.
+CONV-04c adds explicit archive/delete lifecycle without overloading the tab close affordance. Close remains an in-memory UI operation and never mutates durable history. A separate per-tab actions menu exposes Archive and Delete only for conversations that already have durable identity.
 
-Retention policy, export/import and bulk history management remain later work.
+Archive atomically sets the durable `archived` flag and advances `updated_at_us` before the tab is removed from the current notebook. Archived conversations are excluded from normal startup restore but remain present in the conversation store; the storage API also supports unarchive for future history-management UI.
+
+Delete is a distinct destructive action with explicit confirmation. The store deletes exactly one conversation inside one write transaction; schema-v1 foreign-key cascades remove its repository pins, messages and citation rows. If archive or delete fails, the tab remains open and no successful lifecycle transition is presented.
+
+Retention policy, export/import, archived-history browsing and bulk history management remain later work.
 
 ## Acceptance rules for later implementation
 

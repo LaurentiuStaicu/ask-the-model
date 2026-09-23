@@ -109,6 +109,20 @@ gboolean atm_conversation_store_update_title (
     GError **error
 );
 
+gboolean atm_conversation_store_set_archived (
+    AtmConversationStore *store,
+    const char *conversation_id,
+    gboolean archived,
+    gint64 updated_at_us,
+    GError **error
+);
+
+gboolean atm_conversation_store_delete_conversation (
+    AtmConversationStore *store,
+    const char *conversation_id,
+    GError **error
+);
+
 gboolean atm_conversation_store_create_conversation_values (
     AtmConversationStore *store,
     const char *title,
