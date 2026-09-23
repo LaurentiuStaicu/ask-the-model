@@ -998,6 +998,474 @@ test_atomic_write_api (void)
 }
 
 static void
+test_snapshot_read_api (void)
+{
+    char *root = new_temp_root (
+        "atm-conversation-read-XXXXXX"
+    );
+    char *path = store_path (root);
+    AtmConversationStore *store = NULL;
+    GError *error = NULL;
+
+    g_assert_true (
+        atm_conversation_store_open (
+            path,
+            &store,
+            &error
+        )
+    );
+    g_assert_no_error (error);
+
+    char *plain_id = NULL;
+
+    g_assert_true (
+        atm_conversation_store_create_conversation (
+            store,
+            "Plain",
+            10,
+            "model-a",
+            NULL,
+            0,
+            NULL,
+            0,
+            &plain_id,
+            &error
+        )
+    );
+    g_assert_no_error (error);
+
+    gint64 turn_no = -1;
+
+    g_assert_true (
+        atm_conversation_store_commit_turn (
+            store,
+            plain_id,
+            "hello",
+            "world",
+            "world",
+            FALSE,
+            11,
+            NULL,
+            0,
+            &turn_no,
+            &error
+        )
+    );
+    g_assert_no_error (error);
+    g_assert_cmpint (turn_no, ==, 0);
+
+    AtmConversationRepositoryInput repository = {
+        .repository_id = "rmd",
+        .repository_version = "0.1.0",
+        .snapshot_sha =
+            "0123456789abcdef0123456789abcdef01234567"
+    };
+    char *grounded_id = NULL;
+
+    g_assert_true (
+        atm_conversation_store_create_conversation (
+            store,
+            "Grounded",
+            20,
+            "model-b",
+            "digest-b",
+            7,
+            &repository,
+            1,
+            &grounded_id,
+            &error
+        )
+    );
+    g_assert_no_error (error);
+
+    AtmConversationCitationInput citation = {
+        .label = "S1",
+        .repository_id = "rmd",
+        .repository_version = "0.1.0",
+        .snapshot_sha =
+            "0123456789abcdef0123456789abcdef01234567",
+        .logical_source_id = "source-1",
+        .source_path = "README.md",
+        .locator = "lines 1-2",
+        .title = "Title",
+        .excerpt = "Excerpt",
+        .immutable_permalink =
+            "https://example.invalid/rmd/012345/README.md#L1-L2"
+    };
+
+    turn_no = -1;
+    g_assert_true (
+        atm_conversation_store_commit_turn (
+            store,
+            grounded_id,
+            "question",
+            "answer [S1]",
+            "answer",
+            TRUE,
+            21,
+            &citation,
+            1,
+            &turn_no,
+            &error
+        )
+    );
+    g_assert_no_error (error);
+    g_assert_cmpint (turn_no, ==, 0);
+
+    turn_no = -1;
+    g_assert_true (
+        atm_conversation_store_commit_turn (
+            store,
+            grounded_id,
+            "follow-up",
+            "plain follow-up",
+            "plain follow-up",
+            FALSE,
+            22,
+            NULL,
+            0,
+            &turn_no,
+            &error
+        )
+    );
+    g_assert_no_error (error);
+    g_assert_cmpint (turn_no, ==, 1);
+
+    g_assert_true (
+        atm_conversation_store_update_title (
+            store,
+            grounded_id,
+            "Updated grounded",
+            23,
+            &error
+        )
+    );
+    g_assert_no_error (error);
+
+    AtmConversationList *list = NULL;
+
+    g_assert_true (
+        atm_conversation_store_list_conversations (
+            store,
+            &list,
+            &error
+        )
+    );
+    g_assert_no_error (error);
+    g_assert_nonnull (list);
+    g_assert_cmpuint (
+        atm_conversation_list_count (list),
+        ==,
+        2
+    );
+    g_assert_cmpstr (
+        atm_conversation_list_id_at (list, 0),
+        ==,
+        grounded_id
+    );
+    g_assert_cmpstr (
+        atm_conversation_list_title_at (list, 0),
+        ==,
+        "Updated grounded"
+    );
+    g_assert_cmpint (
+        atm_conversation_list_created_at_us_at (
+            list,
+            0
+        ),
+        ==,
+        20
+    );
+    g_assert_cmpint (
+        atm_conversation_list_updated_at_us_at (
+            list,
+            0
+        ),
+        ==,
+        23
+    );
+    g_assert_false (
+        atm_conversation_list_archived_at (
+            list,
+            0
+        )
+    );
+    g_assert_null (
+        atm_conversation_list_id_at (
+            list,
+            2
+        )
+    );
+
+    AtmConversationSnapshot *snapshot = NULL;
+
+    g_assert_true (
+        atm_conversation_store_load_snapshot (
+            store,
+            grounded_id,
+            &snapshot,
+            &error
+        )
+    );
+    g_assert_no_error (error);
+    g_assert_nonnull (snapshot);
+    g_assert_cmpstr (
+        atm_conversation_snapshot_id (snapshot),
+        ==,
+        grounded_id
+    );
+    g_assert_cmpstr (
+        atm_conversation_snapshot_title (snapshot),
+        ==,
+        "Updated grounded"
+    );
+    g_assert_cmpint (
+        atm_conversation_snapshot_created_at_us (
+            snapshot
+        ),
+        ==,
+        20
+    );
+    g_assert_cmpint (
+        atm_conversation_snapshot_updated_at_us (
+            snapshot
+        ),
+        ==,
+        23
+    );
+    g_assert_cmpstr (
+        atm_conversation_snapshot_model_name (
+            snapshot
+        ),
+        ==,
+        "model-b"
+    );
+    g_assert_cmpstr (
+        atm_conversation_snapshot_model_digest (
+            snapshot
+        ),
+        ==,
+        "digest-b"
+    );
+    g_assert_cmpint (
+        atm_conversation_snapshot_repository_generation_id (
+            snapshot
+        ),
+        ==,
+        7
+    );
+    g_assert_false (
+        atm_conversation_snapshot_archived (
+            snapshot
+        )
+    );
+    g_assert_cmpuint (
+        atm_conversation_snapshot_repository_count (
+            snapshot
+        ),
+        ==,
+        1
+    );
+    g_assert_cmpstr (
+        atm_conversation_snapshot_repository_id_at (
+            snapshot,
+            0
+        ),
+        ==,
+        "rmd"
+    );
+    g_assert_cmpstr (
+        atm_conversation_snapshot_repository_version_at (
+            snapshot,
+            0
+        ),
+        ==,
+        "0.1.0"
+    );
+    g_assert_cmpstr (
+        atm_conversation_snapshot_repository_sha_at (
+            snapshot,
+            0
+        ),
+        ==,
+        repository.snapshot_sha
+    );
+    g_assert_cmpuint (
+        atm_conversation_snapshot_message_count (
+            snapshot
+        ),
+        ==,
+        4
+    );
+    g_assert_cmpint (
+        atm_conversation_snapshot_message_sequence_no_at (
+            snapshot,
+            0
+        ),
+        ==,
+        0
+    );
+    g_assert_cmpint (
+        atm_conversation_snapshot_message_turn_no_at (
+            snapshot,
+            0
+        ),
+        ==,
+        0
+    );
+    g_assert_cmpstr (
+        atm_conversation_snapshot_message_role_at (
+            snapshot,
+            0
+        ),
+        ==,
+        "user"
+    );
+    g_assert_cmpstr (
+        atm_conversation_snapshot_message_provider_content_at (
+            snapshot,
+            0
+        ),
+        ==,
+        "question"
+    );
+    g_assert_false (
+        atm_conversation_snapshot_message_grounded_at (
+            snapshot,
+            0
+        )
+    );
+    g_assert_cmpstr (
+        atm_conversation_snapshot_message_role_at (
+            snapshot,
+            1
+        ),
+        ==,
+        "assistant"
+    );
+    g_assert_cmpstr (
+        atm_conversation_snapshot_message_provider_content_at (
+            snapshot,
+            1
+        ),
+        ==,
+        "answer [S1]"
+    );
+    g_assert_cmpstr (
+        atm_conversation_snapshot_message_display_content_at (
+            snapshot,
+            1
+        ),
+        ==,
+        "answer"
+    );
+    g_assert_true (
+        atm_conversation_snapshot_message_grounded_at (
+            snapshot,
+            1
+        )
+    );
+    g_assert_cmpuint (
+        atm_conversation_snapshot_message_citation_count_at (
+            snapshot,
+            1
+        ),
+        ==,
+        1
+    );
+    g_assert_cmpstr (
+        atm_conversation_snapshot_citation_label_at (
+            snapshot,
+            1,
+            0
+        ),
+        ==,
+        "S1"
+    );
+    g_assert_cmpstr (
+        atm_conversation_snapshot_citation_repository_id_at (
+            snapshot,
+            1,
+            0
+        ),
+        ==,
+        "rmd"
+    );
+    g_assert_cmpstr (
+        atm_conversation_snapshot_citation_immutable_permalink_at (
+            snapshot,
+            1,
+            0
+        ),
+        ==,
+        citation.immutable_permalink
+    );
+    g_assert_cmpuint (
+        atm_conversation_snapshot_message_citation_count_at (
+            snapshot,
+            3
+        ),
+        ==,
+        0
+    );
+
+    atm_conversation_snapshot_free (
+        snapshot
+    );
+    snapshot = NULL;
+
+    g_assert_false (
+        atm_conversation_store_load_snapshot (
+            store,
+            "00000000-0000-0000-0000-000000000000",
+            &snapshot,
+            &error
+        )
+    );
+    g_assert_error (
+        error,
+        ATM_CONVERSATION_STORE_ERROR,
+        ATM_CONVERSATION_STORE_ERROR_NOT_FOUND
+    );
+    g_assert_null (snapshot);
+    g_clear_error (&error);
+
+    AtmConversationList *list_after = NULL;
+
+    g_assert_true (
+        atm_conversation_store_list_conversations (
+            store,
+            &list_after,
+            &error
+        )
+    );
+    g_assert_no_error (error);
+    g_assert_cmpint (
+        atm_conversation_list_updated_at_us_at (
+            list_after,
+            0
+        ),
+        ==,
+        23
+    );
+
+    atm_conversation_list_free (
+        list_after
+    );
+    atm_conversation_list_free (
+        list
+    );
+    atm_conversation_store_close (
+        store
+    );
+    g_free (grounded_id);
+    g_free (plain_id);
+    g_free (path);
+    remove_tree_best_effort (root);
+    g_free (root);
+}
+
+static void
 test_symlink_rejected (void)
 {
     char *root = new_temp_root (
@@ -1085,6 +1553,10 @@ main (int argc, char **argv)
     g_test_add_func (
         "/conversation-store/atomic-write-api",
         test_atomic_write_api
+    );
+    g_test_add_func (
+        "/conversation-store/snapshot-read-api",
+        test_snapshot_read_api
     );
     g_test_add_func (
         "/conversation-store/nofollow-symlink",

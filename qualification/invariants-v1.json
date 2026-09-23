@@ -500,6 +500,24 @@
         "meson:conversation-persistence-store",
         "meson:repository-lifecycle-service"
       ]
+    },
+    {
+      "id": "SESSION-S0-005",
+      "category": "SESSION",
+      "severity": "S0",
+      "lifecycle": "enforced",
+      "statement": "Durable conversation listing and snapshot restore must be read-only and must materialize one coherent committed SQLite read transaction containing conversation identity, exact repository pins, ordered committed messages and assistant citation provenance. Restored provider history must be rebuilt only from durable provider_content in exact user/assistant turn order; display_content must never replace provider_content in model history. Loading a snapshot alone must not qualify that conversation for continuation.",
+      "enforced_by": [
+        "src/conversation_store.c",
+        "src/conversation_store.h",
+        "src/ConversationStoreNative.vapi",
+        "src/ConversationPersistenceStore.vala",
+        "src/OllamaProvider.vala"
+      ],
+      "tested_by": [
+        "meson:conversation-store",
+        "meson:conversation-persistence-store"
+      ]
     }
   ]
 }

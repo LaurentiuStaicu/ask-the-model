@@ -272,7 +272,11 @@ CONV-02 still does not restore persisted conversations after restart and does no
 
 Load durable conversations, rebuild provider history/provenance and qualify exact model/repository context before enabling Send.
 
-Historical conversations whose exact context is unavailable remain viewable but non-continuable.
+CONV-03a provides the read-only restore boundary. Conversation summaries and complete snapshots are materialized from one SQLite read transaction. A snapshot includes the pinned model/digest, repository generation and exact repository version/SHA set, ordered committed messages, raw provider content, display content and citation provenance. Provider history is reconstructed only from committed user/assistant `provider_content` pairs.
+
+Snapshot loading alone never enables continuation.
+
+CONV-03b must separately prove that the exact pinned model identity and repository snapshots are still locally available and valid before Send can be enabled. Historical conversations whose exact context is unavailable remain viewable but non-continuable.
 
 ### CONV-04 — GTK lifecycle
 

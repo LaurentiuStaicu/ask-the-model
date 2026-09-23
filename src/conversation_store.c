@@ -16,6 +16,63 @@ struct AtmConversationStore {
     gint schema_version;
 };
 
+typedef struct {
+    char *conversation_id;
+    char *title;
+    gint64 created_at_us;
+    gint64 updated_at_us;
+    gboolean archived;
+} AtmConversationListEntry;
+
+struct AtmConversationList {
+    GPtrArray *entries;
+};
+
+typedef struct {
+    char *repository_id;
+    char *repository_version;
+    char *snapshot_sha;
+} AtmConversationSnapshotRepository;
+
+typedef struct {
+    gint64 ordinal;
+    char *label;
+    char *repository_id;
+    char *repository_version;
+    char *snapshot_sha;
+    char *logical_source_id;
+    char *source_path;
+    char *locator;
+    char *title;
+    char *excerpt;
+    char *immutable_permalink;
+} AtmConversationSnapshotCitation;
+
+typedef struct {
+    char *message_id;
+    gint64 sequence_no;
+    gint64 turn_no;
+    char *role;
+    char *provider_content;
+    char *display_content;
+    gboolean grounded;
+    gint64 created_at_us;
+    GPtrArray *citations;
+} AtmConversationSnapshotMessage;
+
+struct AtmConversationSnapshot {
+    char *conversation_id;
+    char *title;
+    gint64 created_at_us;
+    gint64 updated_at_us;
+    char *model_name;
+    char *model_digest;
+    gint64 repository_generation_id;
+    gboolean archived;
+    GPtrArray *repositories;
+    GPtrArray *messages;
+};
+
 GQuark
 atm_conversation_store_error_quark (void)
 {
@@ -2364,6 +2421,1347 @@ atm_conversation_store_commit_turn_values (
     g_free (citations);
     return ok;
 }
+
+
+static char *
+column_text_dup (
+    sqlite3_stmt *statement,
+    int column
+)
+{
+    const unsigned char *value =
+        sqlite3_column_text (
+            statement,
+            column
+        );
+
+    return value != NULL
+        ? g_strdup ((const char *) value)
+        : g_strdup ("");
+}
+
+static char *
+column_text_dup_nullable (
+    sqlite3_stmt *statement,
+    int column
+)
+{
+    if (sqlite3_column_type (
+            statement,
+            column
+        ) == SQLITE_NULL) {
+        return NULL;
+    }
+
+    return column_text_dup (
+        statement,
+        column
+    );
+}
+
+static void
+conversation_list_entry_free (
+    gpointer data
+)
+{
+    AtmConversationListEntry *entry =
+        data;
+
+    if (entry == NULL) {
+        return;
+    }
+
+    g_free (entry->conversation_id);
+    g_free (entry->title);
+    g_free (entry);
+}
+
+void
+atm_conversation_list_free (
+    AtmConversationList *list
+)
+{
+    if (list == NULL) {
+        return;
+    }
+
+    g_clear_pointer (
+        &list->entries,
+        g_ptr_array_unref
+    );
+    g_free (list);
+}
+
+static void
+snapshot_repository_free (
+    gpointer data
+)
+{
+    AtmConversationSnapshotRepository *repository =
+        data;
+
+    if (repository == NULL) {
+        return;
+    }
+
+    g_free (repository->repository_id);
+    g_free (repository->repository_version);
+    g_free (repository->snapshot_sha);
+    g_free (repository);
+}
+
+static void
+snapshot_citation_free (
+    gpointer data
+)
+{
+    AtmConversationSnapshotCitation *citation =
+        data;
+
+    if (citation == NULL) {
+        return;
+    }
+
+    g_free (citation->label);
+    g_free (citation->repository_id);
+    g_free (citation->repository_version);
+    g_free (citation->snapshot_sha);
+    g_free (citation->logical_source_id);
+    g_free (citation->source_path);
+    g_free (citation->locator);
+    g_free (citation->title);
+    g_free (citation->excerpt);
+    g_free (citation->immutable_permalink);
+    g_free (citation);
+}
+
+static void
+snapshot_message_free (
+    gpointer data
+)
+{
+    AtmConversationSnapshotMessage *message =
+        data;
+
+    if (message == NULL) {
+        return;
+    }
+
+    g_free (message->message_id);
+    g_free (message->role);
+    g_free (message->provider_content);
+    g_free (message->display_content);
+    g_clear_pointer (
+        &message->citations,
+        g_ptr_array_unref
+    );
+    g_free (message);
+}
+
+void
+atm_conversation_snapshot_free (
+    AtmConversationSnapshot *snapshot
+)
+{
+    if (snapshot == NULL) {
+        return;
+    }
+
+    g_free (snapshot->conversation_id);
+    g_free (snapshot->title);
+    g_free (snapshot->model_name);
+    g_free (snapshot->model_digest);
+    g_clear_pointer (
+        &snapshot->repositories,
+        g_ptr_array_unref
+    );
+    g_clear_pointer (
+        &snapshot->messages,
+        g_ptr_array_unref
+    );
+    g_free (snapshot);
+}
+
+static AtmConversationListEntry *
+conversation_list_entry_at (
+    const AtmConversationList *list,
+    guint index
+)
+{
+    if (list == NULL ||
+        list->entries == NULL ||
+        index >= list->entries->len) {
+        return NULL;
+    }
+
+    return g_ptr_array_index (
+        list->entries,
+        index
+    );
+}
+
+static AtmConversationSnapshotRepository *
+snapshot_repository_at (
+    const AtmConversationSnapshot *snapshot,
+    guint index
+)
+{
+    if (snapshot == NULL ||
+        snapshot->repositories == NULL ||
+        index >= snapshot->repositories->len) {
+        return NULL;
+    }
+
+    return g_ptr_array_index (
+        snapshot->repositories,
+        index
+    );
+}
+
+static AtmConversationSnapshotMessage *
+snapshot_message_at (
+    const AtmConversationSnapshot *snapshot,
+    guint index
+)
+{
+    if (snapshot == NULL ||
+        snapshot->messages == NULL ||
+        index >= snapshot->messages->len) {
+        return NULL;
+    }
+
+    return g_ptr_array_index (
+        snapshot->messages,
+        index
+    );
+}
+
+static AtmConversationSnapshotCitation *
+snapshot_citation_at (
+    const AtmConversationSnapshot *snapshot,
+    guint message_index,
+    guint citation_index
+)
+{
+    AtmConversationSnapshotMessage *message =
+        snapshot_message_at (
+            snapshot,
+            message_index
+        );
+
+    if (message == NULL ||
+        message->citations == NULL ||
+        citation_index >= message->citations->len) {
+        return NULL;
+    }
+
+    return g_ptr_array_index (
+        message->citations,
+        citation_index
+    );
+}
+
+gboolean
+atm_conversation_store_list_conversations (
+    AtmConversationStore *store,
+    AtmConversationList **out_list,
+    GError **error
+)
+{
+    if (store == NULL ||
+        store->db == NULL ||
+        out_list == NULL ||
+        *out_list != NULL) {
+        g_set_error_literal (
+            error,
+            ATM_CONVERSATION_STORE_ERROR,
+            ATM_CONVERSATION_STORE_ERROR_ARGUMENT,
+            "Conversation list read received invalid arguments."
+        );
+        return FALSE;
+    }
+
+    if (!exec_sql (
+            store->db,
+            "BEGIN;",
+            error
+        )) {
+        return FALSE;
+    }
+
+    gboolean ok = FALSE;
+    sqlite3_stmt *statement = NULL;
+    AtmConversationList *list =
+        g_new0 (
+            AtmConversationList,
+            1
+        );
+    list->entries =
+        g_ptr_array_new_with_free_func (
+            conversation_list_entry_free
+        );
+
+    if (!prepare_statement (
+            store->db,
+            "SELECT "
+            "conversation_id,title,created_at_us,updated_at_us,archived "
+            "FROM conversations "
+            "ORDER BY updated_at_us DESC,conversation_id ASC;",
+            &statement,
+            error
+        )) {
+        goto out;
+    }
+
+    int rc;
+
+    while ((rc = sqlite3_step (
+                statement
+            )) == SQLITE_ROW) {
+        AtmConversationListEntry *entry =
+            g_new0 (
+                AtmConversationListEntry,
+                1
+            );
+
+        entry->conversation_id =
+            column_text_dup (
+                statement,
+                0
+            );
+        entry->title =
+            column_text_dup (
+                statement,
+                1
+            );
+        entry->created_at_us =
+            sqlite3_column_int64 (
+                statement,
+                2
+            );
+        entry->updated_at_us =
+            sqlite3_column_int64 (
+                statement,
+                3
+            );
+        entry->archived =
+            sqlite3_column_int (
+                statement,
+                4
+            ) != 0;
+
+        g_ptr_array_add (
+            list->entries,
+            entry
+        );
+    }
+
+    if (rc != SQLITE_DONE) {
+        set_sqlite_error (
+            store->db,
+            error,
+            ATM_CONVERSATION_STORE_ERROR_SQLITE,
+            "Could not read durable conversation list"
+        );
+        goto out;
+    }
+
+    sqlite3_finalize (
+        statement
+    );
+    statement = NULL;
+
+    if (!exec_sql (
+            store->db,
+            "COMMIT;",
+            error
+        )) {
+        goto out;
+    }
+
+    *out_list =
+        g_steal_pointer (
+            &list
+        );
+    ok = TRUE;
+
+out:
+    if (statement != NULL) {
+        sqlite3_finalize (
+            statement
+        );
+    }
+
+    if (!ok) {
+        rollback_best_effort (
+            store->db
+        );
+    }
+
+    atm_conversation_list_free (
+        list
+    );
+    return ok;
+}
+
+static AtmConversationSnapshotMessage *
+snapshot_message_for_sequence (
+    AtmConversationSnapshot *snapshot,
+    gint64 sequence_no
+)
+{
+    if (snapshot == NULL ||
+        snapshot->messages == NULL) {
+        return NULL;
+    }
+
+    for (guint i = 0;
+         i < snapshot->messages->len;
+         i++) {
+        AtmConversationSnapshotMessage *message =
+            g_ptr_array_index (
+                snapshot->messages,
+                i
+            );
+
+        if (message->sequence_no ==
+            sequence_no) {
+            return message;
+        }
+    }
+
+    return NULL;
+}
+
+gboolean
+atm_conversation_store_load_snapshot (
+    AtmConversationStore *store,
+    const char *conversation_id,
+    AtmConversationSnapshot **out_snapshot,
+    GError **error
+)
+{
+    if (store == NULL ||
+        store->db == NULL ||
+        !nonempty (conversation_id) ||
+        out_snapshot == NULL ||
+        *out_snapshot != NULL) {
+        g_set_error_literal (
+            error,
+            ATM_CONVERSATION_STORE_ERROR,
+            ATM_CONVERSATION_STORE_ERROR_ARGUMENT,
+            "Conversation snapshot read received invalid arguments."
+        );
+        return FALSE;
+    }
+
+    if (!exec_sql (
+            store->db,
+            "BEGIN;",
+            error
+        )) {
+        return FALSE;
+    }
+
+    gboolean ok = FALSE;
+    sqlite3_stmt *statement = NULL;
+    AtmConversationSnapshot *snapshot =
+        g_new0 (
+            AtmConversationSnapshot,
+            1
+        );
+    snapshot->repositories =
+        g_ptr_array_new_with_free_func (
+            snapshot_repository_free
+        );
+    snapshot->messages =
+        g_ptr_array_new_with_free_func (
+            snapshot_message_free
+        );
+
+    if (!prepare_statement (
+            store->db,
+            "SELECT "
+            "conversation_id,title,created_at_us,updated_at_us,"
+            "model_name,model_digest,repository_generation_id,archived "
+            "FROM conversations WHERE conversation_id=?1;",
+            &statement,
+            error
+        )) {
+        goto out;
+    }
+
+    sqlite3_bind_text (
+        statement,
+        1,
+        conversation_id,
+        -1,
+        SQLITE_TRANSIENT
+    );
+
+    int rc = sqlite3_step (
+        statement
+    );
+
+    if (rc == SQLITE_DONE) {
+        g_set_error_literal (
+            error,
+            ATM_CONVERSATION_STORE_ERROR,
+            ATM_CONVERSATION_STORE_ERROR_NOT_FOUND,
+            "Conversation does not exist in the durable store."
+        );
+        goto out;
+    }
+
+    if (rc != SQLITE_ROW) {
+        set_sqlite_error (
+            store->db,
+            error,
+            ATM_CONVERSATION_STORE_ERROR_SQLITE,
+            "Could not read durable conversation identity"
+        );
+        goto out;
+    }
+
+    snapshot->conversation_id =
+        column_text_dup (
+            statement,
+            0
+        );
+    snapshot->title =
+        column_text_dup (
+            statement,
+            1
+        );
+    snapshot->created_at_us =
+        sqlite3_column_int64 (
+            statement,
+            2
+        );
+    snapshot->updated_at_us =
+        sqlite3_column_int64 (
+            statement,
+            3
+        );
+    snapshot->model_name =
+        column_text_dup (
+            statement,
+            4
+        );
+    snapshot->model_digest =
+        column_text_dup_nullable (
+            statement,
+            5
+        );
+    snapshot->repository_generation_id =
+        sqlite3_column_int64 (
+            statement,
+            6
+        );
+    snapshot->archived =
+        sqlite3_column_int (
+            statement,
+            7
+        ) != 0;
+
+    if (sqlite3_step (
+            statement
+        ) != SQLITE_DONE) {
+        g_set_error_literal (
+            error,
+            ATM_CONVERSATION_STORE_ERROR,
+            ATM_CONVERSATION_STORE_ERROR_INTEGRITY,
+            "Conversation snapshot identity query returned multiple rows."
+        );
+        goto out;
+    }
+
+    sqlite3_finalize (
+        statement
+    );
+    statement = NULL;
+
+    if (!prepare_statement (
+            store->db,
+            "SELECT repository_id,repository_version,snapshot_sha "
+            "FROM conversation_repositories "
+            "WHERE conversation_id=?1 "
+            "ORDER BY CASE repository_id "
+            "WHEN 'ewd' THEN 0 WHEN 'cbd' THEN 1 WHEN 'rmd' THEN 2 ELSE 99 END;",
+            &statement,
+            error
+        )) {
+        goto out;
+    }
+
+    sqlite3_bind_text (
+        statement,
+        1,
+        conversation_id,
+        -1,
+        SQLITE_TRANSIENT
+    );
+
+    while ((rc = sqlite3_step (
+                statement
+            )) == SQLITE_ROW) {
+        AtmConversationSnapshotRepository *repository =
+            g_new0 (
+                AtmConversationSnapshotRepository,
+                1
+            );
+
+        repository->repository_id =
+            column_text_dup (
+                statement,
+                0
+            );
+        repository->repository_version =
+            column_text_dup (
+                statement,
+                1
+            );
+        repository->snapshot_sha =
+            column_text_dup (
+                statement,
+                2
+            );
+
+        g_ptr_array_add (
+            snapshot->repositories,
+            repository
+        );
+    }
+
+    if (rc != SQLITE_DONE) {
+        set_sqlite_error (
+            store->db,
+            error,
+            ATM_CONVERSATION_STORE_ERROR_SQLITE,
+            "Could not read durable conversation repository pins"
+        );
+        goto out;
+    }
+
+    sqlite3_finalize (
+        statement
+    );
+    statement = NULL;
+
+    if (!prepare_statement (
+            store->db,
+            "SELECT "
+            "message_id,sequence_no,turn_no,role,provider_content,"
+            "display_content,grounded,created_at_us "
+            "FROM messages "
+            "WHERE conversation_id=?1 "
+            "ORDER BY sequence_no ASC;",
+            &statement,
+            error
+        )) {
+        goto out;
+    }
+
+    sqlite3_bind_text (
+        statement,
+        1,
+        conversation_id,
+        -1,
+        SQLITE_TRANSIENT
+    );
+
+    while ((rc = sqlite3_step (
+                statement
+            )) == SQLITE_ROW) {
+        AtmConversationSnapshotMessage *message =
+            g_new0 (
+                AtmConversationSnapshotMessage,
+                1
+            );
+
+        message->message_id =
+            column_text_dup (
+                statement,
+                0
+            );
+        message->sequence_no =
+            sqlite3_column_int64 (
+                statement,
+                1
+            );
+        message->turn_no =
+            sqlite3_column_int64 (
+                statement,
+                2
+            );
+        message->role =
+            column_text_dup (
+                statement,
+                3
+            );
+        message->provider_content =
+            column_text_dup (
+                statement,
+                4
+            );
+        message->display_content =
+            column_text_dup (
+                statement,
+                5
+            );
+        message->grounded =
+            sqlite3_column_int (
+                statement,
+                6
+            ) != 0;
+        message->created_at_us =
+            sqlite3_column_int64 (
+                statement,
+                7
+            );
+        message->citations =
+            g_ptr_array_new_with_free_func (
+                snapshot_citation_free
+            );
+
+        g_ptr_array_add (
+            snapshot->messages,
+            message
+        );
+    }
+
+    if (rc != SQLITE_DONE) {
+        set_sqlite_error (
+            store->db,
+            error,
+            ATM_CONVERSATION_STORE_ERROR_SQLITE,
+            "Could not read durable conversation messages"
+        );
+        goto out;
+    }
+
+    sqlite3_finalize (
+        statement
+    );
+    statement = NULL;
+
+    if (!prepare_statement (
+            store->db,
+            "SELECT "
+            "m.sequence_no,c.ordinal,c.label,c.repository_id,"
+            "c.repository_version,c.snapshot_sha,c.logical_source_id,"
+            "c.source_path,c.locator,c.title,c.excerpt,c.immutable_permalink "
+            "FROM citations c "
+            "JOIN messages m ON m.message_id=c.message_id "
+            "WHERE m.conversation_id=?1 "
+            "ORDER BY m.sequence_no ASC,c.ordinal ASC;",
+            &statement,
+            error
+        )) {
+        goto out;
+    }
+
+    sqlite3_bind_text (
+        statement,
+        1,
+        conversation_id,
+        -1,
+        SQLITE_TRANSIENT
+    );
+
+    while ((rc = sqlite3_step (
+                statement
+            )) == SQLITE_ROW) {
+        gint64 sequence_no =
+            sqlite3_column_int64 (
+                statement,
+                0
+            );
+        AtmConversationSnapshotMessage *message =
+            snapshot_message_for_sequence (
+                snapshot,
+                sequence_no
+            );
+
+        if (message == NULL) {
+            g_set_error_literal (
+                error,
+                ATM_CONVERSATION_STORE_ERROR,
+                ATM_CONVERSATION_STORE_ERROR_INTEGRITY,
+                "Conversation citation refers to an unavailable snapshot message."
+            );
+            goto out;
+        }
+
+        AtmConversationSnapshotCitation *citation =
+            g_new0 (
+                AtmConversationSnapshotCitation,
+                1
+            );
+
+        citation->ordinal =
+            sqlite3_column_int64 (
+                statement,
+                1
+            );
+        citation->label =
+            column_text_dup (
+                statement,
+                2
+            );
+        citation->repository_id =
+            column_text_dup (
+                statement,
+                3
+            );
+        citation->repository_version =
+            column_text_dup (
+                statement,
+                4
+            );
+        citation->snapshot_sha =
+            column_text_dup (
+                statement,
+                5
+            );
+        citation->logical_source_id =
+            column_text_dup (
+                statement,
+                6
+            );
+        citation->source_path =
+            column_text_dup (
+                statement,
+                7
+            );
+        citation->locator =
+            column_text_dup (
+                statement,
+                8
+            );
+        citation->title =
+            column_text_dup_nullable (
+                statement,
+                9
+            );
+        citation->excerpt =
+            column_text_dup_nullable (
+                statement,
+                10
+            );
+        citation->immutable_permalink =
+            column_text_dup_nullable (
+                statement,
+                11
+            );
+
+        g_ptr_array_add (
+            message->citations,
+            citation
+        );
+    }
+
+    if (rc != SQLITE_DONE) {
+        set_sqlite_error (
+            store->db,
+            error,
+            ATM_CONVERSATION_STORE_ERROR_SQLITE,
+            "Could not read durable conversation citations"
+        );
+        goto out;
+    }
+
+    sqlite3_finalize (
+        statement
+    );
+    statement = NULL;
+
+    if (!exec_sql (
+            store->db,
+            "COMMIT;",
+            error
+        )) {
+        goto out;
+    }
+
+    *out_snapshot =
+        g_steal_pointer (
+            &snapshot
+        );
+    ok = TRUE;
+
+out:
+    if (statement != NULL) {
+        sqlite3_finalize (
+            statement
+        );
+    }
+
+    if (!ok) {
+        rollback_best_effort (
+            store->db
+        );
+    }
+
+    atm_conversation_snapshot_free (
+        snapshot
+    );
+    return ok;
+}
+
+guint
+atm_conversation_list_count (
+    const AtmConversationList *list
+)
+{
+    return list != NULL &&
+        list->entries != NULL
+            ? list->entries->len
+            : 0;
+}
+
+const char *
+atm_conversation_list_id_at (
+    const AtmConversationList *list,
+    guint index
+)
+{
+    AtmConversationListEntry *entry =
+        conversation_list_entry_at (
+            list,
+            index
+        );
+
+    return entry != NULL
+        ? entry->conversation_id
+        : NULL;
+}
+
+const char *
+atm_conversation_list_title_at (
+    const AtmConversationList *list,
+    guint index
+)
+{
+    AtmConversationListEntry *entry =
+        conversation_list_entry_at (
+            list,
+            index
+        );
+
+    return entry != NULL
+        ? entry->title
+        : NULL;
+}
+
+gint64
+atm_conversation_list_created_at_us_at (
+    const AtmConversationList *list,
+    guint index
+)
+{
+    AtmConversationListEntry *entry =
+        conversation_list_entry_at (
+            list,
+            index
+        );
+
+    return entry != NULL
+        ? entry->created_at_us
+        : -1;
+}
+
+gint64
+atm_conversation_list_updated_at_us_at (
+    const AtmConversationList *list,
+    guint index
+)
+{
+    AtmConversationListEntry *entry =
+        conversation_list_entry_at (
+            list,
+            index
+        );
+
+    return entry != NULL
+        ? entry->updated_at_us
+        : -1;
+}
+
+gboolean
+atm_conversation_list_archived_at (
+    const AtmConversationList *list,
+    guint index
+)
+{
+    AtmConversationListEntry *entry =
+        conversation_list_entry_at (
+            list,
+            index
+        );
+
+    return entry != NULL &&
+        entry->archived;
+}
+
+const char *
+atm_conversation_snapshot_id (
+    const AtmConversationSnapshot *snapshot
+)
+{
+    return snapshot != NULL
+        ? snapshot->conversation_id
+        : NULL;
+}
+
+const char *
+atm_conversation_snapshot_title (
+    const AtmConversationSnapshot *snapshot
+)
+{
+    return snapshot != NULL
+        ? snapshot->title
+        : NULL;
+}
+
+gint64
+atm_conversation_snapshot_created_at_us (
+    const AtmConversationSnapshot *snapshot
+)
+{
+    return snapshot != NULL
+        ? snapshot->created_at_us
+        : -1;
+}
+
+gint64
+atm_conversation_snapshot_updated_at_us (
+    const AtmConversationSnapshot *snapshot
+)
+{
+    return snapshot != NULL
+        ? snapshot->updated_at_us
+        : -1;
+}
+
+const char *
+atm_conversation_snapshot_model_name (
+    const AtmConversationSnapshot *snapshot
+)
+{
+    return snapshot != NULL
+        ? snapshot->model_name
+        : NULL;
+}
+
+const char *
+atm_conversation_snapshot_model_digest (
+    const AtmConversationSnapshot *snapshot
+)
+{
+    return snapshot != NULL
+        ? snapshot->model_digest
+        : NULL;
+}
+
+gint64
+atm_conversation_snapshot_repository_generation_id (
+    const AtmConversationSnapshot *snapshot
+)
+{
+    return snapshot != NULL
+        ? snapshot->repository_generation_id
+        : -1;
+}
+
+gboolean
+atm_conversation_snapshot_archived (
+    const AtmConversationSnapshot *snapshot
+)
+{
+    return snapshot != NULL &&
+        snapshot->archived;
+}
+
+guint
+atm_conversation_snapshot_repository_count (
+    const AtmConversationSnapshot *snapshot
+)
+{
+    return snapshot != NULL &&
+        snapshot->repositories != NULL
+            ? snapshot->repositories->len
+            : 0;
+}
+
+const char *
+atm_conversation_snapshot_repository_id_at (
+    const AtmConversationSnapshot *snapshot,
+    guint index
+)
+{
+    AtmConversationSnapshotRepository *repository =
+        snapshot_repository_at (
+            snapshot,
+            index
+        );
+
+    return repository != NULL
+        ? repository->repository_id
+        : NULL;
+}
+
+const char *
+atm_conversation_snapshot_repository_version_at (
+    const AtmConversationSnapshot *snapshot,
+    guint index
+)
+{
+    AtmConversationSnapshotRepository *repository =
+        snapshot_repository_at (
+            snapshot,
+            index
+        );
+
+    return repository != NULL
+        ? repository->repository_version
+        : NULL;
+}
+
+const char *
+atm_conversation_snapshot_repository_sha_at (
+    const AtmConversationSnapshot *snapshot,
+    guint index
+)
+{
+    AtmConversationSnapshotRepository *repository =
+        snapshot_repository_at (
+            snapshot,
+            index
+        );
+
+    return repository != NULL
+        ? repository->snapshot_sha
+        : NULL;
+}
+
+guint
+atm_conversation_snapshot_message_count (
+    const AtmConversationSnapshot *snapshot
+)
+{
+    return snapshot != NULL &&
+        snapshot->messages != NULL
+            ? snapshot->messages->len
+            : 0;
+}
+
+gint64
+atm_conversation_snapshot_message_sequence_no_at (
+    const AtmConversationSnapshot *snapshot,
+    guint index
+)
+{
+    AtmConversationSnapshotMessage *message =
+        snapshot_message_at (
+            snapshot,
+            index
+        );
+
+    return message != NULL
+        ? message->sequence_no
+        : -1;
+}
+
+gint64
+atm_conversation_snapshot_message_turn_no_at (
+    const AtmConversationSnapshot *snapshot,
+    guint index
+)
+{
+    AtmConversationSnapshotMessage *message =
+        snapshot_message_at (
+            snapshot,
+            index
+        );
+
+    return message != NULL
+        ? message->turn_no
+        : -1;
+}
+
+const char *
+atm_conversation_snapshot_message_role_at (
+    const AtmConversationSnapshot *snapshot,
+    guint index
+)
+{
+    AtmConversationSnapshotMessage *message =
+        snapshot_message_at (
+            snapshot,
+            index
+        );
+
+    return message != NULL
+        ? message->role
+        : NULL;
+}
+
+const char *
+atm_conversation_snapshot_message_provider_content_at (
+    const AtmConversationSnapshot *snapshot,
+    guint index
+)
+{
+    AtmConversationSnapshotMessage *message =
+        snapshot_message_at (
+            snapshot,
+            index
+        );
+
+    return message != NULL
+        ? message->provider_content
+        : NULL;
+}
+
+const char *
+atm_conversation_snapshot_message_display_content_at (
+    const AtmConversationSnapshot *snapshot,
+    guint index
+)
+{
+    AtmConversationSnapshotMessage *message =
+        snapshot_message_at (
+            snapshot,
+            index
+        );
+
+    return message != NULL
+        ? message->display_content
+        : NULL;
+}
+
+gboolean
+atm_conversation_snapshot_message_grounded_at (
+    const AtmConversationSnapshot *snapshot,
+    guint index
+)
+{
+    AtmConversationSnapshotMessage *message =
+        snapshot_message_at (
+            snapshot,
+            index
+        );
+
+    return message != NULL &&
+        message->grounded;
+}
+
+gint64
+atm_conversation_snapshot_message_created_at_us_at (
+    const AtmConversationSnapshot *snapshot,
+    guint index
+)
+{
+    AtmConversationSnapshotMessage *message =
+        snapshot_message_at (
+            snapshot,
+            index
+        );
+
+    return message != NULL
+        ? message->created_at_us
+        : -1;
+}
+
+guint
+atm_conversation_snapshot_message_citation_count_at (
+    const AtmConversationSnapshot *snapshot,
+    guint message_index
+)
+{
+    AtmConversationSnapshotMessage *message =
+        snapshot_message_at (
+            snapshot,
+            message_index
+        );
+
+    return message != NULL &&
+        message->citations != NULL
+            ? message->citations->len
+            : 0;
+}
+
+#define SNAPSHOT_CITATION_TEXT_ACCESSOR(name, field) \
+const char * \
+name ( \
+    const AtmConversationSnapshot *snapshot, \
+    guint message_index, \
+    guint citation_index \
+) \
+{ \
+    AtmConversationSnapshotCitation *citation = \
+        snapshot_citation_at ( \
+            snapshot, \
+            message_index, \
+            citation_index \
+        ); \
+    return citation != NULL \
+        ? citation->field \
+        : NULL; \
+}
+
+SNAPSHOT_CITATION_TEXT_ACCESSOR (
+    atm_conversation_snapshot_citation_label_at,
+    label
+)
+
+SNAPSHOT_CITATION_TEXT_ACCESSOR (
+    atm_conversation_snapshot_citation_repository_id_at,
+    repository_id
+)
+
+SNAPSHOT_CITATION_TEXT_ACCESSOR (
+    atm_conversation_snapshot_citation_repository_version_at,
+    repository_version
+)
+
+SNAPSHOT_CITATION_TEXT_ACCESSOR (
+    atm_conversation_snapshot_citation_snapshot_sha_at,
+    snapshot_sha
+)
+
+SNAPSHOT_CITATION_TEXT_ACCESSOR (
+    atm_conversation_snapshot_citation_logical_source_id_at,
+    logical_source_id
+)
+
+SNAPSHOT_CITATION_TEXT_ACCESSOR (
+    atm_conversation_snapshot_citation_source_path_at,
+    source_path
+)
+
+SNAPSHOT_CITATION_TEXT_ACCESSOR (
+    atm_conversation_snapshot_citation_locator_at,
+    locator
+)
+
+SNAPSHOT_CITATION_TEXT_ACCESSOR (
+    atm_conversation_snapshot_citation_title_at,
+    title
+)
+
+SNAPSHOT_CITATION_TEXT_ACCESSOR (
+    atm_conversation_snapshot_citation_excerpt_at,
+    excerpt
+)
+
+SNAPSHOT_CITATION_TEXT_ACCESSOR (
+    atm_conversation_snapshot_citation_immutable_permalink_at,
+    immutable_permalink
+)
+
+#undef SNAPSHOT_CITATION_TEXT_ACCESSOR
 
 void
 atm_conversation_store_close (

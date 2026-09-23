@@ -34,6 +34,9 @@ All notable public releases of Ask the Model are recorded here.
 - both grounded and ordinary provider calls now support deferred provider-history mutation, and the shared turn committer advances `OllamaConversation` only after the durable SQLite turn succeeds; failed persistence therefore leaves provider history unchanged;
 - when conversation persistence cannot be opened, development chat remains explicitly available as unsaved in-memory session state; if a grounded retrieval/session commit has already advanced and the durable turn then fails, that tab is made non-continuable rather than continuing with divergent state;
 - added `SESSION-S0-004` with domain-level regression coverage for durable-before-provider-history ordering, failed-write history preservation, explicit unsaved mode and frozen repository-pin propagation.
+- CONV-03a adds read-only durable conversation list/snapshot materialization in one SQLite read transaction, preserving exact model identity, repository pins, ordered provider/display message content and citation provenance;
+- restored `OllamaConversation` history is rebuilt strictly from durable `provider_content` user/assistant pairs; snapshot loading does not yet authorize continuation, which remains CONV-03b;
+- added `SESSION-S0-005` plus native/domain regression coverage for coherent snapshot reads and exact provider-history rebuild.
 
 ### Startup qualification fixes
 

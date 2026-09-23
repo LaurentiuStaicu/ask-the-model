@@ -224,6 +224,173 @@ test_domain_bridge_rejects_wrong_provenance ()
     }
 }
 
+private static void
+test_snapshot_restore_provider_history ()
+{
+    string root = new_temp_root ();
+
+    try {
+        var store =
+            new AskTheModel.ConversationPersistenceStore (
+                root
+            );
+
+        var repository =
+            new AskTheModel.ConversationPersistenceRepository (
+                "rmd",
+                "0.1.0",
+                "0123456789abcdef0123456789abcdef01234567"
+            );
+
+        string conversation_id =
+            store.create_conversation (
+                "Grounded",
+                20,
+                "model-b",
+                "digest-b",
+                7,
+                { repository }
+            );
+
+        var citation =
+            new AskTheModel.ConversationPersistenceCitation (
+                "S1",
+                "rmd",
+                "0.1.0",
+                "0123456789abcdef0123456789abcdef01234567",
+                "source-1",
+                "README.md",
+                "lines 1-2",
+                "Title",
+                "Excerpt"
+            );
+
+        assert (
+            store.commit_turn (
+                conversation_id,
+                "question",
+                "answer [S1]",
+                "answer",
+                true,
+                21,
+                { citation }
+            ) == 0
+        );
+        assert (
+            store.commit_turn (
+                conversation_id,
+                "follow-up",
+                "plain follow-up",
+                "plain follow-up",
+                false,
+                22,
+                {}
+            ) == 1
+        );
+
+        store.update_title (
+            conversation_id,
+            "Updated",
+            23
+        );
+
+        AskTheModel.ConversationPersistenceSummary[] summaries =
+            store.list_conversations ();
+
+        assert (summaries.length == 1);
+        assert (
+            summaries[0].conversation_id ==
+            conversation_id
+        );
+        assert (summaries[0].title == "Updated");
+        assert (summaries[0].updated_at_us == 23);
+        assert (!summaries[0].archived);
+
+        AskTheModel.ConversationPersistenceSnapshot snapshot =
+            store.load_snapshot (
+                conversation_id
+            );
+
+        assert (
+            snapshot.conversation_id ==
+            conversation_id
+        );
+        assert (snapshot.title == "Updated");
+        assert (snapshot.model_name == "model-b");
+        assert (snapshot.model_digest == "digest-b");
+        assert (
+            snapshot.repository_generation_id == 7
+        );
+        assert (snapshot.repositories.length == 1);
+        assert (
+            snapshot.repositories[0].repository_id ==
+            "rmd"
+        );
+        assert (snapshot.messages.length == 4);
+        assert (snapshot.messages[0].role == "user");
+        assert (
+            snapshot.messages[0].provider_content ==
+            "question"
+        );
+        assert (
+            snapshot.messages[1].role ==
+            "assistant"
+        );
+        assert (
+            snapshot.messages[1].provider_content ==
+            "answer [S1]"
+        );
+        assert (
+            snapshot.messages[1].display_content ==
+            "answer"
+        );
+        assert (snapshot.messages[1].grounded);
+        assert (
+            snapshot.messages[1].citations.length ==
+            1
+        );
+        assert (
+            snapshot.messages[1].citations[0].label ==
+            "S1"
+        );
+
+        var restored =
+            new AskTheModel.OllamaConversation ();
+
+        snapshot.restore_provider_history (
+            restored
+        );
+
+        assert (restored.message_count () == 4);
+        assert (restored.role_at (0) == "user");
+        assert (
+            restored.content_at (0) ==
+            "question"
+        );
+        assert (
+            restored.role_at (1) ==
+            "assistant"
+        );
+        assert (
+            restored.content_at (1) ==
+            "answer [S1]"
+        );
+        assert (restored.role_at (2) == "user");
+        assert (
+            restored.content_at (2) ==
+            "follow-up"
+        );
+        assert (
+            restored.content_at (3) ==
+            "plain follow-up"
+        );
+        assert (restored.content_at (4) == null);
+    } catch (Error error) {
+        critical ("%s", error.message);
+        assert_not_reached ();
+    }
+}
+
 public static int
 main (string[] args)
 {
@@ -236,6 +403,10 @@ main (string[] args)
     Test.add_func (
         "/conversation-persistence/rejects-wrong-provenance",
         test_domain_bridge_rejects_wrong_provenance
+    );
+    Test.add_func (
+        "/conversation-persistence/snapshot-restore-provider-history",
+        test_snapshot_restore_provider_history
     );
 
     return Test.run ();

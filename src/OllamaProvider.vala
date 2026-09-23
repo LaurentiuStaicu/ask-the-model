@@ -12,6 +12,26 @@ namespace AskTheModel {
             return (uint) roles.length;
         }
 
+        public string? role_at (
+            uint index
+        ) {
+            if (index >= roles.length) {
+                return null;
+            }
+
+            return roles[index];
+        }
+
+        public string? content_at (
+            uint index
+        ) {
+            if (index >= contents.length) {
+                return null;
+            }
+
+            return contents[index];
+        }
+
         public void commit_exchange (
             string prompt,
             string answer
