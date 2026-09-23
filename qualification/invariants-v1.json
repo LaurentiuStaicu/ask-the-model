@@ -290,6 +290,21 @@
       "tested_by": [
         "meson:control-state"
       ]
+    },
+    {
+      "id": "STATE-S0-004",
+      "category": "STATE",
+      "severity": "S0",
+      "lifecycle": "enforced",
+      "statement": "The DB-backed repository-state adapter must read only a valid existing AtM Control DB and only its active COMPLETE generation, must never fall back to repository-state.json or implicitly create a missing authority, must preserve repository SHA/version/seal validation, must apply set_current and set_snapshot_seal transactionally to the active authority, must create the first active generation only inside an already-published empty Control DB, and must restore its in-memory record when persistence fails. The adapter remains unwired from application startup and repository lifecycle until a separate authority-switch gate.",
+      "enforced_by": [
+        "src/control_state.c",
+        "src/ControlRepositoryState.vala"
+      ],
+      "tested_by": [
+        "meson:control-state",
+        "meson:control-repository-state"
+      ]
     }
   ]
 }

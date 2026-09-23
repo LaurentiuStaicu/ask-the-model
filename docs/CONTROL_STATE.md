@@ -86,3 +86,22 @@ For a previously absent authoritative `control-state.sqlite3`, the primitive:
 A failure before publication removes the private candidate and sidecars. If publication has already happened but the final directory fsync reports an error, the final database is left intact rather than being destructively rolled back.
 
 STATE-03a still does **not** make SQLite authoritative in the running application. STATE-03b/03c will separately qualify the DB-backed repository-state adapter and startup authority switch.
+
+
+## STATE-03b — DB-backed repository-state adapter
+
+STATE-03b adds a Vala repository-state adapter backed exclusively by the Control DB. It is compiled and tested independently but is still not wired into application startup or `RepositoryLifecycleService`.
+
+The adapter deliberately has no JSON fallback:
+
+- missing `control-state.sqlite3` is reported as `ABSENT`;
+- malformed, foreign, incomplete, or authority-inconsistent SQLite is reported as `INVALID`;
+- only an active `COMPLETE` repository generation can be read;
+- an empty, already-published Control DB is a valid state with no ready repositories;
+- normal mutations never create the authoritative database file.
+
+For the current pre-STATE-04 semantics, `set_current` updates the active COMPLETE generation transactionally. If the already-published Control DB is an empty bootstrap, the first successful `set_current` creates and activates generation `1` with origin `runtime-state-v1`. `set_snapshot_seal` requires the exact active snapshot SHA.
+
+The Vala adapter mirrors the current JSON store's validation and rollback behavior: invalid SHA/version/seal inputs are rejected before persistence, and an SQLite write failure restores the in-memory record.
+
+STATE-03b does not implement immutable generations. That remains a separate STATE-04 qualification step.

@@ -2041,6 +2041,789 @@ publish_no_replace (
     return TRUE;
 }
 
+
+static gboolean
+open_existing_control_state (
+    const char *path,
+    AtmControlStateStore **out_store,
+    GError **error
+)
+{
+    if (!nonempty (path) ||
+        out_store == NULL ||
+        *out_store != NULL) {
+        g_set_error_literal (
+            error,
+            ATM_CONTROL_STATE_ERROR,
+            ATM_CONTROL_STATE_ERROR_ARGUMENT,
+            "Existing control-state open received invalid arguments."
+        );
+        return FALSE;
+    }
+
+    sqlite3 *db = NULL;
+    int rc = sqlite3_open_v2 (
+        path,
+        &db,
+        SQLITE_OPEN_READWRITE |
+        SQLITE_OPEN_FULLMUTEX,
+        NULL
+    );
+
+    if (rc != SQLITE_OK) {
+        set_sqlite_error (
+            db,
+            error,
+            ATM_CONTROL_STATE_ERROR_IO,
+            "Could not open existing control-state database"
+        );
+        if (db != NULL) {
+            sqlite3_close (db);
+        }
+        return FALSE;
+    }
+
+    AtmControlStateStore *store = g_new0 (
+        AtmControlStateStore,
+        1
+    );
+    store->db = db;
+    store->path = g_strdup (path);
+
+    if (!configure_connection (
+            db,
+            error
+        ) ||
+        !atm_control_state_validate (
+            store,
+            error
+        )) {
+        atm_control_state_close (store);
+        return FALSE;
+    }
+
+    *out_store = store;
+    return TRUE;
+}
+
+static gboolean
+active_complete_generation (
+    sqlite3 *db,
+    gboolean create_if_absent,
+    gint64 *out_generation_id,
+    GError **error
+)
+{
+    sqlite3_stmt *active_statement = NULL;
+
+    if (!prepare_statement (
+            db,
+            "SELECT active_repository_generation "
+            "FROM active_state "
+            "WHERE singleton_id=1;",
+            &active_statement,
+            error
+        )) {
+        return FALSE;
+    }
+
+    int rc = sqlite3_step (active_statement);
+
+    if (rc != SQLITE_ROW) {
+        sqlite3_finalize (active_statement);
+        g_set_error_literal (
+            error,
+            ATM_CONTROL_STATE_ERROR,
+            ATM_CONTROL_STATE_ERROR_SCHEMA,
+            "Control state has no active_state singleton row."
+        );
+        return FALSE;
+    }
+
+    gboolean active_is_null =
+        sqlite3_column_type (
+            active_statement,
+            0
+        ) == SQLITE_NULL;
+    gint64 generation_id =
+        active_is_null
+            ? 0
+            : sqlite3_column_int64 (
+                active_statement,
+                0
+            );
+
+    if (sqlite3_step (active_statement) !=
+        SQLITE_DONE) {
+        sqlite3_finalize (active_statement);
+        g_set_error_literal (
+            error,
+            ATM_CONTROL_STATE_ERROR,
+            ATM_CONTROL_STATE_ERROR_SCHEMA,
+            "Control state has multiple active_state singleton rows."
+        );
+        return FALSE;
+    }
+
+    sqlite3_finalize (active_statement);
+
+    if (generation_id == 0) {
+        if (!create_if_absent) {
+            *out_generation_id = 0;
+            return TRUE;
+        }
+
+        gint64 generation_count = 0;
+
+        if (!query_single_int64 (
+                db,
+                "SELECT count(*) "
+                "FROM repository_generations;",
+                &generation_count,
+                error
+            )) {
+            return FALSE;
+        }
+
+        if (generation_count != 0) {
+            g_set_error_literal (
+                error,
+                ATM_CONTROL_STATE_ERROR,
+                ATM_CONTROL_STATE_ERROR_CONFLICT,
+                "Control state has repository generations but no active authority."
+            );
+            return FALSE;
+        }
+
+        if (!exec_sql (
+                db,
+                "INSERT INTO repository_generations("
+                "generation_id, lifecycle, origin"
+                ") VALUES(1, 'COMPLETE', 'runtime-state-v1');"
+                "UPDATE active_state "
+                "SET active_repository_generation=1 "
+                "WHERE singleton_id=1 "
+                "AND active_repository_generation IS NULL;",
+                error
+            )) {
+            return FALSE;
+        }
+
+        generation_id = 1;
+    }
+
+    sqlite3_stmt *lifecycle_statement = NULL;
+
+    if (!prepare_statement (
+            db,
+            "SELECT lifecycle "
+            "FROM repository_generations "
+            "WHERE generation_id=?1;",
+            &lifecycle_statement,
+            error
+        )) {
+        return FALSE;
+    }
+
+    sqlite3_bind_int64 (
+        lifecycle_statement,
+        1,
+        generation_id
+    );
+
+    rc = sqlite3_step (lifecycle_statement);
+
+    if (rc != SQLITE_ROW) {
+        sqlite3_finalize (lifecycle_statement);
+        g_set_error_literal (
+            error,
+            ATM_CONTROL_STATE_ERROR,
+            ATM_CONTROL_STATE_ERROR_CONFLICT,
+            "Active repository generation does not exist."
+        );
+        return FALSE;
+    }
+
+    const char *lifecycle =
+        (const char *) sqlite3_column_text (
+            lifecycle_statement,
+            0
+        );
+    gboolean complete =
+        g_strcmp0 (
+            lifecycle,
+            "COMPLETE"
+        ) == 0;
+
+    if (sqlite3_step (lifecycle_statement) !=
+        SQLITE_DONE) {
+        sqlite3_finalize (lifecycle_statement);
+        g_set_error_literal (
+            error,
+            ATM_CONTROL_STATE_ERROR,
+            ATM_CONTROL_STATE_ERROR_SCHEMA,
+            "Active repository generation lookup returned multiple rows."
+        );
+        return FALSE;
+    }
+
+    sqlite3_finalize (lifecycle_statement);
+
+    if (!complete) {
+        g_set_error_literal (
+            error,
+            ATM_CONTROL_STATE_ERROR,
+            ATM_CONTROL_STATE_ERROR_CONFLICT,
+            "Active repository generation is not COMPLETE."
+        );
+        return FALSE;
+    }
+
+    *out_generation_id = generation_id;
+    return TRUE;
+}
+
+gboolean
+atm_control_state_load_repository_values (
+    const char *path,
+    const char *repository_id,
+    gboolean *out_present,
+    char **out_snapshot_sha,
+    char **out_repository_version,
+    char **out_snapshot_seal_sha256,
+    GError **error
+)
+{
+    if (!nonempty (path) ||
+        !legacy_repository_id_known (
+            repository_id
+        ) ||
+        out_present == NULL ||
+        out_snapshot_sha == NULL ||
+        out_repository_version == NULL ||
+        out_snapshot_seal_sha256 == NULL) {
+        g_set_error_literal (
+            error,
+            ATM_CONTROL_STATE_ERROR,
+            ATM_CONTROL_STATE_ERROR_ARGUMENT,
+            "Control-state repository read received invalid arguments."
+        );
+        return FALSE;
+    }
+
+    *out_present = FALSE;
+    *out_snapshot_sha = NULL;
+    *out_repository_version = NULL;
+    *out_snapshot_seal_sha256 = NULL;
+
+    AtmControlStateStore *store = NULL;
+
+    if (!open_existing_control_state (
+            path,
+            &store,
+            error
+        )) {
+        return FALSE;
+    }
+
+    gint64 generation_id = 0;
+    gboolean ok = FALSE;
+
+    if (!active_complete_generation (
+            store->db,
+            FALSE,
+            &generation_id,
+            error
+        )) {
+        goto done;
+    }
+
+    if (generation_id == 0) {
+        ok = TRUE;
+        goto done;
+    }
+
+    sqlite3_stmt *statement = NULL;
+
+    if (!prepare_statement (
+            store->db,
+            "SELECT snapshot_sha, "
+            "repository_version, "
+            "snapshot_seal_sha256 "
+            "FROM generation_repositories "
+            "WHERE generation_id=?1 "
+            "AND repository_id=?2;",
+            &statement,
+            error
+        )) {
+        goto done;
+    }
+
+    sqlite3_bind_int64 (
+        statement,
+        1,
+        generation_id
+    );
+    sqlite3_bind_text (
+        statement,
+        2,
+        repository_id,
+        -1,
+        SQLITE_STATIC
+    );
+
+    int rc = sqlite3_step (statement);
+
+    if (rc == SQLITE_DONE) {
+        sqlite3_finalize (statement);
+        ok = TRUE;
+        goto done;
+    }
+
+    if (rc != SQLITE_ROW) {
+        sqlite3_finalize (statement);
+        set_sqlite_error (
+            store->db,
+            error,
+            ATM_CONTROL_STATE_ERROR_SQLITE,
+            "Could not read active repository state"
+        );
+        goto done;
+    }
+
+    const char *snapshot_sha =
+        (const char *) sqlite3_column_text (
+            statement,
+            0
+        );
+    const char *repository_version =
+        (const char *) sqlite3_column_text (
+            statement,
+            1
+        );
+
+    if (!lower_hex_exact (
+            snapshot_sha,
+            40
+        ) ||
+        !nonempty (repository_version)) {
+        sqlite3_finalize (statement);
+        g_set_error_literal (
+            error,
+            ATM_CONTROL_STATE_ERROR,
+            ATM_CONTROL_STATE_ERROR_INTEGRITY,
+            "Active repository state contains an invalid snapshot identity."
+        );
+        goto done;
+    }
+
+    *out_snapshot_sha =
+        g_strdup (snapshot_sha);
+    *out_repository_version =
+        g_strdup (repository_version);
+
+    if (sqlite3_column_type (
+            statement,
+            2
+        ) != SQLITE_NULL) {
+        const char *seal =
+            (const char *) sqlite3_column_text (
+                statement,
+                2
+            );
+
+        if (!lower_hex_exact (
+                seal,
+                64
+            )) {
+            sqlite3_finalize (statement);
+            g_clear_pointer (
+                out_snapshot_sha,
+                g_free
+            );
+            g_clear_pointer (
+                out_repository_version,
+                g_free
+            );
+            g_set_error_literal (
+                error,
+                ATM_CONTROL_STATE_ERROR,
+                ATM_CONTROL_STATE_ERROR_INTEGRITY,
+                "Active repository state contains an invalid snapshot seal."
+            );
+            goto done;
+        }
+
+        *out_snapshot_seal_sha256 =
+            g_strdup (seal);
+    }
+
+    if (sqlite3_step (statement) !=
+        SQLITE_DONE) {
+        sqlite3_finalize (statement);
+        g_clear_pointer (
+            out_snapshot_sha,
+            g_free
+        );
+        g_clear_pointer (
+            out_repository_version,
+            g_free
+        );
+        g_clear_pointer (
+            out_snapshot_seal_sha256,
+            g_free
+        );
+        g_set_error_literal (
+            error,
+            ATM_CONTROL_STATE_ERROR,
+            ATM_CONTROL_STATE_ERROR_SCHEMA,
+            "Active repository state contains duplicate rows."
+        );
+        goto done;
+    }
+
+    sqlite3_finalize (statement);
+    *out_present = TRUE;
+    ok = TRUE;
+
+done:
+    atm_control_state_close (store);
+    return ok;
+}
+
+gboolean
+atm_control_state_set_current_values (
+    const char *path,
+    const char *repository_id,
+    const char *snapshot_sha,
+    const char *repository_version,
+    const char *snapshot_seal_sha256,
+    GError **error
+)
+{
+    if (!nonempty (path) ||
+        !legacy_repository_id_known (
+            repository_id
+        ) ||
+        !lower_hex_exact (
+            snapshot_sha,
+            40
+        ) ||
+        !nonempty (repository_version) ||
+        (snapshot_seal_sha256 != NULL &&
+         !lower_hex_exact (
+             snapshot_seal_sha256,
+             64
+         ))) {
+        g_set_error_literal (
+            error,
+            ATM_CONTROL_STATE_ERROR,
+            ATM_CONTROL_STATE_ERROR_ARGUMENT,
+            "Control-state set-current received invalid repository values."
+        );
+        return FALSE;
+    }
+
+    AtmControlStateStore *store = NULL;
+
+    if (!open_existing_control_state (
+            path,
+            &store,
+            error
+        )) {
+        return FALSE;
+    }
+
+    if (!exec_sql (
+            store->db,
+            "BEGIN IMMEDIATE;",
+            error
+        )) {
+        atm_control_state_close (store);
+        return FALSE;
+    }
+
+    gboolean ok = FALSE;
+    sqlite3_stmt *statement = NULL;
+    gint64 generation_id = 0;
+
+    if (!active_complete_generation (
+            store->db,
+            TRUE,
+            &generation_id,
+            error
+        )) {
+        goto rollback;
+    }
+
+    if (!prepare_statement (
+            store->db,
+            "INSERT INTO generation_repositories("
+            "generation_id, repository_id, "
+            "snapshot_sha, repository_version, "
+            "snapshot_seal_sha256"
+            ") VALUES(?1, ?2, ?3, ?4, ?5) "
+            "ON CONFLICT(generation_id, repository_id) "
+            "DO UPDATE SET "
+            "snapshot_sha=excluded.snapshot_sha, "
+            "repository_version=excluded.repository_version, "
+            "snapshot_seal_sha256=excluded.snapshot_seal_sha256;",
+            &statement,
+            error
+        )) {
+        goto rollback;
+    }
+
+    sqlite3_bind_int64 (
+        statement,
+        1,
+        generation_id
+    );
+    sqlite3_bind_text (
+        statement,
+        2,
+        repository_id,
+        -1,
+        SQLITE_STATIC
+    );
+    sqlite3_bind_text (
+        statement,
+        3,
+        snapshot_sha,
+        -1,
+        SQLITE_STATIC
+    );
+    sqlite3_bind_text (
+        statement,
+        4,
+        repository_version,
+        -1,
+        SQLITE_STATIC
+    );
+
+    if (snapshot_seal_sha256 == NULL) {
+        sqlite3_bind_null (
+            statement,
+            5
+        );
+    } else {
+        sqlite3_bind_text (
+            statement,
+            5,
+            snapshot_seal_sha256,
+            -1,
+            SQLITE_STATIC
+        );
+    }
+
+    if (sqlite3_step (statement) !=
+        SQLITE_DONE) {
+        set_sqlite_error (
+            store->db,
+            error,
+            ATM_CONTROL_STATE_ERROR_SQLITE,
+            "Could not update active repository state"
+        );
+        goto rollback;
+    }
+
+    sqlite3_finalize (statement);
+    statement = NULL;
+
+    if (!exec_sql (
+            store->db,
+            "COMMIT;",
+            error
+        )) {
+        goto rollback;
+    }
+
+    ok = TRUE;
+
+rollback:
+    if (statement != NULL) {
+        sqlite3_finalize (statement);
+    }
+
+    if (!ok) {
+        sqlite3_exec (
+            store->db,
+            "ROLLBACK;",
+            NULL,
+            NULL,
+            NULL
+        );
+    }
+
+    atm_control_state_close (store);
+    return ok;
+}
+
+gboolean
+atm_control_state_set_snapshot_seal_values (
+    const char *path,
+    const char *repository_id,
+    const char *expected_snapshot_sha,
+    const char *snapshot_seal_sha256,
+    GError **error
+)
+{
+    if (!nonempty (path) ||
+        !legacy_repository_id_known (
+            repository_id
+        ) ||
+        !lower_hex_exact (
+            expected_snapshot_sha,
+            40
+        ) ||
+        !lower_hex_exact (
+            snapshot_seal_sha256,
+            64
+        )) {
+        g_set_error_literal (
+            error,
+            ATM_CONTROL_STATE_ERROR,
+            ATM_CONTROL_STATE_ERROR_ARGUMENT,
+            "Control-state set-seal received invalid repository values."
+        );
+        return FALSE;
+    }
+
+    AtmControlStateStore *store = NULL;
+
+    if (!open_existing_control_state (
+            path,
+            &store,
+            error
+        )) {
+        return FALSE;
+    }
+
+    if (!exec_sql (
+            store->db,
+            "BEGIN IMMEDIATE;",
+            error
+        )) {
+        atm_control_state_close (store);
+        return FALSE;
+    }
+
+    gboolean ok = FALSE;
+    sqlite3_stmt *statement = NULL;
+    gint64 generation_id = 0;
+
+    if (!active_complete_generation (
+            store->db,
+            FALSE,
+            &generation_id,
+            error
+        )) {
+        goto rollback;
+    }
+
+    if (generation_id == 0) {
+        g_set_error_literal (
+            error,
+            ATM_CONTROL_STATE_ERROR,
+            ATM_CONTROL_STATE_ERROR_CONFLICT,
+            "No active repository generation exists for snapshot-seal update."
+        );
+        goto rollback;
+    }
+
+    if (!prepare_statement (
+            store->db,
+            "UPDATE generation_repositories "
+            "SET snapshot_seal_sha256=?1 "
+            "WHERE generation_id=?2 "
+            "AND repository_id=?3 "
+            "AND snapshot_sha=?4;",
+            &statement,
+            error
+        )) {
+        goto rollback;
+    }
+
+    sqlite3_bind_text (
+        statement,
+        1,
+        snapshot_seal_sha256,
+        -1,
+        SQLITE_STATIC
+    );
+    sqlite3_bind_int64 (
+        statement,
+        2,
+        generation_id
+    );
+    sqlite3_bind_text (
+        statement,
+        3,
+        repository_id,
+        -1,
+        SQLITE_STATIC
+    );
+    sqlite3_bind_text (
+        statement,
+        4,
+        expected_snapshot_sha,
+        -1,
+        SQLITE_STATIC
+    );
+
+    if (sqlite3_step (statement) !=
+        SQLITE_DONE) {
+        set_sqlite_error (
+            store->db,
+            error,
+            ATM_CONTROL_STATE_ERROR_SQLITE,
+            "Could not update active repository snapshot seal"
+        );
+        goto rollback;
+    }
+
+    if (sqlite3_changes (store->db) != 1) {
+        g_set_error_literal (
+            error,
+            ATM_CONTROL_STATE_ERROR,
+            ATM_CONTROL_STATE_ERROR_CONFLICT,
+            "Snapshot seal cannot be attached to a different or absent active snapshot."
+        );
+        goto rollback;
+    }
+
+    sqlite3_finalize (statement);
+    statement = NULL;
+
+    if (!exec_sql (
+            store->db,
+            "COMMIT;",
+            error
+        )) {
+        goto rollback;
+    }
+
+    ok = TRUE;
+
+rollback:
+    if (statement != NULL) {
+        sqlite3_finalize (statement);
+    }
+
+    if (!ok) {
+        sqlite3_exec (
+            store->db,
+            "ROLLBACK;",
+            NULL,
+            NULL,
+            NULL
+        );
+    }
+
+    atm_control_state_close (store);
+    return ok;
+}
+
 gboolean
 atm_control_state_publish_cutover (
     const char *control_path,

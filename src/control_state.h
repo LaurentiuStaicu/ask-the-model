@@ -46,6 +46,33 @@ gboolean atm_control_state_validate (
     GError **error
 );
 
+gboolean atm_control_state_load_repository_values (
+    const char *path,
+    const char *repository_id,
+    gboolean *out_present,
+    char **out_snapshot_sha,
+    char **out_repository_version,
+    char **out_snapshot_seal_sha256,
+    GError **error
+);
+
+gboolean atm_control_state_set_current_values (
+    const char *path,
+    const char *repository_id,
+    const char *snapshot_sha,
+    const char *repository_version,
+    const char *snapshot_seal_sha256,
+    GError **error
+);
+
+gboolean atm_control_state_set_snapshot_seal_values (
+    const char *path,
+    const char *repository_id,
+    const char *expected_snapshot_sha,
+    const char *snapshot_seal_sha256,
+    GError **error
+);
+
 gboolean atm_control_state_publish_cutover (
     const char *control_path,
     const char *legacy_json_path,
