@@ -64,6 +64,7 @@ executable(
     'src/scientific_control.c',
     'src/scientific_canonical.c',
     'src/scientific_artifact.c',
+    'src/scientific_result.c',
     'src/retrieval_rank.c',
     'src/retrieval_scope.c',
     'src/retrieval_router.c',
@@ -706,6 +707,51 @@ scientific_artifact_test = executable(
 test(
   'scientific-artifact',
   scientific_artifact_test
+)
+
+scientific_result_test = executable(
+  'scientific-result-test',
+  [
+    'src/scientific_canonical.c',
+    'src/scientific_artifact.c',
+    'src/scientific_result.c',
+    'tests/scientific_result_test.c'
+  ],
+  include_directories: include_directories('src'),
+  dependencies: [
+    glib_dep,
+    json_glib_dep
+  ],
+  install: false
+)
+
+test(
+  'scientific-result',
+  scientific_result_test
+)
+
+scientific_gold_v0_test = executable(
+  'scientific-gold-v0-test',
+  [
+    'src/scientific_canonical.c',
+    'src/scientific_artifact.c',
+    'src/scientific_result.c',
+    'tests/scientific_gold_v0_test.c'
+  ],
+  include_directories: include_directories('src'),
+  dependencies: [
+    glib_dep,
+    json_glib_dep
+  ],
+  install: false
+)
+
+test(
+  'scientific-gold-v0',
+  scientific_gold_v0_test,
+  env: {
+    'ATM_SCIENTIFIC_GOLD_V0': meson.current_source_dir() / 'qualification/scientific-gold-v0.json'
+  }
 )
 
 retrieval_rank_test = executable(

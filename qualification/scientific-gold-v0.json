@@ -1,0 +1,247 @@
+{
+  "schema": "atm-scientific-gold/0",
+  "pinned_repositories": {
+    "ewd": {
+      "repository": "LaurentiuStaicu/empirical-world3-dynamics",
+      "sha": "eddeabbbb4dcdceed1ff02102ea1040e24ed7fa0",
+      "profile": "atm-profile/ewd/v1@1",
+      "version": "0.1.0"
+    },
+    "cbd": {
+      "repository": "LaurentiuStaicu/cognitive-belief-dynamics",
+      "sha": "23e53ae1e44530d05d494cefff194b66570bb59b",
+      "profile": "atm-profile/cbd/v1@1",
+      "version": "0.1.1"
+    },
+    "rmd": {
+      "repository": "LaurentiuStaicu/romanian-monetary-dynamics",
+      "sha": "3a0dc09b03964c8001c76bd7df4ec8b24d265c1e",
+      "profile": "atm-profile/rmd/v1@1",
+      "version": "0.3.0"
+    }
+  },
+  "policy": {
+    "llm_required": false,
+    "derived_facts_allowed": false,
+    "operations_allowed": false,
+    "numeric_profile": "atm-numeric/exact-decimal+binary64-v1",
+    "canonical_obligations": [
+      "atm-sra/1",
+      "typed-support-only",
+      "deterministic-control-required-where-applicable",
+      "retrieval-order-invariant",
+      "no-derived-facts-before-sci-06"
+    ]
+  },
+  "cases": [
+    {
+      "id": "SG-001",
+      "repository_id": "ewd",
+      "answerability": "ANSWERED",
+      "source_path": "science/configs/real_model_structure.json",
+      "locator": "json:/modules/2/variables/8",
+      "logical_source_id": "ewd:entity:variable:food_per_capita",
+      "artifact_class": "ewd.variable_record",
+      "payload": {
+        "id": "food_per_capita",
+        "kind": "auxiliary",
+        "unit": "food_unit/person/year",
+        "dimension": "food_per_capita_rate",
+        "evidence_role": "reference_equation",
+        "source_output": "food_per_capita"
+      },
+      "expected_facts": [
+        {
+          "fact_id": "sg001-kind",
+          "fact_type": "categorical",
+          "subject_id": "food_per_capita",
+          "attribute": "kind",
+          "value": "auxiliary"
+        },
+        {
+          "fact_id": "sg001-unit",
+          "fact_type": "unit",
+          "subject_id": "food_per_capita",
+          "attribute": "unit",
+          "value": "food_unit/person/year",
+          "unit": "food_unit/person/year",
+          "dimension": "food_per_capita_rate"
+        }
+      ]
+    },
+    {
+      "id": "SG-002",
+      "repository_id": "ewd",
+      "answerability": "ANSWERED",
+      "source_path": "data/scenarios/fit_diagnostics.csv",
+      "locator": "lines:4-4",
+      "logical_source_id": "ewd:dataset-row:data/scenarios/fit_diagnostics.csv:3",
+      "artifact_class": "ewd.fit_diagnostic_row",
+      "payload": {
+        "key": "food_per_capita",
+        "obs_start": "1961",
+        "obs_end": "2024",
+        "n": "64",
+        "historical_mape_pct": "7.005760432822278",
+        "historical_bias_pct": "-2.1090383536270454"
+      },
+      "expected_facts": [
+        {
+          "fact_id": "sg002-mape",
+          "fact_type": "exact_decimal",
+          "subject_id": "food_per_capita",
+          "attribute": "historical_mape_pct",
+          "value": "7.005760432822278",
+          "unit": "percent"
+        },
+        {
+          "fact_id": "sg002-window",
+          "fact_type": "range",
+          "subject_id": "food_per_capita",
+          "attribute": "observation_window",
+          "value": "1961..2024;n=64"
+        }
+      ]
+    },
+    {
+      "id": "SG-003",
+      "repository_id": "ewd",
+      "answerability": "ANSWERED",
+      "source_path": "data/scenarios/parameter_identifiability.csv",
+      "locator": "lines:2-2",
+      "logical_source_id": "ewd:dataset-row:data/scenarios/parameter_identifiability.csv:1",
+      "artifact_class": "ewd.parameter_identifiability_row",
+      "payload": {
+        "parameter": "resources",
+        "model_name": "initial nonrenewable resources",
+        "prior_lower": "1500000000000.0",
+        "prior_upper": "3500000000000.0",
+        "accepted_min": "1524129472503.1409",
+        "accepted_median": "2216513181185.4805",
+        "accepted_max": "3373062283798.921",
+        "accepted_range_fraction_of_prior": "0.9244664056478901",
+        "weakly_identified": "True"
+      },
+      "expected_facts": [
+        {
+          "fact_id": "sg003-range-fraction",
+          "fact_type": "exact_decimal",
+          "subject_id": "resources",
+          "attribute": "accepted_range_fraction_of_prior",
+          "value": "0.9244664056478901"
+        },
+        {
+          "fact_id": "sg003-weak",
+          "fact_type": "boolean",
+          "subject_id": "resources",
+          "attribute": "weakly_identified",
+          "value": "true"
+        }
+      ]
+    },
+    {
+      "id": "SG-004",
+      "repository_id": "cbd",
+      "answerability": "ANSWERED",
+      "source_path": "model/benchmarks/results/m1_e4_candidate_recovery_authoritative_2026-09-16.csv",
+      "locator": "lines:15-15",
+      "logical_source_id": "cbd:dataset-row:model/benchmarks/results/m1_e4_candidate_recovery_authoritative_2026-09-16.csv:14",
+      "artifact_class": "cbd.candidate_recovery_row",
+      "payload": {
+        "generator": "EVSD",
+        "regime": "medium",
+        "n_target": "160",
+        "n_foil": "160",
+        "operating_points": "5",
+        "replicates": "200",
+        "recovery_probability": "0.830",
+        "wrong_probability": "0.000",
+        "inconclusive_probability": "0.170",
+        "passes_0_80": "true",
+        "memory_mae_complex": "0.057175246",
+        "memory_mae_simple": "0.058429562",
+        "bias_rmse": "0.075273127"
+      },
+      "expected_facts": [
+        {
+          "fact_id": "sg004-recovery",
+          "fact_type": "exact_decimal",
+          "subject_id": "EVSD|medium|160|160|5|200",
+          "attribute": "recovery_probability",
+          "value": "0.830"
+        },
+        {
+          "fact_id": "sg004-pass",
+          "fact_type": "boolean",
+          "subject_id": "EVSD|medium|160|160|5|200",
+          "attribute": "passes_0_80",
+          "value": "true"
+        }
+      ],
+      "note": "Do not identify this case by CSV row_key alone; current row_key is only the first column and is non-unique."
+    },
+    {
+      "id": "SG-005",
+      "repository_id": "rmd",
+      "answerability": "BLOCKED",
+      "control_id": "RMD_BEHAVIOURAL_CLOSURE_ACTIVE",
+      "source_path": "model/dynamics/core_contract.json",
+      "locator": "/behavioural_closure/active",
+      "artifact_class": "rmd.behavioural_closure_active_control",
+      "scalar_type": "boolean",
+      "value": "false",
+      "expected_constraint": {
+        "constraint_id": "rmd.behavioural_closure_required",
+        "status": "DENY",
+        "reason_code": "CONTROL_CONSTRAINT_DENIED"
+      }
+    },
+    {
+      "id": "SG-006",
+      "repository_id": "rmd",
+      "answerability": "ANSWERED",
+      "source_path": "model/dynamics/core_contract.json",
+      "locator": "json:/stocks/0",
+      "logical_source_id": "rmd:entity:stock:bilateral_financial_position",
+      "artifact_class": "rmd.stock_record",
+      "payload": {
+        "id": "bilateral_financial_position",
+        "index": [
+          "holder",
+          "issuer",
+          "instrument"
+        ],
+        "unit": "million_RON",
+        "meaning": "Financial asset of holder and equal financial liability of issuer represented once.",
+        "scientific_status": "ACCOUNTING_IDENTITY"
+      },
+      "expected_facts": [
+        {
+          "fact_id": "sg006-unit",
+          "fact_type": "unit",
+          "subject_id": "bilateral_financial_position",
+          "attribute": "unit",
+          "value": "million_RON",
+          "unit": "million_RON"
+        },
+        {
+          "fact_id": "sg006-status",
+          "fact_type": "categorical",
+          "subject_id": "bilateral_financial_position",
+          "attribute": "scientific_status",
+          "value": "ACCOUNTING_IDENTITY"
+        }
+      ]
+    },
+    {
+      "id": "SG-007",
+      "repository_id": "ewd",
+      "answerability": "NOT_ANSWERABLE",
+      "source_path": "science/configs/real_model_structure.json",
+      "locator": "json:/modules/0",
+      "unsupported_selector": "module",
+      "expected_reason_code": "UNSUPPORTED_SEMANTICS",
+      "expected_facts": []
+    }
+  ]
+}
