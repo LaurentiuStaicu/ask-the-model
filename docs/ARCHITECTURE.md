@@ -163,6 +163,8 @@ Current-turn grounding context, grounded Ollama request construction, temporary 
 
 Responsible for future durable local conversation storage, conversation navigation and recording which repository context and AI model were active.
 
+Current development `main` now includes the restore prerequisite for repository-backed persistence: `RepositoryLifecycleService` can reconstruct frozen grounding from an explicit historical COMPLETE Control DB `repository_generation_id` without changing `active_state`. The restore path validates the saved generation's repository rows, snapshot SHA/version/seal and local snapshot/index before a session can resume. It does not yet persist conversation transcripts or reopen tabs across application restarts.
+
 ### Application settings
 
 Responsible for future provider endpoint configuration, preferred AI model and application-level preferences. Repository source snapshots use the fixed visible location `~/Ask the Model/Repositories`; derived indexes and application state remain in AtM's private XDG cache/state locations. Arbitrary repository storage locations are not a v1 setting.

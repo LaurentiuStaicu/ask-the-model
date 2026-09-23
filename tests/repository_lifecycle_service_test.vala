@@ -329,6 +329,32 @@ namespace AskTheModel.Tests {
             assert (zero.is_frozen ());
             assert (zero.repository_count () == 0);
 
+            ConversationGrounding restored_zero =
+                yield service.prepare_conversation_grounding_at_generation (
+                    none,
+                    0
+                );
+            assert (restored_zero.is_frozen ());
+            assert (
+                restored_zero.repository_count () == 0
+            );
+            assert (
+                restored_zero.repository_generation_id () == 0
+            );
+
+            bool invalid_zero_generation_rejected = false;
+            try {
+                yield service.prepare_conversation_grounding_at_generation (
+                    one,
+                    0
+                );
+            } catch (RepositoryError error) {
+                invalid_zero_generation_rejected =
+                    error.code ==
+                    RepositoryError.INVALID_RESPONSE;
+            }
+            assert (invalid_zero_generation_rejected);
+
             bool not_ready_rejected = false;
 
             try {
@@ -457,6 +483,81 @@ namespace AskTheModel.Tests {
                 pinned_session.repository_generation_id () == 2
             );
 
+            string unavailable_sha =
+                "7777777777777777777777777777777777777777";
+            advancing_writer.set_current (
+                sealed_descriptor.id,
+                unavailable_sha,
+                "0.2.0",
+                enrolled_seal_value
+            );
+            assert (
+                advancing_writer.repository_generation_id == 4
+            );
+
+            bool active_generation_missing_rejected = false;
+            try {
+                yield sealed_service.prepare_conversation_grounding (
+                    sealed_selection
+                );
+            } catch (RepositoryError error) {
+                active_generation_missing_rejected =
+                    error.code == RepositoryError.NOT_READY;
+            }
+            assert (active_generation_missing_rejected);
+
+            ConversationGrounding restored_historical =
+                yield sealed_service.prepare_conversation_grounding_at_generation (
+                    sealed_selection,
+                    2
+                );
+            assert (restored_historical.is_frozen ());
+            assert (
+                restored_historical.repository_count () == 1
+            );
+            assert (
+                restored_historical.repository_generation_id () == 2
+            );
+
+            var restored_session =
+                new ConversationSession ();
+            restored_session.begin (
+                restored_historical,
+                "test-model"
+            );
+            assert (
+                restored_session.repository_generation_id () == 2
+            );
+
+            var after_historical_restore =
+                new ControlRepositoryStateStore (
+                    sealed_state_root
+                );
+            assert (
+                after_historical_restore.repository_generation_id == 4
+            );
+
+            bool missing_generation_rejected = false;
+            try {
+                yield sealed_service.prepare_conversation_grounding_at_generation (
+                    sealed_selection,
+                    9999
+                );
+            } catch (GLib.Error error) {
+                missing_generation_rejected = true;
+            }
+            assert (missing_generation_rejected);
+
+            advancing_writer.set_current (
+                sealed_descriptor.id,
+                sealed_sha,
+                "0.1.0",
+                enrolled_seal_value
+            );
+            assert (
+                advancing_writer.repository_generation_id == 5
+            );
+
             var enrolled_state =
                 new ControlRepositoryStateStore (
                     sealed_state_root
@@ -471,7 +572,7 @@ namespace AskTheModel.Tests {
             assert (enrolled_seal != null);
             assert (enrolled_seal == enrolled_seal_value);
             assert (
-                enrolled_state.repository_generation_id == 3
+                enrolled_state.repository_generation_id == 5
             );
 
             remove_tree_best_effort (

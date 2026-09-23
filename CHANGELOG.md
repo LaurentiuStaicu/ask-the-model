@@ -4,6 +4,12 @@ All notable public releases of Ask the Model are recorded here.
 
 ## Unreleased
 
+### Conversation persistence groundwork
+
+- added a read-only historical repository-generation grounding path that reconstructs a repository-backed conversation from its exact saved COMPLETE Control DB generation instead of substituting the current active generation;
+- historical restore validates repository presence, snapshot SHA/version/seal and local snapshot/index, fails closed when saved state is unavailable, leaves `active_state` unchanged and reserves generation 0 for zero-repository conversations;
+- added `SESSION-S0-002` qualification coverage as a prerequisite for future durable transcript/tab persistence.
+
 ### Control State and repository-generation hardening
 
 - added an application-owned SQLite `control-state.sqlite3` foundation with AtM identity/schema checks, foreign-key enforcement, WAL + FULL durability and fail-closed integrity validation;

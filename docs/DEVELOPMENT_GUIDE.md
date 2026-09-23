@@ -112,6 +112,7 @@ Changes should preserve the following unless a deliberate architecture change is
 22. **Hardened SQLite connections.** Every Control DB connection must meet the SQLite >= 3.31.0 floor and enforce defensive mode, untrusted-schema mode, disabled DQS parsing and enabled triggers before schema work.
 23. **Real writable authority file.** Production Control DB opens must reject symbolic-link paths and must verify that SQLite opened the `main` database read/write.
 24. **Qualified Control DB state root.** The XDG state root must pass the G-S0 real-directory/ownership/write-boundary qualifier before Control DB authority is inspected, created or opened.
+25. **Historical conversation restore is exact.** A repository-backed conversation restored from durable metadata must rebuild grounding from its saved COMPLETE `repository_generation_id`; it must not substitute the current active generation or mutate Control DB authority, and generation 0 is valid only for zero-repository conversations.
 
 ## Extension points
 
@@ -154,7 +155,7 @@ Any future execution path must expose the executed model version, inputs, parame
 
 ## Tests and gates
 
-The Meson suite covers startup qualification, the fail-closed repository runtime gate, storage-boundary checks, Control DB identity/integrity, deterministic legacy import and cutover, copy-on-write repository generations, generation-consistent reads and stale-writer rejection, deterministic snapshot sealing, repository lifecycle, repository-generation conversation pinning, the independent G-O0 state/snapshot/index/provenance oracle, archive safety, manifests, retrieval, grounding and citations.
+The Meson suite covers startup qualification, the fail-closed repository runtime gate, storage-boundary checks, Control DB identity/integrity, deterministic legacy import and cutover, copy-on-write repository generations, generation-consistent reads and stale-writer rejection, deterministic snapshot sealing, repository lifecycle, repository-generation conversation pinning and historical-generation restore, the independent G-O0 state/snapshot/index/provenance oracle, archive safety, manifests, retrieval, grounding and citations.
 
 The Flatpak workflow validates, in order:
 

@@ -3,7 +3,10 @@
   "registry_id": "atm-invariants/v1",
   "scope": "System invariants already enforced by the current AtM baseline; future v1 invariants are added by the PR that implements them.",
   "qualification_policy": {
-    "blocking_severities": ["S0", "S1"],
+    "blocking_severities": [
+      "S0",
+      "S1"
+    ],
     "scoring": "none"
   },
   "invariants": [
@@ -106,6 +109,23 @@
         "src/ConversationGrounding.vala"
       ],
       "tested_by": [
+        "meson:conversation-session"
+      ]
+    },
+    {
+      "id": "SESSION-S0-002",
+      "category": "SESSION",
+      "severity": "S0",
+      "lifecycle": "enforced",
+      "statement": "A restored repository-backed conversation must reconstruct grounding from the exact persisted repository_generation_id rather than the current active generation. Historical grounding must read only a COMPLETE Control DB generation, validate every selected repository snapshot/version/seal, fail closed if the generation or snapshot is unavailable, leave active_state unchanged, and use generation 0 only for zero-repository conversations.",
+      "enforced_by": [
+        "src/RepositoryLifecycleService.vala",
+        "src/control_state.c",
+        "src/ConversationGrounding.vala",
+        "src/ConversationSession.vala"
+      ],
+      "tested_by": [
+        "meson:repository-lifecycle-service",
         "meson:conversation-session"
       ]
     },
