@@ -193,6 +193,21 @@
         "meson:scientific-canonical",
         "meson:scientific-artifact"
       ]
+    },
+    {
+      "id": "SCIENTIFIC-S0-006",
+      "category": "SCIENTIFIC",
+      "severity": "S0",
+      "lifecycle": "enforced",
+      "statement": "SCI-05 scientific results must be finalized deterministically from established typed facts and deterministic constraints: support provenance, including exact per-fact/per-constraint/per-conflict bindings, belongs to QualifiedArtifactId rather than ScientificContentId; qualification support sets may admit only SCI-04 artifacts that pass canonical artifact validation and match the expected evidence/control kind, all support IDs must be qualified, retrieval order must not affect result identities, duplicate semantic record IDs must fail closed, and derived facts or operation claims are forbidden before SCI-06; Gold Set v0 must pass all seven pinned cases without an LLM or network.",
+      "enforced_by": [
+        "src/scientific_result.c",
+        "qualification/scientific-gold-v0.json"
+      ],
+      "tested_by": [
+        "meson:scientific-result",
+        "meson:scientific-gold-v0"
+      ]
     }
   ]
 }
