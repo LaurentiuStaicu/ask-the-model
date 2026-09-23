@@ -426,6 +426,114 @@ test_control_state_symlink_is_rejected (void)
 }
 
 static void
+test_read_only_control_state_is_rejected (void)
+{
+    if (geteuid () == 0) {
+        g_test_skip (
+            "Permission fallback cannot be qualified reliably as root."
+        );
+        return;
+    }
+
+    char *root = new_temp_root (
+        "atm-control-state-readonly-XXXXXX"
+    );
+    char *path = db_path (root);
+    AtmControlStateStore *store = NULL;
+    GError *error = NULL;
+
+    g_assert_true (
+        atm_control_state_open (
+            path,
+            &store,
+            &error
+        )
+    );
+    g_assert_no_error (error);
+    atm_control_state_close (store);
+    store = NULL;
+
+    g_assert_cmpint (
+        chmod (
+            path,
+            0444
+        ),
+        ==,
+        0
+    );
+    g_assert_cmpint (
+        chmod (
+            root,
+            0500
+        ),
+        ==,
+        0
+    );
+
+    g_assert_false (
+        atm_control_state_open (
+            path,
+            &store,
+            &error
+        )
+    );
+    g_assert_nonnull (error);
+    g_assert_cmpuint (
+        error->domain,
+        ==,
+        ATM_CONTROL_STATE_ERROR
+    );
+    g_assert_true (
+        error->code == ATM_CONTROL_STATE_ERROR_IO ||
+        error->code == ATM_CONTROL_STATE_ERROR_SQLITE
+    );
+    g_assert_null (store);
+    g_clear_error (&error);
+
+    gint64 generation_id = -1;
+    g_assert_false (
+        atm_control_state_active_generation_id (
+            path,
+            &generation_id,
+            &error
+        )
+    );
+    g_assert_nonnull (error);
+    g_assert_cmpuint (
+        error->domain,
+        ==,
+        ATM_CONTROL_STATE_ERROR
+    );
+    g_assert_true (
+        error->code == ATM_CONTROL_STATE_ERROR_IO ||
+        error->code == ATM_CONTROL_STATE_ERROR_SQLITE
+    );
+    g_assert_cmpint (generation_id, ==, 0);
+    g_clear_error (&error);
+
+    g_assert_cmpint (
+        chmod (
+            root,
+            0700
+        ),
+        ==,
+        0
+    );
+    g_assert_cmpint (
+        chmod (
+            path,
+            0600
+        ),
+        ==,
+        0
+    );
+
+    g_free (path);
+    remove_tree_best_effort (root);
+    g_free (root);
+}
+
+static void
 test_bootstrap_and_reopen (void)
 {
     char *root = new_temp_root (
@@ -2616,6 +2724,10 @@ main (int argc, char **argv)
     g_test_add_func (
         "/control-state/nofollow-symlink",
         test_control_state_symlink_is_rejected
+    );
+    g_test_add_func (
+        "/control-state/reject-read-only-authority",
+        test_read_only_control_state_is_rejected
     );
     g_test_add_func (
         "/control-state/bootstrap-reopen",

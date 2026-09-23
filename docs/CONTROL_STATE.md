@@ -224,3 +224,14 @@ SQLite 3.31.0 introduced this flag specifically to prevent a database filename f
 A symlink at the authoritative `control-state.sqlite3` path is therefore rejected by SQLite before schema bootstrap, migration, validation or repository-state access. AtM does not follow the link, replace its target or reinterpret the target as Control DB authority.
 
 This complements the storage-boundary and connection hardening layers: filesystem indirection is rejected at the SQLite open primitive itself, while schema identity, generation invariants and per-connection security continue to apply to genuinely opened Control DB files.
+
+
+## STATE-05d — writable-authority requirement
+
+STATE-05d requires the Control DB `main` database to be genuinely read/write on every production connection.
+
+SQLite documents a historical behavior in which `SQLITE_OPEN_READWRITE` may fall back to a read-only connection when operating-system permissions prevent write access. AtM therefore checks `sqlite3_db_readonly(db, "main")` immediately after open and before busy-timeout configuration, security flags, schema bootstrap, migration or validation.
+
+A Control DB connection is accepted only when SQLite reports exactly read/write (`0`). A read-only result or an unavailable `main` handle fails closed.
+
+This prevents a repository authority from appearing valid during startup and only failing later when a seal, generation or repository update needs to be persisted. Both create/bootstrap-capable opens and existing-authority opens use the same connection-qualification path.
