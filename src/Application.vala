@@ -24,6 +24,9 @@ namespace AskTheModel {
         public string[] repository_ids = {};
         public string[] grounded_answers = {};
         public CitationResolution[] grounded_citations = {};
+        public string? persistent_id = null;
+        public bool persistence_failed = false;
+        public bool unsaved_notice_shown = false;
 
         public ChatTabState (
             Gtk.Box page,
@@ -107,6 +110,8 @@ namespace AskTheModel {
         private bool startup_qualification_running = false;
         private bool startup_qualification_failed = false;
         private string? startup_qualification_detail = null;
+        private ConversationPersistenceStore? conversation_store = null;
+        private string? conversation_store_failure = null;
 
         public Application () {
             Object (
@@ -227,6 +232,28 @@ namespace AskTheModel {
             return "Installation qualification did not pass.";
         }
 
+        private void initialize_conversation_persistence () {
+            conversation_store = null;
+            conversation_store_failure = null;
+
+            try {
+                conversation_store =
+                    new ConversationPersistenceStore ();
+
+                stdout.printf (
+                    "AtM: conversation persistence ready path=%s\n",
+                    conversation_store.path
+                );
+            } catch (GLib.Error error) {
+                conversation_store_failure = error.message;
+
+                stderr.printf (
+                    "AtM: conversation persistence unavailable: %s\n",
+                    error.message
+                );
+            }
+        }
+
         private void start_startup_qualification () {
             startup_qualification_running = true;
             startup_qualification_failed = false;
@@ -270,6 +297,8 @@ namespace AskTheModel {
                                     : installation_qualification_detail (
                                         completed_report
                                     );
+
+                        initialize_conversation_persistence ();
 
                         stdout.printf (
                             "AtM: G-S0 mode=%s platform=%s storage=%s state=%d record=%s\n",
@@ -971,9 +1000,12 @@ namespace AskTheModel {
             }
 
             foreach (ChatTabState state in chat_states) {
-                state.prompt.sensitive = !generation_active;
+                state.prompt.sensitive =
+                    !generation_active &&
+                    !state.persistence_failed;
                 state.send_button.sensitive =
                     !generation_active &&
+                    !state.persistence_failed &&
                     state.prompt.buffer.text.strip ().length > 0;
                 state.close_button.sensitive =
                     !state.generating;
@@ -2200,6 +2232,106 @@ namespace AskTheModel {
             return string.joinv (" ", words);
         }
 
+        private bool ensure_persistent_conversation (
+            ChatTabState state
+        ) throws GLib.Error {
+            if (state.persistent_id != null) {
+                return true;
+            }
+
+            if (conversation_store == null) {
+                if (!state.unsaved_notice_shown) {
+                    append_transcript (
+                        state.transcript,
+                        "System: Conversation persistence is unavailable; this chat is running unsaved for the current application session."
+                    );
+                    state.unsaved_notice_shown = true;
+                }
+
+                return false;
+            }
+
+            if (!state.session.is_active () ||
+                state.session.model_name () == null) {
+                throw new GLib.IOError.FAILED (
+                    "Conversation persistence requires an active pinned session."
+                );
+            }
+
+            ConversationPersistenceRepository[] repositories = {};
+
+            for (
+                uint i = 0;
+                i < state.session.repository_count ();
+                i++
+            ) {
+                ConversationRepositoryPin? pin =
+                    state.session.repository_pin_at (i);
+
+                if (pin == null) {
+                    throw new GLib.IOError.INVALID_DATA (
+                        "Pinned repository identity is unavailable for conversation persistence."
+                    );
+                }
+
+                repositories +=
+                    new ConversationPersistenceRepository (
+                        pin.repository_id,
+                        pin.repository_version,
+                        pin.snapshot_sha
+                    );
+            }
+
+            state.persistent_id =
+                conversation_store.create_conversation (
+                    state.title_label.label,
+                    GLib.get_real_time (),
+                    state.session.model_name () ?? "",
+                    state.session.model_digest (),
+                    state.session.repository_generation_id (),
+                    repositories
+                );
+
+            return true;
+        }
+
+        private ConversationPersistenceCitation[]
+        persistence_citations (
+            CitationResolution resolution
+        ) throws GLib.Error {
+            ConversationPersistenceCitation[] citations = {};
+
+            for (
+                uint i = 0;
+                i < resolution.citation_count ();
+                i++
+            ) {
+                CitationReference? citation =
+                    resolution.citation_at (i);
+
+                if (citation == null) {
+                    throw new GLib.IOError.INVALID_DATA (
+                        "Resolved citation is unavailable for durable persistence."
+                    );
+                }
+
+                citations +=
+                    new ConversationPersistenceCitation (
+                        citation.label,
+                        citation.repository_id,
+                        citation.repository_version,
+                        citation.snapshot_sha,
+                        citation.logical_source_id,
+                        citation.source_path,
+                        citation.locator,
+                        citation.title,
+                        citation.excerpt
+                    );
+            }
+
+            return citations;
+        }
+
         private async void update_conversation_title (
             ChatTabState state,
             string first_prompt,
@@ -2233,6 +2365,19 @@ namespace AskTheModel {
 
                 state.title_label.label = title;
                 state.title_label.tooltip_text = title;
+
+                if (conversation_store != null &&
+                    state.persistent_id != null) {
+                    try {
+                        conversation_store.update_title (
+                            state.persistent_id,
+                            title,
+                            GLib.get_real_time ()
+                        );
+                    } catch (GLib.Error error) {
+                        /* Title persistence is cosmetic; the turn remains committed. */
+                    }
+                }
             } catch (GLib.Error error) {
                 /* Title generation is cosmetic; keep New on failure. */
             }
@@ -2254,6 +2399,12 @@ namespace AskTheModel {
             bool grounded_turn_prepared = false;
 
             try {
+                if (state.persistence_failed) {
+                    throw new GLib.IOError.FAILED (
+                        "This conversation cannot continue because its durable state did not commit after the grounded retrieval state advanced."
+                    );
+                }
+
                 if (state.model_name == null ||
                     state.model_name.strip ().length == 0) {
                     throw new ConversationSessionError.INVALID_MODEL (
@@ -2356,20 +2507,43 @@ namespace AskTheModel {
                                 answer
                             );
 
+                        ensure_persistent_conversation (
+                            state
+                        );
+
                         if (!state.session.commit_turn ()) {
                             throw new ConversationSessionError.INVALID_GROUNDING (
                                 "Grounded conversation turn could not be committed."
                             );
                         }
 
-                        state.conversation.commit_exchange (
-                            prompt,
-                            answer
-                        );
+                        grounded_turn_prepared = false;
+
+                        try {
+                            ConversationPersistenceCitation[] citations =
+                                persistence_citations (
+                                    citation_resolution
+                                );
+
+                            ConversationTurnCommitter.commit (
+                                conversation_store,
+                                state.persistent_id,
+                                state.conversation,
+                                prompt,
+                                answer,
+                                visible_answer,
+                                true,
+                                GLib.get_real_time (),
+                                citations
+                            );
+                        } catch (GLib.Error error) {
+                            state.persistence_failed = true;
+                            throw error;
+                        }
+
                         state.grounded_answers += answer;
                         state.grounded_citations +=
                             citation_resolution;
-                        grounded_turn_prepared = false;
 
                         append_grounded_answer (
                             state.transcript,
@@ -2379,15 +2553,30 @@ namespace AskTheModel {
                         assistant_stream_started = true;
                         title_answer = visible_answer;
                     } else {
-                        streaming_transcript = state.transcript;
                         answer = yield ollama_provider.chat (
                             prompt,
-                            state.conversation
+                            state.conversation,
+                            false
+                        );
+
+                        ensure_persistent_conversation (
+                            state
+                        );
+
+                        ConversationTurnCommitter.commit (
+                            conversation_store,
+                            state.persistent_id,
+                            state.conversation,
+                            prompt,
+                            answer,
+                            answer,
+                            false,
+                            GLib.get_real_time (),
+                            {}
                         );
                         title_answer = answer;
 
-                        if (!assistant_stream_started &&
-                            answer.length > 0) {
+                        if (answer.length > 0) {
                             append_transcript (
                                 state.transcript,
                                 "Assistant: " + answer
@@ -2587,12 +2776,14 @@ namespace AskTheModel {
 
                 send_button.sensitive =
                     !generation_active &&
+                    !state.persistence_failed &&
                     prompt_view.sensitive &&
                     prompt_view.buffer.text.strip ().length > 0;
             });
 
             send_button.clicked.connect (() => {
-                if (generation_active) {
+                if (generation_active ||
+                    state.persistence_failed) {
                     return;
                 }
 

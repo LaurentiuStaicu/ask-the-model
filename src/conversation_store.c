@@ -2082,6 +2082,289 @@ atm_conversation_store_open (
     return TRUE;
 }
 
+
+gboolean
+atm_conversation_store_update_title (
+    AtmConversationStore *store,
+    const char *conversation_id,
+    const char *title,
+    gint64 updated_at_us,
+    GError **error
+)
+{
+    if (store == NULL ||
+        store->db == NULL ||
+        !nonempty (conversation_id) ||
+        !nonempty (title) ||
+        updated_at_us < 0) {
+        g_set_error_literal (
+            error,
+            ATM_CONVERSATION_STORE_ERROR,
+            ATM_CONVERSATION_STORE_ERROR_ARGUMENT,
+            "Conversation title update received invalid arguments."
+        );
+        return FALSE;
+    }
+
+    if (!exec_sql (
+            store->db,
+            "BEGIN IMMEDIATE;",
+            error
+        )) {
+        return FALSE;
+    }
+
+    gboolean ok = FALSE;
+    sqlite3_stmt *statement = NULL;
+
+    if (!prepare_statement (
+            store->db,
+            "UPDATE conversations "
+            "SET title=?2,updated_at_us=?3 "
+            "WHERE conversation_id=?1;",
+            &statement,
+            error
+        )) {
+        goto out;
+    }
+
+    sqlite3_bind_text (
+        statement,
+        1,
+        conversation_id,
+        -1,
+        SQLITE_TRANSIENT
+    );
+    sqlite3_bind_text (
+        statement,
+        2,
+        title,
+        -1,
+        SQLITE_TRANSIENT
+    );
+    sqlite3_bind_int64 (
+        statement,
+        3,
+        updated_at_us
+    );
+
+    if (!step_done (
+            store->db,
+            statement,
+            "Could not update conversation title",
+            error
+        )) {
+        goto out;
+    }
+
+    if (sqlite3_changes (
+            store->db
+        ) != 1) {
+        g_set_error_literal (
+            error,
+            ATM_CONVERSATION_STORE_ERROR,
+            ATM_CONVERSATION_STORE_ERROR_INTEGRITY,
+            "Conversation title update did not match exactly one conversation."
+        );
+        goto out;
+    }
+
+    sqlite3_finalize (
+        statement
+    );
+    statement = NULL;
+
+    if (!exec_sql (
+            store->db,
+            "COMMIT;",
+            error
+        )) {
+        goto out;
+    }
+
+    ok = TRUE;
+
+out:
+    if (statement != NULL) {
+        sqlite3_finalize (
+            statement
+        );
+    }
+
+    if (!ok) {
+        rollback_best_effort (
+            store->db
+        );
+    }
+
+    return ok;
+}
+
+gboolean
+atm_conversation_store_create_conversation_values (
+    AtmConversationStore *store,
+    const char *title,
+    gint64 created_at_us,
+    const char *model_name,
+    const char *model_digest,
+    gint64 repository_generation_id,
+    const char * const *repository_ids,
+    const char * const *repository_versions,
+    const char * const *snapshot_shas,
+    gsize repository_count,
+    char **out_conversation_id,
+    GError **error
+)
+{
+    if (repository_count > 0 &&
+        (repository_ids == NULL ||
+         repository_versions == NULL ||
+         snapshot_shas == NULL)) {
+        g_set_error_literal (
+            error,
+            ATM_CONVERSATION_STORE_ERROR,
+            ATM_CONVERSATION_STORE_ERROR_ARGUMENT,
+            "Conversation repository arrays are incomplete."
+        );
+        return FALSE;
+    }
+
+    AtmConversationRepositoryInput *repositories = NULL;
+
+    if (repository_count > 0) {
+        repositories = g_new0 (
+            AtmConversationRepositoryInput,
+            repository_count
+        );
+
+        for (gsize i = 0;
+             i < repository_count;
+             i++) {
+            repositories[i].repository_id =
+                repository_ids[i];
+            repositories[i].repository_version =
+                repository_versions[i];
+            repositories[i].snapshot_sha =
+                snapshot_shas[i];
+        }
+    }
+
+    gboolean ok =
+        atm_conversation_store_create_conversation (
+            store,
+            title,
+            created_at_us,
+            model_name,
+            model_digest,
+            repository_generation_id,
+            repositories,
+            repository_count,
+            out_conversation_id,
+            error
+        );
+
+    g_free (repositories);
+    return ok;
+}
+
+gboolean
+atm_conversation_store_commit_turn_values (
+    AtmConversationStore *store,
+    const char *conversation_id,
+    const char *user_content,
+    const char *assistant_provider_content,
+    const char *assistant_display_content,
+    gboolean grounded,
+    gint64 created_at_us,
+    const char * const *labels,
+    const char * const *repository_ids,
+    const char * const *repository_versions,
+    const char * const *snapshot_shas,
+    const char * const *logical_source_ids,
+    const char * const *source_paths,
+    const char * const *locators,
+    const char * const *titles,
+    const char * const *excerpts,
+    gsize citation_count,
+    gint64 *out_turn_no,
+    GError **error
+)
+{
+    if (citation_count > 0 &&
+        (labels == NULL ||
+         repository_ids == NULL ||
+         repository_versions == NULL ||
+         snapshot_shas == NULL ||
+         logical_source_ids == NULL ||
+         source_paths == NULL ||
+         locators == NULL ||
+         titles == NULL ||
+         excerpts == NULL)) {
+        g_set_error_literal (
+            error,
+            ATM_CONVERSATION_STORE_ERROR,
+            ATM_CONVERSATION_STORE_ERROR_ARGUMENT,
+            "Conversation citation arrays are incomplete."
+        );
+        return FALSE;
+    }
+
+    AtmConversationCitationInput *citations = NULL;
+
+    if (citation_count > 0) {
+        citations = g_new0 (
+            AtmConversationCitationInput,
+            citation_count
+        );
+
+        for (gsize i = 0;
+             i < citation_count;
+             i++) {
+            citations[i].label = labels[i];
+            citations[i].repository_id =
+                repository_ids[i];
+            citations[i].repository_version =
+                repository_versions[i];
+            citations[i].snapshot_sha =
+                snapshot_shas[i];
+            citations[i].logical_source_id =
+                logical_source_ids[i];
+            citations[i].source_path =
+                source_paths[i];
+            citations[i].locator =
+                locators[i];
+            citations[i].title =
+                nonempty (titles[i])
+                    ? titles[i]
+                    : NULL;
+            citations[i].excerpt =
+                nonempty (excerpts[i])
+                    ? excerpts[i]
+                    : NULL;
+            citations[i].immutable_permalink =
+                NULL;
+        }
+    }
+
+    gboolean ok =
+        atm_conversation_store_commit_turn (
+            store,
+            conversation_id,
+            user_content,
+            assistant_provider_content,
+            assistant_display_content,
+            grounded,
+            created_at_us,
+            citations,
+            citation_count,
+            out_turn_no,
+            error
+        );
+
+    g_free (citations);
+    return ok;
+}
+
 void
 atm_conversation_store_close (
     AtmConversationStore *store

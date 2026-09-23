@@ -25,6 +25,16 @@ namespace AskTheModel {
             return grounding.repository_count ();
         }
 
+        public ConversationRepositoryPin? repository_pin_at (
+            uint index
+        ) {
+            if (grounding == null) {
+                return null;
+            }
+
+            return grounding.repository_pin_at (index);
+        }
+
         public void begin (
             ConversationGrounding prepared_grounding,
             string model_name,

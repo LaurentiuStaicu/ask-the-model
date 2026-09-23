@@ -8,6 +8,10 @@ namespace AskTheModel {
             contents = {};
         }
 
+        public uint message_count () {
+            return (uint) roles.length;
+        }
+
         public void commit_exchange (
             string prompt,
             string answer
@@ -365,7 +369,8 @@ namespace AskTheModel {
 
         public async string chat (
             string prompt,
-            OllamaConversation? conversation = null
+            OllamaConversation? conversation = null,
+            bool persist_history = true
         ) throws GLib.Error {
             return yield chat_internal (
                 prompt,
@@ -373,7 +378,7 @@ namespace AskTheModel {
                 null,
                 null,
                 conversation,
-                true
+                persist_history
             );
         }
 

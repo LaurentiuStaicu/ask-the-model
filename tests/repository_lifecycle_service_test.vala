@@ -428,6 +428,20 @@ namespace AskTheModel.Tests {
                 sealed_grounding.repository_generation_id () == 2
             );
 
+            ConversationRepositoryPin? grounding_pin =
+                sealed_grounding.repository_pin_at (0);
+            assert (grounding_pin != null);
+            assert (
+                grounding_pin.repository_id ==
+                sealed_descriptor.id
+            );
+            assert (
+                grounding_pin.repository_version == "0.1.0"
+            );
+            assert (
+                grounding_pin.snapshot_sha == sealed_sha
+            );
+
             var pinned_session =
                 new ConversationSession ();
             pinned_session.begin (
@@ -436,6 +450,20 @@ namespace AskTheModel.Tests {
             );
             assert (
                 pinned_session.repository_generation_id () == 2
+            );
+
+            ConversationRepositoryPin? session_pin =
+                pinned_session.repository_pin_at (0);
+            assert (session_pin != null);
+            assert (
+                session_pin.repository_id ==
+                sealed_descriptor.id
+            );
+            assert (
+                session_pin.repository_version == "0.1.0"
+            );
+            assert (
+                session_pin.snapshot_sha == sealed_sha
             );
 
             var advancing_writer =
