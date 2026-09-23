@@ -74,9 +74,13 @@ for needle in "${required[@]}"; do
 done
 
 development_traceability=(
+  'WORKSPACE="$GITHUB_WORKSPACE"'
+  'cp -a "$WORKSPACE/repo" "$PUBLISH_DIR/repo"'
   '"$PUBLISH_DIR/SOURCE_COMMIT"'
   'Source main commit:'
+  'git -C "$WORKSPACE" checkout --orphan flatpak-repo-publish'
   'Publish Ask the Model development Flatpak from ${GITHUB_SHA}'
+  'git -C "$WORKSPACE" push --force origin HEAD:flatpak-repo'
 )
 
 for needle in "${development_traceability[@]}"; do

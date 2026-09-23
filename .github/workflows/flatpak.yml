@@ -278,8 +278,9 @@ jobs:
         run: |
           set -euo pipefail
 
+          WORKSPACE="$GITHUB_WORKSPACE"
           PUBLISH_DIR="$(mktemp -d)"
-          cp -a repo "$PUBLISH_DIR/repo"
+          cp -a "$WORKSPACE/repo" "$PUBLISH_DIR/repo"
 
           cat > "$PUBLISH_DIR/atm-development.flatpakrepo" <<'EOF'
           [Flatpak Repo]
@@ -308,17 +309,18 @@ jobs:
           EOF
           printf '\n`%s`\n' "$GITHUB_SHA" >> "$PUBLISH_DIR/README.md"
 
-          git config user.name "github-actions[bot]"
-          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git -C "$WORKSPACE" checkout --orphan flatpak-repo-publish
+          git -C "$WORKSPACE" rm -rf .
+          git -C "$WORKSPACE" clean -fdx
 
-          git checkout --orphan flatpak-repo-publish
-          git rm -rf .
-          git clean -fdx
+          cp -a "$PUBLISH_DIR/repo" "$WORKSPACE/repo"
+          cp -a "$PUBLISH_DIR/atm-development.flatpakrepo" "$WORKSPACE/atm-development.flatpakrepo"
+          cp -a "$PUBLISH_DIR/README.md" "$WORKSPACE/README.md"
+          cp -a "$PUBLISH_DIR/SOURCE_COMMIT" "$WORKSPACE/SOURCE_COMMIT"
 
-          cp -a "$PUBLISH_DIR/repo" .
-          cp -a "$PUBLISH_DIR/atm-development.flatpakrepo" .
-          cp -a "$PUBLISH_DIR/README.md" .
-          cp -a "$PUBLISH_DIR/SOURCE_COMMIT" .
-          git add -A
-          git commit -m "Publish Ask the Model development Flatpak from ${GITHUB_SHA}"
-          git push --force origin HEAD:flatpak-repo
+          git -C "$WORKSPACE" add -A
+          git -C "$WORKSPACE" \
+            -c user.name="github-actions[bot]" \
+            -c user.email="41898282+github-actions[bot]@users.noreply.github.com" \
+            commit -m "Publish Ask the Model development Flatpak from ${GITHUB_SHA}"
+          git -C "$WORKSPACE" push --force origin HEAD:flatpak-repo
