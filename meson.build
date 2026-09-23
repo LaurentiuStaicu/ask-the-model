@@ -60,6 +60,8 @@ executable(
     'src/scientific_profile_ewd.c',
     'src/scientific_profile_cbd.c',
     'src/scientific_profile_rmd.c',
+    'src/json_pointer.c',
+    'src/scientific_control.c',
     'src/retrieval_rank.c',
     'src/retrieval_scope.c',
     'src/retrieval_router.c',
@@ -643,6 +645,26 @@ scientific_profiles_test = executable(
 test(
   'scientific-profiles',
   scientific_profiles_test
+)
+
+scientific_control_test = executable(
+  'scientific-control-test',
+  [
+    'src/json_pointer.c',
+    'src/scientific_control.c',
+    'tests/scientific_control_test.c'
+  ],
+  include_directories: include_directories('src'),
+  dependencies: [
+    glib_dep,
+    json_glib_dep
+  ],
+  install: false
+)
+
+test(
+  'scientific-control',
+  scientific_control_test
 )
 
 retrieval_rank_test = executable(

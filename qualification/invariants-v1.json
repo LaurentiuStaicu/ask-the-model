@@ -164,6 +164,20 @@
       "tested_by": [
         "meson:scientific-profiles"
       ]
+    },
+    {
+      "id": "SCIENTIFIC-S0-004",
+      "category": "SCIENTIFIC",
+      "severity": "S0",
+      "lifecycle": "enforced",
+      "statement": "Scientific control evidence must be read only through AtM-owned fixed repository/path/JSON-Pointer/type specifications from the pinned snapshot, without retrieval or textual fallback; unsafe paths, symlink traversal, unresolved pointers and type mismatches must fail closed.",
+      "enforced_by": [
+        "src/scientific_control.c",
+        "src/json_pointer.c"
+      ],
+      "tested_by": [
+        "meson:scientific-control"
+      ]
     }
   ]
 }
