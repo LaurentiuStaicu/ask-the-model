@@ -9,7 +9,7 @@ All notable public releases of Ask the Model are recorded here.
 - split the Flatpak workflow into a read-only verification/build job and a main-only publication job, so pull-request verification no longer receives repository-content write permission;
 - preserved the existing `flatpak` verification job identity while transferring only the verified bundle/repository outputs to publication through pinned GitHub artifact actions;
 - extended the release-workflow contract validator to enforce the single scoped `contents: write` grant, the build-to-publication dependency and the verified-artifact handoff.
-- anchored generated development-repository Git operations to `GITHUB_WORKSPACE` after the publication-job split and added contract coverage for that boundary.
+- anchored generated development-repository Git operations to `GITHUB_WORKSPACE`, explicitly trusted only that checked-out workspace for containerized Git ownership checks, and added contract coverage for both boundaries.
 
 
 ### Control State and repository-generation hardening
