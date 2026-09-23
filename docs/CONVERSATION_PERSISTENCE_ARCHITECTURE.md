@@ -260,11 +260,13 @@ Do not wire GTK or persist live chats yet.
 
 Add a conversation-domain store and atomic committed-turn writes.
 
-CONV-02a implements and qualifies the native write boundary only. Conversation creation plus repository pins are atomic, and each turn is one store-owned transaction containing the paired user/assistant messages, optional citations and metadata update. The store allocates local identities and turn/sequence numbers and rolls back the complete turn on any failure.
+CONV-02a implements and qualifies the native write boundary. Conversation creation plus repository pins are atomic, and each turn is one store-owned transaction containing the paired user/assistant messages, optional citations and metadata update. The store allocates local identities and turn/sequence numbers and rolls back the complete turn on any failure.
 
-CONV-02b will expose that qualified mutation boundary to the Vala conversation domain and change provider-history handling so both grounded and ungrounded turns defer `OllamaConversation.commit_exchange()` until durable persistence succeeds.
+CONV-02b wires that qualified boundary into the Vala conversation domain and development GTK send path. Persistence uses the exact repository ID/version/SHA pins retained by the frozen conversation grounding/session rather than re-reading a later Control DB active generation. Both grounded and ungrounded provider calls defer `OllamaConversation.commit_exchange()`; the shared turn committer advances provider history only after the durable SQLite turn succeeds.
 
-Still no restart restore UI.
+If the separate conversation store is unavailable, AtM keeps ordinary live chat available only as an explicitly disclosed unsaved in-memory session. For a grounded turn, retrieval/session commit still precedes durable persistence as defined above; if persistence then fails, the tab is marked non-continuable instead of allowing provider/retrieval/durable state to diverge.
+
+CONV-02 still does not restore persisted conversations after restart and does not add history navigation. Those remain CONV-03/CONV-04.
 
 ### CONV-03 — restore and continuation qualification
 

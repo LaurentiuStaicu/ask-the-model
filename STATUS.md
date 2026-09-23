@@ -26,6 +26,7 @@ Post-v0.4.0 development currently extends engineering hardening without changing
 - every Control DB connection requires SQLite >= 3.37.0 and fail-closed defensive/trusted-schema/DQS/trigger configuration before bootstrap, migration or validation;
 - every production Control DB open rejects symbolic-link authority paths and verifies that SQLite actually opened the main database read/write;
 - the XDG state root that owns `control-state.sqlite3` is qualified with the same real-directory, current-owner, no-group-or-other-write and exclusive write-probe boundary used by G-S0 storage qualification before authority resolution.
+- development `main` now has a separate hardened `conversations.sqlite3` write path: committed turns persist pinned model/repository identity, raw/display assistant content and citation provenance before provider history advances; restart restore/navigation is not implemented yet.
 
 Legacy `repository-state.json` remains migration/recovery evidence after cutover and is not rewritten by normal development-runtime repository operations.
 
@@ -143,7 +144,7 @@ AtM does not bundle, install, start, stop or update the local AI provider.
 
 The current provider implementation addresses loopback endpoints only. GPU acceleration, remote/cloud behavior and model execution semantics belong to the external provider.
 
-Conversation history is stored only in application memory for the current process and is not persisted across restarts.
+The tagged v0.4.0 release stores conversation history only in application memory for the current process. Development `main` after CONV-02 can write committed turns to the separate local conversation store, but it does not yet reload or navigate those persisted conversations after restart.
 
 The Flatpak receives write access only to the dedicated `~/Ask the Model` directory for repository snapshots. It must not request broad Home or host filesystem access.
 

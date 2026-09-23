@@ -198,6 +198,24 @@ namespace AskTheModel {
         public static extern void abort_turn (void* state);
     }
 
+    public class ConversationRepositoryPin : Object {
+        public string repository_id { get; construct; }
+        public string repository_version { get; construct; }
+        public string snapshot_sha { get; construct; }
+
+        public ConversationRepositoryPin (
+            string repository_id,
+            string repository_version,
+            string snapshot_sha
+        ) {
+            Object (
+                repository_id: repository_id,
+                repository_version: repository_version,
+                snapshot_sha: snapshot_sha
+            );
+        }
+    }
+
     public class CitationReference : Object {
         public string label;
         public string repository_id;
@@ -281,6 +299,7 @@ namespace AskTheModel {
     public class ConversationGrounding : Object {
         private void* state = null;
         private int64 pinned_repository_generation_id = 0;
+        private ConversationRepositoryPin[] pinned_repositories = {};
 
         public ConversationGrounding () {
             state = ConversationGroundingNative.state_new ();
@@ -300,14 +319,26 @@ namespace AskTheModel {
             string snapshot_root,
             string index_path
         ) throws GLib.Error {
-            return ConversationGroundingNative.add_ready_repository (
-                state,
-                repository_id,
-                repository_version,
-                snapshot_sha,
-                snapshot_root,
-                index_path
-            );
+            bool added =
+                ConversationGroundingNative.add_ready_repository (
+                    state,
+                    repository_id,
+                    repository_version,
+                    snapshot_sha,
+                    snapshot_root,
+                    index_path
+                );
+
+            if (added) {
+                pinned_repositories +=
+                    new ConversationRepositoryPin (
+                        repository_id,
+                        repository_version,
+                        snapshot_sha
+                    );
+            }
+
+            return added;
         }
 
         public void pin_repository_generation (
@@ -360,6 +391,16 @@ namespace AskTheModel {
             return ConversationGroundingNative.repository_count (
                 state
             );
+        }
+
+        public ConversationRepositoryPin? repository_pin_at (
+            uint index
+        ) {
+            if (index >= pinned_repositories.length) {
+                return null;
+            }
+
+            return pinned_repositories[index];
         }
 
         public bool prepare_turn (

@@ -483,6 +483,23 @@
       "tested_by": [
         "meson:conversation-store"
       ]
+    },
+    {
+      "id": "SESSION-S0-004",
+      "category": "SESSION",
+      "severity": "S0",
+      "lifecycle": "enforced",
+      "statement": "When durable conversation persistence is active, exact repository ID/version/SHA pins used to create durable conversation identity must come from the frozen ConversationGrounding/ConversationSession scope rather than a later Control DB active_state read, and OllamaConversation provider history must advance only after the durable turn commit succeeds. A failed durable turn commit must leave provider history unchanged; explicit unsaved mode is permitted only when both the persistence store and durable conversation identifier are absent.",
+      "enforced_by": [
+        "src/ConversationGrounding.vala",
+        "src/ConversationSession.vala",
+        "src/ConversationPersistenceStore.vala",
+        "src/OllamaProvider.vala"
+      ],
+      "tested_by": [
+        "meson:conversation-persistence-store",
+        "meson:repository-lifecycle-service"
+      ]
     }
   ]
 }

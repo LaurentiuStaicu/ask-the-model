@@ -23,14 +23,17 @@ All notable public releases of Ask the Model are recorded here.
 
 ### Conversation persistence foundation
 
+- defined a separate application-owned `conversations.sqlite3` schema and hardened validation layer, with STRICT tables for conversation identity/model/repository generation, pinned repository snapshots, committed provider-history messages and durable citation provenance;
+- added fail-closed semantic validation for repository-scope mismatch, incomplete committed turn pairs, invalid grounded-role state and citation provenance that does not match the conversation's pinned repository set;
+- added `SESSION-S0-002` plus Meson regression coverage for bootstrap/reopen, foreign/newer database rejection, valid grounded persistence semantics, invalid citation semantics and symlink rejection;
 - added a native atomic mutation API that generates local conversation/message identity, writes repository pins transactionally, allocates turn/sequence numbers inside the store and commits each complete user/assistant turn with its citations and metadata in one SQLite transaction;
 - citation provenance is checked against the conversation's exact pinned repository/version/SHA set before write, and late failures roll back already-inserted messages/citations so the previous durable boundary remains unchanged;
-- added `SESSION-S0-003` and regression coverage for ordinary and grounded commits, raw-vs-display grounded content, turn sequencing, pre-write provenance rejection and late transactional rollback.
-
-- defined a separate application-owned `conversations.sqlite3` schema and hardened validation layer without wiring persistence into GTK or live chat yet;
-- added STRICT tables for conversation identity/model/repository generation, pinned repository snapshots, committed provider-history messages and durable citation provenance;
-- added fail-closed semantic validation for repository-scope mismatch, incomplete committed turn pairs, invalid grounded-role state and citation provenance that does not match the conversation's pinned repository set;
-- added `SESSION-S0-002` plus Meson regression coverage for bootstrap/reopen, foreign/newer database rejection, valid grounded persistence semantics, invalid citation semantics and symlink rejection.
+- added `SESSION-S0-003` and regression coverage for ordinary and grounded commits, raw-vs-display grounded content, turn sequencing, pre-write provenance rejection and late transactional rollback;
+- wired the qualified conversation-store mutation boundary into the Vala conversation domain and development GTK send path while keeping restore/navigation for later gates;
+- preserved exact frozen repository ID/version/SHA pins for persistence instead of re-reading a newer Control DB active generation;
+- both grounded and ordinary provider calls now support deferred provider-history mutation, and the shared turn committer advances `OllamaConversation` only after the durable SQLite turn succeeds; failed persistence therefore leaves provider history unchanged;
+- when conversation persistence cannot be opened, development chat remains explicitly available as unsaved in-memory session state; if a grounded retrieval/session commit has already advanced and the durable turn then fails, that tab is made non-continuable rather than continuing with divergent state;
+- added `SESSION-S0-004` with domain-level regression coverage for durable-before-provider-history ordering, failed-write history preservation, explicit unsaved mode and frozen repository-pin propagation.
 
 ### Startup qualification fixes
 

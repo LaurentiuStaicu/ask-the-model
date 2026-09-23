@@ -39,6 +39,8 @@ executable(
     'src/RepositoryState.vala',
     'src/ControlStateNative.vala',
     'src/ControlRepositoryState.vala',
+    'src/ConversationStoreNative.vapi',
+    'src/ConversationPersistenceStore.vala',
     'src/StartupQualificationRecord.vala',
     'src/StartupQualificationNative.vapi',
     'src/StartupQualificationService.vala',
@@ -71,6 +73,7 @@ executable(
     'src/scientific_realization.c',
     'src/scientific_operation.c',
     'src/control_state.c',
+    'src/conversation_store.c',
     'src/retrieval_rank.c',
     'src/retrieval_scope.c',
     'src/retrieval_router.c',
@@ -90,7 +93,8 @@ executable(
     gtk_dep,
     granite_dep,
     soup_dep,
-    json_glib_dep
+    json_glib_dep,
+    sqlite_dep
   ],
   link_args: [
     '-larchive',
@@ -348,6 +352,33 @@ conversation_store_test = executable(
 test(
   'conversation-store',
   conversation_store_test
+)
+
+conversation_persistence_store_test = executable(
+  'conversation-persistence-store-test',
+  [
+    'src/ConversationStoreNative.vapi',
+    'src/ConversationPersistenceStore.vala',
+    'src/OllamaProvider.vala',
+    'src/ChatRequestBuilder.vala',
+    'src/conversation_store.c',
+    'tests/conversation_persistence_store_test.vala',
+    resources
+  ],
+  include_directories: include_directories('src'),
+  dependencies: [
+    glib_dep,
+    gio_dep,
+    soup_dep,
+    json_glib_dep,
+    sqlite_dep
+  ],
+  install: false
+)
+
+test(
+  'conversation-persistence-store',
+  conversation_persistence_store_test
 )
 
 control_state_test = executable(
