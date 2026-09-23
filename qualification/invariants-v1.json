@@ -325,6 +325,21 @@
         "meson:control-repository-state",
         "meson:control-state"
       ]
+    },
+    {
+      "id": "STATE-S0-006",
+      "category": "STATE",
+      "severity": "S0",
+      "lifecycle": "enforced",
+      "statement": "Normal Control DB repository-state mutations must be copy-on-write: set_current and set_snapshot_seal must never update a previously COMPLETE generation, must create a fresh CANDIDATE from the exact active COMPLETE generation inside one BEGIN IMMEDIATE transaction, apply the mutation only to the candidate, mark it COMPLETE, atomically advance active_state with an expected-previous-generation guard, and roll back the entire candidate on any failure so no partial or orphan CANDIDATE state remains.",
+      "enforced_by": [
+        "src/control_state.c"
+      ],
+      "tested_by": [
+        "meson:control-state",
+        "meson:control-repository-state",
+        "meson:repository-lifecycle-service"
+      ]
     }
   ]
 }

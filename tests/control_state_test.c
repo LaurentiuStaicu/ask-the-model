@@ -1451,6 +1451,402 @@ test_atomic_cutover_never_replaces_existing_db (void)
     g_free (root);
 }
 
+
+static void
+test_runtime_mutations_are_copy_on_write (void)
+{
+    char *root = new_temp_root (
+        "atm-control-state-cow-XXXXXX"
+    );
+    char *control =
+        control_state_path_for_root (root);
+    char *legacy = legacy_state_path (
+        root,
+        "repository-state.json"
+    );
+    GError *error = NULL;
+    AtmControlStateCutoverDisposition disposition =
+        ATM_CONTROL_STATE_CUTOVER_IMPORTED_LEGACY;
+
+    g_assert_true (
+        atm_control_state_publish_cutover (
+            control,
+            legacy,
+            &disposition,
+            &error
+        )
+    );
+    g_assert_no_error (error);
+    g_assert_cmpint (
+        disposition,
+        ==,
+        ATM_CONTROL_STATE_CUTOVER_EMPTY
+    );
+
+    const char *rmd_sha_1 =
+        "1111111111111111111111111111111111111111";
+    const char *rmd_sha_2 =
+        "2222222222222222222222222222222222222222";
+    const char *ewd_sha =
+        "3333333333333333333333333333333333333333";
+    const char *seal =
+        "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa";
+
+    g_assert_true (
+        atm_control_state_set_current_values (
+            control,
+            "rmd",
+            rmd_sha_1,
+            "0.1.0",
+            NULL,
+            &error
+        )
+    );
+    g_assert_no_error (error);
+
+    g_assert_cmpint (
+        raw_pragma_int64 (
+            control,
+            "SELECT active_repository_generation "
+            "FROM active_state WHERE singleton_id=1;"
+        ),
+        ==,
+        1
+    );
+    g_assert_cmpint (
+        raw_pragma_int64 (
+            control,
+            "SELECT count(*) FROM repository_generations;"
+        ),
+        ==,
+        1
+    );
+
+    g_assert_true (
+        atm_control_state_set_current_values (
+            control,
+            "ewd",
+            ewd_sha,
+            "0.2.0",
+            NULL,
+            &error
+        )
+    );
+    g_assert_no_error (error);
+
+    g_assert_cmpint (
+        raw_pragma_int64 (
+            control,
+            "SELECT active_repository_generation "
+            "FROM active_state WHERE singleton_id=1;"
+        ),
+        ==,
+        2
+    );
+    g_assert_cmpint (
+        raw_pragma_int64 (
+            control,
+            "SELECT count(*) FROM generation_repositories "
+            "WHERE generation_id=1;"
+        ),
+        ==,
+        1
+    );
+    g_assert_cmpint (
+        raw_pragma_int64 (
+            control,
+            "SELECT count(*) FROM generation_repositories "
+            "WHERE generation_id=2;"
+        ),
+        ==,
+        2
+    );
+
+    char *generation_1_rmd = raw_pragma_text (
+        control,
+        "SELECT snapshot_sha FROM generation_repositories "
+        "WHERE generation_id=1 AND repository_id='rmd';"
+    );
+    g_assert_cmpstr (
+        generation_1_rmd,
+        ==,
+        rmd_sha_1
+    );
+    g_free (generation_1_rmd);
+
+    g_assert_true (
+        atm_control_state_set_current_values (
+            control,
+            "rmd",
+            rmd_sha_2,
+            "0.2.0",
+            NULL,
+            &error
+        )
+    );
+    g_assert_no_error (error);
+
+    g_assert_cmpint (
+        raw_pragma_int64 (
+            control,
+            "SELECT active_repository_generation "
+            "FROM active_state WHERE singleton_id=1;"
+        ),
+        ==,
+        3
+    );
+
+    char *generation_2_rmd = raw_pragma_text (
+        control,
+        "SELECT snapshot_sha FROM generation_repositories "
+        "WHERE generation_id=2 AND repository_id='rmd';"
+    );
+    char *generation_3_rmd = raw_pragma_text (
+        control,
+        "SELECT snapshot_sha FROM generation_repositories "
+        "WHERE generation_id=3 AND repository_id='rmd';"
+    );
+    g_assert_cmpstr (
+        generation_2_rmd,
+        ==,
+        rmd_sha_1
+    );
+    g_assert_cmpstr (
+        generation_3_rmd,
+        ==,
+        rmd_sha_2
+    );
+    g_free (generation_2_rmd);
+    g_free (generation_3_rmd);
+
+    g_assert_true (
+        atm_control_state_set_snapshot_seal_values (
+            control,
+            "rmd",
+            rmd_sha_2,
+            seal,
+            &error
+        )
+    );
+    g_assert_no_error (error);
+
+    g_assert_cmpint (
+        raw_pragma_int64 (
+            control,
+            "SELECT active_repository_generation "
+            "FROM active_state WHERE singleton_id=1;"
+        ),
+        ==,
+        4
+    );
+    g_assert_cmpint (
+        raw_pragma_int64 (
+            control,
+            "SELECT snapshot_seal_sha256 IS NULL "
+            "FROM generation_repositories "
+            "WHERE generation_id=3 AND repository_id='rmd';"
+        ),
+        ==,
+        1
+    );
+
+    char *generation_4_seal = raw_pragma_text (
+        control,
+        "SELECT snapshot_seal_sha256 "
+        "FROM generation_repositories "
+        "WHERE generation_id=4 AND repository_id='rmd';"
+    );
+    g_assert_cmpstr (
+        generation_4_seal,
+        ==,
+        seal
+    );
+    g_free (generation_4_seal);
+
+    char *generation_4_ewd = raw_pragma_text (
+        control,
+        "SELECT snapshot_sha FROM generation_repositories "
+        "WHERE generation_id=4 AND repository_id='ewd';"
+    );
+    g_assert_cmpstr (
+        generation_4_ewd,
+        ==,
+        ewd_sha
+    );
+    g_free (generation_4_ewd);
+
+    g_assert_cmpint (
+        raw_pragma_int64 (
+            control,
+            "SELECT count(*) FROM repository_generations "
+            "WHERE lifecycle!='COMPLETE';"
+        ),
+        ==,
+        0
+    );
+
+    g_assert_false (
+        atm_control_state_set_snapshot_seal_values (
+            control,
+            "rmd",
+            rmd_sha_1,
+            seal,
+            &error
+        )
+    );
+    g_assert_error (
+        error,
+        ATM_CONTROL_STATE_ERROR,
+        ATM_CONTROL_STATE_ERROR_CONFLICT
+    );
+    g_clear_error (&error);
+
+    g_assert_cmpint (
+        raw_pragma_int64 (
+            control,
+            "SELECT active_repository_generation "
+            "FROM active_state WHERE singleton_id=1;"
+        ),
+        ==,
+        4
+    );
+    g_assert_cmpint (
+        raw_pragma_int64 (
+            control,
+            "SELECT count(*) FROM repository_generations;"
+        ),
+        ==,
+        4
+    );
+    g_assert_cmpint (
+        raw_pragma_int64 (
+            control,
+            "SELECT count(*) FROM repository_generations "
+            "WHERE lifecycle='CANDIDATE';"
+        ),
+        ==,
+        0
+    );
+
+    g_free (legacy);
+    g_free (control);
+    remove_tree_best_effort (root);
+    g_free (root);
+}
+
+
+static void
+test_orphan_generation_without_active_is_rejected (void)
+{
+    char *root = new_temp_root (
+        "atm-control-state-orphan-XXXXXX"
+    );
+    char *control =
+        control_state_path_for_root (root);
+    AtmControlStateStore *store = NULL;
+    GError *error = NULL;
+
+    g_assert_true (
+        atm_control_state_open (
+            control,
+            &store,
+            &error
+        )
+    );
+    g_assert_no_error (error);
+    atm_control_state_close (store);
+
+    sqlite3 *db = NULL;
+    g_assert_cmpint (
+        sqlite3_open (
+            control,
+            &db
+        ),
+        ==,
+        SQLITE_OK
+    );
+    g_assert_cmpint (
+        sqlite3_exec (
+            db,
+            "INSERT INTO repository_generations("
+            "generation_id, lifecycle, origin"
+            ") VALUES(1, 'COMPLETE', 'orphan-test');",
+            NULL,
+            NULL,
+            NULL
+        ),
+        ==,
+        SQLITE_OK
+    );
+    sqlite3_close (db);
+
+    gboolean present = TRUE;
+    char *sha = NULL;
+    char *version = NULL;
+    char *seal = NULL;
+
+    g_assert_false (
+        atm_control_state_load_repository_values (
+            control,
+            "rmd",
+            &present,
+            &sha,
+            &version,
+            &seal,
+            &error
+        )
+    );
+    g_assert_error (
+        error,
+        ATM_CONTROL_STATE_ERROR,
+        ATM_CONTROL_STATE_ERROR_CONFLICT
+    );
+    g_assert_false (present);
+    g_assert_null (sha);
+    g_assert_null (version);
+    g_assert_null (seal);
+    g_clear_error (&error);
+
+    g_assert_false (
+        atm_control_state_set_current_values (
+            control,
+            "rmd",
+            "1111111111111111111111111111111111111111",
+            "0.1.0",
+            NULL,
+            &error
+        )
+    );
+    g_assert_error (
+        error,
+        ATM_CONTROL_STATE_ERROR,
+        ATM_CONTROL_STATE_ERROR_CONFLICT
+    );
+    g_clear_error (&error);
+
+    g_assert_cmpint (
+        raw_pragma_int64 (
+            control,
+            "SELECT count(*) FROM repository_generations;"
+        ),
+        ==,
+        1
+    );
+    g_assert_cmpint (
+        raw_pragma_int64 (
+            control,
+            "SELECT active_repository_generation IS NULL "
+            "FROM active_state WHERE singleton_id=1;"
+        ),
+        ==,
+        1
+    );
+
+    g_free (control);
+    remove_tree_best_effort (root);
+    g_free (root);
+}
+
 int
 main (int argc, char **argv)
 {
@@ -1511,6 +1907,14 @@ main (int argc, char **argv)
     g_test_add_func (
         "/control-state/cutover-no-replace",
         test_atomic_cutover_never_replaces_existing_db
+    );
+    g_test_add_func (
+        "/control-state/runtime-copy-on-write",
+        test_runtime_mutations_are_copy_on_write
+    );
+    g_test_add_func (
+        "/control-state/orphan-generation-no-active",
+        test_orphan_generation_without_active_is_rejected
     );
 
     return g_test_run ();
