@@ -2576,7 +2576,8 @@ open_existing_control_state (
         path,
         &db,
         SQLITE_OPEN_READWRITE |
-        SQLITE_OPEN_FULLMUTEX,
+        SQLITE_OPEN_FULLMUTEX |
+        SQLITE_OPEN_NOFOLLOW,
         NULL
     );
 
@@ -4350,7 +4351,8 @@ atm_control_state_open (
         &db,
         SQLITE_OPEN_READWRITE |
         SQLITE_OPEN_CREATE |
-        SQLITE_OPEN_FULLMUTEX,
+        SQLITE_OPEN_FULLMUTEX |
+        SQLITE_OPEN_NOFOLLOW,
         NULL
     );
 
