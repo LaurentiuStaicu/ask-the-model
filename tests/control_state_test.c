@@ -324,6 +324,16 @@ create_v1_control_db (
 }
 
 static void
+test_sqlite_security_floor (void)
+{
+    g_assert_cmpint (
+        sqlite3_libversion_number (),
+        >=,
+        3031000
+    );
+}
+
+static void
 test_bootstrap_and_reopen (void)
 {
     char *root = new_temp_root (
@@ -2507,6 +2517,10 @@ main (int argc, char **argv)
 {
     g_test_init (&argc, &argv, NULL);
 
+    g_test_add_func (
+        "/control-state/sqlite-security-floor",
+        test_sqlite_security_floor
+    );
     g_test_add_func (
         "/control-state/bootstrap-reopen",
         test_bootstrap_and_reopen

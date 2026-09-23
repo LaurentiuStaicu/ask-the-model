@@ -194,3 +194,22 @@ Normal copy-on-write remains compatible because repository rows are written whil
 Validation now requires every v2 defense trigger to exist and rejects a persisted `CANDIDATE` generation. This does not conflict with in-flight transactions because uncommitted candidates are not visible as committed database state.
 
 Legacy `control-state-v1.sql` remains bundled solely to qualify deterministic migration compatibility; it is not the bootstrap format for new databases.
+
+
+## STATE-05b — per-connection SQLite hardening
+
+STATE-05b hardens every Control DB connection independently of persistent schema v2.
+
+AtM now requires SQLite 3.31.0 or newer, which is the oldest version needed for the full connection-security set used here. Immediately after opening a Control DB handle, before schema bootstrap, migration or validation, AtM requires:
+
+- `SQLITE_DBCONFIG_DEFENSIVE = 1`;
+- `SQLITE_DBCONFIG_TRUSTED_SCHEMA = 0`;
+- `SQLITE_DBCONFIG_DQS_DML = 0`;
+- `SQLITE_DBCONFIG_DQS_DDL = 0`;
+- `SQLITE_DBCONFIG_ENABLE_TRIGGER = 1`.
+
+Every configuration call is checked for both SQLite return status and the resulting effective value. Failure to enforce any setting rejects the connection.
+
+The existing connection contract remains in force after those flags are applied: foreign keys ON, WAL journal mode, FULL synchronous durability and a bounded busy timeout.
+
+This layer is complementary to schema v2. Persistent triggers protect COMPLETE-generation semantics in the database file; per-connection hardening prevents AtM's own SQLite handles from enabling dangerous legacy/schema-trust behavior and explicitly guarantees that the v2 trigger layer is active.
