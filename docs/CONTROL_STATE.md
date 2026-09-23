@@ -105,3 +105,23 @@ For the current pre-STATE-04 semantics, `set_current` updates the active COMPLET
 The Vala adapter mirrors the current JSON store's validation and rollback behavior: invalid SHA/version/seal inputs are rejected before persistence, and an SQLite write failure restores the in-memory record.
 
 STATE-03b does not implement immutable generations. That remains a separate STATE-04 qualification step.
+
+
+## STATE-03c — one-time authority switch
+
+STATE-03c wires the previously qualified pieces into production and completes the one-time repository-state authority cutover.
+
+Startup authority resolution now follows a single rule:
+
+1. if `control-state.sqlite3` exists, it is the only repository-state authority;
+2. if it is valid, legacy `repository-state.json` is ignored even if it later changes or becomes invalid;
+3. if it exists but is invalid, startup fails closed and does **not** fall back to JSON;
+4. only when the Control DB is absent may STATE-03a publish a verified migration from legacy JSON or an empty bootstrap.
+
+`StartupQualificationService` reconciles repository snapshots from `ControlRepositoryStateStore` and enrolls missing snapshot seals into the Control DB. Repository-state validity is now part of `installation_qualified`.
+
+`RepositoryLifecycleService` is also Control-DB-backed. It may be constructed before startup qualification, but repository operations remain blocked. After startup qualification, the application explicitly reloads the Control DB and only then applies the qualification result. A failed reload keeps repository operations blocked.
+
+The legacy JSON file is retained as migration/recovery evidence and is no longer written by normal production repository-state operations.
+
+STATE-03 therefore ends dual authority: after a successful cutover, Control DB is authoritative. STATE-04 remains responsible for making repository generations immutable and pinning sessions to explicit generation IDs.

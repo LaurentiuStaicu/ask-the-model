@@ -305,6 +305,26 @@
         "meson:control-state",
         "meson:control-repository-state"
       ]
+    },
+    {
+      "id": "STATE-S0-005",
+      "category": "STATE",
+      "severity": "S0",
+      "lifecycle": "enforced",
+      "statement": "After the STATE-03 authority switch, an existing control-state.sqlite3 is the sole repository-state authority: a valid DB must win regardless of legacy JSON contents, an invalid existing DB must fail closed without JSON fallback, and JSON migration is permitted only when the DB is absent. Startup qualification must reconcile and enroll seals through the Control DB, repository-state invalidity must block installation qualification, RepositoryLifecycleService must operate only on reloaded valid Control DB state, and normal production operations must not write repository-state.json.",
+      "enforced_by": [
+        "src/StartupQualificationService.vala",
+        "src/RepositoryLifecycleService.vala",
+        "src/Application.vala",
+        "src/ControlRepositoryState.vala",
+        "src/control_state.c"
+      ],
+      "tested_by": [
+        "meson:startup-qualification-service",
+        "meson:repository-lifecycle-service",
+        "meson:control-repository-state",
+        "meson:control-state"
+      ]
     }
   ]
 }

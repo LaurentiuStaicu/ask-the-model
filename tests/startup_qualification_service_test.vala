@@ -324,7 +324,7 @@ namespace AskTheModel.Tests {
         assert (report.execution_mode == "flatpak");
         assert (
             report.repository_state_status ==
-            RepositoryStateLoadStatus.ABSENT
+            RepositoryStateLoadStatus.VALID
         );
         assert (report.repositories.length == 3);
 
@@ -364,7 +364,7 @@ namespace AskTheModel.Tests {
         assert (
             root.get_string_member (
                 "repository_state_load_status"
-            ) == "ABSENT"
+            ) == "VALID"
         );
         assert (!root.has_member ("provider"));
 
@@ -458,7 +458,7 @@ namespace AskTheModel.Tests {
         StartupQualificationReport report =
             service.run ();
 
-        assert (report.installation_qualified);
+        assert (!report.installation_qualified);
         assert (
             report.repository_state_status ==
             RepositoryStateLoadStatus.INVALID
@@ -623,12 +623,16 @@ namespace AskTheModel.Tests {
         );
 
         var migrated =
-            new RepositoryStateStore (state_root);
+            new ControlRepositoryStateStore (
+                state_root
+            );
         assert (
             migrated.load_status ==
             RepositoryStateLoadStatus.VALID
         );
-        assert (migrated.loaded_schema_version == 2);
+        assert (
+            migrated.control_schema_version == 1
+        );
         assert (
             migrated.record_for (
                 "rmd"
@@ -638,6 +642,19 @@ namespace AskTheModel.Tests {
             migrated.record_for (
                 "rmd"
             ).snapshot_seal_sha256.length == 64
+        );
+
+        var legacy_source =
+            new RepositoryStateStore (
+                state_root
+            );
+        assert (
+            legacy_source.loaded_schema_version == 1
+        );
+        assert (
+            legacy_source.record_for (
+                "rmd"
+            ).snapshot_seal_sha256 == null
         );
 
         var second_service =
@@ -724,11 +741,197 @@ namespace AskTheModel.Tests {
         assert (directory_is_empty (cache_root));
 
         var preserved =
-            new RepositoryStateStore (state_root);
+            new ControlRepositoryStateStore (
+                state_root
+            );
         assert (
             preserved.record_for (
                 "rmd"
             ).snapshot_seal_sha256 == wrong_seal
+        );
+    }
+
+    private static void
+    test_existing_control_db_wins_over_legacy_json ()
+        throws GLib.Error {
+        string fixture_root = new_temp_root (
+            "atm-gs0-authority-fixture-XXXXXX"
+        );
+        string data_parent = new_temp_root (
+            "atm-gs0-authority-data-XXXXXX"
+        );
+        string data_root = GLib.Path.build_filename (
+            data_parent,
+            "Ask the Model"
+        );
+        string cache_root = new_temp_root (
+            "atm-gs0-authority-cache-XXXXXX"
+        );
+        string state_root = new_temp_root (
+            "atm-gs0-authority-state-XXXXXX"
+        );
+        string flatpak_info =
+            write_flatpak_fixture (fixture_root);
+        string sha =
+            "7777777777777777777777777777777777777777";
+
+        write_repository_state_v1 (
+            state_root,
+            "rmd",
+            sha,
+            "0.1.0"
+        );
+
+        var first_service =
+            new StartupQualificationService (
+                flatpak_info,
+                data_root,
+                cache_root,
+                state_root
+            );
+        StartupQualificationReport first =
+            first_service.run ();
+
+        assert (first.installation_qualified);
+        assert (
+            first.repository_state_status ==
+            RepositoryStateLoadStatus.VALID
+        );
+        assert (
+            repository_for (
+                first,
+                "rmd"
+            ).snapshot_sha == sha
+        );
+
+        string legacy_path =
+            GLib.Path.build_filename (
+                state_root,
+                "repository-state.json"
+            );
+        string malformed = "{ legacy is now invalid";
+        GLib.FileUtils.set_contents (
+            legacy_path,
+            malformed
+        );
+
+        var second_service =
+            new StartupQualificationService (
+                flatpak_info,
+                data_root,
+                cache_root,
+                state_root
+            );
+        StartupQualificationReport second =
+            second_service.run ();
+
+        assert (second.installation_qualified);
+        assert (
+            second.repository_state_status ==
+            RepositoryStateLoadStatus.VALID
+        );
+        assert (
+            repository_for (
+                second,
+                "rmd"
+            ).snapshot_sha == sha
+        );
+
+        string preserved;
+        GLib.FileUtils.get_contents (
+            legacy_path,
+            out preserved
+        );
+        assert (preserved == malformed);
+    }
+
+    private static void
+    test_invalid_control_db_blocks_legacy_fallback ()
+        throws GLib.Error {
+        string fixture_root = new_temp_root (
+            "atm-gs0-db-invalid-fixture-XXXXXX"
+        );
+        string data_parent = new_temp_root (
+            "atm-gs0-db-invalid-data-XXXXXX"
+        );
+        string data_root = GLib.Path.build_filename (
+            data_parent,
+            "Ask the Model"
+        );
+        string cache_root = new_temp_root (
+            "atm-gs0-db-invalid-cache-XXXXXX"
+        );
+        string state_root = new_temp_root (
+            "atm-gs0-db-invalid-state-XXXXXX"
+        );
+        string flatpak_info =
+            write_flatpak_fixture (fixture_root);
+        string sha =
+            "8888888888888888888888888888888888888888";
+
+        write_repository_state_v1 (
+            state_root,
+            "rmd",
+            sha,
+            "0.1.0"
+        );
+
+        string control_path =
+            GLib.Path.build_filename (
+                state_root,
+                "control-state.sqlite3"
+            );
+        string corrupt = "not a sqlite database";
+        GLib.FileUtils.set_contents (
+            control_path,
+            corrupt
+        );
+
+        var service =
+            new StartupQualificationService (
+                flatpak_info,
+                data_root,
+                cache_root,
+                state_root
+            );
+        StartupQualificationReport report =
+            service.run ();
+
+        assert (!report.installation_qualified);
+        assert (
+            report.repository_state_status ==
+            RepositoryStateLoadStatus.INVALID
+        );
+
+        foreach (
+            StartupRepositoryOutcome repository
+            in report.repositories
+        ) {
+            assert (
+                repository.status ==
+                StartupRepositoryStatus.STATE_INVALID
+            );
+        }
+
+        string preserved_control;
+        GLib.FileUtils.get_contents (
+            control_path,
+            out preserved_control
+        );
+        assert (preserved_control == corrupt);
+
+        var legacy =
+            new RepositoryStateStore (
+                state_root
+            );
+        assert (
+            legacy.load_status ==
+            RepositoryStateLoadStatus.VALID
+        );
+        assert (
+            legacy.record_for (
+                "rmd"
+            ).current_sha == sha
         );
     }
 
@@ -790,6 +993,26 @@ namespace AskTheModel.Tests {
             () => {
                 try {
                     test_seal_mismatch_precedes_index_rebuild ();
+                } catch (GLib.Error error) {
+                    GLib.error ("%s", error.message);
+                }
+            }
+        );
+        GLib.Test.add_func (
+            "/gs0/authority/db-wins-over-legacy",
+            () => {
+                try {
+                    test_existing_control_db_wins_over_legacy_json ();
+                } catch (GLib.Error error) {
+                    GLib.error ("%s", error.message);
+                }
+            }
+        );
+        GLib.Test.add_func (
+            "/gs0/authority/invalid-db-no-fallback",
+            () => {
+                try {
+                    test_invalid_control_db_blocks_legacy_fallback ();
                 } catch (GLib.Error error) {
                     GLib.error ("%s", error.message);
                 }

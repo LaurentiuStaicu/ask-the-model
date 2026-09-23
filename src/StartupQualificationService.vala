@@ -65,7 +65,10 @@ namespace AskTheModel {
 
         public bool installation_qualified {
             get {
-                return platform_qualified && storage_qualified;
+                return platform_qualified &&
+                    storage_qualified &&
+                    repository_state_status !=
+                        RepositoryStateLoadStatus.INVALID;
             }
         }
     }
@@ -188,7 +191,7 @@ namespace AskTheModel {
         private StartupRepositoryOutcome reconcile_one (
             RepositoryDescriptor descriptor,
             RepositoryLocalRecord local,
-            RepositoryStateStore state_store
+            ControlRepositoryStateStore state_store
         ) {
             var result = new StartupRepositoryOutcome (
                 descriptor.id
@@ -639,11 +642,59 @@ namespace AskTheModel {
                 report.storage_detail = error.message;
             }
 
-            var state_store = new RepositoryStateStore (
-                state_root
-            );
-            report.repository_state_status =
-                state_store.load_status;
+            string control_state_path =
+                GLib.Path.build_filename (
+                    state_root,
+                    "control-state.sqlite3"
+                );
+            string legacy_state_path =
+                GLib.Path.build_filename (
+                    state_root,
+                    "repository-state.json"
+                );
+            string? authority_failure = null;
+
+            if (!GLib.FileUtils.test (
+                    control_state_path,
+                    GLib.FileTest.EXISTS
+                )) {
+                try {
+                    int cutover_disposition;
+                    ControlStateNative.publish_cutover (
+                        control_state_path,
+                        legacy_state_path,
+                        out cutover_disposition
+                    );
+                } catch (GLib.Error error) {
+                    authority_failure = error.message;
+                }
+            }
+
+            ControlRepositoryStateStore? state_store = null;
+
+            if (authority_failure == null) {
+                state_store =
+                    new ControlRepositoryStateStore (
+                        state_root
+                    );
+                report.repository_state_status =
+                    state_store.load_status;
+
+                if (state_store.load_status ==
+                    RepositoryStateLoadStatus.INVALID) {
+                    authority_failure =
+                        "Persistent Control DB repository state is invalid.";
+                } else if (state_store.load_status ==
+                           RepositoryStateLoadStatus.ABSENT) {
+                    authority_failure =
+                        "Control DB repository authority is absent after cutover resolution.";
+                    report.repository_state_status =
+                        RepositoryStateLoadStatus.INVALID;
+                }
+            } else {
+                report.repository_state_status =
+                    RepositoryStateLoadStatus.INVALID;
+            }
 
             StartupRepositoryOutcome[] outcomes = {};
 
@@ -652,11 +703,19 @@ namespace AskTheModel {
                 in RepositoryCatalog.all ()
             ) {
                 RepositoryLocalRecord local =
-                    state_store.record_for (descriptor.id);
+                    state_store != null
+                        ? state_store.record_for (
+                            descriptor.id
+                        )
+                        : new RepositoryLocalRecord (
+                            descriptor.id
+                        );
                 StartupRepositoryOutcome outcome;
 
-                if (state_store.load_status ==
-                    RepositoryStateLoadStatus.INVALID) {
+                if (authority_failure != null ||
+                    state_store == null ||
+                    state_store.load_status ==
+                        RepositoryStateLoadStatus.INVALID) {
                     outcome = new StartupRepositoryOutcome (
                         descriptor.id
                     );
@@ -665,7 +724,8 @@ namespace AskTheModel {
                     outcome.reason_code =
                         "repository_state_invalid";
                     outcome.detail =
-                        "Persistent repository state is invalid; no snapshot was selected heuristically.";
+                        authority_failure ??
+                        "Persistent Control DB repository state is invalid; no snapshot was selected heuristically.";
                 } else if (!report.installation_qualified) {
                     outcome = new StartupRepositoryOutcome (
                         descriptor.id
@@ -675,7 +735,7 @@ namespace AskTheModel {
                     outcome.reason_code =
                         "installation_unqualified";
                     outcome.detail =
-                        "Repository reconciliation is blocked until platform and storage qualification pass.";
+                        "Repository reconciliation is blocked until platform, storage, and repository-state qualification pass.";
                     outcome.snapshot_sha =
                         local.current_sha;
                     outcome.persisted_version =

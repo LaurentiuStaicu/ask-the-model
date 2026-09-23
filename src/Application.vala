@@ -208,6 +208,22 @@ namespace AskTheModel {
                     : report.storage_reason_code;
             }
 
+            if (report.repository_state_status ==
+                RepositoryStateLoadStatus.INVALID) {
+                foreach (
+                    StartupRepositoryOutcome repository
+                    in report.repositories
+                ) {
+                    if (repository.status ==
+                            StartupRepositoryStatus.STATE_INVALID &&
+                        repository.detail.length > 0) {
+                        return repository.detail;
+                    }
+                }
+
+                return "Repository Control DB authority is invalid.";
+            }
+
             return "Installation qualification did not pass.";
         }
 
@@ -235,17 +251,25 @@ namespace AskTheModel {
                     startup_qualification_running = false;
 
                     if (completed_report != null) {
+                        bool lifecycle_state_ready =
+                            repository_lifecycle.reload_control_state ();
+                        bool runtime_qualified =
+                            completed_report.installation_qualified &&
+                            lifecycle_state_ready;
+
                         repository_lifecycle.apply_installation_qualification (
-                            completed_report.installation_qualified
+                            runtime_qualified
                         );
                         startup_qualification_failed =
-                            !completed_report.installation_qualified;
+                            !runtime_qualified;
                         startup_qualification_detail =
-                            completed_report.installation_qualified
+                            runtime_qualified
                                 ? null
-                                : installation_qualification_detail (
-                                    completed_report
-                                );
+                                : !lifecycle_state_ready
+                                    ? "Repository Control DB could not be reloaded after startup qualification."
+                                    : installation_qualification_detail (
+                                        completed_report
+                                    );
 
                         stdout.printf (
                             "AtM: G-S0 mode=%s platform=%s storage=%s state=%d record=%s\n",
