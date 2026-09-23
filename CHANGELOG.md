@@ -37,6 +37,10 @@ All notable public releases of Ask the Model are recorded here.
 - CONV-03a adds read-only durable conversation list/snapshot materialization in one SQLite read transaction, preserving exact model identity, repository pins, ordered provider/display message content and citation provenance;
 - restored `OllamaConversation` history is rebuilt strictly from durable `provider_content` user/assistant pairs; snapshot loading does not yet authorize continuation, which remains CONV-03b;
 - added `SESSION-S0-005` plus native/domain regression coverage for coherent snapshot reads and exact provider-history rebuild.
+- CONV-03b adds exact continuation qualification: repository-backed restore can reconstruct grounding from an explicit historical COMPLETE Control DB generation without changing `active_state`, then durable repository generation/version/SHA pins must match the reconstructed context exactly;
+- local model inventory now exposes name+digest pairs for restore qualification; a persisted digest must match exactly, while conversations created without a digest remain name-pinned only;
+- historical restore failures do not mark the current runtime repository invalid, and generation 0 remains valid only for zero-repository conversations;
+- added `SESSION-S0-006` with regression coverage for historical-generation restore, active-authority non-mutation, missing-generation fail-closed behavior, exact model digest checks and durable repository-pin equality.
 
 ### Startup qualification fixes
 

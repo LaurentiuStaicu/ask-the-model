@@ -354,6 +354,88 @@ test_snapshot_restore_provider_history ()
             "S1"
         );
 
+        string[] available_names = {
+            "other-model",
+            "model-b"
+        };
+        string[] available_digests = {
+            "other-digest",
+            "digest-b"
+        };
+        AskTheModel.ConversationPersistenceRepository[]
+            qualified_repositories = {
+                new AskTheModel.ConversationPersistenceRepository (
+                    "rmd",
+                    "0.1.0",
+                    "0123456789abcdef0123456789abcdef01234567"
+                )
+            };
+
+        assert (
+            snapshot.model_identity_available (
+                available_names,
+                available_digests
+            )
+        );
+
+        snapshot.require_continuation_identity (
+            available_names,
+            available_digests,
+            7,
+            qualified_repositories
+        );
+
+        bool wrong_digest_rejected = false;
+
+        try {
+            snapshot.require_continuation_identity (
+                { "model-b" },
+                { "wrong-digest" },
+                7,
+                qualified_repositories
+            );
+        } catch (Error error) {
+            wrong_digest_rejected = true;
+        }
+
+        assert (wrong_digest_rejected);
+
+        bool wrong_generation_rejected = false;
+
+        try {
+            snapshot.require_continuation_identity (
+                available_names,
+                available_digests,
+                8,
+                qualified_repositories
+            );
+        } catch (Error error) {
+            wrong_generation_rejected = true;
+        }
+
+        assert (wrong_generation_rejected);
+
+        bool wrong_repository_rejected = false;
+
+        try {
+            snapshot.require_continuation_identity (
+                available_names,
+                available_digests,
+                7,
+                {
+                    new AskTheModel.ConversationPersistenceRepository (
+                        "rmd",
+                        "0.1.0",
+                        "1111111111111111111111111111111111111111"
+                    )
+                }
+            );
+        } catch (Error error) {
+            wrong_repository_rejected = true;
+        }
+
+        assert (wrong_repository_rejected);
+
         var restored =
             new AskTheModel.OllamaConversation ();
 

@@ -73,6 +73,10 @@ namespace AskTheModel {
             return completion_models;
         }
 
+        public string[] get_completion_model_digests () {
+            return completion_model_digests;
+        }
+
         public bool select_model (string requested_model) {
             for (int i = 0; i < completion_models.length; i++) {
                 if (completion_models[i] == requested_model) {
