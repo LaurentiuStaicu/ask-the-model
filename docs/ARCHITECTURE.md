@@ -130,11 +130,14 @@ The development Control State path:
 - represents repository mutations as copy-on-write generations so previously COMPLETE generations remain unchanged;
 - guards mutation with the generation a caller actually read, rejecting stale writers after another transaction advances `active_state`;
 - loads all repository rows for one store from one captured immutable generation;
-- pins a non-empty repository-backed `ConversationGrounding` and `ConversationSession` to the exact generation used for validation, while zero-repository chat remains valid with no repository-generation dependency.
+- pins a non-empty repository-backed `ConversationGrounding` and `ConversationSession` to the exact generation used for validation, while zero-repository chat remains valid with no repository-generation dependency;
+- migrates valid Control DB schema v1 state atomically to schema v2 and uses persistent triggers to defend COMPLETE-generation immutability, forward-only COMPLETE activation and append-only migration history;
+- requires SQLite >= 3.31.0 and configures each Control DB connection with defensive mode, untrusted-schema mode, disabled legacy DQS parsing and explicit trigger enablement before schema work;
+- opens Control DB authority with `SQLITE_OPEN_NOFOLLOW`, verifies the `main` database is genuinely read/write and rejects unsafe XDG state roots before authority resolution.
 
 Conversation grounding does not mutate repository authority while pinning. Required snapshot seals must already exist in the pinned generation, and a later repository update may advance the active generation without changing the generation identity retained by an already-started conversation.
 
-The detailed state contract and staged qualification history are maintained in `docs/CONTROL_STATE.md` and the `STATE-S0-001` through `STATE-S0-007` invariant registry entries.
+The detailed state contract and staged qualification history are maintained in `docs/CONTROL_STATE.md` and the `STATE-S0-001` through `STATE-S0-012` invariant registry entries.
 
 ### R5 retrieval-conversation and benchmark framework
 

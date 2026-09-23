@@ -21,7 +21,11 @@ Post-v0.4.0 development currently extends engineering hardening without changing
 - a valid existing Control DB is the sole runtime repository-state authority, while an invalid existing DB fails closed instead of falling back to legacy JSON;
 - normal repository-state mutation is copy-on-write: each change creates a fresh COMPLETE generation and atomically advances `active_state`, preserving earlier generations;
 - generation-consistent reads and expected-generation guards prevent mixed-generation state and stale-writer overwrite;
-- non-empty repository-backed conversations pin the exact immutable repository generation used to prepare their grounding, so later repository updates apply only to future conversations.
+- non-empty repository-backed conversations pin the exact immutable repository generation used to prepare their grounding, so later repository updates apply only to future conversations;
+- Control DB schema v2 adds atomic v1→v2 migration and persistent trigger defense-in-depth for COMPLETE-generation immutability, active-generation transitions and append-only migration history;
+- every Control DB connection requires SQLite >= 3.31.0 and fail-closed defensive/trusted-schema/DQS/trigger configuration before bootstrap, migration or validation;
+- every production Control DB open rejects symbolic-link authority paths and verifies that SQLite actually opened the main database read/write;
+- the XDG state root that owns `control-state.sqlite3` is qualified with the same real-directory, current-owner, no-group-or-other-write and exclusive write-probe boundary used by G-S0 storage qualification before authority resolution.
 
 Legacy `repository-state.json` remains migration/recovery evidence after cutover and is not rewritten by normal development-runtime repository operations.
 
