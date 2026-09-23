@@ -656,6 +656,14 @@ namespace AskTheModel {
             );
         }
 
+        public string export_conversation_json (
+            string conversation_id
+        ) throws GLib.Error {
+            return ConversationExport.serialize_snapshot (
+                load_snapshot (conversation_id)
+            );
+        }
+
         public string create_conversation (
             string title,
             int64 created_at_us,
