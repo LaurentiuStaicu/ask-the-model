@@ -178,6 +178,19 @@
       "tested_by": [
         "meson:scientific-control"
       ]
+    },
+    {
+      "id": "SCIENTIFIC-S0-005",
+      "category": "SCIENTIFIC",
+      "severity": "S0",
+      "lifecycle": "enforced",
+      "statement": "A canonical scientific artifact may be constructed only from TYPED_VALIDATED production-profile evidence or an exact AtM scientific control; it must preserve canonical provenance and payload, derive a deterministic versioned SHA-256 artifact ID, and fail validation if any canonical field is changed without a matching ID.",
+      "enforced_by": [
+        "src/scientific_artifact.c"
+      ],
+      "tested_by": [
+        "meson:scientific-artifact"
+      ]
     }
   ]
 }

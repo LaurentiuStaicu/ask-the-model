@@ -62,6 +62,7 @@ executable(
     'src/scientific_profile_rmd.c',
     'src/json_pointer.c',
     'src/scientific_control.c',
+    'src/scientific_artifact.c',
     'src/retrieval_rank.c',
     'src/retrieval_scope.c',
     'src/retrieval_router.c',
@@ -665,6 +666,24 @@ scientific_control_test = executable(
 test(
   'scientific-control',
   scientific_control_test
+)
+
+scientific_artifact_test = executable(
+  'scientific-artifact-test',
+  [
+    'src/scientific_artifact.c',
+    'tests/scientific_artifact_test.c'
+  ],
+  include_directories: include_directories('src'),
+  dependencies: [
+    glib_dep
+  ],
+  install: false
+)
+
+test(
+  'scientific-artifact',
+  scientific_artifact_test
 )
 
 retrieval_rank_test = executable(
