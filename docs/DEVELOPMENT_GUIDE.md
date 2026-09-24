@@ -349,7 +349,7 @@ C0-M2 is measurement-only qualification for the unresolved state-root reserve ra
 
 C0-E3 established one small-Control-DB boundary, but a permanent reserve must not assume that one-row history has the same SQLite page/WAL behavior as a larger append-only generation history. M2 therefore uses the real guarded Control DB mutation after constructing real copy-on-write histories of 1, 100 and 1000 COMPLETE generations.
 
-For each history size it runs isolated bounded-tmpfs cases with target free-space bands of 32 KiB, 64 KiB, 128 KiB and 256 KiB. Each record captures:
+For each history size it runs isolated bounded-tmpfs cases in two SQLite sidecar states: `warm` (sidecars left by prior guarded mutations) and `cold` (WAL checkpointed and WAL/SHM removed after all connections close). Each mode is measured at target free-space bands of 16 KiB, 32 KiB, 64 KiB and 128 KiB. Each record captures:
 - Control DB allocated bytes before the filler;
 - SQLite page size/page count/freelist count before and after the guarded mutation;
 - filesystem fragment size;
