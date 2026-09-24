@@ -397,13 +397,13 @@ test_shared_filesystem_post_download_peak (void)
         {
             .device_id = 7,
             .available_bytes = 920,
-            .available_inodes = 105,
+            .available_inodes = 110,
             .inode_budget_known = TRUE
         },
         {
             .device_id = 7,
             .available_bytes = 920,
-            .available_inodes = 105,
+            .available_inodes = 110,
             .inode_budget_known = TRUE
         }
     };
