@@ -4,7 +4,8 @@ This directory freezes the evidence used by C0 disk/inode admission planning.
 
 `evidence.json` is **qualification evidence, not production policy**. It
 records the exact GitHub Actions artifacts and repository SHAs behind C0-M1,
-C0-E1, C0-E2 and C0-E3 so later implementation work does not depend on
+C0-E1, C0-E2 and C0-E3, plus the reviewed C0-M2 tmpfs and C0-M3 ext4
+state-headroom matrices, so later implementation work does not depend on
 expiring CI artifacts or prose-only pull-request comments.
 
 ## Exact-SHA rule
@@ -49,6 +50,19 @@ The runtime-independent C0 model remains layered:
 ## Reserve policy
 
 No reserve is selected here.
+
+M2 and M3 now provide a cross-history, cross-filesystem observation for the
+guarded Control DB publication path:
+
+- tmpfs: 32 KiB available failed while 64 KiB succeeded at 1, 100 and 1000
+  completed generations;
+- ext4: about 28–32 KiB actual available failed while 61,440 B actual
+  available succeeded at 1 and 1000 completed generations.
+
+The Control DB itself grew from roughly 40 KiB to more than 220 KiB across
+these cases without moving the observed success/failure frontier. This is
+evidence against a reserve proportional to total Control DB size, but it is
+still not a portable upper bound or a selected runtime reserve.
 
 The issue contract explicitly forbids freezing an arbitrary percentage. A
 later production change must document its byte/inode reserve rationale,
