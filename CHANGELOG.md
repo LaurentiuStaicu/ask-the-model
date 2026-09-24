@@ -6,7 +6,7 @@ All notable public releases of Ask the Model are recorded here.
 
 ### Optimization controls
 
-- added one global session-only `OPT OFF / OPT ON` switch in the header for the post-v0.5.0 optimization program; every process starts OFF, the state is deliberately not persisted, and future runtime optimizations must preserve the baseline path while OFF;
+- added one global session-only instrument-style `OPT  OFF  [switch]  ON` control in the header for the post-v0.5.0 optimization program; every process starts OFF, the state is deliberately not persisted, the switch uses a warm red/green case with a neutral metallic slider and the same ridge-border language as the application frame, the LCD mirrors the state as `OPT OFF` / `OPT ON`, and future runtime optimizations must preserve the baseline path while OFF;
 - kept the state visually explicit as text as well as color: a native sliding GTK switch uses a subdued warm red trough when OFF and a subdued warm green trough when ON.
 
 ### Qualification infrastructure
