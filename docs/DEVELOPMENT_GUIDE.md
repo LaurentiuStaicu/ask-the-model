@@ -181,6 +181,23 @@ Runtime optimization code must receive/snapshot this policy through explicit pro
 
 When the gate is OFF, runtime behavior must remain on the established baseline path. Test/measurement infrastructure such as OPT-A0, C0-M1 and D0 is not gated because it does not change ordinary application behavior.
 
+### C0-M1 capacity measurement
+
+C0-M1 is qualification infrastructure only. It must not reject Download/Update, select a safety reserve, delete old snapshots, preallocate repository payloads or otherwise alter ordinary runtime behavior.
+
+The Linux measurement contract distinguishes:
+- logical regular-file bytes from `st_size`;
+- allocated bytes from Linux `st_blocks * 512`;
+- filesystem identity from `st_dev`;
+- bytes available to an unprivileged process from `statvfs().f_bavail * f_frsize`;
+- inode/file slots available to an unprivileged process from `statvfs().f_favail`.
+
+The measurement helpers use no-follow inspection and refuse symlink/special-object inputs rather than traversing through them. For a not-yet-created root, filesystem capacity is measured from the nearest existing ancestor without converting that ancestor into an authority decision.
+
+The real C0-M1 workflow reuses the exact EWD/CBD/RMD SHA corpus frozen by the R5 retrieval benchmark. For each repository it downloads the exact GitHub tarball, runs the real ingest/storage/retrieval-index code in an isolated temporary AtM root, records fresh-install data-root peak allocation, records cache-root peak allocation while the archive remains present during index construction, quarantines the same-SHA snapshot with the production quarantine primitive and measures replacement coexistence during repair, then uploads deterministic JSON artifacts carrying AtM source commit and repository SHA provenance.
+
+Peak sampling is measurement evidence, not a production reservation guarantee. Production capacity admission remains a later decision and must be derived from measured evidence, separate byte/inode formulas, filesystem grouping and ENOSPC recovery qualification.
+
 ### Repository authority-mutation lease
 
 When an operation snapshots optimization mode ON, repository Download/Update uses one application-owned exclusive nonblocking lease at `<state_root>/repository-mutation.lock` before any selected-repository staging or authority mutation begins.
