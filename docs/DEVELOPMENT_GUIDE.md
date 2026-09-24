@@ -320,6 +320,29 @@ The checked-in M1 values are observations from one qualification environment, no
 
 The registry deliberately states `production_thresholds_selected: false`. Reserve sizes, refusal thresholds and production `NO_SPACE` behavior remain later reviewed policy. The invariant-registry CI gate validates evidence provenance, exact-SHA alignment with the frozen R5 corpus and preservation of this non-threshold boundary.
 
+### C0-F5 NO_SPACE error and UI contract
+
+C0-F5 defines the repository-capacity error surface before any production admission threshold is selected.
+
+`RepositoryError.NO_SPACE` is a distinct repository error code. It is appended after the existing error codes so current RepositoryError numeric values are not renumbered.
+
+The semantic class covers two later production cases:
+
+1. **Preflight refusal:** capacity admission can prove the operation is already unsafe before the relevant deterministic staging/mutation checkpoint.
+2. **Post-admission exhaustion:** a real write still fails because local capacity changed or prediction/reserve evidence was insufficient.
+
+The detail text must distinguish these cases. Recommended wording is:
+- preflight: `Not enough local storage to safely update <REPO>.`
+- post-admission: `Local storage became full while updating <REPO>; the previous qualified repository remains active.`
+
+The short LCD representation reuses the existing critical repository-error segment and changes its text from `ERR` to `NO SPACE` only for this error class. No extra LCD segment is added, so ordinary layout is unchanged. The full detail remains available through the existing tooltip/accessibility description.
+
+`NO_SPACE` is not an offline/network condition. It must not set the repository `OFFLINE` state.
+
+This slice adds only dormant error/UI plumbing. Current storage/admission code does not emit `RepositoryError.NO_SPACE`; therefore baseline Download/Update behavior is unchanged. When production C0 is later wired, admission-generated `NO_SPACE` must remain behind the OFF-by-default Optimizations snapshot. Mapping actual post-admission ENOSPC to this semantic class may be shared by both modes because it improves error precision without authorizing proactive admission, but that mapping must be separately reviewed with native errno/SQLite result preservation rather than message-string parsing.
+
+SQLite `SQLITE_FULL` is the canonical database-full signal. Generic `SQLITE_IOERR` is not automatically equivalent to no-space; qualification has already observed that extremely tight state headroom can fail earlier during WAL/SHM setup. Native error classification must therefore preserve specific underlying results instead of treating every I/O error as `NO_SPACE`.
+
 ### Repository authority-mutation lease
 
 When an operation snapshots optimization mode ON, repository Download/Update uses one application-owned exclusive nonblocking lease at `<state_root>/repository-mutation.lock` before any selected-repository staging or authority mutation begins.
