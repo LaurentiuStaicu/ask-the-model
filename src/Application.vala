@@ -3216,9 +3216,9 @@ namespace AskTheModel {
 
             var lifecycle_button =
                 new Gtk.Button.from_icon_name (
-                    "folder-symbolic"
+                    "document-save-symbolic"
                 ) {
-                    tooltip_text = "Archive conversation",
+                    tooltip_text = "Save to History",
                     valign = Gtk.Align.CENTER,
                     sensitive = false
                 };
@@ -3228,7 +3228,7 @@ namespace AskTheModel {
             );
             lifecycle_button.update_property (
                 Gtk.AccessibleProperty.LABEL,
-                "Archive conversation"
+                "Save to History"
             );
 
             var close_button =
