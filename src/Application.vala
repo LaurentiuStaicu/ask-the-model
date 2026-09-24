@@ -12,7 +12,7 @@ namespace AskTheModel {
         public Gtk.Button send_button;
         public Gtk.Label placeholder;
         public Gtk.Label title_label;
-        public Gtk.MenuButton lifecycle_button;
+        public Gtk.Button lifecycle_button;
         public Gtk.Button close_button;
         public OllamaConversation conversation;
         public ConversationSession session =
@@ -30,6 +30,7 @@ namespace AskTheModel {
         public bool unsaved_notice_shown = false;
         public bool restored_view_only = false;
         public string? restored_read_only_reason = null;
+        public bool archived = false;
 
         public ChatTabState (
             Gtk.Box page,
@@ -38,7 +39,7 @@ namespace AskTheModel {
             Gtk.Button send_button,
             Gtk.Label placeholder,
             Gtk.Label title_label,
-            Gtk.MenuButton lifecycle_button,
+            Gtk.Button lifecycle_button,
             Gtk.Button close_button,
             OllamaConversation conversation,
             uint serial
@@ -984,33 +985,16 @@ namespace AskTheModel {
             }
 
             try {
-                ConversationPersistenceSnapshot initial_snapshot =
-                    conversation_store.load_snapshot (
-                        summary.conversation_id
-                    );
-
-                /*
-                 * Make startup-open state durable before clearing archive.
-                 * If unarchive then fails, the conversation remains archived
-                 * and therefore still excluded from startup restore.
-                 */
-                conversation_store.set_open_on_startup (
-                    summary.conversation_id,
-                    true
-                );
-
-                if (initial_snapshot.archived) {
-                    conversation_store.set_archived (
-                        summary.conversation_id,
-                        false,
-                        GLib.get_real_time ()
-                    );
-                }
-
                 ConversationPersistenceSnapshot snapshot =
                     conversation_store.load_snapshot (
                         summary.conversation_id
                     );
+
+                if (!snapshot.archived) {
+                    throw new GLib.IOError.INVALID_DATA (
+                        "Only explicitly archived conversations can be opened from History."
+                    );
+                }
 
                 ChatTabState? restored =
                     create_restored_chat_tab (
@@ -1026,11 +1010,8 @@ namespace AskTheModel {
                 history_window.close ();
 
                 stdout.printf (
-                    "AtM: conversation %s reopened from history%s\n",
-                    summary.conversation_id,
-                    initial_snapshot.archived
-                        ? " after unarchive"
-                        : ""
+                    "AtM: archived conversation %s reopened from history\n",
+                    summary.conversation_id
                 );
 
                 qualify_restored_conversations.begin ();
@@ -1057,7 +1038,7 @@ namespace AskTheModel {
                 "Delete this conversation permanently?"
             ) {
                 detail =
-                    "The transcript, repository pins, citation provenance and automatic JSON export will be deleted. This cannot be undone.",
+                    "The archived transcript, repository pins, citation provenance and automatic JSON export will be deleted. This cannot be undone.",
                 buttons = {
                     "Cancel",
                     "Delete permanently"
@@ -1136,9 +1117,7 @@ namespace AskTheModel {
 
             var open_button =
                 new Gtk.Button.with_label (
-                    summary.archived
-                        ? "Unarchive & Open"
-                        : "Open"
+                    "Open"
                 ) {
                     valign = Gtk.Align.CENTER
                 };
@@ -1219,7 +1198,7 @@ namespace AskTheModel {
             };
 
             var description = new Gtk.Label (
-                "Closed and archived conversations remain local. Open restores the saved transcript and rechecks its exact saved context. Delete permanently removes the conversation and its automatic JSON export."
+                "Only conversations explicitly archived with the Archive button are saved here. Open restores an archived conversation; Delete permanently removes it and its automatic JSON export."
             ) {
                 halign = Gtk.Align.START,
                 xalign = 0.0f,
@@ -1250,7 +1229,8 @@ namespace AskTheModel {
                 ConversationPersistenceSummary summary
                 in summaries
             ) {
-                if (durable_conversation_is_open (
+                if (!summary.archived ||
+                    durable_conversation_is_open (
                         summary.conversation_id
                     )) {
                     continue;
@@ -1267,7 +1247,7 @@ namespace AskTheModel {
 
             if (visible_count == 0) {
                 var empty = new Gtk.Label (
-                    "No closed or archived conversations."
+                    "No archived conversations."
                 ) {
                     halign = Gtk.Align.CENTER,
                     margin_top = 24,
@@ -1288,55 +1268,14 @@ namespace AskTheModel {
             history_window.present ();
         }
 
-        private void configure_conversation_lifecycle_menu (
+        private void configure_conversation_archive_button (
             ChatTabState state
         ) {
-            var actions = new Gtk.Box (
-                Gtk.Orientation.VERTICAL,
-                2
-            ) {
-                margin_top = 6,
-                margin_bottom = 6,
-                margin_start = 6,
-                margin_end = 6
-            };
-
-            var archive_button =
-                new Gtk.Button.with_label (
-                    "Archive"
-                );
-            archive_button.halign = Gtk.Align.FILL;
-
-            var delete_button =
-                new Gtk.Button.with_label (
-                    "Delete permanently"
-                );
-            delete_button.halign = Gtk.Align.FILL;
-            delete_button.add_css_class (
-                "destructive-action"
-            );
-
-            archive_button.clicked.connect (() => {
+            state.lifecycle_button.clicked.connect (() => {
                 archive_chat_tab (
                     state
                 );
             });
-            delete_button.clicked.connect (() => {
-                confirm_delete_chat_tab.begin (
-                    state
-                );
-            });
-
-            actions.append (archive_button);
-            actions.append (delete_button);
-
-            var popover = new Gtk.Popover () {
-                child = actions,
-                has_arrow = true
-            };
-
-            state.lifecycle_button.popover =
-                popover;
         }
 
         private void archive_chat_tab (
@@ -1362,6 +1301,8 @@ namespace AskTheModel {
                 );
                 return;
             }
+
+            state.archived = true;
 
             close_chat_tab (
                 state,
@@ -1431,7 +1372,7 @@ namespace AskTheModel {
 
         private void close_chat_tab (
             ChatTabState state,
-            bool persist_closed = true
+            bool discard_unarchived = true
         ) {
             if (state.generating || chat_notebook == null) {
                 return;
@@ -1442,25 +1383,26 @@ namespace AskTheModel {
                 return;
             }
 
-            if (persist_closed &&
-                state.persistent_id != null) {
+            if (discard_unarchived &&
+                state.persistent_id != null &&
+                !state.archived) {
                 if (conversation_store == null) {
                     append_transcript (
                         state.transcript,
-                        "System: Conversation could not be closed durably because persistence is unavailable."
+                        "System: Conversation could not be closed because temporary persistence is unavailable."
                     );
                     return;
                 }
 
                 try {
-                    conversation_store.set_open_on_startup (
-                        state.persistent_id,
-                        false
+                    conversation_store.delete_conversation (
+                        state.persistent_id
                     );
+                    state.persistent_id = null;
                 } catch (GLib.Error error) {
                     append_transcript (
                         state.transcript,
-                        "System: Conversation could not be closed durably: " +
+                        "System: Conversation could not be discarded on close: " +
                         error.message
                     );
                     return;
@@ -1541,7 +1483,8 @@ namespace AskTheModel {
                 state.lifecycle_button.sensitive =
                     !state.generating &&
                     !state.persistence_failed &&
-                    state.persistent_id != null;
+                    state.persistent_id != null &&
+                    !state.archived;
                 state.close_button.sensitive =
                     !state.generating;
             }
@@ -2125,6 +2068,21 @@ namespace AskTheModel {
                     main_window.remove_css_class ("atm-dark");
                 }
             }
+        }
+
+        protected override void shutdown () {
+            if (conversation_store != null) {
+                try {
+                    conversation_store.discard_unarchived_conversations ();
+                } catch (GLib.Error error) {
+                    stderr.printf (
+                        "AtM: temporary conversation cleanup on shutdown failed: %s\n",
+                        error.message
+                    );
+                }
+            }
+
+            base.shutdown ();
         }
 
         protected override void activate () {
@@ -3213,7 +3171,7 @@ namespace AskTheModel {
 
         private Gtk.Widget build_chat_tab_label (
             Gtk.Label title_label,
-            Gtk.MenuButton lifecycle_button,
+            Gtk.Button lifecycle_button,
             Gtk.Button close_button
         ) {
             var box = new Gtk.Box (
@@ -3324,9 +3282,10 @@ namespace AskTheModel {
             };
 
             var lifecycle_button =
-                new Gtk.MenuButton () {
-                    icon_name = "open-menu-symbolic",
-                    tooltip_text = "Conversation actions",
+                new Gtk.Button.from_icon_name (
+                    "folder-symbolic"
+                ) {
+                    tooltip_text = "Archive conversation",
                     valign = Gtk.Align.CENTER,
                     sensitive = false
                 };
@@ -3336,7 +3295,7 @@ namespace AskTheModel {
             );
             lifecycle_button.update_property (
                 Gtk.AccessibleProperty.LABEL,
-                "Conversation actions"
+                "Archive conversation"
             );
 
             var close_button =
@@ -3371,7 +3330,7 @@ namespace AskTheModel {
             state.repository_ids =
                 selected_repository_ids ();
 
-            configure_conversation_lifecycle_menu (
+            configure_conversation_archive_button (
                 state
             );
 
@@ -3796,6 +3755,7 @@ namespace AskTheModel {
                 "continuation context is being qualified";
             state.locked = true;
             state.persistent_id = snapshot.conversation_id;
+            state.archived = snapshot.archived;
             state.model_name = snapshot.model_name;
             state.model_digest = snapshot.model_digest;
             state.repository_ids =
@@ -3830,95 +3790,24 @@ namespace AskTheModel {
 
         private void restore_durable_conversations_if_ready () {
             if (durable_restore_attempted ||
-                generation_active ||
-                conversation_store == null ||
-                chat_notebook == null) {
+                conversation_store == null) {
                 return;
             }
 
             durable_restore_attempted = true;
-            ChatTabState? pristine_new = active_chat;
-            int first_restored_page = -1;
-            uint restored_count = 0;
 
             try {
-                ConversationPersistenceSummary[] summaries =
-                    conversation_store.list_conversations ();
-
-                foreach (
-                    ConversationPersistenceSummary summary
-                    in summaries
-                ) {
-                    if (summary.archived ||
-                        !summary.open_on_startup) {
-                        continue;
-                    }
-
-                    ConversationPersistenceSnapshot snapshot =
-                        conversation_store.load_snapshot (
-                            summary.conversation_id
-                        );
-
-                    ChatTabState? restored =
-                        create_restored_chat_tab (
-                            snapshot
-                        );
-
-                    if (restored == null) {
-                        continue;
-                    }
-
-                    int page_num =
-                        chat_notebook.page_num (
-                            restored.page
-                        );
-
-                    if (first_restored_page < 0 &&
-                        page_num >= 0) {
-                        first_restored_page = page_num;
-                    }
-
-                    restored_count++;
-                }
+                conversation_store.discard_unarchived_conversations ();
             } catch (GLib.Error error) {
                 stderr.printf (
-                    "AtM: durable conversation restore failed: %s\n",
+                    "AtM: temporary conversation cleanup failed: %s\n",
                     error.message
                 );
             }
 
-            if (restored_count > 0 &&
-                pristine_new != null &&
-                chat_state_is_open (pristine_new) &&
-                chat_state_is_pristine_new (
-                    pristine_new
-                )) {
-                close_chat_tab (
-                    pristine_new
-                );
-
-                if (first_restored_page > 0) {
-                    first_restored_page--;
-                }
-            }
-
-            if (first_restored_page >= 0 &&
-                chat_notebook.get_n_pages () >
-                    first_restored_page) {
-                chat_notebook.set_current_page (
-                    first_restored_page
-                );
-            }
-
             stdout.printf (
-                "AtM: restored %u durable conversation%s in read-only mode\n",
-                restored_count,
-                restored_count == 1 ? "" : "s"
+                "AtM: archived conversations remain available through History\n"
             );
-
-            if (restored_count > 0) {
-                qualify_restored_conversations.begin ();
-            }
         }
 
         private Gtk.Widget build_main_content () {
