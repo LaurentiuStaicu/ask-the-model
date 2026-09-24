@@ -68,9 +68,10 @@ path_matches_opened_file (
     return TRUE;
 }
 
-gboolean
-atm_coordination_lease_acquire (
+static gboolean
+coordination_lease_acquire_mode (
     const char *path,
+    gint lock_operation,
     gboolean nonblocking,
     gint *out_fd,
     gboolean *out_contended,
@@ -80,7 +81,7 @@ atm_coordination_lease_acquire (
 {
     struct stat opened_stat;
     gint fd = -1;
-    gint operation = LOCK_EX;
+    gint operation = lock_operation;
     gint64 wait_started_us;
     gboolean ok = FALSE;
 
@@ -194,6 +195,48 @@ out:
     }
 
     return ok;
+}
+
+gboolean
+atm_coordination_lease_acquire (
+    const char *path,
+    gboolean nonblocking,
+    gint *out_fd,
+    gboolean *out_contended,
+    gint64 *out_wait_us,
+    GError **error
+)
+{
+    return coordination_lease_acquire_mode (
+        path,
+        LOCK_EX,
+        nonblocking,
+        out_fd,
+        out_contended,
+        out_wait_us,
+        error
+    );
+}
+
+gboolean
+atm_coordination_lease_acquire_shared (
+    const char *path,
+    gboolean nonblocking,
+    gint *out_fd,
+    gboolean *out_contended,
+    gint64 *out_wait_us,
+    GError **error
+)
+{
+    return coordination_lease_acquire_mode (
+        path,
+        LOCK_SH,
+        nonblocking,
+        out_fd,
+        out_contended,
+        out_wait_us,
+        error
+    );
 }
 
 void
