@@ -34,7 +34,7 @@ Post-v0.4.0 development now combines engineering hardening with unreleased produ
 - CONV-04b enables continuation only after the restored snapshot's exact Ollama model name/digest and historical repository generation/version/SHA context are requalified; unavailable or mismatched context stays view-only and can be retried without repinning.
 - CONV-04c keeps tab Close, Archive and permanent Delete distinct; conversation-store schema v2 persists an independent `open_on_startup` flag so application shutdown restores chats left open, while an explicit tab Close suppresses startup restoration without archiving or deleting history; archive clears startup-open state and delete still requires explicit confirmation with dependent rows removed only through conversation-store cascades.
 - CONV-05a adds a compact durable Conversation History surface for chats no longer open in the notebook: closed conversations can be reopened, archived conversations can be unarchived and reopened, and every history-opened tab re-enters the existing read-only restore boundary before exact model/repository continuation qualification.
-- CONV-05b adds a deterministic read-only JSON export foundation for one durable conversation snapshot, preserving exact model/repository identity, provider/display content and citation provenance without changing the conversation database; file-save UI and import remain future work.
+- CONV-05b adds an automatic deterministic JSON export mirror under `~/Ask the Model/Conversation Exports/`: existing durable chats synchronize at startup and stable per-conversation files refresh after durable content/title/archive changes without any location chooser or export button; import remains future work.
 
 Legacy `repository-state.json` remains migration/recovery evidence after cutover and is not rewritten by normal development-runtime repository operations.
 
@@ -181,7 +181,7 @@ The Flatpak receives write access only to the dedicated `~/Ask the Model` direct
 
 Likely extension areas include:
 
-- user-facing conversation export file flow, import, retention policy and bulk conversation-history management;
+- conversation import, retention policy and bulk conversation-history management;
 - a dedicated repository-management surface for snapshot history/removal;
 - additional reviewed repository families;
 - optional semantic retrieval/reranking only where benchmark evidence justifies the local cost;
