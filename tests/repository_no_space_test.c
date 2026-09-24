@@ -3,6 +3,7 @@
 #include "archive_extract.h"
 #include "control_state.h"
 #include "retrieval_index.h"
+#include "repository_storage.h"
 
 #include <gio/gio.h>
 #include <glib.h>
@@ -97,6 +98,21 @@ test_control_no_space (void)
 }
 
 static void
+test_storage_no_space (void)
+{
+    assert_classified (
+        g_error_new_literal (
+            g_quark_from_static_string (
+                "atm-storage-error-quark"
+            ),
+            ATM_STORAGE_ERROR_NO_SPACE,
+            "no space"
+        ),
+        TRUE
+    );
+}
+
+static void
 test_unrelated_storage_error (void)
 {
     assert_classified (
@@ -142,6 +158,10 @@ main (
     g_test_add_func (
         "/repository-no-space/control",
         test_control_no_space
+    );
+    g_test_add_func (
+        "/repository-no-space/storage",
+        test_storage_no_space
     );
     g_test_add_func (
         "/repository-no-space/unrelated",
