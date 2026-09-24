@@ -13,6 +13,7 @@ All notable public releases of Ask the Model are recorded here.
 
 ### Qualification infrastructure
 
+- added C0-M4 historical capacity-amplification qualification: a validated 18-SHA EWD/CBD/RMD corpus reuses the real M1 ingest/index runner, derives per-repository observable-to-allocated-byte envelopes, and performs leave-one-out underprediction tests without selecting any production predictor or margin;
 - extended C0-F6 with the supplementary 24-case SQLite sidecar-sensitivity artifact: warm SHM allows lower additional headroom, while cold sidecars retain the 32 KiB fail / 64 KiB success frontier; the checked-in evidence therefore fixes cold-sidecar state as the conservative future admission baseline without selecting a reserve;
 - extended the C0-F6 checked-in capacity evidence registry with the exact M2 tmpfs and M3 ext4 state-headroom matrices, artifact digests and source provenance; CI now freezes the reviewed 32–64 KiB qualification frontier while continuing to enforce that no production reserve/threshold is selected;
 - added C0-M3 ext4 portability measurement for the state-root reserve: the M2 constrained guarded-Control-DB mutation is repeated on a 64 MiB ext4 loopback filesystem with 0% root-reserved blocks at 1/1000 generations and 16/32/64/128 KiB target headroom, recording actual unprivileged availability and atomic success/fail-closed behavior without selecting a production reserve;
