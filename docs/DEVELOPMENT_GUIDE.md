@@ -34,6 +34,8 @@ The first Send freezes model/repository identity for that chat.
 
 Durable history reopen must reuse the persisted snapshot restore boundary: reopening a closed or archived conversation may change only its lifecycle visibility state before reconstructing the saved snapshot, and the resulting tab must remain view-only until the exact persisted model/repository context passes the existing continuation qualification.
 
+CONV-05b export is intentionally layered above the same read-only durable snapshot boundary. `ConversationExport.vala` serializes a loaded snapshot into a versioned deterministic JSON envelope; `ConversationPersistenceStore.export_conversation_json()` must not mutate lifecycle state or database contents. Import is not implied by the export format and requires a separate future design.
+
 ### Startup qualification and repository lifecycle
 
 `StartupQualificationService.vala`, `StartupQualificationRecord.vala`, `startup_qualification.c` and the G-S0 native bridge qualify the effective packaged deployment, the dedicated repository-storage boundary and persistent repository state before local readiness is accepted.
