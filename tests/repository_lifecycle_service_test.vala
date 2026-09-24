@@ -307,7 +307,7 @@ namespace AskTheModel.Tests {
 
             bool busy_rejected = false;
             try {
-                yield service.download_or_update (none);
+                yield service.download_or_update (one);
             } catch (RepositoryError error) {
                 busy_rejected =
                     error.code == RepositoryError.BUSY;
