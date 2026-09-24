@@ -591,6 +591,25 @@ test(
   capacity_admission_model_test
 )
 
+capacity_operation_plan_test = executable(
+  'capacity-operation-plan-test',
+  [
+    'src/capacity_admission_model.c',
+    'src/capacity_operation_plan.c',
+    'tests/capacity_operation_plan_test.c'
+  ],
+  include_directories: include_directories('src'),
+  dependencies: [
+    glib_dep
+  ],
+  install: false
+)
+
+test(
+  'capacity-operation-plan',
+  capacity_operation_plan_test
+)
+
 capacity_measurement_probe = executable(
   'capacity-measurement-probe',
   [

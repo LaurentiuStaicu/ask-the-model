@@ -282,6 +282,32 @@ The inspection result is a planning input, not a replacement for extraction vali
 
 No filesystem-allocation byte threshold is derived directly from logical tar sizes in this slice because compressed/deduplicating/sparse-capable filesystems can make logical bytes differ from allocated bytes. Production byte admission continues to use measured phase evidence plus filesystem availability, while C0-F2 closes the archive-entry/inode observability gap.
 
+### C0-F3 two-checkpoint operation phase construction
+
+C0-F3 converts explicit capacity predictions into the phase arrays consumed by C0-F1, but deliberately separates two different availability baselines.
+
+#### Checkpoint A — before archive staging
+
+Before the archive `.part` path is created, only the predicted archive allocation/inode demand belongs to the operation. This checkpoint can reject clearly insufficient cache capacity before deterministic staging begins.
+
+No archive inspection exists yet at this point.
+
+#### Checkpoint B — after completed archive + pre-scan, before mutation
+
+After the completed archive exists, AtM must measure filesystem availability **again**. The archive is now already consuming the measured `f_bavail` / `f_favail` pool and therefore must not be charged a second time as additional demand.
+
+From this post-download baseline the mutation plan contains:
+
+1. **Extraction:** new snapshot allocation and the exact materialized-entry requirement from C0-F2.
+2. **Index build:** the new snapshot remains while predicted additional index allocation is created.
+3. **State commit:** snapshot + completed index remain while predicted state-root mutation allocation occurs.
+
+This separation prevents a subtle double-counting error: using the pre-download archive requirement again after F2 inspection would subtract the same completed archive from capacity twice.
+
+Fresh install, different-SHA update and same-SHA repair share the same post-download **additional-space** arithmetic when no speculative reclamation is allowed. Existing active snapshots and an invalid same-SHA snapshot renamed into quarantine already consumed capacity before Checkpoint B and are not counted again. Same-SHA repair carries an explicit `must_admit_before_quarantine` contract.
+
+C0-F3 does not infer allocated bytes from tar logical bytes. Archive, snapshot, index and state predictions remain explicit later-policy inputs; F2 contributes the inode/materialization requirement; F1 groups roots by `st_dev`, applies reserve floors and evaluates phase overlap.
+
 ### Repository authority-mutation lease
 
 When an operation snapshots optimization mode ON, repository Download/Update uses one application-owned exclusive nonblocking lease at `<state_root>/repository-mutation.lock` before any selected-repository staging or authority mutation begins.
