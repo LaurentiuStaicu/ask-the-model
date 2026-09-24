@@ -620,6 +620,23 @@ add_u64_json (
 }
 
 static void
+add_i64_json (
+    JsonBuilder *builder,
+    const char *name,
+    gint64 value
+)
+{
+    json_builder_set_member_name (
+        builder,
+        name
+    );
+    json_builder_add_int_value (
+        builder,
+        value
+    );
+}
+
+static void
 emit_result (
     guint history_generations,
     guint64 leave_target_bytes,
@@ -659,8 +676,130 @@ emit_result (
     JsonBuilder *builder =
         json_builder_new ();
 
-    json_builder_begin_object (builder);
+    json_builder_begin_object (
+        builder
+    );
 
+    json_builder_set_member_name (
+        builder,
+        "schema_version"
+    );
+    json_builder_add_int_value (
+        builder,
+        1
+    );
+
+    add_u64_json (
+        builder,
+        "history_generations",
+        history_generations
+    );
+    add_u64_json (
+        builder,
+        "leave_target_bytes",
+        leave_target_bytes
+    );
+    add_u64_json (
+        builder,
+        "available_bytes_before_filler",
+        available_bytes_before_filler
+    );
+    add_u64_json (
+        builder,
+        "available_inodes_before_filler",
+        available_inodes_before_filler
+    );
+    add_u64_json (
+        builder,
+        "available_bytes_before_operation",
+        available_bytes_before_operation
+    );
+    add_u64_json (
+        builder,
+        "available_inodes_before_operation",
+        available_inodes_before_operation
+    );
+    add_u64_json (
+        builder,
+        "filesystem_fragment_size",
+        fragment_size
+    );
+    add_u64_json (
+        builder,
+        "filler_allocated_bytes",
+        filler_bytes
+    );
+    add_u64_json (
+        builder,
+        "control_db_allocated_bytes_before",
+        control_db_allocated_bytes_before
+    );
+    add_i64_json (
+        builder,
+        "generation_before",
+        generation_before
+    );
+    add_i64_json (
+        builder,
+        "generation_after",
+        generation_after
+    );
+    add_i64_json (
+        builder,
+        "candidate_generations",
+        candidate_generations
+    );
+    add_i64_json (
+        builder,
+        "page_size_before",
+        stats_before->page_size
+    );
+    add_i64_json (
+        builder,
+        "page_count_before",
+        stats_before->page_count
+    );
+    add_i64_json (
+        builder,
+        "freelist_count_before",
+        stats_before->freelist_count
+    );
+    add_i64_json (
+        builder,
+        "page_size_after",
+        stats_after->page_size
+    );
+    add_i64_json (
+        builder,
+        "page_count_after",
+        stats_after->page_count
+    );
+    add_i64_json (
+        builder,
+        "freelist_count_after",
+        stats_after->freelist_count
+    );
+    add_u64_json (
+        builder,
+        "control_db_allocated_bytes_after",
+        allocated_bytes (
+            control_path
+        )
+    );
+    add_u64_json (
+        builder,
+        "wal_allocated_bytes_after",
+        allocated_bytes (
+            wal_path
+        )
+    );
+    add_u64_json (
+        builder,
+        "shm_allocated_bytes_after",
+        allocated_bytes (
+            shm_path
+        )
+    );
 
     json_builder_set_member_name (
         builder,
@@ -715,6 +854,7 @@ emit_result (
         builder,
         "operation_error"
     );
+
     if (operation_error == NULL) {
         json_builder_add_null_value (
             builder
@@ -723,6 +863,7 @@ emit_result (
         json_builder_begin_object (
             builder
         );
+
         json_builder_set_member_name (
             builder,
             "domain"
@@ -733,6 +874,7 @@ emit_result (
                 operation_error->domain
             )
         );
+
         json_builder_set_member_name (
             builder,
             "code"
@@ -741,6 +883,7 @@ emit_result (
             builder,
             operation_error->code
         );
+
         json_builder_set_member_name (
             builder,
             "message"
@@ -749,6 +892,7 @@ emit_result (
             builder,
             operation_error->message
         );
+
         json_builder_end_object (
             builder
         );
