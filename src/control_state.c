@@ -41,6 +41,20 @@ nonempty (const char *value)
     return value != NULL && value[0] != '\0';
 }
 
+static AtmControlStateError
+control_sqlite_error_code (
+    sqlite3 *db,
+    AtmControlStateError fallback
+)
+{
+    if (db != NULL &&
+        sqlite3_errcode (db) == SQLITE_FULL) {
+        return ATM_CONTROL_STATE_ERROR_NO_SPACE;
+    }
+
+    return fallback;
+}
+
 static void
 set_sqlite_error (
     sqlite3 *db,
@@ -52,7 +66,10 @@ set_sqlite_error (
     g_set_error (
         error,
         ATM_CONTROL_STATE_ERROR,
-        code,
+        control_sqlite_error_code (
+            db,
+            code
+        ),
         "%s: %s",
         context,
         db != NULL
@@ -81,7 +98,9 @@ exec_sql (
         g_set_error (
             error,
             ATM_CONTROL_STATE_ERROR,
-            ATM_CONTROL_STATE_ERROR_SQLITE,
+            rc == SQLITE_FULL
+                ? ATM_CONTROL_STATE_ERROR_NO_SPACE
+                : ATM_CONTROL_STATE_ERROR_SQLITE,
             "Control-state SQL failed (%d): %s",
             rc,
             message != NULL
