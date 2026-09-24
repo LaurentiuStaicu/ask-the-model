@@ -80,4 +80,12 @@ namespace AskTheModel.RepositoryNative {
     public static extern void release_mutation_lease (
         int lease_fd
     );
+
+    [CCode (
+        cname = "atm_repository_error_is_no_space",
+        cheader_filename = "repository_no_space.h"
+    )]
+    public static extern bool error_is_no_space (
+        GLib.Error error
+    );
 }
