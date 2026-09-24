@@ -224,6 +224,28 @@ The runner records `statvfs().f_bavail × f_frsize` and `f_favail` immediately b
 
 This evidence is specifically for C0-T3. It does not select the future inode reserve or production refusal threshold; it proves only that inode exhaustion is observable through the same fail-closed storage path and that admission must compare predicted new entries against unprivileged `f_favail`.
 
+
+### C0-F1 phase-aware admission model
+
+C0-F1 fixes the admission arithmetic without wiring it into Download/Update.
+
+Inputs are:
+- one availability record for each AtM root (`data`, `cache`, `state`), including `st_dev`, user-available bytes and user-available inode/file slots;
+- an ordered set of operation phases, each carrying the additional bytes and entries attributable to each root during that phase;
+- optional byte/inode headroom floors, still supplied as policy inputs rather than frozen constants.
+
+The model groups roots by `st_dev`. For each filesystem group it:
+1. uses the minimum contemporaneous availability reported by any root on that filesystem;
+2. sums only the root requirements that coexist in the same named phase;
+3. takes the maximum phase sum as the operation peak;
+4. applies the strictest shared headroom floor for roots on that filesystem rather than summing duplicate reserve floors;
+5. compares bytes and inode/file slots independently;
+6. skips inode rejection only when the filesystem's inode budget is explicitly classified as not meaningful/known.
+
+This deliberately avoids the incorrect pattern of summing independent per-root maxima that never coexist. It also avoids double-counting already-allocated old snapshots/quarantine: those blocks are already reflected in `f_bavail`; only the additional replacement requirement belongs in the operation phase.
+
+C0-F1 remains a pure qualification model. No production path calls it yet, and no reserve value is selected by this slice. The model exists so C0-T1/T2/T3/T6/T7 can be exercised deterministically before runtime admission is authorized.
+
 ### Repository authority-mutation lease
 
 When an operation snapshots optimization mode ON, repository Download/Update uses one application-owned exclusive nonblocking lease at `<state_root>/repository-mutation.lock` before any selected-repository staging or authority mutation begins.
