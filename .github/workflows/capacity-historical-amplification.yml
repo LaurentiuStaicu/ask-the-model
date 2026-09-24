@@ -1,0 +1,621 @@
+name: C0-M4 historical capacity amplification
+
+on:
+  workflow_dispatch:
+  pull_request:
+    paths:
+      - 'benchmarks/capacity-v2/corpus.json'
+      - 'src/archive_extract.c'
+      - 'src/archive_extract.h'
+      - 'src/capacity_measurement.c'
+      - 'src/capacity_measurement.h'
+      - 'src/cff_version.c'
+      - 'src/cff_version.h'
+      - 'src/repository_ingest.c'
+      - 'src/repository_ingest.h'
+      - 'src/repository_manifest.c'
+      - 'src/repository_manifest.h'
+      - 'src/repository_storage.c'
+      - 'src/repository_storage.h'
+      - 'src/repository_sources.c'
+      - 'src/repository_sources.h'
+      - 'src/markdown_sections.c'
+      - 'src/markdown_sections.h'
+      - 'src/csv_table.c'
+      - 'src/csv_table.h'
+      - 'src/structured_json.c'
+      - 'src/structured_json.h'
+      - 'src/retrieval_index.c'
+      - 'src/retrieval_index.h'
+      - 'data/schemas/retrieval-index-v2.sql'
+      - 'data/io.github.laurentiustaicu.ask_the_model.gresource.xml'
+      - 'tests/capacity_measurement_real_runner.c'
+      - '.github/workflows/capacity-historical-amplification.yml'
+
+permissions:
+  contents: read
+
+concurrency:
+  group: capacity-c0-m4-${{ github.event.pull_request.number || github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  measure:
+    runs-on: ubuntu-24.04
+    timeout-minutes: 45
+
+    steps:
+      - name: Checkout AtM
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+
+      - name: Install measurement dependencies
+        shell: bash
+        run: |
+          set -euo pipefail
+          sudo apt-get update
+          sudo apt-get install -y --no-install-recommends \
+            build-essential \
+            curl \
+            pkg-config \
+            libarchive-dev \
+            libglib2.0-dev \
+            libglib2.0-bin \
+            libjson-glib-dev \
+            libsqlite3-dev \
+            libyaml-dev
+
+      - name: Compile real capacity measurement runner
+        shell: bash
+        run: |
+          set -euo pipefail
+
+          glib-compile-resources \
+            data/io.github.laurentiustaicu.ask_the_model.gresource.xml \
+            --sourcedir=data \
+            --generate-source \
+            --target=/tmp/atm-resources.c
+
+          cc \
+            -std=c11 \
+            -D_GNU_SOURCE \
+            -O2 \
+            -Wall \
+            -Wextra \
+            -Werror \
+            -Isrc \
+            $(pkg-config --cflags \
+              glib-2.0 \
+              gio-2.0 \
+              json-glib-1.0) \
+            -c tests/capacity_measurement_real_runner.c \
+            -o /tmp/capacity-measurement-real-runner.o
+
+          cc \
+            -std=c11 \
+            -D_GNU_SOURCE \
+            -O2 \
+            -Wall \
+            -Wextra \
+            -Isrc \
+            src/capacity_measurement.c \
+            src/cff_version.c \
+            src/archive_extract.c \
+            src/repository_manifest.c \
+            src/repository_storage.c \
+            src/repository_ingest.c \
+            src/repository_sources.c \
+            src/markdown_sections.c \
+            src/csv_table.c \
+            src/structured_json.c \
+            src/retrieval_index.c \
+            /tmp/capacity-measurement-real-runner.o \
+            /tmp/atm-resources.c \
+            $(pkg-config --cflags --libs \
+              glib-2.0 \
+              gio-2.0 \
+              json-glib-1.0 \
+              sqlite3 \
+              libarchive \
+              yaml-0.1) \
+            -o /tmp/atm-capacity-real-runner
+
+      - name: Measure frozen historical corpus
+        shell: bash
+        env:
+          GH_TOKEN: ${{ github.token }}
+          ATM_SOURCE_COMMIT: ${{ github.event.pull_request.head.sha || github.sha }}
+        run: |
+          set -euo pipefail
+
+          root=/tmp/atm-c0-m4
+          results="$root/results"
+          mkdir -p "$results"
+
+          python3 - <<'PY' > "$root/corpus.tsv"
+          import json
+
+          corpus = json.load(
+              open(
+                  "benchmarks/capacity-v2/corpus.json",
+                  encoding="utf-8",
+              )
+          )
+
+          seen = set()
+          for repository in corpus["repositories"]:
+              for sample in repository["samples"]:
+                  key = (
+                      repository["repository_id"],
+                      sample["sha"],
+                  )
+                  if key in seen:
+                      raise SystemExit(f"duplicate corpus sample: {key}")
+                  seen.add(key)
+
+                  print(
+                      repository["repository_id"],
+                      repository["repository"],
+                      repository["acronym"],
+                      repository["display_name"],
+                      sample["label"],
+                      sample["sha"],
+                      sep="\t",
+                  )
+
+          if len(seen) != 18:
+              raise SystemExit(
+                  f"C0-M4 corpus must contain exactly 18 samples, got {len(seen)}"
+              )
+          PY
+
+          while IFS=$'\t' read -r \
+            repository_id repository acronym display_name label snapshot_sha
+          do
+            work="$root/work/$repository_id/$label"
+            archive_dir="$work/cache/repository-staging/$repository_id"
+            archive="$archive_dir/$snapshot_sha.tar.gz"
+            output="$results/$repository_id-$label.json"
+
+            mkdir -p "$archive_dir" "$work/data" "$work/state"
+
+            curl \
+              --fail \
+              --location \
+              --retry 3 \
+              --silent \
+              --show-error \
+              -H "Accept: application/vnd.github+json" \
+              -H "Authorization: Bearer $GH_TOKEN" \
+              -H "X-GitHub-Api-Version: 2022-11-28" \
+              "https://api.github.com/repos/LaurentiuStaicu/$repository/tarball/$snapshot_sha" \
+              --output "$archive"
+
+            test -s "$archive"
+
+            /tmp/atm-capacity-real-runner \
+              "$ATM_SOURCE_COMMIT" \
+              "$repository_id" \
+              "$acronym" \
+              "$display_name" \
+              "$snapshot_sha" \
+              "$archive" \
+              "$work" \
+              "$output"
+
+            python3 -m json.tool "$output" >/dev/null
+          done < "$root/corpus.tsv"
+
+      - name: Derive per-repository amplification envelopes
+        shell: bash
+        env:
+          ATM_SOURCE_COMMIT: ${{ github.event.pull_request.head.sha || github.sha }}
+          ATM_WORKFLOW_COMMIT: ${{ github.sha }}
+        run: |
+          set -euo pipefail
+
+          python3 - <<'PY'
+          import json
+          import math
+          import os
+          import pathlib
+          import platform
+          from fractions import Fraction
+
+          root = pathlib.Path("/tmp/atm-c0-m4")
+          results_dir = root / "results"
+
+          corpus = json.loads(
+              pathlib.Path(
+                  "benchmarks/capacity-v2/corpus.json"
+              ).read_text(encoding="utf-8")
+          )
+
+          labels = {}
+          expected = set()
+          for repository in corpus["repositories"]:
+              rid = repository["repository_id"]
+              for sample in repository["samples"]:
+                  labels[(rid, sample["sha"])] = sample["label"]
+                  expected.add((rid, sample["sha"]))
+
+          raw_records = []
+          for path in sorted(results_dir.glob("*.json")):
+              if path.name == "c0-m4-historical-amplification.json":
+                  continue
+              record = json.loads(path.read_text(encoding="utf-8"))
+              raw_records.append(record)
+
+          observed = {
+              (record["repository_id"], record["repository_sha"])
+              for record in raw_records
+          }
+          if observed != expected:
+              raise SystemExit(
+                  "C0-M4 measured set does not exactly match frozen corpus"
+              )
+
+          rows = []
+          for record in raw_records:
+              rid = record["repository_id"]
+              sha = record["repository_sha"]
+              logical = record["snapshot"]["logical_regular_bytes"]
+              entries = record["snapshot"]["entries"]
+              archive_allocated = record["archive"]["allocated_bytes"]
+              snapshot_peak = record["ingest_report"][
+                  "fresh_data_root_additional_peak_bytes"
+              ]
+              index_peak = record["index_build"][
+                  "cache_root_additional_peak_bytes"
+              ]
+
+              if logical <= 0 or entries <= 0 or archive_allocated <= 0:
+                  raise SystemExit(
+                      f"non-positive observable feature for {rid} {sha}"
+                  )
+
+              snapshot_overhead = max(
+                  0,
+                  snapshot_peak - logical,
+              )
+
+              rows.append(
+                  {
+                      "repository_id": rid,
+                      "label": labels[(rid, sha)],
+                      "repository_sha": sha,
+                      "archive_allocated_bytes": archive_allocated,
+                      "logical_regular_bytes": logical,
+                      "entries": entries,
+                      "snapshot_additional_peak_bytes": snapshot_peak,
+                      "index_additional_peak_bytes": index_peak,
+                      "snapshot_overhead_per_entry": {
+                          "numerator": snapshot_overhead,
+                          "denominator": entries,
+                      },
+                      "snapshot_peak_to_logical": {
+                          "numerator": snapshot_peak,
+                          "denominator": logical,
+                      },
+                      "index_peak_to_logical": {
+                          "numerator": index_peak,
+                          "denominator": logical,
+                      },
+                      "index_peak_per_entry": {
+                          "numerator": index_peak,
+                          "denominator": entries,
+                      },
+                      "index_peak_to_archive": {
+                          "numerator": index_peak,
+                          "denominator": archive_allocated,
+                      },
+                  }
+              )
+
+          def fraction(row, key):
+              value = row[key]
+              return Fraction(
+                  value["numerator"],
+                  value["denominator"],
+              )
+
+          def ceil_fraction(value):
+              return (
+                  value.numerator +
+                  value.denominator - 1
+              ) // value.denominator
+
+          envelopes = {}
+          leave_one_out = {}
+
+          for rid in ("ewd", "cbd", "rmd"):
+              group = [
+                  row
+                  for row in rows
+                  if row["repository_id"] == rid
+              ]
+              if len(group) != 6:
+                  raise SystemExit(
+                      f"{rid} must have exactly 6 measured samples"
+                  )
+
+              metrics = (
+                  "snapshot_overhead_per_entry",
+                  "snapshot_peak_to_logical",
+                  "index_peak_to_logical",
+                  "index_peak_per_entry",
+                  "index_peak_to_archive",
+              )
+
+              envelopes[rid] = {}
+              for metric in metrics:
+                  maximum = max(
+                      fraction(row, metric)
+                      for row in group
+                  )
+                  envelopes[rid][metric] = {
+                      "numerator": maximum.numerator,
+                      "denominator": maximum.denominator,
+                      "decimal": float(maximum),
+                  }
+
+              repo_loo = []
+              for heldout in group:
+                  train = [
+                      row
+                      for row in group
+                      if row is not heldout
+                  ]
+
+                  snap_k = max(
+                      fraction(
+                          row,
+                          "snapshot_overhead_per_entry",
+                      )
+                      for row in train
+                  )
+                  snapshot_prediction = (
+                      heldout["logical_regular_bytes"] +
+                      ceil_fraction(
+                          snap_k * heldout["entries"]
+                      )
+                  )
+
+                  snapshot_ratio_k = max(
+                      fraction(
+                          row,
+                          "snapshot_peak_to_logical",
+                      )
+                      for row in train
+                  )
+                  snapshot_ratio_prediction = ceil_fraction(
+                      snapshot_ratio_k *
+                      heldout["logical_regular_bytes"]
+                  )
+                  snapshot_absolute_floor = max(
+                      row["snapshot_additional_peak_bytes"]
+                      for row in train
+                  )
+                  snapshot_hybrid_prediction = max(
+                      snapshot_prediction,
+                      snapshot_ratio_prediction,
+                      snapshot_absolute_floor,
+                  )
+
+                  index_logical_k = max(
+                      fraction(
+                          row,
+                          "index_peak_to_logical",
+                      )
+                      for row in train
+                  )
+                  index_logical_prediction = ceil_fraction(
+                      index_logical_k *
+                      heldout["logical_regular_bytes"]
+                  )
+
+                  index_entry_k = max(
+                      fraction(
+                          row,
+                          "index_peak_per_entry",
+                      )
+                      for row in train
+                  )
+                  index_entry_prediction = ceil_fraction(
+                      index_entry_k *
+                      heldout["entries"]
+                  )
+                  index_absolute_floor = max(
+                      row["index_additional_peak_bytes"]
+                      for row in train
+                  )
+                  index_hybrid_prediction = max(
+                      index_logical_prediction,
+                      index_entry_prediction,
+                      index_absolute_floor,
+                  )
+
+                  actual_snapshot = heldout[
+                      "snapshot_additional_peak_bytes"
+                  ]
+                  actual_index = heldout[
+                      "index_additional_peak_bytes"
+                  ]
+
+                  repo_loo.append(
+                      {
+                          "label": heldout["label"],
+                          "repository_sha":
+                              heldout["repository_sha"],
+                          "snapshot_additive_per_entry": {
+                              "predicted_bytes":
+                                  snapshot_prediction,
+                              "actual_bytes": actual_snapshot,
+                              "covered":
+                                  snapshot_prediction >=
+                                  actual_snapshot,
+                              "actual_over_prediction":
+                                  actual_snapshot /
+                                  max(snapshot_prediction, 1),
+                          },
+                          "snapshot_hybrid_with_historical_floor": {
+                              "predicted_bytes":
+                                  snapshot_hybrid_prediction,
+                              "actual_bytes": actual_snapshot,
+                              "covered":
+                                  snapshot_hybrid_prediction >=
+                                  actual_snapshot,
+                              "actual_over_prediction":
+                                  actual_snapshot /
+                                  max(snapshot_hybrid_prediction, 1),
+                              "components": {
+                                  "additive_per_entry":
+                                      snapshot_prediction,
+                                  "ratio_logical":
+                                      snapshot_ratio_prediction,
+                                  "historical_absolute_floor":
+                                      snapshot_absolute_floor,
+                              },
+                          },
+                          "index_ratio_logical": {
+                              "predicted_bytes":
+                                  index_logical_prediction,
+                              "actual_bytes": actual_index,
+                              "covered":
+                                  index_logical_prediction >=
+                                  actual_index,
+                              "actual_over_prediction":
+                                  actual_index /
+                                  max(index_logical_prediction, 1),
+                          },
+                          "index_per_entry": {
+                              "predicted_bytes":
+                                  index_entry_prediction,
+                              "actual_bytes": actual_index,
+                              "covered":
+                                  index_entry_prediction >=
+                                  actual_index,
+                              "actual_over_prediction":
+                                  actual_index /
+                                  max(index_entry_prediction, 1),
+                          },
+                          "index_hybrid_with_historical_floor": {
+                              "predicted_bytes":
+                                  index_hybrid_prediction,
+                              "actual_bytes": actual_index,
+                              "covered":
+                                  index_hybrid_prediction >=
+                                  actual_index,
+                              "actual_over_prediction":
+                                  actual_index /
+                                  max(index_hybrid_prediction, 1),
+                              "components": {
+                                  "ratio_logical":
+                                      index_logical_prediction,
+                                  "per_entry":
+                                      index_entry_prediction,
+                                  "historical_absolute_floor":
+                                      index_absolute_floor,
+                              },
+                          },
+                      }
+                  )
+
+              leave_one_out[rid] = repo_loo
+
+          validation_summary = {}
+          for rid, cases in leave_one_out.items():
+              validation_summary[rid] = {}
+              for model in (
+                  "snapshot_additive_per_entry",
+                  "snapshot_hybrid_with_historical_floor",
+                  "index_ratio_logical",
+                  "index_per_entry",
+                  "index_hybrid_with_historical_floor",
+              ):
+                  values = [
+                      case[model]
+                      for case in cases
+                  ]
+                  validation_summary[rid][model] = {
+                      "covered_count": sum(
+                          1
+                          for value in values
+                          if value["covered"]
+                      ),
+                      "case_count": len(values),
+                      "worst_actual_over_prediction": max(
+                          value["actual_over_prediction"]
+                          for value in values
+                      ),
+                  }
+
+          artifact = {
+              "schema_version": 1,
+              "measurement_id":
+                  "atm-c0-m4-historical-amplification-v1",
+              "production_prediction_selected": False,
+              "atm_source_commit":
+                  os.environ["ATM_SOURCE_COMMIT"],
+              "workflow_commit":
+                  os.environ["ATM_WORKFLOW_COMMIT"],
+              "runtime": {
+                  "system": platform.system(),
+                  "release": platform.release(),
+                  "machine": platform.machine(),
+              },
+              "corpus": corpus,
+              "rows": sorted(
+                  rows,
+                  key=lambda row: (
+                      row["repository_id"],
+                      row["label"],
+                  ),
+              ),
+              "per_repository_envelopes": envelopes,
+              "leave_one_out": leave_one_out,
+              "validation_summary": validation_summary,
+              "interpretation": [
+                  "This artifact measures historical variability; it does not select a production predictor or safety margin.",
+                  "Per-repository envelopes are evaluated because M1 already disproved one useful global archive multiplier.",
+                  "Leave-one-out underprediction quantifies how much an envelope learned from other sampled SHAs can miss a held-out SHA.",
+                  "Hybrid candidates take the maximum of transparent observable formulas plus the training-set historical absolute peak; this is evaluated as evidence, not selected as production policy.",
+                  "A future unknown SHA remains unqualified unless a separately reviewed policy chooses and validates a predictor/margin/fallback.",
+              ],
+          }
+
+          output = (
+              results_dir /
+              "c0-m4-historical-amplification.json"
+          )
+          output.write_text(
+              json.dumps(
+                  artifact,
+                  indent=2,
+                  sort_keys=True,
+              ) + "\n",
+              encoding="utf-8",
+          )
+
+          print(
+              json.dumps(
+                  {
+                      "validation_summary":
+                          validation_summary,
+                      "per_repository_envelopes":
+                          envelopes,
+                  },
+                  indent=2,
+                  sort_keys=True,
+              )
+          )
+          PY
+
+      - name: Upload C0-M4 evidence
+        if: always()
+        uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7.0.1
+        with:
+          name: atm-c0-m4-historical-amplification-${{ github.run_id }}-${{ github.run_attempt }}
+          path: |
+            /tmp/atm-c0-m4/results/*.json
+          if-no-files-found: error
+          retention-days: 90

@@ -1,0 +1,128 @@
+{
+  "schema_version": 1,
+  "evidence_id": "atm-capacity-v2-evidence-v1",
+  "status": "qualification-only",
+  "production_prediction_selected": false,
+  "production_margin_selected": false,
+  "source": {
+    "actions_run_id": 36036948751,
+    "artifact_name": "atm-c0-m4-historical-amplification-36036948751-1",
+    "artifact_id": 10824567894,
+    "artifact_sha256": "b636c6af271af734948729672fcb7fa019c3db3fba10643275947f23450d3531",
+    "atm_source_commit": "79ae34dddae6ddba8f1676460d66b3f13782b533",
+    "workflow_commit": "9ea89f2fbc614abf8f8551f815f3d9567f4c4ecf",
+    "runtime": {
+      "system": "Linux",
+      "release": "6.17.0-1022-azure",
+      "machine": "x86_64"
+    }
+  },
+  "corpus": {
+    "repository_count": 3,
+    "samples_per_repository": 6,
+    "total_samples": 18,
+    "path": "benchmarks/capacity-v2/corpus.json"
+  },
+  "candidate_models": {
+    "snapshot_hybrid_with_historical_floor": {
+      "definition": "max(logical_bytes + max_train_overhead_per_entry * entries, max_train_snapshot_to_logical * logical_bytes, max_train_absolute_snapshot_peak)",
+      "leave_one_out": {
+        "cbd": {
+          "covered": 6,
+          "cases": 6,
+          "worst_actual_over_prediction": 0.9388984247691472
+        },
+        "ewd": {
+          "covered": 6,
+          "cases": 6,
+          "worst_actual_over_prediction": 0.9962748479210416
+        },
+        "rmd": {
+          "covered": 6,
+          "cases": 6,
+          "worst_actual_over_prediction": 0.9470963784426066
+        }
+      }
+    },
+    "index_hybrid_with_historical_floor": {
+      "definition": "max(max_train_index_to_logical * logical_bytes, max_train_index_per_entry * entries, max_train_absolute_index_peak)",
+      "leave_one_out": {
+        "cbd": {
+          "covered": 6,
+          "cases": 6,
+          "worst_actual_over_prediction": 0.9197374796996871
+        },
+        "ewd": {
+          "covered": 6,
+          "cases": 6,
+          "worst_actual_over_prediction": 1
+        },
+        "rmd": {
+          "covered": 6,
+          "cases": 6,
+          "worst_actual_over_prediction": 0.8790420279419942
+        }
+      }
+    }
+  },
+  "single_model_sensitivity": {
+    "cbd": {
+      "snapshot_additive_per_entry": {
+        "covered": 5,
+        "cases": 6,
+        "worst_actual_over_prediction": 1.019633767435711
+      },
+      "index_ratio_logical": {
+        "covered": 5,
+        "cases": 6,
+        "worst_actual_over_prediction": 1.0872661228788514
+      },
+      "index_per_entry": {
+        "covered": 5,
+        "cases": 6,
+        "worst_actual_over_prediction": 1.0109754188282003
+      }
+    },
+    "ewd": {
+      "snapshot_additive_per_entry": {
+        "covered": 5,
+        "cases": 6,
+        "worst_actual_over_prediction": 1.0022235807091224
+      },
+      "index_ratio_logical": {
+        "covered": 5,
+        "cases": 6,
+        "worst_actual_over_prediction": 1.0473524864280415
+      },
+      "index_per_entry": {
+        "covered": 5,
+        "cases": 6,
+        "worst_actual_over_prediction": 1.1302082481469444
+      }
+    },
+    "rmd": {
+      "snapshot_additive_per_entry": {
+        "covered": 5,
+        "cases": 6,
+        "worst_actual_over_prediction": 1.0000281618732572
+      },
+      "index_ratio_logical": {
+        "covered": 5,
+        "cases": 6,
+        "worst_actual_over_prediction": 1.1376016784467489
+      },
+      "index_per_entry": {
+        "covered": 5,
+        "cases": 6,
+        "worst_actual_over_prediction": 1.0102398261517191
+      }
+    }
+  },
+  "reviewed_limits": [
+    "Hybrid leave-one-out coverage is 18/18 for snapshot and 18/18 for index on this frozen historical corpus.",
+    "EWD index hybrid has a worst actual/prediction ratio of exactly 1.0, so observed coverage alone does not provide a positive safety margin.",
+    "The historical absolute floor is repository-specific and can become stale when a future SHA exceeds every sampled historical peak.",
+    "This evidence supports a candidate prediction family but does not prove an upper bound for arbitrary future SHAs.",
+    "No production predictor, reserve, margin, refusal threshold, or Optimizations-ON runtime behavior is selected by this evidence."
+  ]
+}
