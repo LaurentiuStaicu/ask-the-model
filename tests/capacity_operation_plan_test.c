@@ -135,7 +135,30 @@ test_fresh_post_download_phase_construction (void)
             ATM_CAPACITY_ROOT_DATA
         ],
         ==,
-        100
+        105
+    );
+
+    /*
+     * Fresh install can create five AtM-owned structural directories outside
+     * the F2 materialized archive tree.
+     */
+    g_assert_cmpuint (
+        plan.phases[
+            ATM_CAPACITY_MUTATION_PHASE_INDEX_BUILD
+        ].inodes[
+            ATM_CAPACITY_ROOT_DATA
+        ],
+        ==,
+        105
+    );
+    g_assert_cmpuint (
+        plan.phases[
+            ATM_CAPACITY_MUTATION_PHASE_STATE_COMMIT
+        ].inodes[
+            ATM_CAPACITY_ROOT_DATA
+        ],
+        ==,
+        105
     );
 
     /*
@@ -219,7 +242,7 @@ test_fresh_post_download_phase_construction (void)
 }
 
 static void
-test_operation_kinds_share_post_download_additional_phases (void)
+test_operation_kinds_apply_fresh_inode_overhead_only (void)
 {
     AtmArchiveInspection inspection =
         sample_inspection ();
@@ -273,15 +296,82 @@ test_operation_kinds_share_post_download_additional_phases (void)
         repair.must_admit_before_quarantine
     );
 
+    for (gsize phase = 0;
+         phase < ATM_CAPACITY_MUTATION_PHASE_COUNT;
+         phase++) {
+        g_assert_cmpuint (
+            fresh.phases[phase].bytes[
+                ATM_CAPACITY_ROOT_DATA
+            ],
+            ==,
+            update.phases[phase].bytes[
+                ATM_CAPACITY_ROOT_DATA
+            ]
+        );
+        g_assert_cmpuint (
+            fresh.phases[phase].bytes[
+                ATM_CAPACITY_ROOT_CACHE
+            ],
+            ==,
+            update.phases[phase].bytes[
+                ATM_CAPACITY_ROOT_CACHE
+            ]
+        );
+        g_assert_cmpuint (
+            fresh.phases[phase].bytes[
+                ATM_CAPACITY_ROOT_STATE
+            ],
+            ==,
+            update.phases[phase].bytes[
+                ATM_CAPACITY_ROOT_STATE
+            ]
+        );
+
+        g_assert_cmpuint (
+            fresh.phases[phase].inodes[
+                ATM_CAPACITY_ROOT_DATA
+            ],
+            ==,
+            inspection.materialized_entries + 5
+        );
+        g_assert_cmpuint (
+            update.phases[phase].inodes[
+                ATM_CAPACITY_ROOT_DATA
+            ],
+            ==,
+            inspection.materialized_entries
+        );
+        g_assert_cmpuint (
+            repair.phases[phase].inodes[
+                ATM_CAPACITY_ROOT_DATA
+            ],
+            ==,
+            inspection.materialized_entries
+        );
+
+        g_assert_cmpuint (
+            fresh.phases[phase].inodes[
+                ATM_CAPACITY_ROOT_CACHE
+            ],
+            ==,
+            update.phases[phase].inodes[
+                ATM_CAPACITY_ROOT_CACHE
+            ]
+        );
+        g_assert_cmpuint (
+            fresh.phases[phase].inodes[
+                ATM_CAPACITY_ROOT_STATE
+            ],
+            ==,
+            update.phases[phase].inodes[
+                ATM_CAPACITY_ROOT_STATE
+            ]
+        );
+    }
+
     g_assert_cmpmem (
-        fresh.phases,
-        sizeof fresh.phases,
         update.phases,
-        sizeof update.phases
-    );
-    g_assert_cmpmem (
-        fresh.phases,
-        sizeof fresh.phases,
+        sizeof update.phases,
         repair.phases,
         sizeof repair.phases
     );
@@ -301,7 +391,7 @@ test_shared_filesystem_post_download_peak (void)
         {
             .device_id = 7,
             .available_bytes = 920,
-            .available_inodes = 105,
+            .available_inodes = 110,
             .inode_budget_known = TRUE
         },
         {
@@ -352,7 +442,7 @@ test_shared_filesystem_post_download_peak (void)
     g_assert_cmpuint (
         decision.devices[0].operation_peak_inodes,
         ==,
-        105
+        110
     );
 
     roots[0].available_bytes = 919;
@@ -612,8 +702,8 @@ main (
         test_fresh_post_download_phase_construction
     );
     g_test_add_func (
-        "/capacity-operation/kind-equivalence",
-        test_operation_kinds_share_post_download_additional_phases
+        "/capacity-operation/fresh-inode-overhead",
+        test_operation_kinds_apply_fresh_inode_overhead_only
     );
     g_test_add_func (
         "/capacity-operation/shared-filesystem-post-download",
