@@ -28,6 +28,22 @@ Before the first Send, any combination may be selected, including no repository 
 
 Refresh does not silently replace local snapshots.
 
+### Optimization mode
+
+A compact global `OPT OFF / OPT ON` switch sits at the end of the header.
+
+It controls the post-v0.5.0 runtime optimization program as one application-wide mode:
+
+- every AtM process starts with **OPT OFF**;
+- the state is session-only and is not remembered after restart;
+- **OPT OFF** preserves the established baseline runtime path;
+- **OPT ON** allows runtime optimizations that have passed their individual qualification gates;
+- measurement and qualification tools do not depend on this UI switch.
+
+The native sliding switch uses a subdued warm red trough when OFF and a subdued warm green trough when ON. The adjacent text always states the mode explicitly, so color is not the only state cue.
+
+Changing the switch affects subsequent operations. An operation already in progress keeps the optimization mode captured when it started rather than changing behavior halfway through.
+
 ### Download / Update
 
 The repository action button downloads a repository that is not installed, updates one whose exact remote SHA differs from the current local snapshot, or repairs a locally integrity-invalid snapshot. A same-SHA integrity repair still requires a fresh exact-SHA download before the invalid local directory is quarantined and replaced.
