@@ -371,6 +371,13 @@ verify_snapshot (
         qualified = TRUE;
     }
 
+    char *active_sha_json = snapshot_sha != NULL
+        ? g_strdup_printf (
+            "\"%s\"",
+            snapshot_sha
+        )
+        : g_strdup ("null");
+
     g_print (
         "{"
         "\"schema_version\":1,"
@@ -386,15 +393,15 @@ verify_snapshot (
         "}\n",
         classification,
         generation_id,
-        snapshot_sha != NULL
-            ? g_strdup_printf ("\"%s\"", snapshot_sha)
-            : "null",
+        active_sha_json,
         TEST_SHA,
         final_exists ? "true" : "false",
         staging_exists ? "true" : "false",
         qualified ? "true" : "false",
         reason_code
     );
+
+    g_free (active_sha_json);
 
     g_free (seal);
     g_free (repository_version);
