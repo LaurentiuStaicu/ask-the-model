@@ -699,6 +699,23 @@ capacity_state_enospc_runner = executable(
   install: false
 )
 
+capacity_state_headroom_runner = executable(
+  'capacity-state-headroom-runner',
+  [
+    'src/control_state.c',
+    'tests/capacity_state_headroom_runner.c',
+    resources
+  ],
+  include_directories: include_directories('src'),
+  dependencies: [
+    glib_dep,
+    gio_dep,
+    json_glib_dep,
+    sqlite_dep
+  ],
+  install: false
+)
+
 repository_mutation_lease_test = executable(
   'repository-mutation-lease-test',
   [
