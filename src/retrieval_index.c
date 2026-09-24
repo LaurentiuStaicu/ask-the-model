@@ -1,4 +1,5 @@
 #include "retrieval_index.h"
+#include "fault_injection_test_hook.h"
 #include "markdown_sections.h"
 #include "csv_table.h"
 #include "structured_json.h"
@@ -2216,6 +2217,13 @@ retrieval_index_create_internal (
 
     db = NULL;
 
+    atm_test_fault_checkpoint (
+        "index_validated_closed"
+    );
+    atm_test_fault_checkpoint (
+        "index_pre_rename"
+    );
+
     if (g_rename (staging_path, final_path) != 0) {
         g_set_error (
             error,
@@ -2226,6 +2234,10 @@ retrieval_index_create_internal (
         );
         goto out;
     }
+
+    atm_test_fault_checkpoint (
+        "index_post_rename"
+    );
 
     *out_index_path = g_steal_pointer (&final_path);
     ok = TRUE;
