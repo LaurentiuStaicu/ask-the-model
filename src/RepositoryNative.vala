@@ -60,4 +60,22 @@ namespace AskTheModel.RepositoryNative {
         out string index_path,
         out string repository_version
     ) throws GLib.Error;
+
+    [CCode (
+        cname = "atm_repository_mutation_lease_try_acquire",
+        cheader_filename = "repository_mutation_lease.h"
+    )]
+    public static extern bool try_acquire_mutation_lease (
+        string state_root,
+        out int lease_fd,
+        out bool contended
+    ) throws GLib.Error;
+
+    [CCode (
+        cname = "atm_repository_mutation_lease_release",
+        cheader_filename = "repository_mutation_lease.h"
+    )]
+    public static extern void release_mutation_lease (
+        int lease_fd
+    );
 }
