@@ -442,6 +442,23 @@ Any underprediction is retained as evidence. The workflow does not add a margin 
 
 M5 still does not select a production predictor or margin. Its purpose is to determine whether the M4 family survives a genuinely disjoint no-refit test strongly enough to justify a later explicit policy decision in #232.
 
+### C0P-M6 structural amplification qualification
+
+M6 stress-tests the historical capacity predictor against valid synthetic AtM repository contracts with retrieval-content structures that may be rare or absent in the historical EWD/CBD/RMD samples.
+
+The generator stays inside current parser limits and creates:
+- EWD-style row-heavy CSV at 50,000 and 150,000 rows;
+- CBD-style structured JSON at 25,000 and 75,000 entities;
+- RMD-style Markdown at approximately 4 MiB and 12 MiB with many sections and distinct terms.
+
+Each fixture contains a real `.atm/repository.json`, `CITATION.cff` and `STATUS.md`, is ingested by the normal repository path and is indexed by the production retrieval-index builder. The fixture identifiers are deterministic synthetic 40-hex IDs, not Git commit claims.
+
+The M4/M5 hybrid is fitted only on the frozen 18 real training SHAs. Synthetic observations are not used to refit coefficients, historical floors or margins.
+
+This test is important because the current FTS5 table is a normal content-storing table rather than a contentless/external-content configuration. Structured rows/sections are also stored in ordinary SQLite tables before being inserted into FTS. Index allocation may therefore depend materially on record cardinality, token distribution and content type, not only on repository logical bytes.
+
+M6 is evidence-only. Underprediction is retained as a result and no automatic margin is added. A synthetic failure does not mean the real repositories are invalid; it means the empirical predictor is not a structural upper bound over the full admitted parser surface.
+
 ### Repository authority-mutation lease
 
 When an operation snapshots optimization mode ON, repository Download/Update uses one application-owned exclusive nonblocking lease at `<state_root>/repository-mutation.lock` before any selected-repository staging or authority mutation begins.
