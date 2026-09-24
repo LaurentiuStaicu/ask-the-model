@@ -123,6 +123,51 @@
     "EWD index hybrid has a worst actual/prediction ratio of exactly 1.0, so observed coverage alone does not provide a positive safety margin.",
     "The historical absolute floor is repository-specific and can become stale when a future SHA exceeds every sampled historical peak.",
     "This evidence supports a candidate prediction family but does not prove an upper bound for arbitrary future SHAs.",
-    "No production predictor, reserve, margin, refusal threshold, or Optimizations-ON runtime behavior is selected by this evidence."
-  ]
+    "No production predictor, reserve, margin, refusal threshold, or Optimizations-ON runtime behavior is selected by this evidence.",
+    "M6 structural stress covered snapshot allocation in all six fixtures but retrieval-index allocation in 0/6; the limiting RMD case reached 17.2604x actual/prediction, structurally falsifying the current historical hybrid as a conservative unknown-SHA index predictor."
+  ],
+  "structural_stress_m6": {
+    "source": {
+      "actions_run_id": 36042147396,
+      "artifact_name": "atm-c0p-m6-structural-36042147396-1",
+      "artifact_id": 10826829257,
+      "artifact_sha256": "f47e7c519e619227d15460d393bf8ff333aa6aa638fcb8908e8333c805c2fb2c",
+      "atm_source_commit": "93c4e1d2e5c8c8ad197c05150a4269b8c56dac47",
+      "workflow_commit": "2c81b56b4af56891ec68910c6238893169edfbc2"
+    },
+    "fitted_on_m4_training_only": true,
+    "training_refit_on_structural_fixtures": false,
+    "synthetic_stress_only": true,
+    "summary": {
+      "cbd": {
+        "snapshot_covered": 2,
+        "index_covered": 0,
+        "cases": 2,
+        "snapshot_worst_actual_over_prediction": 0.6472185429479939,
+        "index_worst_actual_over_prediction": 2.536945009947175
+      },
+      "ewd": {
+        "snapshot_covered": 2,
+        "index_covered": 0,
+        "cases": 2,
+        "snapshot_worst_actual_over_prediction": 0.8990249889240215,
+        "index_worst_actual_over_prediction": 2.3448667340982996
+      },
+      "rmd": {
+        "snapshot_covered": 2,
+        "index_covered": 0,
+        "cases": 2,
+        "snapshot_worst_actual_over_prediction": 0.2678416391734676,
+        "index_worst_actual_over_prediction": 17.26044226044226
+      }
+    },
+    "limiting_case": {
+      "repository_id": "rmd",
+      "scenario": "rmd-markdown-12m",
+      "predicted_index_bytes": 3334144,
+      "actual_index_bytes": 57548800,
+      "actual_over_prediction": 17.26044226044226
+    },
+    "reviewed_conclusion": "Historical hybrid is structurally falsified as a conservative unknown-SHA retrieval-index predictor; exact-profile-only proactive byte admission is the evidence-supported conservative production direction unless a new structural observable-input model is independently derived and qualified."
+  }
 }
