@@ -64,6 +64,14 @@ these cases without moving the observed success/failure frontier. This is
 evidence against a reserve proportional to total Control DB size, but it is
 still not a portable upper bound or a selected runtime reserve.
 
+A supplementary warm/cold sidecar qualification also shows why the reserve
+must use the conservative **cold** SQLite baseline. With an already allocated
+32 KiB `-shm` sidecar, 32 KiB additional free space succeeded across the
+tested histories. With no `-shm` present, 32 KiB failed and 64 KiB
+succeeded. AtM opens and closes the Control DB store per guarded mutation, so
+it must not assume that sidecar allocation is already present when admitting
+the operation.
+
 The issue contract explicitly forbids freezing an arbitrary percentage. A
 later production change must document its byte/inode reserve rationale,
 including state-root SQLite headroom, and must keep the reserve policy
