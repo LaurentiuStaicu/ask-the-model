@@ -32,9 +32,11 @@ The current implementation addresses loopback endpoints only.
 
 The first Send freezes model/repository identity for that chat.
 
-Durable history reopen must reuse the persisted snapshot restore boundary: reopening a closed or archived conversation may change only its lifecycle visibility state before reconstructing the saved snapshot, and the resulting tab must remain view-only until the exact persisted model/repository context passes the existing continuation qualification.
+History reopen must reuse the persisted snapshot restore boundary: only explicitly archived conversations appear in History, reopening an archive must preserve `archived=true`, and the resulting tab must remain view-only until the exact persisted model/repository context passes the existing continuation qualification.
 
-CONV-05b export is intentionally layered above the same read-only durable snapshot boundary. `ConversationExport.vala` serializes a loaded snapshot into a versioned deterministic JSON envelope. `ConversationPersistenceStore` maintains a best-effort automatic mirror under `~/Ask the Model/Conversation Exports/`, using stable conversation-ID filenames and atomic replacement; startup synchronizes pre-existing durable conversations and later durable changes refresh the mirror. Export failure must not roll back or misreport a successful SQLite commit. The existing narrow `~/Ask the Model:create` Flatpak permission is sufficient and must not be broadened. Import is not implied by the export format and requires a separate future design.
+CONV-05c makes Archive the sole user-visible save action. Unarchived rows exist only as transactional working-state records needed by the durable-before-provider-history boundary; tab Close, normal shutdown and next-start cleanup discard them. The direct tab archive button uses a symbolic folder/archive icon instead of a generic lifecycle menu.
+
+`ConversationExport.vala` remains layered above the read-only durable snapshot boundary. `ConversationPersistenceStore` maintains automatic JSON mirrors only for archived conversations under `~/Ask the Model/Conversation Exports/`, using stable conversation-ID filenames and atomic replacement. Permanent Delete removes both archive authorities from the user's perspective: the SQLite archived conversation and its managed JSON mirror, with export removal fail-closed before DB deletion. The existing narrow `~/Ask the Model:create` Flatpak permission is sufficient and must not be broadened. Import is not implied by the export format and requires a separate future design.
 
 ### Startup qualification and repository lifecycle
 
