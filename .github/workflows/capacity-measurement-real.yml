@@ -123,6 +123,8 @@ jobs:
         shell: bash
         env:
           GH_TOKEN: ${{ github.token }}
+          ATM_SOURCE_COMMIT: ${{ github.event.pull_request.head.sha || github.sha }}
+          ATM_WORKFLOW_COMMIT: ${{ github.sha }}
         run: |
           set -euo pipefail
 
@@ -190,7 +192,7 @@ jobs:
             test -s "$archive"
 
             /tmp/atm-capacity-real-runner \
-              "$GITHUB_SHA" \
+              "$ATM_SOURCE_COMMIT" \
               "$repository_id" \
               "$acronym" \
               "$display_name" \
@@ -204,6 +206,8 @@ jobs:
 
       - name: Aggregate measurement artifact
         shell: bash
+        env:
+          ATM_WORKFLOW_COMMIT: ${{ github.sha }}
         run: |
           set -euo pipefail
 
@@ -228,6 +232,10 @@ jobs:
           artifact = {
               "schema_version": 1,
               "measurement_id": "atm-c0-m1-real-v1",
+              "atm_source_commit": records[0]["atm_source_commit"],
+              "workflow_commit": __import__("os").environ.get(
+                  "ATM_WORKFLOW_COMMIT"
+              ),
               "records": records,
           }
 
