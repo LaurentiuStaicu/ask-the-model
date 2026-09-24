@@ -103,34 +103,37 @@ jobs:
           }
           trap cleanup EXIT
 
-          for history in 1 100 1000; do
-            for leave in 32768 65536 131072 262144; do
-              case_root="$root/h${history}-b${leave}"
-              state="$case_root/state"
-              output="$results/h${history}-b${leave}.json"
+          for sidecar in warm cold; do
+            for history in 1 100 1000; do
+              for leave in 16384 32768 65536 131072; do
+                case_root="$root/${sidecar}-h${history}-b${leave}"
+                state="$case_root/state"
+                output="$results/${sidecar}-h${history}-b${leave}.json"
 
-              rm -rf "$case_root"
-              mkdir -p "$state"
+                rm -rf "$case_root"
+                mkdir -p "$state"
 
-              sudo mount \
-                -t tmpfs \
-                -o size=16M,nr_inodes=4096 \
-                tmpfs \
-                "$state"
-              mounted="$state"
+                sudo mount \
+                  -t tmpfs \
+                  -o size=16M,nr_inodes=4096 \
+                  tmpfs \
+                  "$state"
+                mounted="$state"
 
-              /tmp/atm-capacity-state-headroom-runner \
-                --exercise \
-                "$state" \
-                rmd \
-                "$history" \
-                "$leave" \
-                | tee "$output"
+                /tmp/atm-capacity-state-headroom-runner \
+                  --exercise \
+                  "$state" \
+                  rmd \
+                  "$history" \
+                  "$leave" \
+                  "$sidecar" \
+                  | tee "$output"
 
-              python3 -m json.tool "$output" >/dev/null
+                python3 -m json.tool "$output" >/dev/null
 
-              sudo umount "$state"
-              mounted=""
+                sudo umount "$state"
+                mounted=""
+              done
             done
           done
 
@@ -154,18 +157,20 @@ jobs:
           results = pathlib.Path("/tmp/atm-c0-m2/results")
           records = []
 
-          for path in sorted(results.glob("h*-b*.json")):
+          for path in sorted(results.glob("*-h*-b*.json")):
               records.append(
                   json.loads(path.read_text(encoding="utf-8"))
               )
 
           expected = {
-              (history, leave)
+              (sidecar, history, leave)
+              for sidecar in ("warm", "cold")
               for history in (1, 100, 1000)
-              for leave in (32768, 65536, 131072, 262144)
+              for leave in (16384, 32768, 65536, 131072)
           }
           actual = {
               (
+                  record["sidecar_mode"],
                   record["history_generations"],
                   record["leave_target_bytes"],
               )
@@ -219,12 +224,13 @@ jobs:
                   "machine": platform.machine(),
               },
               "matrix": {
+                  "sidecar_mode": ["warm", "cold"],
                   "history_generations": [1, 100, 1000],
                   "leave_target_bytes": [
+                      16384,
                       32768,
                       65536,
                       131072,
-                      262144,
                   ],
               },
               "outcome_counts": dict(sorted(outcomes.items())),
