@@ -16,6 +16,8 @@ on:
       - 'src/structured_json.h'
       - 'src/retrieval_index.c'
       - 'src/retrieval_index.h'
+      - 'src/coordination_lease.c'
+      - 'src/coordination_lease.h'
       - 'src/retrieval_index_lifecycle.c'
       - 'src/retrieval_index_lifecycle.h'
       - 'data/schemas/retrieval-index-v2.sql'
@@ -38,6 +40,8 @@ on:
       - 'src/structured_json.h'
       - 'src/retrieval_index.c'
       - 'src/retrieval_index.h'
+      - 'src/coordination_lease.c'
+      - 'src/coordination_lease.h'
       - 'src/retrieval_index_lifecycle.c'
       - 'src/retrieval_index_lifecycle.h'
       - 'data/schemas/retrieval-index-v2.sql'
@@ -138,6 +142,7 @@ jobs:
             src/csv_table.c \
             src/structured_json.c \
             src/retrieval_index.c \
+            src/coordination_lease.c \
             src/retrieval_index_lifecycle.c \
             tests/repository_real_snapshot_test.c \
             /tmp/atm-resources.c \
