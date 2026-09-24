@@ -135,6 +135,28 @@ atm_repository_mutation_lease_try_acquire (
         goto out;
     }
 
+    if (lstat (path, &path_stat) != 0) {
+        set_errno_error (
+            error,
+            ATM_REPOSITORY_MUTATION_LEASE_ERROR_IO,
+            "Could not revalidate acquired repository mutation lease path"
+        );
+        goto out;
+    }
+
+    if (!S_ISREG (path_stat.st_mode) ||
+        S_ISLNK (path_stat.st_mode) ||
+        path_stat.st_dev != opened_stat.st_dev ||
+        path_stat.st_ino != opened_stat.st_ino) {
+        g_set_error_literal (
+            error,
+            ATM_REPOSITORY_MUTATION_LEASE_ERROR,
+            ATM_REPOSITORY_MUTATION_LEASE_ERROR_INVALID_OBJECT,
+            "Repository mutation lease path changed before acquisition completed."
+        );
+        goto out;
+    }
+
     *out_fd = fd;
     fd = -1;
     ok = TRUE;
