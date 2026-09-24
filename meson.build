@@ -57,6 +57,7 @@ executable(
     'src/repository_reconcile.c',
     'src/repository_storage.c',
     'src/repository_mutation_lease.c',
+    'src/repository_no_space.c',
     'src/repository_ingest.c',
     'src/repository_ui_bridge.c',
     'src/retrieval_index.c',
@@ -608,6 +609,25 @@ capacity_operation_plan_test = executable(
 test(
   'capacity-operation-plan',
   capacity_operation_plan_test
+)
+
+repository_no_space_test = executable(
+  'repository-no-space-test',
+  [
+    'src/repository_no_space.c',
+    'tests/repository_no_space_test.c'
+  ],
+  include_directories: include_directories('src'),
+  dependencies: [
+    glib_dep,
+    gio_dep
+  ],
+  install: false
+)
+
+test(
+  'repository-no-space',
+  repository_no_space_test
 )
 
 capacity_measurement_probe = executable(
