@@ -229,6 +229,17 @@ namespace AskTheModel.Tests {
 
         try {
             var service = new RepositoryLifecycleService (root);
+            var optimization_policy = new OptimizationPolicy ();
+            service.set_optimization_policy (
+                optimization_policy
+            );
+
+            assert (!service.optimization_mode_snapshot ());
+            optimization_policy.set_enabled_for_session (true);
+            assert (service.optimization_mode_snapshot ());
+            optimization_policy.set_enabled_for_session (false);
+            assert (!service.optimization_mode_snapshot ());
+
             RepositoryDescriptor[] catalog = RepositoryCatalog.all ();
             RepositoryDescriptor[] none = {};
             RepositoryDescriptor[] one = { catalog[0] };

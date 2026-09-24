@@ -90,6 +90,8 @@ namespace AskTheModel {
         private string state_root;
         private string data_root;
         private string cache_root;
+        private OptimizationPolicy optimization_policy =
+            new OptimizationPolicy ();
         private bool installation_qualification_complete = false;
         private bool installation_qualified = false;
 
@@ -114,6 +116,16 @@ namespace AskTheModel {
                     this.state_root
                 );
             rebuild_repository_runtime ();
+        }
+
+        public void set_optimization_policy (
+            OptimizationPolicy policy
+        ) {
+            optimization_policy = policy;
+        }
+
+        public bool optimization_mode_snapshot () {
+            return optimization_policy.snapshot_enabled ();
         }
 
         private void rebuild_repository_runtime () {

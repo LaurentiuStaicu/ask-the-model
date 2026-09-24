@@ -32,6 +32,7 @@ executable(
     'src/ActivityRing.vala',
     'src/SelectorTriangle.vala',
     'src/ChatRequestBuilder.vala',
+    'src/OptimizationPolicy.vala',
     'src/OllamaProvider.vala',
     'src/RepositoryService.vala',
     'src/RepositoryNative.vala',
@@ -453,6 +454,24 @@ chat_request_builder_test = executable(
 test(
   'chat-request-builder',
   chat_request_builder_test
+)
+
+optimization_policy_test = executable(
+  'optimization-policy-test',
+  [
+    'src/OptimizationPolicy.vala',
+    'tests/optimization_policy_test.vala'
+  ],
+  dependencies: [
+    glib_dep,
+    dependency('gobject-2.0')
+  ],
+  install: false
+)
+
+test(
+  'optimization-policy',
+  optimization_policy_test
 )
 
 cff_version_test = executable(
@@ -1276,6 +1295,7 @@ repository_lifecycle_service_test = executable(
     'src/RepositoryState.vala',
     'src/ControlStateNative.vala',
     'src/ControlRepositoryState.vala',
+    'src/OptimizationPolicy.vala',
     'src/RepositoryLifecycleService.vala',
     'src/control_state.c',
     'src/ConversationGrounding.vala',

@@ -171,6 +171,16 @@ The Flatpak workflow validates, in order:
 
 The R5 benchmark is intentionally deterministic and pinned. Development diagnostics may expand, but reviewed qrels/corpus/thresholds are not silently rewritten.
 
+### Runtime optimization gate
+
+The post-v0.5.0 optimization program has one session-only runtime gate owned by `OptimizationPolicy`.
+
+The application always constructs this policy disabled. The header switch may enable it for the current process only; there is no persisted setting or environment override in the first implementation.
+
+Runtime optimization code must receive/snapshot this policy through explicit program interfaces. It must not read GTK widget state directly and must not invent independent per-feature toggles. Each operation snapshots the mode at entry so a user change cannot partially alter an in-flight mutation or retrieval operation.
+
+When the gate is OFF, runtime behavior must remain on the established baseline path. Test/measurement infrastructure such as OPT-A0, C0-M1 and D0 is not gated because it does not change ordinary application behavior.
+
 ### Recovery fault qualification
 
 The OPT-A0 recovery harness is test-only. Native checkpoint calls compile to no-ops in the production application; only the dedicated recovery helper is built with `ATM_TEST_FAULT_INJECTION`.
