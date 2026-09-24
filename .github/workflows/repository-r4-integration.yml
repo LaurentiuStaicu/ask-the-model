@@ -16,6 +16,8 @@ on:
       - 'src/structured_json.h'
       - 'src/retrieval_index.c'
       - 'src/retrieval_index.h'
+      - 'src/coordination_lease.c'
+      - 'src/coordination_lease.h'
       - 'src/retrieval_index_lifecycle.c'
       - 'src/retrieval_index_lifecycle.h'
       - 'src/retrieval_query.c'
@@ -52,6 +54,8 @@ on:
       - 'src/structured_json.h'
       - 'src/retrieval_index.c'
       - 'src/retrieval_index.h'
+      - 'src/coordination_lease.c'
+      - 'src/coordination_lease.h'
       - 'src/retrieval_index_lifecycle.c'
       - 'src/retrieval_index_lifecycle.h'
       - 'src/retrieval_query.c'
@@ -166,6 +170,7 @@ jobs:
             src/csv_table.c \
             src/structured_json.c \
             src/retrieval_index.c \
+            src/coordination_lease.c \
             src/retrieval_index_lifecycle.c \
             src/retrieval_query.c \
             src/retrieval_rank.c \
