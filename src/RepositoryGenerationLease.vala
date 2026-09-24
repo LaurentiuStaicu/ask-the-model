@@ -38,12 +38,13 @@ namespace AskTheModel {
             this.lease_fd = lease_fd;
         }
 
-        public static RepositoryGenerationLease acquire_shared (
+        public static RepositoryGenerationLease? try_acquire_shared (
             string state_root,
-            int64 generation_id
+            int64 generation_id,
+            out bool contended
         ) throws GLib.Error {
             int lease_fd;
-            bool contended;
+            contended = false;
 
             bool acquired =
                 RepositoryGenerationLeaseNative.try_acquire_shared (
@@ -60,9 +61,7 @@ namespace AskTheModel {
             }
 
             if (contended) {
-                throw new GLib.IOError.BUSY (
-                    "Repository generation is currently in exclusive use."
-                );
+                return null;
             }
 
             if (lease_fd < 0) {
