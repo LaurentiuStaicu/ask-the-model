@@ -540,6 +540,26 @@ test_archive_delete_domain_lifecycle ()
             102
         );
 
+        string automatic_export_path =
+            GLib.Path.build_filename (
+                store.export_root,
+                "%s.json".printf (
+                    conversation_id
+                )
+            );
+        string archived_export;
+        assert (
+            GLib.FileUtils.get_contents (
+                automatic_export_path,
+                out archived_export
+            )
+        );
+        assert (
+            archived_export.index_of (
+                "\"archived\" : true"
+            ) >= 0
+        );
+
         var archived =
             store.load_snapshot (
                 conversation_id
@@ -590,6 +610,13 @@ test_archive_delete_domain_lifecycle ()
 
         store.delete_conversation (
             conversation_id
+        );
+
+        assert (
+            !GLib.FileUtils.test (
+                automatic_export_path,
+                GLib.FileTest.EXISTS
+            )
         );
 
         bool missing = false;
@@ -689,6 +716,23 @@ test_deterministic_read_only_export ()
             );
         var after = store.list_conversations ()[0];
 
+        string automatic_export_path =
+            GLib.Path.build_filename (
+                store.export_root,
+                "%s.json".printf (
+                    conversation_id
+                )
+            );
+        string automatic_export;
+
+        assert (
+            GLib.FileUtils.get_contents (
+                automatic_export_path,
+                out automatic_export
+            )
+        );
+
+        assert (automatic_export == first);
         assert (first == second);
         assert (first.has_suffix ("\n"));
         assert (
