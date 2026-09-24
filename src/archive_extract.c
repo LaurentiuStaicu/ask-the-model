@@ -18,6 +18,36 @@ atm_archive_error_quark (void)
     return g_quark_from_static_string ("atm-archive-error-quark");
 }
 
+static AtmArchiveError
+archive_errno_error_code (
+    int err_no
+)
+{
+    return err_no == ENOSPC
+        ? ATM_ARCHIVE_ERROR_NO_SPACE
+        : ATM_ARCHIVE_ERROR_IO;
+}
+
+static void
+set_archive_errno_error (
+    GError **error,
+    const char *context
+)
+{
+    int saved_errno = errno;
+
+    g_set_error (
+        error,
+        ATM_ARCHIVE_ERROR,
+        archive_errno_error_code (
+            saved_errno
+        ),
+        "%s: %s.",
+        context,
+        g_strerror (saved_errno)
+    );
+}
+
 static void
 remove_tree_best_effort (const char *path)
 {
@@ -72,12 +102,9 @@ write_all_fd (
                 continue;
             }
 
-            g_set_error (
+            set_archive_errno_error (
                 error,
-                ATM_ARCHIVE_ERROR,
-                ATM_ARCHIVE_ERROR_IO,
-                "Could not write extracted repository file: %s.",
-                g_strerror (errno)
+                "Could not write extracted repository file"
             );
             return FALSE;
         }
@@ -683,12 +710,9 @@ atm_archive_extract_snapshot_cancellable (
     }
 
     if (g_mkdir (destination, 0700) != 0) {
-        g_set_error (
+        set_archive_errno_error (
             error,
-            ATM_ARCHIVE_ERROR,
-            ATM_ARCHIVE_ERROR_IO,
-            "Could not create empty extraction directory: %s.",
-            g_strerror (errno)
+            "Could not create empty extraction directory"
         );
         return FALSE;
     }
@@ -802,12 +826,9 @@ atm_archive_extract_snapshot_cancellable (
 
         if (filetype == AE_IFDIR) {
             if (g_mkdir_with_parents (output_path, 0700) != 0) {
-                g_set_error (
+                set_archive_errno_error (
                     error,
-                    ATM_ARCHIVE_ERROR,
-                    ATM_ARCHIVE_ERROR_IO,
-                    "Could not create extracted repository directory: %s.",
-                    g_strerror (errno)
+                    "Could not create extracted repository directory"
                 );
                 g_free (output_path);
                 g_free (relative);
@@ -851,12 +872,9 @@ atm_archive_extract_snapshot_cancellable (
 
             parent = g_path_get_dirname (output_path);
             if (g_mkdir_with_parents (parent, 0700) != 0) {
-                g_set_error (
+                set_archive_errno_error (
                     error,
-                    ATM_ARCHIVE_ERROR,
-                    ATM_ARCHIVE_ERROR_IO,
-                    "Could not create parent directory for extracted file: %s.",
-                    g_strerror (errno)
+                    "Could not create parent directory for extracted file"
                 );
                 g_free (parent);
                 g_free (output_path);
@@ -872,12 +890,9 @@ atm_archive_extract_snapshot_cancellable (
             );
 
             if (fd < 0) {
-                g_set_error (
+                set_archive_errno_error (
                     error,
-                    ATM_ARCHIVE_ERROR,
-                    ATM_ARCHIVE_ERROR_IO,
-                    "Could not create extracted repository file: %s.",
-                    g_strerror (errno)
+                    "Could not create extracted repository file"
                 );
                 g_free (output_path);
                 g_free (relative);
@@ -955,12 +970,9 @@ atm_archive_extract_snapshot_cancellable (
             }
 
             if (close (fd) != 0) {
-                g_set_error (
+                set_archive_errno_error (
                     error,
-                    ATM_ARCHIVE_ERROR,
-                    ATM_ARCHIVE_ERROR_IO,
-                    "Could not close extracted repository file: %s.",
-                    g_strerror (errno)
+                    "Could not close extracted repository file"
                 );
                 g_remove (output_path);
                 g_free (output_path);
