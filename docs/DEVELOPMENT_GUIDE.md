@@ -343,6 +343,25 @@ This slice adds only dormant error/UI plumbing. Current storage/admission code d
 
 SQLite `SQLITE_FULL` is the canonical database-full signal. Generic `SQLITE_IOERR` is not automatically equivalent to no-space; qualification has already observed that extremely tight state headroom can fail earlier during WAL/SHM setup. Native error classification must therefore preserve specific underlying results instead of treating every I/O error as `NO_SPACE`.
 
+### C0-M2 state-root headroom scaling
+
+C0-M2 is measurement-only qualification for the unresolved state-root reserve rationale.
+
+C0-E3 established one small-Control-DB boundary, but a permanent reserve must not assume that one-row history has the same SQLite page/WAL behavior as a larger append-only generation history. M2 therefore uses the real guarded Control DB mutation after constructing real copy-on-write histories of 1, 100 and 1000 COMPLETE generations.
+
+For each history size it runs isolated bounded-tmpfs cases with target free-space bands of 32 KiB, 64 KiB, 128 KiB and 256 KiB. Each record captures:
+- Control DB allocated bytes before the filler;
+- SQLite page size/page count/freelist count before and after the guarded mutation;
+- filesystem fragment size;
+- bytes/inodes available before filler and immediately before mutation;
+- success versus the exact observed low-space failure class;
+- post-operation Control DB/WAL/SHM allocated bytes;
+- active generation/SHA and persisted CANDIDATE count.
+
+Both a successful mutation and a low-headroom failure are required somewhere in the matrix, but no specific boundary is hard-coded as the expected answer. Every case must preserve Control DB semantic integrity: a success activates exactly the new generation; a failure keeps the previous authority active; neither may leave a persisted CANDIDATE generation.
+
+The aggregate artifact explicitly records `production_reserve_selected: false`. M2 is evidence for later reserve selection, not the reserve itself.
+
 ### Repository authority-mutation lease
 
 When an operation snapshots optimization mode ON, repository Download/Update uses one application-owned exclusive nonblocking lease at `<state_root>/repository-mutation.lock` before any selected-repository staging or authority mutation begins.
