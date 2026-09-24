@@ -8,6 +8,7 @@
 #include <glib/gstdio.h>
 
 #include <errno.h>
+#include <fcntl.h>
 #include <string.h>
 #include <sys/stat.h>
 #include <unistd.h>
@@ -22,6 +23,51 @@ atm_retrieval_lifecycle_error_quark (void)
 
 #ifdef ATM_TEST_INDEX_SINGLE_FLIGHT
 static gint test_single_flight_build_entries = 0;
+
+static void
+test_single_flight_note_build_entry (void)
+{
+    const char *event_path =
+        g_getenv ("ATM_TEST_INDEX_BUILD_EVENT");
+
+    g_atomic_int_inc (
+        &test_single_flight_build_entries
+    );
+
+    if (event_path != NULL &&
+        event_path[0] != '\0') {
+        gint fd = open (
+            event_path,
+            O_WRONLY | O_CREAT | O_APPEND | O_CLOEXEC,
+            0600
+        );
+
+        if (fd >= 0) {
+            const char event[] = "build\n";
+            gsize offset = 0;
+
+            while (offset < sizeof event - 1) {
+                ssize_t written = write (
+                    fd,
+                    event + offset,
+                    sizeof event - 1 - offset
+                );
+
+                if (written < 0 && errno == EINTR) {
+                    continue;
+                }
+
+                if (written <= 0) {
+                    break;
+                }
+
+                offset += (gsize) written;
+            }
+
+            close (fd);
+        }
+    }
+}
 
 void
 atm_retrieval_index_single_flight_test_reset (void)
@@ -724,9 +770,7 @@ atm_retrieval_index_ensure_for_snapshot_coordinated (
     }
 
 #ifdef ATM_TEST_INDEX_SINGLE_FLIGHT
-    g_atomic_int_inc (
-        &test_single_flight_build_entries
-    );
+    test_single_flight_note_build_entry ();
 #endif
 
     g_clear_pointer (&index_path, g_free);
