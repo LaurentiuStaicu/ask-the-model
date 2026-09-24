@@ -209,6 +209,21 @@ Two pinned real-repository paths are qualified:
 
 This establishes the fail-closed behavior required when real capacity is consumed after any future admission decision. It does not itself add admission, reserve sizing, GC, preallocation or a runtime `NO_SPACE` mapping. Production C0 must continue to assume that another process can consume capacity after preflight and therefore must preserve these recovery properties.
 
+
+### C0-E2 genuine inode exhaustion qualification
+
+C0-E2 is also test-only qualification infrastructure. It mounts a roomy byte-capacity `tmpfs` with a deliberately small `nr_inodes` limit and runs the exact pinned CBD repository ingest path.
+
+The runner records `statvfs().f_bavail × f_frsize` and `f_favail` immediately before the attempted ingest, after the old repository authority has been seeded. Qualification requires:
+- substantial byte capacity still available before the operation;
+- an intentionally insufficient inode/file-slot budget for the pinned CBD snapshot;
+- a genuine filesystem `ENOSPC` during extraction;
+- no new final snapshot and no extraction staging residue;
+- the previous Control DB generation/SHA and snapshot remaining unchanged;
+- a fresh-process restart verifier confirming the old authority.
+
+This evidence is specifically for C0-T3. It does not select the future inode reserve or production refusal threshold; it proves only that inode exhaustion is observable through the same fail-closed storage path and that admission must compare predicted new entries against unprivileged `f_favail`.
+
 ### Repository authority-mutation lease
 
 When an operation snapshots optimization mode ON, repository Download/Update uses one application-owned exclusive nonblocking lease at `<state_root>/repository-mutation.lock` before any selected-repository staging or authority mutation begins.
