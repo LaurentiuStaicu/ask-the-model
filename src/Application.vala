@@ -1447,7 +1447,7 @@ namespace AskTheModel {
             }
 
             if (new_chat_action != null) {
-                new_chat_action.set_enabled (can_start_new_chat);
+                new_chat_action.set_enabled_for_session (can_start_new_chat);
             }
 
             if (history_button != null) {
@@ -2258,7 +2258,7 @@ namespace AskTheModel {
 
             optimization_mode_switch
                 .notify["active"].connect (() => {
-                    optimization_policy.set_enabled (
+                    optimization_policy.set_enabled_for_session (
                         optimization_mode_switch.active
                     );
                     update_optimization_control ();
