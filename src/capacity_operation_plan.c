@@ -104,6 +104,39 @@ atm_capacity_mutation_plan_build (
         return FALSE;
     }
 
+    guint64 data_additional_inodes =
+        archive_inspection->materialized_entries;
+
+    /*
+     * On a first repository install, extraction/promotion may also create
+     * five AtM-owned structural directories outside the F2 archive tree:
+     *
+     *   Repositories/
+     *   Repositories/.staging/
+     *   Repositories/.staging/<repository>/
+     *   Repositories/<repository>/
+     *   Repositories/<repository>/snapshots/
+     *
+     * Startup qualification has already created/validated data_root itself.
+     * M1 observed exactly +5 fresh data-root entries for CBD/EWD/RMD versus
+     * the same-SHA replacement tree, so account for those inodes explicitly.
+     */
+    if (operation_kind ==
+            ATM_CAPACITY_OPERATION_FRESH_INSTALL) {
+        if (data_additional_inodes >
+            G_MAXUINT64 - 5) {
+            g_set_error_literal (
+                error,
+                ATM_CAPACITY_OPERATION_PLAN_ERROR,
+                ATM_CAPACITY_OPERATION_PLAN_ERROR_ARGUMENT,
+                "Fresh-install data inode requirement overflowed."
+            );
+            return FALSE;
+        }
+
+        data_additional_inodes += 5;
+    }
+
     *out_plan =
         (AtmCapacityMutationPlan) {
             .operation_kind = operation_kind,
@@ -143,7 +176,7 @@ atm_capacity_mutation_plan_build (
     ].inodes[
         ATM_CAPACITY_ROOT_DATA
     ] =
-        archive_inspection->materialized_entries;
+        data_additional_inodes;
 
     /*
      * Phase 1: retrieval-index build.
@@ -164,7 +197,7 @@ atm_capacity_mutation_plan_build (
     ].inodes[
         ATM_CAPACITY_ROOT_DATA
     ] =
-        archive_inspection->materialized_entries;
+        data_additional_inodes;
 
     out_plan->phases[
         ATM_CAPACITY_MUTATION_PHASE_INDEX_BUILD
@@ -199,7 +232,7 @@ atm_capacity_mutation_plan_build (
     ].inodes[
         ATM_CAPACITY_ROOT_DATA
     ] =
-        archive_inspection->materialized_entries;
+        data_additional_inodes;
 
     out_plan->phases[
         ATM_CAPACITY_MUTATION_PHASE_STATE_COMMIT
