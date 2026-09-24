@@ -1,6 +1,6 @@
 # Interface design requirements
 
-> v0.4.0 implements the approved compact repository/model header, status LCD, multi-chat tabs, first-Send identity freeze and on-demand source details described below. Future UI work should preserve these interaction contracts unless a reviewed design change replaces them.
+> v0.5.0 implements the approved compact repository/model header, status LCD, multi-chat tabs, first-Send identity freeze, on-demand source details and explicit Save to History conversation archiving. Future UI work should preserve these interaction contracts unless a reviewed design change replaces them.
 
 ## Purpose
 

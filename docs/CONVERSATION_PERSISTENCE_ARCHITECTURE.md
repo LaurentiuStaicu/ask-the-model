@@ -4,7 +4,7 @@
 
 This document defines the durable local conversation-storage boundary for Ask the Model after the completed Control State hardening work.
 
-The contract was introduced as CONV-00 and is now implemented on development `main` through CONV-05c. The tagged public release remains v0.4.0, so this document describes unreleased development capability rather than retroactively changing the v0.4.0 release boundary.
+The contract was introduced as CONV-00, completed through CONV-05c and is released in v0.5.0. The document defines the released saved-conversation boundary while preserving the earlier design history.
 
 Conversation persistence is intentionally **not** part of the repository Control DB. The Control DB is authoritative repository state with its own S0 invariants and generation lifecycle. Conversation history is user data with independent retention, deletion, navigation and recovery semantics.
 

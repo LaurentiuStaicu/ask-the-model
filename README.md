@@ -5,7 +5,7 @@
 <h2 align="center">Ask the Model (AtM)</h2>
 
 <p align="center">
-  <a href="https://github.com/LaurentiuStaicu/ask-the-model/releases/latest"><img alt="Version: 0.4.0" src="https://img.shields.io/github/v/tag/LaurentiuStaicu/ask-the-model?sort=semver&style=flat-square&label=release&color=333333"></a>
+  <a href="https://github.com/LaurentiuStaicu/ask-the-model/releases/latest"><img alt="Version: 0.5.0" src="https://img.shields.io/github/v/tag/LaurentiuStaicu/ask-the-model?sort=semver&style=flat-square&label=release&color=333333"></a>
   <a href="LICENSE"><img alt="MIT License" src="https://img.shields.io/badge/license-MIT-707070?style=flat-square"></a>
   <a href="#supported-platform-and-compatibility"><img alt="Linux / Flatpak" src="https://img.shields.io/badge/platform-Linux%20%2F%20Flatpak-a0a0a0?style=flat-square"></a>
 </p>
@@ -18,7 +18,7 @@
 
 <p align="center"><small><strong>A local-first desktop interface for local AI chat and repository-grounded exploration of scientific dynamical models with exact, inspectable provenance.</strong></small></p>
 
-<p align="center"><small><a href="#start-here-first-time-setup">First-time setup</a> · <a href="#repository-grounded-scientific-model-chat">Repository-grounded chat</a> · <a href="docs/USER_INTERFACE_GUIDE.md">Interface guide</a> · <a href="docs/TROUBLESHOOTING.md">Troubleshooting</a> · <a href="STATUS.md">Project status</a></small></p>
+<p align="center"><small><a href="#start-here-first-time-setup">First-time setup</a> · <a href="#repository-grounded-scientific-model-chat">Repository-grounded chat</a> · <a href="#save-conversations-for-later">Saved conversations</a> · <a href="docs/USER_INTERFACE_GUIDE.md">Interface guide</a> · <a href="docs/TROUBLESHOOTING.md">Troubleshooting</a> · <a href="STATUS.md">Project status</a></small></p>
 
 ---
 
@@ -32,13 +32,19 @@
 
 <small><strong>Ask the Model</strong> provides the interface and retrieval/provenance layer. A <strong>local provider</strong>, such as Ollama, loads and runs AI models. The <strong>AI model</strong> remains a separate artifact that must currently be downloaded and managed through the provider rather than AtM.</small>
 
-<small>Version 0.4.0 retains repository-grounded multi-chat and adds offline startup qualification plus deterministic local snapshot-integrity seals. AtM now verifies the effective packaged deployment, its dedicated repository-storage boundary and persisted repository state before accepting local repository readiness, while keeping upstream Git SHA provenance distinct from local integrity checks. Successful installation qualification gates repository-grounded use and Download/Update; ordinary zero-repository chat remains a separate valid path. EWD, CBD and RMD remain authoritative for their own code, data, assumptions, provenance and validation.</small>
+<small>Version 0.5.0 adds explicit <strong>Save to History</strong> conversation archiving with exact-context restore and deterministic local JSON mirrors for saved conversations. It also promotes the hardened SQLite repository/control-state and conversation-state work completed after v0.4.0, while retaining offline startup qualification and deterministic local snapshot-integrity seals. EWD, CBD and RMD remain authoritative for their own code, data, assumptions, provenance and validation.</small>
 
 ### Repository-grounded scientific-model chat
 
 <small>Select any combination of EWD, CBD and RMD before the first Send. Refresh resolves each tracked branch to an exact Git SHA. Download/Update validates an immutable local snapshot and builds a deterministic per-snapshot retrieval index. The first Send freezes the model/repository identity for that chat.</small>
 
 <small>Grounded answers expose numbered source references. Opening a source shows repository/version, exact snapshot SHA, file/locator, logical source ID, readable excerpt and an immutable GitHub permalink where appropriate. Repository evidence is current-turn data and is not accumulated permanently into ordinary provider conversation history.</small>
+
+### Save conversations for later
+
+<small>A conversation is saved only when you activate the per-tab <strong>Save to History</strong> control. Saved conversations appear in History and can later be reopened with their transcript, model identity, exact repository generation/version/SHA pins and citation provenance intact. AtM requalifies that exact historical context before allowing continuation; if it is unavailable, the saved conversation remains readable but view-only rather than being silently repinned.</small>
+
+<small>Saved conversations are also mirrored automatically as deterministic JSON files under <code>~/Ask the Model/Conversation Exports</code>. Closing an unsaved chat with <strong>X</strong> does not add it to History. History provides <strong>Open</strong> and separately confirmed <strong>Delete permanently</strong>; permanent deletion removes both the archived conversation and its managed JSON mirror.</small>
 
 ### Before you begin
 
@@ -148,13 +154,13 @@ flatpak run io.github.laurentiustaicu.ask_the_model
 
 <small>A raw GGUF file does not become visible to AtM merely because it exists on disk; it must first be registered with a compatible provider. For model sources, GGUF import, parameter scales, quantization, context windows, starter examples, storage, CPU/GPU checks and Ollama management commands, see <a href="docs/MODEL_GUIDE.md">Choosing, installing and managing AI models</a>.</small>
 
-<small><strong>Model capability does not automatically become AtM capability.</strong> AtM v0.4.0 currently provides text chat and repository-grounded text retrieval. Image input and tool-calling controls are not part of this release, and the default chat path requests <code>think: false</code>.</small>
+<small><strong>Model capability does not automatically become AtM capability.</strong> AtM v0.5.0 currently provides text chat and repository-grounded text retrieval. Image input and tool-calling controls are not part of this release, and the default chat path requests <code>think: false</code>.</small>
 
 <small>If a model is too slow, consumes too much memory or does not appear in AtM, use <a href="docs/TROUBLESHOOTING.md">Troubleshooting</a> for symptom-by-symptom checks rather than treating model size or download success as proof of compatibility.</small>
 
 ### Privacy and the local-provider boundary
 
-<small>AtM v0.4.0 connects only to loopback provider addresses on the same machine and sends prompt content when you activate <strong>Send</strong>. Conversation history is held in AtM memory for the current application process and is not persisted by AtM across restarts. Repository-grounded evidence comes from validated local snapshots; network access is used for explicit repository Refresh/Download/Update and for immutable GitHub links opened by the user.</small>
+<small>AtM v0.5.0 connects only to loopback provider addresses on the same machine and sends prompt content when you activate <strong>Send</strong>. Working chats are not saved implicitly: only conversations explicitly sent to <strong>History</strong> persist across restarts, with managed JSON mirrors under <code>~/Ask the Model/Conversation Exports</code>. Repository-grounded evidence comes from validated local snapshots; network access is used for explicit repository Refresh/Download/Update and for immutable GitHub links opened by the user.</small>
 
 <small>A loopback connection does not by itself prove that every model is local. The external provider decides how a selected model is executed. Modern Ollama versions can also expose cloud features. If strict local-only operation is required, choose a locally installed model and configure the provider accordingly; Ollama documents a local-only mode using <code>OLLAMA_NO_CLOUD=1</code> or <code>disable_ollama_cloud</code> in its server configuration.</small>
 
@@ -177,7 +183,9 @@ flatpak run io.github.laurentiustaicu.ask_the_model
 
 - <small>discovers a supported local Ollama-compatible provider and completion-capable provider-managed models;</small>
 - <small>refreshes model discovery without restarting;</small>
-- <small>streams assistant responses and keeps independent in-memory multi-chat histories;</small>
+- <small>streams assistant responses in independent multi-chat tabs;</small>
+- <small>saves only explicitly selected conversations to History and reopens them through exact model/repository-context qualification;</small>
+- <small>maintains deterministic managed JSON mirrors for saved conversations under <code>~/Ask the Model/Conversation Exports</code>;</small>
 - <small>selects any combination of the fixed EWD/CBD/RMD repository catalog before the first Send;</small>
 - <small>resolves repository Refresh to exact Git SHAs and performs explicit validated Download/Update;</small>
 - <small>stores immutable validated snapshots under <code>~/Ask the Model/Repositories</code>;</small>
@@ -188,12 +196,13 @@ flatpak run io.github.laurentiustaicu.ask_the_model
 - <small>shows compact numbered citations with exact repository/version/SHA/source/locator provenance and immutable source links;</small>
 - <small>follows desktop light/dark appearance and runs as a GTK 4 / Granite Flatpak for the elementary OS 8 runtime.</small>
 
-### What v0.4.0 still does not do
+### What v0.5.0 still does not do
 
 - <small>download, import, move, update or delete AI model files through AtM;</small>
 - <small>install, start, stop or update the external provider through AtM;</small>
 - <small>configure provider host/port, authentication or TLS in the UI;</small>
-- <small>persist conversations across application restarts;</small>
+- <small>import saved-conversation JSON archives;</small>
+- <small>provide retention-policy or bulk History management;</small>
 - <small>accept arbitrary unreviewed repository origins beyond the fixed EWD/CBD/RMD catalog;</small>
 - <small>execute or simulate EWD, CBD or RMD;</small>
 - <small>autonomously modify scientific repositories;</small>
@@ -204,7 +213,7 @@ flatpak run io.github.laurentiustaicu.ask_the_model
 
 <small>AtM is an interface and retrieval/provenance layer. The source repositories remain canonical for their documentation, code, data, assumptions, provenance, validation and release boundaries. A repository marked READY has passed AtM compatibility/integrity checks; READY is not a scientific certification.</small>
 
-<small>Future work may add broader repository management, provider support, persistent conversations, semantic retrieval or explicit scientific-model execution. Such work must preserve exact provenance and remain distinct from generated interpretation.</small>
+<small>Future work may add broader repository management, provider support, conversation-archive import/retention tools, semantic retrieval or explicit scientific-model execution. Such work must preserve exact provenance and remain distinct from generated interpretation.</small>
 
 </details>
 

@@ -1,6 +1,6 @@
 # Troubleshooting Ask the Model
 
-This guide covers the most common problems in the AtM v0.4.0 local-chat setup. Work through the checks in order. The reference provider in the examples is Ollama.
+This guide covers the most common problems in the AtM v0.5.0 local-chat setup. Work through the checks in order. The reference provider in the examples is Ollama.
 
 ## Quick diagnostic sequence
 
@@ -23,7 +23,7 @@ This gives you a basic picture of whether Flatpak is available, whether the prov
 
 ## AtM shows “Ollama not found”
 
-AtM v0.4.0 probes these endpoints in order:
+AtM v0.5.0 probes these endpoints in order:
 
 1. `http://127.0.0.1:11434`
 2. `http://127.0.0.1:11435`
@@ -266,7 +266,9 @@ If direct provider execution also fails, fix the provider/model problem before d
 
 ## My conversation disappeared after restarting AtM
 
-This is expected in v0.4.0. Conversation history exists only in application memory for the current AtM process. Persistent conversation storage is not implemented yet.
+In v0.5.0, a conversation persists only when you explicitly activate **Save to History** before closing it. The ordinary **X** close action discards an unarchived chat, and normal application exit also discards unarchived working conversations.
+
+Open **History** to see saved conversations. If a conversation is present there, **Open** reconstructs it and AtM rechecks the exact saved model/repository context before continuation. If it is not in History and was never explicitly saved, its disappearance after Close/restart is expected behavior.
 
 ## Repository Refresh shows an update
 
@@ -297,7 +299,7 @@ Do not manually move partial content from `Repositories/.staging` into a snapsho
 
 ## A repository was ready but now requires Download again
 
-In v0.4.0 this can be an intentional integrity response rather than a newly published repository revision.
+In v0.5.0 this can be an intentional integrity response rather than a newly published repository revision.
 
 If the enrolled local snapshot seal no longer matches the files under the exact persisted SHA, AtM refuses to ground that snapshot and marks the existing **Download/Update** action as required.
 
@@ -351,11 +353,11 @@ This can be expected.
 
 Validated snapshots are immutable. AtM may retain the previous snapshot/index pair for safe rollback or because an active chat is pinned to it.
 
-The v0.4.0 compact header does not yet expose full snapshot-history/removal management.
+The v0.5.0 compact header does not yet expose full snapshot-history/removal management.
 
 ## I expected AtM to download or delete a model
 
-This is not implemented in v0.4.0.
+This is not implemented in v0.5.0.
 
 For now, use provider commands:
 
@@ -396,7 +398,7 @@ Open the badge or the repository Actions tab to inspect the failing run.
 
 The repository previously experimented with publishing the development Flatpak repository through GitHub Pages. That historical Pages deployment failed because GitHub Pages had not been enabled, and the workflow was subsequently replaced with direct publication to the `flatpak-repo` branch.
 
-The current build/release workflow no longer uses the `github-pages` environment. A historical red Deployment therefore does not describe the current AtM v0.4.0 build state.
+The current build/release workflow no longer uses the `github-pages` environment. A historical red Deployment therefore does not describe the current AtM v0.5.0 build state.
 
 Repository administrators can clean up obsolete deployment/environment history from GitHub settings or the GitHub Deployments API where appropriate.
 

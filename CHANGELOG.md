@@ -4,6 +4,12 @@ All notable public releases of Ask the Model are recorded here.
 
 ## Unreleased
 
+_No unreleased changes yet._
+
+## 0.5.0 - 2026-09-24
+
+Saved Conversation History and State Hardening.
+
 ### CI and publication hardening
 
 - split the Flatpak workflow into a read-only verification/build job and a main-only publication job, so pull-request verification no longer receives repository-content write permission;

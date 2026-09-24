@@ -1,10 +1,10 @@
 # Application architecture boundary
 
-## Released state — v0.4.0
+## Released state — v0.5.0
 
-AtM v0.4.0 provides a functional GTK 4 / Granite local-chat application, desktop integration, AppStream metadata, elementary OS 8 Flatpak packaging, an implemented local AI-provider layer, repository-grounded EWD/CBD/RMD conversation paths and a non-visual startup qualification/snapshot-integrity layer.
+AtM v0.5.0 provides a functional GTK 4 / Granite local-chat application, desktop integration, AppStream metadata, elementary OS 8 Flatpak packaging, an implemented local AI-provider layer, repository-grounded EWD/CBD/RMD conversation paths, startup qualification/snapshot integrity, hardened SQLite repository authority and explicit saved-conversation History.
 
-Repository selection, validated exact-SHA snapshots, deterministic retrieval, per-chat repository/model pinning, grounded citations and on-demand provenance inspection remain part of the released capability boundary; v0.4.0 additionally qualifies the effective deployment/storage state and verifies local snapshot integrity before repository readiness is accepted.
+Repository selection, validated exact-SHA snapshots, deterministic retrieval, per-chat repository/model pinning, grounded citations and on-demand provenance inspection remain part of the released capability boundary. v0.5.0 additionally releases application-owned SQLite Control State plus explicit Save to History conversation archiving, exact-context restore and managed archived-conversation JSON mirrors.
 
 ## Repository-aware implementation — released in v0.3.0
 
@@ -63,11 +63,11 @@ Each open chat tab keeps its own user/assistant provider history in memory and o
 - New creates another independent tab rather than resetting existing conversations;
 - closing a tab discards only that tab's in-memory provider/session state.
 
-Conversation state is not persisted across application restarts.
+Working conversation state is not saved implicitly. Only conversations explicitly sent to History persist across restarts; those archives retain durable transcript/provenance and exact saved model/repository identity for later qualification.
 
 ### User interface
 
-The v0.4.0 UI provides:
+The v0.5.0 UI provides:
 
 - elementary-style GTK/Granite shell and system color-scheme following;
 - separate AI-model and multi-repository selectors with explicit refresh/download/update lifecycle controls;
@@ -77,7 +77,9 @@ The v0.4.0 UI provides:
 - transcript and prompt composer per tab;
 - streamed ordinary local-chat answers;
 - validated repository-grounded answers whose temporary `[S#]` labels are removed before display;
-- compact `Sources: [1] [2]…` references that open exact provenance details.
+- compact `Sources: [1] [2]…` references that open exact provenance details;
+- a direct **Save to History** control for explicit conversation archiving;
+- archive-only History with Open and separately confirmed permanent Delete.
 
 ### Graphics compatibility layer
 
@@ -115,11 +117,11 @@ The R4 backend can freeze validated repository snapshots for a conversation, bui
 
 These capabilities are wired into the released v0.3.0 GTK path. Grounded answers are held until current-turn citation labels are resolved; unknown labels fail closed. Successful grounded answers retain turn-owned provenance and render compact source-reference controls in the transcript.
 
-### Development Control State after v0.4.0 — current `main`
+### SQLite Control State — released in v0.5.0
 
-The tagged v0.4.0 release continues to use the repository-state behavior documented above. Current development `main` adds a separately qualified application-owned SQLite Control State for repository authority without retroactively changing the release description.
+v0.5.0 promotes the separately qualified application-owned SQLite Control State to the released repository-authority boundary.
 
-The development Control State path:
+The released Control State path:
 
 - identifies the database with an AtM-specific SQLite `application_id` and supported `user_version`;
 - enforces foreign keys, WAL journaling, FULL synchronous durability, schema/integrity checks and fail-closed handling of foreign, newer, corrupt or incomplete databases;
@@ -159,21 +161,25 @@ Responsible for selecting retrieved evidence within a turn budget, recording exa
 
 Current-turn grounding context, grounded Ollama request construction, temporary source-label resolution, persistent citation provenance and real-repository traceability are implemented and wired through the released v0.3.0 GTK path. User-visible references are intentionally compact; detailed provenance is disclosed on demand in a transient source-detail window rather than a permanent pane.
 
-### Conversation persistence service — implemented on development `main`
+### Conversation persistence service — released in v0.5.0
 
-Responsible for durable local conversation storage, restart restoration/navigation, explicit history reopen, exact continuation qualification and Close/Archive/Delete lifecycle while keeping repository authority independent.
+Responsible for durable local saved-conversation storage, History navigation, exact continuation qualification and permanent deletion while keeping repository authority independent.
 
-The persistence boundary is specified in `docs/CONVERSATION_PERSISTENCE_ARCHITECTURE.md`. Conversation history is user data in a separate application-owned SQLite database, not an extension of repository Control DB authority. Development `main` implements the CONV-01→CONV-05a sequence: a qualified schema and atomic committed-turn write path; coherent durable list/snapshot reads; exact provider-history reconstruction from persisted provider content; immutable citation-permalink round-trip; startup restore of non-archived conversations whose independent `open_on_startup` state remains set; exact model name/digest and historical repository-generation/version/SHA requalification before continuation; and explicit Close/Archive/Delete lifecycle separation. Closing the application leaves startup-open state unchanged, while explicitly closing a tab clears only that restore state and does not archive or delete its history. Historical repository grounding is reconstructed from the persisted COMPLETE Control DB generation without changing current `active_state`, and failed context qualification leaves history viewable but non-continuable. History reopening uses the same restored view-only boundary and exact continuation qualification as startup restoration; it does not repin saved conversations to current authority.
+The persistence boundary is specified in `docs/CONVERSATION_PERSISTENCE_ARCHITECTURE.md`. Conversation user data lives in a separate application-owned SQLite database rather than the repository Control DB. Working turns use that store transactionally, but only explicit **Save to History** marks a conversation as user-saved. Close and normal shutdown discard unarchived working conversations; startup cleans unarchived leftovers after an interrupted process.
 
-Export/import, retention policy and bulk history management remain future work.
+History lists archived conversations only. Opening a saved conversation reconstructs durable transcript/provenance and requalifies the exact persisted model name/digest plus repository generation/version/SHA before continuation. Opening does not unarchive or silently repin the conversation.
+
+Archived conversations also receive deterministic managed JSON mirrors under `~/Ask the Model/Conversation Exports/`. Permanent Delete removes both the archived SQLite conversation and its managed export with fail-closed export-removal semantics.
+
+Import, retention policy and bulk History management remain future work.
 
 ### Application settings
 
 Responsible for future provider endpoint configuration, preferred AI model and application-level preferences. Repository source snapshots use the fixed visible location `~/Ask the Model/Repositories`; derived indexes and application state remain in AtM's private XDG cache/state locations. Arbitrary repository storage locations are not a v1 setting.
 
-## Explicitly outside the v0.4.0 boundary
+## Explicitly outside the v0.5.0 boundary
 
-- persistent conversation storage across application restarts;
+- import of saved-conversation archives plus retention-policy/bulk History management;
 - arbitrary unreviewed repository origins beyond the fixed EWD/CBD/RMD catalog;
 - full repository snapshot-history/removal management UI;
 - in-app AI-model download/import/delete;
