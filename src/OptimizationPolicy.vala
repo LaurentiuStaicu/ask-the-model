@@ -4,7 +4,7 @@ namespace AskTheModel {
 
         public signal void changed (bool enabled);
 
-        public void set_enabled (bool enabled) {
+        public void set_enabled_for_session (bool enabled) {
             if (this.enabled == enabled) {
                 return;
             }
