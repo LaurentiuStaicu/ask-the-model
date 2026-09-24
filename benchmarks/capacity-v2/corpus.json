@@ -1,0 +1,114 @@
+{
+  "schema_version": 1,
+  "measurement_id": "atm-c0-m4-historical-amplification-v1",
+  "selection_policy": {
+    "description": "Five stratified commits from the 30 most recent default-branch commits observed during C0-M4 design, plus the exact C0-M1 pinned SHA.",
+    "recent_commit_ranks": [
+      1,
+      8,
+      15,
+      22,
+      30
+    ],
+    "pinned_baseline_included": true,
+    "compatibility_gate": "Each frozen SHA was prechecked to contain .atm/repository.json and CITATION.cff; the real ingest/index runner remains the authoritative compatibility test."
+  },
+  "repositories": [
+    {
+      "repository_id": "ewd",
+      "repository": "empirical-world3-dynamics",
+      "acronym": "EWD",
+      "display_name": "Empirical World3 Dynamics",
+      "samples": [
+        {
+          "label": "recent-r1",
+          "sha": "eddeabbbb4dcdceed1ff02102ea1040e24ed7fa0"
+        },
+        {
+          "label": "recent-r8",
+          "sha": "92f7d30a244b44426740a69735e1e2d2e963367a"
+        },
+        {
+          "label": "recent-r15",
+          "sha": "2ea257b08ca9da1f48767e76737361a583c7bfd2"
+        },
+        {
+          "label": "recent-r22",
+          "sha": "f6ff853ac3fe49085c708547855d92f23ecfea0b"
+        },
+        {
+          "label": "recent-r30",
+          "sha": "d59471e40180693730acbc06c01b977aa6c216bb"
+        },
+        {
+          "label": "pinned-m1",
+          "sha": "795a6b8e42e2a19497f686a89e7c3a6056e6930c"
+        }
+      ]
+    },
+    {
+      "repository_id": "cbd",
+      "repository": "cognitive-belief-dynamics",
+      "acronym": "CBD",
+      "display_name": "Cognitive Belief Dynamics",
+      "samples": [
+        {
+          "label": "recent-r1",
+          "sha": "23e53ae1e44530d05d494cefff194b66570bb59b"
+        },
+        {
+          "label": "recent-r8",
+          "sha": "cb74bd36421897cc0b84b7ed8a35a2cb49387fbe"
+        },
+        {
+          "label": "recent-r15",
+          "sha": "fa71e14f4ff047c24ee79d039de2858c0e51ad01"
+        },
+        {
+          "label": "recent-r22",
+          "sha": "55271e06d2c12c4ce7d4c3289fb8a9b78fb1eb36"
+        },
+        {
+          "label": "recent-r30",
+          "sha": "4248a76affd302ab77bce00a3e38e155efaf7d18"
+        },
+        {
+          "label": "pinned-m1",
+          "sha": "e6e3b3077b7d78e3f37d963e0734e9084e8a62ab"
+        }
+      ]
+    },
+    {
+      "repository_id": "rmd",
+      "repository": "romanian-monetary-dynamics",
+      "acronym": "RMD",
+      "display_name": "Romanian Monetary Dynamics",
+      "samples": [
+        {
+          "label": "recent-r1",
+          "sha": "e43eb4e899f123d3b1aa0f6e20b7c8ed35434170"
+        },
+        {
+          "label": "recent-r8",
+          "sha": "b96fe1c47e38ea395a540ba02935e4c898d4e943"
+        },
+        {
+          "label": "recent-r15",
+          "sha": "18d41399eb3d23e08253ac4b1e5d50614115b631"
+        },
+        {
+          "label": "recent-r22",
+          "sha": "58273dce6233e2a52e34cacb028721e13e6cf399"
+        },
+        {
+          "label": "recent-r30",
+          "sha": "23f5ab7a7c2eea14c2884c14781e804a013c096a"
+        },
+        {
+          "label": "pinned-m1",
+          "sha": "a8b5ff89a951d3194fdedb59771bc79937fe7bc7"
+        }
+      ]
+    }
+  ]
+}
