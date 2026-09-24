@@ -28,6 +28,20 @@ Before the first Send, any combination may be selected, including no repository 
 
 Refresh does not silently replace local snapshots.
 
+### Optimizations master switch
+
+The header includes a global **Optimizations** sliding switch with an adjacent **OFF/ON** state label.
+
+Every AtM process starts with **Optimizations OFF**. The switch state is intentionally not persisted in this first implementation, so enabling it is an explicit opt-in for the current application run.
+
+- **OFF** preserves the post-v0.5.0 baseline behavior for newly started operations.
+- **ON** permits only optimization features that have actually been implemented and qualified; planned features do not become active merely because the switch is ON.
+- changing the switch affects newly started operations rather than changing the semantics of an operation already in progress.
+
+The switch trough is warm muted red when OFF and warm muted green when ON. The adjacent text and accessibility state provide a non-color indication of the same state.
+
+Test-only crash/fault qualification infrastructure is not controlled by this switch because it is not present as a production runtime feature.
+
 ### Download / Update
 
 The repository action button downloads a repository that is not installed, updates one whose exact remote SHA differs from the current local snapshot, or repairs a locally integrity-invalid snapshot. A same-SHA integrity repair still requires a fresh exact-SHA download before the invalid local directory is quarantined and replaced.
