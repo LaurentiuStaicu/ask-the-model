@@ -308,6 +308,18 @@ Fresh install, different-SHA update and same-SHA repair share the same post-down
 
 C0-F3 does not infer allocated bytes from tar logical bytes. Archive, snapshot, index and state predictions remain explicit later-policy inputs; F2 contributes the inode/materialization requirement; F1 groups roots by `st_dev`, applies reserve floors and evaluates phase overlap.
 
+### C0-F4 capacity evidence registry
+
+C0-F4 freezes reviewed C0 qualification evidence under `benchmarks/capacity-v1/evidence.json`.
+
+The registry exists to separate **measurement evidence** from future **production policy**. It carries the source/action provenance and exact repository SHAs for C0-M1 plus the genuine byte, inode and state-root exhaustion qualifications from E1/E2/E3.
+
+Repository capacity observations are keyed by exact `repository_id + repository_sha`. A later SHA must not inherit an older SHA's measured allocated-byte values as a capacity guarantee. If a future runtime policy has no exact qualified profile, its proactive prediction state is `UNQUALIFIED_NO_PROACTIVE_PREDICTION`; fail-closed ENOSPC recovery remains the safety fallback.
+
+The checked-in M1 values are observations from one qualification environment, not filesystem-independent upper bounds. In particular they must not be converted into one archive-size multiplier across CBD/EWD/RMD.
+
+The registry deliberately states `production_thresholds_selected: false`. Reserve sizes, refusal thresholds and production `NO_SPACE` behavior remain later reviewed policy. The invariant-registry CI gate validates evidence provenance, exact-SHA alignment with the frozen R5 corpus and preservation of this non-threshold boundary.
+
 ### Repository authority-mutation lease
 
 When an operation snapshots optimization mode ON, repository Download/Update uses one application-owned exclusive nonblocking lease at `<state_root>/repository-mutation.lock` before any selected-repository staging or authority mutation begins.
