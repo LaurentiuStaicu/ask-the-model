@@ -233,7 +233,8 @@ static void
 add_fs (
     JsonBuilder *builder,
     const char *name,
-    const char *path
+    const char *path,
+    AtmFilesystemCapacityMeasurement *out_measurement
 )
 {
     AtmFilesystemCapacityMeasurement m;
@@ -284,6 +285,11 @@ add_fs (
     );
 
     json_builder_end_object (builder);
+
+    if (out_measurement != NULL) {
+        *out_measurement = m;
+    }
+
     g_free (device);
 }
 
@@ -435,6 +441,9 @@ run_measurement (
     GError *error = NULL;
     guint64 entries = 0;
     guint64 extracted_logical_bytes = 0;
+    AtmFilesystemCapacityMeasurement data_fs;
+    AtmFilesystemCapacityMeasurement cache_fs;
+    AtmFilesystemCapacityMeasurement state_fs;
 
     if (!make_root (data_root, &error) ||
         !make_root (cache_root, &error) ||
@@ -509,17 +518,20 @@ run_measurement (
     add_fs (
         builder,
         "data",
-        data_root
+        data_root,
+        &data_fs
     );
     add_fs (
         builder,
         "cache",
-        cache_root
+        cache_root,
+        &cache_fs
     );
     add_fs (
         builder,
         "state",
-        state_root
+        state_root,
+        &state_fs
     );
     json_builder_end_object (builder);
 
@@ -575,6 +587,10 @@ run_measurement (
     gint64 ingest_elapsed_ms =
         (g_get_monotonic_time () -
          ingest_started) / 1000;
+    PeakResult data_steady_after_ingest =
+        current_tree_sample (
+            data_root
+        );
 
     add_tree (
         builder,
@@ -696,6 +712,10 @@ run_measurement (
     gint64 index_elapsed_ms =
         (g_get_monotonic_time () -
          index_started) / 1000;
+    PeakResult cache_steady_after_index =
+        current_tree_sample (
+            cache_root
+        );
 
     if (!atm_retrieval_index_validate_snapshot_sources (
             index_path,
@@ -874,6 +894,136 @@ run_measurement (
         "elapsed_ms",
         (guint64) repair_elapsed_ms
     );
+    json_builder_end_object (builder);
+
+    json_builder_set_member_name (
+        builder,
+        "steady_state"
+    );
+    json_builder_begin_object (builder);
+    add_u64 (
+        builder,
+        "data_after_ingest_allocated_bytes",
+        data_steady_after_ingest.allocated_bytes
+    );
+    add_u64 (
+        builder,
+        "data_after_ingest_entries",
+        data_steady_after_ingest.entries
+    );
+    add_u64 (
+        builder,
+        "cache_after_index_allocated_bytes",
+        cache_steady_after_index.allocated_bytes
+    );
+    add_u64 (
+        builder,
+        "cache_after_index_entries",
+        cache_steady_after_index.entries
+    );
+    json_builder_end_object (builder);
+
+    json_builder_set_member_name (
+        builder,
+        "filesystem_grouping"
+    );
+    json_builder_begin_object (builder);
+    json_builder_set_member_name (
+        builder,
+        "data_cache_same_device"
+    );
+    json_builder_add_boolean_value (
+        builder,
+        data_fs.device_id == cache_fs.device_id
+    );
+    json_builder_set_member_name (
+        builder,
+        "data_cache_state_same_device"
+    );
+    json_builder_add_boolean_value (
+        builder,
+        data_fs.device_id == cache_fs.device_id &&
+        data_fs.device_id == state_fs.device_id
+    );
+
+    if (data_fs.device_id == cache_fs.device_id) {
+        guint64 fresh_combined =
+            fresh_data_peak.allocated_bytes +
+            cache_baseline.allocated_bytes;
+        guint64 index_combined =
+            data_steady_after_ingest.allocated_bytes +
+            cache_peak.allocated_bytes;
+        guint64 repair_combined =
+            repair_data_peak.allocated_bytes +
+            cache_steady_after_index.allocated_bytes;
+        guint64 max_combined =
+            MAX (
+                fresh_combined,
+                MAX (
+                    index_combined,
+                    repair_combined
+                )
+            );
+
+        add_u64 (
+            builder,
+            "fresh_ingest_combined_allocated_peak_bytes",
+            fresh_combined
+        );
+        add_u64 (
+            builder,
+            "index_build_combined_allocated_peak_bytes",
+            index_combined
+        );
+        add_u64 (
+            builder,
+            "same_sha_repair_combined_allocated_peak_bytes",
+            repair_combined
+        );
+        add_u64 (
+            builder,
+            "operation_combined_allocated_peak_bytes",
+            max_combined
+        );
+
+        guint64 fresh_entries =
+            fresh_data_peak.entries +
+            cache_baseline.entries;
+        guint64 index_entries =
+            data_steady_after_ingest.entries +
+            cache_peak.entries;
+        guint64 repair_entries =
+            repair_data_peak.entries +
+            cache_steady_after_index.entries;
+
+        add_u64 (
+            builder,
+            "fresh_ingest_combined_peak_entries",
+            fresh_entries
+        );
+        add_u64 (
+            builder,
+            "index_build_combined_peak_entries",
+            index_entries
+        );
+        add_u64 (
+            builder,
+            "same_sha_repair_combined_peak_entries",
+            repair_entries
+        );
+        add_u64 (
+            builder,
+            "operation_combined_peak_entries",
+            MAX (
+                fresh_entries,
+                MAX (
+                    index_entries,
+                    repair_entries
+                )
+            )
+        );
+    }
+
     json_builder_end_object (builder);
 
     struct utsname uts;
