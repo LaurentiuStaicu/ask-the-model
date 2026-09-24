@@ -262,6 +262,26 @@ After the failed mutation the test removes only its filler file and requires:
 
 This slice measures and qualifies fail-closed behavior; it does not yet turn the observed low-space boundary into a permanent state-root reserve. SQLite may react to `SQLITE_FULL` by rolling back a statement or the whole transaction depending on where the error occurs, so AtM retains its explicit rollback path and verifies the persisted result instead of assuming one internal SQLite outcome.
 
+### C0-F2 archive pre-scan
+
+C0-F2 adds a no-write archive inspection primitive for the future disk/inode admission path. It is deliberately not wired into Download/Update yet.
+
+The inspector opens the completed repository tarball with libarchive, walks headers without extracting payloads and applies the same top-level-prefix, path traversal, link, special-entry and declared-size limits used by the extraction path.
+
+It records:
+- total archive header entries;
+- unique regular files that would be materialized;
+- unique directories that would be materialized, including implicit parent directories absent as explicit tar entries;
+- total declared logical regular-file bytes;
+- largest declared regular-file size;
+- total new materialized filesystem entries, including the operation-owned extraction root.
+
+This gives a pre-extraction inode requirement that is materially stronger than raw tar header count. For example, a file at `a/b/c.txt` consumes parent-directory inodes even if those directories do not appear as separate archive entries.
+
+The inspection result is a planning input, not a replacement for extraction validation. Extraction still rechecks actual streamed byte counts and remains authoritative if archive payload data disagrees with header metadata.
+
+No filesystem-allocation byte threshold is derived directly from logical tar sizes in this slice because compressed/deduplicating/sparse-capable filesystems can make logical bytes differ from allocated bytes. Production byte admission continues to use measured phase evidence plus filesystem availability, while C0-F2 closes the archive-entry/inode observability gap.
+
 ### Repository authority-mutation lease
 
 When an operation snapshots optimization mode ON, repository Download/Update uses one application-owned exclusive nonblocking lease at `<state_root>/repository-mutation.lock` before any selected-repository staging or authority mutation begins.
