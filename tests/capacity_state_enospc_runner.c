@@ -342,19 +342,11 @@ error_is_capacity_failure (
     const GError *error
 )
 {
-    if (error == NULL ||
-        error->message == NULL) {
-        return FALSE;
-    }
-
-    return strstr (
-        error->message,
-        "database or disk is full"
-    ) != NULL ||
-        strstr (
-            error->message,
-            "No space left on device"
-        ) != NULL;
+    return error != NULL &&
+        error->domain ==
+            ATM_CONTROL_STATE_ERROR &&
+        error->code ==
+            ATM_CONTROL_STATE_ERROR_NO_SPACE;
 }
 
 static gboolean
