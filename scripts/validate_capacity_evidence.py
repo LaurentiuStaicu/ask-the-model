@@ -99,6 +99,10 @@ def main() -> int:
         "fresh_data_additional_peak_bytes",
         "index_cache_additional_peak_bytes",
         "same_sha_repair_data_additional_peak_bytes",
+        "snapshot_entries",
+        "fresh_data_additional_peak_entries",
+        "index_cache_additional_peak_entries",
+        "same_sha_repair_data_additional_peak_entries",
         "same_device_operation_peak_bytes",
         "same_device_operation_peak_entries",
     )
@@ -132,6 +136,31 @@ def main() -> int:
                 record,
                 key,
                 f"c0_m1.observations[{repository_id}]",
+            )
+
+        if (
+            record["same_sha_repair_data_additional_peak_entries"]
+            != record["snapshot_entries"] + 1
+        ):
+            fail(
+                f"{repository_id} repair inode peak must equal "
+                "snapshot entries + extraction root"
+            )
+
+        if (
+            record["fresh_data_additional_peak_entries"]
+            != record[
+                "same_sha_repair_data_additional_peak_entries"
+            ] + 5
+        ):
+            fail(
+                f"{repository_id} fresh inode peak lost the fixed "
+                "five-directory AtM storage-tree overhead"
+            )
+
+        if record["index_cache_additional_peak_entries"] != 4:
+            fail(
+                f"{repository_id} index-build inode peak must remain 4"
             )
 
         by_repo[repository_id] = record
@@ -433,7 +462,7 @@ def main() -> int:
 
     print(
         "capacity evidence validation passed: "
-        "exact-SHA corpus + provenance + non-threshold policy"
+        "exact-SHA corpus + phase inode provenance + non-threshold policy"
     )
     return 0
 
