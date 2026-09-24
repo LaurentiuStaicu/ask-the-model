@@ -160,7 +160,7 @@ Any future execution path must expose the executed model version, inputs, parame
 
 ## Tests and gates
 
-The Meson suite covers startup qualification, the fail-closed repository runtime gate, storage-boundary checks, Control DB identity/integrity, deterministic legacy import and cutover, copy-on-write repository generations, generation-consistent reads and stale-writer rejection, deterministic snapshot sealing, repository lifecycle, repository-generation conversation pinning, the independent G-O0 state/snapshot/index/provenance oracle, archive safety, manifests, retrieval, grounding and citations.
+The Meson suite covers startup qualification, the fail-closed repository runtime gate, storage-boundary checks, Control DB identity/integrity, deterministic legacy import and cutover, copy-on-write repository generations, generation-consistent reads and stale-writer rejection, deterministic snapshot sealing, repository lifecycle, repository-generation conversation pinning, the independent G-O0 state/snapshot/index/provenance oracle, deterministic process-crash/restart qualification at snapshot/index promotion boundaries, archive safety, manifests, retrieval, grounding and citations.
 
 The Flatpak workflow validates, in order:
 
@@ -170,6 +170,14 @@ The Flatpak workflow validates, in order:
 4. publication only where the workflow rules permit it.
 
 The R5 benchmark is intentionally deterministic and pinned. Development diagnostics may expand, but reviewed qrels/corpus/thresholds are not silently rewritten.
+
+### Recovery fault qualification
+
+The OPT-A0 recovery harness is test-only. Native checkpoint calls compile to no-ops in the production application; only the dedicated recovery helper is built with `ATM_TEST_FAULT_INJECTION`.
+
+The blocking harness launches a helper subprocess with explicit checkpoint/control file descriptors, terminates it at named promotion boundaries and runs a new verifier process against the same isolated state root. This qualifies deterministic **process-crash** behavior and must not be described as proof of physical power-loss durability.
+
+The initial oracle covers snapshot pre/post-rename and retrieval-index validated/pre/post-rename boundaries. It intentionally reports existing recovery gaps rather than repairing them; durability barriers, stale-staging cleanup and cross-process leases belong to later OPT workstreams.
 
 ## Release workflow
 
