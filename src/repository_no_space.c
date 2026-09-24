@@ -3,6 +3,7 @@
 #include "archive_extract.h"
 #include "control_state.h"
 #include "retrieval_index.h"
+#include "repository_storage.h"
 
 #include <gio/gio.h>
 
@@ -60,5 +61,10 @@ atm_repository_error_is_no_space (
             error,
             "atm-control-state-error-quark",
             ATM_CONTROL_STATE_ERROR_NO_SPACE
+        ) ||
+        matches_private_domain (
+            error,
+            "atm-storage-error-quark",
+            ATM_STORAGE_ERROR_NO_SPACE
         );
 }
