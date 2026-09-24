@@ -2,6 +2,14 @@
 
 #include "coordination_lease.h"
 
+GQuark
+atm_repository_mutation_lease_error_quark (void)
+{
+    return g_quark_from_static_string (
+        "atm-repository-mutation-lease-error-quark"
+    );
+}
+
 static AtmRepositoryMutationLeaseError
 map_coordination_error (
     const GError *error
