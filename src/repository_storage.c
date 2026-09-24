@@ -13,6 +13,36 @@ atm_storage_error_quark (void)
     return g_quark_from_static_string ("atm-storage-error-quark");
 }
 
+static AtmStorageError
+storage_errno_error_code (
+    int err_no
+)
+{
+    return err_no == ENOSPC
+        ? ATM_STORAGE_ERROR_NO_SPACE
+        : ATM_STORAGE_ERROR_IO;
+}
+
+static void
+set_storage_errno_error (
+    GError **error,
+    const char *context
+)
+{
+    int saved_errno = errno;
+
+    g_set_error (
+        error,
+        ATM_STORAGE_ERROR,
+        storage_errno_error_code (
+            saved_errno
+        ),
+        "%s: %s.",
+        context,
+        g_strerror (saved_errno)
+    );
+}
+
 static gboolean
 repository_id_is_valid (const char *repository_id)
 {
@@ -180,12 +210,9 @@ atm_repository_quarantine_snapshot (
                 break;
             }
 
-            g_set_error (
+            set_storage_errno_error (
                 error,
-                ATM_STORAGE_ERROR,
-                ATM_STORAGE_ERROR_IO,
-                "Could not inspect snapshot quarantine path: %s.",
-                g_strerror (errno)
+                "Could not inspect snapshot quarantine path"
             );
             goto out;
         }
@@ -212,12 +239,9 @@ atm_repository_quarantine_snapshot (
     }
 
     if (g_rename (snapshot_path, quarantine_path) != 0) {
-        g_set_error (
+        set_storage_errno_error (
             error,
-            ATM_STORAGE_ERROR,
-            ATM_STORAGE_ERROR_IO,
-            "Could not quarantine invalid snapshot: %s.",
-            g_strerror (errno)
+            "Could not quarantine invalid snapshot"
         );
         goto out;
     }
@@ -321,24 +345,18 @@ atm_repository_promote_snapshot (
     }
 
     if (errno != ENOENT) {
-        g_set_error (
+        set_storage_errno_error (
             error,
-            ATM_STORAGE_ERROR,
-            ATM_STORAGE_ERROR_IO,
-            "Could not inspect final snapshot path: %s.",
-            g_strerror (errno)
+            "Could not inspect final snapshot path"
         );
         goto out;
     }
 
     snapshot_parent = g_path_get_dirname (snapshot_path);
     if (g_mkdir_with_parents (snapshot_parent, 0700) != 0) {
-        g_set_error (
+        set_storage_errno_error (
             error,
-            ATM_STORAGE_ERROR,
-            ATM_STORAGE_ERROR_IO,
-            "Could not create snapshot parent directory: %s.",
-            g_strerror (errno)
+            "Could not create snapshot parent directory"
         );
         goto out;
     }
@@ -348,12 +366,9 @@ atm_repository_promote_snapshot (
     );
 
     if (g_rename (staging_path, snapshot_path) != 0) {
-        g_set_error (
+        set_storage_errno_error (
             error,
-            ATM_STORAGE_ERROR,
-            ATM_STORAGE_ERROR_IO,
-            "Could not atomically promote validated snapshot: %s.",
-            g_strerror (errno)
+            "Could not atomically promote validated snapshot"
         );
         goto out;
     }
