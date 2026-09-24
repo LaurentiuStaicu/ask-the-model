@@ -587,6 +587,35 @@ capacity_measurement_probe = executable(
   install: false
 )
 
+capacity_measurement_real_runner = executable(
+  'capacity-measurement-real-runner',
+  [
+    'src/capacity_measurement.c',
+    'src/cff_version.c',
+    'src/archive_extract.c',
+    'src/repository_manifest.c',
+    'src/repository_storage.c',
+    'src/repository_ingest.c',
+    'src/repository_sources.c',
+    'src/markdown_sections.c',
+    'src/csv_table.c',
+    'src/structured_json.c',
+    'src/retrieval_index.c',
+    'tests/capacity_measurement_real_runner.c',
+    resources
+  ],
+  include_directories: include_directories('src'),
+  dependencies: [
+    glib_dep,
+    gio_dep,
+    json_glib_dep,
+    sqlite_dep,
+    archive_dep,
+    yaml_dep
+  ],
+  install: false
+)
+
 repository_mutation_lease_test = executable(
   'repository-mutation-lease-test',
   [
