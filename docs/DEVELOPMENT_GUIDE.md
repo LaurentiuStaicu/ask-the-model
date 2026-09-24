@@ -181,6 +181,22 @@ Runtime optimization code must receive/snapshot this policy through explicit pro
 
 When the gate is OFF, runtime behavior must remain on the established baseline path. Test/measurement infrastructure such as OPT-A0, C0-M1 and D0 is not gated because it does not change ordinary application behavior.
 
+### Repository authority-mutation lease
+
+When an operation snapshots optimization mode ON, repository Download/Update uses one application-owned exclusive nonblocking lease at `<state_root>/repository-mutation.lock` before any selected-repository staging or authority mutation begins.
+
+The native lease helper opens the coordination file with `O_RDWR | O_CREAT | O_CLOEXEC | O_NOFOLLOW`, requires a user-owned regular file, rejects multiple-hard-link state, revalidates the path against the opened inode and acquires `flock(LOCK_EX | LOCK_NB)`. The descriptor remains open for the complete operation and releasing/closing it drops the kernel-held lease. File existence alone is never interpreted as ownership.
+
+The lock order is fixed:
+
+`global repository mutation lease → filesystem staging/preparation → guarded Control DB transaction`
+
+The existing SQLite generation guard remains mandatory defense in depth and is not replaced by the lease. Cooperative contention is surfaced as `RepositoryError.BUSY` before deterministic staging paths are modified.
+
+The global lease applies only to authority-changing Download/Update work. Remote Refresh, existing-snapshot reads, snapshot/seal validation and ordinary grounding do not take the global authority lease. A missing/invalid derived retrieval index encountered by grounding remains the responsibility of the later per-SHA single-flight workstream, not B0.
+
+This coordination contract is intentionally limited to AtM's supported local-storage/same-host boundary. SQLite WAL itself requires same-host shared memory and is not a cross-host network-filesystem design.
+
 ### Recovery fault qualification
 
 The OPT-A0 recovery harness is test-only. Native checkpoint calls compile to no-ops in the production application; only the dedicated recovery helper is built with `ATM_TEST_FAULT_INJECTION`.
