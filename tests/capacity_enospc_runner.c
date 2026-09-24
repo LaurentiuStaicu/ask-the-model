@@ -147,6 +147,19 @@ seed_old_authority (
             state_root
         );
 
+    AtmControlStateStore *store = NULL;
+
+    if (!atm_control_state_open (
+            control_path,
+            &store,
+            error
+        )) {
+        goto out;
+    }
+
+    atm_control_state_close (store);
+    store = NULL;
+
     if (!atm_control_state_set_current_values (
             control_path,
             repository_id,
