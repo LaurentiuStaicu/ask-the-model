@@ -463,7 +463,8 @@ optimization_policy_test = executable(
     'tests/optimization_policy_test.vala'
   ],
   dependencies: [
-    glib_dep
+    glib_dep,
+    dependency('gobject-2.0')
   ],
   install: false
 )
