@@ -10,38 +10,52 @@
 
 #include <errno.h>
 #include <sys/stat.h>
+#include <sys/utsname.h>
 
 typedef struct {
     const char *root;
     gint stop;
     GMutex mutex;
     guint64 peak_allocated_bytes;
+    guint64 peak_entries;
 } PeakSampler;
 
-static guint64
-allocated_bytes_best_effort (
-    const char *path
+typedef struct {
+    guint64 allocated_bytes;
+    guint64 entries;
+} PeakResult;
+
+static void
+sample_tree_best_effort (
+    const char *path,
+    gboolean is_root,
+    guint64 *allocated_bytes,
+    guint64 *entries
 )
 {
     GStatBuf st;
 
     if (g_lstat (path, &st) != 0) {
-        return 0;
+        return;
     }
 
     if (S_ISLNK (st.st_mode) ||
         (!S_ISREG (st.st_mode) &&
          !S_ISDIR (st.st_mode))) {
-        return 0;
+        return;
     }
 
-    guint64 total =
-        st.st_blocks > 0
-            ? (guint64) st.st_blocks * 512
-            : 0;
+    if (st.st_blocks > 0) {
+        *allocated_bytes +=
+            (guint64) st.st_blocks * 512;
+    }
+
+    if (!is_root) {
+        (*entries)++;
+    }
 
     if (!S_ISDIR (st.st_mode)) {
-        return total;
+        return;
     }
 
     GError *error = NULL;
@@ -53,7 +67,7 @@ allocated_bytes_best_effort (
 
     if (directory == NULL) {
         g_clear_error (&error);
-        return total;
+        return;
     }
 
     const char *name;
@@ -63,12 +77,33 @@ allocated_bytes_best_effort (
             name,
             NULL
         );
-        total += allocated_bytes_best_effort (child);
+        sample_tree_best_effort (
+            child,
+            FALSE,
+            allocated_bytes,
+            entries
+        );
         g_free (child);
     }
 
     g_dir_close (directory);
-    return total;
+}
+
+static PeakResult
+current_tree_sample (
+    const char *root
+)
+{
+    PeakResult result = { 0, 0 };
+
+    sample_tree_best_effort (
+        root,
+        TRUE,
+        &result.allocated_bytes,
+        &result.entries
+    );
+
+    return result;
 }
 
 static gpointer
@@ -79,28 +114,42 @@ peak_sampler_thread (
     PeakSampler *sampler = user_data;
 
     while (!g_atomic_int_get (&sampler->stop)) {
-        guint64 current =
-            allocated_bytes_best_effort (
+        PeakResult current =
+            current_tree_sample (
                 sampler->root
             );
 
         g_mutex_lock (&sampler->mutex);
-        if (current > sampler->peak_allocated_bytes) {
-            sampler->peak_allocated_bytes = current;
+        if (current.allocated_bytes >
+            sampler->peak_allocated_bytes) {
+            sampler->peak_allocated_bytes =
+                current.allocated_bytes;
+        }
+        if (current.entries >
+            sampler->peak_entries) {
+            sampler->peak_entries =
+                current.entries;
         }
         g_mutex_unlock (&sampler->mutex);
 
         g_usleep (1000);
     }
 
-    guint64 final =
-        allocated_bytes_best_effort (
+    PeakResult final =
+        current_tree_sample (
             sampler->root
         );
 
     g_mutex_lock (&sampler->mutex);
-    if (final > sampler->peak_allocated_bytes) {
-        sampler->peak_allocated_bytes = final;
+    if (final.allocated_bytes >
+        sampler->peak_allocated_bytes) {
+        sampler->peak_allocated_bytes =
+            final.allocated_bytes;
+    }
+    if (final.entries >
+        sampler->peak_entries) {
+        sampler->peak_entries =
+            final.entries;
     }
     g_mutex_unlock (&sampler->mutex);
 
@@ -124,13 +173,13 @@ peak_sampler_start (
     );
 }
 
-static guint64
+static PeakResult
 peak_sampler_stop (
     PeakSampler *sampler,
     GThread *thread
 )
 {
-    guint64 peak;
+    PeakResult peak;
 
     g_atomic_int_set (
         &sampler->stop,
@@ -139,11 +188,25 @@ peak_sampler_stop (
     g_thread_join (thread);
 
     g_mutex_lock (&sampler->mutex);
-    peak = sampler->peak_allocated_bytes;
+    peak.allocated_bytes =
+        sampler->peak_allocated_bytes;
+    peak.entries =
+        sampler->peak_entries;
     g_mutex_unlock (&sampler->mutex);
     g_mutex_clear (&sampler->mutex);
 
     return peak;
+}
+
+static guint64
+subtract_floor_zero (
+    guint64 total,
+    guint64 baseline
+)
+{
+    return total > baseline
+        ? total - baseline
+        : 0;
 }
 
 static void
@@ -466,6 +529,10 @@ run_measurement (
         archive_path
     );
 
+    PeakResult fresh_data_baseline =
+        current_tree_sample (
+            data_root
+        );
     gint64 ingest_started =
         g_get_monotonic_time ();
     PeakSampler fresh_data_sampler;
@@ -488,7 +555,7 @@ run_measurement (
             &extracted_logical_bytes,
             &error
         )) {
-        peak_sampler_stop (
+        (void) peak_sampler_stop (
             &fresh_data_sampler,
             fresh_data_thread
         );
@@ -500,7 +567,7 @@ run_measurement (
         return 3;
     }
 
-    guint64 fresh_data_peak =
+    PeakResult fresh_data_peak =
         peak_sampler_stop (
             &fresh_data_sampler,
             fresh_data_thread
@@ -533,7 +600,28 @@ run_measurement (
     add_u64 (
         builder,
         "fresh_data_root_peak_allocated_bytes",
-        fresh_data_peak
+        fresh_data_peak.allocated_bytes
+    );
+    add_u64 (
+        builder,
+        "fresh_data_root_additional_peak_bytes",
+        subtract_floor_zero (
+            fresh_data_peak.allocated_bytes,
+            fresh_data_baseline.allocated_bytes
+        )
+    );
+    add_u64 (
+        builder,
+        "fresh_data_root_peak_entries",
+        fresh_data_peak.entries
+    );
+    add_u64 (
+        builder,
+        "fresh_data_root_additional_peak_entries",
+        subtract_floor_zero (
+            fresh_data_peak.entries,
+            fresh_data_baseline.entries
+        )
     );
     add_u64 (
         builder,
@@ -567,6 +655,10 @@ run_measurement (
             "1970-01-01T00:00:00Z"
     };
 
+    PeakResult cache_baseline =
+        current_tree_sample (
+            cache_root
+        );
     gint64 index_started =
         g_get_monotonic_time ();
     PeakSampler cache_sampler;
@@ -584,7 +676,7 @@ run_measurement (
             &index_path,
             &error
         )) {
-        peak_sampler_stop (
+        (void) peak_sampler_stop (
             &cache_sampler,
             cache_thread
         );
@@ -596,7 +688,7 @@ run_measurement (
         return 5;
     }
 
-    guint64 cache_peak =
+    PeakResult cache_peak =
         peak_sampler_stop (
             &cache_sampler,
             cache_thread
@@ -634,7 +726,28 @@ run_measurement (
     add_u64 (
         builder,
         "cache_root_peak_allocated_bytes",
-        cache_peak
+        cache_peak.allocated_bytes
+    );
+    add_u64 (
+        builder,
+        "cache_root_additional_peak_bytes",
+        subtract_floor_zero (
+            cache_peak.allocated_bytes,
+            cache_baseline.allocated_bytes
+        )
+    );
+    add_u64 (
+        builder,
+        "cache_root_peak_entries",
+        cache_peak.entries
+    );
+    add_u64 (
+        builder,
+        "cache_root_additional_peak_entries",
+        subtract_floor_zero (
+            cache_peak.entries,
+            cache_baseline.entries
+        )
     );
     add_u64 (
         builder,
@@ -667,6 +780,10 @@ run_measurement (
         g_free
     );
 
+    PeakResult repair_baseline =
+        current_tree_sample (
+            data_root
+        );
     gint64 repair_started =
         g_get_monotonic_time ();
     PeakSampler repair_sampler;
@@ -689,7 +806,7 @@ run_measurement (
             &extracted_logical_bytes,
             &error
         )) {
-        peak_sampler_stop (
+        (void) peak_sampler_stop (
             &repair_sampler,
             repair_thread
         );
@@ -701,7 +818,7 @@ run_measurement (
         return 8;
     }
 
-    guint64 repair_data_peak =
+    PeakResult repair_data_peak =
         peak_sampler_stop (
             &repair_sampler,
             repair_thread
@@ -729,13 +846,85 @@ run_measurement (
     add_u64 (
         builder,
         "data_root_peak_allocated_bytes",
-        repair_data_peak
+        repair_data_peak.allocated_bytes
+    );
+    add_u64 (
+        builder,
+        "data_root_additional_peak_bytes",
+        subtract_floor_zero (
+            repair_data_peak.allocated_bytes,
+            repair_baseline.allocated_bytes
+        )
+    );
+    add_u64 (
+        builder,
+        "data_root_peak_entries",
+        repair_data_peak.entries
+    );
+    add_u64 (
+        builder,
+        "data_root_additional_peak_entries",
+        subtract_floor_zero (
+            repair_data_peak.entries,
+            repair_baseline.entries
+        )
     );
     add_u64 (
         builder,
         "elapsed_ms",
         (guint64) repair_elapsed_ms
     );
+    json_builder_end_object (builder);
+
+    struct utsname uts;
+    json_builder_set_member_name (
+        builder,
+        "runtime"
+    );
+    json_builder_begin_object (builder);
+
+    if (uname (&uts) == 0) {
+        json_builder_set_member_name (
+            builder,
+            "sysname"
+        );
+        json_builder_add_string_value (
+            builder,
+            uts.sysname
+        );
+        json_builder_set_member_name (
+            builder,
+            "release"
+        );
+        json_builder_add_string_value (
+            builder,
+            uts.release
+        );
+        json_builder_set_member_name (
+            builder,
+            "machine"
+        );
+        json_builder_add_string_value (
+            builder,
+            uts.machine
+        );
+    }
+
+    char *glib_version = g_strdup_printf (
+        "%u.%u.%u",
+        glib_major_version,
+        glib_minor_version,
+        glib_micro_version
+    );
+    json_builder_set_member_name (
+        builder,
+        "glib"
+    );
+    json_builder_add_string_value (
+        builder,
+        glib_version
+    );
+    g_free (glib_version);
     json_builder_end_object (builder);
 
     json_builder_set_member_name (
@@ -756,7 +945,15 @@ run_measurement (
     add_u64 (
         builder,
         "data_root_allocated_peak",
-        fresh_data_peak
+        fresh_data_peak.allocated_bytes
+    );
+    add_u64 (
+        builder,
+        "data_root_additional_peak_bytes",
+        subtract_floor_zero (
+            fresh_data_peak.allocated_bytes,
+            fresh_data_baseline.allocated_bytes
+        )
     );
     json_builder_end_object (builder);
 
@@ -772,7 +969,15 @@ run_measurement (
     add_u64 (
         builder,
         "cache_root_allocated_peak",
-        cache_peak
+        cache_peak.allocated_bytes
+    );
+    add_u64 (
+        builder,
+        "cache_root_additional_peak_bytes",
+        subtract_floor_zero (
+            cache_peak.allocated_bytes,
+            cache_baseline.allocated_bytes
+        )
     );
     json_builder_end_object (builder);
 
@@ -788,7 +993,15 @@ run_measurement (
     add_u64 (
         builder,
         "data_root_allocated_peak",
-        repair_data_peak
+        repair_data_peak.allocated_bytes
+    );
+    add_u64 (
+        builder,
+        "data_root_additional_peak_bytes",
+        subtract_floor_zero (
+            repair_data_peak.allocated_bytes,
+            repair_baseline.allocated_bytes
+        )
     );
     json_builder_end_object (builder);
 
