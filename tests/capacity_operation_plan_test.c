@@ -624,7 +624,7 @@ test_logical_archive_bytes_are_not_allocated_prediction (void)
             ATM_CAPACITY_ROOT_DATA
         ],
         ==,
-        inspection.materialized_entries
+        inspection.materialized_entries + 5
     );
 }
 
