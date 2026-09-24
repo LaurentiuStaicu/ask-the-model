@@ -1,6 +1,8 @@
 #include "fault_injection_test_hook.h"
 #include "fault_injection_support.h"
 
+#include <glib.h>
+
 #include <errno.h>
 #include <string.h>
 #include <unistd.h>
