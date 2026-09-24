@@ -13,6 +13,7 @@ All notable public releases of Ask the Model are recorded here.
 
 ### Qualification infrastructure
 
+- added C0-M3 ext4 portability measurement for the state-root reserve: the M2 constrained guarded-Control-DB mutation is repeated on a 64 MiB ext4 loopback filesystem with 0% root-reserved blocks at 1/1000 generations and 16/32/64/128 KiB target headroom, recording actual unprivileged availability and atomic success/fail-closed behavior without selecting a production reserve;
 - added C0-M2 state-root reserve scaling measurement: the real guarded Control DB publication path is exercised after 1/100/1000 completed generations at 16/32/64/128 KiB target headroom, recording atomic success versus fail-closed behavior and DB/WAL/SHM footprints without selecting a production reserve;
 - added C0-F5 dormant `RepositoryError.NO_SPACE` contract and UI mapping: the error code is appended without renumbering existing RepositoryError values, the existing critical LCD `ERR` segment becomes `NO SPACE` only for this class, accessibility retains the full local-capacity detail, and no storage/admission path emits the new error yet so baseline runtime behavior is unchanged;
 - added C0-F4 checked-in capacity evidence registry and validator: M1/E1/E2/E3 artifact provenance and exact EWD/CBD/RMD SHAs are frozen under `benchmarks/capacity-v1`, measured profiles are explicitly exact-SHA-only, unknown SHAs cannot inherit stale byte predictions, and CI enforces that no production threshold/reserve has been selected by this qualification data;
