@@ -751,6 +751,81 @@ namespace AskTheModel.Tests {
                 enrolled_state.repository_generation_id == 5
             );
 
+            string index_lock_root =
+                GLib.Path.build_filename (
+                    sealed_state_root,
+                    "retrieval-index-locks"
+                );
+            string index_lock_path =
+                GLib.Path.build_filename (
+                    index_lock_root,
+                    sealed_descriptor.id,
+                    sealed_sha + ".lock"
+                );
+
+            remove_tree_best_effort (
+                sealed_cache_root
+            );
+            assert (
+                GLib.DirUtils.create (
+                    sealed_cache_root,
+                    0700
+                ) == 0
+            );
+            assert (
+                !GLib.FileUtils.test (
+                    index_lock_root,
+                    GLib.FileTest.EXISTS
+                )
+            );
+
+            ConversationGrounding baseline_rebuild =
+                yield sealed_service.prepare_conversation_grounding (
+                    sealed_selection
+                );
+            assert (baseline_rebuild.is_frozen ());
+            assert (
+                !GLib.FileUtils.test (
+                    index_lock_root,
+                    GLib.FileTest.EXISTS
+                )
+            );
+
+            remove_tree_best_effort (
+                sealed_cache_root
+            );
+            assert (
+                GLib.DirUtils.create (
+                    sealed_cache_root,
+                    0700
+                ) == 0
+            );
+
+            var sealed_optimization_policy =
+                new OptimizationPolicy ();
+            sealed_service.set_optimization_policy (
+                sealed_optimization_policy
+            );
+            sealed_optimization_policy.set_enabled_for_session (
+                true
+            );
+
+            ConversationGrounding coordinated_rebuild =
+                yield sealed_service.prepare_conversation_grounding (
+                    sealed_selection
+                );
+            assert (coordinated_rebuild.is_frozen ());
+            assert (
+                GLib.FileUtils.test (
+                    index_lock_path,
+                    GLib.FileTest.IS_REGULAR
+                )
+            );
+
+            sealed_optimization_policy.set_enabled_for_session (
+                false
+            );
+
             remove_tree_best_effort (
                 sealed_cache_root
             );

@@ -5,6 +5,8 @@
 G_BEGIN_DECLS
 
 gboolean atm_repository_ui_ensure_index (
+    const char *state_root,
+    gboolean coordinated,
     const char *cache_root,
     const char *snapshot_root,
     const char *repository_id,
