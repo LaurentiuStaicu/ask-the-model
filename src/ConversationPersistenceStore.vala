@@ -533,6 +533,31 @@ namespace AskTheModel {
                 );
             }
 
+            if (GLib.FileUtils.test (
+                    export_root,
+                    GLib.FileTest.IS_SYMLINK
+                )) {
+                throw new GLib.IOError.FAILED (
+                    "Automatic conversation export directory is a symbolic link."
+                );
+            }
+
+            if (!GLib.FileUtils.test (
+                    export_root,
+                    GLib.FileTest.EXISTS
+                )) {
+                return;
+            }
+
+            if (!GLib.FileUtils.test (
+                    export_root,
+                    GLib.FileTest.IS_DIR
+                )) {
+                throw new GLib.IOError.FAILED (
+                    "Automatic conversation export path is not a directory."
+                );
+            }
+
             string export_path =
                 automatic_export_path (
                     conversation_id
@@ -541,6 +566,10 @@ namespace AskTheModel {
             if (!GLib.FileUtils.test (
                     export_path,
                     GLib.FileTest.EXISTS
+                ) &&
+                !GLib.FileUtils.test (
+                    export_path,
+                    GLib.FileTest.IS_SYMLINK
                 )) {
                 return;
             }
