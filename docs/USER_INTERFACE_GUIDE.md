@@ -63,6 +63,10 @@ The update path is fail-closed:
 
 A failed update leaves the last valid snapshot available. When repairing a locally invalid same-SHA snapshot, AtM preserves the invalid directory under a diagnostic quarantine name rather than silently rewriting it in place.
 
+When **OPT ON** is active, Download/Update also uses a nonblocking cross-process repository mutation lease. If another AtM process is already changing repository authority, the operation stops before repository staging is touched and reports that another Ask the Model instance is currently updating repository state. Ordinary repository reads and grounding do not wait for this global mutation lease.
+
+With **OPT OFF**, this additional coordination layer is not used and the established v0.5.0 runtime path remains in effect.
+
 ## Status LCD
 
 The narrow status strip reports compact model/repository lifecycle states such as repository identity, refresh/update activity, ready, offline and error conditions.

@@ -56,6 +56,7 @@ executable(
     'src/repository_manifest.c',
     'src/repository_reconcile.c',
     'src/repository_storage.c',
+    'src/repository_mutation_lease.c',
     'src/repository_ingest.c',
     'src/repository_ui_bridge.c',
     'src/retrieval_index.c',
@@ -550,6 +551,24 @@ repository_storage_test = executable(
 test(
   'repository-storage',
   repository_storage_test
+)
+
+repository_mutation_lease_test = executable(
+  'repository-mutation-lease-test',
+  [
+    'src/repository_mutation_lease.c',
+    'tests/repository_mutation_lease_test.c'
+  ],
+  include_directories: include_directories('src'),
+  dependencies: [
+    glib_dep
+  ],
+  install: false
+)
+
+test(
+  'repository-mutation-lease',
+  repository_mutation_lease_test
 )
 
 repository_ingest_test = executable(
@@ -1304,6 +1323,7 @@ repository_lifecycle_service_test = executable(
     'src/archive_extract.c',
     'src/repository_manifest.c',
     'src/repository_storage.c',
+    'src/repository_mutation_lease.c',
     'src/repository_ingest.c',
     'src/snapshot_seal.c',
     'src/repository_ui_bridge.c',

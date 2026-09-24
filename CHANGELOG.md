@@ -8,6 +8,7 @@ All notable public releases of Ask the Model are recorded here.
 
 - added one global session-only instrument-style `OPT  OFF  [switch]  ON` control in the header for the post-v0.5.0 optimization program; every process starts OFF, the state is deliberately not persisted, the switch uses a warm red/green case with a neutral metallic slider and the same ridge-border language as the application frame, the LCD mirrors the state as `OPT OFF` / `OPT ON`, and future runtime optimizations must preserve the baseline path while OFF;
 - kept the state visually explicit as text as well as color: a native sliding GTK switch uses a subdued warm red trough when OFF and a subdued warm green trough when ON.
+- added the first runtime optimization behind that gate: when OPT is ON, repository Download/Update acquires one global nonblocking cross-process authority-mutation lease before staging and holds it through guarded Control DB commit and cleanup; cooperative contention fails before deterministic staging is touched, while OPT OFF preserves the v0.5.0 baseline path and ordinary read/grounding paths remain outside the global lease.
 
 ### Qualification infrastructure
 

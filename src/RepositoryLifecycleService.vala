@@ -735,152 +735,201 @@ namespace AskTheModel {
                 );
             }
 
-            uint changed = 0;
+            bool optimized_operation =
+                optimization_mode_snapshot ();
+            int mutation_lease_fd = -1;
 
-            foreach (RepositoryDescriptor descriptor in selected) {
-                RepositoryRuntimeInfo info =
-                    info_for (descriptor.id);
-                bool integrity_repair =
-                    info.integrity_invalid;
-                bool updating_existing =
-                    !info.download_required ();
-
-                if (info.remote_sha == null ||
-                    info.remote_version == null) {
-                    info = yield refresh (
-                        descriptor,
-                        cancellable
-                    );
-                }
-
-                if (info.remote_sha == null ||
-                    info.remote_version == null) {
-                    throw new RepositoryError.INVALID_RESPONSE (
-                        "Remote repository identity is incomplete."
-                    );
-                }
-
-                if (!info.download_required () &&
-                    info.local.current_sha ==
-                    info.remote_sha) {
-                    continue;
-                }
-
-                string sha = info.remote_sha ?? "";
-                string expected_snapshot =
-                    snapshot_path_for_root (
-                        data_root,
-                        descriptor,
-                        sha
-                    );
-                string? archive_path = null;
-                bool repairing_same_snapshot =
-                    integrity_repair &&
-                    info.local.current_sha == sha &&
-                    GLib.FileUtils.test (
-                        expected_snapshot,
-                        GLib.FileTest.EXISTS
-                    );
+            if (optimized_operation) {
+                bool contended = false;
+                bool acquired = false;
 
                 try {
-                    if (repairing_same_snapshot ||
-                        !GLib.FileUtils.test (
-                            expected_snapshot,
-                            GLib.FileTest.IS_DIR
-                        )) {
-                        progress (
-                            updating_existing
-                                ? "Updating %s…".printf (
-                                    descriptor.acronym
-                                )
-                                : "Downloading %s…".printf (
-                                    descriptor.acronym
-                                )
+                    acquired =
+                        RepositoryNative.try_acquire_mutation_lease (
+                            state_root,
+                            out mutation_lease_fd,
+                            out contended
                         );
-                        archive_path =
-                            yield client.download_archive_to_staging (
-                                descriptor,
-                                sha,
-                                cancellable
-                            );
+                } catch (GLib.Error error) {
+                    throw new RepositoryError.STORAGE (
+                        "Repository mutation coordination could not be established."
+                    );
+                }
+
+                if (!acquired) {
+                    throw new RepositoryError.STORAGE (
+                        "Repository mutation coordination could not be established."
+                    );
+                }
+
+                if (contended) {
+                    throw new RepositoryError.BUSY (
+                        "Another Ask the Model instance is currently updating repository state. Try again after that operation finishes."
+                    );
+                }
+
+                if (mutation_lease_fd < 0) {
+                    throw new RepositoryError.STORAGE (
+                        "Repository mutation coordination returned no lease."
+                    );
+                }
+            }
+
+            try {
+                uint changed = 0;
+
+                foreach (RepositoryDescriptor descriptor in selected) {
+                    RepositoryRuntimeInfo info =
+                        info_for (descriptor.id);
+                    bool integrity_repair =
+                        info.integrity_invalid;
+                    bool updating_existing =
+                        !info.download_required ();
+
+                    if (info.remote_sha == null ||
+                        info.remote_version == null) {
+                        info = yield refresh (
+                            descriptor,
+                            cancellable
+                        );
                     }
 
-                    if (repairing_same_snapshot) {
+                    if (info.remote_sha == null ||
+                        info.remote_version == null) {
+                        throw new RepositoryError.INVALID_RESPONSE (
+                            "Remote repository identity is incomplete."
+                        );
+                    }
+
+                    if (!info.download_required () &&
+                        info.local.current_sha ==
+                        info.remote_sha) {
+                        continue;
+                    }
+
+                    string sha = info.remote_sha ?? "";
+                    string expected_snapshot =
+                        snapshot_path_for_root (
+                            data_root,
+                            descriptor,
+                            sha
+                        );
+                    string? archive_path = null;
+                    bool repairing_same_snapshot =
+                        integrity_repair &&
+                        info.local.current_sha == sha &&
+                        GLib.FileUtils.test (
+                            expected_snapshot,
+                            GLib.FileTest.EXISTS
+                        );
+
+                    try {
+                        if (repairing_same_snapshot ||
+                            !GLib.FileUtils.test (
+                                expected_snapshot,
+                                GLib.FileTest.IS_DIR
+                            )) {
+                            progress (
+                                updating_existing
+                                    ? "Updating %s…".printf (
+                                        descriptor.acronym
+                                    )
+                                    : "Downloading %s…".printf (
+                                        descriptor.acronym
+                                    )
+                            );
+                            archive_path =
+                                yield client.download_archive_to_staging (
+                                    descriptor,
+                                    sha,
+                                    cancellable
+                                );
+                        }
+
+                        if (repairing_same_snapshot) {
+                            progress (
+                                "Repairing %s…".printf (
+                                    descriptor.acronym
+                                )
+                            );
+
+                            string quarantine_path;
+                            if (!RepositoryNative.quarantine_snapshot (
+                                    data_root,
+                                    descriptor.id,
+                                    sha,
+                                    out quarantine_path
+                                )) {
+                                throw new RepositoryError.STORAGE (
+                                    "Invalid repository snapshot could not be quarantined for repair."
+                                );
+                            }
+
+                            stdout.printf (
+                                "AtM: quarantined invalid repository %s snapshot=%s path=%s\n",
+                                descriptor.acronym,
+                                sha,
+                                quarantine_path
+                            );
+                        }
+
                         progress (
-                            "Repairing %s…".printf (
+                            "Validating %s…".printf (
                                 descriptor.acronym
                             )
                         );
 
-                        string quarantine_path;
-                        if (!RepositoryNative.quarantine_snapshot (
-                                data_root,
-                                descriptor.id,
+                        RepositoryInstallResult result =
+                            yield prepare_snapshot (
+                                descriptor,
                                 sha,
-                                out quarantine_path
-                            )) {
-                            throw new RepositoryError.STORAGE (
-                                "Invalid repository snapshot could not be quarantined for repair."
+                                archive_path,
+                                null
+                            );
+
+                        if (result.version != info.remote_version) {
+                            throw new RepositoryError.INVALID_RESPONSE (
+                                "Validated repository version does not match the exact-SHA remote metadata."
                             );
                         }
 
+                        state_store.set_current (
+                            descriptor.id,
+                            sha,
+                            result.version,
+                            result.snapshot_seal_sha256
+                        );
+                        info.clear_integrity_invalid ();
+
+                        info.remote_sha = sha;
+                        info.remote_version = result.version;
+                        changed++;
+
                         stdout.printf (
-                            "AtM: quarantined invalid repository %s snapshot=%s path=%s\n",
+                            "AtM: repository %s ready version=%s sha=%s snapshot=%s index=%s seal=%s\n",
                             descriptor.acronym,
+                            result.version,
                             sha,
-                            quarantine_path
+                            result.snapshot_path,
+                            result.index_path,
+                            result.snapshot_seal_sha256
                         );
-                    }
-
-                    progress (
-                        "Validating %s…".printf (
-                            descriptor.acronym
-                        )
-                    );
-
-                    RepositoryInstallResult result =
-                        yield prepare_snapshot (
-                            descriptor,
-                            sha,
-                            archive_path,
-                            null
-                        );
-
-                    if (result.version != info.remote_version) {
-                        throw new RepositoryError.INVALID_RESPONSE (
-                            "Validated repository version does not match the exact-SHA remote metadata."
-                        );
-                    }
-
-                    state_store.set_current (
-                        descriptor.id,
-                        sha,
-                        result.version,
-                        result.snapshot_seal_sha256
-                    );
-                    info.clear_integrity_invalid ();
-
-                    info.remote_sha = sha;
-                    info.remote_version = result.version;
-                    changed++;
-
-                    stdout.printf (
-                        "AtM: repository %s ready version=%s sha=%s snapshot=%s index=%s seal=%s\n",
-                        descriptor.acronym,
-                        result.version,
-                        sha,
-                        result.snapshot_path,
-                        result.index_path,
-                        result.snapshot_seal_sha256
-                    );
-                } finally {
-                    if (archive_path != null) {
-                        GLib.FileUtils.remove (archive_path);
+                    } finally {
+                        if (archive_path != null) {
+                            GLib.FileUtils.remove (archive_path);
+                        }
                     }
                 }
-            }
 
-            return changed;
+                return changed;
+            } finally {
+                if (mutation_lease_fd >= 0) {
+                    RepositoryNative.release_mutation_lease (
+                        mutation_lease_fd
+                    );
+                }
+            }
         }
+
     }
 }

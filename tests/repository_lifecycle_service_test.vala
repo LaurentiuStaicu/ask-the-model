@@ -265,6 +265,113 @@ namespace AskTheModel.Tests {
             service.apply_installation_qualification (true);
             assert (service.repository_operations_allowed ());
 
+            string mutation_lock_path =
+                GLib.Path.build_filename (
+                    root,
+                    "repository-mutation.lock"
+                );
+
+            uint off_changed =
+                yield service.download_or_update (none);
+            assert (off_changed == 0);
+            assert (
+                !GLib.FileUtils.test (
+                    mutation_lock_path,
+                    GLib.FileTest.EXISTS
+                )
+            );
+
+            optimization_policy.set_enabled_for_session (true);
+
+            uint on_changed =
+                yield service.download_or_update (none);
+            assert (on_changed == 0);
+            assert (
+                GLib.FileUtils.test (
+                    mutation_lock_path,
+                    GLib.FileTest.IS_REGULAR
+                )
+            );
+
+            int held_lease_fd;
+            bool lease_contended;
+            assert (
+                RepositoryNative.try_acquire_mutation_lease (
+                    root,
+                    out held_lease_fd,
+                    out lease_contended
+                )
+            );
+            assert (!lease_contended);
+            assert (held_lease_fd >= 0);
+
+            bool busy_rejected = false;
+            try {
+                yield service.download_or_update (one);
+            } catch (RepositoryError error) {
+                busy_rejected =
+                    error.code == RepositoryError.BUSY;
+            }
+            assert (busy_rejected);
+
+            RepositoryNative.release_mutation_lease (
+                held_lease_fd
+            );
+            optimization_policy.set_enabled_for_session (false);
+
+            string guarded_root = new_temp_root ();
+            publish_control_state (guarded_root);
+
+            var guarded_writer_a =
+                new ControlRepositoryStateStore (
+                    guarded_root
+                );
+            var guarded_writer_b =
+                new ControlRepositoryStateStore (
+                    guarded_root
+                );
+
+            assert (
+                guarded_writer_a.repository_generation_id ==
+                guarded_writer_b.repository_generation_id
+            );
+
+            int guarded_lease_fd;
+            bool guarded_lease_contended;
+            assert (
+                RepositoryNative.try_acquire_mutation_lease (
+                    guarded_root,
+                    out guarded_lease_fd,
+                    out guarded_lease_contended
+                )
+            );
+            assert (!guarded_lease_contended);
+            assert (guarded_lease_fd >= 0);
+
+            guarded_writer_a.set_current (
+                catalog[0].id,
+                "8888888888888888888888888888888888888888",
+                "0.1.0"
+            );
+
+            bool stale_generation_rejected = false;
+            try {
+                guarded_writer_b.set_current (
+                    catalog[1].id,
+                    "9999999999999999999999999999999999999999",
+                    "0.1.0"
+                );
+            } catch (RepositoryError error) {
+                stale_generation_rejected =
+                    error.code == RepositoryError.STORAGE;
+            }
+            assert (stale_generation_rejected);
+
+            RepositoryNative.release_mutation_lease (
+                guarded_lease_fd
+            );
+            remove_tree_best_effort (guarded_root);
+
             RepositoryRuntimeInfo freshness =
                 service.info_for (catalog[0].id);
             freshness.remote_sha =
@@ -452,10 +559,26 @@ namespace AskTheModel.Tests {
 
             sealed_service.apply_installation_qualification (true);
 
+            int sealed_lease_fd;
+            bool sealed_lease_contended;
+            assert (
+                RepositoryNative.try_acquire_mutation_lease (
+                    sealed_state_root,
+                    out sealed_lease_fd,
+                    out sealed_lease_contended
+                )
+            );
+            assert (!sealed_lease_contended);
+            assert (sealed_lease_fd >= 0);
+
             ConversationGrounding sealed_grounding =
                 yield sealed_service.prepare_conversation_grounding (
                     sealed_selection
                 );
+
+            RepositoryNative.release_mutation_lease (
+                sealed_lease_fd
+            );
 
             assert (sealed_grounding.is_frozen ());
             assert (
