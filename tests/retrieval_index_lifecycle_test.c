@@ -163,6 +163,7 @@ typedef struct {
     const char *state_root;
     const char *cache_root;
     const char *snapshot_root;
+    const char *snapshot_sha;
     GMutex mutex;
     GCond cond;
     gboolean started;
@@ -192,7 +193,7 @@ coordinated_ensure_thread_run (
             state->cache_root,
             state->snapshot_root,
             "ewd",
-            snapshot_sha (),
+            state->snapshot_sha,
             &state->index_path,
             &state->version,
             &state->result,
@@ -218,6 +219,7 @@ coordinated_thread_init (
     state->state_root = state_root;
     state->cache_root = cache_root;
     state->snapshot_root = snapshot_root;
+    state->snapshot_sha = snapshot_sha ();
     g_mutex_init (&state->mutex);
     g_cond_init (&state->cond);
 }
@@ -1509,6 +1511,163 @@ test_coordinated_crashed_holder_staging_is_recovered (void)
     g_free (state_root);
 }
 
+static void
+test_coordinated_invalid_final_is_rebuilt_under_flight (void)
+{
+    char *state_root = new_temp_root (
+        "atm-index-single-flight-state-XXXXXX"
+    );
+    char *cache_root = new_temp_root (
+        "atm-index-single-flight-cache-XXXXXX"
+    );
+    char *snapshot_root = new_snapshot ();
+    char *index_path = NULL;
+    char *version = NULL;
+    AtmRetrievalEnsureResult result;
+    GError *error = NULL;
+
+    g_assert_true (
+        atm_retrieval_index_ensure_for_snapshot (
+            cache_root,
+            snapshot_root,
+            "ewd",
+            snapshot_sha (),
+            &index_path,
+            &version,
+            &result,
+            &error
+        )
+    );
+    g_assert_no_error (error);
+
+    g_assert_true (
+        g_file_set_contents (
+            index_path,
+            "corrupt coordinated final",
+            -1,
+            &error
+        )
+    );
+    g_assert_no_error (error);
+
+    g_clear_pointer (&index_path, g_free);
+    g_clear_pointer (&version, g_free);
+    atm_retrieval_index_single_flight_test_reset ();
+
+    g_assert_true (
+        atm_retrieval_index_ensure_for_snapshot_coordinated (
+            state_root,
+            cache_root,
+            snapshot_root,
+            "ewd",
+            snapshot_sha (),
+            &index_path,
+            &version,
+            &result,
+            &error
+        )
+    );
+    g_assert_no_error (error);
+    g_assert_cmpint (
+        result,
+        ==,
+        ATM_RETRIEVAL_ENSURE_REBUILT
+    );
+    g_assert_cmpint (
+        atm_retrieval_index_single_flight_test_build_entries (),
+        ==,
+        1
+    );
+    g_assert_true (
+        atm_retrieval_index_validate_snapshot_sources (
+            index_path,
+            snapshot_root,
+            "ewd",
+            snapshot_sha (),
+            &error
+        )
+    );
+    g_assert_no_error (error);
+
+    g_free (version);
+    g_free (index_path);
+    remove_tree_best_effort (snapshot_root);
+    g_free (snapshot_root);
+    remove_tree_best_effort (cache_root);
+    g_free (cache_root);
+    remove_tree_best_effort (state_root);
+    g_free (state_root);
+}
+
+static void
+test_coordinated_different_sha_does_not_wait (void)
+{
+    const char *other_sha =
+        "89abcdef0123456789abcdef0123456789abcdef";
+    char *state_root = new_temp_root (
+        "atm-index-single-flight-state-XXXXXX"
+    );
+    char *cache_root = new_temp_root (
+        "atm-index-single-flight-cache-XXXXXX"
+    );
+    char *snapshot_root = new_snapshot ();
+    gint held_fd = hold_single_flight_lock (
+        state_root
+    );
+    CoordinatedEnsureThread call;
+    GThread *thread;
+    gboolean independent_finished;
+
+    atm_retrieval_index_single_flight_test_reset ();
+    coordinated_thread_init (
+        &call,
+        state_root,
+        cache_root,
+        snapshot_root
+    );
+    call.snapshot_sha = other_sha;
+
+    thread = g_thread_new (
+        "index-different-sha",
+        coordinated_ensure_thread_run,
+        &call
+    );
+    wait_until_thread_started (&call);
+
+    independent_finished =
+        thread_finishes_before (
+            &call,
+            5 * G_TIME_SPAN_SECOND
+        );
+
+    atm_coordination_lease_release (
+        held_fd
+    );
+    g_thread_join (thread);
+
+    g_assert_true (independent_finished);
+    g_assert_true (call.ok);
+    g_assert_no_error (call.error);
+    g_assert_cmpint (
+        call.result,
+        ==,
+        ATM_RETRIEVAL_ENSURE_REBUILT
+    );
+    g_assert_cmpint (
+        atm_retrieval_index_single_flight_test_build_entries (),
+        ==,
+        1
+    );
+
+    coordinated_thread_clear (&call);
+    remove_tree_best_effort (snapshot_root);
+    g_free (snapshot_root);
+    remove_tree_best_effort (cache_root);
+    g_free (cache_root);
+    remove_tree_best_effort (state_root);
+    g_free (state_root);
+}
+
 int
 main (int argc, char **argv)
 {
@@ -1561,6 +1720,14 @@ main (int argc, char **argv)
     g_test_add_func (
         "/retrieval-lifecycle/coordinated-valid-fast-path",
         test_coordinated_valid_fast_path_does_not_wait
+    );
+    g_test_add_func (
+        "/retrieval-lifecycle/coordinated-invalid-final-rebuild",
+        test_coordinated_invalid_final_is_rebuilt_under_flight
+    );
+    g_test_add_func (
+        "/retrieval-lifecycle/coordinated-different-sha-independent",
+        test_coordinated_different_sha_does_not_wait
     );
     g_test_add_func (
         "/retrieval-lifecycle/coordinated-symlink-lock-root-refused",
