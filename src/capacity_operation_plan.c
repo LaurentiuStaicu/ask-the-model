@@ -9,28 +9,6 @@ atm_capacity_operation_plan_error_quark (void)
 }
 
 static gboolean
-add_checked (
-    guint64 left,
-    guint64 right,
-    guint64 *out,
-    GError **error
-)
-{
-    if (G_MAXUINT64 - left < right) {
-        g_set_error_literal (
-            error,
-            ATM_CAPACITY_OPERATION_PLAN_ERROR,
-            ATM_CAPACITY_OPERATION_PLAN_ERROR_OVERFLOW,
-            "Capacity operation phase arithmetic overflowed."
-        );
-        return FALSE;
-    }
-
-    *out = left + right;
-    return TRUE;
-}
-
-static gboolean
 operation_kind_valid (
     AtmCapacityOperationKind operation_kind
 )
@@ -45,11 +23,49 @@ operation_kind_valid (
 }
 
 gboolean
-atm_capacity_operation_plan_build (
+atm_capacity_download_phase_build (
+    const AtmCapacityDownloadPrediction *prediction,
+    AtmCapacityPhaseRequirement *out_phase,
+    GError **error
+)
+{
+    g_return_val_if_fail (
+        prediction != NULL,
+        FALSE
+    );
+    g_return_val_if_fail (
+        out_phase != NULL,
+        FALSE
+    );
+
+    *out_phase =
+        (AtmCapacityPhaseRequirement) { 0 };
+
+    /*
+     * This checkpoint is evaluated before deterministic archive staging
+     * begins. The .part file is renamed to the completed archive on the
+     * same cache filesystem, so policy supplies one additional archive
+     * allocation/inode prediction rather than two simultaneous copies.
+     */
+    out_phase->bytes[
+        ATM_CAPACITY_ROOT_CACHE
+    ] =
+        prediction->archive_additional_bytes;
+
+    out_phase->inodes[
+        ATM_CAPACITY_ROOT_CACHE
+    ] =
+        prediction->archive_additional_inodes;
+
+    return TRUE;
+}
+
+gboolean
+atm_capacity_mutation_plan_build (
     AtmCapacityOperationKind operation_kind,
     const AtmArchiveInspection *archive_inspection,
-    const AtmCapacityOperationPrediction *prediction,
-    AtmCapacityOperationPlan *out_plan,
+    const AtmCapacityMutationPrediction *prediction,
+    AtmCapacityMutationPlan *out_plan,
     GError **error
 )
 {
@@ -89,167 +105,125 @@ atm_capacity_operation_plan_build (
     }
 
     *out_plan =
-        (AtmCapacityOperationPlan) {
+        (AtmCapacityMutationPlan) {
             .operation_kind = operation_kind,
             .must_admit_before_quarantine =
                 operation_kind ==
                     ATM_CAPACITY_OPERATION_SAME_SHA_REPAIR,
             .phase_count =
-                ATM_CAPACITY_PHASE_COUNT
+                ATM_CAPACITY_MUTATION_PHASE_COUNT
         };
 
     /*
-     * Phase 0: archive download.
+     * IMPORTANT CHECKPOINT SEMANTICS
      *
-     * The archive .part file is renamed to the completed archive on
-     * the same cache filesystem, so this is one operation-owned
-     * allocation rather than two simultaneous archive copies.
+     * This plan is evaluated only after the completed archive has been
+     * downloaded and the filesystem availability has been measured again.
+     * The archive therefore belongs to the baseline already reflected in
+     * f_bavail/f_favail and is intentionally absent from all requirements
+     * below. Counting it again would double-charge the cache filesystem.
      */
-    out_plan->phases[
-        ATM_CAPACITY_PHASE_DOWNLOAD
-    ].bytes[
-        ATM_CAPACITY_ROOT_CACHE
-    ] =
-        prediction->archive_additional_bytes;
-
-    out_plan->phases[
-        ATM_CAPACITY_PHASE_DOWNLOAD
-    ].inodes[
-        ATM_CAPACITY_ROOT_CACHE
-    ] =
-        prediction->archive_additional_inodes;
 
     /*
-     * Phase 1: extraction.
+     * Phase 0: extraction.
      *
-     * The completed archive remains present while extraction creates
-     * the new snapshot tree. Existing active/quarantined snapshots
-     * were already consuming blocks before admission and therefore
-     * are intentionally not counted again as additional demand.
+     * Existing active/quarantined snapshots were already consuming blocks
+     * and inodes before this checkpoint. Only the new materialized snapshot
+     * is additional demand.
      */
     out_plan->phases[
-        ATM_CAPACITY_PHASE_EXTRACTION
-    ].bytes[
-        ATM_CAPACITY_ROOT_CACHE
-    ] =
-        prediction->archive_additional_bytes;
-
-    out_plan->phases[
-        ATM_CAPACITY_PHASE_EXTRACTION
-    ].inodes[
-        ATM_CAPACITY_ROOT_CACHE
-    ] =
-        prediction->archive_additional_inodes;
-
-    out_plan->phases[
-        ATM_CAPACITY_PHASE_EXTRACTION
+        ATM_CAPACITY_MUTATION_PHASE_EXTRACTION
     ].bytes[
         ATM_CAPACITY_ROOT_DATA
     ] =
         prediction->snapshot_additional_bytes;
 
     out_plan->phases[
-        ATM_CAPACITY_PHASE_EXTRACTION
+        ATM_CAPACITY_MUTATION_PHASE_EXTRACTION
     ].inodes[
         ATM_CAPACITY_ROOT_DATA
     ] =
         archive_inspection->materialized_entries;
 
     /*
-     * Phase 2: retrieval-index build.
+     * Phase 1: retrieval-index build.
      *
-     * The newly materialized snapshot and completed archive remain
-     * present while index staging/final storage is created.
+     * The new snapshot remains while index staging/final allocation is
+     * created. The completed archive also remains physically present, but
+     * it is still part of the post-download baseline rather than new demand.
      */
     out_plan->phases[
-        ATM_CAPACITY_PHASE_INDEX_BUILD
+        ATM_CAPACITY_MUTATION_PHASE_INDEX_BUILD
     ].bytes[
         ATM_CAPACITY_ROOT_DATA
     ] =
         prediction->snapshot_additional_bytes;
 
     out_plan->phases[
-        ATM_CAPACITY_PHASE_INDEX_BUILD
+        ATM_CAPACITY_MUTATION_PHASE_INDEX_BUILD
     ].inodes[
         ATM_CAPACITY_ROOT_DATA
     ] =
         archive_inspection->materialized_entries;
 
-    if (!add_checked (
-            prediction->archive_additional_bytes,
-            prediction->index_additional_bytes,
-            &out_plan->phases[
-                ATM_CAPACITY_PHASE_INDEX_BUILD
-            ].bytes[
-                ATM_CAPACITY_ROOT_CACHE
-            ],
-            error
-        ) ||
-        !add_checked (
-            prediction->archive_additional_inodes,
-            prediction->index_additional_inodes,
-            &out_plan->phases[
-                ATM_CAPACITY_PHASE_INDEX_BUILD
-            ].inodes[
-                ATM_CAPACITY_ROOT_CACHE
-            ],
-            error
-        )) {
-        return FALSE;
-    }
+    out_plan->phases[
+        ATM_CAPACITY_MUTATION_PHASE_INDEX_BUILD
+    ].bytes[
+        ATM_CAPACITY_ROOT_CACHE
+    ] =
+        prediction->index_additional_bytes;
+
+    out_plan->phases[
+        ATM_CAPACITY_MUTATION_PHASE_INDEX_BUILD
+    ].inodes[
+        ATM_CAPACITY_ROOT_CACHE
+    ] =
+        prediction->index_additional_inodes;
 
     /*
-     * Phase 3: guarded Control DB authority commit.
+     * Phase 2: guarded Control DB authority commit.
      *
-     * Archive cleanup happens after the operation body completes, so
-     * archive + snapshot + completed index still coexist while state
-     * mutation occurs.
+     * Snapshot + completed index remain while state mutation consumes
+     * state-root capacity. Archive cleanup still occurs later, but archive
+     * allocation remains baseline at this second checkpoint.
      */
     out_plan->phases[
-        ATM_CAPACITY_PHASE_STATE_COMMIT
+        ATM_CAPACITY_MUTATION_PHASE_STATE_COMMIT
     ].bytes[
         ATM_CAPACITY_ROOT_DATA
     ] =
         prediction->snapshot_additional_bytes;
 
     out_plan->phases[
-        ATM_CAPACITY_PHASE_STATE_COMMIT
+        ATM_CAPACITY_MUTATION_PHASE_STATE_COMMIT
     ].inodes[
         ATM_CAPACITY_ROOT_DATA
     ] =
         archive_inspection->materialized_entries;
 
     out_plan->phases[
-        ATM_CAPACITY_PHASE_STATE_COMMIT
+        ATM_CAPACITY_MUTATION_PHASE_STATE_COMMIT
     ].bytes[
         ATM_CAPACITY_ROOT_CACHE
     ] =
-        out_plan->phases[
-            ATM_CAPACITY_PHASE_INDEX_BUILD
-        ].bytes[
-            ATM_CAPACITY_ROOT_CACHE
-        ];
+        prediction->index_additional_bytes;
 
     out_plan->phases[
-        ATM_CAPACITY_PHASE_STATE_COMMIT
+        ATM_CAPACITY_MUTATION_PHASE_STATE_COMMIT
     ].inodes[
         ATM_CAPACITY_ROOT_CACHE
     ] =
-        out_plan->phases[
-            ATM_CAPACITY_PHASE_INDEX_BUILD
-        ].inodes[
-            ATM_CAPACITY_ROOT_CACHE
-        ];
+        prediction->index_additional_inodes;
 
     out_plan->phases[
-        ATM_CAPACITY_PHASE_STATE_COMMIT
+        ATM_CAPACITY_MUTATION_PHASE_STATE_COMMIT
     ].bytes[
         ATM_CAPACITY_ROOT_STATE
     ] =
         prediction->state_additional_bytes;
 
     out_plan->phases[
-        ATM_CAPACITY_PHASE_STATE_COMMIT
+        ATM_CAPACITY_MUTATION_PHASE_STATE_COMMIT
     ].inodes[
         ATM_CAPACITY_ROOT_STATE
     ] =
