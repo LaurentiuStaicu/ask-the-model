@@ -555,6 +555,24 @@ test(
   repository_storage_test
 )
 
+capacity_measurement_test = executable(
+  'capacity-measurement-test',
+  [
+    'src/capacity_measurement.c',
+    'tests/capacity_measurement_test.c'
+  ],
+  include_directories: include_directories('src'),
+  dependencies: [
+    glib_dep
+  ],
+  install: false
+)
+
+test(
+  'capacity-measurement',
+  capacity_measurement_test
+)
+
 repository_mutation_lease_test = executable(
   'repository-mutation-lease-test',
   [
