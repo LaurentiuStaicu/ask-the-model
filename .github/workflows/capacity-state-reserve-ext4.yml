@@ -1,0 +1,270 @@
+name: C0-M3 state reserve ext4 measurement
+
+on:
+  workflow_dispatch:
+  pull_request:
+    paths:
+      - 'src/control_state.c'
+      - 'src/control_state.h'
+      - 'data/io.github.laurentiustaicu.ask_the_model.gresource.xml'
+      - 'data/schemas/control-state-v1.sql'
+      - 'data/schemas/control-state-v2.sql'
+      - 'tests/capacity_state_reserve_scaling_runner.c'
+      - '.github/workflows/capacity-state-reserve-ext4.yml'
+
+permissions:
+  contents: read
+
+concurrency:
+  group: capacity-c0-m3-state-${{ github.event.pull_request.number || github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  measure:
+    runs-on: ubuntu-24.04
+    timeout-minutes: 30
+
+    steps:
+      - name: Checkout AtM
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+
+      - name: Install measurement dependencies
+        shell: bash
+        run: |
+          set -euo pipefail
+          sudo apt-get update
+          sudo apt-get install -y --no-install-recommends \
+            build-essential \
+            e2fsprogs \
+            pkg-config \
+            libglib2.0-dev \
+            libglib2.0-bin \
+            libjson-glib-dev \
+            libsqlite3-dev \
+            sqlite3
+
+      - name: Compile state reserve scaling runner
+        shell: bash
+        run: |
+          set -euo pipefail
+
+          glib-compile-resources \
+            data/io.github.laurentiustaicu.ask_the_model.gresource.xml \
+            --sourcedir=data \
+            --generate-source \
+            --target=/tmp/atm-resources.c
+
+          cc \
+            -std=c11 \
+            -D_GNU_SOURCE \
+            -O2 \
+            -Wall \
+            -Wextra \
+            -Werror \
+            -Isrc \
+            $(pkg-config --cflags \
+              glib-2.0 \
+              gio-2.0 \
+              json-glib-1.0 \
+              sqlite3) \
+            -c tests/capacity_state_reserve_scaling_runner.c \
+            -o /tmp/capacity-state-reserve-scaling-runner.o
+
+          cc \
+            -std=c11 \
+            -O2 \
+            -Wall \
+            -Wextra \
+            -Isrc \
+            src/control_state.c \
+            /tmp/capacity-state-reserve-scaling-runner.o \
+            /tmp/atm-resources.c \
+            $(pkg-config --cflags --libs \
+              glib-2.0 \
+              gio-2.0 \
+              json-glib-1.0 \
+              sqlite3) \
+            -o /tmp/atm-capacity-state-reserve-scaling-runner
+
+      - name: Measure state headroom on ext4 loopback
+        shell: bash
+        env:
+          LC_ALL: C
+        run: |
+          set -euo pipefail
+
+          root=/tmp/atm-c0-m3
+          results="$root/results"
+          mkdir -p "$results"
+
+          for history in 1 1000; do
+            for leave in 16384 32768 65536 131072; do
+              case_root="$root/case-$history-$leave"
+              state="$case_root/state"
+              image="$case_root/state.ext4"
+              mkdir -p "$state"
+
+              truncate -s 64M "$image"
+              mkfs.ext4 \
+                -q \
+                -F \
+                -m 0 \
+                -b 4096 \
+                "$image"
+
+              sudo mount \
+                -o loop,nosuid,nodev \
+                "$image" \
+                "$state"
+              trap 'sudo umount "$state" || true' EXIT
+
+              sudo chown \
+                "$(id -u):$(id -g)" \
+                "$state"
+
+              fs_type="$(stat -f -c %T "$state")"
+              if [[ "$fs_type" != "ext2/ext3" ]]; then
+                echo "Unexpected filesystem type: $fs_type" >&2
+                exit 1
+              fi
+
+              /tmp/atm-capacity-state-reserve-scaling-runner \
+                --exercise \
+                "$state" \
+                rmd \
+                "$history" \
+                "$leave" \
+                | tee "$results/history-$history-leave-$leave.json"
+
+              sudo umount "$state"
+              trap - EXIT
+            done
+          done
+
+      - name: Aggregate ext4 reserve evidence
+        shell: bash
+        env:
+          ATM_SOURCE_COMMIT: ${{ github.event.pull_request.head.sha || github.sha }}
+          ATM_WORKFLOW_COMMIT: ${{ github.sha }}
+        run: |
+          set -euo pipefail
+
+          python3 - <<'PY'
+          import json
+          import os
+          import pathlib
+          import platform
+          import subprocess
+
+          results_dir = pathlib.Path("/tmp/atm-c0-m3/results")
+          records = []
+
+          for path in sorted(results_dir.glob("history-*.json")):
+              record = json.loads(path.read_text(encoding="utf-8"))
+              if not record["invariant_ok"]:
+                  raise SystemExit(
+                      f"ext4 reserve invariant failed: {path}: {record}"
+                  )
+              records.append(record)
+
+          expected = {
+              (history, leave)
+              for history in (1, 1000)
+              for leave in (16384, 32768, 65536, 131072)
+          }
+          observed = {
+              (
+                  record["history_generations"],
+                  record["leave_target_bytes"],
+              )
+              for record in records
+          }
+
+          if observed != expected:
+              raise SystemExit(
+                  f"ext4 reserve matrix mismatch: {observed}"
+              )
+
+          artifact = {
+              "schema_version": 1,
+              "measurement_id": "atm-c0-m3-state-reserve-ext4-v1",
+              "atm_source_commit": os.environ["ATM_SOURCE_COMMIT"],
+              "workflow_commit": os.environ["ATM_WORKFLOW_COMMIT"],
+              "filesystem": {
+                  "type": "ext4",
+                  "image_size_bytes": 64 * 1024 * 1024,
+                  "block_size_bytes": 4096,
+                  "reserved_blocks_percentage": 0,
+              },
+              "runtime": {
+                  "system": platform.system(),
+                  "release": platform.release(),
+                  "machine": platform.machine(),
+                  "sqlite": subprocess.check_output(
+                      ["sqlite3", "--version"],
+                      text=True,
+                  ).strip(),
+                  "mke2fs": subprocess.check_output(
+                      ["mke2fs", "-V"],
+                      text=True,
+                      stderr=subprocess.STDOUT,
+                  ).strip(),
+              },
+              "history_generation_counts": [1, 1000],
+              "leave_target_bytes": [
+                  16384,
+                  32768,
+                  65536,
+                  131072,
+              ],
+              "records": records,
+          }
+
+          output = (
+              results_dir /
+              "c0-m3-state-reserve-ext4.json"
+          )
+          output.write_text(
+              json.dumps(
+                  artifact,
+                  indent=2,
+                  sort_keys=True,
+              ) + "\n",
+              encoding="utf-8",
+          )
+
+          summary = {}
+          for history in artifact["history_generation_counts"]:
+              history_records = [
+                  record
+                  for record in records
+                  if record["history_generations"] == history
+              ]
+              summary[str(history)] = {
+                  str(record["available_bytes_before_operation"]): record[
+                      "classification"
+                  ]
+                  for record in history_records
+              }
+
+          print(
+              json.dumps(
+                  {
+                      "summary_by_actual_available_bytes": summary,
+                      "artifact": artifact,
+                  },
+                  indent=2,
+                  sort_keys=True,
+              )
+          )
+          PY
+
+      - name: Upload C0-M3 measurement evidence
+        if: always()
+        uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7.0.1
+        with:
+          name: atm-c0-m3-state-reserve-ext4-${{ github.run_id }}-${{ github.run_attempt }}
+          path: |
+            /tmp/atm-c0-m3/results/*.json
+          if-no-files-found: error
+          retention-days: 90
