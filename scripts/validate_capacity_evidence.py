@@ -165,6 +165,255 @@ def main() -> int:
     if e2.get("pinned_repository_sha") != corpus["cbd"]:
         fail("C0-E2 CBD SHA drifted from the pinned corpus")
 
+    for measurement in ("c0_m2", "c0_m3"):
+        record = evidence.get(measurement)
+        if not isinstance(record, dict):
+            fail(f"{measurement} object is missing")
+
+        require_positive_int(
+            record,
+            "actions_run_id",
+            measurement,
+        )
+        require_positive_int(
+            record,
+            "artifact_id",
+            measurement,
+        )
+        require_digest(
+            record.get("artifact_sha256"),
+            f"{measurement}.artifact_sha256",
+        )
+        require_sha(
+            record.get("atm_source_commit"),
+            f"{measurement}.atm_source_commit",
+        )
+
+        observations = record.get("observations")
+        if not isinstance(observations, list) or not observations:
+            fail(f"{measurement}.observations must be a non-empty list")
+
+        for index, observation in enumerate(observations):
+            if not isinstance(observation, dict):
+                fail(
+                    f"{measurement}.observations[{index}] "
+                    "must be an object"
+                )
+
+            context = f"{measurement}.observations[{index}]"
+            require_positive_int(
+                observation,
+                "history_generations",
+                context,
+            )
+            require_positive_int(
+                observation,
+                "control_db_allocated_bytes",
+                context,
+            )
+            require_positive_int(
+                observation,
+                "available_bytes_before_operation",
+                context,
+            )
+
+            classification = observation.get("classification")
+            if classification not in {
+                "SUCCESS_ATOMIC",
+                "FAIL_CLOSED_OLD_AUTHORITY",
+            }:
+                fail(
+                    f"{context}.classification is not an "
+                    "accepted atomic outcome"
+                )
+
+            sqlite_result = observation.get("sqlite_result")
+            if classification == "SUCCESS_ATOMIC":
+                if sqlite_result is not None:
+                    fail(
+                        f"{context} successful observation "
+                        "must not carry a SQLite failure result"
+                    )
+            elif sqlite_result not in {
+                "SQLITE_IOERR",
+                "SQLITE_FULL",
+            }:
+                fail(
+                    f"{context} fail-closed observation lost "
+                    "its SQLite failure classification"
+                )
+
+        frontier = record.get("observed_frontier")
+        if not isinstance(frontier, dict):
+            fail(f"{measurement}.observed_frontier is missing")
+
+        highest_failed = require_positive_int(
+            frontier,
+            "highest_failed_available_bytes",
+            f"{measurement}.observed_frontier",
+        )
+        lowest_success = require_positive_int(
+            frontier,
+            "lowest_successful_available_bytes",
+            f"{measurement}.observed_frontier",
+        )
+        if highest_failed >= lowest_success:
+            fail(
+                f"{measurement} observed frontier is not ordered"
+            )
+
+    m2 = evidence["c0_m2"]
+    if m2.get("filesystem") != {
+        "type": "tmpfs",
+        "size_bytes": 33554432,
+        "inode_limit": 4096,
+    }:
+        fail("C0-M2 filesystem qualification contract drifted")
+
+    expected_m2 = {
+        (1, 16384, "FAIL_CLOSED_OLD_AUTHORITY"),
+        (1, 32768, "FAIL_CLOSED_OLD_AUTHORITY"),
+        (1, 65536, "SUCCESS_ATOMIC"),
+        (1, 131072, "SUCCESS_ATOMIC"),
+        (100, 16384, "FAIL_CLOSED_OLD_AUTHORITY"),
+        (100, 32768, "FAIL_CLOSED_OLD_AUTHORITY"),
+        (100, 65536, "SUCCESS_ATOMIC"),
+        (100, 131072, "SUCCESS_ATOMIC"),
+        (1000, 16384, "FAIL_CLOSED_OLD_AUTHORITY"),
+        (1000, 32768, "FAIL_CLOSED_OLD_AUTHORITY"),
+        (1000, 65536, "SUCCESS_ATOMIC"),
+        (1000, 131072, "SUCCESS_ATOMIC"),
+    }
+    observed_m2 = {
+        (
+            item["history_generations"],
+            item["available_bytes_before_operation"],
+            item["classification"],
+        )
+        for item in m2["observations"]
+    }
+    if observed_m2 != expected_m2:
+        fail("C0-M2 reviewed state-headroom matrix drifted")
+
+    if m2.get("observed_frontier") != {
+        "highest_failed_available_bytes": 32768,
+        "lowest_successful_available_bytes": 65536,
+    }:
+        fail("C0-M2 reviewed frontier drifted")
+
+    m3 = evidence["c0_m3"]
+    if m3.get("filesystem") != {
+        "type": "ext4",
+        "image_size_bytes": 67108864,
+        "block_size_bytes": 4096,
+        "reserved_blocks_percentage": 0,
+    }:
+        fail("C0-M3 ext4 qualification contract drifted")
+
+    expected_m3 = {
+        (1, 12288, "FAIL_CLOSED_OLD_AUTHORITY"),
+        (1, 32768, "FAIL_CLOSED_OLD_AUTHORITY"),
+        (1, 61440, "SUCCESS_ATOMIC"),
+        (1, 131072, "SUCCESS_ATOMIC"),
+        (1000, 12288, "FAIL_CLOSED_OLD_AUTHORITY"),
+        (1000, 28672, "FAIL_CLOSED_OLD_AUTHORITY"),
+        (1000, 61440, "SUCCESS_ATOMIC"),
+        (1000, 126976, "SUCCESS_ATOMIC"),
+    }
+    observed_m3 = {
+        (
+            item["history_generations"],
+            item["available_bytes_before_operation"],
+            item["classification"],
+        )
+        for item in m3["observations"]
+    }
+    if observed_m3 != expected_m3:
+        fail("C0-M3 reviewed ext4 state-headroom matrix drifted")
+
+    if m3.get("observed_frontier") != {
+        "highest_failed_available_bytes": 32768,
+        "lowest_successful_available_bytes": 61440,
+    }:
+        fail("C0-M3 reviewed frontier drifted")
+
+    sidecar = evidence.get("c0_m2_sidecar_sensitivity")
+    if not isinstance(sidecar, dict):
+        fail("c0_m2_sidecar_sensitivity object is missing")
+
+    require_positive_int(
+        sidecar,
+        "actions_run_id",
+        "c0_m2_sidecar_sensitivity",
+    )
+    require_positive_int(
+        sidecar,
+        "artifact_id",
+        "c0_m2_sidecar_sensitivity",
+    )
+    require_digest(
+        sidecar.get("artifact_sha256"),
+        "c0_m2_sidecar_sensitivity.artifact_sha256",
+    )
+    require_sha(
+        sidecar.get("atm_source_commit"),
+        "c0_m2_sidecar_sensitivity.atm_source_commit",
+    )
+    require_sha(
+        sidecar.get("workflow_commit"),
+        "c0_m2_sidecar_sensitivity.workflow_commit",
+    )
+
+    if sidecar.get("history_generation_counts") != [1, 100, 1000]:
+        fail("C0-M2 sidecar history matrix drifted")
+    if sidecar.get("available_byte_bands") != [
+        16384,
+        32768,
+        65536,
+        131072,
+    ]:
+        fail("C0-M2 sidecar byte bands drifted")
+
+    warm = sidecar.get("warm")
+    cold = sidecar.get("cold")
+    if not isinstance(warm, dict) or not isinstance(cold, dict):
+        fail("C0-M2 sidecar warm/cold observations are missing")
+
+    if warm.get("shm_allocated_bytes_before_operation") != 32768:
+        fail("C0-M2 warm SHM baseline drifted")
+    if warm.get("highest_failed_available_bytes") != 16384:
+        fail("C0-M2 warm failure frontier drifted")
+    if warm.get("lowest_successful_available_bytes") != 32768:
+        fail("C0-M2 warm success frontier drifted")
+
+    if cold.get("shm_allocated_bytes_before_operation") != 0:
+        fail("C0-M2 cold SHM baseline drifted")
+    if cold.get("highest_failed_available_bytes") != 32768:
+        fail("C0-M2 cold failure frontier drifted")
+    if cold.get("lowest_successful_available_bytes") != 65536:
+        fail("C0-M2 cold success frontier drifted")
+
+    if sidecar.get("outcome_counts") != {
+        "SUCCESS": 15,
+        "SQLITE_FULL": 6,
+        "OTHER_ERROR": 3,
+    }:
+        fail("C0-M2 sidecar outcome counts drifted")
+
+    runtime_relevance = str(
+        sidecar.get("runtime_relevance", "")
+    ).lower()
+    for required_phrase in (
+        "opens and closes",
+        "cold sidecar",
+        "conservative runtime baseline",
+    ):
+        if required_phrase not in runtime_relevance:
+            fail(
+                "C0-M2 sidecar runtime-relevance contract "
+                f"lost phrase: {required_phrase}"
+            )
+
     rules = evidence.get("interpretation_rules")
     if not isinstance(rules, list) or len(rules) < 6:
         fail("interpretation_rules are incomplete")

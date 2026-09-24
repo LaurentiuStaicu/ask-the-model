@@ -98,6 +98,241 @@
     "An unknown repository SHA must not inherit a measured byte prediction from an older SHA as a capacity guarantee.",
     "Archive logical bytes and materialized entries from C0-F2 are separate planning inputs and are not substitutes for allocated-byte measurements.",
     "C0-F1 phase grouping and C0-F3 checkpoint semantics remain mandatory when any future policy consumes these observations.",
-    "No fixed percentage, reserve size, refusal threshold or production NO_SPACE behavior is selected by this evidence manifest."
-  ]
+    "No fixed percentage, reserve size, refusal threshold or production NO_SPACE behavior is selected by this evidence manifest.",
+    "C0-M2 and C0-M3 state-root frontiers are environment-specific qualification observations; they strengthen reserve rationale but do not themselves select a reserve.",
+    "State-root reserve policy must remain separate from total Control DB size because M2/M3 observed a stable transaction-headroom frontier while database allocation increased materially.",
+    "C0-M2 sidecar sensitivity shows that a pre-existing 32 KiB SQLite SHM sidecar can reduce additional transaction headroom; admission must use the cold-sidecar/worst-case baseline rather than assuming warm sidecars."
+  ],
+  "c0_m2": {
+    "actions_run_id": 36029835402,
+    "artifact_name": "atm-c0-m2-state-reserve-36029835402-1",
+    "artifact_id": 10820984250,
+    "artifact_sha256": "290573582a1ac9d5c878413004d261867018ab39a42f92f9a8c3434c11b6593b",
+    "atm_source_commit": "3491028dc5ce456c95dfc22fc8e8fce61968e767",
+    "runtime": {
+      "system": "Linux",
+      "release": "6.17.0-1022-azure",
+      "machine": "x86_64",
+      "sqlite": "3.45.1"
+    },
+    "filesystem": {
+      "type": "tmpfs",
+      "size_bytes": 33554432,
+      "inode_limit": 4096
+    },
+    "observations": [
+      {
+        "history_generations": 1,
+        "control_db_allocated_bytes": 40960,
+        "available_bytes_before_operation": 16384,
+        "classification": "FAIL_CLOSED_OLD_AUTHORITY",
+        "sqlite_result": "SQLITE_IOERR"
+      },
+      {
+        "history_generations": 1,
+        "control_db_allocated_bytes": 40960,
+        "available_bytes_before_operation": 32768,
+        "classification": "FAIL_CLOSED_OLD_AUTHORITY",
+        "sqlite_result": "SQLITE_FULL"
+      },
+      {
+        "history_generations": 1,
+        "control_db_allocated_bytes": 40960,
+        "available_bytes_before_operation": 65536,
+        "classification": "SUCCESS_ATOMIC",
+        "sqlite_result": null
+      },
+      {
+        "history_generations": 1,
+        "control_db_allocated_bytes": 40960,
+        "available_bytes_before_operation": 131072,
+        "classification": "SUCCESS_ATOMIC",
+        "sqlite_result": null
+      },
+      {
+        "history_generations": 100,
+        "control_db_allocated_bytes": 57344,
+        "available_bytes_before_operation": 16384,
+        "classification": "FAIL_CLOSED_OLD_AUTHORITY",
+        "sqlite_result": "SQLITE_IOERR"
+      },
+      {
+        "history_generations": 100,
+        "control_db_allocated_bytes": 57344,
+        "available_bytes_before_operation": 32768,
+        "classification": "FAIL_CLOSED_OLD_AUTHORITY",
+        "sqlite_result": "SQLITE_FULL"
+      },
+      {
+        "history_generations": 100,
+        "control_db_allocated_bytes": 57344,
+        "available_bytes_before_operation": 65536,
+        "classification": "SUCCESS_ATOMIC",
+        "sqlite_result": null
+      },
+      {
+        "history_generations": 100,
+        "control_db_allocated_bytes": 57344,
+        "available_bytes_before_operation": 131072,
+        "classification": "SUCCESS_ATOMIC",
+        "sqlite_result": null
+      },
+      {
+        "history_generations": 1000,
+        "control_db_allocated_bytes": 229376,
+        "available_bytes_before_operation": 16384,
+        "classification": "FAIL_CLOSED_OLD_AUTHORITY",
+        "sqlite_result": "SQLITE_IOERR"
+      },
+      {
+        "history_generations": 1000,
+        "control_db_allocated_bytes": 229376,
+        "available_bytes_before_operation": 32768,
+        "classification": "FAIL_CLOSED_OLD_AUTHORITY",
+        "sqlite_result": "SQLITE_FULL"
+      },
+      {
+        "history_generations": 1000,
+        "control_db_allocated_bytes": 229376,
+        "available_bytes_before_operation": 65536,
+        "classification": "SUCCESS_ATOMIC",
+        "sqlite_result": null
+      },
+      {
+        "history_generations": 1000,
+        "control_db_allocated_bytes": 229376,
+        "available_bytes_before_operation": 131072,
+        "classification": "SUCCESS_ATOMIC",
+        "sqlite_result": null
+      }
+    ],
+    "observed_frontier": {
+      "highest_failed_available_bytes": 32768,
+      "lowest_successful_available_bytes": 65536
+    }
+  },
+  "c0_m3": {
+    "actions_run_id": 36030618271,
+    "artifact_name": "atm-c0-m3-state-reserve-ext4-36030618271-1",
+    "artifact_id": 10822481226,
+    "artifact_sha256": "4dc497aad7cd7ff32bfb188bb8752d87869c811b01fea22330aa6bae6e64b55b",
+    "atm_source_commit": "90e16894fdd0bcbf8e6600585defd6268b27521b",
+    "runtime": {
+      "system": "Linux",
+      "release": "6.17.0-1022-azure",
+      "machine": "x86_64",
+      "sqlite": "3.45.1",
+      "mke2fs": "1.47.0"
+    },
+    "filesystem": {
+      "type": "ext4",
+      "image_size_bytes": 67108864,
+      "block_size_bytes": 4096,
+      "reserved_blocks_percentage": 0
+    },
+    "observations": [
+      {
+        "history_generations": 1,
+        "control_db_allocated_bytes": 40960,
+        "available_bytes_before_operation": 12288,
+        "classification": "FAIL_CLOSED_OLD_AUTHORITY",
+        "sqlite_result": "SQLITE_IOERR"
+      },
+      {
+        "history_generations": 1,
+        "control_db_allocated_bytes": 40960,
+        "available_bytes_before_operation": 32768,
+        "classification": "FAIL_CLOSED_OLD_AUTHORITY",
+        "sqlite_result": "SQLITE_FULL"
+      },
+      {
+        "history_generations": 1,
+        "control_db_allocated_bytes": 40960,
+        "available_bytes_before_operation": 61440,
+        "classification": "SUCCESS_ATOMIC",
+        "sqlite_result": null
+      },
+      {
+        "history_generations": 1,
+        "control_db_allocated_bytes": 40960,
+        "available_bytes_before_operation": 131072,
+        "classification": "SUCCESS_ATOMIC",
+        "sqlite_result": null
+      },
+      {
+        "history_generations": 1000,
+        "control_db_allocated_bytes": 233472,
+        "available_bytes_before_operation": 12288,
+        "classification": "FAIL_CLOSED_OLD_AUTHORITY",
+        "sqlite_result": "SQLITE_IOERR"
+      },
+      {
+        "history_generations": 1000,
+        "control_db_allocated_bytes": 233472,
+        "available_bytes_before_operation": 28672,
+        "classification": "FAIL_CLOSED_OLD_AUTHORITY",
+        "sqlite_result": "SQLITE_IOERR"
+      },
+      {
+        "history_generations": 1000,
+        "control_db_allocated_bytes": 233472,
+        "available_bytes_before_operation": 61440,
+        "classification": "SUCCESS_ATOMIC",
+        "sqlite_result": null
+      },
+      {
+        "history_generations": 1000,
+        "control_db_allocated_bytes": 233472,
+        "available_bytes_before_operation": 126976,
+        "classification": "SUCCESS_ATOMIC",
+        "sqlite_result": null
+      }
+    ],
+    "observed_frontier": {
+      "highest_failed_available_bytes": 32768,
+      "lowest_successful_available_bytes": 61440
+    }
+  },
+  "c0_m2_sidecar_sensitivity": {
+    "actions_run_id": 36028146283,
+    "artifact_name": "atm-c0-m2-state-headroom-36028146283-1",
+    "artifact_id": 10821066612,
+    "artifact_sha256": "b18cda82cd14a4b73b1927e1b416c9cb8843dcf127bfede2c2c6da69da805907",
+    "atm_source_commit": "6f90ff102e2c6e846d48ed57869b3c2738285c18",
+    "workflow_commit": "7e09fd3e9f4ffc86361332030b1d5639cb5eec09",
+    "runtime": {
+      "system": "Linux",
+      "release": "6.17.0-1022-azure",
+      "machine": "x86_64"
+    },
+    "history_generation_counts": [
+      1,
+      100,
+      1000
+    ],
+    "available_byte_bands": [
+      16384,
+      32768,
+      65536,
+      131072
+    ],
+    "warm": {
+      "shm_allocated_bytes_before_operation": 32768,
+      "highest_failed_available_bytes": 16384,
+      "lowest_successful_available_bytes": 32768,
+      "result_pattern": "16 KiB SQLITE_FULL; 32/64/128 KiB SUCCESS for all tested history sizes"
+    },
+    "cold": {
+      "shm_allocated_bytes_before_operation": 0,
+      "highest_failed_available_bytes": 32768,
+      "lowest_successful_available_bytes": 65536,
+      "result_pattern": "16 KiB SQLITE_IOERR; 32 KiB SQLITE_FULL; 64/128 KiB SUCCESS for all tested history sizes"
+    },
+    "outcome_counts": {
+      "SUCCESS": 15,
+      "SQLITE_FULL": 6,
+      "OTHER_ERROR": 3
+    },
+    "runtime_relevance": "AtM guarded Control DB mutation opens and closes its SQLite store per call; no persistent Control DB connection is held by ControlRepositoryStateStore, so cold sidecar state is the conservative runtime baseline. Warm sidecars may reduce additional headroom but must not weaken admission."
+  }
 }
