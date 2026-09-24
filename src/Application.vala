@@ -133,6 +133,10 @@ namespace AskTheModel {
                 flags: ApplicationFlags.DEFAULT_FLAGS
             );
 
+            repository_lifecycle.set_optimization_policy (
+                optimization_policy
+            );
+
             optimization_policy.changed.connect ((enabled) => {
                 update_optimization_control ();
                 stdout.printf (
