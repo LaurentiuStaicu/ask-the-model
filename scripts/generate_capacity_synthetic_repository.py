@@ -28,12 +28,12 @@ SCENARIOS = {
         "kind": "json",
         "records": 25_000,
     },
-    "cbd-json-75k": {
+    "cbd-json-70k": {
         "repository_id": "cbd",
         "acronym": "CBD",
         "display_name": "Cognitive Belief Dynamics",
         "kind": "json",
-        "records": 75_000,
+        "records": 70_000,
     },
     "rmd-markdown-4m": {
         "repository_id": "rmd",
