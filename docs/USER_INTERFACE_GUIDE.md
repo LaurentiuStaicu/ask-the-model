@@ -63,7 +63,7 @@ The **+** control creates a new chat.
 The tab controls deliberately separate **discard** from **save**:
 
 - **Close (X)** closes the chat without saving it. If the chat already has temporary durable turn records, they are removed rather than added to History.
-- the adjacent **Archive** symbol is the explicit save action. It preserves the transcript, repository pins and citation provenance and places the conversation in History.
+- the adjacent **Save to History** control uses the standard symbolic save icon. It is the explicit archive/save action: it preserves the transcript, repository pins and citation provenance and places the conversation in History.
 
 Only explicitly archived conversations are saved across normal application exit. If the process was interrupted, the next startup removes any leftover unarchived working records.
 
