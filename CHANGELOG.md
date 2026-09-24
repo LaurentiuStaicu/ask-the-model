@@ -13,6 +13,7 @@ All notable public releases of Ask the Model are recorded here.
 
 ### Qualification infrastructure
 
+- corrected C0P-F8 fresh-install data-root inode admission to include the five AtM-owned storage-tree directories created outside the F2 archive materialization tree; M1 CBD/EWD/RMD measurements independently show the same +5 fresh-install peak versus same-SHA replacement, while update/repair and byte requirements remain unchanged;
 - added C0P-M7 state-root inode headroom measurement: the cold-sidecar guarded Control DB path is exercised with 1/2/3/4/8 unprivileged inode slots available while byte capacity remains abundant, preserving atomic success/fail-closed invariants without selecting a production inode reserve;
 - added C0P-F7 checked-in M6 structural stress evidence and validator: snapshot prediction remains covered in all six fixtures, retrieval-index prediction remains explicitly 0/6 with the limiting RMD Markdown case at 17.2604× actual/prediction, and CI prevents the structurally falsified historical hybrid from being silently restored as a conservative unknown-SHA index predictor;
 - added C0P-M6 structural capacity qualification: valid synthetic AtM fixtures stress row-heavy CSV, entity-heavy JSON and section/token-heavy Markdown within current parser limits, while the M4/M5 hybrid remains fitted only on the frozen 18 real training SHAs; underprediction is preserved as evidence and no production margin or predictor is selected;
