@@ -37,46 +37,75 @@ window.atm-window headerbar button:active {
 }
 
 /* Global optimization master switch.
- * It deliberately starts OFF on every process launch. Color is secondary
- * to the adjacent OPT OFF / OPT ON text, so state is never color-only.
- * Both colors are muted warm instrument tones rather than bright LEDs.
+ * Instrument-panel treatment: the trough is the colored case, while the
+ * moving slider is deliberately metallic/neutral. The case reuses the same
+ * ridge border language as the application frame. OFF/ON text on both sides
+ * keeps state explicit without relying on color.
  */
 window.atm-window .atm-optimization-controls {
     margin-left: 8px;
 }
 
-window.atm-window label.atm-optimization-label {
-    min-width: 50px;
+window.atm-window label.atm-optimization-title {
     color: #5F605C;
-    font-size: 0.82em;
+    font-size: 0.76em;
     font-weight: 600;
 }
 
+window.atm-window label.atm-optimization-side-label {
+    min-width: 18px;
+    color: #8A8B87;
+    font-size: 0.68em;
+    font-weight: 600;
+}
+
+window.atm-window label.atm-optimization-side-label.off.active {
+    color: #A65D54;
+}
+
+window.atm-window label.atm-optimization-side-label.on.active {
+    color: #637E55;
+}
+
 window.atm-window switch.atm-optimization-switch {
-    min-width: 38px;
+    min-width: 44px;
     min-height: 20px;
     padding: 2px;
     background-image: none;
     background-color: #B46156;
-    border: 1px solid #8E4C45;
-    border-radius: 999px;
-    box-shadow: none;
+    border: 2px ridge #A4A5A1;
+    border-radius: 10px;
+    box-shadow:
+        inset 0 0 0 1px rgba(27, 27, 24, 0.10),
+        0 1px 1px rgba(27, 27, 24, 0.08);
 }
 
 window.atm-window switch.atm-optimization-switch:checked {
     background-image: none;
     background-color: #6F9468;
-    border-color: #587A53;
+    border-color: #A4A5A1;
 }
 
 window.atm-window switch.atm-optimization-switch slider {
-    min-width: 16px;
+    min-width: 18px;
     min-height: 16px;
-    background-image: none;
-    background-color: #FAFBF9;
-    border: 1px solid #A4A5A1;
-    border-radius: 999px;
-    box-shadow: none;
+    background-color: #B8BAB6;
+    background-image: linear-gradient(
+        to bottom,
+        #DDDEDB 0%,
+        #BFC1BD 42%,
+        #8F918D 58%,
+        #CACCC8 100%
+    );
+    border: 1px solid #777873;
+    border-radius: 7px;
+    box-shadow:
+        inset 0 1px 0 rgba(255, 255, 255, 0.45),
+        0 1px 1px rgba(27, 27, 24, 0.22);
+}
+
+window.atm-window switch.atm-optimization-switch > image {
+    opacity: 0;
 }
 
 window.atm-window scrolledwindow,
@@ -311,23 +340,48 @@ window.atm-window.atm-dark headerbar button:active {
     background-color: rgba(250, 251, 249, 0.15);
 }
 
-window.atm-window.atm-dark label.atm-optimization-label {
+window.atm-window.atm-dark label.atm-optimization-title {
     color: #C9CAC7;
+}
+
+window.atm-window.atm-dark label.atm-optimization-side-label {
+    color: #8F908C;
+}
+
+window.atm-window.atm-dark label.atm-optimization-side-label.off.active {
+    color: #D07A6E;
+}
+
+window.atm-window.atm-dark label.atm-optimization-side-label.on.active {
+    color: #94AD7A;
 }
 
 window.atm-window.atm-dark switch.atm-optimization-switch {
     background-color: #A85A51;
-    border-color: #C06A60;
+    border-color: #6F706C;
+    box-shadow:
+        inset 0 0 0 1px rgba(250, 251, 249, 0.08),
+        0 1px 1px rgba(0, 0, 0, 0.28);
 }
 
 window.atm-window.atm-dark switch.atm-optimization-switch:checked {
     background-color: #668A62;
-    border-color: #7BA276;
+    border-color: #6F706C;
 }
 
 window.atm-window.atm-dark switch.atm-optimization-switch slider {
-    background-color: #FAFBF9;
-    border-color: #6F706C;
+    background-color: #9FA19D;
+    background-image: linear-gradient(
+        to bottom,
+        #C6C7C4 0%,
+        #A5A7A3 42%,
+        #737571 58%,
+        #B3B5B1 100%
+    );
+    border-color: #5F605C;
+    box-shadow:
+        inset 0 1px 0 rgba(250, 251, 249, 0.28),
+        0 1px 1px rgba(0, 0, 0, 0.40);
 }
 
 window.atm-window.atm-dark .atm-selector-triangle {
