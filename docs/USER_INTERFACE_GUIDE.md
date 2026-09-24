@@ -32,7 +32,7 @@ Refresh does not silently replace local snapshots.
 
 A compact global instrument-style control sits at the end of the header:
 
-`Optimizations  OFF  [switch]  ON`
+`Optimizations  [switch]`
 
 It controls the post-v0.5.0 runtime optimization program as one application-wide mode:
 
@@ -42,9 +42,9 @@ It controls the post-v0.5.0 runtime optimization program as one application-wide
 - **ON** allows runtime optimizations that have passed their individual qualification gates;
 - measurement and qualification tools do not depend on this UI switch.
 
-The control deliberately resembles a small panel switch rather than a flat preference toggle. Its rounded case uses the same neutral ridge-border language as the AtM application frame. The case interior is warm muted red when OFF and warm muted green when ON, while the moving slider remains neutral metallic gray. Small fixed OFF and ON labels sit on the left and right, so color is never the only state cue.
+The control deliberately resembles a small panel switch rather than a flat preference toggle. Its rounded case uses the same neutral ridge-border language as the AtM application frame. The case interior is warm muted red when OFF and warm muted green when ON, while the moving slider remains neutral metallic gray. The redundant side labels are intentionally omitted to keep the header compact.
 
-The status LCD mirrors the same state with a compact `OPT OFF` / `OPT ON` annunciator in the NASA-style status strip.
+The status LCD provides the explicit textual state cue with a compact `OPT OFF` / `OPT ON` annunciator in the NASA-style status strip, while the native switch retains its accessible control semantics.
 
 Changing the switch affects subsequent operations. An operation already in progress keeps the optimization mode captured when it started rather than changing behavior halfway through.
 
