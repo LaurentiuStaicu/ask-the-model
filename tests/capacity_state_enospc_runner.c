@@ -3,6 +3,7 @@
 #include <glib.h>
 #include <glib/gstdio.h>
 #include <json-glib/json-glib.h>
+#include <sqlite3.h>
 
 #include <errno.h>
 #include <fcntl.h>
@@ -353,13 +354,79 @@ error_is_capacity_failure (
         strstr (
             error->message,
             "No space left on device"
-        ) != NULL ||
-        (error->domain ==
-             ATM_CONTROL_STATE_ERROR &&
-         (error->code ==
-              ATM_CONTROL_STATE_ERROR_SQLITE ||
-          error->code ==
-              ATM_CONTROL_STATE_ERROR_IO));
+        ) != NULL;
+}
+
+static gboolean
+count_candidate_generations (
+    const char *control_path,
+    gint64 *out_count,
+    GError **error
+)
+{
+    sqlite3 *db = NULL;
+    sqlite3_stmt *statement = NULL;
+    gboolean ok = FALSE;
+
+    *out_count = -1;
+
+    int rc = sqlite3_open_v2 (
+        control_path,
+        &db,
+        SQLITE_OPEN_READONLY,
+        NULL
+    );
+
+    if (rc != SQLITE_OK) {
+        g_set_error (
+            error,
+            G_FILE_ERROR,
+            G_FILE_ERROR_FAILED,
+            "Could not open Control DB read-only for candidate check: %s",
+            db != NULL
+                ? sqlite3_errmsg (db)
+                : "unknown SQLite error"
+        );
+        goto out;
+    }
+
+    rc = sqlite3_prepare_v2 (
+        db,
+        "SELECT COUNT(*) "
+        "FROM repository_generations "
+        "WHERE lifecycle='CANDIDATE';",
+        -1,
+        &statement,
+        NULL
+    );
+
+    if (rc != SQLITE_OK ||
+        sqlite3_step (statement) != SQLITE_ROW) {
+        g_set_error (
+            error,
+            G_FILE_ERROR,
+            G_FILE_ERROR_FAILED,
+            "Could not count persisted candidate generations: %s",
+            sqlite3_errmsg (db)
+        );
+        goto out;
+    }
+
+    *out_count =
+        sqlite3_column_int64 (
+            statement,
+            0
+        );
+    ok = TRUE;
+
+out:
+    if (statement != NULL) {
+        sqlite3_finalize (statement);
+    }
+    if (db != NULL) {
+        sqlite3_close (db);
+    }
+    return ok;
 }
 
 static void
@@ -374,6 +441,7 @@ emit_result (
     guint64 available_bytes_before_operation,
     guint64 available_inodes_before_operation,
     guint64 filler_bytes,
+    gint64 candidate_generations,
     const char *control_path,
     const GError *operation_error
 )
@@ -508,6 +576,15 @@ emit_result (
             filler_bytes,
             (guint64) G_MAXINT64
         )
+    );
+
+    json_builder_set_member_name (
+        builder,
+        "candidate_generations"
+    );
+    json_builder_add_int_value (
+        builder,
+        candidate_generations
     );
 
     json_builder_set_member_name (
@@ -714,6 +791,13 @@ run_exercise (
             &active_after,
             &error
         );
+    gint64 candidate_generations = -1;
+    gboolean candidate_check_ok =
+        count_candidate_generations (
+            control_path,
+            &candidate_generations,
+            &error
+        );
 
     qualified =
         !mutation_ok &&
@@ -721,6 +805,8 @@ run_exercise (
             operation_error
         ) &&
         reload_ok &&
+        candidate_check_ok &&
+        candidate_generations == 0 &&
         generation_after ==
             generation_before &&
         g_strcmp0 (
@@ -748,6 +834,7 @@ run_exercise (
         available_bytes,
         available_inodes,
         filler_bytes,
+        candidate_generations,
         control_path,
         operation_error
     );
@@ -783,6 +870,7 @@ run_verify (
         );
     AtmControlStateStore *store = NULL;
     gint64 generation = 0;
+    gint64 candidate_generations = -1;
     gboolean qualified = FALSE;
 
     if (load_active (
@@ -805,7 +893,13 @@ run_verify (
         atm_control_state_validate (
             store,
             &error
-        )) {
+        ) &&
+        count_candidate_generations (
+            control_path,
+            &candidate_generations,
+            &error
+        ) &&
+        candidate_generations == 0) {
         qualified = TRUE;
     }
 
@@ -822,6 +916,7 @@ run_verify (
         0,
         0,
         0,
+        candidate_generations,
         control_path,
         NULL
     );
