@@ -525,13 +525,42 @@ namespace AskTheModel {
 
             bool optimized_operation =
                 optimization_mode_snapshot ();
+            var grounding = new ConversationGrounding ();
+
+            if (optimized_operation) {
+                bool lease_contended;
+                RepositoryGenerationLease? generation_lease;
+
+                try {
+                    generation_lease =
+                        RepositoryGenerationLease.try_acquire_shared (
+                            state_root,
+                            generation_id,
+                            out lease_contended
+                        );
+                } catch (GLib.Error error) {
+                    throw new RepositoryError.STORAGE (
+                        "Repository generation coordination could not be established."
+                    );
+                }
+
+                if (lease_contended ||
+                    generation_lease == null) {
+                    throw new RepositoryError.BUSY (
+                        "Repository generation is currently in exclusive use. Try again after that operation finishes."
+                    );
+                }
+
+                grounding.hold_generation_lease (
+                    generation_lease
+                );
+            }
 
             string control_state_path =
                 GLib.Path.build_filename (
                     state_root,
                     "control-state.sqlite3"
                 );
-            var grounding = new ConversationGrounding ();
 
             foreach (
                 RepositoryDescriptor descriptor
