@@ -52,21 +52,6 @@ window.atm-window label.atm-optimization-title {
     font-weight: inherit;
 }
 
-window.atm-window label.atm-optimization-side-label {
-    min-width: 18px;
-    color: #8A8B87;
-    font-size: 0.68em;
-    font-weight: 600;
-}
-
-window.atm-window label.atm-optimization-side-label.off.active {
-    color: #A65D54;
-}
-
-window.atm-window label.atm-optimization-side-label.on.active {
-    color: #637E55;
-}
-
 window.atm-window switch.atm-optimization-switch {
     min-width: 46px;
     min-height: 22px;
@@ -342,18 +327,6 @@ window.atm-window.atm-dark headerbar button:active {
 
 window.atm-window.atm-dark label.atm-optimization-title {
     color: #FAFBF9;
-}
-
-window.atm-window.atm-dark label.atm-optimization-side-label {
-    color: #8F908C;
-}
-
-window.atm-window.atm-dark label.atm-optimization-side-label.off.active {
-    color: #D07A6E;
-}
-
-window.atm-window.atm-dark label.atm-optimization-side-label.on.active {
-    color: #94AD7A;
 }
 
 window.atm-window.atm-dark switch.atm-optimization-switch {
