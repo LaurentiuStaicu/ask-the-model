@@ -4,6 +4,13 @@ All notable public releases of Ask the Model are recorded here.
 
 ## Unreleased
 
+### Optimization master control
+
+- added a header-level **Optimizations** master switch for the post-v0.5.0 optimization program; every application process starts with the switch **OFF**, the state is intentionally not persisted, and future qualified runtime optimization slices must activate only when this gate is ON;
+- the native GTK sliding control uses an explicit OFF/ON text cue plus a warm muted red trough when OFF and warm muted green when ON, so color is not the sole state indicator;
+- changing the switch affects newly started operations only; test-only qualification infrastructure remains independent and is compiled out of production.
+
+
 ### Qualification infrastructure
 
 - added a test-only deterministic crash/restart qualification harness for snapshot promotion and retrieval-index promotion, using explicit subprocess checkpoints plus a fresh-process JSON restart oracle; production builds contain no runtime fault-injection switch and no durability/recovery behavior is changed by this slice;
