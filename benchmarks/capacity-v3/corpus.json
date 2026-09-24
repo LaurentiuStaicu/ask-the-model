@@ -1,0 +1,91 @@
+{
+  "schema_version": 1,
+  "measurement_id": "atm-c0p-m5-out-of-sample-capacity-v1",
+  "training_corpus": "benchmarks/capacity-v2/corpus.json",
+  "selection_policy": {
+    "description": "Disjoint holdout samples selected from default-branch ranks 4/12/20/40 observed after C0-M4. Ranks 4/12/20 interpolate between M4 training points 1/8/15/22/30; rank 40 is older than the recent-r30 training window.",
+    "holdout_commit_ranks": [
+      4,
+      12,
+      20,
+      40
+    ],
+    "no_refit": true,
+    "compatibility_gate": "Each frozen SHA was prechecked to contain .atm/repository.json and CITATION.cff; the real ingest/index runner remains authoritative.",
+    "overlap_forbidden": true
+  },
+  "repositories": [
+    {
+      "repository_id": "ewd",
+      "repository": "empirical-world3-dynamics",
+      "acronym": "EWD",
+      "display_name": "Empirical World3 Dynamics",
+      "samples": [
+        {
+          "label": "holdout-r4",
+          "sha": "f5c3271800c95063d1f098c269d4d84e9cf0c6c8"
+        },
+        {
+          "label": "holdout-r12",
+          "sha": "54cd3c10f8c82ea113aede006e7fc3a5fa78779d"
+        },
+        {
+          "label": "holdout-r20",
+          "sha": "1dc083cc5ca5ac632bb6d4e155cfc6004c4d9d23"
+        },
+        {
+          "label": "holdout-r40",
+          "sha": "422894cfb5f8ccce5ee940f184bbabf645d5a1e0"
+        }
+      ]
+    },
+    {
+      "repository_id": "cbd",
+      "repository": "cognitive-belief-dynamics",
+      "acronym": "CBD",
+      "display_name": "Cognitive Belief Dynamics",
+      "samples": [
+        {
+          "label": "holdout-r4",
+          "sha": "e12dff77df708e05c839d0145f1d1773672d92f8"
+        },
+        {
+          "label": "holdout-r12",
+          "sha": "2f9fdd92631df1e467a051dc994c8de5782db7d0"
+        },
+        {
+          "label": "holdout-r20",
+          "sha": "74d1c2fbabfc0d927077de01f3b0010ee287c5b7"
+        },
+        {
+          "label": "holdout-r40",
+          "sha": "897b9481e7b6162279898ec8e78509f810689e99"
+        }
+      ]
+    },
+    {
+      "repository_id": "rmd",
+      "repository": "romanian-monetary-dynamics",
+      "acronym": "RMD",
+      "display_name": "Romanian Monetary Dynamics",
+      "samples": [
+        {
+          "label": "holdout-r4",
+          "sha": "807f828cb63ebfe2587114e341798bac46f31e1e"
+        },
+        {
+          "label": "holdout-r12",
+          "sha": "f454f3988062e0385de56de37fde76c5db65fb1e"
+        },
+        {
+          "label": "holdout-r20",
+          "sha": "3a0dc09b03964c8001c76bd7df4ec8b24d265c1e"
+        },
+        {
+          "label": "holdout-r40",
+          "sha": "abd192d31689ddb330065ca20c521a77cd1c0c1a"
+        }
+      ]
+    }
+  ]
+}
