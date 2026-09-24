@@ -796,6 +796,11 @@ run_data_enospc (
 
     qualified =
         !ingest_ok &&
+        operation_error != NULL &&
+        operation_error->domain ==
+            ATM_ARCHIVE_ERROR &&
+        operation_error->code ==
+            ATM_ARCHIVE_ERROR_NO_SPACE &&
         error_mentions_enospc (
             operation_error
         ) &&
@@ -1015,7 +1020,7 @@ run_index_enospc (
         operation_error->domain ==
             ATM_RETRIEVAL_INDEX_ERROR &&
         operation_error->code ==
-            ATM_RETRIEVAL_INDEX_ERROR_SQLITE &&
+            ATM_RETRIEVAL_INDEX_ERROR_NO_SPACE &&
         error_mentions_sqlite_full (
             operation_error
         ) &&
