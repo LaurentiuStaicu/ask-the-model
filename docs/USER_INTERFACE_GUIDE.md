@@ -60,14 +60,14 @@ Each tab owns its own:
 
 The **+** control creates a new chat.
 
-For a durable chat, the tab **Close** control closes the current tab and records that it should not reopen automatically at the next startup. It does not archive or delete the conversation.
+The tab controls deliberately separate **discard** from **save**:
 
-The per-tab conversation menu keeps lifecycle actions separate:
+- **Close (X)** closes the chat without saving it. If the chat already has temporary durable turn records, they are removed rather than added to History.
+- the adjacent **Archive** symbol is the explicit save action. It preserves the transcript, repository pins and citation provenance and places the conversation in History.
 
-- **Archive** preserves transcript, repository pins and citation provenance but removes the conversation from normal startup restore;
-- **Delete permanently** requires confirmation and removes the durable conversation and its dependent local history.
+Only explicitly archived conversations are saved across normal application exit. If the process was interrupted, the next startup removes any leftover unarchived working records.
 
-The **History** control at the opposite end of the tab strip lists durable conversations that are not currently open. A closed conversation can be **Open**ed again; an archived conversation can be **Unarchive & Open**ed. History-opened conversations first return as restored read-only tabs and become continuable only after AtM requalifies the exact saved AI-model identity and repository generation/version/SHA context.
+The **History** control at the opposite end of the tab strip lists archived conversations only. Each row provides **Open** and **Delete permanently**. Open reconstructs the archived transcript and then rechecks the exact saved AI-model identity and repository generation/version/SHA context before continuation; opening does not unarchive the saved conversation. Delete permanently requires confirmation and removes both the archived local conversation and its managed automatic JSON export.
 
 ## First-Send freeze
 
@@ -110,7 +110,7 @@ Durable conversations are mirrored automatically as JSON files under:
 ~/Ask the Model/Conversation Exports/
 ```
 
-The export folder is created automatically and does not require a location chooser or export button. Existing durable chats are synchronized at startup and the corresponding file is refreshed after durable conversation changes.
+The export folder is created automatically and does not require a location chooser or export button. Only explicitly archived conversations receive managed JSON files; unarchived working chats are not exported. Archived files are refreshed automatically when the saved conversation changes.
 
 Per-snapshot retrieval indexes are regenerable cache data inside the Flatpak private cache.
 
