@@ -321,12 +321,20 @@ namespace AskTheModel {
                 "conversations.sqlite3"
             );
 
-            export_root = automatic_export_root ??
-                GLib.Path.build_filename (
+            if (automatic_export_root != null) {
+                export_root = automatic_export_root;
+            } else if (state_root != null) {
+                export_root = GLib.Path.build_filename (
+                    root,
+                    "Conversation Exports"
+                );
+            } else {
+                export_root = GLib.Path.build_filename (
                     GLib.Environment.get_home_dir (),
                     "Ask the Model",
                     "Conversation Exports"
                 );
+            }
 
             ConversationStoreNative.Store opened;
 
