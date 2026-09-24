@@ -4,6 +4,8 @@
 
 gboolean
 atm_repository_ui_ensure_index (
+    const char *state_root,
+    gboolean coordinated,
     const char *cache_root,
     const char *snapshot_root,
     const char *repository_id,
@@ -14,6 +16,20 @@ atm_repository_ui_ensure_index (
 )
 {
     AtmRetrievalEnsureResult result;
+
+    if (coordinated) {
+        return atm_retrieval_index_ensure_for_snapshot_coordinated (
+            state_root,
+            cache_root,
+            snapshot_root,
+            repository_id,
+            snapshot_sha,
+            out_index_path,
+            out_repository_version,
+            &result,
+            error
+        );
+    }
 
     return atm_retrieval_index_ensure_for_snapshot (
         cache_root,
