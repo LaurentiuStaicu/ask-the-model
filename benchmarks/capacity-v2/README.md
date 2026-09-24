@@ -43,6 +43,13 @@ leave-one-out checks for simple transparent families:
 Leave-one-out means one SHA is held out while the envelope is learned from
 the other five. Any underprediction is reported explicitly.
 
+M4 also evaluates a transparent hybrid candidate for snapshot and index
+prediction. The hybrid takes the maximum of the relevant observable formulas
+and the maximum absolute peak seen in the five training SHAs. This is useful
+because a repository can have a relatively stable absolute index floor even
+when logical bytes or entry counts change. Hybrid coverage is measured only;
+the benchmark does not select it as production policy.
+
 ## Non-policy boundary
 
 No production predictor, multiplier, safety margin or refusal threshold is
