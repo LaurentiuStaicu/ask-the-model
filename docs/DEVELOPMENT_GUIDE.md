@@ -389,6 +389,23 @@ Actual `f_bavail` after the qualification filler is recorded and is authoritativ
 
 C0-M3 selects no production reserve. It tests whether the M2 tmpfs frontier is stable on a filesystem with persistent allocation and journaling semantics closer to a typical Linux home/storage volume.
 
+### C0-F6 M2/M3 evidence freeze
+
+C0-F6 extends the checked-in capacity evidence registry with the reviewed
+state-root scaling and ext4 portability artifacts.
+
+The registry now preserves:
+- C0-M2 tmpfs observations at 1/100/1000 Control DB generations;
+- C0-M3 ext4 observations at 1/1000 generations;
+- exact Actions run IDs, artifact IDs/digests and source commits;
+- actual unprivileged free bytes at each constrained mutation;
+- Control DB allocated bytes and atomic success/fail-closed classification.
+
+CI validates the reviewed matrices exactly. The evidence remains explicitly
+qualification-only: `production_thresholds_selected` must remain false, and
+the stable ~32–64 KiB observed frontier must not be silently promoted into a
+runtime reserve without a separate policy decision and boundary qualification.
+
 ### Repository authority-mutation lease
 
 When an operation snapshots optimization mode ON, repository Download/Update uses one application-owned exclusive nonblocking lease at `<state_root>/repository-mutation.lock` before any selected-repository staging or authority mutation begins.
