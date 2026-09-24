@@ -368,6 +368,27 @@ The harness does **not** require a chosen headroom band to succeed. Its purpose 
 
 The resulting M2 artifact is evidence for a later state-root safety-reserve rationale. It must not be converted directly into a universal reserve without reviewing the observed matrix, SQLite/runtime version and filesystem environment.
 
+### C0-M3 ext4 state-reserve portability measurement
+
+C0-M3 repeats the C0-M2 constrained Control DB publication measurement on a bounded ext4 loopback filesystem.
+
+The ext4 image is created with:
+- 64 MiB filesystem size;
+- 4096-byte blocks;
+- 0% super-user reserved blocks (`mke2fs -m 0`), so unprivileged `f_bavail` is not intentionally reduced by ext4's default root reserve;
+- normal ext4 journaling and allocation behavior.
+
+The matrix uses 1 and 1000 completed generations at target headroom bands of 16/32/64/128 KiB. These two history sizes bracket the M2 range while keeping the portability run focused on filesystem behavior rather than repeating the entire tmpfs matrix.
+
+The same atomicity rule applies:
+- `SUCCESS_ATOMIC`, or
+- `FAIL_CLOSED_OLD_AUTHORITY`,
+with zero persisted CANDIDATE generations in either case.
+
+Actual `f_bavail` after the qualification filler is recorded and is authoritative; the target headroom is only the requested calibration point because ext4 metadata/extent allocation can make the final free-byte count differ from the nominal target.
+
+C0-M3 selects no production reserve. It tests whether the M2 tmpfs frontier is stable on a filesystem with persistent allocation and journaling semantics closer to a typical Linux home/storage volume.
+
 ### Repository authority-mutation lease
 
 When an operation snapshots optimization mode ON, repository Download/Update uses one application-owned exclusive nonblocking lease at `<state_root>/repository-mutation.lock` before any selected-repository staging or authority mutation begins.
