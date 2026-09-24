@@ -307,9 +307,11 @@ namespace AskTheModel {
     public class ConversationPersistenceStore : Object {
         private ConversationStoreNative.Store native_store;
         public string path { get; private set; }
+        public string export_root { get; private set; }
 
         public ConversationPersistenceStore (
-            string? state_root = null
+            string? state_root = null,
+            string? automatic_export_root = null
         ) throws GLib.Error {
             string root = state_root ??
                 GLib.Environment.get_user_state_dir ();
@@ -318,6 +320,13 @@ namespace AskTheModel {
                 root,
                 "conversations.sqlite3"
             );
+
+            export_root = automatic_export_root ??
+                GLib.Path.build_filename (
+                    GLib.Environment.get_home_dir (),
+                    "Ask the Model",
+                    "Conversation Exports"
+                );
 
             ConversationStoreNative.Store opened;
 
@@ -331,6 +340,119 @@ namespace AskTheModel {
             }
 
             native_store = (owned) opened;
+        }
+
+        private bool automatic_export_directory_ready () {
+            if (GLib.FileUtils.test (
+                    export_root,
+                    GLib.FileTest.IS_SYMLINK
+                )) {
+                warning (
+                    "AtM: automatic conversation export directory is a symbolic link: %s",
+                    export_root
+                );
+                return false;
+            }
+
+            if (GLib.FileUtils.test (
+                    export_root,
+                    GLib.FileTest.IS_DIR
+                )) {
+                return true;
+            }
+
+            if (GLib.DirUtils.create_with_parents (
+                    export_root,
+                    0700
+                ) != 0) {
+                warning (
+                    "AtM: automatic conversation export directory could not be created: %s",
+                    export_root
+                );
+                return false;
+            }
+
+            return true;
+        }
+
+        private string automatic_export_path (
+            string conversation_id
+        ) {
+            return GLib.Path.build_filename (
+                export_root,
+                "%s.json".printf (conversation_id)
+            );
+        }
+
+        private void sync_automatic_export_best_effort (
+            string conversation_id
+        ) {
+            if (!GLib.Regex.match_simple (
+                    "^[A-Za-z0-9-]+$",
+                    conversation_id
+                )) {
+                warning (
+                    "AtM: automatic conversation export refused an invalid conversation id."
+                );
+                return;
+            }
+
+            if (!automatic_export_directory_ready ()) {
+                return;
+            }
+
+            try {
+                string json =
+                    export_conversation_json (
+                        conversation_id
+                    );
+
+                GLib.FileUtils.set_contents_full (
+                    automatic_export_path (
+                        conversation_id
+                    ),
+                    json,
+                    -1,
+                    GLib.FileSetContentsFlags.CONSISTENT,
+                    0600
+                );
+            } catch (GLib.Error error) {
+                warning (
+                    "AtM: automatic conversation export failed for %s: %s",
+                    conversation_id,
+                    error.message
+                );
+            }
+        }
+
+        private void remove_automatic_export_best_effort (
+            string conversation_id
+        ) {
+            if (!GLib.Regex.match_simple (
+                    "^[A-Za-z0-9-]+$",
+                    conversation_id
+                )) {
+                return;
+            }
+
+            string export_path =
+                automatic_export_path (
+                    conversation_id
+                );
+
+            if (!GLib.FileUtils.test (
+                    export_path,
+                    GLib.FileTest.EXISTS
+                )) {
+                return;
+            }
+
+            if (GLib.FileUtils.remove (export_path) != 0) {
+                warning (
+                    "AtM: automatic conversation export could not be removed: %s",
+                    export_path
+                );
+            }
         }
 
         private static string require_native_text (
@@ -706,6 +828,10 @@ namespace AskTheModel {
                 );
             }
 
+            sync_automatic_export_best_effort (
+                conversation_id
+            );
+
             return conversation_id;
         }
 
@@ -776,6 +902,10 @@ namespace AskTheModel {
                 );
             }
 
+            sync_automatic_export_best_effort (
+                conversation_id
+            );
+
             return turn_no;
         }
 
@@ -794,6 +924,10 @@ namespace AskTheModel {
                     "Conversation title could not be persisted."
                 );
             }
+
+            sync_automatic_export_best_effort (
+                conversation_id
+            );
         }
 
         public void set_archived (
@@ -811,6 +945,10 @@ namespace AskTheModel {
                     "Conversation archive state could not be persisted."
                 );
             }
+
+            sync_automatic_export_best_effort (
+                conversation_id
+            );
         }
 
         public void set_open_on_startup (
@@ -839,6 +977,10 @@ namespace AskTheModel {
                     "Conversation could not be deleted."
                 );
             }
+
+            remove_automatic_export_best_effort (
+                conversation_id
+            );
         }
     }
 
