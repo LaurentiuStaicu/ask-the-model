@@ -69,6 +69,23 @@
       ]
     },
     {
+      "id": "REPOSITORY-S0-004",
+      "category": "REPOSITORY",
+      "severity": "S0",
+      "lifecycle": "enforced",
+      "statement": "When a repository Download/Update operation snapshots optimization mode ON, it must acquire one application-owned exclusive nonblocking repository mutation lease before any selected-repository staging or authority mutation and hold it through filesystem preparation, guarded Control DB commit and operation cleanup. Contention must fail before deterministic staging is touched; the lease must not replace guarded Control DB generation checks, and ordinary read-only grounding must not require the global authority lease.",
+      "enforced_by": [
+        "src/repository_mutation_lease.c",
+        "src/repository_mutation_lease.h",
+        "src/RepositoryNative.vala",
+        "src/RepositoryLifecycleService.vala"
+      ],
+      "tested_by": [
+        "meson:repository-mutation-lease",
+        "meson:repository-lifecycle-service"
+      ]
+    },
+    {
       "id": "INGEST-S0-001",
       "category": "INGEST",
       "severity": "S0",
