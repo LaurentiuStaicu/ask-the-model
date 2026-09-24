@@ -477,6 +477,32 @@ This evidence does not itself wire production behavior. It narrows #232's defens
 
 No scalar margin is selected by F7. In particular, multiplying the current hybrid until it covers the six M6 fixtures would be fixture-fitting rather than an independently justified upper bound.
 
+### C0P-F8 fresh-install structural inode overhead
+
+C0P-F8 corrects the F3 post-download data-root inode model for first installation.
+
+C0-F2 counts the extraction root plus the unique files/directories materialized from the repository archive. On a first repository install, the production ingest/promotion path may additionally create five AtM-owned structural directories outside that archive tree:
+
+- `Repositories/`;
+- `Repositories/.staging/`;
+- `Repositories/.staging/<repository>/`;
+- `Repositories/<repository>/`;
+- `Repositories/<repository>/snapshots/`.
+
+The top-level AtM data root itself is excluded because startup storage qualification creates and validates it before repository operations are enabled.
+
+C0-M1 observed this exact difference for all three pinned repositories:
+- CBD: 126 final snapshot entries, 127 same-SHA replacement entries, 132 fresh-install peak entries;
+- EWD: 192 / 193 / 198;
+- RMD: 923 / 924 / 929.
+
+Therefore the post-download data-root inode requirement is:
+- fresh install: `F2 materialized_entries + 5`;
+- different-SHA update: `F2 materialized_entries`;
+- same-SHA repair: `F2 materialized_entries`.
+
+Byte requirements are unchanged. Same-SHA repair still requires admission before quarantine.
+
 ### Repository authority-mutation lease
 
 When an operation snapshots optimization mode ON, repository Download/Update uses one application-owned exclusive nonblocking lease at `<state_root>/repository-mutation.lock` before any selected-repository staging or authority mutation begins.
