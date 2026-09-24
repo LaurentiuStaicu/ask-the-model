@@ -215,6 +215,12 @@ The header presents repository controls as a distinct group immediately after th
 
 `[AI model] [Refresh AI]    [Repositories] [Refresh repositories] [Download/Update]`
 
+A separate compact global optimization control is packed at the end of the header, before the native window controls:
+
+`OPT OFF  [switch]` / `OPT ON  [switch]`
+
+It is application-wide rather than conversation-specific. Every process launch starts OFF and the value is deliberately not persisted. The native `Gtk.Switch` keeps its normal click, keyboard and drag behavior. Its trough is subdued warm red in OFF state and subdued warm green in ON state; the adjacent OFF/ON text is mandatory so state is not communicated by color alone.
+
 Transient model and repository status text is not placed in this horizontal control row. A fixed, compact status LCD sits immediately below the header in the upper edge of the conversation area, so status changes never cause header controls to shift.
 
 The repository selector remains a selection control only. Its popover contains the EWD/CBD/RMD multi-selection controls and does not become a repository-management dialog.
