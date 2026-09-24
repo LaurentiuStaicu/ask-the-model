@@ -217,11 +217,11 @@ The header presents repository controls as a distinct group immediately after th
 
 A separate compact global optimization control is packed at the end of the header, before the native window controls:
 
-`Optimizations  OFF  [switch]  ON`
+`Optimizations  [switch]`
 
-The control should read as a small instrument-panel slider rather than a flat preference switch. Its pill-shaped rounded case reuses the application's neutral ridge-border language; the case interior is warm muted red when OFF and warm muted green when ON, while the moving slider is circular, neutral metallic gray with restrained relief. OFF and ON remain visible as small fixed labels on the left and right so state is not communicated by color alone. The LCD includes a compact `OPT OFF` / `OPT ON` annunciator tied to the same policy state.
+The control should read as a small instrument-panel slider rather than a flat preference switch. Its pill-shaped rounded case reuses the application's neutral ridge-border language; the case interior is warm muted red when OFF and warm muted green when ON, while the moving slider is circular, neutral metallic gray with restrained relief. No fixed OFF/ON labels are shown beside the switch. The LCD includes the explicit compact `OPT OFF` / `OPT ON` annunciator tied to the same policy state.
 
-It is application-wide rather than conversation-specific. Every process launch starts OFF and the value is deliberately not persisted. The native `Gtk.Switch` keeps its normal click, keyboard and drag behavior. Its trough is subdued warm red in OFF state and subdued warm green in ON state; the adjacent OFF/ON text is mandatory so state is not communicated by color alone.
+It is application-wide rather than conversation-specific. Every process launch starts OFF and the value is deliberately not persisted. The native `Gtk.Switch` keeps its normal click, keyboard and drag behavior. Its trough is subdued warm red in OFF state and subdued warm green in ON state; explicit textual state remains available in the status LCD and through the switch's accessible label/description.
 
 Transient model and repository status text is not placed in this horizontal control row. A fixed, compact status LCD sits immediately below the header in the upper edge of the conversation area, so status changes never cause header controls to shift.
 
