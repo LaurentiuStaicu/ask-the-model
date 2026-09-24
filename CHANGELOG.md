@@ -68,6 +68,7 @@ All notable public releases of Ask the Model are recorded here.
 - replaced the per-tab conversation-actions menu with a direct symbolic Archive button; History now contains only explicitly archived conversations, reopening an archive preserves its archived identity, and every History row exposes a separately confirmed destructive `Delete permanently` action.
 - archived JSON mirrors use private directory/file modes and atomic consistent replacement; permanent deletion is fail-closed with respect to the managed export, so the SQLite archive is not reported deleted while its JSON copy remains.
 - added regression coverage for deterministic serialization, archive-only mirror creation, cleanup of unarchived leftovers, archived resynchronization and fail-closed managed-export deletion; import, retention policy and bulk history management remain future work.
+- reconciled the enforced session invariant registry with the CONV-05c lifecycle and added `SESSION-S0-012` for archive-only managed JSON mirrors and fail-closed permanent deletion.
 
 
 ### Startup qualification fixes
