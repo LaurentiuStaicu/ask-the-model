@@ -597,6 +597,7 @@ collect_paths (
 
 static int
 run_data_enospc (
+    const char *scenario,
     const char *data_root,
     const char *state_root,
     const char *archive_path,
@@ -719,7 +720,7 @@ run_data_enospc (
         !extraction_staging_exists;
 
     emit_result (
-        "data-enospc",
+        scenario,
         qualified
             ? "FAIL_CLOSED_OLD_AUTHORITY"
             : "UNQUALIFIED",
@@ -1040,11 +1041,24 @@ main (
 )
 {
     if (argc == 10 &&
-        g_strcmp0 (
-            argv[1],
-            "--data-enospc"
-        ) == 0) {
+        (g_strcmp0 (
+             argv[1],
+             "--data-enospc"
+         ) == 0 ||
+         g_strcmp0 (
+             argv[1],
+             "--data-inode-enospc"
+         ) == 0)) {
+        const char *scenario =
+            g_strcmp0 (
+                argv[1],
+                "--data-inode-enospc"
+            ) == 0
+                ? "data-inode-enospc"
+                : "data-enospc";
+
         return run_data_enospc (
+            scenario,
             argv[2],
             argv[3],
             argv[4],
@@ -1075,12 +1089,24 @@ main (
     }
 
     if (argc == 7 &&
-        g_strcmp0 (
-            argv[1],
-            "--verify-data"
-        ) == 0) {
+        (g_strcmp0 (
+             argv[1],
+             "--verify-data"
+         ) == 0 ||
+         g_strcmp0 (
+             argv[1],
+             "--verify-data-inode"
+         ) == 0)) {
+        const char *scenario =
+            g_strcmp0 (
+                argv[1],
+                "--verify-data-inode"
+            ) == 0
+                ? "data-inode-enospc-restart"
+                : "data-enospc-restart";
+
         return run_verify (
-            "data-enospc-restart",
+            scenario,
             argv[2],
             NULL,
             argv[3],
@@ -1110,11 +1136,11 @@ main (
 
     g_printerr (
         "Usage:\n"
-        "  capacity-enospc-runner --data-enospc "
+        "  capacity-enospc-runner --data-enospc|--data-inode-enospc "
         "DATA STATE ARCHIVE ID ACRONYM DISPLAY NEW_SHA OLD_SHA\n"
         "  capacity-enospc-runner --index-enospc "
         "DATA CACHE STATE ARCHIVE ID ACRONYM DISPLAY NEW_SHA OLD_SHA\n"
-        "  capacity-enospc-runner --verify-data "
+        "  capacity-enospc-runner --verify-data|--verify-data-inode "
         "DATA STATE ID NEW_SHA OLD_SHA\n"
         "  capacity-enospc-runner --verify-index "
         "DATA CACHE STATE ID NEW_SHA OLD_SHA\n"
