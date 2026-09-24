@@ -146,7 +146,7 @@ The current provider implementation addresses loopback endpoints only. GPU accel
 
 v0.5.0 persists only conversations explicitly saved to History. Working turns use the separate local conversation store as a transactional boundary, but Close or normal application exit discards unarchived conversations; startup removes unarchived leftovers from an interrupted prior session. Saved History entries retain exact model/repository provenance, and permanent Delete removes both the archived SQLite record and its managed JSON export.
 
-The Flatpak receives write access only to the dedicated `~/Ask the Model` directory for repository snapshots. It must not request broad Home or host filesystem access.
+The Flatpak receives write access only to the dedicated `~/Ask the Model` directory for validated repository snapshots and managed conversation exports. It must not request broad Home or host filesystem access.
 
 ## Not implemented in v0.5.0
 
