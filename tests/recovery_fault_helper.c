@@ -321,7 +321,11 @@ verify_snapshot (
             control_path,
             &generation_id,
             error
-        ) ||
+        )) {
+        goto fail;
+    }
+
+    if (generation_id > 0 &&
         !atm_control_state_load_repository_values_at_generation (
             control_path,
             generation_id,
