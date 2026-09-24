@@ -1,0 +1,216 @@
+name: C0-E3 state-root ENOSPC qualification
+
+on:
+  workflow_dispatch:
+  pull_request:
+    paths:
+      - 'src/control_state.c'
+      - 'src/control_state.h'
+      - 'data/io.github.laurentiustaicu.ask_the_model.gresource.xml'
+      - 'data/schemas/control-state-v1.sql'
+      - 'data/schemas/control-state-v2.sql'
+      - 'tests/capacity_state_enospc_runner.c'
+      - '.github/workflows/capacity-state-enospc.yml'
+
+permissions:
+  contents: read
+
+concurrency:
+  group: capacity-c0-e3-${{ github.event.pull_request.number || github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  state-enospc:
+    runs-on: ubuntu-24.04
+    timeout-minutes: 20
+
+    steps:
+      - name: Checkout AtM
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+
+      - name: Install qualification build dependencies
+        shell: bash
+        run: |
+          set -euo pipefail
+          sudo apt-get update
+          sudo apt-get install -y --no-install-recommends \
+            build-essential \
+            pkg-config \
+            libglib2.0-dev \
+            libglib2.0-bin \
+            libjson-glib-dev \
+            libsqlite3-dev
+
+      - name: Compile state ENOSPC qualification runner
+        shell: bash
+        run: |
+          set -euo pipefail
+
+          glib-compile-resources \
+            data/io.github.laurentiustaicu.ask_the_model.gresource.xml \
+            --sourcedir=data \
+            --generate-source \
+            --target=/tmp/atm-resources.c
+
+          cc \
+            -std=c11 \
+            -D_GNU_SOURCE \
+            -O2 \
+            -Wall \
+            -Wextra \
+            -Werror \
+            -Isrc \
+            src/control_state.c \
+            tests/capacity_state_enospc_runner.c \
+            /tmp/atm-resources.c \
+            $(pkg-config --cflags --libs \
+              glib-2.0 \
+              gio-2.0 \
+              json-glib-1.0 \
+              sqlite3) \
+            -o /tmp/atm-capacity-state-enospc-runner
+
+      - name: Qualify Control DB fail-closed behavior on full state filesystem
+        shell: bash
+        env:
+          LC_ALL: C
+        run: |
+          set -euo pipefail
+
+          root=/tmp/atm-c0-e3
+          state="$root/state"
+          results="$root/results"
+          mkdir -p "$state" "$results"
+
+          sudo mount -t tmpfs -o size=2M,nr_inodes=1024 tmpfs "$state"
+          trap 'sudo umount "$state" || true' EXIT
+
+          old_sha=4444444444444444444444444444444444444444
+          new_sha=5555555555555555555555555555555555555555
+
+          /tmp/atm-capacity-state-enospc-runner \
+            --exercise \
+            "$state" \
+            rmd \
+            "$old_sha" \
+            "$new_sha" \
+            16384 \
+            | tee "$results/state-enospc-attempt.json"
+
+          /tmp/atm-capacity-state-enospc-runner \
+            --verify \
+            "$state" \
+            rmd \
+            "$old_sha" \
+            | tee "$results/state-enospc-restart.json"
+
+          python3 - <<'PY'
+          import json
+          import pathlib
+
+          results = pathlib.Path("/tmp/atm-c0-e3/results")
+          attempt = json.loads(
+              (results / "state-enospc-attempt.json").read_text(
+                  encoding="utf-8"
+              )
+          )
+          restart = json.loads(
+              (results / "state-enospc-restart.json").read_text(
+                  encoding="utf-8"
+              )
+          )
+
+          if not attempt["qualified"]:
+              raise SystemExit(
+                  f"state ENOSPC attempt not qualified: {attempt}"
+              )
+          if not restart["qualified"]:
+              raise SystemExit(
+                  f"state ENOSPC restart not qualified: {restart}"
+              )
+          if attempt["candidate_generations"] != 0:
+              raise SystemExit(
+                  "state ENOSPC left a persisted CANDIDATE generation"
+              )
+          if restart["candidate_generations"] != 0:
+              raise SystemExit(
+                  "fresh verifier found a persisted CANDIDATE generation"
+              )
+          if attempt["available_bytes_before_operation"] > 65536:
+              raise SystemExit(
+                  "state ENOSPC test did not reach the intended low-space band"
+              )
+
+          artifact = {
+              "schema_version": 1,
+              "qualification_id": "atm-c0-e3-state-enospc-v1",
+              "leave_target_bytes": 16384,
+              "records": [attempt, restart],
+          }
+
+          output = results / "c0-e3-state-enospc.json"
+          output.write_text(
+              json.dumps(
+                  artifact,
+                  indent=2,
+                  sort_keys=True,
+              ) + "\n",
+              encoding="utf-8",
+          )
+
+          print(output.read_text(encoding="utf-8"))
+          PY
+
+          sudo umount "$state"
+          trap - EXIT
+
+      - name: Add provenance to aggregate artifact
+        shell: bash
+        env:
+          ATM_SOURCE_COMMIT: ${{ github.event.pull_request.head.sha || github.sha }}
+          ATM_WORKFLOW_COMMIT: ${{ github.sha }}
+        run: |
+          set -euo pipefail
+
+          python3 - <<'PY'
+          import json
+          import os
+          import pathlib
+          import platform
+
+          path = pathlib.Path(
+              "/tmp/atm-c0-e3/results/c0-e3-state-enospc.json"
+          )
+          artifact = json.loads(
+              path.read_text(encoding="utf-8")
+          )
+          artifact["atm_source_commit"] = os.environ[
+              "ATM_SOURCE_COMMIT"
+          ]
+          artifact["workflow_commit"] = os.environ[
+              "ATM_WORKFLOW_COMMIT"
+          ]
+          artifact["runtime"] = {
+              "system": platform.system(),
+              "release": platform.release(),
+              "machine": platform.machine(),
+          }
+          path.write_text(
+              json.dumps(
+                  artifact,
+                  indent=2,
+                  sort_keys=True,
+              ) + "\n",
+              encoding="utf-8",
+          )
+          PY
+
+      - name: Upload C0-E3 qualification evidence
+        if: always()
+        uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7.0.1
+        with:
+          name: atm-c0-e3-state-enospc-${{ github.run_id }}-${{ github.run_attempt }}
+          path: |
+            /tmp/atm-c0-e3/results/*.json
+          if-no-files-found: error
+          retention-days: 90
