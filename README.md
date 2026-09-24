@@ -18,7 +18,7 @@
 
 <p align="center"><small><strong>A local-first desktop interface for local AI chat and repository-grounded exploration of scientific dynamical models with exact, inspectable provenance.</strong></small></p>
 
-<p align="center"><small><a href="#start-here-first-time-setup">First-time setup</a> · <a href="#repository-grounded-scientific-model-chat">Repository-grounded chat</a> · <a href="docs/USER_INTERFACE_GUIDE.md">Interface guide</a> · <a href="docs/TROUBLESHOOTING.md">Troubleshooting</a> · <a href="STATUS.md">Project status</a></small></p>
+<p align="center"><small><a href="#start-here-first-time-setup">First-time setup</a> · <a href="#repository-grounded-scientific-model-chat">Repository-grounded chat</a> · <a href="#save-conversations-for-later">Saved conversations</a> · <a href="docs/USER_INTERFACE_GUIDE.md">Interface guide</a> · <a href="docs/TROUBLESHOOTING.md">Troubleshooting</a> · <a href="STATUS.md">Project status</a></small></p>
 
 ---
 
