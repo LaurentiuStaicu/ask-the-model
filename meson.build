@@ -573,6 +573,20 @@ test(
   capacity_measurement_test
 )
 
+capacity_measurement_probe = executable(
+  'capacity-measurement-probe',
+  [
+    'src/capacity_measurement.c',
+    'tests/capacity_measurement_probe.c'
+  ],
+  include_directories: include_directories('src'),
+  dependencies: [
+    glib_dep,
+    json_glib_dep
+  ],
+  install: false
+)
+
 repository_mutation_lease_test = executable(
   'repository-mutation-lease-test',
   [
