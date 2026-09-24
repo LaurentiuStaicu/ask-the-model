@@ -95,6 +95,9 @@ namespace AskTheModel {
             new OptimizationPolicy ();
         private Gtk.Switch? optimization_switch;
         private Gtk.Label? optimization_label;
+        private Gtk.Label? optimization_off_label;
+        private Gtk.Label? optimization_on_label;
+        private Gtk.Label? optimization_lcd_annunciator;
         private RepositorySelection repository_selection =
             new RepositorySelection ();
         private RepositoryLifecycleService repository_lifecycle =
@@ -576,10 +579,16 @@ namespace AskTheModel {
                         : "; remote check offline";
             }
 
+            string optimization_summary =
+                optimization_policy.enabled
+                    ? "Optimizations on"
+                    : "Optimizations off";
+
             string summary =
-                "%s. %s.".printf (
+                "%s. %s. %s.".printf (
                     ai_summary,
-                    repository_summary
+                    repository_summary,
+                    optimization_summary
                 );
 
             status_lcd.tooltip_text = summary;
@@ -2059,7 +2068,9 @@ namespace AskTheModel {
 
         private void update_optimization_control () {
             if (optimization_switch == null ||
-                optimization_label == null) {
+                optimization_label == null ||
+                optimization_off_label == null ||
+                optimization_on_label == null) {
                 return;
             }
 
@@ -2069,19 +2080,37 @@ namespace AskTheModel {
                 optimization_switch.active = enabled;
             }
 
-            optimization_label.label =
-                enabled ? "OPT ON" : "OPT OFF";
+            if (enabled) {
+                optimization_off_label.remove_css_class ("active");
+                optimization_on_label.add_css_class ("active");
+            } else {
+                optimization_on_label.remove_css_class ("active");
+                optimization_off_label.add_css_class ("active");
+            }
 
             optimization_switch.tooltip_text = enabled
-                ? "Optimizations ON — experimental optimized runtime"
+                ? "Optimizations ON — qualified optimized paths may run"
                 : "Optimizations OFF — baseline runtime";
 
             optimization_switch.update_property (
                 Gtk.AccessibleProperty.LABEL,
+                "Optimizations",
+                Gtk.AccessibleProperty.DESCRIPTION,
                 enabled
-                    ? "Optimization mode on"
-                    : "Optimization mode off"
+                    ? "Optimizations on"
+                    : "Optimizations off; baseline runtime"
             );
+
+            if (optimization_lcd_annunciator != null) {
+                optimization_lcd_annunciator.label =
+                    enabled ? "OPT ON" : "OPT OFF";
+                set_annunciator (
+                    optimization_lcd_annunciator,
+                    true
+                );
+            }
+
+            update_status_lcd_accessibility ();
         }
 
         private Gtk.Widget build_titlebar () {
@@ -2228,12 +2257,23 @@ namespace AskTheModel {
 
             headerbar.pack_start (header_controls);
 
-            var optimization_state_label =
-                new Gtk.Label ("OPT OFF") {
+            var optimization_title_label =
+                new Gtk.Label ("OPT") {
                     valign = Gtk.Align.CENTER
                 };
-            optimization_state_label.add_css_class (
-                "atm-optimization-label"
+            optimization_title_label.add_css_class (
+                "atm-optimization-title"
+            );
+
+            var optimization_off_state_label =
+                new Gtk.Label ("OFF") {
+                    valign = Gtk.Align.CENTER
+                };
+            optimization_off_state_label.add_css_class (
+                "atm-optimization-side-label"
+            );
+            optimization_off_state_label.add_css_class (
+                "off"
             );
 
             var optimization_mode_switch =
@@ -2246,13 +2286,24 @@ namespace AskTheModel {
             optimization_mode_switch.add_css_class (
                 "atm-optimization-switch"
             );
-            optimization_mode_switch.update_property (
-                Gtk.AccessibleProperty.LABEL,
-                "Optimization mode off"
+
+            var optimization_on_state_label =
+                new Gtk.Label ("ON") {
+                    valign = Gtk.Align.CENTER
+                };
+            optimization_on_state_label.add_css_class (
+                "atm-optimization-side-label"
+            );
+            optimization_on_state_label.add_css_class (
+                "on"
             );
 
             optimization_label =
-                optimization_state_label;
+                optimization_title_label;
+            optimization_off_label =
+                optimization_off_state_label;
+            optimization_on_label =
+                optimization_on_state_label;
             optimization_switch =
                 optimization_mode_switch;
 
@@ -2266,7 +2317,7 @@ namespace AskTheModel {
 
             var optimization_controls = new Gtk.Box (
                 Gtk.Orientation.HORIZONTAL,
-                6
+                4
             ) {
                 valign = Gtk.Align.CENTER
             };
@@ -2274,10 +2325,16 @@ namespace AskTheModel {
                 "atm-optimization-controls"
             );
             optimization_controls.append (
-                optimization_state_label
+                optimization_title_label
+            );
+            optimization_controls.append (
+                optimization_off_state_label
             );
             optimization_controls.append (
                 optimization_mode_switch
+            );
+            optimization_controls.append (
+                optimization_on_state_label
             );
 
             headerbar.pack_end (
@@ -3879,6 +3936,8 @@ namespace AskTheModel {
                     "ERR",
                     "atm-annunciator-critical"
                 );
+            optimization_lcd_annunciator =
+                build_annunciator_label ("OPT OFF");
 
             no_ai_annunciator.tooltip_text =
                 "No usable local AI available";
@@ -3900,6 +3959,8 @@ namespace AskTheModel {
                 "Remote check unavailable; local repositories may remain usable";
             repo_error_annunciator.tooltip_text =
                 "Repository operation failed";
+            optimization_lcd_annunciator.tooltip_text =
+                "Optimization mode";
 
             var lcd_row = new Gtk.Box (
                 Gtk.Orientation.HORIZONTAL,
@@ -3926,7 +3987,8 @@ namespace AskTheModel {
                 repo_validate_annunciator,
                 repo_ready_annunciator,
                 repo_offline_annunciator,
-                repo_error_annunciator
+                repo_error_annunciator,
+                optimization_lcd_annunciator
             };
 
             for (int i = 0; i < lcd_segments.length; i++) {
