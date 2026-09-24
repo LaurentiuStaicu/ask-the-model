@@ -53,6 +53,8 @@ namespace AskTheModel.RepositoryNative {
         cheader_filename = "repository_ui_bridge.h"
     )]
     public static extern bool ensure_index (
+        string state_root,
+        bool coordinated,
         string cache_root,
         string snapshot_root,
         string repository_id,
