@@ -282,6 +282,23 @@ The inspection result is a planning input, not a replacement for extraction vali
 
 No filesystem-allocation byte threshold is derived directly from logical tar sizes in this slice because compressed/deduplicating/sparse-capable filesystems can make logical bytes differ from allocated bytes. Production byte admission continues to use measured phase evidence plus filesystem availability, while C0-F2 closes the archive-entry/inode observability gap.
 
+### C0-F3 operation phase construction
+
+C0-F3 converts explicit capacity predictions into the phase array consumed by the C0-F1 admission arithmetic. It remains qualification-only and is not called by Download/Update.
+
+The plan is anchored at the start of one repository mutation and keeps additional operation-owned allocations present in every later phase until current runtime cleanup actually removes them:
+
+1. **Download:** archive allocation in cache.
+2. **Extraction:** completed archive remains while the replacement/new snapshot is materialized in data.
+3. **Index build:** archive and new snapshot remain while index staging/final allocation is created.
+4. **State commit:** archive, new snapshot and completed index still coexist while the guarded Control DB mutation uses state-root capacity.
+
+Existing active snapshots, and an invalid same-SHA snapshot that is merely renamed into quarantine, are not counted again as new capacity because their blocks/inodes were already consumed when `f_bavail` / `f_favail` were measured.
+
+Fresh install, different-SHA update and same-SHA repair therefore share the same **additional-space** phase arithmetic when no speculative reclamation is allowed. Same-SHA repair carries an explicit `must_admit_before_quarantine` contract so future runtime wiring cannot rename the only inspectable old snapshot before capacity admission has succeeded.
+
+C0-F3 does not derive allocated bytes from archive logical bytes. Snapshot, index, archive and state byte predictions are explicit inputs supplied by later policy/calibration work. The archive pre-scan contributes the exact materialized-entry/inode requirement; C0-F1 then groups roots by `st_dev` and evaluates actual same-filesystem phase overlap rather than summing unrelated maxima.
+
 ### Repository authority-mutation lease
 
 When an operation snapshots optimization mode ON, repository Download/Update uses one application-owned exclusive nonblocking lease at `<state_root>/repository-mutation.lock` before any selected-repository staging or authority mutation begins.
