@@ -604,10 +604,13 @@ static void
 emit_result (
     guint history_generations,
     guint64 leave_target_bytes,
+    guint64 available_bytes_before_filler,
+    guint64 available_inodes_before_filler,
     guint64 available_bytes_before_operation,
     guint64 available_inodes_before_operation,
     guint64 fragment_size,
     guint64 filler_bytes,
+    guint64 control_db_allocated_bytes_before,
     gint64 generation_before,
     gint64 generation_after,
     const char *sha_before,
@@ -659,6 +662,14 @@ emit_result (
         leave_target_bytes
     );
     ADD_INT (
+        "available_bytes_before_filler",
+        available_bytes_before_filler
+    );
+    ADD_INT (
+        "available_inodes_before_filler",
+        available_inodes_before_filler
+    );
+    ADD_INT (
         "available_bytes_before_operation",
         available_bytes_before_operation
     );
@@ -685,6 +696,10 @@ emit_result (
     ADD_INT (
         "candidate_generations",
         candidate_generations
+    );
+    ADD_INT (
+        "control_db_allocated_bytes_before",
+        control_db_allocated_bytes_before
     );
     ADD_INT (
         "page_size_before",
@@ -880,9 +895,13 @@ run_exercise (
     char *sha_before = NULL;
     char *sha_after = NULL;
     guint64 filler_bytes = 0;
+    guint64 available_bytes_before_filler = 0;
+    guint64 available_inodes_before_filler = 0;
     guint64 available_bytes = 0;
     guint64 available_inodes = 0;
     guint64 fragment_size = 0;
+    guint64 pre_filler_fragment_size = 0;
+    guint64 control_db_allocated_bytes_before = 0;
     gint64 generation_before = 0;
     gint64 generation_after = 0;
     gint64 candidate_generations = -1;
@@ -934,6 +953,13 @@ run_exercise (
             &stats_before,
             &error
         ) ||
+        !measure_available (
+            state_root,
+            &available_bytes_before_filler,
+            &available_inodes_before_filler,
+            &pre_filler_fragment_size,
+            &error
+        ) ||
         !consume_capacity (
             state_root,
             leave_target_bytes,
@@ -955,6 +981,23 @@ run_exercise (
                 : "unknown setup error"
         );
         g_clear_error (&error);
+        g_free (filler_path);
+        g_free (sha_before);
+        g_free (control_path);
+        return 4;
+    }
+
+    control_db_allocated_bytes_before =
+        allocated_bytes (
+            control_path
+        );
+
+    if (pre_filler_fragment_size !=
+        fragment_size) {
+        g_printerr (
+            "C0-M2 filesystem fragment size changed within one case.\n"
+        );
+        g_remove (filler_path);
         g_free (filler_path);
         g_free (sha_before);
         g_free (control_path);
@@ -1048,10 +1091,13 @@ run_exercise (
     emit_result (
         history_generations,
         leave_target_bytes,
+        available_bytes_before_filler,
+        available_inodes_before_filler,
         available_bytes,
         available_inodes,
         fragment_size,
         filler_bytes,
+        control_db_allocated_bytes_before,
         generation_before,
         generation_after,
         sha_before,
