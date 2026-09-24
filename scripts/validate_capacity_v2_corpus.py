@@ -120,6 +120,22 @@ def main() -> int:
     if policy.get("pinned_baseline_included") is not True:
         fail("pinned baseline inclusion must remain explicit")
 
+    expected_temporal_order = [
+        "pinned-m1",
+        "recent-r30",
+        "recent-r22",
+        "recent-r15",
+        "recent-r8",
+        "recent-r1",
+    ]
+    if policy.get("temporal_order_labels") != expected_temporal_order:
+        fail("verified temporal order drifted")
+    if policy.get("ancestry_verified") is not True:
+        fail("temporal ancestry must remain explicitly verified")
+    ancestry_contract = str(policy.get("ancestry_contract", "")).lower()
+    if "ancestor" not in ancestry_contract or "behind_by=0" not in ancestry_contract:
+        fail("temporal ancestry contract is incomplete")
+
     print(
         "capacity-v2 corpus validation passed: "
         "18 exact SHAs + pinned R5 anchors"
