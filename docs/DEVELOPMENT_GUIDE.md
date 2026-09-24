@@ -197,6 +197,26 @@ The global lease applies only to authority-changing Download/Update work. Remote
 
 This coordination contract is intentionally limited to AtM's supported local-storage/same-host boundary. SQLite WAL itself requires same-host shared memory and is not a cross-host network-filesystem design.
 
+### Retrieval-index per-SHA single-flight
+
+When an operation snapshots Optimizations ON, retrieval-index ensure keeps the valid-index fast path lock-free. If the exact index is missing or invalid, the worker joins one blocking exclusive build flight identified by repository ID plus exact snapshot SHA under:
+
+`<state_root>/retrieval-index-locks/<repository_id>/<sha>.lock`
+
+The coordination directory is created one component at a time and each application-owned component is required to be a real effective-user-owned directory. The lock file uses the shared native coordination-lease helper with defensive no-follow open and inode revalidation.
+
+The fixed lock order is:
+
+`optional global repository mutation lease → per-SHA index-build lease`
+
+A grounding/read operation never acquires the global authority lease merely to rebuild derived cache. It may take only the per-SHA build flight inside the existing repository-preparation worker thread.
+
+After a waiter acquires the per-SHA lease, it revalidates the final index. If the previous builder completed, the waiter returns that validated index as REUSED. Otherwise only the flight owner may remove an invalid final index or a real regular abandoned staging file and perform the rebuild/promotion. A symlink, directory or other unexpected staging object fails closed.
+
+The per-SHA lock is blocking by design in this first slice and no arbitrary timeout is imposed. The wait occurs off the GTK main loop, and monotonic wait duration is measured internally for diagnostics. Lock files are persistent coordination metadata; normal release never unlinks them.
+
+When Optimizations is OFF, the established post-v0.5.0 retrieval-index ensure path remains unchanged.
+
 ### Recovery fault qualification
 
 The OPT-A0 recovery harness is test-only. Native checkpoint calls compile to no-ops in the production application; only the dedicated recovery helper is built with `ATM_TEST_FAULT_INJECTION`.
