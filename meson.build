@@ -60,6 +60,7 @@ executable(
     'src/repository_ingest.c',
     'src/repository_ui_bridge.c',
     'src/retrieval_index.c',
+    'src/coordination_lease.c',
     'src/retrieval_index_lifecycle.c',
     'src/retrieval_query.c',
     'src/scientific_profile.c',
@@ -233,6 +234,7 @@ startup_qualification_service_test = executable(
     'src/csv_table.c',
     'src/structured_json.c',
     'src/retrieval_index.c',
+    'src/coordination_lease.c',
     'src/retrieval_index_lifecycle.c',
     'src/repository_reconcile.c',
     'src/snapshot_seal.c',
@@ -556,6 +558,7 @@ test(
 repository_mutation_lease_test = executable(
   'repository-mutation-lease-test',
   [
+    'src/coordination_lease.c',
     'src/repository_mutation_lease.c',
     'tests/repository_mutation_lease_test.c'
   ],
@@ -701,6 +704,7 @@ retrieval_index_lifecycle_test = executable(
     'src/csv_table.c',
     'src/structured_json.c',
     'src/retrieval_index.c',
+    'src/coordination_lease.c',
     'src/retrieval_index_lifecycle.c',
     'tests/retrieval_index_lifecycle_test.c',
     resources
@@ -712,6 +716,9 @@ retrieval_index_lifecycle_test = executable(
     json_glib_dep,
     sqlite_dep,
     yaml_dep
+  ],
+  c_args: [
+    '-DATM_TEST_INDEX_SINGLE_FLIGHT'
   ],
   install: false
 )
@@ -732,6 +739,7 @@ repository_reconcile_test = executable(
     'src/csv_table.c',
     'src/structured_json.c',
     'src/retrieval_index.c',
+    'src/coordination_lease.c',
     'src/retrieval_index_lifecycle.c',
     'src/repository_reconcile.c',
     'tests/repository_reconcile_test.c',
@@ -763,6 +771,7 @@ repository_oracle_integration_test = executable(
     'src/csv_table.c',
     'src/structured_json.c',
     'src/retrieval_index.c',
+    'src/coordination_lease.c',
     'src/retrieval_index_lifecycle.c',
     'src/repository_reconcile.c',
     'src/snapshot_seal.c',
@@ -1194,6 +1203,7 @@ conversation_grounding_test = executable(
     'src/csv_table.c',
     'src/structured_json.c',
     'src/retrieval_index.c',
+    'src/coordination_lease.c',
     'src/retrieval_index_lifecycle.c',
     'src/retrieval_query.c',
     'src/retrieval_rank.c',
@@ -1233,6 +1243,7 @@ conversation_grounding_vala_test = executable(
     'src/csv_table.c',
     'src/structured_json.c',
     'src/retrieval_index.c',
+    'src/coordination_lease.c',
     'src/retrieval_index_lifecycle.c',
     'src/retrieval_query.c',
     'src/retrieval_rank.c',
@@ -1275,6 +1286,7 @@ conversation_session_test = executable(
     'src/csv_table.c',
     'src/structured_json.c',
     'src/retrieval_index.c',
+    'src/coordination_lease.c',
     'src/retrieval_index_lifecycle.c',
     'src/retrieval_query.c',
     'src/retrieval_rank.c',
@@ -1332,6 +1344,7 @@ repository_lifecycle_service_test = executable(
     'src/csv_table.c',
     'src/structured_json.c',
     'src/retrieval_index.c',
+    'src/coordination_lease.c',
     'src/retrieval_index_lifecycle.c',
     'src/retrieval_query.c',
     'src/retrieval_rank.c',
