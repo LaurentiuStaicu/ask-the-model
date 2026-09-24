@@ -1456,7 +1456,7 @@ namespace AskTheModel {
             }
 
             if (new_chat_action != null) {
-                new_chat_action.set_enabled_for_session (can_start_new_chat);
+                new_chat_action.set_enabled (can_start_new_chat);
             }
 
             if (history_button != null) {
@@ -2089,16 +2089,16 @@ namespace AskTheModel {
             }
 
             optimization_switch.tooltip_text = enabled
-                ? "Optimizations ON — qualified optimized paths may run"
-                : "Optimizations OFF — baseline runtime";
+                ? "Optimizations ON — experimental optimized runtime behavior"
+                : "Optimizations OFF — baseline runtime behavior";
 
             optimization_switch.update_property (
                 Gtk.AccessibleProperty.LABEL,
-                "Optimizations",
+                "Optimization mode",
                 Gtk.AccessibleProperty.DESCRIPTION,
                 enabled
-                    ? "Optimizations on"
-                    : "Optimizations off; baseline runtime"
+                    ? "Optimizations on. Experimental optimized runtime behavior."
+                    : "Optimizations off. Baseline runtime behavior."
             );
 
             if (optimization_lcd_annunciator != null) {
@@ -2289,7 +2289,7 @@ namespace AskTheModel {
                     active = false,
                     valign = Gtk.Align.CENTER,
                     tooltip_text =
-                        "Optimizations OFF — baseline runtime"
+                        "Optimizations OFF — baseline runtime behavior"
                 };
             optimization_mode_switch.add_css_class (
                 "atm-optimization-switch"
