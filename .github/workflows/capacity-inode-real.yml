@@ -203,20 +203,11 @@ jobs:
             "$old_sha" \
             | tee /tmp/atm-c0-e2/results/inode-enospc-restart.json
 
-          available_bytes="$(df -B1 --output=avail "$data" | tail -n 1 | tr -d ' ')"
-          available_inodes="$(df -i --output=iavail "$data" | tail -n 1 | tr -d ' ')"
-
-          python3 - \
-            "$available_bytes" \
-            "$available_inodes" \
-            <<'PY'
+          python3 - <<'PY'
           import json
           import pathlib
-          import sys
 
           results = pathlib.Path("/tmp/atm-c0-e2/results")
-          available_bytes = int(sys.argv[1])
-          available_inodes = int(sys.argv[2])
 
           for name in (
               "inode-enospc-attempt.json",
@@ -241,11 +232,35 @@ jobs:
                   f"wrong scenario: {attempt['scenario']}"
               )
 
+          available_bytes = attempt[
+              "available_bytes_before_operation"
+          ]
+          available_inodes = attempt[
+              "available_inodes_before_operation"
+          ]
+
+          # CBD's measured snapshot allocation is below 1 MiB. Requiring
+          # at least 16 MiB free here demonstrates that the actual ENOSPC
+          # did not come from the byte budget.
+          if available_bytes < 16 * 1024 * 1024:
+              raise SystemExit(
+                  f"byte budget unexpectedly low: {available_bytes}"
+              )
+
+          # The bounded tmpfs has 64 total inodes and the seeded authority
+          # consumes a few before ingest. The pinned CBD snapshot requires
+          # more than 100 filesystem entries, so this budget is intentionally
+          # insufficient for inode/file-slot capacity.
+          if available_inodes >= 100:
+              raise SystemExit(
+                  f"inode budget unexpectedly high: {available_inodes}"
+              )
+
           evidence = {
               "schema_version": 1,
               "qualification_id": "atm-c0-e2-inode-exhaustion-v1",
-              "available_bytes_after_failure": available_bytes,
-              "available_inodes_after_failure": available_inodes,
+              "available_bytes_before_operation": available_bytes,
+              "available_inodes_before_operation": available_inodes,
               "pinned_repository_id": "cbd",
               "pinned_repository_sha": __import__("os").environ[
                   "ATM_CBD_SHA"
