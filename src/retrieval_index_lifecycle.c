@@ -106,6 +106,30 @@ require_coordination_directory (
 }
 
 static gboolean
+ensure_coordination_directory (
+    const char *path,
+    GError **error
+)
+{
+    if (g_mkdir (path, 0700) != 0 &&
+        errno != EEXIST) {
+        g_set_error (
+            error,
+            ATM_RETRIEVAL_LIFECYCLE_ERROR,
+            ATM_RETRIEVAL_LIFECYCLE_ERROR_CACHE,
+            "Could not create retrieval-index coordination directory: %s.",
+            g_strerror (errno)
+        );
+        return FALSE;
+    }
+
+    return require_coordination_directory (
+        path,
+        error
+    );
+}
+
+static gboolean
 prepare_single_flight_lock_path (
     const char *state_root,
     const char *repository_id,
@@ -145,25 +169,11 @@ prepare_single_flight_lock_path (
         NULL
     );
 
-    if (g_mkdir_with_parents (
-            repository_root,
-            0700
-        ) != 0) {
-        g_set_error (
-            error,
-            ATM_RETRIEVAL_LIFECYCLE_ERROR,
-            ATM_RETRIEVAL_LIFECYCLE_ERROR_CACHE,
-            "Could not create retrieval-index coordination directory: %s.",
-            g_strerror (errno)
-        );
-        goto out;
-    }
-
-    if (!require_coordination_directory (
+    if (!ensure_coordination_directory (
             lock_root,
             error
         ) ||
-        !require_coordination_directory (
+        !ensure_coordination_directory (
             repository_root,
             error
         )) {
