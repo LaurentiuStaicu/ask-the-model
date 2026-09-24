@@ -36,6 +36,58 @@ window.atm-window headerbar button:active {
     background-color: rgba(27, 27, 24, 0.12);
 }
 
+/* Post-v0.5.0 optimization master gate.
+ * The switch is intentionally unmistakable without being bright:
+ * warm brick red = OFF, warm olive green = ON.
+ * OFF/ON text beside the switch provides a non-color state cue.
+ */
+window.atm-window .atm-optimization-controls {
+    margin-left: 8px;
+}
+
+window.atm-window label.atm-optimization-label,
+window.atm-window label.atm-optimization-state {
+    font-size: 0.82em;
+    font-weight: 600;
+}
+
+window.atm-window label.atm-optimization-state {
+    min-width: 24px;
+    color: #98574F;
+}
+
+window.atm-window label.atm-optimization-state.enabled {
+    color: #60784F;
+}
+
+window.atm-window switch.atm-optimization-switch {
+    min-width: 42px;
+    min-height: 20px;
+    background-image: none;
+    background-color: #A96258;
+    border: 1px solid #864B44;
+    box-shadow: inset 0 0 0 1px rgba(255, 255, 255, 0.10);
+}
+
+window.atm-window switch.atm-optimization-switch:checked {
+    background-image: none;
+    background-color: #70885E;
+    border-color: #566B49;
+}
+
+window.atm-window switch.atm-optimization-switch > slider {
+    min-width: 18px;
+    min-height: 18px;
+    background-image: none;
+    background-color: #EFF0ED;
+    border: 1px solid #A4A5A1;
+    box-shadow: none;
+}
+
+window.atm-window switch.atm-optimization-switch > image {
+    opacity: 0;
+}
+
 window.atm-window scrolledwindow,
 window.atm-window textview,
 window.atm-window textview text {
@@ -266,6 +318,34 @@ window.atm-window.atm-dark headerbar button:hover {
 
 window.atm-window.atm-dark headerbar button:active {
     background-color: rgba(250, 251, 249, 0.15);
+}
+
+window.atm-window.atm-dark label.atm-optimization-label {
+    color: #FAFBF9;
+}
+
+window.atm-window.atm-dark label.atm-optimization-state {
+    color: #D07A6E;
+}
+
+window.atm-window.atm-dark label.atm-optimization-state.enabled {
+    color: #94AD7A;
+}
+
+window.atm-window.atm-dark switch.atm-optimization-switch {
+    background-color: #A65D54;
+    border-color: #C17469;
+    box-shadow: inset 0 0 0 1px rgba(27, 27, 24, 0.22);
+}
+
+window.atm-window.atm-dark switch.atm-optimization-switch:checked {
+    background-color: #71875F;
+    border-color: #8EA379;
+}
+
+window.atm-window.atm-dark switch.atm-optimization-switch > slider {
+    background-color: #D8D9D6;
+    border-color: #6F706C;
 }
 
 window.atm-window.atm-dark .atm-selector-triangle {
