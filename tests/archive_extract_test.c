@@ -454,6 +454,230 @@ test_total_size_limit (void)
     );
 }
 
+static void
+test_inspect_valid_archive (void)
+{
+    char *root = new_temp_root ();
+    char *archive_path = g_build_filename (
+        root,
+        "snapshot.tar.gz",
+        NULL
+    );
+    FixtureEntry entries[] = {
+        { "repo-sha/", AE_IFDIR, NULL, NULL, NULL },
+        { "repo-sha/CITATION.cff", AE_IFREG,
+          "version: 0.1.0\n", NULL, NULL },
+        { "repo-sha/model/core.txt", AE_IFREG,
+          "core\n", NULL, NULL }
+    };
+    AtmArchiveLimits limits = default_limits ();
+    AtmArchiveInspection inspection;
+    GError *error = NULL;
+
+    write_fixture (
+        archive_path,
+        entries,
+        G_N_ELEMENTS (entries)
+    );
+
+    g_assert_true (
+        atm_archive_inspect_snapshot (
+            archive_path,
+            &limits,
+            &inspection,
+            &error
+        )
+    );
+    g_assert_no_error (error);
+
+    g_assert_cmpuint (
+        inspection.archive_entries,
+        ==,
+        3
+    );
+    g_assert_cmpuint (
+        inspection.regular_files,
+        ==,
+        2
+    );
+    g_assert_cmpuint (
+        inspection.directories,
+        ==,
+        1
+    );
+    g_assert_cmpuint (
+        inspection.materialized_entries,
+        ==,
+        4
+    );
+    g_assert_cmpuint (
+        inspection.logical_regular_bytes,
+        ==,
+        strlen ("version: 0.1.0\n") +
+        strlen ("core\n")
+    );
+    g_assert_cmpuint (
+        inspection.largest_regular_file_bytes,
+        ==,
+        strlen ("version: 0.1.0\n")
+    );
+
+    remove_tree_best_effort (root);
+    g_free (archive_path);
+    g_free (root);
+}
+
+static void
+test_inspect_explicit_directory_not_double_counted (void)
+{
+    char *root = new_temp_root ();
+    char *archive_path = g_build_filename (
+        root,
+        "snapshot.tar.gz",
+        NULL
+    );
+    FixtureEntry entries[] = {
+        { "repo-sha/", AE_IFDIR, NULL, NULL, NULL },
+        { "repo-sha/model/", AE_IFDIR, NULL, NULL, NULL },
+        { "repo-sha/model/core.txt", AE_IFREG,
+          "core\n", NULL, NULL }
+    };
+    AtmArchiveLimits limits = default_limits ();
+    AtmArchiveInspection inspection;
+    GError *error = NULL;
+
+    write_fixture (
+        archive_path,
+        entries,
+        G_N_ELEMENTS (entries)
+    );
+
+    g_assert_true (
+        atm_archive_inspect_snapshot (
+            archive_path,
+            &limits,
+            &inspection,
+            &error
+        )
+    );
+    g_assert_no_error (error);
+
+    g_assert_cmpuint (
+        inspection.directories,
+        ==,
+        1
+    );
+    g_assert_cmpuint (
+        inspection.regular_files,
+        ==,
+        1
+    );
+    g_assert_cmpuint (
+        inspection.materialized_entries,
+        ==,
+        3
+    );
+
+    remove_tree_best_effort (root);
+    g_free (archive_path);
+    g_free (root);
+}
+
+static void
+assert_inspection_rejected (
+    const FixtureEntry *entries,
+    gsize count,
+    AtmArchiveLimits limits,
+    AtmArchiveError expected_code
+)
+{
+    char *root = new_temp_root ();
+    char *archive_path = g_build_filename (
+        root,
+        "snapshot.tar.gz",
+        NULL
+    );
+    AtmArchiveInspection inspection;
+    GError *error = NULL;
+
+    write_fixture (
+        archive_path,
+        entries,
+        count
+    );
+
+    g_assert_false (
+        atm_archive_inspect_snapshot (
+            archive_path,
+            &limits,
+            &inspection,
+            &error
+        )
+    );
+    g_assert_error (
+        error,
+        ATM_ARCHIVE_ERROR,
+        expected_code
+    );
+
+    g_clear_error (&error);
+    remove_tree_best_effort (root);
+    g_free (archive_path);
+    g_free (root);
+}
+
+static void
+test_inspect_duplicate_file_rejected (void)
+{
+    FixtureEntry entries[] = {
+        { "repo-sha/", AE_IFDIR, NULL, NULL, NULL },
+        { "repo-sha/a.txt", AE_IFREG, "a", NULL, NULL },
+        { "repo-sha/a.txt", AE_IFREG, "b", NULL, NULL }
+    };
+
+    assert_inspection_rejected (
+        entries,
+        G_N_ELEMENTS (entries),
+        default_limits (),
+        ATM_ARCHIVE_ERROR_FORMAT
+    );
+}
+
+static void
+test_inspect_symlink_rejected (void)
+{
+    FixtureEntry entries[] = {
+        { "repo-sha/", AE_IFDIR, NULL, NULL, NULL },
+        { "repo-sha/link", AE_IFLNK, NULL, "/tmp", NULL }
+    };
+
+    assert_inspection_rejected (
+        entries,
+        G_N_ELEMENTS (entries),
+        default_limits (),
+        ATM_ARCHIVE_ERROR_UNSUPPORTED_ENTRY
+    );
+}
+
+static void
+test_inspect_total_limit_rejected (void)
+{
+    FixtureEntry entries[] = {
+        { "repo-sha/", AE_IFDIR, NULL, NULL, NULL },
+        { "repo-sha/a.txt", AE_IFREG, "abc", NULL, NULL },
+        { "repo-sha/b.txt", AE_IFREG, "def", NULL, NULL }
+    };
+    AtmArchiveLimits limits = default_limits ();
+    limits.max_total_bytes = 5;
+
+    assert_inspection_rejected (
+        entries,
+        G_N_ELEMENTS (entries),
+        limits,
+        ATM_ARCHIVE_ERROR_LIMIT
+    );
+}
+
 int
 main (int argc, char **argv)
 {
@@ -489,6 +713,26 @@ main (int argc, char **argv)
     g_test_add_func (
         "/archive/total-size-limit",
         test_total_size_limit
+    );
+    g_test_add_func (
+        "/archive/inspect-valid",
+        test_inspect_valid_archive
+    );
+    g_test_add_func (
+        "/archive/inspect-explicit-directory",
+        test_inspect_explicit_directory_not_double_counted
+    );
+    g_test_add_func (
+        "/archive/inspect-duplicate-file-rejected",
+        test_inspect_duplicate_file_rejected
+    );
+    g_test_add_func (
+        "/archive/inspect-symlink-rejected",
+        test_inspect_symlink_rejected
+    );
+    g_test_add_func (
+        "/archive/inspect-total-limit-rejected",
+        test_inspect_total_limit_rejected
     );
 
     return g_test_run ();
