@@ -17,17 +17,17 @@ private void test_toggle_and_snapshot () {
         last_value = enabled;
     });
 
-    policy.set_enabled (true);
+    policy.set_enabled_for_session (true);
 
     assert (policy.enabled);
     assert (policy.snapshot_enabled ());
     assert (change_count == 1);
     assert (last_value);
 
-    policy.set_enabled (true);
+    policy.set_enabled_for_session (true);
     assert (change_count == 1);
 
-    policy.set_enabled (false);
+    policy.set_enabled_for_session (false);
 
     assert (!policy.enabled);
     assert (!policy.snapshot_enabled ());
