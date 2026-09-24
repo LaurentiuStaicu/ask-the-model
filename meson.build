@@ -1294,6 +1294,7 @@ repository_lifecycle_service_test = executable(
     'src/RepositoryState.vala',
     'src/ControlStateNative.vala',
     'src/ControlRepositoryState.vala',
+    'src/OptimizationPolicy.vala',
     'src/RepositoryLifecycleService.vala',
     'src/control_state.c',
     'src/ConversationGrounding.vala',
