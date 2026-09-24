@@ -285,6 +285,7 @@ jobs:
           set -euo pipefail
 
           python3 - <<'PY'
+          import hashlib
           import json
           import os
           import pathlib
@@ -352,6 +353,19 @@ jobs:
                   value.denominator - 1
               ) // value.denominator
 
+          scenario_names = (
+              "ewd-csv-50k",
+              "ewd-csv-150k",
+              "cbd-json-25k",
+              "cbd-json-70k",
+              "rmd-markdown-4m",
+              "rmd-markdown-12m",
+          )
+          scenario_by_id = {
+              hashlib.sha1(name.encode("utf-8")).hexdigest(): name
+              for name in scenario_names
+          }
+
           fitted = {}
           evaluations = {}
           summary = {}
@@ -415,8 +429,16 @@ jobs:
                       index_floor,
                   )
 
+                  synthetic_id = item["repository_sha"]
+                  scenario = scenario_by_id.get(synthetic_id)
+                  if scenario is None:
+                      raise SystemExit(
+                          f"unknown synthetic fixture id: {synthetic_id}"
+                      )
+
                   cases.append({
-                      "synthetic_snapshot_id": item["repository_sha"],
+                      "scenario": scenario,
+                      "synthetic_snapshot_id": synthetic_id,
                       "logical_regular_bytes": item["logical"],
                       "entries": item["entries"],
                       "snapshot": {
@@ -506,7 +528,16 @@ jobs:
               encoding="utf-8",
           )
 
-          print(json.dumps(summary, indent=2, sort_keys=True))
+          print(
+              json.dumps(
+                  {
+                      "summary": summary,
+                      "evaluations": evaluations,
+                  },
+                  indent=2,
+                  sort_keys=True,
+              )
+          )
           PY
 
       - name: Upload C0P-M6 evidence
