@@ -225,6 +225,14 @@ namespace AskTheModel {
                 repository_generation_id =
                     new_generation_id;
             } catch (GLib.Error error) {
+                if (RepositoryNative.error_is_no_space (
+                        error
+                    )) {
+                    throw new RepositoryError.NO_SPACE (
+                        "Not enough local storage space to update repository authority."
+                    );
+                }
+
                 throw new RepositoryError.STORAGE (
                     "Control repository state could not be written from the pinned generation: %s".printf (
                         error.message
@@ -286,6 +294,14 @@ namespace AskTheModel {
                 repository_generation_id =
                     new_generation_id;
             } catch (GLib.Error error) {
+                if (RepositoryNative.error_is_no_space (
+                        error
+                    )) {
+                    throw new RepositoryError.NO_SPACE (
+                        "Not enough local storage space to update repository snapshot authority."
+                    );
+                }
+
                 throw new RepositoryError.STORAGE (
                     "Control repository snapshot seal could not be written from the pinned generation: %s".printf (
                         error.message
