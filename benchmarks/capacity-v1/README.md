@@ -46,6 +46,18 @@ The runtime-independent C0 model remains layered:
    and restart-safe even when admission cannot predict a later external
    capacity loss.
 
+## State-root scaling evidence
+
+C0-M2 extends the state-root evidence from one small Control DB to completed
+histories of 1, 100 and 1000 generations. In the qualification environment,
+the Control DB allocated footprint grew from 40,960 B to 229,376 B, while the
+constrained guarded-publication frontier remained unchanged: 16 KiB and
+32 KiB failed closed, while 64 KiB and 128 KiB completed atomically.
+
+This is useful evidence that immediate publication headroom is not simply
+proportional to total Control DB history size. It is still one Linux/SQLite/
+filesystem environment and therefore is not a portable reserve guarantee.
+
 ## Reserve policy
 
 No reserve is selected here.
