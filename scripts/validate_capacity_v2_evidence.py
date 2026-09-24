@@ -176,6 +176,122 @@ def main() -> int:
     if not underprediction_seen:
         fail("single-model underprediction sensitivity disappeared")
 
+    m6 = evidence.get("structural_stress_m6")
+    if not isinstance(m6, dict):
+        fail("M6 structural stress evidence is missing")
+
+    m6_source = m6.get("source")
+    if not isinstance(m6_source, dict):
+        fail("M6 source provenance is missing")
+
+    require_positive_int(
+        m6_source.get("actions_run_id"),
+        "structural_stress_m6.source.actions_run_id",
+    )
+    require_positive_int(
+        m6_source.get("artifact_id"),
+        "structural_stress_m6.source.artifact_id",
+    )
+    require_digest(
+        m6_source.get("artifact_sha256"),
+        "structural_stress_m6.source.artifact_sha256",
+    )
+    require_sha(
+        m6_source.get("atm_source_commit"),
+        "structural_stress_m6.source.atm_source_commit",
+    )
+    require_sha(
+        m6_source.get("workflow_commit"),
+        "structural_stress_m6.source.workflow_commit",
+    )
+
+    if m6.get("fitted_on_m4_training_only") is not True:
+        fail("M6 must remain fitted only on M4 training evidence")
+    if m6.get("training_refit_on_structural_fixtures") is not False:
+        fail("M6 structural fixtures must not refit the predictor")
+    if m6.get("synthetic_stress_only") is not True:
+        fail("M6 fixtures must remain explicitly synthetic stress evidence")
+
+    m6_summary = m6.get("summary")
+    if not isinstance(m6_summary, dict) or set(m6_summary) != {
+        "cbd", "ewd", "rmd"
+    }:
+        fail("M6 summary repository set drifted")
+
+    expected_index_min = {
+        "cbd": 2.5,
+        "ewd": 2.2,
+        "rmd": 17.0,
+    }
+
+    for rid, record in m6_summary.items():
+        if record.get("cases") != 2:
+            fail(f"M6 {rid} case count must remain 2")
+        if record.get("snapshot_covered") != 2:
+            fail(f"M6 {rid} snapshot coverage must remain 2/2")
+        if record.get("index_covered") != 0:
+            fail(
+                f"M6 {rid} index underprediction must remain visible as 0/2"
+            )
+
+        snapshot_ratio = record.get(
+            "snapshot_worst_actual_over_prediction"
+        )
+        index_ratio = record.get(
+            "index_worst_actual_over_prediction"
+        )
+
+        if (
+            not isinstance(snapshot_ratio, (int, float))
+            or isinstance(snapshot_ratio, bool)
+            or snapshot_ratio <= 0
+            or snapshot_ratio > 1
+        ):
+            fail(f"M6 {rid} snapshot ratio is invalid")
+
+        if (
+            not isinstance(index_ratio, (int, float))
+            or isinstance(index_ratio, bool)
+            or index_ratio < expected_index_min[rid]
+        ):
+            fail(
+                f"M6 {rid} structural index underprediction was weakened"
+            )
+
+    limiting = m6.get("limiting_case")
+    if not isinstance(limiting, dict):
+        fail("M6 limiting case is missing")
+    if limiting.get("repository_id") != "rmd":
+        fail("M6 limiting case must remain RMD")
+    if limiting.get("scenario") != "rmd-markdown-12m":
+        fail("M6 limiting scenario drifted")
+    if limiting.get("predicted_index_bytes") != 3334144:
+        fail("M6 limiting predicted index bytes drifted")
+    if limiting.get("actual_index_bytes") != 57548800:
+        fail("M6 limiting actual index bytes drifted")
+
+    limiting_ratio = limiting.get("actual_over_prediction")
+    if (
+        not isinstance(limiting_ratio, (int, float))
+        or isinstance(limiting_ratio, bool)
+        or limiting_ratio < 17.26
+    ):
+        fail("M6 limiting 17.26x structural miss disappeared")
+
+    conclusion = m6.get("reviewed_conclusion")
+    if not isinstance(conclusion, str):
+        fail("M6 reviewed conclusion is missing")
+    lower_conclusion = conclusion.lower()
+    for phrase in (
+        "structurally falsified",
+        "exact-profile-only",
+        "new structural observable-input model",
+    ):
+        if phrase not in lower_conclusion:
+            fail(
+                f"M6 reviewed conclusion lost required phrase: {phrase}"
+            )
+
     limits = evidence.get("reviewed_limits")
     if not isinstance(limits, list) or len(limits) < 5:
         fail("reviewed_limits are incomplete")
@@ -193,7 +309,8 @@ def main() -> int:
 
     print(
         "capacity-v2 evidence validation passed: "
-        "hybrid 18/18 preserved without selecting production policy"
+        "historical 18/18 preserved and M6 structural index falsification "
+        "locked without selecting production policy"
     )
     return 0
 
