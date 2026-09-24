@@ -165,6 +165,81 @@ def main() -> int:
     if e2.get("pinned_repository_sha") != corpus["cbd"]:
         fail("C0-E2 CBD SHA drifted from the pinned corpus")
 
+    m2 = evidence.get("c0_m2")
+    if not isinstance(m2, dict):
+        fail("c0_m2 object is missing")
+
+    require_positive_int(m2, "actions_run_id", "c0_m2")
+    require_positive_int(m2, "artifact_id", "c0_m2")
+    require_digest(
+        m2.get("artifact_sha256"),
+        "c0_m2.artifact_sha256",
+    )
+    require_sha(
+        m2.get("atm_source_commit"),
+        "c0_m2.atm_source_commit",
+    )
+    require_sha(
+        m2.get("workflow_commit"),
+        "c0_m2.workflow_commit",
+    )
+
+    scaling = m2.get("history_scaling")
+    if not isinstance(scaling, list) or len(scaling) != 3:
+        fail("c0_m2.history_scaling must contain exactly 3 records")
+
+    expected_histories = {1, 100, 1000}
+    observed_histories = set()
+    expected_headroom = {"16384", "32768", "65536", "131072"}
+
+    for record in scaling:
+        if not isinstance(record, dict):
+            fail("each M2 scaling record must be an object")
+
+        history = require_positive_int(
+            record,
+            "completed_generations",
+            "c0_m2.history_scaling",
+        )
+        if history in observed_histories:
+            fail(f"duplicate M2 history record for {history}")
+        observed_histories.add(history)
+
+        require_positive_int(
+            record,
+            "control_db_allocated_bytes",
+            f"c0_m2.history_scaling[{history}]",
+        )
+
+        results = record.get("headroom_results")
+        if not isinstance(results, dict) or set(results) != expected_headroom:
+            fail(
+                f"M2 headroom matrix is incomplete for history {history}"
+            )
+
+        if results["16384"] != (
+            "FAIL_CLOSED_OLD_AUTHORITY_SQLITE_IOERR"
+        ):
+            fail(f"M2 16 KiB result drifted for history {history}")
+
+        if results["32768"] != (
+            "FAIL_CLOSED_OLD_AUTHORITY_SQLITE_FULL"
+        ):
+            fail(f"M2 32 KiB result drifted for history {history}")
+
+        for key in ("65536", "131072"):
+            if results[key] != "SUCCESS_ATOMIC":
+                fail(
+                    f"M2 {key}-byte result drifted for history {history}"
+                )
+
+    if observed_histories != expected_histories:
+        fail("M2 history matrix must remain 1/100/1000 generations")
+
+    interpretation = str(m2.get("interpretation", "")).lower()
+    if "not a portable production reserve" not in interpretation:
+        fail("M2 interpretation lost the non-portable-reserve boundary")
+
     rules = evidence.get("interpretation_rules")
     if not isinstance(rules, list) or len(rules) < 6:
         fail("interpretation_rules are incomplete")
