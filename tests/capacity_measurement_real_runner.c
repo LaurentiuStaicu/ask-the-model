@@ -826,7 +826,7 @@ run_measurement (
     g_object_unref (generator);
     json_node_free (root);
     g_object_unref (builder);
-    atm_repository_source_catalog_free (
+    atm_source_catalog_free (
         catalog
     );
     g_free (quarantine_path);
