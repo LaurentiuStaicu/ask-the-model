@@ -303,6 +303,7 @@ namespace AskTheModel {
         private void* state = null;
         private int64 pinned_repository_generation_id = 0;
         private ConversationRepositoryPin[] pinned_repositories = {};
+        private RepositoryGenerationLease? generation_lease = null;
 
         public ConversationGrounding () {
             state = ConversationGroundingNative.state_new ();
@@ -344,6 +345,48 @@ namespace AskTheModel {
             return added;
         }
 
+        internal void hold_generation_lease (
+            RepositoryGenerationLease lease
+        ) throws GLib.Error {
+            if (is_frozen ()) {
+                throw new GLib.IOError.FAILED (
+                    "Repository generation lease cannot change after conversation grounding is frozen."
+                );
+            }
+
+            if (lease.generation_id <= 0) {
+                throw new GLib.IOError.INVALID_DATA (
+                    "Repository generation lease identifier must be positive."
+                );
+            }
+
+            if (generation_lease != null &&
+                generation_lease.generation_id !=
+                    lease.generation_id) {
+                throw new GLib.IOError.INVALID_DATA (
+                    "Conversation grounding already holds a different repository generation lease."
+                );
+            }
+
+            if (pinned_repository_generation_id != 0 &&
+                pinned_repository_generation_id !=
+                    lease.generation_id) {
+                throw new GLib.IOError.INVALID_DATA (
+                    "Repository generation lease does not match the pinned generation."
+                );
+            }
+
+            generation_lease = lease;
+        }
+
+        internal bool holds_generation_lease (
+            int64 generation_id
+        ) {
+            return generation_lease != null &&
+                generation_lease.generation_id ==
+                    generation_id;
+        }
+
         public void pin_repository_generation (
             int64 generation_id
         ) throws GLib.Error {
@@ -364,6 +407,14 @@ namespace AskTheModel {
                     generation_id) {
                 throw new GLib.IOError.INVALID_DATA (
                     "Conversation grounding already has a different repository generation."
+                );
+            }
+
+            if (generation_lease != null &&
+                generation_lease.generation_id !=
+                    generation_id) {
+                throw new GLib.IOError.INVALID_DATA (
+                    "Pinned repository generation does not match the held generation lease."
                 );
             }
 
