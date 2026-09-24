@@ -24,6 +24,19 @@ atm_retrieval_index_error_quark (void)
     );
 }
 
+static AtmRetrievalIndexError
+retrieval_sqlite_error_code (
+    sqlite3 *db
+)
+{
+    if (db != NULL &&
+        sqlite3_errcode (db) == SQLITE_FULL) {
+        return ATM_RETRIEVAL_INDEX_ERROR_NO_SPACE;
+    }
+
+    return ATM_RETRIEVAL_INDEX_ERROR_SQLITE;
+}
+
 static gboolean
 repository_id_is_valid (const char *repository_id)
 {
@@ -63,7 +76,7 @@ sqlite_exec_checked (
         g_set_error (
             error,
             ATM_RETRIEVAL_INDEX_ERROR,
-            ATM_RETRIEVAL_INDEX_ERROR_SQLITE,
+            retrieval_sqlite_error_code (db),
             "SQLite statement failed (%d): %s",
             rc,
             message != NULL ? message : sqlite3_errmsg (db)
@@ -156,7 +169,7 @@ sqlite_failure:
     g_set_error (
         error,
         ATM_RETRIEVAL_INDEX_ERROR,
-        ATM_RETRIEVAL_INDEX_ERROR_SQLITE,
+        retrieval_sqlite_error_code (db),
         "SQLite integrity query could not be prepared: %s",
         sqlite3_errmsg (db)
     );
@@ -188,7 +201,7 @@ insert_metadata (
         g_set_error (
             error,
             ATM_RETRIEVAL_INDEX_ERROR,
-            ATM_RETRIEVAL_INDEX_ERROR_SQLITE,
+            retrieval_sqlite_error_code (db),
             "Could not prepare retrieval-index metadata insert: %s",
             sqlite3_errmsg (db)
         );
@@ -243,7 +256,7 @@ insert_metadata (
         g_set_error (
             error,
             ATM_RETRIEVAL_INDEX_ERROR,
-            ATM_RETRIEVAL_INDEX_ERROR_SQLITE,
+            retrieval_sqlite_error_code (db),
             "Could not insert retrieval-index metadata: %s",
             sqlite3_errmsg (db)
         );
@@ -296,7 +309,7 @@ insert_source_catalog (
         g_set_error (
             error,
             ATM_RETRIEVAL_INDEX_ERROR,
-            ATM_RETRIEVAL_INDEX_ERROR_SQLITE,
+            retrieval_sqlite_error_code (db),
             "Could not prepare source-catalog inserts: %s",
             sqlite3_errmsg (db)
         );
@@ -356,7 +369,7 @@ insert_source_catalog (
             g_set_error (
                 error,
                 ATM_RETRIEVAL_INDEX_ERROR,
-                ATM_RETRIEVAL_INDEX_ERROR_SQLITE,
+                retrieval_sqlite_error_code (db),
                 "Could not insert source file '%s': %s",
                 record->path,
                 sqlite3_errmsg (db)
@@ -393,7 +406,7 @@ insert_source_catalog (
                 g_set_error (
                     error,
                     ATM_RETRIEVAL_INDEX_ERROR,
-                    ATM_RETRIEVAL_INDEX_ERROR_SQLITE,
+                    retrieval_sqlite_error_code (db),
                     "Could not insert source role '%s' for '%s': %s",
                     roles[role_index].name,
                     record->path,
@@ -465,7 +478,7 @@ insert_document_sections (
         g_set_error (
             error,
             ATM_RETRIEVAL_INDEX_ERROR,
-            ATM_RETRIEVAL_INDEX_ERROR_SQLITE,
+            retrieval_sqlite_error_code (db),
             "Could not prepare document-index inserts: %s",
             sqlite3_errmsg (db)
         );
@@ -614,7 +627,7 @@ insert_document_sections (
                 g_set_error (
                     error,
                     ATM_RETRIEVAL_INDEX_ERROR,
-                    ATM_RETRIEVAL_INDEX_ERROR_SQLITE,
+                    retrieval_sqlite_error_code (db),
                     "Could not insert Markdown section for '%s': %s",
                     source->path,
                     sqlite3_errmsg (db)
@@ -666,7 +679,7 @@ insert_document_sections (
                 g_set_error (
                     error,
                     ATM_RETRIEVAL_INDEX_ERROR,
-                    ATM_RETRIEVAL_INDEX_ERROR_SQLITE,
+                    retrieval_sqlite_error_code (db),
                     "Could not insert FTS section for '%s': %s",
                     source->path,
                     sqlite3_errmsg (db)
@@ -862,7 +875,7 @@ insert_tabular_datasets (
         g_set_error (
             error,
             ATM_RETRIEVAL_INDEX_ERROR,
-            ATM_RETRIEVAL_INDEX_ERROR_SQLITE,
+            retrieval_sqlite_error_code (db),
             "Could not prepare dataset-index inserts: %s",
             sqlite3_errmsg (db)
         );
@@ -975,7 +988,7 @@ insert_tabular_datasets (
             g_set_error (
                 error,
                 ATM_RETRIEVAL_INDEX_ERROR,
-                ATM_RETRIEVAL_INDEX_ERROR_SQLITE,
+                retrieval_sqlite_error_code (db),
                 "Could not insert dataset for '%s': %s",
                 source->path,
                 sqlite3_errmsg (db)
@@ -1071,7 +1084,7 @@ insert_tabular_datasets (
                 g_set_error (
                     error,
                     ATM_RETRIEVAL_INDEX_ERROR,
-                    ATM_RETRIEVAL_INDEX_ERROR_SQLITE,
+                    retrieval_sqlite_error_code (db),
                     "Could not insert dataset row for '%s': %s",
                     source->path,
                     sqlite3_errmsg (db)
@@ -1123,7 +1136,7 @@ insert_tabular_datasets (
                 g_set_error (
                     error,
                     ATM_RETRIEVAL_INDEX_ERROR,
-                    ATM_RETRIEVAL_INDEX_ERROR_SQLITE,
+                    retrieval_sqlite_error_code (db),
                     "Could not insert FTS dataset row for '%s': %s",
                     source->path,
                     sqlite3_errmsg (db)
@@ -1448,7 +1461,7 @@ insert_structured_json_content (
         g_set_error (
             error,
             ATM_RETRIEVAL_INDEX_ERROR,
-            ATM_RETRIEVAL_INDEX_ERROR_SQLITE,
+            retrieval_sqlite_error_code (db),
             "Could not prepare structured-content inserts: %s",
             sqlite3_errmsg (db)
         );
@@ -1577,7 +1590,7 @@ insert_structured_json_content (
                 g_set_error (
                     error,
                     ATM_RETRIEVAL_INDEX_ERROR,
-                    ATM_RETRIEVAL_INDEX_ERROR_SQLITE,
+                    retrieval_sqlite_error_code (db),
                     "Could not insert structured entity '%s' from '%s': %s",
                     entity->native_id,
                     source->path,
@@ -1640,7 +1653,7 @@ insert_structured_json_content (
                 g_set_error (
                     error,
                     ATM_RETRIEVAL_INDEX_ERROR,
-                    ATM_RETRIEVAL_INDEX_ERROR_SQLITE,
+                    retrieval_sqlite_error_code (db),
                     "Could not insert FTS entity '%s' from '%s': %s",
                     entity->native_id,
                     source->path,
@@ -1811,7 +1824,7 @@ insert_structured_json_content (
                 g_set_error (
                     error,
                     ATM_RETRIEVAL_INDEX_ERROR,
-                    ATM_RETRIEVAL_INDEX_ERROR_SQLITE,
+                    retrieval_sqlite_error_code (db),
                     "Could not insert structured relation from '%s': %s",
                     source->path,
                     sqlite3_errmsg (db)
@@ -1865,7 +1878,7 @@ insert_structured_json_content (
                 g_set_error (
                     error,
                     ATM_RETRIEVAL_INDEX_ERROR,
-                    ATM_RETRIEVAL_INDEX_ERROR_SQLITE,
+                    retrieval_sqlite_error_code (db),
                     "Could not insert FTS relation from '%s': %s",
                     source->path,
                     sqlite3_errmsg (db)
@@ -2042,7 +2055,7 @@ retrieval_index_create_internal (
         g_set_error_literal (
             error,
             ATM_RETRIEVAL_INDEX_ERROR,
-            ATM_RETRIEVAL_INDEX_ERROR_SQLITE,
+            retrieval_sqlite_error_code (db),
             "Retrieval-index metadata is incomplete or unsupported."
         );
         goto out;
@@ -2137,7 +2150,7 @@ retrieval_index_create_internal (
         g_set_error (
             error,
             ATM_RETRIEVAL_INDEX_ERROR,
-            ATM_RETRIEVAL_INDEX_ERROR_SQLITE,
+            retrieval_sqlite_error_code (db),
             "Could not create retrieval-index staging database: %s",
             db != NULL ? sqlite3_errmsg (db) : "unknown SQLite error"
         );
@@ -2209,7 +2222,7 @@ retrieval_index_create_internal (
         g_set_error_literal (
             error,
             ATM_RETRIEVAL_INDEX_ERROR,
-            ATM_RETRIEVAL_INDEX_ERROR_SQLITE,
+            retrieval_sqlite_error_code (db),
             "Could not close validated retrieval index."
         );
         goto out;
@@ -2379,7 +2392,7 @@ atm_retrieval_index_validate_identity (
         g_set_error (
             error,
             ATM_RETRIEVAL_INDEX_ERROR,
-            ATM_RETRIEVAL_INDEX_ERROR_SQLITE,
+            retrieval_sqlite_error_code (db),
             "Could not open retrieval index read-only: %s",
             db != NULL ? sqlite3_errmsg (db) : "unknown SQLite error"
         );
@@ -2567,7 +2580,7 @@ validate_indexed_source_roles (
         g_set_error (
             error,
             ATM_RETRIEVAL_INDEX_ERROR,
-            ATM_RETRIEVAL_INDEX_ERROR_SQLITE,
+            retrieval_sqlite_error_code (db),
             "Could not prepare source-role validation query: %s",
             sqlite3_errmsg (db)
         );
@@ -2603,7 +2616,7 @@ validate_indexed_source_roles (
         g_set_error (
             error,
             ATM_RETRIEVAL_INDEX_ERROR,
-            ATM_RETRIEVAL_INDEX_ERROR_SQLITE,
+            retrieval_sqlite_error_code (db),
             "Could not finish source-role validation: %s",
             sqlite3_errmsg (db)
         );
@@ -2673,7 +2686,7 @@ atm_retrieval_index_validate_snapshot_sources (
         g_set_error (
             error,
             ATM_RETRIEVAL_INDEX_ERROR,
-            ATM_RETRIEVAL_INDEX_ERROR_SQLITE,
+            retrieval_sqlite_error_code (db),
             "Could not reopen retrieval index for source validation: %s",
             db != NULL ? sqlite3_errmsg (db) : "unknown SQLite error"
         );
@@ -2740,7 +2753,7 @@ atm_retrieval_index_validate_snapshot_sources (
         g_set_error (
             error,
             ATM_RETRIEVAL_INDEX_ERROR,
-            ATM_RETRIEVAL_INDEX_ERROR_SQLITE,
+            retrieval_sqlite_error_code (db),
             "Could not prepare source provenance validation query: %s",
             sqlite3_errmsg (db)
         );
