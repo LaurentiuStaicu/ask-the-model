@@ -4,7 +4,10 @@ All notable public releases of Ask the Model are recorded here.
 
 ## Unreleased
 
-_No unreleased changes yet._
+### Qualification infrastructure
+
+- added a test-only deterministic crash/restart qualification harness for snapshot promotion and retrieval-index promotion, using explicit subprocess checkpoints plus a fresh-process JSON restart oracle; production builds contain no runtime fault-injection switch and no durability/recovery behavior is changed by this slice;
+- qualified the current baseline behavior around promotion boundaries: a crash before snapshot rename leaves no repository authority, a crash after snapshot rename but before Control DB commit leaves an unreferenced promoted snapshot requiring recovery, pre-rename index crashes leave staging requiring recovery, and a post-rename index remains a valid derived cache.
 
 ## 0.5.0 - 2026-09-24
 
