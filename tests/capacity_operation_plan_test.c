@@ -17,12 +17,21 @@ sample_inspection (void)
     return inspection;
 }
 
-static AtmCapacityOperationPrediction
-sample_prediction (void)
+static AtmCapacityDownloadPrediction
+sample_download_prediction (void)
 {
-    AtmCapacityOperationPrediction prediction = {
+    AtmCapacityDownloadPrediction prediction = {
         .archive_additional_bytes = 100,
-        .archive_additional_inodes = 1,
+        .archive_additional_inodes = 1
+    };
+
+    return prediction;
+}
+
+static AtmCapacityMutationPrediction
+sample_mutation_prediction (void)
+{
+    AtmCapacityMutationPrediction prediction = {
         .snapshot_additional_bytes = 500,
         .index_additional_bytes = 400,
         .index_additional_inodes = 3,
@@ -34,17 +43,64 @@ sample_prediction (void)
 }
 
 static void
-test_fresh_phase_construction (void)
+test_download_checkpoint_is_cache_only (void)
 {
-    AtmArchiveInspection inspection =
-        sample_inspection ();
-    AtmCapacityOperationPrediction prediction =
-        sample_prediction ();
-    AtmCapacityOperationPlan plan;
+    AtmCapacityDownloadPrediction prediction =
+        sample_download_prediction ();
+    AtmCapacityPhaseRequirement phase;
     GError *error = NULL;
 
     g_assert_true (
-        atm_capacity_operation_plan_build (
+        atm_capacity_download_phase_build (
+            &prediction,
+            &phase,
+            &error
+        )
+    );
+    g_assert_no_error (error);
+
+    g_assert_cmpuint (
+        phase.bytes[
+            ATM_CAPACITY_ROOT_DATA
+        ],
+        ==,
+        0
+    );
+    g_assert_cmpuint (
+        phase.bytes[
+            ATM_CAPACITY_ROOT_CACHE
+        ],
+        ==,
+        100
+    );
+    g_assert_cmpuint (
+        phase.inodes[
+            ATM_CAPACITY_ROOT_CACHE
+        ],
+        ==,
+        1
+    );
+    g_assert_cmpuint (
+        phase.bytes[
+            ATM_CAPACITY_ROOT_STATE
+        ],
+        ==,
+        0
+    );
+}
+
+static void
+test_fresh_post_download_phase_construction (void)
+{
+    AtmArchiveInspection inspection =
+        sample_inspection ();
+    AtmCapacityMutationPrediction prediction =
+        sample_mutation_prediction ();
+    AtmCapacityMutationPlan plan;
+    GError *error = NULL;
+
+    g_assert_true (
+        atm_capacity_mutation_plan_build (
             ATM_CAPACITY_OPERATION_FRESH_INSTALL,
             &inspection,
             &prediction,
@@ -57,7 +113,7 @@ test_fresh_phase_construction (void)
     g_assert_cmpuint (
         plan.phase_count,
         ==,
-        ATM_CAPACITY_PHASE_COUNT
+        ATM_CAPACITY_MUTATION_PHASE_COUNT
     );
     g_assert_false (
         plan.must_admit_before_quarantine
@@ -65,26 +121,7 @@ test_fresh_phase_construction (void)
 
     g_assert_cmpuint (
         plan.phases[
-            ATM_CAPACITY_PHASE_DOWNLOAD
-        ].bytes[
-            ATM_CAPACITY_ROOT_CACHE
-        ],
-        ==,
-        100
-    );
-    g_assert_cmpuint (
-        plan.phases[
-            ATM_CAPACITY_PHASE_DOWNLOAD
-        ].inodes[
-            ATM_CAPACITY_ROOT_CACHE
-        ],
-        ==,
-        1
-    );
-
-    g_assert_cmpuint (
-        plan.phases[
-            ATM_CAPACITY_PHASE_EXTRACTION
+            ATM_CAPACITY_MUTATION_PHASE_EXTRACTION
         ].bytes[
             ATM_CAPACITY_ROOT_DATA
         ],
@@ -93,45 +130,31 @@ test_fresh_phase_construction (void)
     );
     g_assert_cmpuint (
         plan.phases[
-            ATM_CAPACITY_PHASE_EXTRACTION
+            ATM_CAPACITY_MUTATION_PHASE_EXTRACTION
         ].inodes[
             ATM_CAPACITY_ROOT_DATA
         ],
         ==,
         100
     );
+
+    /*
+     * The archive is already on disk at this second checkpoint.
+     * It must not be charged again as additional cache demand.
+     */
     g_assert_cmpuint (
         plan.phases[
-            ATM_CAPACITY_PHASE_EXTRACTION
+            ATM_CAPACITY_MUTATION_PHASE_EXTRACTION
         ].bytes[
             ATM_CAPACITY_ROOT_CACHE
         ],
         ==,
-        100
+        0
     );
 
     g_assert_cmpuint (
         plan.phases[
-            ATM_CAPACITY_PHASE_INDEX_BUILD
-        ].bytes[
-            ATM_CAPACITY_ROOT_CACHE
-        ],
-        ==,
-        500
-    );
-    g_assert_cmpuint (
-        plan.phases[
-            ATM_CAPACITY_PHASE_INDEX_BUILD
-        ].inodes[
-            ATM_CAPACITY_ROOT_CACHE
-        ],
-        ==,
-        4
-    );
-
-    g_assert_cmpuint (
-        plan.phases[
-            ATM_CAPACITY_PHASE_STATE_COMMIT
+            ATM_CAPACITY_MUTATION_PHASE_INDEX_BUILD
         ].bytes[
             ATM_CAPACITY_ROOT_DATA
         ],
@@ -140,16 +163,44 @@ test_fresh_phase_construction (void)
     );
     g_assert_cmpuint (
         plan.phases[
-            ATM_CAPACITY_PHASE_STATE_COMMIT
+            ATM_CAPACITY_MUTATION_PHASE_INDEX_BUILD
         ].bytes[
             ATM_CAPACITY_ROOT_CACHE
+        ],
+        ==,
+        400
+    );
+    g_assert_cmpuint (
+        plan.phases[
+            ATM_CAPACITY_MUTATION_PHASE_INDEX_BUILD
+        ].inodes[
+            ATM_CAPACITY_ROOT_CACHE
+        ],
+        ==,
+        3
+    );
+
+    g_assert_cmpuint (
+        plan.phases[
+            ATM_CAPACITY_MUTATION_PHASE_STATE_COMMIT
+        ].bytes[
+            ATM_CAPACITY_ROOT_DATA
         ],
         ==,
         500
     );
     g_assert_cmpuint (
         plan.phases[
-            ATM_CAPACITY_PHASE_STATE_COMMIT
+            ATM_CAPACITY_MUTATION_PHASE_STATE_COMMIT
+        ].bytes[
+            ATM_CAPACITY_ROOT_CACHE
+        ],
+        ==,
+        400
+    );
+    g_assert_cmpuint (
+        plan.phases[
+            ATM_CAPACITY_MUTATION_PHASE_STATE_COMMIT
         ].bytes[
             ATM_CAPACITY_ROOT_STATE
         ],
@@ -158,7 +209,7 @@ test_fresh_phase_construction (void)
     );
     g_assert_cmpuint (
         plan.phases[
-            ATM_CAPACITY_PHASE_STATE_COMMIT
+            ATM_CAPACITY_MUTATION_PHASE_STATE_COMMIT
         ].inodes[
             ATM_CAPACITY_ROOT_STATE
         ],
@@ -168,19 +219,19 @@ test_fresh_phase_construction (void)
 }
 
 static void
-test_operation_kinds_share_additional_phases (void)
+test_operation_kinds_share_post_download_additional_phases (void)
 {
     AtmArchiveInspection inspection =
         sample_inspection ();
-    AtmCapacityOperationPrediction prediction =
-        sample_prediction ();
-    AtmCapacityOperationPlan fresh;
-    AtmCapacityOperationPlan update;
-    AtmCapacityOperationPlan repair;
+    AtmCapacityMutationPrediction prediction =
+        sample_mutation_prediction ();
+    AtmCapacityMutationPlan fresh;
+    AtmCapacityMutationPlan update;
+    AtmCapacityMutationPlan repair;
     GError *error = NULL;
 
     g_assert_true (
-        atm_capacity_operation_plan_build (
+        atm_capacity_mutation_plan_build (
             ATM_CAPACITY_OPERATION_FRESH_INSTALL,
             &inspection,
             &prediction,
@@ -191,7 +242,7 @@ test_operation_kinds_share_additional_phases (void)
     g_assert_no_error (error);
 
     g_assert_true (
-        atm_capacity_operation_plan_build (
+        atm_capacity_mutation_plan_build (
             ATM_CAPACITY_OPERATION_DIFFERENT_SHA_UPDATE,
             &inspection,
             &prediction,
@@ -202,7 +253,7 @@ test_operation_kinds_share_additional_phases (void)
     g_assert_no_error (error);
 
     g_assert_true (
-        atm_capacity_operation_plan_build (
+        atm_capacity_mutation_plan_build (
             ATM_CAPACITY_OPERATION_SAME_SHA_REPAIR,
             &inspection,
             &prediction,
@@ -237,32 +288,32 @@ test_operation_kinds_share_additional_phases (void)
 }
 
 static void
-test_shared_filesystem_peak_uses_real_phase_overlap (void)
+test_shared_filesystem_post_download_peak (void)
 {
     AtmArchiveInspection inspection =
         sample_inspection ();
-    AtmCapacityOperationPrediction prediction =
-        sample_prediction ();
-    AtmCapacityOperationPlan plan;
+    AtmCapacityMutationPrediction prediction =
+        sample_mutation_prediction ();
+    AtmCapacityMutationPlan plan;
     AtmCapacityRootAvailability roots[
         ATM_CAPACITY_ROOT_COUNT
     ] = {
         {
             .device_id = 7,
-            .available_bytes = 1020,
-            .available_inodes = 106,
+            .available_bytes = 920,
+            .available_inodes = 105,
             .inode_budget_known = TRUE
         },
         {
             .device_id = 7,
-            .available_bytes = 1020,
-            .available_inodes = 106,
+            .available_bytes = 920,
+            .available_inodes = 105,
             .inode_budget_known = TRUE
         },
         {
             .device_id = 7,
-            .available_bytes = 1020,
-            .available_inodes = 106,
+            .available_bytes = 920,
+            .available_inodes = 105,
             .inode_budget_known = TRUE
         }
     };
@@ -270,7 +321,7 @@ test_shared_filesystem_peak_uses_real_phase_overlap (void)
     GError *error = NULL;
 
     g_assert_true (
-        atm_capacity_operation_plan_build (
+        atm_capacity_mutation_plan_build (
             ATM_CAPACITY_OPERATION_FRESH_INSTALL,
             &inspection,
             &prediction,
@@ -292,29 +343,21 @@ test_shared_filesystem_peak_uses_real_phase_overlap (void)
     );
     g_assert_no_error (error);
     g_assert_true (decision.admitted);
-    g_assert_cmpuint (
-        decision.device_count,
-        ==,
-        1
-    );
+
     g_assert_cmpuint (
         decision.devices[0].operation_peak_bytes,
         ==,
-        1020
+        920
     );
     g_assert_cmpuint (
         decision.devices[0].operation_peak_inodes,
         ==,
-        106
+        105
     );
 
-    /*
-     * This is phase-aware. It is not the invalid sum of every phase
-     * or the independent maxima repeated across phases.
-     */
-    roots[0].available_bytes = 1019;
-    roots[1].available_bytes = 1019;
-    roots[2].available_bytes = 1019;
+    roots[0].available_bytes = 919;
+    roots[1].available_bytes = 919;
+    roots[2].available_bytes = 919;
 
     g_assert_true (
         atm_capacity_admission_evaluate (
@@ -331,13 +374,13 @@ test_shared_filesystem_peak_uses_real_phase_overlap (void)
 }
 
 static void
-test_split_filesystems_require_independent_peaks (void)
+test_split_filesystems_post_download (void)
 {
     AtmArchiveInspection inspection =
         sample_inspection ();
-    AtmCapacityOperationPrediction prediction =
-        sample_prediction ();
-    AtmCapacityOperationPlan plan;
+    AtmCapacityMutationPrediction prediction =
+        sample_mutation_prediction ();
+    AtmCapacityMutationPlan plan;
     AtmCapacityRootAvailability roots[
         ATM_CAPACITY_ROOT_COUNT
     ] = {
@@ -349,8 +392,8 @@ test_split_filesystems_require_independent_peaks (void)
         },
         {
             .device_id = 2,
-            .available_bytes = 500,
-            .available_inodes = 4,
+            .available_bytes = 400,
+            .available_inodes = 3,
             .inode_budget_known = TRUE
         },
         {
@@ -364,7 +407,7 @@ test_split_filesystems_require_independent_peaks (void)
     GError *error = NULL;
 
     g_assert_true (
-        atm_capacity_operation_plan_build (
+        atm_capacity_mutation_plan_build (
             ATM_CAPACITY_OPERATION_DIFFERENT_SHA_UPDATE,
             &inspection,
             &prediction,
@@ -394,13 +437,69 @@ test_split_filesystems_require_independent_peaks (void)
 }
 
 static void
-test_logical_archive_bytes_are_not_implicitly_allocated_prediction (void)
+test_archive_not_double_counted_between_checkpoints (void)
+{
+    AtmCapacityDownloadPrediction download =
+        sample_download_prediction ();
+    AtmArchiveInspection inspection =
+        sample_inspection ();
+    AtmCapacityMutationPrediction mutation =
+        sample_mutation_prediction ();
+    AtmCapacityPhaseRequirement download_phase;
+    AtmCapacityMutationPlan mutation_plan;
+    GError *error = NULL;
+
+    download.archive_additional_bytes = 777;
+
+    g_assert_true (
+        atm_capacity_download_phase_build (
+            &download,
+            &download_phase,
+            &error
+        )
+    );
+    g_assert_no_error (error);
+
+    g_assert_true (
+        atm_capacity_mutation_plan_build (
+            ATM_CAPACITY_OPERATION_FRESH_INSTALL,
+            &inspection,
+            &mutation,
+            &mutation_plan,
+            &error
+        )
+    );
+    g_assert_no_error (error);
+
+    g_assert_cmpuint (
+        download_phase.bytes[
+            ATM_CAPACITY_ROOT_CACHE
+        ],
+        ==,
+        777
+    );
+
+    for (gsize i = 0;
+         i < mutation_plan.phase_count;
+         i++) {
+        g_assert_cmpuint (
+            mutation_plan.phases[i].bytes[
+                ATM_CAPACITY_ROOT_CACHE
+            ],
+            <=,
+            mutation.index_additional_bytes
+        );
+    }
+}
+
+static void
+test_logical_archive_bytes_are_not_allocated_prediction (void)
 {
     AtmArchiveInspection inspection =
         sample_inspection ();
-    AtmCapacityOperationPrediction prediction =
-        sample_prediction ();
-    AtmCapacityOperationPlan plan;
+    AtmCapacityMutationPrediction prediction =
+        sample_mutation_prediction ();
+    AtmCapacityMutationPlan plan;
     GError *error = NULL;
 
     inspection.logical_regular_bytes =
@@ -409,7 +508,7 @@ test_logical_archive_bytes_are_not_implicitly_allocated_prediction (void)
         1234;
 
     g_assert_true (
-        atm_capacity_operation_plan_build (
+        atm_capacity_mutation_plan_build (
             ATM_CAPACITY_OPERATION_FRESH_INSTALL,
             &inspection,
             &prediction,
@@ -421,7 +520,7 @@ test_logical_archive_bytes_are_not_implicitly_allocated_prediction (void)
 
     g_assert_cmpuint (
         plan.phases[
-            ATM_CAPACITY_PHASE_EXTRACTION
+            ATM_CAPACITY_MUTATION_PHASE_EXTRACTION
         ].bytes[
             ATM_CAPACITY_ROOT_DATA
         ],
@@ -430,7 +529,7 @@ test_logical_archive_bytes_are_not_implicitly_allocated_prediction (void)
     );
     g_assert_cmpuint (
         plan.phases[
-            ATM_CAPACITY_PHASE_EXTRACTION
+            ATM_CAPACITY_MUTATION_PHASE_EXTRACTION
         ].inodes[
             ATM_CAPACITY_ROOT_DATA
         ],
@@ -440,22 +539,18 @@ test_logical_archive_bytes_are_not_implicitly_allocated_prediction (void)
 }
 
 static void
-test_cache_sum_overflow_rejected (void)
+test_invalid_operation_kind_rejected (void)
 {
     AtmArchiveInspection inspection =
         sample_inspection ();
-    AtmCapacityOperationPrediction prediction =
-        sample_prediction ();
-    AtmCapacityOperationPlan plan;
+    AtmCapacityMutationPrediction prediction =
+        sample_mutation_prediction ();
+    AtmCapacityMutationPlan plan;
     GError *error = NULL;
 
-    prediction.archive_additional_bytes =
-        G_MAXUINT64;
-    prediction.index_additional_bytes = 1;
-
     g_assert_false (
-        atm_capacity_operation_plan_build (
-            ATM_CAPACITY_OPERATION_FRESH_INSTALL,
+        atm_capacity_mutation_plan_build (
+            (AtmCapacityOperationKind) 99,
             &inspection,
             &prediction,
             &plan,
@@ -465,24 +560,23 @@ test_cache_sum_overflow_rejected (void)
     g_assert_error (
         error,
         ATM_CAPACITY_OPERATION_PLAN_ERROR,
-        ATM_CAPACITY_OPERATION_PLAN_ERROR_OVERFLOW
+        ATM_CAPACITY_OPERATION_PLAN_ERROR_ARGUMENT
     );
     g_clear_error (&error);
 }
 
 static void
-test_invalid_operation_kind_rejected (void)
+test_empty_inspection_rejected (void)
 {
-    AtmArchiveInspection inspection =
-        sample_inspection ();
-    AtmCapacityOperationPrediction prediction =
-        sample_prediction ();
-    AtmCapacityOperationPlan plan;
+    AtmArchiveInspection inspection = { 0 };
+    AtmCapacityMutationPrediction prediction =
+        sample_mutation_prediction ();
+    AtmCapacityMutationPlan plan;
     GError *error = NULL;
 
     g_assert_false (
-        atm_capacity_operation_plan_build (
-            (AtmCapacityOperationKind) 99,
+        atm_capacity_mutation_plan_build (
+            ATM_CAPACITY_OPERATION_FRESH_INSTALL,
             &inspection,
             &prediction,
             &plan,
@@ -510,32 +604,40 @@ main (
     );
 
     g_test_add_func (
-        "/capacity-operation/fresh-phases",
-        test_fresh_phase_construction
+        "/capacity-operation/download-checkpoint",
+        test_download_checkpoint_is_cache_only
+    );
+    g_test_add_func (
+        "/capacity-operation/post-download-fresh-phases",
+        test_fresh_post_download_phase_construction
     );
     g_test_add_func (
         "/capacity-operation/kind-equivalence",
-        test_operation_kinds_share_additional_phases
+        test_operation_kinds_share_post_download_additional_phases
     );
     g_test_add_func (
-        "/capacity-operation/shared-filesystem-peak",
-        test_shared_filesystem_peak_uses_real_phase_overlap
+        "/capacity-operation/shared-filesystem-post-download",
+        test_shared_filesystem_post_download_peak
     );
     g_test_add_func (
-        "/capacity-operation/split-filesystems",
-        test_split_filesystems_require_independent_peaks
+        "/capacity-operation/split-filesystems-post-download",
+        test_split_filesystems_post_download
+    );
+    g_test_add_func (
+        "/capacity-operation/archive-not-double-counted",
+        test_archive_not_double_counted_between_checkpoints
     );
     g_test_add_func (
         "/capacity-operation/logical-not-allocated",
-        test_logical_archive_bytes_are_not_implicitly_allocated_prediction
-    );
-    g_test_add_func (
-        "/capacity-operation/cache-overflow",
-        test_cache_sum_overflow_rejected
+        test_logical_archive_bytes_are_not_allocated_prediction
     );
     g_test_add_func (
         "/capacity-operation/invalid-kind",
         test_invalid_operation_kind_rejected
+    );
+    g_test_add_func (
+        "/capacity-operation/empty-inspection",
+        test_empty_inspection_rejected
     );
 
     return g_test_run ();
