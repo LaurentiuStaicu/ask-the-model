@@ -26,6 +26,12 @@ The v0.5.0 capability boundary promotes the qualified post-v0.4.0 development wo
 
 At publication time, the tagged v0.5.0 release and `main` share this capability boundary. Later **AtM Development** builds may move ahead independently and must continue to expose their exact source `main` commit SHA.
 
+## Development after v0.5.0 — optimization master control
+
+Development builds now introduce a user-visible **Optimizations** master switch for the post-v0.5.0 optimization program. Every process starts with the switch **OFF** and the state is not persisted in its first implementation. OFF preserves the post-v0.5.0 baseline for newly started operations; ON permits only optimization slices that have been implemented and qualified. Test-only fault/measurement infrastructure is outside this runtime gate because it is not a production optimization path.
+
+No runtime optimization is considered production-active merely because it is planned in OPT-00; each future slice must prove both OFF-baseline and ON-qualified behavior.
+
 ## Canonical application role
 
 **Ask the Model (AtM) is a local conversational interface and retrieval/provenance layer for locally managed AI models and repositories of scientific dynamical models. It is not itself a scientific model and does not replace the canonical models maintained in those repositories.**
