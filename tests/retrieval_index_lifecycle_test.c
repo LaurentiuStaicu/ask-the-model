@@ -8,6 +8,7 @@
 #include <string.h>
 
 #include <sys/stat.h>
+#include <unistd.h>
 
 static void
 remove_tree_best_effort (const char *path)
@@ -1094,6 +1095,80 @@ test_coordinated_valid_fast_path_does_not_wait (void)
     g_free (state_root);
 }
 
+static void
+test_coordinated_symlink_lock_root_is_refused_without_following (void)
+{
+    char *state_root = new_temp_root (
+        "atm-index-single-flight-state-XXXXXX"
+    );
+    char *target_root = new_temp_root (
+        "atm-index-single-flight-target-XXXXXX"
+    );
+    char *cache_root = new_temp_root (
+        "atm-index-single-flight-cache-XXXXXX"
+    );
+    char *snapshot_root = new_snapshot ();
+    char *lock_root = g_build_filename (
+        state_root,
+        "retrieval-index-locks",
+        NULL
+    );
+    char *unexpected_repository_root = g_build_filename (
+        target_root,
+        "ewd",
+        NULL
+    );
+    char *index_path = NULL;
+    char *version = NULL;
+    AtmRetrievalEnsureResult result;
+    GError *error = NULL;
+
+    g_assert_cmpint (
+        symlink (target_root, lock_root),
+        ==,
+        0
+    );
+
+    g_assert_false (
+        atm_retrieval_index_ensure_for_snapshot_coordinated (
+            state_root,
+            cache_root,
+            snapshot_root,
+            "ewd",
+            snapshot_sha (),
+            &index_path,
+            &version,
+            &result,
+            &error
+        )
+    );
+    g_assert_error (
+        error,
+        ATM_RETRIEVAL_LIFECYCLE_ERROR,
+        ATM_RETRIEVAL_LIFECYCLE_ERROR_CACHE
+    );
+    g_assert_false (
+        g_file_test (
+            unexpected_repository_root,
+            G_FILE_TEST_EXISTS
+        )
+    );
+    g_assert_null (index_path);
+    g_assert_null (version);
+
+    g_clear_error (&error);
+    g_free (unexpected_repository_root);
+    g_free (lock_root);
+    remove_tree_best_effort (snapshot_root);
+    g_free (snapshot_root);
+    remove_tree_best_effort (cache_root);
+    g_free (cache_root);
+    remove_tree_best_effort (state_root);
+    g_free (state_root);
+    remove_tree_best_effort (target_root);
+    g_free (target_root);
+}
+
 int
 main (int argc, char **argv)
 {
@@ -1138,6 +1213,10 @@ main (int argc, char **argv)
     g_test_add_func (
         "/retrieval-lifecycle/coordinated-valid-fast-path",
         test_coordinated_valid_fast_path_does_not_wait
+    );
+    g_test_add_func (
+        "/retrieval-lifecycle/coordinated-symlink-lock-root-refused",
+        test_coordinated_symlink_lock_root_is_refused_without_following
     );
 
     return g_test_run ();
