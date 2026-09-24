@@ -517,6 +517,23 @@ Therefore the post-download data-root inode requirement is:
 
 Byte requirements are unchanged. Same-SHA repair still requires admission before quarantine.
 
+### C0P-F9 M1 phase inode evidence
+
+C0P-F9 freezes the phase-level inode observations already present in the reviewed C0-M1 artifact.
+
+For each exact pinned repository SHA, the capacity-v1 evidence registry now records:
+- final snapshot entry count;
+- fresh-install data-root additional peak entries;
+- retrieval-index/cache additional peak entries;
+- same-SHA repair data-root additional peak entries.
+
+The validator enforces the cross-repository structural relationships observed independently for CBD, EWD and RMD:
+- same-SHA replacement = final snapshot entries + 1 extraction root;
+- fresh install = same-SHA replacement + 5 AtM storage-tree directories;
+- retrieval-index build = 4 additional cache entries.
+
+These are evidence constraints, not a universal byte predictor. They exist so production inode policy cannot silently drift away from the measured M1 storage topology.
+
 ### Repository authority-mutation lease
 
 When an operation snapshots optimization mode ON, repository Download/Update uses one application-owned exclusive nonblocking lease at `<state_root>/repository-mutation.lock` before any selected-repository staging or authority mutation begins.
