@@ -327,7 +327,8 @@ namespace AskTheModel {
             RepositoryDescriptor descriptor,
             string sha,
             string? archive_path,
-            string? expected_seal = null
+            string? expected_seal,
+            bool coordinated_index
         ) throws RepositoryError {
             SourceFunc callback = prepare_snapshot.callback;
             RepositoryInstallResult? worker_result = null;
@@ -403,6 +404,8 @@ namespace AskTheModel {
                         }
 
                         if (!RepositoryNative.ensure_index (
+                                state_root,
+                                coordinated_index,
                                 cache_root,
                                 snapshot,
                                 descriptor.id,
@@ -520,6 +523,9 @@ namespace AskTheModel {
                 );
             }
 
+            bool optimized_operation =
+                optimization_mode_snapshot ();
+
             string control_state_path =
                 GLib.Path.build_filename (
                     state_root,
@@ -606,7 +612,8 @@ namespace AskTheModel {
                         descriptor,
                         sha,
                         null,
-                        expected_seal
+                        expected_seal,
+                        optimized_operation
                     );
                 } catch (RepositoryError error) {
                     if (mark_runtime_integrity_failure &&
@@ -884,7 +891,8 @@ namespace AskTheModel {
                                 descriptor,
                                 sha,
                                 archive_path,
-                                null
+                                null,
+                                optimized_operation
                             );
 
                         if (result.version != info.remote_version) {
