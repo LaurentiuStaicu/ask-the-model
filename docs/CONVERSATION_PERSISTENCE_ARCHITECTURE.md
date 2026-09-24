@@ -4,7 +4,7 @@
 
 This document defines the durable local conversation-storage boundary for Ask the Model after the completed Control State hardening work.
 
-The contract was introduced as CONV-00 and is now implemented on development `main` through CONV-05a. The tagged public release remains v0.4.0, so this document describes unreleased development capability rather than retroactively changing the v0.4.0 release boundary.
+The contract was introduced as CONV-00 and is now implemented on development `main` through CONV-05b. The tagged public release remains v0.4.0, so this document describes unreleased development capability rather than retroactively changing the v0.4.0 release boundary.
 
 Conversation persistence is intentionally **not** part of the repository Control DB. The Control DB is authoritative repository state with its own S0 invariants and generation lifecycle. Conversation history is user data with independent retention, deletion, navigation and recovery semantics.
 
@@ -305,7 +305,7 @@ Delete is a distinct destructive action with explicit confirmation. The store de
 
 CONV-05a adds an explicit Conversation History surface for durable conversations that are not currently open in the notebook. Closed conversations can be reopened by restoring `open_on_startup=1`. Archived conversations are reopened in a fail-closed order: startup-open state is made durable while the row is still archived, then the archive flag is cleared. A failure before unarchive therefore leaves the conversation archived and still excluded from startup restore. History reopening never bypasses restore qualification: the saved snapshot is rebuilt into the same view-only GTK state used by startup restore, and exact persisted model/repository identity must qualify before prompt/Send can become available.
 
-Retention policy, export/import and bulk history management remain later work.
+CONV-05b adds a read-only deterministic JSON export foundation for one durable conversation snapshot. The versioned export preserves conversation/model identity, exact repository generation/version/SHA pins, provider/display message content, grounded state and citation provenance including immutable permalinks. Export adds no volatile export timestamp and performs no conversation-store mutation. File-save UI, import semantics, retention policy and bulk history management remain later work.
 
 ## Acceptance rules for later implementation
 
