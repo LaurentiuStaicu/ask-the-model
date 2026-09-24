@@ -12,6 +12,7 @@
 #include <errno.h>
 #include <string.h>
 #include <sys/stat.h>
+#include <sys/statvfs.h>
 
 static const char *TEST_VERSION = "0.1.0";
 static const char *TEST_SEAL =
@@ -283,6 +284,56 @@ error_mentions_sqlite_full (
         ) != NULL;
 }
 
+static gboolean
+measure_available_capacity (
+    const char *path,
+    guint64 *out_available_bytes,
+    guint64 *out_available_inodes,
+    GError **error
+)
+{
+    struct statvfs fs;
+
+    *out_available_bytes = 0;
+    *out_available_inodes = 0;
+
+    if (statvfs (path, &fs) != 0) {
+        g_set_error (
+            error,
+            G_FILE_ERROR,
+            g_file_error_from_errno (errno),
+            "Could not read filesystem capacity for '%s': %s",
+            path,
+            g_strerror (errno)
+        );
+        return FALSE;
+    }
+
+    guint64 fragment_size =
+        fs.f_frsize != 0
+            ? (guint64) fs.f_frsize
+            : (guint64) fs.f_bsize;
+
+    if (fragment_size == 0 ||
+        (guint64) fs.f_bavail >
+            G_MAXUINT64 / fragment_size) {
+        g_set_error_literal (
+            error,
+            G_FILE_ERROR,
+            G_FILE_ERROR_FAILED,
+            "Filesystem capacity measurement overflowed."
+        );
+        return FALSE;
+    }
+
+    *out_available_bytes =
+        (guint64) fs.f_bavail *
+        fragment_size;
+    *out_available_inodes =
+        (guint64) fs.f_favail;
+    return TRUE;
+}
+
 static void
 emit_result (
     const char *scenario,
@@ -293,6 +344,8 @@ emit_result (
     const char *old_sha,
     const char *active_sha_after,
     const GError *operation_error,
+    guint64 available_bytes_before_operation,
+    guint64 available_inodes_before_operation,
     gboolean old_snapshot_exists,
     gboolean new_snapshot_exists,
     gboolean extraction_staging_exists,
@@ -471,6 +524,30 @@ emit_result (
         );
     }
 
+    json_builder_set_member_name (
+        builder,
+        "available_bytes_before_operation"
+    );
+    json_builder_add_int_value (
+        builder,
+        (gint64) MIN (
+            available_bytes_before_operation,
+            (guint64) G_MAXINT64
+        )
+    );
+
+    json_builder_set_member_name (
+        builder,
+        "available_inodes_before_operation"
+    );
+    json_builder_add_int_value (
+        builder,
+        (gint64) MIN (
+            available_inodes_before_operation,
+            (guint64) G_MAXINT64
+        )
+    );
+
     json_builder_end_object (builder);
 
     JsonNode *root =
@@ -597,6 +674,7 @@ collect_paths (
 
 static int
 run_data_enospc (
+    const char *scenario,
     const char *data_root,
     const char *state_root,
     const char *archive_path,
@@ -624,6 +702,8 @@ run_data_enospc (
     gboolean index_staging_exists = FALSE;
     gboolean ingest_ok;
     gboolean qualified;
+    guint64 available_bytes_before_operation = 0;
+    guint64 available_inodes_before_operation = 0;
 
     if (!seed_old_authority (
             data_root,
@@ -648,6 +728,21 @@ run_data_enospc (
         g_clear_error (&error);
         g_free (active_before);
         return 2;
+    }
+
+    if (!measure_available_capacity (
+            data_root,
+            &available_bytes_before_operation,
+            &available_inodes_before_operation,
+            &error
+        )) {
+        g_printerr (
+            "ENOSPC capacity measurement failed: %s\n",
+            error->message
+        );
+        g_clear_error (&error);
+        g_free (active_before);
+        return 3;
     }
 
     ingest_ok =
@@ -719,7 +814,7 @@ run_data_enospc (
         !extraction_staging_exists;
 
     emit_result (
-        "data-enospc",
+        scenario,
         qualified
             ? "FAIL_CLOSED_OLD_AUTHORITY"
             : "UNQUALIFIED",
@@ -729,6 +824,8 @@ run_data_enospc (
         old_sha,
         active_after,
         operation_error,
+        available_bytes_before_operation,
+        available_inodes_before_operation,
         old_snapshot_exists,
         new_snapshot_exists,
         extraction_staging_exists,
@@ -776,6 +873,8 @@ run_index_enospc (
     gboolean index_staging_exists = FALSE;
     gboolean index_ok = FALSE;
     gboolean qualified = FALSE;
+    guint64 available_bytes_before_operation = 0;
+    guint64 available_inodes_before_operation = 0;
 
     if (!seed_old_authority (
             data_root,
@@ -845,6 +944,24 @@ run_index_enospc (
         .created_at_utc =
             "1970-01-01T00:00:00Z"
     };
+
+    if (!measure_available_capacity (
+            cache_root,
+            &available_bytes_before_operation,
+            &available_inodes_before_operation,
+            &error
+        )) {
+        g_printerr (
+            "ENOSPC cache capacity measurement failed: %s\n",
+            error->message
+        );
+        g_clear_error (&error);
+        atm_source_catalog_free (catalog);
+        g_free (snapshot_path);
+        g_free (version);
+        g_free (active_before);
+        return 4;
+    }
 
     index_ok =
         atm_retrieval_index_create_with_content (
@@ -929,6 +1046,8 @@ run_index_enospc (
         old_sha,
         active_after,
         operation_error,
+        available_bytes_before_operation,
+        available_inodes_before_operation,
         old_snapshot_exists,
         new_snapshot_exists,
         extraction_staging_exists,
@@ -1022,6 +1141,8 @@ run_verify (
         old_sha,
         active_sha,
         NULL,
+        0,
+        0,
         old_snapshot_exists,
         new_snapshot_exists,
         extraction_staging_exists,
@@ -1040,11 +1161,24 @@ main (
 )
 {
     if (argc == 10 &&
-        g_strcmp0 (
-            argv[1],
-            "--data-enospc"
-        ) == 0) {
+        (g_strcmp0 (
+             argv[1],
+             "--data-enospc"
+         ) == 0 ||
+         g_strcmp0 (
+             argv[1],
+             "--data-inode-enospc"
+         ) == 0)) {
+        const char *scenario =
+            g_strcmp0 (
+                argv[1],
+                "--data-inode-enospc"
+            ) == 0
+                ? "data-inode-enospc"
+                : "data-enospc";
+
         return run_data_enospc (
+            scenario,
             argv[2],
             argv[3],
             argv[4],
@@ -1075,12 +1209,24 @@ main (
     }
 
     if (argc == 7 &&
-        g_strcmp0 (
-            argv[1],
-            "--verify-data"
-        ) == 0) {
+        (g_strcmp0 (
+             argv[1],
+             "--verify-data"
+         ) == 0 ||
+         g_strcmp0 (
+             argv[1],
+             "--verify-data-inode"
+         ) == 0)) {
+        const char *scenario =
+            g_strcmp0 (
+                argv[1],
+                "--verify-data-inode"
+            ) == 0
+                ? "data-inode-enospc-restart"
+                : "data-enospc-restart";
+
         return run_verify (
-            "data-enospc-restart",
+            scenario,
             argv[2],
             NULL,
             argv[3],
@@ -1110,11 +1256,11 @@ main (
 
     g_printerr (
         "Usage:\n"
-        "  capacity-enospc-runner --data-enospc "
+        "  capacity-enospc-runner --data-enospc|--data-inode-enospc "
         "DATA STATE ARCHIVE ID ACRONYM DISPLAY NEW_SHA OLD_SHA\n"
         "  capacity-enospc-runner --index-enospc "
         "DATA CACHE STATE ARCHIVE ID ACRONYM DISPLAY NEW_SHA OLD_SHA\n"
-        "  capacity-enospc-runner --verify-data "
+        "  capacity-enospc-runner --verify-data|--verify-data-inode "
         "DATA STATE ID NEW_SHA OLD_SHA\n"
         "  capacity-enospc-runner --verify-index "
         "DATA CACHE STATE ID NEW_SHA OLD_SHA\n"
