@@ -1,4 +1,5 @@
 #include "repository_storage.h"
+#include "fault_injection_test_hook.h"
 
 #include <glib/gstdio.h>
 
@@ -342,6 +343,10 @@ atm_repository_promote_snapshot (
         goto out;
     }
 
+    atm_test_fault_checkpoint (
+        "snapshot_pre_rename"
+    );
+
     if (g_rename (staging_path, snapshot_path) != 0) {
         g_set_error (
             error,
@@ -352,6 +357,10 @@ atm_repository_promote_snapshot (
         );
         goto out;
     }
+
+    atm_test_fault_checkpoint (
+        "snapshot_post_rename"
+    );
 
     *out_snapshot_path = g_steal_pointer (&snapshot_path);
     ok = TRUE;
