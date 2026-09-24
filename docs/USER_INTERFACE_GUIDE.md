@@ -32,7 +32,7 @@ Refresh does not silently replace local snapshots.
 
 A compact global instrument-style control sits at the end of the header:
 
-`OPT  OFF  [switch]  ON`
+`Optimizations  OFF  [switch]  ON`
 
 It controls the post-v0.5.0 runtime optimization program as one application-wide mode:
 
@@ -63,9 +63,9 @@ The update path is fail-closed:
 
 A failed update leaves the last valid snapshot available. When repairing a locally invalid same-SHA snapshot, AtM preserves the invalid directory under a diagnostic quarantine name rather than silently rewriting it in place.
 
-When **OPT ON** is active, Download/Update also uses a nonblocking cross-process repository mutation lease. If another AtM process is already changing repository authority, the operation stops before repository staging is touched and reports that another Ask the Model instance is currently updating repository state. Ordinary repository reads and grounding do not wait for this global mutation lease.
+When **Optimizations ON** is active, Download/Update also uses a nonblocking cross-process repository mutation lease. If another AtM process is already changing repository authority, the operation stops before repository staging is touched and reports that another Ask the Model instance is currently updating repository state. Ordinary repository reads and grounding do not wait for this global mutation lease.
 
-With **OPT OFF**, this additional coordination layer is not used and the established v0.5.0 runtime path remains in effect.
+With **Optimizations OFF**, this additional coordination layer is not used and the established v0.5.0 runtime path remains in effect.
 
 ## Status LCD
 
