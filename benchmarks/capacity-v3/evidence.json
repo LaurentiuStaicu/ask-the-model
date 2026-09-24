@@ -1,0 +1,86 @@
+{
+  "schema_version": 1,
+  "evidence_id": "atm-c0p-m5-out-of-sample-capacity-v1",
+  "status": "qualification-only",
+  "production_prediction_selected": false,
+  "production_margin_selected": false,
+  "training_refit_on_holdout": false,
+  "source": {
+    "actions_run_id": 36039967290,
+    "artifact_name": "atm-c0p-m5-out-of-sample-36039967290-1",
+    "artifact_id": 10826687010,
+    "artifact_sha256": "5e58f88bf10e06ac040c65089c8d68d2489e72b9494ab82d211f935d14aa3ed4",
+    "atm_source_commit": "fe1444ebf850fd330a3dd76014f46eea233b713b",
+    "workflow_commit": "afaacd4939a405967ae29bd66d256e795d65413a"
+  },
+  "training": {
+    "corpus": "benchmarks/capacity-v2/corpus.json",
+    "samples": 18,
+    "per_repository": 6
+  },
+  "holdout": {
+    "corpus": "benchmarks/capacity-v3/corpus.json",
+    "samples": 12,
+    "per_repository": 4,
+    "ranks": [
+      4,
+      12,
+      20,
+      40
+    ]
+  },
+  "summary": {
+    "cbd": {
+      "snapshot": {
+        "covered": 4,
+        "cases": 4,
+        "worst_actual_over_prediction": 0.9403090920959029
+      },
+      "index": {
+        "covered": 4,
+        "cases": 4,
+        "worst_actual_over_prediction": 0.9177193805484417
+      }
+    },
+    "ewd": {
+      "snapshot": {
+        "covered": 4,
+        "cases": 4,
+        "worst_actual_over_prediction": 0.9965564549170199
+      },
+      "index": {
+        "covered": 4,
+        "cases": 4,
+        "worst_actual_over_prediction": 0.9099525652444519
+      }
+    },
+    "rmd": {
+      "snapshot": {
+        "covered": 4,
+        "cases": 4,
+        "worst_actual_over_prediction": 0.9470397029226463
+      },
+      "index": {
+        "covered": 4,
+        "cases": 4,
+        "worst_actual_over_prediction": 0.8790656679041781
+      }
+    }
+  },
+  "global_summary": {
+    "snapshot_covered": 12,
+    "snapshot_cases": 12,
+    "index_covered": 12,
+    "index_cases": 12,
+    "limiting_repository": "ewd",
+    "limiting_artifact": "snapshot",
+    "limiting_actual_over_prediction": 0.9965564549170199
+  },
+  "reviewed_limits": [
+    "The 12 holdout SHAs were not used to fit or refit any M4 hybrid coefficient or historical absolute floor.",
+    "Out-of-sample coverage is 12/12 for snapshot and 12/12 for index on this frozen holdout corpus.",
+    "The limiting EWD snapshot actual/prediction ratio is approximately 0.99656, so positive slack is observed on this holdout set but remains small.",
+    "Observed holdout coverage does not prove an upper bound for an arbitrary future SHA.",
+    "No production predictor, safety multiplier, reserve, refusal threshold, or Optimizations-ON runtime behavior is selected by this evidence."
+  ]
+}
