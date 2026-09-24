@@ -34,6 +34,8 @@ The first Send freezes model/repository identity for that chat.
 
 Durable history reopen must reuse the persisted snapshot restore boundary: reopening a closed or archived conversation may change only its lifecycle visibility state before reconstructing the saved snapshot, and the resulting tab must remain view-only until the exact persisted model/repository context passes the existing continuation qualification.
 
+CONV-05b export is intentionally layered above the same read-only durable snapshot boundary. `ConversationExport.vala` serializes a loaded snapshot into a versioned deterministic JSON envelope. `ConversationPersistenceStore` maintains a best-effort automatic mirror under `~/Ask the Model/Conversation Exports/`, using stable conversation-ID filenames and atomic replacement; startup synchronizes pre-existing durable conversations and later durable changes refresh the mirror. Export failure must not roll back or misreport a successful SQLite commit. The existing narrow `~/Ask the Model:create` Flatpak permission is sufficient and must not be broadened. Import is not implied by the export format and requires a separate future design.
+
 ### Startup qualification and repository lifecycle
 
 `StartupQualificationService.vala`, `StartupQualificationRecord.vala`, `startup_qualification.c` and the G-S0 native bridge qualify the effective packaged deployment, the dedicated repository-storage boundary and persistent repository state before local readiness is accepted.

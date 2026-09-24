@@ -63,7 +63,10 @@ All notable public releases of Ask the Model are recorded here.
 - reconciled STATUS and architecture documentation after CONV-04c so the tagged v0.4.0 release boundary remains historical while development `main` is accurately described as having the complete CONV-01→CONV-04c persistence lifecycle; archived-history browsing/export/import remain future work.
 - CONV-05a adds a modal Conversation History surface for durable chats that are no longer open: closed chats can be reopened and archived chats can be unarchived and reopened; history reopen deliberately reuses the restored read-only tab path and exact continuation qualification rather than repinning to current model/repository authority.
 - history reopen persists startup-open state before clearing archive state so a failed unarchive leaves the conversation archived and excluded from startup restore; regression coverage now qualifies that ordering and retained startup-open state after unarchive.
-- added `SESSION-S0-011`; export/import, retention policy and bulk history management remain future work.
+- added `SESSION-S0-011`; history reopening is qualified independently from later export/import work.
+- CONV-05b adds an automatic deterministic versioned JSON export mirror at `~/Ask the Model/Conversation Exports/`; the folder is created automatically, existing durable chats synchronize at startup and stable `<conversation_id>.json` files refresh after durable turns, title changes and archive/unarchive transitions without a location chooser or dedicated export button.
+- automatic exports use private directory/file modes, atomic consistent replacement and best-effort failure isolation so an export filesystem failure cannot invalidate an already committed SQLite turn; permanent conversation deletion removes its managed export mirror.
+- added regression coverage for deterministic serialization, JSON escaping, nullable fields, grounded/ungrounded content, immutable citation permalinks, automatic mirror updates and managed-export deletion; import, retention policy and bulk history management remain future work.
 
 
 ### Startup qualification fixes

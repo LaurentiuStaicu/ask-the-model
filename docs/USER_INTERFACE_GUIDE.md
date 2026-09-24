@@ -104,6 +104,14 @@ Validated snapshots are visible under:
 ~/Ask the Model/Repositories/
 ```
 
+Durable conversations are mirrored automatically as JSON files under:
+
+```text
+~/Ask the Model/Conversation Exports/
+```
+
+The export folder is created automatically and does not require a location chooser or export button. Existing durable chats are synchronized at startup and the corresponding file is refreshed after durable conversation changes.
+
 Per-snapshot retrieval indexes are regenerable cache data inside the Flatpak private cache.
 
 The application receives only the dedicated `~/Ask the Model:create` filesystem permission; it does not request broad Home or host filesystem access.

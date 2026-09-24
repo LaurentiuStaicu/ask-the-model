@@ -41,6 +41,7 @@ executable(
     'src/ControlRepositoryState.vala',
     'src/ConversationStoreNative.vapi',
     'src/ConversationPersistenceStore.vala',
+    'src/ConversationExport.vala',
     'src/StartupQualificationRecord.vala',
     'src/StartupQualificationNative.vapi',
     'src/StartupQualificationService.vala',
@@ -359,6 +360,7 @@ conversation_persistence_store_test = executable(
   [
     'src/ConversationStoreNative.vapi',
     'src/ConversationPersistenceStore.vala',
+    'src/ConversationExport.vala',
     'src/OllamaProvider.vala',
     'src/ChatRequestBuilder.vala',
     'src/conversation_store.c',

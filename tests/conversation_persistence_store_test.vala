@@ -540,6 +540,26 @@ test_archive_delete_domain_lifecycle ()
             102
         );
 
+        string automatic_export_path =
+            GLib.Path.build_filename (
+                store.export_root,
+                "%s.json".printf (
+                    conversation_id
+                )
+            );
+        string archived_export;
+        assert (
+            GLib.FileUtils.get_contents (
+                automatic_export_path,
+                out archived_export
+            )
+        );
+        assert (
+            archived_export.index_of (
+                "\"archived\" : true"
+            ) >= 0
+        );
+
         var archived =
             store.load_snapshot (
                 conversation_id
@@ -592,6 +612,13 @@ test_archive_delete_domain_lifecycle ()
             conversation_id
         );
 
+        assert (
+            !GLib.FileUtils.test (
+                automatic_export_path,
+                GLib.FileTest.EXISTS
+            )
+        );
+
         bool missing = false;
 
         try {
@@ -605,6 +632,298 @@ test_archive_delete_domain_lifecycle ()
         assert (missing);
         assert (
             store.list_conversations ().length == 0
+        );
+    } catch (Error error) {
+        critical ("%s", error.message);
+        assert_not_reached ();
+    }
+}
+
+
+private static void
+test_deterministic_read_only_export ()
+{
+    string root = new_temp_root ();
+
+    try {
+        var store =
+            new AskTheModel.ConversationPersistenceStore (
+                root
+            );
+
+        var repository =
+            new AskTheModel.ConversationPersistenceRepository (
+                "rmd",
+                "0.1.0",
+                "0123456789abcdef0123456789abcdef01234567"
+            );
+
+        string conversation_id =
+            store.create_conversation (
+                "Quoted \"title\"\nline",
+                200,
+                "model-export",
+                null,
+                9,
+                { repository }
+            );
+
+        var citation =
+            new AskTheModel.ConversationPersistenceCitation (
+                "S1",
+                "rmd",
+                "0.1.0",
+                "0123456789abcdef0123456789abcdef01234567",
+                "source-1",
+                "README.md",
+                "lines 1-2",
+                null,
+                "Excerpt \"quoted\"\nΔ",
+                "https://example.invalid/rmd/README.md#L1-L2"
+            );
+
+        assert (
+            store.commit_turn (
+                conversation_id,
+                "question",
+                "answer [S1]",
+                "answer",
+                true,
+                201,
+                { citation }
+            ) == 0
+        );
+        assert (
+            store.commit_turn (
+                conversation_id,
+                "follow-up",
+                "plain provider",
+                "plain display",
+                false,
+                202,
+                {}
+            ) == 1
+        );
+
+        var before = store.list_conversations ()[0];
+        string first =
+            store.export_conversation_json (
+                conversation_id
+            );
+        string second =
+            store.export_conversation_json (
+                conversation_id
+            );
+        var after = store.list_conversations ()[0];
+
+        string automatic_export_path =
+            GLib.Path.build_filename (
+                store.export_root,
+                "%s.json".printf (
+                    conversation_id
+                )
+            );
+        string automatic_export;
+
+        assert (
+            GLib.FileUtils.get_contents (
+                automatic_export_path,
+                out automatic_export
+            )
+        );
+
+        assert (automatic_export == first);
+        assert (first == second);
+        assert (first.has_suffix ("\n"));
+        assert (
+            first.index_of (
+                AskTheModel.ConversationExport.FORMAT
+            ) >= 0
+        );
+        assert (
+            first.index_of (
+                "\"schema_version\""
+            ) >= 0
+        );
+        assert (
+            first.index_of (
+                "\"repository_generation_id\""
+            ) >= 0
+        );
+        assert (
+            first.index_of (
+                "0123456789abcdef0123456789abcdef01234567"
+            ) >= 0
+        );
+        assert (
+            first.index_of (
+                "https://example.invalid/rmd/README.md#L1-L2"
+            ) >= 0
+        );
+        assert (
+            first.index_of ("answer [S1]") >= 0
+        );
+        assert (
+            first.index_of ("plain display") >= 0
+        );
+        assert (
+            first.index_of ("\\\"quoted\\\"") >= 0
+        );
+
+        var parser = new Json.Parser ();
+        parser.load_from_data (first, -1);
+
+        Json.Node root_node = parser.get_root ();
+        Json.Object envelope = root_node.get_object ();
+
+        assert (
+            envelope.get_string_member ("format") ==
+            AskTheModel.ConversationExport.FORMAT
+        );
+        assert (
+            envelope.get_int_member ("schema_version") ==
+            AskTheModel.ConversationExport.SCHEMA_VERSION
+        );
+
+        Json.Object exported =
+            envelope.get_object_member ("conversation");
+        assert (
+            exported.get_string_member ("conversation_id") ==
+            conversation_id
+        );
+        assert (
+            exported.get_int_member (
+                "repository_generation_id"
+            ) == 9
+        );
+
+        Json.Object model =
+            exported.get_object_member ("model");
+        assert (
+            model.get_string_member ("name") ==
+            "model-export"
+        );
+        assert (model.get_null_member ("digest"));
+
+        Json.Array repositories =
+            exported.get_array_member ("repositories");
+        assert (repositories.get_length () == 1);
+        assert (
+            repositories.get_object_element (0)
+                .get_string_member ("repository_id") ==
+            "rmd"
+        );
+
+        Json.Array messages =
+            exported.get_array_member ("messages");
+        assert (messages.get_length () == 4);
+        assert (
+            messages.get_object_element (1)
+                .get_boolean_member ("grounded")
+        );
+        assert (
+            messages.get_object_element (1)
+                .get_array_member ("citations")
+                .get_length () == 1
+        );
+        assert (
+            messages.get_object_element (1)
+                .get_array_member ("citations")
+                .get_object_element (0)
+                .get_null_member ("title")
+        );
+
+        assert (
+            before.updated_at_us ==
+            after.updated_at_us
+        );
+        assert (
+            before.archived ==
+            after.archived
+        );
+        assert (
+            before.open_on_startup ==
+            after.open_on_startup
+        );
+    } catch (Error error) {
+        critical ("%s", error.message);
+        assert_not_reached ();
+    }
+}
+
+
+private static void
+test_existing_exports_resynchronize_on_reopen ()
+{
+    string root = new_temp_root ();
+
+    try {
+        var first_store =
+            new AskTheModel.ConversationPersistenceStore (
+                root
+            );
+
+        string conversation_id =
+            first_store.create_conversation (
+                "Existing",
+                300,
+                "model-existing",
+                "digest-existing",
+                0,
+                {}
+            );
+
+        assert (
+            first_store.commit_turn (
+                conversation_id,
+                "hello",
+                "world",
+                "world",
+                false,
+                301,
+                {}
+            ) == 0
+        );
+
+        string export_path =
+            GLib.Path.build_filename (
+                first_store.export_root,
+                "%s.json".printf (
+                    conversation_id
+                )
+            );
+
+        assert (
+            GLib.FileUtils.test (
+                export_path,
+                GLib.FileTest.EXISTS
+            )
+        );
+        assert (GLib.FileUtils.remove (export_path) == 0);
+        assert (
+            !GLib.FileUtils.test (
+                export_path,
+                GLib.FileTest.EXISTS
+            )
+        );
+
+        var reopened_store =
+            new AskTheModel.ConversationPersistenceStore (
+                root
+            );
+
+        string synchronized_export;
+        assert (
+            GLib.FileUtils.get_contents (
+                export_path,
+                out synchronized_export
+            )
+        );
+        assert (
+            synchronized_export ==
+            reopened_store.export_conversation_json (
+                conversation_id
+            )
         );
     } catch (Error error) {
         critical ("%s", error.message);
@@ -632,6 +951,14 @@ main (string[] args)
     Test.add_func (
         "/conversation-persistence/archive-delete-lifecycle",
         test_archive_delete_domain_lifecycle
+    );
+    Test.add_func (
+        "/conversation-persistence/deterministic-read-only-export",
+        test_deterministic_read_only_export
+    );
+    Test.add_func (
+        "/conversation-persistence/existing-export-resync",
+        test_existing_exports_resynchronize_on_reopen
     );
 
     return Test.run ();
