@@ -28,3 +28,4 @@ jobs:
           python3 scripts/validate_capacity_v2_corpus.py
           python3 scripts/validate_capacity_v2_evidence.py
           python3 scripts/validate_capacity_v3_corpus.py
+          python3 scripts/validate_capacity_v3_evidence.py
