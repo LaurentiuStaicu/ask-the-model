@@ -71,6 +71,8 @@ All notable public releases of Ask the Model are recorded here.
 - reconciled the enforced session invariant registry with the CONV-05c lifecycle and added `SESSION-S0-012` for archive-only managed JSON mirrors and fail-closed permanent deletion.
 
 
+- retuned the CONV-05c per-tab save control to use Adwaita `document-save-symbolic` with the explicit tooltip/accessibility label `Save to History`, replacing the ambiguous generic folder symbol; behavior is unchanged.
+
 ### Startup qualification fixes
 
 - accept the effective Flatpak runtime identity in both `runtime/ID/ARCH/BRANCH` and legacy `ID/ARCH/BRANCH` forms while still rejecting wrong ref kinds, IDs, architectures and branches;
