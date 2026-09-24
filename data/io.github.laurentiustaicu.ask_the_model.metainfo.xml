@@ -16,15 +16,15 @@
     <p>
       Ask the Model is a local-first GTK desktop interface for locally managed
       language models through an Ollama-compatible provider. It discovers
-      completion-capable provider models, streams responses and keeps independent
-      in-memory conversation state in multiple chat tabs.
+      completion-capable provider models, streams responses, keeps independent
+      chat tabs and lets users explicitly save selected conversations to local History.
     </p>
     <p>
-      Version 0.4.0 retains repository-grounded exploration for the fixed Empirical
+      Version 0.5.0 retains repository-grounded exploration for the fixed Empirical
       World3 Dynamics, Cognitive Belief Dynamics and Romanian Monetary Dynamics
-      repository suite and adds offline startup qualification plus deterministic
-      local snapshot-integrity seals. Upstream Git SHA provenance remains distinct
-      from local integrity verification.
+      repository suite and adds explicit saved-conversation History with exact-context
+      restore, deterministic managed JSON mirrors and hardened SQLite state authority.
+      Upstream Git SHA provenance remains distinct from local integrity verification.
     </p>
     <p>
       AtM remains an interface and retrieval layer. The external provider owns
@@ -45,6 +45,15 @@
   <content_rating type="oars-1.1"/>
 
   <releases>
+    <release version="0.5.0" date="2026-09-24">
+      <description>
+        <p>
+          Saved Conversation History and State Hardening with explicit Save to History,
+          exact-context restore, deterministic archived-conversation JSON mirrors,
+          hardened SQLite state authority and least-privilege publication.
+        </p>
+      </description>
+    </release>
     <release version="0.4.0" date="2026-09-22">
       <description>
         <p>
