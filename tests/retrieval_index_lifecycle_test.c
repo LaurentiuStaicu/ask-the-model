@@ -8,6 +8,7 @@
 #include <string.h>
 
 #include <sys/stat.h>
+#include <sys/wait.h>
 #include <unistd.h>
 
 static void
@@ -1169,6 +1170,163 @@ test_coordinated_symlink_lock_root_is_refused_without_following (void)
     g_free (target_root);
 }
 
+static void
+run_coordinated_child (
+    const char *state_root,
+    const char *cache_root,
+    const char *snapshot_root
+)
+{
+    char *index_path = NULL;
+    char *version = NULL;
+    AtmRetrievalEnsureResult result;
+    GError *error = NULL;
+    gboolean ok =
+        atm_retrieval_index_ensure_for_snapshot_coordinated (
+            state_root,
+            cache_root,
+            snapshot_root,
+            "ewd",
+            snapshot_sha (),
+            &index_path,
+            &version,
+            &result,
+            &error
+        );
+
+    if (!ok || error != NULL) {
+        g_clear_error (&error);
+        g_free (version);
+        g_free (index_path);
+        _exit (20);
+    }
+
+    gint exit_code =
+        result == ATM_RETRIEVAL_ENSURE_REBUILT
+            ? 10
+            : result == ATM_RETRIEVAL_ENSURE_REUSED
+                ? 11
+                : 12;
+
+    g_free (version);
+    g_free (index_path);
+    _exit (exit_code);
+}
+
+static void
+test_coordinated_two_processes_build_once (void)
+{
+    char *state_root = new_temp_root (
+        "atm-index-single-flight-state-XXXXXX"
+    );
+    char *cache_root = new_temp_root (
+        "atm-index-single-flight-cache-XXXXXX"
+    );
+    char *snapshot_root = new_snapshot ();
+    char *event_path = g_build_filename (
+        state_root,
+        "index-build-events.log",
+        NULL
+    );
+    char *index_path =
+        atm_retrieval_index_path (
+            cache_root,
+            "ewd",
+            snapshot_sha ()
+        );
+    GError *error = NULL;
+    char *events = NULL;
+    gsize events_length = 0;
+    gint first_status = 0;
+    gint second_status = 0;
+
+    g_assert_true (
+        g_setenv (
+            "ATM_TEST_INDEX_BUILD_EVENT",
+            event_path,
+            TRUE
+        )
+    );
+
+    pid_t first = fork ();
+    g_assert_cmpint (first, >=, 0);
+
+    if (first == 0) {
+        run_coordinated_child (
+            state_root,
+            cache_root,
+            snapshot_root
+        );
+    }
+
+    pid_t second = fork ();
+    g_assert_cmpint (second, >=, 0);
+
+    if (second == 0) {
+        run_coordinated_child (
+            state_root,
+            cache_root,
+            snapshot_root
+        );
+    }
+
+    g_assert_cmpint (
+        waitpid (first, &first_status, 0),
+        ==,
+        first
+    );
+    g_assert_cmpint (
+        waitpid (second, &second_status, 0),
+        ==,
+        second
+    );
+
+    g_unsetenv ("ATM_TEST_INDEX_BUILD_EVENT");
+
+    g_assert_true (WIFEXITED (first_status));
+    g_assert_true (WIFEXITED (second_status));
+
+    gint first_code = WEXITSTATUS (first_status);
+    gint second_code = WEXITSTATUS (second_status);
+
+    g_assert_true (
+        (first_code == 10 && second_code == 11) ||
+        (first_code == 11 && second_code == 10)
+    );
+
+    g_assert_true (
+        g_file_get_contents (
+            event_path,
+            &events,
+            &events_length,
+            &error
+        )
+    );
+    g_assert_no_error (error);
+    g_assert_cmpstr (events, ==, "build\n");
+
+    g_assert_true (
+        atm_retrieval_index_validate_snapshot_sources (
+            index_path,
+            snapshot_root,
+            "ewd",
+            snapshot_sha (),
+            &error
+        )
+    );
+    g_assert_no_error (error);
+
+    g_free (events);
+    g_free (index_path);
+    g_free (event_path);
+    remove_tree_best_effort (snapshot_root);
+    g_free (snapshot_root);
+    remove_tree_best_effort (cache_root);
+    g_free (cache_root);
+    remove_tree_best_effort (state_root);
+    g_free (state_root);
+}
+
 int
 main (int argc, char **argv)
 {
@@ -1201,6 +1359,10 @@ main (int argc, char **argv)
     g_test_add_func (
         "/retrieval-lifecycle/coordinated-two-callers-one-build",
         test_coordinated_two_callers_build_once
+    );
+    g_test_add_func (
+        "/retrieval-lifecycle/coordinated-two-processes-one-build",
+        test_coordinated_two_processes_build_once
     );
     g_test_add_func (
         "/retrieval-lifecycle/coordinated-stale-staging-recovery",
