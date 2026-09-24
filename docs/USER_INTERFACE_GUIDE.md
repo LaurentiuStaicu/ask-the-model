@@ -30,17 +30,21 @@ Refresh does not silently replace local snapshots.
 
 ### Optimization mode
 
-A compact global `OPT OFF / OPT ON` switch sits at the end of the header.
+A compact global instrument-style control sits at the end of the header:
+
+`OPT  OFF  [switch]  ON`
 
 It controls the post-v0.5.0 runtime optimization program as one application-wide mode:
 
-- every AtM process starts with **OPT OFF**;
+- every AtM process starts with **OFF** selected;
 - the state is session-only and is not remembered after restart;
-- **OPT OFF** preserves the established baseline runtime path;
-- **OPT ON** allows runtime optimizations that have passed their individual qualification gates;
+- **OFF** preserves the established baseline runtime path;
+- **ON** allows runtime optimizations that have passed their individual qualification gates;
 - measurement and qualification tools do not depend on this UI switch.
 
-The native sliding switch uses a subdued warm red trough when OFF and a subdued warm green trough when ON. The adjacent text always states the mode explicitly, so color is not the only state cue.
+The control deliberately resembles a small panel switch rather than a flat preference toggle. Its rounded case uses the same neutral ridge-border language as the AtM application frame. The case interior is warm muted red when OFF and warm muted green when ON, while the moving slider remains neutral metallic gray. Small fixed OFF and ON labels sit on the left and right, so color is never the only state cue.
+
+The status LCD mirrors the same state with a compact `OPT OFF` / `OPT ON` annunciator in the NASA-style status strip.
 
 Changing the switch affects subsequent operations. An operation already in progress keeps the optimization mode captured when it started rather than changing behavior halfway through.
 
