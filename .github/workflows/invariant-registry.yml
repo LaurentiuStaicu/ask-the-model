@@ -19,8 +19,9 @@ jobs:
       - name: Checkout AtM
         uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
 
-      - name: Validate invariant registry
+      - name: Validate invariant and capacity evidence registries
         shell: bash
         run: |
           set -euo pipefail
           python3 scripts/validate_invariant_registry.py
+          python3 scripts/validate_capacity_evidence.py
