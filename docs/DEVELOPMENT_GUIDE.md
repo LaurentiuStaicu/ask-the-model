@@ -459,6 +459,24 @@ This test is important because the current FTS5 table is a normal content-storin
 
 M6 is evidence-only. Underprediction is retained as a result and no automatic margin is added. A synthetic failure does not mean the real repositories are invalid; it means the empirical predictor is not a structural upper bound over the full admitted parser surface.
 
+### C0P-F7 structural predictor falsification evidence
+
+C0P-F7 freezes the reviewed M6 result under `benchmarks/capacity-v2/evidence.json`.
+
+The historical M4/M5 hybrid remains useful descriptive evidence for the sampled scientific repository history, but M6 demonstrates that it is not a conservative unknown-SHA retrieval-index predictor across valid structural content changes.
+
+The frozen structural result is:
+- snapshot allocation covered in 6/6 synthetic stress fixtures;
+- retrieval-index allocation covered in 0/6;
+- worst actual/prediction index ratio: CBD 2.5369×, EWD 2.3449×, RMD 17.2604×;
+- limiting case: RMD Markdown ~12 MiB, predicted index 3,334,144 B versus actual 57,548,800 B.
+
+The validator requires this underprediction to remain visible. It also requires the reviewed conclusion that the current historical hybrid is structurally falsified for conservative unknown-SHA index admission.
+
+This evidence does not itself wire production behavior. It narrows #232's defensible policy space: exact-profile-only proactive byte admission is the current conservative production direction unless a new structural observable-input model is independently derived and qualified.
+
+No scalar margin is selected by F7. In particular, multiplying the current hybrid until it covers the six M6 fixtures would be fixture-fitting rather than an independently justified upper bound.
+
 ### Repository authority-mutation lease
 
 When an operation snapshots optimization mode ON, repository Download/Update uses one application-owned exclusive nonblocking lease at `<state_root>/repository-mutation.lock` before any selected-repository staging or authority mutation begins.

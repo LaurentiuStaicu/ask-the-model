@@ -13,6 +13,7 @@ All notable public releases of Ask the Model are recorded here.
 
 ### Qualification infrastructure
 
+- added C0P-F7 checked-in M6 structural stress evidence and validator: snapshot prediction remains covered in all six fixtures, retrieval-index prediction remains explicitly 0/6 with the limiting RMD Markdown case at 17.2604× actual/prediction, and CI prevents the structurally falsified historical hybrid from being silently restored as a conservative unknown-SHA index predictor;
 - added C0P-M6 structural capacity qualification: valid synthetic AtM fixtures stress row-heavy CSV, entity-heavy JSON and section/token-heavy Markdown within current parser limits, while the M4/M5 hybrid remains fitted only on the frozen 18 real training SHAs; underprediction is preserved as evidence and no production margin or predictor is selected;
 - added C0P-M5 no-refit out-of-sample capacity qualification: the frozen 18-SHA M4 corpus is the only training set, while 12 disjoint EWD/CBD/RMD holdouts at ranks 4/12/20/40 are measured with the real ingest/index runner and evaluated without refitting or automatically adding a margin; this remains evidence-only and selects no production predictor or threshold;
 - added C0-M4 historical capacity-amplification qualification: a validated 18-SHA EWD/CBD/RMD corpus reuses the real M1 ingest/index runner, derives per-repository observable-to-allocated-byte envelopes, and performs leave-one-out underprediction tests without selecting any production predictor or margin;
