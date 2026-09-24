@@ -455,14 +455,16 @@ namespace AskTheModel {
             }
         }
 
-        private void remove_automatic_export_best_effort (
+        private void remove_automatic_export_required (
             string conversation_id
-        ) {
+        ) throws GLib.Error {
             if (!GLib.Regex.match_simple (
                     "^[A-Za-z0-9-]+$",
                     conversation_id
                 )) {
-                return;
+                throw new GLib.IOError.INVALID_DATA (
+                    "Conversation identity is invalid for managed export deletion."
+                );
             }
 
             string export_path =
@@ -478,9 +480,8 @@ namespace AskTheModel {
             }
 
             if (GLib.FileUtils.remove (export_path) != 0) {
-                warning (
-                    "AtM: automatic conversation export could not be removed: %s",
-                    export_path
+                throw new GLib.IOError.FAILED (
+                    "Automatic conversation export could not be deleted."
                 );
             }
         }
@@ -999,18 +1000,22 @@ namespace AskTheModel {
         public void delete_conversation (
             string conversation_id
         ) throws GLib.Error {
+            remove_automatic_export_required (
+                conversation_id
+            );
+
             if (!ConversationStoreNative.delete_conversation (
                     native_store,
                     conversation_id
                 )) {
+                sync_automatic_export_best_effort (
+                    conversation_id
+                );
+
                 throw new GLib.IOError.FAILED (
                     "Conversation could not be deleted."
                 );
             }
-
-            remove_automatic_export_best_effort (
-                conversation_id
-            );
         }
     }
 
