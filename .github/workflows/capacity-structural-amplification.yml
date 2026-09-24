@@ -210,7 +210,7 @@ jobs:
             ewd-csv-50k
             ewd-csv-150k
             cbd-json-25k
-            cbd-json-75k
+            cbd-json-70k
             rmd-markdown-4m
             rmd-markdown-12m
           )
@@ -477,7 +477,7 @@ jobs:
                   ],
                   "cbd": [
                       "cbd-json-25k",
-                      "cbd-json-75k",
+                      "cbd-json-70k",
                   ],
                   "rmd": [
                       "rmd-markdown-4m",
