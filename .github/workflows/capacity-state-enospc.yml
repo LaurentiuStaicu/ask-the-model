@@ -108,7 +108,7 @@ jobs:
             rmd \
             "$old_sha" \
             "$new_sha" \
-            16384 \
+            65536 \
             | tee "$results/state-enospc-attempt.json"
 
           /tmp/atm-capacity-state-enospc-runner \
@@ -150,7 +150,7 @@ jobs:
               raise SystemExit(
                   "fresh verifier found a persisted CANDIDATE generation"
               )
-          if attempt["available_bytes_before_operation"] > 65536:
+          if attempt["available_bytes_before_operation"] > 131072:
               raise SystemExit(
                   "state ENOSPC test did not reach the intended low-space band"
               )
@@ -158,7 +158,7 @@ jobs:
           artifact = {
               "schema_version": 1,
               "qualification_id": "atm-c0-e3-state-enospc-v1",
-              "leave_target_bytes": 16384,
+              "leave_target_bytes": 65536,
               "records": [attempt, restart],
           }
 
