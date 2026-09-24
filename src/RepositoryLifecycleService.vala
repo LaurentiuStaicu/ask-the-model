@@ -334,6 +334,7 @@ namespace AskTheModel {
             RepositoryInstallResult? worker_result = null;
             string? failure = null;
             bool integrity_failure = false;
+            bool no_space_failure = false;
             string expected_snapshot =
                 snapshot_path_for_root (
                     data_root,
@@ -450,6 +451,10 @@ namespace AskTheModel {
                                 post_snapshot_seal
                             );
                     } catch (GLib.Error error) {
+                        no_space_failure =
+                            RepositoryNative.error_is_no_space (
+                                error
+                            );
                         failure = error.message;
                     }
 
@@ -466,6 +471,16 @@ namespace AskTheModel {
                     throw new RepositoryError.NOT_READY (
                         failure ??
                         "Repository snapshot integrity verification failed."
+                    );
+                }
+
+                if (no_space_failure) {
+                    throw new RepositoryError.NO_SPACE (
+                        "Not enough local storage space to prepare repository %s: %s".printf (
+                            descriptor.acronym,
+                            failure ??
+                            "local storage is full"
+                        )
                     );
                 }
 
@@ -845,12 +860,26 @@ namespace AskTheModel {
                                         descriptor.acronym
                                     )
                             );
-                            archive_path =
-                                yield client.download_archive_to_staging (
-                                    descriptor,
-                                    sha,
-                                    cancellable
-                                );
+                            try {
+                                archive_path =
+                                    yield client.download_archive_to_staging (
+                                        descriptor,
+                                        sha,
+                                        cancellable
+                                    );
+                            } catch (GLib.Error error) {
+                                if (RepositoryNative.error_is_no_space (
+                                        error
+                                    )) {
+                                    throw new RepositoryError.NO_SPACE (
+                                        "Not enough local storage space to download repository %s.".printf (
+                                            descriptor.acronym
+                                        )
+                                    );
+                                }
+
+                                throw error;
+                            }
                         }
 
                         if (repairing_same_snapshot) {
@@ -861,15 +890,29 @@ namespace AskTheModel {
                             );
 
                             string quarantine_path;
-                            if (!RepositoryNative.quarantine_snapshot (
-                                    data_root,
-                                    descriptor.id,
-                                    sha,
-                                    out quarantine_path
-                                )) {
-                                throw new RepositoryError.STORAGE (
-                                    "Invalid repository snapshot could not be quarantined for repair."
-                                );
+                            try {
+                                if (!RepositoryNative.quarantine_snapshot (
+                                        data_root,
+                                        descriptor.id,
+                                        sha,
+                                        out quarantine_path
+                                    )) {
+                                    throw new RepositoryError.STORAGE (
+                                        "Invalid repository snapshot could not be quarantined for repair."
+                                    );
+                                }
+                            } catch (GLib.Error error) {
+                                if (RepositoryNative.error_is_no_space (
+                                        error
+                                    )) {
+                                    throw new RepositoryError.NO_SPACE (
+                                        "Not enough local storage space to prepare repository %s repair.".printf (
+                                            descriptor.acronym
+                                        )
+                                    );
+                                }
+
+                                throw error;
                             }
 
                             stdout.printf (
