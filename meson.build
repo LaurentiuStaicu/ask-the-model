@@ -603,6 +603,57 @@ test(
   retrieval_index_test
 )
 
+recovery_fault_helper = executable(
+  'recovery-fault-helper',
+  [
+    'src/repository_storage.c',
+    'src/control_state.c',
+    'src/repository_sources.c',
+    'src/markdown_sections.c',
+    'src/csv_table.c',
+    'src/structured_json.c',
+    'src/retrieval_index.c',
+    'tests/fault_injection_support.c',
+    'tests/recovery_fault_helper.c',
+    resources
+  ],
+  include_directories: [
+    include_directories('src'),
+    include_directories('tests')
+  ],
+  dependencies: [
+    glib_dep,
+    gio_dep,
+    json_glib_dep,
+    sqlite_dep
+  ],
+  c_args: [
+    '-DATM_TEST_FAULT_INJECTION'
+  ],
+  install: false
+)
+
+recovery_fault_test = executable(
+  'recovery-fault-test',
+  'tests/recovery_fault_test.c',
+  dependencies: [
+    glib_dep,
+    gio_dep,
+    json_glib_dep
+  ],
+  install: false
+)
+
+test(
+  'recovery-fault',
+  recovery_fault_test,
+  env: {
+    'ATM_RECOVERY_FAULT_HELPER':
+      recovery_fault_helper.full_path()
+  },
+  timeout: 60
+)
+
 retrieval_index_lifecycle_test = executable(
   'retrieval-index-lifecycle-test',
   [
