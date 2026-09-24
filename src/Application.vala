@@ -80,6 +80,9 @@ namespace AskTheModel {
         private ActivityRing? refresh_repositories_ring;
         private Gtk.Button? repository_action_button;
         private ActivityRing? repository_action_ring;
+        private Gtk.Switch? optimization_switch;
+        private Gtk.Label? optimization_state_label;
+        private bool optimization_mode_enabled = false;
         private Gtk.Label? no_repos_annunciator;
         private Gtk.Label? repo_ewd_annunciator;
         private Gtk.Label? repo_cbd_annunciator;
@@ -2041,6 +2044,44 @@ namespace AskTheModel {
             main_window.present ();
         }
 
+        /*
+         * Master gate for the post-v0.5.0 optimization program.
+         *
+         * The gate is deliberately process-local and starts false on every
+         * application launch. Future runtime OPT slices must sample it at the
+         * beginning of an operation and must not change operation semantics
+         * midway when the UI switch changes.
+         */
+        private bool optimizations_enabled_for_new_operation () {
+            return optimization_mode_enabled;
+        }
+
+        private void set_optimization_mode (
+            bool enabled
+        ) {
+            optimization_mode_enabled = enabled;
+
+            if (optimization_state_label != null) {
+                optimization_state_label.label =
+                    enabled ? "ON" : "OFF";
+
+                if (enabled) {
+                    optimization_state_label.add_css_class (
+                        "enabled"
+                    );
+                } else {
+                    optimization_state_label.remove_css_class (
+                        "enabled"
+                    );
+                }
+            }
+
+            stdout.printf (
+                "AtM: optimizations %s for new operations\n",
+                enabled ? "ON" : "OFF"
+            );
+        }
+
         private Gtk.Widget build_titlebar () {
             var headerbar = new Gtk.HeaderBar () {
                 show_title_buttons = true
@@ -2183,7 +2224,72 @@ namespace AskTheModel {
             header_controls.append (model_controls);
             header_controls.append (repository_controls);
 
+            var optimization_label =
+                new Gtk.Label ("Optimizations") {
+                    valign = Gtk.Align.CENTER
+                };
+            optimization_label.add_css_class (
+                "atm-optimization-label"
+            );
+
+            optimization_switch = new Gtk.Switch () {
+                active = false,
+                valign = Gtk.Align.CENTER,
+                tooltip_text =
+                    "Enable qualified optimizations for new operations. " +
+                    "AtM starts with optimizations OFF every time."
+            };
+            optimization_switch.add_css_class (
+                "atm-optimization-switch"
+            );
+            optimization_switch.update_property (
+                Gtk.AccessibleProperty.LABEL,
+                "Optimizations"
+            );
+
+            optimization_state_label =
+                new Gtk.Label ("OFF") {
+                    valign = Gtk.Align.CENTER
+                };
+            optimization_state_label.add_css_class (
+                "atm-optimization-state"
+            );
+
+            optimization_switch.notify["active"].connect (() => {
+                if (optimization_switch == null) {
+                    return;
+                }
+
+                set_optimization_mode (
+                    optimization_switch.active
+                );
+            });
+
+            var optimization_controls = new Gtk.Box (
+                Gtk.Orientation.HORIZONTAL,
+                6
+            );
+            optimization_controls.add_css_class (
+                "atm-optimization-controls"
+            );
+            optimization_controls.append (
+                optimization_label
+            );
+            optimization_controls.append (
+                optimization_switch
+            );
+            optimization_controls.append (
+                optimization_state_label
+            );
+
             headerbar.pack_start (header_controls);
+            headerbar.pack_end (optimization_controls);
+
+            /*
+             * Explicitly establish the startup baseline after widgets exist.
+             * This state is intentionally not persisted.
+             */
+            set_optimization_mode (false);
 
             return headerbar;
         }
