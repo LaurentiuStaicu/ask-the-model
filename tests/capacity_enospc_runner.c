@@ -1061,7 +1061,7 @@ main (
         );
     }
 
-    if (argc == 8 &&
+    if (argc == 7 &&
         g_strcmp0 (
             argv[1],
             "--verify-data"
@@ -1078,7 +1078,7 @@ main (
         );
     }
 
-    if (argc == 9 &&
+    if (argc == 8 &&
         g_strcmp0 (
             argv[1],
             "--verify-index"
@@ -1102,9 +1102,9 @@ main (
         "  capacity-enospc-runner --index-enospc "
         "DATA CACHE STATE ARCHIVE ID ACRONYM DISPLAY NEW_SHA OLD_SHA\n"
         "  capacity-enospc-runner --verify-data "
-        "DATA STATE ID NEW_SHA OLD_SHA UNUSED\n"
+        "DATA STATE ID NEW_SHA OLD_SHA\n"
         "  capacity-enospc-runner --verify-index "
-        "DATA CACHE STATE ID NEW_SHA OLD_SHA UNUSED\n"
+        "DATA CACHE STATE ID NEW_SHA OLD_SHA\n"
     );
     return 64;
 }
