@@ -1804,10 +1804,16 @@ namespace AskTheModel {
                     RepositoryOperationOutcome.NORMAL
                 );
             } catch (RepositoryError error) {
+                RepositoryOperationOutcome outcome =
+                    RepositoryOperationOutcome.ERROR;
+
+                if (error is RepositoryError.NO_SPACE) {
+                    outcome =
+                        RepositoryOperationOutcome.NO_SPACE;
+                }
+
                 finish_repository_operation (
-                    error is RepositoryError.NO_SPACE
-                        ? RepositoryOperationOutcome.NO_SPACE
-                        : RepositoryOperationOutcome.ERROR,
+                    outcome,
                     error.message
                 );
 
@@ -1917,10 +1923,16 @@ namespace AskTheModel {
                     );
                 }
             } catch (RepositoryError error) {
+                RepositoryOperationOutcome outcome =
+                    RepositoryOperationOutcome.ERROR;
+
+                if (error is RepositoryError.NO_SPACE) {
+                    outcome =
+                        RepositoryOperationOutcome.NO_SPACE;
+                }
+
                 finish_repository_operation (
-                    error is RepositoryError.NO_SPACE
-                        ? RepositoryOperationOutcome.NO_SPACE
-                        : RepositoryOperationOutcome.ERROR,
+                    outcome,
                     error.message
                 );
 
