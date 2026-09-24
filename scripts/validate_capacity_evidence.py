@@ -165,6 +165,178 @@ def main() -> int:
     if e2.get("pinned_repository_sha") != corpus["cbd"]:
         fail("C0-E2 CBD SHA drifted from the pinned corpus")
 
+    for measurement in ("c0_m2", "c0_m3"):
+        record = evidence.get(measurement)
+        if not isinstance(record, dict):
+            fail(f"{measurement} object is missing")
+
+        require_positive_int(
+            record,
+            "actions_run_id",
+            measurement,
+        )
+        require_positive_int(
+            record,
+            "artifact_id",
+            measurement,
+        )
+        require_digest(
+            record.get("artifact_sha256"),
+            f"{measurement}.artifact_sha256",
+        )
+        require_sha(
+            record.get("atm_source_commit"),
+            f"{measurement}.atm_source_commit",
+        )
+
+        observations = record.get("observations")
+        if not isinstance(observations, list) or not observations:
+            fail(f"{measurement}.observations must be a non-empty list")
+
+        for index, observation in enumerate(observations):
+            if not isinstance(observation, dict):
+                fail(
+                    f"{measurement}.observations[{index}] "
+                    "must be an object"
+                )
+
+            context = f"{measurement}.observations[{index}]"
+            require_positive_int(
+                observation,
+                "history_generations",
+                context,
+            )
+            require_positive_int(
+                observation,
+                "control_db_allocated_bytes",
+                context,
+            )
+            require_positive_int(
+                observation,
+                "available_bytes_before_operation",
+                context,
+            )
+
+            classification = observation.get("classification")
+            if classification not in {
+                "SUCCESS_ATOMIC",
+                "FAIL_CLOSED_OLD_AUTHORITY",
+            }:
+                fail(
+                    f"{context}.classification is not an "
+                    "accepted atomic outcome"
+                )
+
+            sqlite_result = observation.get("sqlite_result")
+            if classification == "SUCCESS_ATOMIC":
+                if sqlite_result is not None:
+                    fail(
+                        f"{context} successful observation "
+                        "must not carry a SQLite failure result"
+                    )
+            elif sqlite_result not in {
+                "SQLITE_IOERR",
+                "SQLITE_FULL",
+            }:
+                fail(
+                    f"{context} fail-closed observation lost "
+                    "its SQLite failure classification"
+                )
+
+        frontier = record.get("observed_frontier")
+        if not isinstance(frontier, dict):
+            fail(f"{measurement}.observed_frontier is missing")
+
+        highest_failed = require_positive_int(
+            frontier,
+            "highest_failed_available_bytes",
+            f"{measurement}.observed_frontier",
+        )
+        lowest_success = require_positive_int(
+            frontier,
+            "lowest_successful_available_bytes",
+            f"{measurement}.observed_frontier",
+        )
+        if highest_failed >= lowest_success:
+            fail(
+                f"{measurement} observed frontier is not ordered"
+            )
+
+    m2 = evidence["c0_m2"]
+    if m2.get("filesystem") != {
+        "type": "tmpfs",
+        "size_bytes": 33554432,
+        "inode_limit": 4096,
+    }:
+        fail("C0-M2 filesystem qualification contract drifted")
+
+    expected_m2 = {
+        (1, 16384, "FAIL_CLOSED_OLD_AUTHORITY"),
+        (1, 32768, "FAIL_CLOSED_OLD_AUTHORITY"),
+        (1, 65536, "SUCCESS_ATOMIC"),
+        (1, 131072, "SUCCESS_ATOMIC"),
+        (100, 16384, "FAIL_CLOSED_OLD_AUTHORITY"),
+        (100, 32768, "FAIL_CLOSED_OLD_AUTHORITY"),
+        (100, 65536, "SUCCESS_ATOMIC"),
+        (100, 131072, "SUCCESS_ATOMIC"),
+        (1000, 16384, "FAIL_CLOSED_OLD_AUTHORITY"),
+        (1000, 32768, "FAIL_CLOSED_OLD_AUTHORITY"),
+        (1000, 65536, "SUCCESS_ATOMIC"),
+        (1000, 131072, "SUCCESS_ATOMIC"),
+    }
+    observed_m2 = {
+        (
+            item["history_generations"],
+            item["available_bytes_before_operation"],
+            item["classification"],
+        )
+        for item in m2["observations"]
+    }
+    if observed_m2 != expected_m2:
+        fail("C0-M2 reviewed state-headroom matrix drifted")
+
+    if m2.get("observed_frontier") != {
+        "highest_failed_available_bytes": 32768,
+        "lowest_successful_available_bytes": 65536,
+    }:
+        fail("C0-M2 reviewed frontier drifted")
+
+    m3 = evidence["c0_m3"]
+    if m3.get("filesystem") != {
+        "type": "ext4",
+        "image_size_bytes": 67108864,
+        "block_size_bytes": 4096,
+        "reserved_blocks_percentage": 0,
+    }:
+        fail("C0-M3 ext4 qualification contract drifted")
+
+    expected_m3 = {
+        (1, 12288, "FAIL_CLOSED_OLD_AUTHORITY"),
+        (1, 32768, "FAIL_CLOSED_OLD_AUTHORITY"),
+        (1, 61440, "SUCCESS_ATOMIC"),
+        (1, 131072, "SUCCESS_ATOMIC"),
+        (1000, 12288, "FAIL_CLOSED_OLD_AUTHORITY"),
+        (1000, 28672, "FAIL_CLOSED_OLD_AUTHORITY"),
+        (1000, 61440, "SUCCESS_ATOMIC"),
+        (1000, 126976, "SUCCESS_ATOMIC"),
+    }
+    observed_m3 = {
+        (
+            item["history_generations"],
+            item["available_bytes_before_operation"],
+            item["classification"],
+        )
+        for item in m3["observations"]
+    }
+    if observed_m3 != expected_m3:
+        fail("C0-M3 reviewed ext4 state-headroom matrix drifted")
+
+    if m3.get("observed_frontier") != {
+        "highest_failed_available_bytes": 32768,
+        "lowest_successful_available_bytes": 61440,
+    }:
+        fail("C0-M3 reviewed frontier drifted")
+
     rules = evidence.get("interpretation_rules")
     if not isinstance(rules, list) or len(rules) < 6:
         fail("interpretation_rules are incomplete")
