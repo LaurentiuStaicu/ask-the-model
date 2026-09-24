@@ -6,6 +6,7 @@
 #include <glib/gstdio.h>
 #include <sqlite3.h>
 #include <string.h>
+#include <signal.h>
 
 #include <sys/stat.h>
 #include <sys/wait.h>
@@ -1327,6 +1328,187 @@ test_coordinated_two_processes_build_once (void)
     g_free (state_root);
 }
 
+static void
+test_coordinated_crashed_holder_staging_is_recovered (void)
+{
+    char *state_root = new_temp_root (
+        "atm-index-single-flight-state-XXXXXX"
+    );
+    char *cache_root = new_temp_root (
+        "atm-index-single-flight-cache-XXXXXX"
+    );
+    char *snapshot_root = new_snapshot ();
+    char *lock_root = g_build_filename (
+        state_root,
+        "retrieval-index-locks",
+        "ewd",
+        NULL
+    );
+    char *lock_name = g_strdup_printf (
+        "%s.lock",
+        snapshot_sha ()
+    );
+    char *lock_path = g_build_filename (
+        lock_root,
+        lock_name,
+        NULL
+    );
+    char *staging_path =
+        atm_retrieval_index_staging_path (
+            cache_root,
+            "ewd",
+            snapshot_sha ()
+        );
+    char *staging_parent =
+        g_path_get_dirname (staging_path);
+    int ready_pipe[2];
+    pid_t child;
+    char ready = 0;
+    gint child_status = 0;
+    char *index_path = NULL;
+    char *version = NULL;
+    AtmRetrievalEnsureResult result;
+    GError *error = NULL;
+
+    g_assert_cmpint (
+        g_mkdir_with_parents (
+            lock_root,
+            0700
+        ),
+        ==,
+        0
+    );
+    g_assert_cmpint (
+        g_mkdir_with_parents (
+            staging_parent,
+            0700
+        ),
+        ==,
+        0
+    );
+    g_assert_cmpint (pipe (ready_pipe), ==, 0);
+
+    child = fork ();
+    g_assert_cmpint (child, >=, 0);
+
+    if (child == 0) {
+        gint lease_fd = -1;
+        gboolean contended = FALSE;
+        gint64 wait_us = 0;
+        GError *child_error = NULL;
+
+        close (ready_pipe[0]);
+
+        if (!atm_coordination_lease_acquire (
+                lock_path,
+                FALSE,
+                &lease_fd,
+                &contended,
+                &wait_us,
+                &child_error
+            ) ||
+            contended ||
+            lease_fd < 0) {
+            _exit (30);
+        }
+
+        if (!g_file_set_contents (
+                staging_path,
+                "crashed builder residue",
+                -1,
+                &child_error
+            )) {
+            _exit (31);
+        }
+
+        ready = '1';
+        if (write (ready_pipe[1], &ready, 1) != 1) {
+            _exit (32);
+        }
+
+        pause ();
+        _exit (33);
+    }
+
+    close (ready_pipe[1]);
+    g_assert_cmpint (
+        read (ready_pipe[0], &ready, 1),
+        ==,
+        1
+    );
+    close (ready_pipe[0]);
+    g_assert_cmpint (ready, ==, '1');
+    g_assert_true (
+        g_file_test (
+            staging_path,
+            G_FILE_TEST_IS_REGULAR
+        )
+    );
+
+    g_assert_cmpint (kill (child, SIGKILL), ==, 0);
+    g_assert_cmpint (
+        waitpid (child, &child_status, 0),
+        ==,
+        child
+    );
+    g_assert_true (WIFSIGNALED (child_status));
+    g_assert_cmpint (
+        WTERMSIG (child_status),
+        ==,
+        SIGKILL
+    );
+
+    g_assert_true (
+        atm_retrieval_index_ensure_for_snapshot_coordinated (
+            state_root,
+            cache_root,
+            snapshot_root,
+            "ewd",
+            snapshot_sha (),
+            &index_path,
+            &version,
+            &result,
+            &error
+        )
+    );
+    g_assert_no_error (error);
+    g_assert_cmpint (
+        result,
+        ==,
+        ATM_RETRIEVAL_ENSURE_REBUILT
+    );
+    g_assert_false (
+        g_file_test (
+            staging_path,
+            G_FILE_TEST_EXISTS
+        )
+    );
+    g_assert_true (
+        atm_retrieval_index_validate_snapshot_sources (
+            index_path,
+            snapshot_root,
+            "ewd",
+            snapshot_sha (),
+            &error
+        )
+    );
+    g_assert_no_error (error);
+
+    g_free (version);
+    g_free (index_path);
+    g_free (staging_parent);
+    g_free (staging_path);
+    g_free (lock_path);
+    g_free (lock_name);
+    g_free (lock_root);
+    remove_tree_best_effort (snapshot_root);
+    g_free (snapshot_root);
+    remove_tree_best_effort (cache_root);
+    g_free (cache_root);
+    remove_tree_best_effort (state_root);
+    g_free (state_root);
+}
+
 int
 main (int argc, char **argv)
 {
@@ -1367,6 +1549,10 @@ main (int argc, char **argv)
     g_test_add_func (
         "/retrieval-lifecycle/coordinated-stale-staging-recovery",
         test_coordinated_abandoned_staging_is_recovered
+    );
+    g_test_add_func (
+        "/retrieval-lifecycle/coordinated-crashed-holder-staging-recovery",
+        test_coordinated_crashed_holder_staging_is_recovered
     );
     g_test_add_func (
         "/retrieval-lifecycle/coordinated-malicious-staging-refused",
