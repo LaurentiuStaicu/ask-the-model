@@ -380,6 +380,27 @@ jobs:
                       )
                   )
 
+                  snapshot_ratio_k = max(
+                      fraction(
+                          row,
+                          "snapshot_peak_to_logical",
+                      )
+                      for row in train
+                  )
+                  snapshot_ratio_prediction = ceil_fraction(
+                      snapshot_ratio_k *
+                      heldout["logical_regular_bytes"]
+                  )
+                  snapshot_absolute_floor = max(
+                      row["snapshot_additional_peak_bytes"]
+                      for row in train
+                  )
+                  snapshot_hybrid_prediction = max(
+                      snapshot_prediction,
+                      snapshot_ratio_prediction,
+                      snapshot_absolute_floor,
+                  )
+
                   index_logical_k = max(
                       fraction(
                           row,
@@ -402,6 +423,15 @@ jobs:
                   index_entry_prediction = ceil_fraction(
                       index_entry_k *
                       heldout["entries"]
+                  )
+                  index_absolute_floor = max(
+                      row["index_additional_peak_bytes"]
+                      for row in train
+                  )
+                  index_hybrid_prediction = max(
+                      index_logical_prediction,
+                      index_entry_prediction,
+                      index_absolute_floor,
                   )
 
                   actual_snapshot = heldout[
@@ -427,6 +457,25 @@ jobs:
                                   actual_snapshot /
                                   max(snapshot_prediction, 1),
                           },
+                          "snapshot_hybrid_with_historical_floor": {
+                              "predicted_bytes":
+                                  snapshot_hybrid_prediction,
+                              "actual_bytes": actual_snapshot,
+                              "covered":
+                                  snapshot_hybrid_prediction >=
+                                  actual_snapshot,
+                              "actual_over_prediction":
+                                  actual_snapshot /
+                                  max(snapshot_hybrid_prediction, 1),
+                              "components": {
+                                  "additive_per_entry":
+                                      snapshot_prediction,
+                                  "ratio_logical":
+                                      snapshot_ratio_prediction,
+                                  "historical_absolute_floor":
+                                      snapshot_absolute_floor,
+                              },
+                          },
                           "index_ratio_logical": {
                               "predicted_bytes":
                                   index_logical_prediction,
@@ -449,6 +498,25 @@ jobs:
                                   actual_index /
                                   max(index_entry_prediction, 1),
                           },
+                          "index_hybrid_with_historical_floor": {
+                              "predicted_bytes":
+                                  index_hybrid_prediction,
+                              "actual_bytes": actual_index,
+                              "covered":
+                                  index_hybrid_prediction >=
+                                  actual_index,
+                              "actual_over_prediction":
+                                  actual_index /
+                                  max(index_hybrid_prediction, 1),
+                              "components": {
+                                  "ratio_logical":
+                                      index_logical_prediction,
+                                  "per_entry":
+                                      index_entry_prediction,
+                                  "historical_absolute_floor":
+                                      index_absolute_floor,
+                              },
+                          },
                       }
                   )
 
@@ -459,8 +527,10 @@ jobs:
               validation_summary[rid] = {}
               for model in (
                   "snapshot_additive_per_entry",
+                  "snapshot_hybrid_with_historical_floor",
                   "index_ratio_logical",
                   "index_per_entry",
+                  "index_hybrid_with_historical_floor",
               ):
                   values = [
                       case[model]
@@ -508,7 +578,8 @@ jobs:
                   "This artifact measures historical variability; it does not select a production predictor or safety margin.",
                   "Per-repository envelopes are evaluated because M1 already disproved one useful global archive multiplier.",
                   "Leave-one-out underprediction quantifies how much an envelope learned from other sampled SHAs can miss a held-out SHA.",
-                  "A future unknown SHA remains unqualified unless a separately reviewed policy chooses and validates a margin/fallback.",
+                  "Hybrid candidates take the maximum of transparent observable formulas plus the training-set historical absolute peak; this is evaluated as evidence, not selected as production policy.",
+                  "A future unknown SHA remains unqualified unless a separately reviewed policy chooses and validates a predictor/margin/fallback.",
               ],
           }
 
