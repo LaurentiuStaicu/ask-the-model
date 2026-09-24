@@ -91,6 +91,10 @@ namespace AskTheModel {
         private Gtk.Label? repo_ready_annunciator;
         private Gtk.Label? repo_offline_annunciator;
         private Gtk.Label? repo_error_annunciator;
+        private OptimizationPolicy optimization_policy =
+            new OptimizationPolicy ();
+        private Gtk.Switch? optimization_switch;
+        private Gtk.Label? optimization_label;
         private RepositorySelection repository_selection =
             new RepositorySelection ();
         private RepositoryLifecycleService repository_lifecycle =
@@ -128,6 +132,14 @@ namespace AskTheModel {
                 application_id: APP_ID,
                 flags: ApplicationFlags.DEFAULT_FLAGS
             );
+
+            optimization_policy.changed.connect ((enabled) => {
+                update_optimization_control ();
+                stdout.printf (
+                    "AtM: optimization mode %s\n",
+                    enabled ? "ON" : "OFF"
+                );
+            });
         }
 
         protected override void startup () {
@@ -2041,6 +2053,33 @@ namespace AskTheModel {
             main_window.present ();
         }
 
+        private void update_optimization_control () {
+            if (optimization_switch == null ||
+                optimization_label == null) {
+                return;
+            }
+
+            bool enabled = optimization_policy.enabled;
+
+            if (optimization_switch.active != enabled) {
+                optimization_switch.active = enabled;
+            }
+
+            optimization_label.label =
+                enabled ? "OPT ON" : "OPT OFF";
+
+            optimization_switch.tooltip_text = enabled
+                ? "Optimizations ON — experimental optimized runtime"
+                : "Optimizations OFF — baseline runtime";
+
+            optimization_switch.update_property (
+                Gtk.AccessibleProperty.LABEL,
+                enabled
+                    ? "Optimization mode on"
+                    : "Optimization mode off"
+            );
+        }
+
         private Gtk.Widget build_titlebar () {
             var headerbar = new Gtk.HeaderBar () {
                 show_title_buttons = true
@@ -2184,6 +2223,63 @@ namespace AskTheModel {
             header_controls.append (repository_controls);
 
             headerbar.pack_start (header_controls);
+
+            var optimization_state_label =
+                new Gtk.Label ("OPT OFF") {
+                    valign = Gtk.Align.CENTER
+                };
+            optimization_state_label.add_css_class (
+                "atm-optimization-label"
+            );
+
+            var optimization_mode_switch =
+                new Gtk.Switch () {
+                    active = false,
+                    valign = Gtk.Align.CENTER,
+                    tooltip_text =
+                        "Optimizations OFF — baseline runtime"
+                };
+            optimization_mode_switch.add_css_class (
+                "atm-optimization-switch"
+            );
+            optimization_mode_switch.update_property (
+                Gtk.AccessibleProperty.LABEL,
+                "Optimization mode off"
+            );
+
+            optimization_label =
+                optimization_state_label;
+            optimization_switch =
+                optimization_mode_switch;
+
+            optimization_mode_switch
+                .notify["active"].connect (() => {
+                    optimization_policy.set_enabled (
+                        optimization_mode_switch.active
+                    );
+                    update_optimization_control ();
+                });
+
+            var optimization_controls = new Gtk.Box (
+                Gtk.Orientation.HORIZONTAL,
+                6
+            ) {
+                valign = Gtk.Align.CENTER
+            };
+            optimization_controls.add_css_class (
+                "atm-optimization-controls"
+            );
+            optimization_controls.append (
+                optimization_state_label
+            );
+            optimization_controls.append (
+                optimization_mode_switch
+            );
+
+            headerbar.pack_end (
+                optimization_controls
+            );
+            update_optimization_control ();
 
             return headerbar;
         }
