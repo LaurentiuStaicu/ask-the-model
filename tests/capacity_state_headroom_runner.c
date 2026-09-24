@@ -573,6 +573,116 @@ build_history (
         *out_generation == (gint64) generations;
 }
 
+static gboolean
+prepare_cold_sidecars (
+    const char *control_path,
+    GError **error
+)
+{
+    sqlite3 *db = NULL;
+    int log_frames = 0;
+    int checkpointed_frames = 0;
+
+    int rc = sqlite3_open_v2 (
+        control_path,
+        &db,
+        SQLITE_OPEN_READWRITE,
+        NULL
+    );
+
+    if (rc != SQLITE_OK) {
+        g_set_error (
+            error,
+            G_FILE_ERROR,
+            G_FILE_ERROR_FAILED,
+            "Could not open Control DB for cold-sidecar checkpoint: %s",
+            db != NULL
+                ? sqlite3_errmsg (db)
+                : "unknown SQLite error"
+        );
+        if (db != NULL) {
+            sqlite3_close (db);
+        }
+        return FALSE;
+    }
+
+    rc = sqlite3_wal_checkpoint_v2 (
+        db,
+        NULL,
+        SQLITE_CHECKPOINT_TRUNCATE,
+        &log_frames,
+        &checkpointed_frames
+    );
+
+    if (rc != SQLITE_OK) {
+        g_set_error (
+            error,
+            G_FILE_ERROR,
+            G_FILE_ERROR_FAILED,
+            "Could not checkpoint Control DB before cold-sidecar case (%d): %s",
+            rc,
+            sqlite3_errmsg (db)
+        );
+        sqlite3_close (db);
+        return FALSE;
+    }
+
+    if (sqlite3_close (db) != SQLITE_OK) {
+        g_set_error_literal (
+            error,
+            G_FILE_ERROR,
+            G_FILE_ERROR_FAILED,
+            "Could not close Control DB after cold-sidecar checkpoint."
+        );
+        return FALSE;
+    }
+
+    char *wal_path =
+        g_strconcat (
+            control_path,
+            "-wal",
+            NULL
+        );
+    char *shm_path =
+        g_strconcat (
+            control_path,
+            "-shm",
+            NULL
+        );
+
+    if (g_remove (wal_path) != 0 &&
+        errno != ENOENT) {
+        g_set_error (
+            error,
+            G_FILE_ERROR,
+            g_file_error_from_errno (errno),
+            "Could not remove checkpointed WAL for cold-sidecar case: %s",
+            g_strerror (errno)
+        );
+        g_free (shm_path);
+        g_free (wal_path);
+        return FALSE;
+    }
+
+    if (g_remove (shm_path) != 0 &&
+        errno != ENOENT) {
+        g_set_error (
+            error,
+            G_FILE_ERROR,
+            g_file_error_from_errno (errno),
+            "Could not remove SHM for cold-sidecar case: %s",
+            g_strerror (errno)
+        );
+        g_free (shm_path);
+        g_free (wal_path);
+        return FALSE;
+    }
+
+    g_free (shm_path);
+    g_free (wal_path);
+    return TRUE;
+}
+
 static const char *
 classify_operation_error (
     const GError *error
@@ -638,6 +748,7 @@ add_i64_json (
 
 static void
 emit_result (
+    const char *sidecar_mode,
     guint history_generations,
     guint64 leave_target_bytes,
     guint64 available_bytes_before_filler,
@@ -647,6 +758,8 @@ emit_result (
     guint64 fragment_size,
     guint64 filler_bytes,
     guint64 control_db_allocated_bytes_before,
+    guint64 wal_allocated_bytes_before,
+    guint64 shm_allocated_bytes_before,
     gint64 generation_before,
     gint64 generation_after,
     const char *sha_before,
@@ -687,6 +800,15 @@ emit_result (
     json_builder_add_int_value (
         builder,
         1
+    );
+
+    json_builder_set_member_name (
+        builder,
+        "sidecar_mode"
+    );
+    json_builder_add_string_value (
+        builder,
+        sidecar_mode
     );
 
     add_u64_json (
@@ -733,6 +855,16 @@ emit_result (
         builder,
         "control_db_allocated_bytes_before",
         control_db_allocated_bytes_before
+    );
+    add_u64_json (
+        builder,
+        "wal_allocated_bytes_before",
+        wal_allocated_bytes_before
+    );
+    add_u64_json (
+        builder,
+        "shm_allocated_bytes_before",
+        shm_allocated_bytes_before
     );
     add_i64_json (
         builder,
@@ -942,7 +1074,8 @@ run_exercise (
     const char *state_root,
     const char *repository_id,
     guint history_generations,
-    guint64 leave_target_bytes
+    guint64 leave_target_bytes,
+    const char *sidecar_mode
 )
 {
     GError *error = NULL;
@@ -962,6 +1095,8 @@ run_exercise (
     guint64 fragment_size = 0;
     guint64 pre_filler_fragment_size = 0;
     guint64 control_db_allocated_bytes_before = 0;
+    guint64 wal_allocated_bytes_before = 0;
+    guint64 shm_allocated_bytes_before = 0;
     gint64 generation_before = 0;
     gint64 generation_after = 0;
     gint64 candidate_generations = -1;
@@ -1012,8 +1147,78 @@ run_exercise (
             control_path,
             &stats_before,
             &error
-        ) ||
-        !measure_available (
+        )) {
+        g_printerr (
+            "C0-M2 history setup failed: %s\n",
+            error != NULL
+                ? error->message
+                : "unknown history setup error"
+        );
+        g_clear_error (&error);
+        g_free (sha_before);
+        g_free (control_path);
+        return 4;
+    }
+
+    if (g_strcmp0 (
+            sidecar_mode,
+            "cold"
+        ) == 0) {
+        if (!prepare_cold_sidecars (
+                control_path,
+                &error
+            )) {
+            g_printerr (
+                "C0-M2 cold-sidecar setup failed: %s\n",
+                error->message
+            );
+            g_clear_error (&error);
+            g_free (sha_before);
+            g_free (control_path);
+            return 4;
+        }
+    } else if (g_strcmp0 (
+                   sidecar_mode,
+                   "warm"
+               ) != 0) {
+        g_printerr (
+            "C0-M2 sidecar mode must be warm or cold.\n"
+        );
+        g_free (sha_before);
+        g_free (control_path);
+        return 64;
+    }
+
+    char *pre_wal_path =
+        g_strconcat (
+            control_path,
+            "-wal",
+            NULL
+        );
+    char *pre_shm_path =
+        g_strconcat (
+            control_path,
+            "-shm",
+            NULL
+        );
+
+    control_db_allocated_bytes_before =
+        allocated_bytes (
+            control_path
+        );
+    wal_allocated_bytes_before =
+        allocated_bytes (
+            pre_wal_path
+        );
+    shm_allocated_bytes_before =
+        allocated_bytes (
+            pre_shm_path
+        );
+
+    g_free (pre_shm_path);
+    g_free (pre_wal_path);
+
+    if (!measure_available (
             state_root,
             &available_bytes_before_filler,
             &available_inodes_before_filler,
@@ -1046,11 +1251,6 @@ run_exercise (
         g_free (control_path);
         return 4;
     }
-
-    control_db_allocated_bytes_before =
-        allocated_bytes (
-            control_path
-        );
 
     if (pre_filler_fragment_size !=
         fragment_size) {
@@ -1149,6 +1349,7 @@ run_exercise (
     }
 
     emit_result (
+        sidecar_mode,
         history_generations,
         leave_target_bytes,
         available_bytes_before_filler,
@@ -1158,6 +1359,8 @@ run_exercise (
         fragment_size,
         filler_bytes,
         control_db_allocated_bytes_before,
+        wal_allocated_bytes_before,
+        shm_allocated_bytes_before,
         generation_before,
         generation_after,
         sha_before,
@@ -1188,7 +1391,7 @@ main (
     char **argv
 )
 {
-    if (argc != 6 ||
+    if (argc != 7 ||
         g_strcmp0 (
             argv[1],
             "--exercise"
@@ -1196,7 +1399,7 @@ main (
         g_printerr (
             "Usage: capacity-state-headroom-runner "
             "--exercise STATE_ROOT REPOSITORY_ID "
-            "HISTORY_GENERATIONS LEAVE_BYTES\n"
+            "HISTORY_GENERATIONS LEAVE_BYTES SIDECAR_MODE\n"
         );
         return 64;
     }
@@ -1227,6 +1430,7 @@ main (
         argv[2],
         argv[3],
         (guint) history,
-        leave
+        leave,
+        argv[6]
     );
 }
