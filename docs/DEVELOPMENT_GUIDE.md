@@ -198,6 +198,17 @@ The real C0-M1 workflow reuses the exact EWD/CBD/RMD SHA corpus frozen by the R5
 
 Peak sampling is measurement evidence, not a production reservation guarantee. Production capacity admission remains a later decision and must be derived from measured evidence, separate byte/inode formulas, filesystem grouping and ENOSPC recovery qualification.
 
+### C0-E1 genuine ENOSPC qualification
+
+C0-E1 is test-only qualification infrastructure. It uses bounded `tmpfs` mounts on a standard Linux CI VM to produce genuine filesystem-full failures rather than synthesizing an application error.
+
+Two pinned real-repository paths are qualified:
+
+- **RMD data-root exhaustion:** the exact RMD archive is ingested into an 8 MiB data filesystem. Extraction reaches a real `ENOSPC` write failure. The extraction staging tree is removed, no new final snapshot exists, the previously active Control DB generation/SHA remains unchanged, and a fresh-process verifier observes the same old authority.
+- **EWD retrieval-index exhaustion:** the exact EWD archive is retained on an 8 MiB cache filesystem, the snapshot is successfully promoted on a separate roomy data root, and the production SQLite retrieval-index build reaches disk-full. Final and staging index files are absent after failure, the previous Control DB generation/SHA remains active, and the newly promoted snapshot is left only as an unreferenced/recoverable immutable snapshot. A fresh-process verifier confirms the same classification.
+
+This establishes the fail-closed behavior required when real capacity is consumed after any future admission decision. It does not itself add admission, reserve sizing, GC, preallocation or a runtime `NO_SPACE` mapping. Production C0 must continue to assume that another process can consume capacity after preflight and therefore must preserve these recovery properties.
+
 ### Repository authority-mutation lease
 
 When an operation snapshots optimization mode ON, repository Download/Update uses one application-owned exclusive nonblocking lease at `<state_root>/repository-mutation.lock` before any selected-repository staging or authority mutation begins.
