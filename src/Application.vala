@@ -2264,6 +2264,10 @@ namespace AskTheModel {
             optimization_title_label.add_css_class (
                 "atm-optimization-title"
             );
+            optimization_title_label.update_state (
+                Gtk.AccessibleState.HIDDEN,
+                true
+            );
 
             var optimization_off_state_label =
                 new Gtk.Label ("OFF") {
@@ -2274,6 +2278,10 @@ namespace AskTheModel {
             );
             optimization_off_state_label.add_css_class (
                 "off"
+            );
+            optimization_off_state_label.update_state (
+                Gtk.AccessibleState.HIDDEN,
+                true
             );
 
             var optimization_mode_switch =
@@ -2296,6 +2304,10 @@ namespace AskTheModel {
             );
             optimization_on_state_label.add_css_class (
                 "on"
+            );
+            optimization_on_state_label.update_state (
+                Gtk.AccessibleState.HIDDEN,
+                true
             );
 
             optimization_label =
@@ -3938,6 +3950,10 @@ namespace AskTheModel {
                 );
             optimization_lcd_annunciator =
                 build_annunciator_label ("OPT OFF");
+            set_annunciator (
+                optimization_lcd_annunciator,
+                true
+            );
 
             no_ai_annunciator.tooltip_text =
                 "No usable local AI available";
