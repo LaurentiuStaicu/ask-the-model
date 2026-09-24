@@ -1,0 +1,238 @@
+name: C0-M2 state reserve scaling measurement
+
+on:
+  workflow_dispatch:
+  pull_request:
+    paths:
+      - 'src/control_state.c'
+      - 'src/control_state.h'
+      - 'data/io.github.laurentiustaicu.ask_the_model.gresource.xml'
+      - 'data/schemas/control-state-v1.sql'
+      - 'data/schemas/control-state-v2.sql'
+      - 'tests/capacity_state_reserve_scaling_runner.c'
+      - '.github/workflows/capacity-state-reserve-scaling.yml'
+
+permissions:
+  contents: read
+
+concurrency:
+  group: capacity-c0-m2-state-${{ github.event.pull_request.number || github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  measure:
+    runs-on: ubuntu-24.04
+    timeout-minutes: 30
+
+    steps:
+      - name: Checkout AtM
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+
+      - name: Install measurement build dependencies
+        shell: bash
+        run: |
+          set -euo pipefail
+          sudo apt-get update
+          sudo apt-get install -y --no-install-recommends \
+            build-essential \
+            pkg-config \
+            libglib2.0-dev \
+            libglib2.0-bin \
+            libjson-glib-dev \
+            libsqlite3-dev \
+            sqlite3
+
+      - name: Compile state reserve scaling runner
+        shell: bash
+        run: |
+          set -euo pipefail
+
+          glib-compile-resources \
+            data/io.github.laurentiustaicu.ask_the_model.gresource.xml \
+            --sourcedir=data \
+            --generate-source \
+            --target=/tmp/atm-resources.c
+
+          cc \
+            -std=c11 \
+            -D_GNU_SOURCE \
+            -O2 \
+            -Wall \
+            -Wextra \
+            -Werror \
+            -Isrc \
+            $(pkg-config --cflags \
+              glib-2.0 \
+              gio-2.0 \
+              json-glib-1.0 \
+              sqlite3) \
+            -c tests/capacity_state_reserve_scaling_runner.c \
+            -o /tmp/capacity-state-reserve-scaling-runner.o
+
+          cc \
+            -std=c11 \
+            -O2 \
+            -Wall \
+            -Wextra \
+            -Isrc \
+            src/control_state.c \
+            /tmp/capacity-state-reserve-scaling-runner.o \
+            /tmp/atm-resources.c \
+            $(pkg-config --cflags --libs \
+              glib-2.0 \
+              gio-2.0 \
+              json-glib-1.0 \
+              sqlite3) \
+            -o /tmp/atm-capacity-state-reserve-scaling-runner
+
+      - name: Measure state headroom across Control DB history sizes
+        shell: bash
+        env:
+          LC_ALL: C
+        run: |
+          set -euo pipefail
+
+          root=/tmp/atm-c0-m2
+          results="$root/results"
+          mkdir -p "$results"
+
+          for history in 1 100 1000; do
+            for leave in 16384 32768 65536 131072; do
+              case_root="$root/case-$history-$leave"
+              state="$case_root/state"
+              mkdir -p "$state"
+
+              sudo mount -t tmpfs \
+                -o size=32M,nr_inodes=4096 \
+                tmpfs "$state"
+              trap 'sudo umount "$state" || true' EXIT
+
+              /tmp/atm-capacity-state-reserve-scaling-runner \
+                --exercise \
+                "$state" \
+                rmd \
+                "$history" \
+                "$leave" \
+                | tee "$results/history-$history-leave-$leave.json"
+
+              sudo umount "$state"
+              trap - EXIT
+            done
+          done
+
+      - name: Aggregate state reserve scaling evidence
+        shell: bash
+        env:
+          ATM_SOURCE_COMMIT: ${{ github.event.pull_request.head.sha || github.sha }}
+          ATM_WORKFLOW_COMMIT: ${{ github.sha }}
+        run: |
+          set -euo pipefail
+
+          python3 - <<'PY'
+          import json
+          import os
+          import pathlib
+          import platform
+          import subprocess
+
+          results_dir = pathlib.Path("/tmp/atm-c0-m2/results")
+          records = []
+
+          for path in sorted(results_dir.glob("history-*.json")):
+              record = json.loads(path.read_text(encoding="utf-8"))
+              if not record["invariant_ok"]:
+                  raise SystemExit(
+                      f"state reserve invariant failed: {path}: {record}"
+                  )
+              records.append(record)
+
+          expected = {
+              (history, leave)
+              for history in (1, 100, 1000)
+              for leave in (16384, 32768, 65536, 131072)
+          }
+          observed = {
+              (
+                  record["history_generations"],
+                  record["leave_target_bytes"],
+              )
+              for record in records
+          }
+
+          if observed != expected:
+              raise SystemExit(
+                  f"state reserve matrix mismatch: {observed}"
+              )
+
+          artifact = {
+              "schema_version": 1,
+              "measurement_id": "atm-c0-m2-state-reserve-scaling-v1",
+              "atm_source_commit": os.environ["ATM_SOURCE_COMMIT"],
+              "workflow_commit": os.environ["ATM_WORKFLOW_COMMIT"],
+              "runtime": {
+                  "system": platform.system(),
+                  "release": platform.release(),
+                  "machine": platform.machine(),
+                  "sqlite": subprocess.check_output(
+                      ["sqlite3", "--version"],
+                      text=True,
+                  ).strip(),
+              },
+              "history_generation_counts": [1, 100, 1000],
+              "leave_target_bytes": [
+                  16384,
+                  32768,
+                  65536,
+                  131072,
+              ],
+              "records": records,
+          }
+
+          output = (
+              results_dir /
+              "c0-m2-state-reserve-scaling.json"
+          )
+          output.write_text(
+              json.dumps(
+                  artifact,
+                  indent=2,
+                  sort_keys=True,
+              ) + "\n",
+              encoding="utf-8",
+          )
+
+          summary = {}
+          for history in artifact["history_generation_counts"]:
+              history_records = [
+                  record
+                  for record in records
+                  if record["history_generations"] == history
+              ]
+              summary[str(history)] = {
+                  str(record["leave_target_bytes"]): record[
+                      "classification"
+                  ]
+                  for record in history_records
+              }
+
+          print(
+              json.dumps(
+                  {
+                      "summary": summary,
+                      "artifact": artifact,
+                  },
+                  indent=2,
+                  sort_keys=True,
+              )
+          )
+          PY
+
+      - name: Upload C0-M2 measurement evidence
+        if: always()
+        uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7.0.1
+        with:
+          name: atm-c0-m2-state-reserve-${{ github.run_id }}-${{ github.run_attempt }}
+          path: |
+            /tmp/atm-c0-m2/results/*.json
+          if-no-files-found: error
+          retention-days: 90

@@ -343,6 +343,31 @@ This slice adds only dormant error/UI plumbing. Current storage/admission code d
 
 SQLite `SQLITE_FULL` is the canonical database-full signal. Generic `SQLITE_IOERR` is not automatically equivalent to no-space; qualification has already observed that extremely tight state headroom can fail earlier during WAL/SHM setup. Native error classification must therefore preserve specific underlying results instead of treating every I/O error as `NO_SPACE`.
 
+### C0-M2 state-root reserve scaling measurement
+
+C0-M2 extends the C0-E3 Control DB disk-full qualification into a measurement matrix. It remains qualification-only and selects no production reserve.
+
+The runner creates real Control DB history with the production guarded copy-on-write publication path, then constrains the state filesystem to a target remaining byte band and attempts one more guarded mutation.
+
+The current matrix measures:
+- 1, 100 and 1000 completed repository generations;
+- target state headroom of 16 KiB, 32 KiB, 64 KiB and 128 KiB;
+- Control DB allocated bytes before the constrained mutation;
+- actual available bytes/inodes immediately before the mutation;
+- mutation success/failure class;
+- generation before/after;
+- persisted CANDIDATE count;
+- DB/WAL/SHM allocation after the qualification-owned filler is removed;
+- the exact underlying error for failed cases.
+
+A case passes the measurement harness only if it is atomic in one of two ways:
+- `SUCCESS_ATOMIC`: the next generation becomes active, validation passes and zero CANDIDATE generations remain;
+- `FAIL_CLOSED_OLD_AUTHORITY`: the old generation remains active, validation passes and zero CANDIDATE generations remain.
+
+The harness does **not** require a chosen headroom band to succeed. Its purpose is to observe whether the success/failure frontier changes with Control DB history size while preserving authority invariants.
+
+The resulting M2 artifact is evidence for a later state-root safety-reserve rationale. It must not be converted directly into a universal reserve without reviewing the observed matrix, SQLite/runtime version and filesystem environment.
+
 ### Repository authority-mutation lease
 
 When an operation snapshots optimization mode ON, repository Download/Update uses one application-owned exclusive nonblocking lease at `<state_root>/repository-mutation.lock` before any selected-repository staging or authority mutation begins.
