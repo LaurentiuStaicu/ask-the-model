@@ -406,6 +406,13 @@ qualification-only: `production_thresholds_selected` must remain false, and
 the stable ~32–64 KiB observed frontier must not be silently promoted into a
 runtime reserve without a separate policy decision and boundary qualification.
 
+The registry also preserves a supplementary 24-case warm/cold SQLite sidecar
+experiment. A pre-existing 32 KiB SHM sidecar reduced additional headroom
+enough for 32 KiB to succeed, while the cold state required the 64 KiB band.
+Because production guarded mutations open and close the Control DB store per
+call, the cold-sidecar case is the conservative admission baseline; warm
+sidecars may reduce actual demand but cannot justify a smaller reserve.
+
 ### Repository authority-mutation lease
 
 When an operation snapshots optimization mode ON, repository Download/Update uses one application-owned exclusive nonblocking lease at `<state_root>/repository-mutation.lock` before any selected-repository staging or authority mutation begins.
