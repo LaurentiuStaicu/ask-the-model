@@ -207,6 +207,441 @@ normalize_entry_path (
     return TRUE;
 }
 
+static gboolean
+inspection_register_path (
+    GHashTable *paths,
+    const char *path,
+    gboolean directory,
+    AtmArchiveInspection *inspection,
+    GError **error
+)
+{
+    gpointer existing =
+        g_hash_table_lookup (
+            paths,
+            path
+        );
+    guint kind =
+        directory ? 1u : 2u;
+
+    if (existing != NULL) {
+        guint existing_kind =
+            GPOINTER_TO_UINT (existing);
+
+        if (directory &&
+            existing_kind == 1u) {
+            return TRUE;
+        }
+
+        g_set_error_literal (
+            error,
+            ATM_ARCHIVE_ERROR,
+            ATM_ARCHIVE_ERROR_FORMAT,
+            "Repository archive contains a duplicate or conflicting materialized path."
+        );
+        return FALSE;
+    }
+
+    g_hash_table_insert (
+        paths,
+        g_strdup (path),
+        GUINT_TO_POINTER (kind)
+    );
+
+    inspection->materialized_entries++;
+
+    if (directory) {
+        inspection->directories++;
+    } else {
+        inspection->regular_files++;
+    }
+
+    return TRUE;
+}
+
+static gboolean
+inspection_register_relative_path (
+    GHashTable *paths,
+    const char *relative,
+    gboolean final_is_directory,
+    AtmArchiveInspection *inspection,
+    GError **error
+)
+{
+    char **parts =
+        g_strsplit (
+            relative,
+            G_DIR_SEPARATOR_S,
+            -1
+        );
+    GString *prefix =
+        g_string_new (NULL);
+    gsize count = 0;
+
+    while (parts[count] != NULL) {
+        count++;
+    }
+
+    if (count == 0) {
+        g_string_free (prefix, TRUE);
+        g_strfreev (parts);
+        g_set_error_literal (
+            error,
+            ATM_ARCHIVE_ERROR,
+            ATM_ARCHIVE_ERROR_FORMAT,
+            "Repository archive contains an empty materialized path."
+        );
+        return FALSE;
+    }
+
+    for (gsize i = 0; i < count; i++) {
+        if (i > 0) {
+            g_string_append_c (
+                prefix,
+                G_DIR_SEPARATOR
+            );
+        }
+
+        g_string_append (
+            prefix,
+            parts[i]
+        );
+
+        gboolean is_final =
+            i + 1 == count;
+        gboolean directory =
+            !is_final ||
+            final_is_directory;
+
+        if (!inspection_register_path (
+                paths,
+                prefix->str,
+                directory,
+                inspection,
+                error
+            )) {
+            g_string_free (prefix, TRUE);
+            g_strfreev (parts);
+            return FALSE;
+        }
+    }
+
+    g_string_free (prefix, TRUE);
+    g_strfreev (parts);
+    return TRUE;
+}
+
+gboolean
+atm_archive_inspect_snapshot (
+    const char *archive_path,
+    const AtmArchiveLimits *limits,
+    AtmArchiveInspection *out_inspection,
+    GError **error
+)
+{
+    struct archive *reader = NULL;
+    struct archive_entry *entry = NULL;
+    char *archive_prefix = NULL;
+    GHashTable *paths = NULL;
+    AtmArchiveInspection inspection = {
+        .archive_entries = 0,
+        /*
+         * Extraction creates one operation-owned root directory before
+         * materializing archive-relative paths beneath it.
+         */
+        .materialized_entries = 1,
+        .regular_files = 0,
+        .directories = 0,
+        .logical_regular_bytes = 0,
+        .largest_regular_file_bytes = 0
+    };
+    gboolean ok = FALSE;
+    int result;
+
+    g_return_val_if_fail (
+        archive_path != NULL,
+        FALSE
+    );
+    g_return_val_if_fail (
+        limits != NULL,
+        FALSE
+    );
+    g_return_val_if_fail (
+        limits->max_entries > 0,
+        FALSE
+    );
+    g_return_val_if_fail (
+        limits->max_file_bytes > 0,
+        FALSE
+    );
+    g_return_val_if_fail (
+        limits->max_total_bytes > 0,
+        FALSE
+    );
+    g_return_val_if_fail (
+        out_inspection != NULL,
+        FALSE
+    );
+
+    *out_inspection =
+        (AtmArchiveInspection) { 0 };
+
+    paths = g_hash_table_new_full (
+        g_str_hash,
+        g_str_equal,
+        g_free,
+        NULL
+    );
+
+    reader = archive_read_new ();
+
+    if (reader == NULL) {
+        g_set_error_literal (
+            error,
+            ATM_ARCHIVE_ERROR,
+            ATM_ARCHIVE_ERROR_OPEN,
+            "Could not allocate libarchive reader for archive inspection."
+        );
+        goto out;
+    }
+
+    if (archive_read_support_filter_gzip (reader) != ARCHIVE_OK ||
+        archive_read_support_format_tar (reader) != ARCHIVE_OK) {
+        g_set_error_literal (
+            error,
+            ATM_ARCHIVE_ERROR,
+            ATM_ARCHIVE_ERROR_FORMAT,
+            "Could not enable gzip/tar support for archive inspection."
+        );
+        goto out;
+    }
+
+    result = archive_read_open_filename (
+        reader,
+        archive_path,
+        64 * 1024
+    );
+
+    if (result != ARCHIVE_OK) {
+        g_set_error (
+            error,
+            ATM_ARCHIVE_ERROR,
+            ATM_ARCHIVE_ERROR_OPEN,
+            "Could not open repository archive for inspection: %s.",
+            archive_error_string (reader)
+        );
+        goto out;
+    }
+
+    while ((result = archive_read_next_header (
+                reader,
+                &entry
+            )) == ARCHIVE_OK) {
+        const char *pathname =
+            archive_entry_pathname (entry);
+        const char *symlink_target =
+            archive_entry_symlink (entry);
+        const char *hardlink_target =
+            archive_entry_hardlink (entry);
+        mode_t filetype =
+            archive_entry_filetype (entry);
+        char *relative = NULL;
+        gboolean is_root = FALSE;
+
+        inspection.archive_entries++;
+
+        if (inspection.archive_entries >
+            limits->max_entries) {
+            g_set_error_literal (
+                error,
+                ATM_ARCHIVE_ERROR,
+                ATM_ARCHIVE_ERROR_LIMIT,
+                "Repository archive exceeds the entry-count limit."
+            );
+            goto out;
+        }
+
+        if (symlink_target != NULL ||
+            hardlink_target != NULL) {
+            g_set_error_literal (
+                error,
+                ATM_ARCHIVE_ERROR,
+                ATM_ARCHIVE_ERROR_UNSUPPORTED_ENTRY,
+                "Repository archive contains a symbolic or hard link."
+            );
+            goto out;
+        }
+
+        if (!normalize_entry_path (
+                pathname,
+                &archive_prefix,
+                &relative,
+                &is_root,
+                error
+            )) {
+            goto out;
+        }
+
+        if (is_root) {
+            if (filetype != AE_IFDIR) {
+                g_free (relative);
+                g_set_error_literal (
+                    error,
+                    ATM_ARCHIVE_ERROR,
+                    ATM_ARCHIVE_ERROR_UNSUPPORTED_ENTRY,
+                    "Repository archive root entry is not a directory."
+                );
+                goto out;
+            }
+
+            g_free (relative);
+
+            result =
+                archive_read_data_skip (
+                    reader
+                );
+            if (result != ARCHIVE_OK) {
+                g_set_error (
+                    error,
+                    ATM_ARCHIVE_ERROR,
+                    ATM_ARCHIVE_ERROR_FORMAT,
+                    "Could not skip repository archive root entry: %s.",
+                    archive_error_string (reader)
+                );
+                goto out;
+            }
+
+            continue;
+        }
+
+        if (filetype == AE_IFDIR) {
+            if (!inspection_register_relative_path (
+                    paths,
+                    relative,
+                    TRUE,
+                    &inspection,
+                    error
+                )) {
+                g_free (relative);
+                goto out;
+            }
+        } else if (filetype == AE_IFREG) {
+            if (!archive_entry_size_is_set (entry)) {
+                g_free (relative);
+                g_set_error_literal (
+                    error,
+                    ATM_ARCHIVE_ERROR,
+                    ATM_ARCHIVE_ERROR_FORMAT,
+                    "Repository archive regular file has no declared size."
+                );
+                goto out;
+            }
+
+            int64_t declared_size =
+                archive_entry_size (entry);
+
+            if (declared_size < 0 ||
+                (guint64) declared_size >
+                    limits->max_file_bytes ||
+                inspection.logical_regular_bytes >
+                    limits->max_total_bytes -
+                    (guint64) declared_size) {
+                g_free (relative);
+                g_set_error_literal (
+                    error,
+                    ATM_ARCHIVE_ERROR,
+                    ATM_ARCHIVE_ERROR_LIMIT,
+                    "Repository archive exceeds an extraction size limit."
+                );
+                goto out;
+            }
+
+            if (!inspection_register_relative_path (
+                    paths,
+                    relative,
+                    FALSE,
+                    &inspection,
+                    error
+                )) {
+                g_free (relative);
+                goto out;
+            }
+
+            inspection.logical_regular_bytes +=
+                (guint64) declared_size;
+            inspection.largest_regular_file_bytes =
+                MAX (
+                    inspection.largest_regular_file_bytes,
+                    (guint64) declared_size
+                );
+        } else {
+            g_free (relative);
+            g_set_error_literal (
+                error,
+                ATM_ARCHIVE_ERROR,
+                ATM_ARCHIVE_ERROR_UNSUPPORTED_ENTRY,
+                "Repository archive contains an unsupported special entry."
+            );
+            goto out;
+        }
+
+        g_free (relative);
+
+        result =
+            archive_read_data_skip (
+                reader
+            );
+
+        if (result != ARCHIVE_OK) {
+            g_set_error (
+                error,
+                ATM_ARCHIVE_ERROR,
+                ATM_ARCHIVE_ERROR_FORMAT,
+                "Could not skip repository archive entry data: %s.",
+                archive_error_string (reader)
+            );
+            goto out;
+        }
+    }
+
+    if (result != ARCHIVE_EOF) {
+        g_set_error (
+            error,
+            ATM_ARCHIVE_ERROR,
+            ATM_ARCHIVE_ERROR_FORMAT,
+            "Could not finish inspecting repository archive: %s.",
+            archive_error_string (reader)
+        );
+        goto out;
+    }
+
+    if (archive_prefix == NULL) {
+        g_set_error_literal (
+            error,
+            ATM_ARCHIVE_ERROR,
+            ATM_ARCHIVE_ERROR_FORMAT,
+            "Repository archive contains no entries."
+        );
+        goto out;
+    }
+
+    *out_inspection = inspection;
+    ok = TRUE;
+
+out:
+    if (reader != NULL) {
+        archive_read_close (reader);
+        archive_read_free (reader);
+    }
+
+    if (paths != NULL) {
+        g_hash_table_destroy (paths);
+    }
+
+    g_free (archive_prefix);
+    return ok;
+}
+
 gboolean
 atm_archive_extract_snapshot_cancellable (
     const char *archive_path,

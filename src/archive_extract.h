@@ -23,7 +23,23 @@ typedef struct {
     guint64 max_total_bytes;
 } AtmArchiveLimits;
 
+typedef struct {
+    guint64 archive_entries;
+    guint64 materialized_entries;
+    guint64 regular_files;
+    guint64 directories;
+    guint64 logical_regular_bytes;
+    guint64 largest_regular_file_bytes;
+} AtmArchiveInspection;
+
 GQuark atm_archive_error_quark (void);
+
+gboolean atm_archive_inspect_snapshot (
+    const char *archive_path,
+    const AtmArchiveLimits *limits,
+    AtmArchiveInspection *out_inspection,
+    GError **error
+);
 
 gboolean atm_archive_extract_snapshot_cancellable (
     const char *archive_path,
