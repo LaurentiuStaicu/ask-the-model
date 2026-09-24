@@ -1042,6 +1042,66 @@ namespace AskTheModel {
             }
         }
 
+        private async void confirm_delete_history_conversation (
+            ConversationPersistenceSummary summary,
+            Gtk.Window history_window
+        ) {
+            if (conversation_store == null ||
+                durable_conversation_is_open (
+                    summary.conversation_id
+                )) {
+                return;
+            }
+
+            var dialog = new Gtk.AlertDialog (
+                "Delete this conversation permanently?"
+            ) {
+                detail =
+                    "The transcript, repository pins, citation provenance and automatic JSON export will be deleted. This cannot be undone.",
+                buttons = {
+                    "Cancel",
+                    "Delete permanently"
+                },
+                cancel_button = 0,
+                default_button = 0,
+                modal = true
+            };
+
+            int response;
+
+            try {
+                response = yield dialog.choose (
+                    history_window,
+                    null
+                );
+            } catch (GLib.Error error) {
+                return;
+            }
+
+            if (response != 1 ||
+                conversation_store == null ||
+                durable_conversation_is_open (
+                    summary.conversation_id
+                )) {
+                return;
+            }
+
+            try {
+                conversation_store.delete_conversation (
+                    summary.conversation_id
+                );
+            } catch (GLib.Error error) {
+                show_conversation_history_error (
+                    history_window,
+                    error.message
+                );
+                return;
+            }
+
+            history_window.close ();
+            show_conversation_history ();
+        }
+
         private Gtk.Widget build_conversation_history_row (
             ConversationPersistenceSummary summary,
             Gtk.Window history_window
@@ -1083,6 +1143,16 @@ namespace AskTheModel {
                     valign = Gtk.Align.CENTER
                 };
 
+            var delete_button =
+                new Gtk.Button.with_label (
+                    "Delete permanently"
+                ) {
+                    valign = Gtk.Align.CENTER
+                };
+            delete_button.add_css_class (
+                "destructive-action"
+            );
+
             ConversationPersistenceSummary item = summary;
             open_button.clicked.connect (() => {
                 open_history_conversation (
@@ -1090,6 +1160,19 @@ namespace AskTheModel {
                     history_window
                 );
             });
+            delete_button.clicked.connect (() => {
+                confirm_delete_history_conversation.begin (
+                    item,
+                    history_window
+                );
+            });
+
+            var actions = new Gtk.Box (
+                Gtk.Orientation.HORIZONTAL,
+                6
+            );
+            actions.append (open_button);
+            actions.append (delete_button);
 
             var row = new Gtk.Box (
                 Gtk.Orientation.HORIZONTAL,
@@ -1101,7 +1184,7 @@ namespace AskTheModel {
                 margin_end = 10
             };
             row.append (labels);
-            row.append (open_button);
+            row.append (actions);
 
             return row;
         }
@@ -1136,7 +1219,7 @@ namespace AskTheModel {
             };
 
             var description = new Gtk.Label (
-                "Closed and archived conversations remain local. Opening one restores its saved transcript and then rechecks the exact saved AI model and repository context before continuation."
+                "Closed and archived conversations remain local. Open restores the saved transcript and rechecks its exact saved context. Delete permanently removes the conversation and its automatic JSON export."
             ) {
                 halign = Gtk.Align.START,
                 xalign = 0.0f,
@@ -1299,10 +1382,10 @@ namespace AskTheModel {
                 "Delete this conversation permanently?"
             ) {
                 detail =
-                    "The transcript, repository pins and citation provenance will be removed from local conversation history.",
+                    "The transcript, repository pins, citation provenance and automatic JSON export will be deleted. This cannot be undone.",
                 buttons = {
                     "Cancel",
-                    "Delete"
+                    "Delete permanently"
                 },
                 cancel_button = 0,
                 default_button = 0,
