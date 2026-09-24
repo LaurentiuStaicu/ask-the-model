@@ -430,6 +430,18 @@ The qualification artifact evaluates simple envelope families and performs leave
 
 M4 deliberately does **not** choose a production predictor or margin. Its purpose is to determine whether repository-specific historical variability is stable enough to support a later conservative policy. If leave-one-out evidence is poor, unknown SHAs remain unqualified for proactive byte prediction and must not inherit stale exact-SHA measurements.
 
+### C0P-M5 out-of-sample capacity qualification
+
+M5 is the first production-policy follow-up measurement under OPT-C0P / #232. It does not change runtime behavior.
+
+The frozen M4 18-SHA corpus remains the only training set. M5 adds 12 disjoint holdout SHAs (four per repository) at default-branch ranks 4/12/20/40 observed after M4 design. Ranks 4/12/20 lie between M4 training ranks and rank 40 extends beyond the recent-r30 training window.
+
+The workflow remeasures both corpora with the real ingest/index/repair runner, fits the transparent M4 hybrid only on the 18 training rows and evaluates the 12 holdouts without refitting any coefficient or historical floor.
+
+Any underprediction is retained as evidence. The workflow does not add a margin automatically to make a failing holdout pass.
+
+M5 still does not select a production predictor or margin. Its purpose is to determine whether the M4 family survives a genuinely disjoint no-refit test strongly enough to justify a later explicit policy decision in #232.
+
 ### Repository authority-mutation lease
 
 When an operation snapshots optimization mode ON, repository Download/Update uses one application-owned exclusive nonblocking lease at `<state_root>/repository-mutation.lock` before any selected-repository staging or authority mutation begins.
