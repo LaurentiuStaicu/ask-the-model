@@ -349,8 +349,46 @@ namespace AskTheModel {
 
             native_store = (owned) opened;
 
+            discard_unarchived_conversations_best_effort ();
+
             if (automatic_export_directory_ready ()) {
                 sync_all_automatic_exports_best_effort ();
+            }
+        }
+
+        private void discard_unarchived_conversations_best_effort () {
+            try {
+                foreach (
+                    ConversationPersistenceSummary summary
+                    in list_conversations ()
+                ) {
+                    if (summary.archived) {
+                        continue;
+                    }
+
+                    delete_conversation (
+                        summary.conversation_id
+                    );
+                }
+            } catch (GLib.Error error) {
+                warning (
+                    "AtM: unarchived conversation cleanup could not complete: %s",
+                    error.message
+                );
+            }
+        }
+
+        public void discard_unarchived_conversations ()
+        throws GLib.Error {
+            foreach (
+                ConversationPersistenceSummary summary
+                in list_conversations ()
+            ) {
+                if (!summary.archived) {
+                    delete_conversation (
+                        summary.conversation_id
+                    );
+                }
             }
         }
 
@@ -414,6 +452,22 @@ namespace AskTheModel {
             );
         }
 
+        private void remove_automatic_export_best_effort (
+            string conversation_id
+        ) {
+            try {
+                remove_automatic_export_required (
+                    conversation_id
+                );
+            } catch (GLib.Error error) {
+                warning (
+                    "AtM: automatic conversation export could not be removed for %s: %s",
+                    conversation_id,
+                    error.message
+                );
+            }
+        }
+
         private void sync_automatic_export_best_effort (
             string conversation_id
         ) {
@@ -427,14 +481,26 @@ namespace AskTheModel {
                 return;
             }
 
-            if (!automatic_export_directory_ready ()) {
-                return;
-            }
-
             try {
-                string json =
-                    export_conversation_json (
+                ConversationPersistenceSnapshot snapshot =
+                    load_snapshot (
                         conversation_id
+                    );
+
+                if (!snapshot.archived) {
+                    remove_automatic_export_best_effort (
+                        conversation_id
+                    );
+                    return;
+                }
+
+                if (!automatic_export_directory_ready ()) {
+                    return;
+                }
+
+                string json =
+                    ConversationExport.serialize_snapshot (
+                        snapshot
                     );
 
                 GLib.FileUtils.set_contents_full (
@@ -858,10 +924,6 @@ namespace AskTheModel {
                     "Conversation identity could not be persisted."
                 );
             }
-
-            sync_automatic_export_best_effort (
-                conversation_id
-            );
 
             return conversation_id;
         }
