@@ -217,7 +217,9 @@ The header presents repository controls as a distinct group immediately after th
 
 A separate compact global optimization control is packed at the end of the header, before the native window controls:
 
-`OPT OFF  [switch]` / `OPT ON  [switch]`
+`OPT  OFF  [switch]  ON`
+
+The control should read as a small instrument-panel slider rather than a flat preference switch. Its rounded case reuses the application's neutral ridge-border language; the case interior is warm muted red when OFF and warm muted green when ON, while the moving slider is neutral metallic gray with restrained relief. OFF and ON remain visible as small fixed labels on the left and right so state is not communicated by color alone. The LCD includes a compact `OPT OFF` / `OPT ON` annunciator tied to the same policy state.
 
 It is application-wide rather than conversation-specific. Every process launch starts OFF and the value is deliberately not persisted. The native `Gtk.Switch` keeps its normal click, keyboard and drag behavior. Its trough is subdued warm red in OFF state and subdued warm green in ON state; the adjacent OFF/ON text is mandatory so state is not communicated by color alone.
 
