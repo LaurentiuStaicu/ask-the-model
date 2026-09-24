@@ -319,6 +319,59 @@ namespace AskTheModel.Tests {
             );
             optimization_policy.set_enabled_for_session (false);
 
+            string guarded_root = new_temp_root ();
+            publish_control_state (guarded_root);
+
+            var guarded_writer_a =
+                new ControlRepositoryStateStore (
+                    guarded_root
+                );
+            var guarded_writer_b =
+                new ControlRepositoryStateStore (
+                    guarded_root
+                );
+
+            assert (
+                guarded_writer_a.repository_generation_id ==
+                guarded_writer_b.repository_generation_id
+            );
+
+            int guarded_lease_fd;
+            bool guarded_lease_contended;
+            assert (
+                RepositoryNative.try_acquire_mutation_lease (
+                    guarded_root,
+                    out guarded_lease_fd,
+                    out guarded_lease_contended
+                )
+            );
+            assert (!guarded_lease_contended);
+            assert (guarded_lease_fd >= 0);
+
+            guarded_writer_a.set_current (
+                catalog[0].id,
+                "8888888888888888888888888888888888888888",
+                "0.1.0"
+            );
+
+            bool stale_generation_rejected = false;
+            try {
+                guarded_writer_b.set_current (
+                    catalog[1].id,
+                    "9999999999999999999999999999999999999999",
+                    "0.1.0"
+                );
+            } catch (RepositoryError error) {
+                stale_generation_rejected =
+                    error.code == RepositoryError.STORAGE;
+            }
+            assert (stale_generation_rejected);
+
+            RepositoryNative.release_mutation_lease (
+                guarded_lease_fd
+            );
+            remove_tree_best_effort (guarded_root);
+
             RepositoryRuntimeInfo freshness =
                 service.info_for (catalog[0].id);
             freshness.remote_sha =
