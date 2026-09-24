@@ -851,6 +851,86 @@ test_deterministic_read_only_export ()
     }
 }
 
+
+private static void
+test_existing_exports_resynchronize_on_reopen ()
+{
+    string root = new_temp_root ();
+
+    try {
+        var first_store =
+            new AskTheModel.ConversationPersistenceStore (
+                root
+            );
+
+        string conversation_id =
+            first_store.create_conversation (
+                "Existing",
+                300,
+                "model-existing",
+                "digest-existing",
+                0,
+                {}
+            );
+
+        assert (
+            first_store.commit_turn (
+                conversation_id,
+                "hello",
+                "world",
+                "world",
+                false,
+                301,
+                {}
+            ) == 0
+        );
+
+        string export_path =
+            GLib.Path.build_filename (
+                first_store.export_root,
+                "%s.json".printf (
+                    conversation_id
+                )
+            );
+
+        assert (
+            GLib.FileUtils.test (
+                export_path,
+                GLib.FileTest.EXISTS
+            )
+        );
+        assert (GLib.FileUtils.remove (export_path) == 0);
+        assert (
+            !GLib.FileUtils.test (
+                export_path,
+                GLib.FileTest.EXISTS
+            )
+        );
+
+        var reopened_store =
+            new AskTheModel.ConversationPersistenceStore (
+                root
+            );
+
+        string synchronized_export;
+        assert (
+            GLib.FileUtils.get_contents (
+                export_path,
+                out synchronized_export
+            )
+        );
+        assert (
+            synchronized_export ==
+            reopened_store.export_conversation_json (
+                conversation_id
+            )
+        );
+    } catch (Error error) {
+        critical ("%s", error.message);
+        assert_not_reached ();
+    }
+}
+
 public static int
 main (string[] args)
 {
@@ -875,6 +955,10 @@ main (string[] args)
     Test.add_func (
         "/conversation-persistence/deterministic-read-only-export",
         test_deterministic_read_only_export
+    );
+    Test.add_func (
+        "/conversation-persistence/existing-export-resync",
+        test_existing_exports_resynchronize_on_reopen
     );
 
     return Test.run ();
