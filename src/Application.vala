@@ -2258,7 +2258,7 @@ namespace AskTheModel {
             headerbar.pack_start (header_controls);
 
             var optimization_title_label =
-                new Gtk.Label ("OPT") {
+                new Gtk.Label ("Optimizations") {
                     valign = Gtk.Align.CENTER
                 };
             optimization_title_label.add_css_class (
