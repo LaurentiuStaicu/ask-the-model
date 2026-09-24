@@ -71,6 +71,7 @@ The visual design process must explicitly consider and approve each of these sur
 - Prefer native GTK 4 / Granite widgets over custom-drawn controls.
 - Keep global actions in the header area and settings toward the end of the header/menu.
 - Use a sidebar only for high-level navigation, not for unrelated controls.
+- The post-v0.5.0 optimization program uses one global native `Gtk.Switch` in the header: **Optimizations**, with explicit OFF/ON text. It starts OFF on every process launch and is not persisted in its first implementation. Warm red/green state styling supplements, but never replaces, the textual/accessibility state cue.
 - Avoid permanently visible secondary panes unless their information is useful often enough to justify the space.
 - Keep the main reading/composing area visually dominant.
 - Preserve usable spacing and avoid excessive density.
