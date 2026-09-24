@@ -11,7 +11,17 @@
       30
     ],
     "pinned_baseline_included": true,
-    "compatibility_gate": "Each frozen SHA was prechecked to contain .atm/repository.json and CITATION.cff; the real ingest/index runner remains the authoritative compatibility test."
+    "compatibility_gate": "Each frozen SHA was prechecked to contain .atm/repository.json and CITATION.cff; the real ingest/index runner remains the authoritative compatibility test.",
+    "temporal_order_labels": [
+      "pinned-m1",
+      "recent-r30",
+      "recent-r22",
+      "recent-r15",
+      "recent-r8",
+      "recent-r1"
+    ],
+    "ancestry_verified": true,
+    "ancestry_contract": "For each repository, every temporal-order SHA was verified as an ancestor of the next sample with compare status ahead and behind_by=0."
   },
   "repositories": [
     {
