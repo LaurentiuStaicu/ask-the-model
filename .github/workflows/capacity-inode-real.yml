@@ -1,0 +1,292 @@
+name: C0-E2 genuine inode exhaustion qualification
+
+on:
+  workflow_dispatch:
+  pull_request:
+    paths:
+      - 'benchmarks/retrieval-v1/benchmark.json'
+      - 'src/archive_extract.c'
+      - 'src/archive_extract.h'
+      - 'src/cff_version.c'
+      - 'src/cff_version.h'
+      - 'src/control_state.c'
+      - 'src/control_state.h'
+      - 'src/repository_ingest.c'
+      - 'src/repository_ingest.h'
+      - 'src/repository_manifest.c'
+      - 'src/repository_manifest.h'
+      - 'src/repository_sources.c'
+      - 'src/repository_sources.h'
+      - 'src/repository_storage.c'
+      - 'src/repository_storage.h'
+      - 'src/retrieval_index.c'
+      - 'src/retrieval_index.h'
+      - 'src/markdown_sections.c'
+      - 'src/markdown_sections.h'
+      - 'src/csv_table.c'
+      - 'src/csv_table.h'
+      - 'src/structured_json.c'
+      - 'src/structured_json.h'
+      - 'data/io.github.laurentiustaicu.ask_the_model.gresource.xml'
+      - 'data/schemas/**'
+      - 'tests/capacity_enospc_runner.c'
+      - '.github/workflows/capacity-inode-real.yml'
+
+permissions:
+  contents: read
+
+concurrency:
+  group: capacity-c0-e2-${{ github.event.pull_request.number || github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  inode-exhaustion:
+    runs-on: ubuntu-24.04
+    timeout-minutes: 30
+
+    steps:
+      - name: Checkout AtM
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+
+      - name: Install qualification build dependencies
+        shell: bash
+        run: |
+          set -euo pipefail
+          sudo apt-get update
+          sudo apt-get install -y --no-install-recommends \
+            build-essential \
+            curl \
+            pkg-config \
+            libarchive-dev \
+            libglib2.0-dev \
+            libglib2.0-bin \
+            libjson-glib-dev \
+            libsqlite3-dev \
+            libyaml-dev
+
+      - name: Compile inode qualification runner
+        shell: bash
+        run: |
+          set -euo pipefail
+
+          glib-compile-resources \
+            data/io.github.laurentiustaicu.ask_the_model.gresource.xml \
+            --sourcedir=data \
+            --generate-source \
+            --target=/tmp/atm-resources.c
+
+          cc \
+            -std=c11 \
+            -D_GNU_SOURCE \
+            -O2 \
+            -Wall \
+            -Wextra \
+            -Werror \
+            -Isrc \
+            $(pkg-config --cflags \
+              glib-2.0 \
+              gio-2.0 \
+              json-glib-1.0) \
+            -c tests/capacity_enospc_runner.c \
+            -o /tmp/capacity-enospc-runner.o
+
+          cc \
+            -std=c11 \
+            -D_GNU_SOURCE \
+            -O2 \
+            -Wall \
+            -Wextra \
+            -Isrc \
+            src/cff_version.c \
+            src/archive_extract.c \
+            src/repository_manifest.c \
+            src/repository_storage.c \
+            src/repository_ingest.c \
+            src/repository_sources.c \
+            src/markdown_sections.c \
+            src/csv_table.c \
+            src/structured_json.c \
+            src/retrieval_index.c \
+            src/control_state.c \
+            /tmp/capacity-enospc-runner.o \
+            /tmp/atm-resources.c \
+            $(pkg-config --cflags --libs \
+              glib-2.0 \
+              gio-2.0 \
+              json-glib-1.0 \
+              sqlite3 \
+              libarchive \
+              yaml-0.1) \
+            -o /tmp/atm-capacity-enospc-runner
+
+      - name: Resolve pinned CBD SHA
+        shell: bash
+        run: |
+          set -euo pipefail
+
+          python3 - <<'PY' >> "$GITHUB_ENV"
+          import json
+
+          with open(
+              "benchmarks/retrieval-v1/benchmark.json",
+              encoding="utf-8",
+          ) as handle:
+              benchmark = json.load(handle)
+
+          corpus = {
+              item["repository_id"]: item["snapshot_sha"]
+              for item in benchmark["corpus"]
+          }
+          print(f"ATM_CBD_SHA={corpus['cbd']}")
+          PY
+
+      - name: Download exact pinned CBD archive
+        shell: bash
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          set -euo pipefail
+
+          mkdir -p /tmp/atm-c0-e2/archives /tmp/atm-c0-e2/results
+
+          curl \
+            --fail \
+            --location \
+            --retry 3 \
+            --silent \
+            --show-error \
+            -H "Accept: application/vnd.github+json" \
+            -H "Authorization: Bearer $GH_TOKEN" \
+            -H "X-GitHub-Api-Version: 2022-11-28" \
+            "https://api.github.com/repos/LaurentiuStaicu/cognitive-belief-dynamics/tarball/$ATM_CBD_SHA" \
+            --output /tmp/atm-c0-e2/archives/cbd.tar.gz
+
+          test -s /tmp/atm-c0-e2/archives/cbd.tar.gz
+
+      - name: Qualify genuine inode exhaustion with bytes still available
+        shell: bash
+        env:
+          LC_ALL: C
+        run: |
+          set -euo pipefail
+
+          root=/tmp/atm-c0-e2/inode-case
+          data="$root/data"
+          state="$root/state"
+          mkdir -p "$data" "$state"
+
+          sudo mount -t tmpfs -o size=32M,nr_inodes=64 tmpfs "$data"
+          trap 'sudo umount "$data" || true' EXIT
+
+          old_sha=3333333333333333333333333333333333333333
+
+          # Seed the old authority first, then measure the actual remaining
+          # byte and inode budgets immediately before the attempted ingest.
+          /tmp/atm-capacity-enospc-runner \
+            --data-inode-enospc \
+            "$data" \
+            "$state" \
+            /tmp/atm-c0-e2/archives/cbd.tar.gz \
+            cbd \
+            CBD \
+            "Cognitive Belief Dynamics" \
+            "$ATM_CBD_SHA" \
+            "$old_sha" \
+            | tee /tmp/atm-c0-e2/results/inode-enospc-attempt.json
+
+          /tmp/atm-capacity-enospc-runner \
+            --verify-data-inode \
+            "$data" \
+            "$state" \
+            cbd \
+            "$ATM_CBD_SHA" \
+            "$old_sha" \
+            | tee /tmp/atm-c0-e2/results/inode-enospc-restart.json
+
+          available_bytes="$(df -B1 --output=avail "$data" | tail -n 1 | tr -d ' ')"
+          available_inodes="$(df -i --output=iavail "$data" | tail -n 1 | tr -d ' ')"
+
+          python3 - \
+            "$available_bytes" \
+            "$available_inodes" \
+            <<'PY'
+          import json
+          import pathlib
+          import sys
+
+          results = pathlib.Path("/tmp/atm-c0-e2/results")
+          available_bytes = int(sys.argv[1])
+          available_inodes = int(sys.argv[2])
+
+          for name in (
+              "inode-enospc-attempt.json",
+              "inode-enospc-restart.json",
+          ):
+              record = json.loads(
+                  (results / name).read_text(encoding="utf-8")
+              )
+              if not record["qualified"]:
+                  raise SystemExit(
+                      f"{name} is not qualified: {record}"
+                  )
+
+          attempt = json.loads(
+              (results / "inode-enospc-attempt.json").read_text(
+                  encoding="utf-8"
+              )
+          )
+
+          if attempt["scenario"] != "data-inode-enospc":
+              raise SystemExit(
+                  f"wrong scenario: {attempt['scenario']}"
+              )
+
+          evidence = {
+              "schema_version": 1,
+              "qualification_id": "atm-c0-e2-inode-exhaustion-v1",
+              "available_bytes_after_failure": available_bytes,
+              "available_inodes_after_failure": available_inodes,
+              "pinned_repository_id": "cbd",
+              "pinned_repository_sha": __import__("os").environ[
+                  "ATM_CBD_SHA"
+              ],
+              "records": [
+                  json.loads(
+                      (results / "inode-enospc-attempt.json").read_text(
+                          encoding="utf-8"
+                      )
+                  ),
+                  json.loads(
+                      (results / "inode-enospc-restart.json").read_text(
+                          encoding="utf-8"
+                      )
+                  ),
+              ],
+          }
+
+          (results / "c0-e2-inode-exhaustion.json").write_text(
+              json.dumps(evidence, indent=2, sort_keys=True) + "\n",
+              encoding="utf-8",
+          )
+
+          print(
+              json.dumps(
+                  evidence,
+                  indent=2,
+                  sort_keys=True,
+              )
+          )
+          PY
+
+          sudo umount "$data"
+          trap - EXIT
+
+      - name: Upload C0-E2 qualification evidence
+        if: always()
+        uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7.0.1
+        with:
+          name: atm-c0-e2-inodes-${{ github.run_id }}-${{ github.run_attempt }}
+          path: |
+            /tmp/atm-c0-e2/results/*.json
+          if-no-files-found: error
+          retention-days: 90
