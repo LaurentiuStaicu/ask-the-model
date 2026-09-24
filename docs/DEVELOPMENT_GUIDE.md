@@ -413,6 +413,23 @@ Because production guarded mutations open and close the Control DB store per
 call, the cold-sidecar case is the conservative admission baseline; warm
 sidecars may reduce actual demand but cannot justify a smaller reserve.
 
+### C0-M4 historical amplification measurement
+
+C0-M4 addresses the remaining unknown-SHA byte-prediction gap without changing runtime policy.
+
+The frozen corpus under `benchmarks/capacity-v2/` contains six exact SHAs for each of EWD, CBD and RMD: five stratified points from recent default-branch history plus the exact C0-M1 pinned SHA. The corpus validator requires 18 unique SHAs and keeps the pinned anchors aligned with R5.
+
+Every sample is measured with the same real ingest/storage/retrieval-index runner used by C0-M1. M4 derives transparent per-repository relationships from observables available after archive download/pre-scan:
+- archive allocated bytes;
+- snapshot logical regular bytes;
+- materialized/observed entry count;
+- fresh snapshot additional allocated peak;
+- index-build additional allocated peak.
+
+The qualification artifact evaluates simple envelope families and performs leave-one-out validation. A held-out SHA is never used to establish the envelope used to predict itself. Underprediction is reported as a failure/sensitivity measure rather than hidden by fitting the full corpus.
+
+M4 deliberately does **not** choose a production predictor or margin. Its purpose is to determine whether repository-specific historical variability is stable enough to support a later conservative policy. If leave-one-out evidence is poor, unknown SHAs remain unqualified for proactive byte prediction and must not inherit stale exact-SHA measurements.
+
 ### Repository authority-mutation lease
 
 When an operation snapshots optimization mode ON, repository Download/Update uses one application-owned exclusive nonblocking lease at `<state_root>/repository-mutation.lock` before any selected-repository staging or authority mutation begins.
