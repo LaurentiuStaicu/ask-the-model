@@ -50,6 +50,27 @@ because a repository can have a relatively stable absolute index floor even
 when logical bytes or entry counts change. Hybrid coverage is measured only;
 the benchmark does not select it as production policy.
 
+## Reviewed M4 result
+
+The successful hybrid run is frozen in `evidence.json`.
+
+Across the 18-SHA corpus, both hybrid candidates covered all leave-one-out
+cases:
+
+- snapshot hybrid: 18/18;
+- index hybrid: 18/18.
+
+This is materially stronger than the individual formulas, each of which
+covered only 5/6 cases per repository. However, the EWD index hybrid has a
+limiting held-out case with actual/prediction = exactly 1.0. The reviewed
+sample therefore demonstrates coverage but does not itself provide a positive
+future-SHA safety margin.
+
+The historical absolute floor is also inherently backward-looking: a future
+SHA can exceed every sampled peak. These limitations are deliberately
+machine-validated so later policy cannot reinterpret 18/18 historical coverage
+as a mathematical upper bound.
+
 ## Non-policy boundary
 
 No production predictor, multiplier, safety margin or refusal threshold is
