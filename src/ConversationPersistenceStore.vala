@@ -348,6 +348,28 @@ namespace AskTheModel {
             }
 
             native_store = (owned) opened;
+
+            if (automatic_export_directory_ready ()) {
+                sync_all_automatic_exports_best_effort ();
+            }
+        }
+
+        private void sync_all_automatic_exports_best_effort () {
+            try {
+                foreach (
+                    ConversationPersistenceSummary summary
+                    in list_conversations ()
+                ) {
+                    sync_automatic_export_best_effort (
+                        summary.conversation_id
+                    );
+                }
+            } catch (GLib.Error error) {
+                warning (
+                    "AtM: existing automatic conversation exports could not be synchronized: %s",
+                    error.message
+                );
+            }
         }
 
         private bool automatic_export_directory_ready () {
