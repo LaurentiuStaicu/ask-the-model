@@ -246,6 +246,22 @@ This deliberately avoids the incorrect pattern of summing independent per-root m
 
 C0-F1 remains a pure qualification model. No production path calls it yet, and no reserve value is selected by this slice. The model exists so C0-T1/T2/T3/T6/T7 can be exercised deterministically before runtime admission is authorized.
 
+
+### C0-E3 Control DB state-root ENOSPC qualification
+
+C0-E3 qualifies the third storage filesystem: the authoritative Control DB state root.
+
+The test mounts an isolated bounded `tmpfs`, seeds one valid COMPLETE repository generation, consumes only qualification-owned free capacity down to a small measured headroom, and then calls the real guarded copy-on-write Control DB mutation. A qualifying failure must be a genuine disk-full/ENOSPC condition.
+
+After the failed mutation the test removes only its filler file and requires:
+- the active generation and repository SHA to remain unchanged;
+- the guarded mutation to return no new generation identifier;
+- zero persisted `CANDIDATE` generations;
+- the Control DB to reopen and pass full validation;
+- a separate fresh-process verifier to observe the same old authority.
+
+This slice measures and qualifies fail-closed behavior; it does not yet turn the observed low-space boundary into a permanent state-root reserve. SQLite may react to `SQLITE_FULL` by rolling back a statement or the whole transaction depending on where the error occurs, so AtM retains its explicit rollback path and verifies the persisted result instead of assuming one internal SQLite outcome.
+
 ### Repository authority-mutation lease
 
 When an operation snapshots optimization mode ON, repository Download/Update uses one application-owned exclusive nonblocking lease at `<state_root>/repository-mutation.lock` before any selected-repository staging or authority mutation begins.
