@@ -561,7 +561,7 @@
       "category": "SESSION",
       "severity": "S0",
       "lifecycle": "enforced",
-      "statement": "Startup durable-conversation restore must remain view-only until exact continuation qualification is explicitly completed. Only non-archived durable conversations are restored into GTK tabs; restored transcript rendering must use durable display_content while provider history is rebuilt only from durable provider_content, grounded citation provenance including any persisted immutable permalink must remain inspectable, and restored prompt/Send controls must remain disabled. Startup restore must not discard a user-started pristine New tab unless it is still completely untouched.",
+      "statement": "Any archived durable conversation reconstructed into GTK must begin view-only until exact continuation qualification is explicitly completed. Restored transcript rendering must use durable display_content while provider history is rebuilt only from durable provider_content, grounded citation provenance including any persisted immutable permalink must remain inspectable, and restored prompt/Send controls must remain disabled until qualification. CONV-05c does not automatically reopen saved conversations at application startup; archived conversations remain available through History.",
       "enforced_by": [
         "src/Application.vala",
         "src/ConversationPersistenceStore.vala",
@@ -594,7 +594,7 @@
       "category": "SESSION",
       "severity": "S0",
       "lifecycle": "enforced",
-      "statement": "Conversation tab closing, durable archive and durable deletion must remain distinct operations. Explicit tab Close may mutate only durable startup-open metadata: it must atomically clear open_on_startup before removing a durable tab, without archiving or deleting conversation history, while application shutdown must not clear that flag. Startup restore must include only conversations with archived=0 and open_on_startup=1. Archive must atomically set archived and clear open_on_startup before the tab is removed. Permanent deletion must require an explicit user choice and atomically delete exactly one durable conversation; repository pins, messages and citations must disappear only through the conversation-store foreign-key cascade. Failed close/archive/delete persistence must leave the tab open and durable history unchanged.",
+      "statement": "Conversation Close, explicit Archive and permanent Delete must remain distinct operations. Archive is the only user-visible save transition and must set archived before the tab is removed. Closing an unarchived durable tab must discard its temporary conversation row rather than retain it in History; normal shutdown and next-start cleanup must likewise remove unarchived working rows. An archived conversation reopened from History retains archived=true and therefore survives Close. Permanent deletion must require an explicit user choice and remove exactly one archived conversation, with repository pins, messages and citations removed through the conversation-store foreign-key cascade. Failed close/archive/delete persistence must not be reported as a successful lifecycle transition.",
       "enforced_by": [
         "src/Application.vala",
         "src/ConversationPersistenceStore.vala",
@@ -613,7 +613,7 @@
       "category": "SESSION",
       "severity": "S0",
       "lifecycle": "enforced",
-      "statement": "Conversation History must reopen only durable conversations that are not already open and must reuse the existing persisted-snapshot restore boundary. Closed conversations may be made startup-open before tab reconstruction. Archived conversations must make startup-open state durable while still archived and only then clear archive state, so a failed unarchive leaves them excluded from startup restore. Every history-opened tab must begin in restored view-only mode and may become continuable only through the same exact persisted model name/digest and repository generation/version/SHA qualification used by startup restoration; current model or repository authority must never be silently substituted.",
+      "statement": "Conversation History must list only explicitly archived conversations that are not already open and must reuse the existing persisted-snapshot restore boundary. Opening a History item must preserve archived=true rather than unarchiving it. Every history-opened tab must begin in restored view-only mode and may become continuable only through the same exact persisted model name/digest and repository generation/version/SHA qualification; current model or repository authority must never be silently substituted. Every History row may expose a separately confirmed permanent-delete action for that archived conversation.",
       "enforced_by": [
         "src/Application.vala",
         "src/ConversationPersistenceStore.vala"
@@ -621,6 +621,21 @@
       "tested_by": [
         "meson:conversation-persistence-store",
         "meson:repository-lifecycle-service"
+      ]
+    },
+    {
+      "id": "SESSION-S0-012",
+      "category": "SESSION",
+      "severity": "S0",
+      "lifecycle": "enforced",
+      "statement": "Managed conversation JSON mirrors must exist only for explicitly archived conversations. Unarchived working conversations must not create managed exports. Permanent deletion must remove the managed archived JSON export before deleting the SQLite conversation and must fail closed if that export cannot be removed; if SQLite deletion then fails while the archived row still exists, the export should be regenerated when possible. Export files must remain derived mirrors, not an alternate conversation authority.",
+      "enforced_by": [
+        "src/ConversationPersistenceStore.vala",
+        "src/ConversationExport.vala",
+        "src/Application.vala"
+      ],
+      "tested_by": [
+        "meson:conversation-persistence-store"
       ]
     }
   ]

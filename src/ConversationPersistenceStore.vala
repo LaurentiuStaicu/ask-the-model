@@ -349,8 +349,46 @@ namespace AskTheModel {
 
             native_store = (owned) opened;
 
+            discard_unarchived_conversations_best_effort ();
+
             if (automatic_export_directory_ready ()) {
                 sync_all_automatic_exports_best_effort ();
+            }
+        }
+
+        private void discard_unarchived_conversations_best_effort () {
+            try {
+                foreach (
+                    ConversationPersistenceSummary summary
+                    in list_conversations ()
+                ) {
+                    if (summary.archived) {
+                        continue;
+                    }
+
+                    delete_conversation (
+                        summary.conversation_id
+                    );
+                }
+            } catch (GLib.Error error) {
+                warning (
+                    "AtM: unarchived conversation cleanup could not complete: %s",
+                    error.message
+                );
+            }
+        }
+
+        public void discard_unarchived_conversations ()
+        throws GLib.Error {
+            foreach (
+                ConversationPersistenceSummary summary
+                in list_conversations ()
+            ) {
+                if (!summary.archived) {
+                    delete_conversation (
+                        summary.conversation_id
+                    );
+                }
             }
         }
 
@@ -414,6 +452,22 @@ namespace AskTheModel {
             );
         }
 
+        private void remove_automatic_export_best_effort (
+            string conversation_id
+        ) {
+            try {
+                remove_automatic_export_required (
+                    conversation_id
+                );
+            } catch (GLib.Error error) {
+                warning (
+                    "AtM: automatic conversation export could not be removed for %s: %s",
+                    conversation_id,
+                    error.message
+                );
+            }
+        }
+
         private void sync_automatic_export_best_effort (
             string conversation_id
         ) {
@@ -427,14 +481,26 @@ namespace AskTheModel {
                 return;
             }
 
-            if (!automatic_export_directory_ready ()) {
-                return;
-            }
-
             try {
-                string json =
-                    export_conversation_json (
+                ConversationPersistenceSnapshot snapshot =
+                    load_snapshot (
                         conversation_id
+                    );
+
+                if (!snapshot.archived) {
+                    remove_automatic_export_best_effort (
+                        conversation_id
+                    );
+                    return;
+                }
+
+                if (!automatic_export_directory_ready ()) {
+                    return;
+                }
+
+                string json =
+                    ConversationExport.serialize_snapshot (
+                        snapshot
                     );
 
                 GLib.FileUtils.set_contents_full (
@@ -455,14 +521,41 @@ namespace AskTheModel {
             }
         }
 
-        private void remove_automatic_export_best_effort (
+        private void remove_automatic_export_required (
             string conversation_id
-        ) {
+        ) throws GLib.Error {
             if (!GLib.Regex.match_simple (
                     "^[A-Za-z0-9-]+$",
                     conversation_id
                 )) {
+                throw new GLib.IOError.INVALID_DATA (
+                    "Conversation identity is invalid for managed export deletion."
+                );
+            }
+
+            if (GLib.FileUtils.test (
+                    export_root,
+                    GLib.FileTest.IS_SYMLINK
+                )) {
+                throw new GLib.IOError.FAILED (
+                    "Automatic conversation export directory is a symbolic link."
+                );
+            }
+
+            if (!GLib.FileUtils.test (
+                    export_root,
+                    GLib.FileTest.EXISTS
+                )) {
                 return;
+            }
+
+            if (!GLib.FileUtils.test (
+                    export_root,
+                    GLib.FileTest.IS_DIR
+                )) {
+                throw new GLib.IOError.FAILED (
+                    "Automatic conversation export path is not a directory."
+                );
             }
 
             string export_path =
@@ -473,14 +566,17 @@ namespace AskTheModel {
             if (!GLib.FileUtils.test (
                     export_path,
                     GLib.FileTest.EXISTS
+                ) &&
+                !GLib.FileUtils.test (
+                    export_path,
+                    GLib.FileTest.IS_SYMLINK
                 )) {
                 return;
             }
 
             if (GLib.FileUtils.remove (export_path) != 0) {
-                warning (
-                    "AtM: automatic conversation export could not be removed: %s",
-                    export_path
+                throw new GLib.IOError.FAILED (
+                    "Automatic conversation export could not be deleted."
                 );
             }
         }
@@ -858,10 +954,6 @@ namespace AskTheModel {
                 );
             }
 
-            sync_automatic_export_best_effort (
-                conversation_id
-            );
-
             return conversation_id;
         }
 
@@ -999,18 +1091,22 @@ namespace AskTheModel {
         public void delete_conversation (
             string conversation_id
         ) throws GLib.Error {
+            remove_automatic_export_required (
+                conversation_id
+            );
+
             if (!ConversationStoreNative.delete_conversation (
                     native_store,
                     conversation_id
                 )) {
+                sync_automatic_export_best_effort (
+                    conversation_id
+                );
+
                 throw new GLib.IOError.FAILED (
                     "Conversation could not be deleted."
                 );
             }
-
-            remove_automatic_export_best_effort (
-                conversation_id
-            );
         }
     }
 

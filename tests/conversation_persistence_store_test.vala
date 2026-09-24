@@ -512,26 +512,19 @@ test_archive_delete_domain_lifecycle ()
             ) == 0
         );
 
-        var initial_summary =
-            store.list_conversations ()[0];
-        assert (initial_summary.open_on_startup);
+        string automatic_export_path =
+            GLib.Path.build_filename (
+                store.export_root,
+                "%s.json".printf (
+                    conversation_id
+                )
+            );
 
-        store.set_open_on_startup (
-            conversation_id,
-            false
-        );
         assert (
-            !store.list_conversations ()[0]
-                .open_on_startup
-        );
-
-        store.set_open_on_startup (
-            conversation_id,
-            true
-        );
-        assert (
-            store.list_conversations ()[0]
-                .open_on_startup
+            !GLib.FileUtils.test (
+                automatic_export_path,
+                GLib.FileTest.EXISTS
+            )
         );
 
         store.set_archived (
@@ -540,13 +533,6 @@ test_archive_delete_domain_lifecycle ()
             102
         );
 
-        string automatic_export_path =
-            GLib.Path.build_filename (
-                store.export_root,
-                "%s.json".printf (
-                    conversation_id
-                )
-            );
         string archived_export;
         assert (
             GLib.FileUtils.get_contents (
@@ -566,47 +552,6 @@ test_archive_delete_domain_lifecycle ()
             );
         assert (archived.archived);
         assert (archived.updated_at_us == 102);
-        assert (
-            !store.list_conversations ()[0]
-                .open_on_startup
-        );
-
-        /*
-         * History reopen makes startup-open durable while the
-         * conversation is still archived. If unarchive were to fail,
-         * startup restore would continue to exclude the row.
-         */
-        store.set_open_on_startup (
-            conversation_id,
-            true
-        );
-
-        var archived_reopen =
-            store.load_snapshot (
-                conversation_id
-            );
-        assert (archived_reopen.archived);
-        assert (
-            store.list_conversations ()[0]
-                .open_on_startup
-        );
-
-        store.set_archived (
-            conversation_id,
-            false,
-            103
-        );
-
-        var restored =
-            store.load_snapshot (
-                conversation_id
-            );
-        assert (!restored.archived);
-        assert (restored.updated_at_us == 103);
-        assert (
-            store.list_conversations ()[0]
-                .open_on_startup
-        );
 
         store.delete_conversation (
             conversation_id
@@ -726,13 +671,31 @@ test_deterministic_read_only_export ()
         string automatic_export;
 
         assert (
+            !GLib.FileUtils.test (
+                automatic_export_path,
+                GLib.FileTest.EXISTS
+            )
+        );
+
+        store.set_archived (
+            conversation_id,
+            true,
+            203
+        );
+
+        string archived_json =
+            store.export_conversation_json (
+                conversation_id
+            );
+
+        assert (
             GLib.FileUtils.get_contents (
                 automatic_export_path,
                 out automatic_export
             )
         );
 
-        assert (automatic_export == first);
+        assert (automatic_export == archived_json);
         assert (first == second);
         assert (first.has_suffix ("\n"));
         assert (
@@ -885,6 +848,12 @@ test_existing_exports_resynchronize_on_reopen ()
             ) == 0
         );
 
+        first_store.set_archived (
+            conversation_id,
+            true,
+            302
+        );
+
         string export_path =
             GLib.Path.build_filename (
                 first_store.export_root,
@@ -931,6 +900,154 @@ test_existing_exports_resynchronize_on_reopen ()
     }
 }
 
+private static void
+test_unarchived_conversations_are_discarded_on_reopen ()
+{
+    string root = new_temp_root ();
+
+    try {
+        string conversation_id;
+
+        {
+            var first_store =
+                new AskTheModel.ConversationPersistenceStore (
+                    root
+                );
+
+            conversation_id =
+                first_store.create_conversation (
+                    "Temporary",
+                    400,
+                    "model-temporary",
+                    null,
+                    0,
+                    {}
+                );
+
+            assert (
+                first_store.commit_turn (
+                    conversation_id,
+                    "temporary",
+                    "answer",
+                    "answer",
+                    false,
+                    401,
+                    {}
+                ) == 0
+            );
+        }
+
+        var reopened_store =
+            new AskTheModel.ConversationPersistenceStore (
+                root
+            );
+
+        assert (
+            reopened_store.list_conversations ().length == 0
+        );
+
+        bool missing = false;
+
+        try {
+            reopened_store.load_snapshot (
+                conversation_id
+            );
+        } catch (Error error) {
+            missing = true;
+        }
+
+        assert (missing);
+    } catch (Error error) {
+        critical ("%s", error.message);
+        assert_not_reached ();
+    }
+}
+
+private static void
+test_permanent_delete_fails_closed_when_export_cannot_be_removed ()
+{
+    string root = new_temp_root ();
+
+    try {
+        var store =
+            new AskTheModel.ConversationPersistenceStore (
+                root
+            );
+
+        string conversation_id =
+            store.create_conversation (
+                "Protected archive",
+                500,
+                "model-delete",
+                null,
+                0,
+                {}
+            );
+
+        assert (
+            store.commit_turn (
+                conversation_id,
+                "keep",
+                "me",
+                "me",
+                false,
+                501,
+                {}
+            ) == 0
+        );
+
+        store.set_archived (
+            conversation_id,
+            true,
+            502
+        );
+
+        string export_path =
+            GLib.Path.build_filename (
+                store.export_root,
+                "%s.json".printf (
+                    conversation_id
+                )
+            );
+
+        assert (GLib.FileUtils.remove (export_path) == 0);
+        assert (GLib.DirUtils.create (export_path, 0700) == 0);
+
+        string blocker =
+            GLib.Path.build_filename (
+                export_path,
+                "blocker"
+            );
+        GLib.FileUtils.set_contents (
+            blocker,
+            "block"
+        );
+
+        bool failed = false;
+
+        try {
+            store.delete_conversation (
+                conversation_id
+            );
+        } catch (Error error) {
+            failed = true;
+        }
+
+        assert (failed);
+        assert (
+            store.load_snapshot (
+                conversation_id
+            ).archived
+        );
+
+        assert (GLib.FileUtils.remove (blocker) == 0);
+        assert (GLib.DirUtils.remove (export_path) == 0);
+    } catch (Error error) {
+        critical ("%s", error.message);
+        assert_not_reached ();
+    }
+}
+
 public static int
 main (string[] args)
 {
@@ -959,6 +1076,14 @@ main (string[] args)
     Test.add_func (
         "/conversation-persistence/existing-export-resync",
         test_existing_exports_resynchronize_on_reopen
+    );
+    Test.add_func (
+        "/conversation-persistence/unarchived-discard-on-reopen",
+        test_unarchived_conversations_are_discarded_on_reopen
+    );
+    Test.add_func (
+        "/conversation-persistence/permanent-delete-export-fail-closed",
+        test_permanent_delete_fails_closed_when_export_cannot_be_removed
     );
 
     return Test.run ();
