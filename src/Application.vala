@@ -1094,14 +1094,7 @@ namespace AskTheModel {
                 ellipsize = Pango.EllipsizeMode.END
             };
 
-            string lifecycle =
-                summary.archived
-                    ? "Archived"
-                    : summary.open_on_startup
-                        ? "Saved"
-                        : "Closed";
-
-            var state_label = new Gtk.Label (lifecycle) {
+            var state_label = new Gtk.Label ("Archived") {
                 halign = Gtk.Align.START,
                 xalign = 0.0f
             };
@@ -1307,66 +1300,6 @@ namespace AskTheModel {
             close_chat_tab (
                 state,
                 false
-            );
-        }
-
-        private async void confirm_delete_chat_tab (
-            ChatTabState state
-        ) {
-            if (state.generating ||
-                conversation_store == null ||
-                state.persistent_id == null) {
-                return;
-            }
-
-            var dialog = new Gtk.AlertDialog (
-                "Delete this conversation permanently?"
-            ) {
-                detail =
-                    "The transcript, repository pins, citation provenance and automatic JSON export will be deleted. This cannot be undone.",
-                buttons = {
-                    "Cancel",
-                    "Delete permanently"
-                },
-                cancel_button = 0,
-                default_button = 0,
-                modal = true
-            };
-
-            int response;
-
-            try {
-                response = yield dialog.choose (
-                    this.active_window,
-                    null
-                );
-            } catch (GLib.Error error) {
-                return;
-            }
-
-            if (response != 1 ||
-                conversation_store == null ||
-                state.persistent_id == null ||
-                state.generating) {
-                return;
-            }
-
-            try {
-                conversation_store.delete_conversation (
-                    state.persistent_id
-                );
-            } catch (GLib.Error error) {
-                append_transcript (
-                    state.transcript,
-                    "System: Conversation could not be deleted: " +
-                    error.message
-                );
-                return;
-            }
-
-            state.persistent_id = null;
-            close_chat_tab (
-                state
             );
         }
 
