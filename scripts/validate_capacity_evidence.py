@@ -337,6 +337,83 @@ def main() -> int:
     }:
         fail("C0-M3 reviewed frontier drifted")
 
+    sidecar = evidence.get("c0_m2_sidecar_sensitivity")
+    if not isinstance(sidecar, dict):
+        fail("c0_m2_sidecar_sensitivity object is missing")
+
+    require_positive_int(
+        sidecar,
+        "actions_run_id",
+        "c0_m2_sidecar_sensitivity",
+    )
+    require_positive_int(
+        sidecar,
+        "artifact_id",
+        "c0_m2_sidecar_sensitivity",
+    )
+    require_digest(
+        sidecar.get("artifact_sha256"),
+        "c0_m2_sidecar_sensitivity.artifact_sha256",
+    )
+    require_sha(
+        sidecar.get("atm_source_commit"),
+        "c0_m2_sidecar_sensitivity.atm_source_commit",
+    )
+    require_sha(
+        sidecar.get("workflow_commit"),
+        "c0_m2_sidecar_sensitivity.workflow_commit",
+    )
+
+    if sidecar.get("history_generation_counts") != [1, 100, 1000]:
+        fail("C0-M2 sidecar history matrix drifted")
+    if sidecar.get("available_byte_bands") != [
+        16384,
+        32768,
+        65536,
+        131072,
+    ]:
+        fail("C0-M2 sidecar byte bands drifted")
+
+    warm = sidecar.get("warm")
+    cold = sidecar.get("cold")
+    if not isinstance(warm, dict) or not isinstance(cold, dict):
+        fail("C0-M2 sidecar warm/cold observations are missing")
+
+    if warm.get("shm_allocated_bytes_before_operation") != 32768:
+        fail("C0-M2 warm SHM baseline drifted")
+    if warm.get("highest_failed_available_bytes") != 16384:
+        fail("C0-M2 warm failure frontier drifted")
+    if warm.get("lowest_successful_available_bytes") != 32768:
+        fail("C0-M2 warm success frontier drifted")
+
+    if cold.get("shm_allocated_bytes_before_operation") != 0:
+        fail("C0-M2 cold SHM baseline drifted")
+    if cold.get("highest_failed_available_bytes") != 32768:
+        fail("C0-M2 cold failure frontier drifted")
+    if cold.get("lowest_successful_available_bytes") != 65536:
+        fail("C0-M2 cold success frontier drifted")
+
+    if sidecar.get("outcome_counts") != {
+        "SUCCESS": 15,
+        "SQLITE_FULL": 6,
+        "OTHER_ERROR": 3,
+    }:
+        fail("C0-M2 sidecar outcome counts drifted")
+
+    runtime_relevance = str(
+        sidecar.get("runtime_relevance", "")
+    ).lower()
+    for required_phrase in (
+        "opens and closes",
+        "cold sidecar",
+        "conservative runtime baseline",
+    ):
+        if required_phrase not in runtime_relevance:
+            fail(
+                "C0-M2 sidecar runtime-relevance contract "
+                f"lost phrase: {required_phrase}"
+            )
+
     rules = evidence.get("interpretation_rules")
     if not isinstance(rules, list) or len(rules) < 6:
         fail("interpretation_rules are incomplete")
