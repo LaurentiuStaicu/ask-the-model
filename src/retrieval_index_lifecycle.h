@@ -31,4 +31,21 @@ gboolean atm_retrieval_index_ensure_for_snapshot (
     GError **error
 );
 
+gboolean atm_retrieval_index_ensure_for_snapshot_coordinated (
+    const char *state_root,
+    const char *cache_root,
+    const char *snapshot_root,
+    const char *repository_id,
+    const char *snapshot_sha,
+    char **out_index_path,
+    char **out_repository_version,
+    AtmRetrievalEnsureResult *out_result,
+    GError **error
+);
+
+#ifdef ATM_TEST_INDEX_SINGLE_FLIGHT
+void atm_retrieval_index_single_flight_test_reset (void);
+gint atm_retrieval_index_single_flight_test_build_entries (void);
+#endif
+
 G_END_DECLS
