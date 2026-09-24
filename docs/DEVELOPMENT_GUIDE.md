@@ -448,7 +448,7 @@ M6 stress-tests the historical capacity predictor against valid synthetic AtM re
 
 The generator stays inside current parser limits and creates:
 - EWD-style row-heavy CSV at 50,000 and 150,000 rows;
-- CBD-style structured JSON at 25,000 and 75,000 entities;
+- CBD-style structured JSON at 25,000 and 70,000 entities;
 - RMD-style Markdown at approximately 4 MiB and 12 MiB with many sections and distinct terms.
 
 Each fixture contains a real `.atm/repository.json`, `CITATION.cff` and `STATUS.md`, is ingested by the normal repository path and is indexed by the production retrieval-index builder. The fixture identifiers are deterministic synthetic 40-hex IDs, not Git commit claims.
