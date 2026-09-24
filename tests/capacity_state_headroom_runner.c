@@ -601,6 +601,25 @@ classify_operation_error (
 }
 
 static void
+add_u64_json (
+    JsonBuilder *builder,
+    const char *name,
+    guint64 value
+)
+{
+    json_builder_set_member_name (
+        builder,
+        name
+    );
+    json_builder_add_int_value (
+        builder,
+        value > (guint64) G_MAXINT64
+            ? G_MAXINT64
+            : (gint64) value
+    );
+}
+
+static void
 emit_result (
     guint history_generations,
     guint64 leave_target_bytes,
@@ -642,109 +661,6 @@ emit_result (
 
     json_builder_begin_object (builder);
 
-#define ADD_INT(name, value)     G_STMT_START {         json_builder_set_member_name (builder, name);         json_builder_add_int_value (             builder,             (gint64) MIN (                 (guint64) (value),                 (guint64) G_MAXINT64             )         );     } G_STMT_END
-
-    json_builder_set_member_name (
-        builder,
-        "schema_version"
-    );
-    json_builder_add_int_value (
-        builder,
-        1
-    );
-
-    ADD_INT (
-        "history_generations",
-        history_generations
-    );
-    ADD_INT (
-        "leave_target_bytes",
-        leave_target_bytes
-    );
-    ADD_INT (
-        "available_bytes_before_filler",
-        available_bytes_before_filler
-    );
-    ADD_INT (
-        "available_inodes_before_filler",
-        available_inodes_before_filler
-    );
-    ADD_INT (
-        "available_bytes_before_operation",
-        available_bytes_before_operation
-    );
-    ADD_INT (
-        "available_inodes_before_operation",
-        available_inodes_before_operation
-    );
-    ADD_INT (
-        "filesystem_fragment_size",
-        fragment_size
-    );
-    ADD_INT (
-        "filler_allocated_bytes",
-        filler_bytes
-    );
-    ADD_INT (
-        "generation_before",
-        generation_before
-    );
-    ADD_INT (
-        "generation_after",
-        generation_after
-    );
-    ADD_INT (
-        "candidate_generations",
-        candidate_generations
-    );
-    ADD_INT (
-        "control_db_allocated_bytes_before",
-        control_db_allocated_bytes_before
-    );
-    ADD_INT (
-        "page_size_before",
-        stats_before->page_size
-    );
-    ADD_INT (
-        "page_count_before",
-        stats_before->page_count
-    );
-    ADD_INT (
-        "freelist_count_before",
-        stats_before->freelist_count
-    );
-    ADD_INT (
-        "page_size_after",
-        stats_after->page_size
-    );
-    ADD_INT (
-        "page_count_after",
-        stats_after->page_count
-    );
-    ADD_INT (
-        "freelist_count_after",
-        stats_after->freelist_count
-    );
-    ADD_INT (
-        "control_db_allocated_bytes_after",
-        allocated_bytes (
-            control_path
-        )
-    );
-    ADD_INT (
-        "wal_allocated_bytes_after",
-        allocated_bytes (
-            wal_path
-        )
-    );
-    ADD_INT (
-        "shm_allocated_bytes_after",
-        allocated_bytes (
-            shm_path
-        )
-    );
-
-#undef ADD_INT
 
     json_builder_set_member_name (
         builder,
