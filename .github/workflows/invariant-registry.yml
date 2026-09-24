@@ -26,3 +26,4 @@ jobs:
           python3 scripts/validate_invariant_registry.py
           python3 scripts/validate_capacity_evidence.py
           python3 scripts/validate_capacity_v2_corpus.py
+          python3 scripts/validate_capacity_v2_evidence.py
