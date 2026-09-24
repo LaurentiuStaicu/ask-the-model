@@ -2,7 +2,8 @@ namespace AskTheModel {
     private enum RepositoryOperationOutcome {
         NORMAL,
         OFFLINE,
-        ERROR
+        ERROR,
+        NO_SPACE
     }
 
     private class ChatTabState : Object {
@@ -115,6 +116,7 @@ namespace AskTheModel {
         private bool repository_validating = false;
         private bool repository_offline = false;
         private bool repository_error = false;
+        private bool repository_no_space = false;
         private string? repository_status_detail = null;
         private bool assistant_stream_started = false;
         private bool updating_model_selector = false;
@@ -524,12 +526,21 @@ namespace AskTheModel {
                         )
                         : "Repository runtime blocked by startup qualification";
             } else if (repository_error) {
-                repository_summary =
-                    repository_status_detail != null
-                        ? "Repository operation failed: %s".printf (
-                            repository_status_detail
-                        )
-                        : "Repository operation failed";
+                if (repository_no_space) {
+                    repository_summary =
+                        repository_status_detail != null
+                            ? "Local storage capacity error: %s".printf (
+                                repository_status_detail
+                            )
+                            : "Not enough local storage for repository operation";
+                } else {
+                    repository_summary =
+                        repository_status_detail != null
+                            ? "Repository operation failed: %s".printf (
+                                repository_status_detail
+                            )
+                            : "Repository operation failed";
+                }
             } else if (repository_validating) {
                 repository_summary =
                     "Validating repositories";
@@ -709,6 +720,13 @@ namespace AskTheModel {
                 startup_qualification_failed
             );
 
+            if (repo_error_annunciator != null) {
+                repo_error_annunciator.label =
+                    repository_no_space
+                        ? "NO SPACE"
+                        : "ERR";
+            }
+
             if (repo_offline_annunciator != null) {
                 repo_offline_annunciator.tooltip_text =
                     repository_offline &&
@@ -724,10 +742,15 @@ namespace AskTheModel {
                     startup_qualification_failed
                         ? startup_qualification_detail ??
                             "Repository runtime blocked by startup qualification"
-                        : repository_error &&
+                        : repository_no_space &&
                             repository_status_detail != null
                             ? repository_status_detail
-                            : "Repository operation failed";
+                            : repository_no_space
+                                ? "Not enough local storage for repository operation"
+                                : repository_error &&
+                                    repository_status_detail != null
+                                    ? repository_status_detail
+                                    : "Repository operation failed";
             }
 
             update_status_lcd_accessibility ();
@@ -745,6 +768,7 @@ namespace AskTheModel {
             repository_validating = false;
             repository_offline = false;
             repository_error = false;
+            repository_no_space = false;
             repository_status_detail = null;
             update_repository_annunciators ();
         }
@@ -1692,6 +1716,7 @@ namespace AskTheModel {
             repository_checking = true;
             repository_offline = false;
             repository_error = false;
+            repository_no_space = false;
             repository_status_detail = null;
             update_repository_annunciators ();
         }
@@ -1706,8 +1731,11 @@ namespace AskTheModel {
             repository_validating = false;
             repository_offline =
                 outcome == RepositoryOperationOutcome.OFFLINE;
+            repository_no_space =
+                outcome == RepositoryOperationOutcome.NO_SPACE;
             repository_error =
-                outcome == RepositoryOperationOutcome.ERROR;
+                outcome == RepositoryOperationOutcome.ERROR ||
+                outcome == RepositoryOperationOutcome.NO_SPACE;
             repository_status_detail =
                 outcome == RepositoryOperationOutcome.NORMAL
                     ? null
@@ -1777,7 +1805,9 @@ namespace AskTheModel {
                 );
             } catch (RepositoryError error) {
                 finish_repository_operation (
-                    RepositoryOperationOutcome.ERROR,
+                    error is RepositoryError.NO_SPACE
+                        ? RepositoryOperationOutcome.NO_SPACE
+                        : RepositoryOperationOutcome.ERROR,
                     error.message
                 );
 
@@ -1844,6 +1874,7 @@ namespace AskTheModel {
             repository_checking = false;
             repository_offline = false;
             repository_error = false;
+            repository_no_space = false;
             repository_status_detail = null;
             repository_validating = false;
             repository_downloading = needs_download;
@@ -1887,7 +1918,9 @@ namespace AskTheModel {
                 }
             } catch (RepositoryError error) {
                 finish_repository_operation (
-                    RepositoryOperationOutcome.ERROR,
+                    error is RepositoryError.NO_SPACE
+                        ? RepositoryOperationOutcome.NO_SPACE
+                        : RepositoryOperationOutcome.ERROR,
                     error.message
                 );
 
