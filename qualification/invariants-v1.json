@@ -101,6 +101,24 @@
       ]
     },
     {
+      "id": "RETRIEVAL-S0-001",
+      "category": "RETRIEVAL",
+      "severity": "S0",
+      "lifecycle": "enforced",
+      "statement": "When a retrieval-index ensure operation snapshots Optimizations ON and the exact final index is not already valid, cooperative AtM processes must coordinate one exclusive per-repository-SHA build flight under the qualified state root. A waiter must revalidate the final index after acquiring the flight and return the completed artifact when valid; only the flight owner may remove an invalid final index or a regular abandoned deterministic staging file. Non-regular staging and unqualified coordination paths must fail closed. Optimizations OFF must retain the baseline retrieval-index lifecycle.",
+      "enforced_by": [
+        "src/coordination_lease.c",
+        "src/coordination_lease.h",
+        "src/retrieval_index_lifecycle.c",
+        "src/repository_ui_bridge.c",
+        "src/RepositoryLifecycleService.vala"
+      ],
+      "tested_by": [
+        "meson:retrieval-index-lifecycle",
+        "meson:repository-lifecycle-service"
+      ]
+    },
+    {
       "id": "RETRIEVAL-S1-001",
       "category": "RETRIEVAL",
       "severity": "S1",
