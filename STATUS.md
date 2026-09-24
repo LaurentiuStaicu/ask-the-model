@@ -2,43 +2,29 @@
 
 ## Release status
 
-**Current release: Ask the Model (AtM) v0.4.0 — Startup Qualification and Snapshot Integrity, released 2026-09-22.**
+**Current release: Ask the Model (AtM) v0.5.0 — Saved Conversation History and State Hardening, released 2026-09-24.**
 
-v0.4.0 retains the repository-grounded multi-chat capability introduced in v0.3.0 and adds offline startup qualification, an authoritative fail-closed installation gate for repository use/mutation, a backward-compatible repository-state v2 integrity field, deterministic local snapshot seals, fail-closed seal comparison before repository use, stable pre/post integrity checks around retrieval-index preparation and independent G-O0 verification of local repository state.
+v0.5.0 retains the repository-grounded and startup-integrity boundaries of v0.3.0/v0.4.0 and adds explicit **Save to History** conversation archiving with exact-context restore, deterministic managed JSON mirrors, hardened durable conversation persistence and the application-owned SQLite Control DB generation model. It also promotes the post-v0.4.0 publication hardening and the effective Flatpak runtime-ref qualification fix.
 
 The project remains in the `0.x` initial-development series. The public API and repository-management surface are not yet considered stable enough for v1.0.
 
-## Development after v0.4.0
+## v0.5.0 release highlights
 
-The tagged public release remains v0.4.0. Development on `main` may be newer than that tag and is published separately through the **AtM Development** Flatpak repository.
+The v0.5.0 capability boundary promotes the qualified post-v0.4.0 development work:
 
-Post-v0.4.0 development now combines engineering hardening with unreleased product capability, without changing the tagged public release:
+- **Save to History** is the only user-visible conversation save transition; closing an unarchived chat or exiting normally discards that working conversation instead of silently persisting it;
+- History lists explicitly archived conversations only and exposes **Open** plus separately confirmed **Delete permanently**;
+- reopening a saved conversation reconstructs its durable transcript/provenance and requalifies the exact saved AI-model name/digest plus repository generation/version/SHA before continuation;
+- saved conversations receive deterministic managed JSON mirrors under `~/Ask the Model/Conversation Exports/`; unarchived working chats are not exported;
+- permanent deletion is fail-closed across the archived SQLite conversation and its managed JSON mirror;
+- committed turns use a separate hardened `conversations.sqlite3` path that preserves provider/display content, exact pinned model/repository identity and citation provenance before provider history advances;
+- repository-state runtime authority is the application-owned SQLite `control-state.sqlite3`, with verified legacy cutover, copy-on-write COMPLETE generations, generation-consistent reads and stale-writer guards;
+- Control DB connections and authority paths are qualified with SQLite defensive configuration, no-follow opens, writable-authority verification and a qualified XDG state root;
+- the effective Flatpak runtime parser accepts the real `runtime/ID/ARCH/BRANCH` form while retaining strict rejection of mismatched runtime identities;
+- Flatpak CI separates read-only verification/build from the main-only publication job, with verified artifact handoff and source-commit traceability;
+- production retrieval/context limits are shared with observational measurement tooling while the frozen R5 retrieval-quality gate remains unchanged and blocking.
 
-- future GitHub Release publication is hardened for draft-first asset attachment and optional immutable releases;
-- production retrieval/context policy constants are shared between runtime and benchmark tooling without changing their values;
-- a production-policy R5 shadow run measures context efficiency while the frozen R5 gate remains unchanged and blocking;
-- repository-state runtime authority has moved on `main` from legacy `repository-state.json` to the application-owned SQLite `control-state.sqlite3` through a verified one-time cutover;
-- a valid existing Control DB is the sole runtime repository-state authority, while an invalid existing DB fails closed instead of falling back to legacy JSON;
-- normal repository-state mutation is copy-on-write: each change creates a fresh COMPLETE generation and atomically advances `active_state`, preserving earlier generations;
-- generation-consistent reads and expected-generation guards prevent mixed-generation state and stale-writer overwrite;
-- non-empty repository-backed conversations pin the exact immutable repository generation used to prepare their grounding, so later repository updates apply only to future conversations;
-- Control DB schema v2 adds atomic v1→v2 migration and persistent trigger defense-in-depth for COMPLETE-generation immutability, active-generation transitions and append-only migration history;
-- every Control DB connection requires SQLite >= 3.37.0 and fail-closed defensive/trusted-schema/DQS/trigger configuration before bootstrap, migration or validation;
-- every production Control DB open rejects symbolic-link authority paths and verifies that SQLite actually opened the main database read/write;
-- the XDG state root that owns `control-state.sqlite3` is qualified with the same real-directory, current-owner, no-group-or-other-write and exclusive write-probe boundary used by G-S0 storage qualification before authority resolution.
-- development `main` now has a separate hardened `conversations.sqlite3` write path: committed turns persist pinned model/repository identity, raw/display assistant content and citation provenance before provider history advances;
-- CONV-03a adds a read-only durable list/snapshot boundary and exact provider-history rebuild from committed `provider_content`;
-- CONV-03b adds exact continuation-qualification primitives for historical repository generation/version/SHA and local AI model name/digest without changing current repository authority;
-- live grounded-turn persistence now carries canonical immutable source permalinks through the Vala/native bridge, so durable provenance restored later is not weaker than the provenance shown at commit time.
-- CONV-04a restores non-archived durable conversations into the existing GTK notebook as view-only tabs with transcript and citation provenance; restored prompt/Send controls remain disabled until CONV-04b exact continuation qualification.
-- CONV-04b enables continuation only after the restored snapshot's exact Ollama model name/digest and historical repository generation/version/SHA context are requalified; unavailable or mismatched context stays view-only and can be retried without repinning.
-- CONV-04c introduced separate Close, Archive and permanent Delete lifecycle states and the schema-v2 `open_on_startup` compatibility field; CONV-05c now supersedes the earlier Close/startup-restore behavior at the product boundary: only explicit Archive is a save action, while closing or exiting discards unarchived conversations.
-- CONV-05a introduced the Conversation History surface; under CONV-05c, History now lists only explicitly archived conversations. Opening an archived conversation does not clear its archived state, and it still re-enters the existing read-only restore boundary before exact model/repository continuation qualification.
-- CONV-05b adds the deterministic JSON export format under `~/Ask the Model/Conversation Exports/`; CONV-05c narrows automatic mirrors to explicitly archived conversations only. Unarchived working chats produce no export, while archived conversations keep stable per-conversation JSON files without any location chooser or export button.
-
-Legacy `repository-state.json` remains migration/recovery evidence after cutover and is not rewritten by normal development-runtime repository operations.
-
-Development Flatpak publications must expose the exact source `main` commit SHA so a development build can be distinguished reproducibly from the tagged v0.4.0 release artifact.
+At publication time, the tagged v0.5.0 release and `main` share this capability boundary. Later **AtM Development** builds may move ahead independently and must continue to expose their exact source `main` commit SHA.
 
 ## Canonical application role
 
@@ -54,14 +40,14 @@ Each repository remains authoritative for its own model definitions, data, assum
 
 ## Current functional boundary
 
-v0.4.0 provides:
+v0.5.0 provides:
 
 - GTK 4 / Granite desktop shell packaged for the elementary OS 8 Flatpak runtime;
 - local Ollama-compatible provider discovery on loopback;
 - provider-managed completion-capable AI-model discovery;
 - refreshable AI-model selector;
 - streamed text-chat responses;
-- independent in-memory multi-chat tabs;
+- independent multi-chat tabs;
 - fixed EWD/CBD/RMD repository selection before first Send;
 - exact remote SHA/version Refresh;
 - explicit validated repository Download/Update;
@@ -85,6 +71,12 @@ v0.4.0 provides:
 - deterministic local snapshot-integrity verification before repository grounding and around index validation/rebuild;
 - explicit same-SHA recovery through the existing Download/Update action, with invalid real-directory snapshots quarantined for diagnosis before a revalidated exact-SHA replacement is promoted;
 - non-empty repository grounding and Download/Update remain blocked until platform/storage startup qualification has passed; ordinary zero-repository chat remains separate and valid.
+- application-owned SQLite Control DB repository-state authority with copy-on-write COMPLETE generations and immutable historical generation reads;
+- exact repository-generation pinning for repository-backed conversations;
+- hardened durable conversation commits in a separate `conversations.sqlite3` store;
+- explicit **Save to History** archive semantics, archive-only History and exact-context continuation qualification;
+- deterministic managed JSON mirrors for archived conversations under `~/Ask the Model/Conversation Exports/`;
+- fail-closed permanent deletion across archived SQLite state and the managed JSON mirror.
 
 ## Repository lifecycle contract
 
@@ -125,9 +117,9 @@ Grounded evidence is retrieved only for the current turn. Repository text is tre
 
 Temporary model-visible source labels are resolved by AtM into persistent provenance objects. User-visible source details can expose an immutable GitHub permalink tied to the exact evidence revision.
 
-## Verification for v0.4.0
+## Verification for v0.5.0
 
-The v0.4.0 development stack passes the Flatpak/Meson CI gate for startup qualification, authoritative runtime gating of repository grounding/mutation, repository-state migration, deterministic snapshot seals, G-S0 seal ordering, lifecycle seal enrollment/tamper rejection, explicit invalid-snapshot quarantine, stable pre/post snapshot identity across index preparation and the independent G-O0 state/snapshot/index/provenance oracle. The repository-grounded GTK interaction baseline remains inherited from the locally smoke-tested v0.3.0 release on elementary OS 8 / GTK 4.14.
+The v0.5.0 stack passes the Flatpak/Meson and invariant gates for startup qualification, repository snapshot integrity, Control DB authority/generation semantics, durable conversation persistence, exact-context History restore, archive-only managed exports, fail-closed permanent deletion, retrieval/provenance behavior and the independent G-O0 state/snapshot/index/provenance oracle. The packaged baseline remains elementary OS 8 / GTK 4.14; automated release qualification does not convert generated AI text into a scientific-model result.
 
 Verified paths include:
 
@@ -152,13 +144,14 @@ AtM does not bundle, install, start, stop or update the local AI provider.
 
 The current provider implementation addresses loopback endpoints only. GPU acceleration, remote/cloud behavior and model execution semantics belong to the external provider.
 
-The tagged v0.4.0 release stores conversation history only in application memory for the current process. Development `main` now has the CONV-01→CONV-05c conversation path: working turns use the separate local conversation store as a transactional session boundary, but only explicit Archive makes a conversation user-saved. Close or normal application exit discards unarchived conversations, startup removes any unarchived leftovers from an interrupted prior session, History lists archived conversations only, exact model/repository context is requalified before continuation, and permanent Delete removes both the archived SQLite record and its managed JSON export.
+v0.5.0 persists only conversations explicitly saved to History. Working turns use the separate local conversation store as a transactional boundary, but Close or normal application exit discards unarchived conversations; startup removes unarchived leftovers from an interrupted prior session. Saved History entries retain exact model/repository provenance, and permanent Delete removes both the archived SQLite record and its managed JSON export.
 
 The Flatpak receives write access only to the dedicated `~/Ask the Model` directory for repository snapshots. It must not request broad Home or host filesystem access.
 
-## Not implemented in v0.4.0
+## Not implemented in v0.5.0
 
-- persistent conversations across application restarts;
+- import of saved-conversation JSON archives;
+- retention-policy and bulk History management;
 - in-app AI-model download/import/delete;
 - provider installation/service management;
 - configurable provider host/port/authentication/TLS UI;
@@ -169,7 +162,7 @@ The Flatpak receives write access only to the dedicated `~/Ask the Model` direct
 - autonomous modification of scientific repositories;
 - cloud-provider integration owned by AtM.
 
-## What v0.4.0 does not claim
+## What v0.5.0 does not claim
 
 - scientific certification of a repository merely because it is READY;
 - validated scientific inference from AI-generated prose;
@@ -199,6 +192,6 @@ Any such work should preserve the invariants documented in `docs/DEVELOPMENT_GUI
 - `docs/ARCHITECTURE.md` — application architecture;
 - `docs/REPOSITORY_RETRIEVAL_ARCHITECTURE.md` — repository/retrieval architecture;
 - `docs/REPOSITORY_RETRIEVAL_ACCEPTANCE.md` — acceptance gates;
-- `releases/v0.4.0.md` — current release description;
-- `releases/v0.3.0.md` — previous repository-grounded release description;
+- `releases/v0.5.0.md` — current release description;
+- `releases/v0.4.0.md` — previous startup-integrity release description;
 - `CHANGELOG.md` — release history.
