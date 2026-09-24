@@ -716,6 +716,23 @@ capacity_state_reserve_scaling_runner = executable(
   install: false
 )
 
+capacity_state_inode_reserve_runner = executable(
+  'capacity-state-inode-reserve-runner',
+  [
+    'src/control_state.c',
+    'tests/capacity_state_inode_reserve_runner.c',
+    resources
+  ],
+  include_directories: include_directories('src'),
+  dependencies: [
+    glib_dep,
+    gio_dep,
+    json_glib_dep,
+    sqlite_dep
+  ],
+  install: false
+)
+
 repository_mutation_lease_test = executable(
   'repository-mutation-lease-test',
   [

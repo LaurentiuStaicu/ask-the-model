@@ -477,6 +477,20 @@ This evidence does not itself wire production behavior. It narrows #232's defens
 
 No scalar margin is selected by F7. In particular, multiplying the current hybrid until it covers the six M6 fixtures would be fixture-fitting rather than an independently justified upper bound.
 
+### C0P-M7 state-root inode headroom measurement
+
+C0P-M7 measures the inode/file-slot requirement of the cold-sidecar guarded Control DB publication path before selecting the production state inode reserve.
+
+The qualification uses a bounded tmpfs with abundant byte capacity and constrains only `f_favail` by creating empty qualification-owned files. It exercises the real guarded Control DB mutation with exactly 1, 2, 3, 4 and 8 unprivileged inode slots available immediately before mutation.
+
+Each case is accepted only if it is atomic:
+- `SUCCESS_ATOMIC`: the next generation becomes active and zero CANDIDATE generations remain; or
+- `FAIL_CLOSED_OLD_AUTHORITY`: the old generation remains active and zero CANDIDATE generations remain.
+
+The byte budget must remain above 8 MiB in every case so an observed failure is attributable to inode/file-slot exhaustion rather than byte exhaustion.
+
+This measurement selects no reserve by itself. Its purpose is to justify a later state inode reserve instead of assuming that WAL/SHM require an arbitrary number of slots.
+
 ### Repository authority-mutation lease
 
 When an operation snapshots optimization mode ON, repository Download/Update uses one application-owned exclusive nonblocking lease at `<state_root>/repository-mutation.lock` before any selected-repository staging or authority mutation begins.
