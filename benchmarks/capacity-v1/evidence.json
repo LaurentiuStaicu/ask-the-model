@@ -1,0 +1,103 @@
+{
+  "schema_version": 1,
+  "evidence_id": "atm-capacity-evidence-v1",
+  "status": "qualification-only",
+  "production_thresholds_selected": false,
+  "profile_key_contract": [
+    "repository_id",
+    "repository_sha"
+  ],
+  "unknown_sha_policy": "UNQUALIFIED_NO_PROACTIVE_PREDICTION",
+  "c0_m1": {
+    "actions_run_id": 36011386673,
+    "artifact_name": "atm-c0-m1-capacity-36011386673-1",
+    "artifact_id": 10812622526,
+    "artifact_sha256": "d130c3617f5e227095f09741f8c49a5c49be317b4c52274acd5ee8a063e5d907",
+    "atm_source_commit": "746b8709a69f7d48e4c4291bb784d2cdca49caa6",
+    "runtime": {
+      "system": "Linux",
+      "release": "6.17.0-1022-azure",
+      "machine": "x86_64",
+      "glib": "2.80.0"
+    },
+    "observations": [
+      {
+        "repository_id": "cbd",
+        "repository_sha": "e6e3b3077b7d78e3f37d963e0734e9084e8a62ab",
+        "archive_allocated_bytes": 200704,
+        "snapshot_allocated_bytes": 966656,
+        "final_index_allocated_bytes": 999424,
+        "fresh_data_additional_peak_bytes": 987136,
+        "index_cache_additional_peak_bytes": 1011712,
+        "same_sha_repair_data_additional_peak_bytes": 966656,
+        "same_device_operation_peak_bytes": 3178496,
+        "same_device_operation_peak_entries": 265
+      },
+      {
+        "repository_id": "ewd",
+        "repository_sha": "795a6b8e42e2a19497f686a89e7c3a6056e6930c",
+        "archive_allocated_bytes": 1241088,
+        "snapshot_allocated_bytes": 5124096,
+        "final_index_allocated_bytes": 13324288,
+        "fresh_data_additional_peak_bytes": 5144576,
+        "index_cache_additional_peak_bytes": 13336576,
+        "same_sha_repair_data_additional_peak_bytes": 5124096,
+        "same_device_operation_peak_bytes": 24858624,
+        "same_device_operation_peak_entries": 397
+      },
+      {
+        "repository_id": "rmd",
+        "repository_sha": "a8b5ff89a951d3194fdedb59771bc79937fe7bc7",
+        "archive_allocated_bytes": 3747840,
+        "snapshot_allocated_bytes": 17354752,
+        "final_index_allocated_bytes": 1310720,
+        "fresh_data_additional_peak_bytes": 17375232,
+        "index_cache_additional_peak_bytes": 1323008,
+        "same_sha_repair_data_additional_peak_bytes": 17354752,
+        "same_device_operation_peak_bytes": 39813120,
+        "same_device_operation_peak_entries": 1859
+      }
+    ]
+  },
+  "c0_e1": {
+    "actions_run_id": 36013191576,
+    "artifact_name": "atm-c0-e1-enospc-36013191576-1",
+    "artifact_id": 10813447028,
+    "artifact_sha256": "f102a2ddf376ceb06b51fb94ffcfc71d3ec8ed15fe930905d883f1872cecf6ab",
+    "qualified_head": "1ba3a9320907c4153c60535a2a97abcff64f8d76",
+    "result": "genuine data/cache ENOSPC preserves old authority and restart safety"
+  },
+  "c0_e2": {
+    "actions_run_id": 36015867562,
+    "artifact_name": "atm-c0-e2-inodes-36015867562-1",
+    "artifact_id": 10813934023,
+    "artifact_sha256": "949f50aa8fb308c4a4f4e55fae432beea06e3ddf95835ae90fe0ac07cf1370d5",
+    "pinned_repository_id": "cbd",
+    "pinned_repository_sha": "e6e3b3077b7d78e3f37d963e0734e9084e8a62ab",
+    "available_bytes_before_operation": 33550336,
+    "available_inodes_before_operation": 58,
+    "result": "genuine inode exhaustion preserves old authority and restart safety"
+  },
+  "c0_e3": {
+    "actions_run_id": 36018723444,
+    "artifact_name": "atm-c0-e3-state-enospc-36018723444-1",
+    "artifact_id": 10815777231,
+    "artifact_sha256": "6a7f9234e4e3aa1a20282d87915d920a2fa028fb4362bdc7b1b39baf5c8a65b2",
+    "qualified_head": "5ba714c7d0382a0fd9778425b5498e338b560c9b",
+    "sqlite_full_free_bytes": 32768,
+    "successful_free_bytes": 65536,
+    "earlier_ioerr_free_bytes": 16384,
+    "control_db_allocated_bytes_at_failure": 40960,
+    "shm_allocated_bytes_at_failure": 32768,
+    "wal_allocated_bytes_after_failure_observation": 0,
+    "result": "state-root disk full preserves generation and leaves zero persisted CANDIDATE rows"
+  },
+  "interpretation_rules": [
+    "Observed allocated-byte values are qualification measurements, not filesystem-independent upper bounds.",
+    "A capacity profile is valid only for the exact repository_id and repository_sha named in the observation.",
+    "An unknown repository SHA must not inherit a measured byte prediction from an older SHA as a capacity guarantee.",
+    "Archive logical bytes and materialized entries from C0-F2 are separate planning inputs and are not substitutes for allocated-byte measurements.",
+    "C0-F1 phase grouping and C0-F3 checkpoint semantics remain mandatory when any future policy consumes these observations.",
+    "No fixed percentage, reserve size, refusal threshold or production NO_SPACE behavior is selected by this evidence manifest."
+  ]
+}
