@@ -235,9 +235,9 @@ namespace AskTheModel.Tests {
             );
 
             assert (!service.optimization_mode_snapshot ());
-            optimization_policy.set_enabled (true);
+            optimization_policy.set_enabled_for_session (true);
             assert (service.optimization_mode_snapshot ());
-            optimization_policy.set_enabled (false);
+            optimization_policy.set_enabled_for_session (false);
             assert (!service.optimization_mode_snapshot ());
 
             RepositoryDescriptor[] catalog = RepositoryCatalog.all ();
