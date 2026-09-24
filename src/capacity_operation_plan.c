@@ -105,7 +105,7 @@ atm_capacity_mutation_plan_build (
     }
 
     guint64 data_additional_inodes =
-        data_additional_inodes;
+        archive_inspection->materialized_entries;
 
     /*
      * On a first repository install, extraction/promotion may also create
