@@ -94,9 +94,6 @@ namespace AskTheModel {
         private OptimizationPolicy optimization_policy =
             new OptimizationPolicy ();
         private Gtk.Switch? optimization_switch;
-        private Gtk.Label? optimization_label;
-        private Gtk.Label? optimization_off_label;
-        private Gtk.Label? optimization_on_label;
         private Gtk.Label? optimization_lcd_annunciator;
         private RepositorySelection repository_selection =
             new RepositorySelection ();
@@ -2067,10 +2064,7 @@ namespace AskTheModel {
         }
 
         private void update_optimization_control () {
-            if (optimization_switch == null ||
-                optimization_label == null ||
-                optimization_off_label == null ||
-                optimization_on_label == null) {
+            if (optimization_switch == null) {
                 return;
             }
 
@@ -2078,14 +2072,6 @@ namespace AskTheModel {
 
             if (optimization_switch.active != enabled) {
                 optimization_switch.active = enabled;
-            }
-
-            if (enabled) {
-                optimization_off_label.remove_css_class ("active");
-                optimization_on_label.add_css_class ("active");
-            } else {
-                optimization_on_label.remove_css_class ("active");
-                optimization_off_label.add_css_class ("active");
             }
 
             optimization_switch.tooltip_text = enabled
@@ -2269,21 +2255,6 @@ namespace AskTheModel {
                 true
             );
 
-            var optimization_off_state_label =
-                new Gtk.Label ("OFF") {
-                    valign = Gtk.Align.CENTER
-                };
-            optimization_off_state_label.add_css_class (
-                "atm-optimization-side-label"
-            );
-            optimization_off_state_label.add_css_class (
-                "off"
-            );
-            optimization_off_state_label.update_state (
-                Gtk.AccessibleState.HIDDEN,
-                true
-            );
-
             var optimization_mode_switch =
                 new Gtk.Switch () {
                     active = false,
@@ -2295,27 +2266,6 @@ namespace AskTheModel {
                 "atm-optimization-switch"
             );
 
-            var optimization_on_state_label =
-                new Gtk.Label ("ON") {
-                    valign = Gtk.Align.CENTER
-                };
-            optimization_on_state_label.add_css_class (
-                "atm-optimization-side-label"
-            );
-            optimization_on_state_label.add_css_class (
-                "on"
-            );
-            optimization_on_state_label.update_state (
-                Gtk.AccessibleState.HIDDEN,
-                true
-            );
-
-            optimization_label =
-                optimization_title_label;
-            optimization_off_label =
-                optimization_off_state_label;
-            optimization_on_label =
-                optimization_on_state_label;
             optimization_switch =
                 optimization_mode_switch;
 
@@ -2340,13 +2290,7 @@ namespace AskTheModel {
                 optimization_title_label
             );
             optimization_controls.append (
-                optimization_off_state_label
-            );
-            optimization_controls.append (
                 optimization_mode_switch
-            );
-            optimization_controls.append (
-                optimization_on_state_label
             );
 
             headerbar.pack_end (
