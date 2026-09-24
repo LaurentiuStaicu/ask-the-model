@@ -5,7 +5,8 @@ namespace AskTheModel {
         TOO_LARGE,
         STORAGE,
         NOT_READY,
-        BUSY
+        BUSY,
+        NO_SPACE
     }
 
     public errordomain CitationError {
