@@ -99,5 +99,52 @@
     "Archive logical bytes and materialized entries from C0-F2 are separate planning inputs and are not substitutes for allocated-byte measurements.",
     "C0-F1 phase grouping and C0-F3 checkpoint semantics remain mandatory when any future policy consumes these observations.",
     "No fixed percentage, reserve size, refusal threshold or production NO_SPACE behavior is selected by this evidence manifest."
-  ]
+  ],
+  "c0_m2": {
+    "actions_run_id": 36029835402,
+    "artifact_name": "atm-c0-m2-state-reserve-36029835402-1",
+    "artifact_id": 10820984250,
+    "artifact_sha256": "290573582a1ac9d5c878413004d261867018ab39a42f92f9a8c3434c11b6593b",
+    "atm_source_commit": "3491028dc5ce456c95dfc22fc8e8fce61968e767",
+    "workflow_commit": "7300c94b2a71ccaa0f5466cdc1a8786678ee072d",
+    "runtime": {
+      "system": "Linux",
+      "release": "6.17.0-1022-azure",
+      "machine": "x86_64",
+      "sqlite": "3.45.1"
+    },
+    "history_scaling": [
+      {
+        "completed_generations": 1,
+        "control_db_allocated_bytes": 40960,
+        "headroom_results": {
+          "16384": "FAIL_CLOSED_OLD_AUTHORITY_SQLITE_IOERR",
+          "32768": "FAIL_CLOSED_OLD_AUTHORITY_SQLITE_FULL",
+          "65536": "SUCCESS_ATOMIC",
+          "131072": "SUCCESS_ATOMIC"
+        }
+      },
+      {
+        "completed_generations": 100,
+        "control_db_allocated_bytes": 57344,
+        "headroom_results": {
+          "16384": "FAIL_CLOSED_OLD_AUTHORITY_SQLITE_IOERR",
+          "32768": "FAIL_CLOSED_OLD_AUTHORITY_SQLITE_FULL",
+          "65536": "SUCCESS_ATOMIC",
+          "131072": "SUCCESS_ATOMIC"
+        }
+      },
+      {
+        "completed_generations": 1000,
+        "control_db_allocated_bytes": 229376,
+        "headroom_results": {
+          "16384": "FAIL_CLOSED_OLD_AUTHORITY_SQLITE_IOERR",
+          "32768": "FAIL_CLOSED_OLD_AUTHORITY_SQLITE_FULL",
+          "65536": "SUCCESS_ATOMIC",
+          "131072": "SUCCESS_ATOMIC"
+        }
+      }
+    ],
+    "interpretation": "In this qualification environment the guarded-publication headroom frontier remained between 32 KiB and 64 KiB while Control DB allocation grew by more than 5x; this is not a portable production reserve."
+  }
 }
