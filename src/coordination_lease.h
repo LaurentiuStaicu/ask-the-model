@@ -23,6 +23,15 @@ gboolean atm_coordination_lease_acquire (
     GError **error
 );
 
+gboolean atm_coordination_lease_acquire_shared (
+    const char *path,
+    gboolean nonblocking,
+    gint *out_fd,
+    gboolean *out_contended,
+    gint64 *out_wait_us,
+    GError **error
+);
+
 void atm_coordination_lease_release (
     gint fd
 );
