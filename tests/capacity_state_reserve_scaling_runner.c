@@ -312,6 +312,20 @@ seed_history (
         control_path_for (
             state_root
         );
+    AtmControlStateStore *store = NULL;
+
+    if (!atm_control_state_open (
+            control_path,
+            &store,
+            error
+        )) {
+        g_free (control_path);
+        return FALSE;
+    }
+
+    atm_control_state_close (store);
+    store = NULL;
+
     char *sha =
         sha_for_generation (1);
 
