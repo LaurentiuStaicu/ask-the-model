@@ -861,6 +861,21 @@ This result falsifies the current S3 baseline against A1's stronger Tier-2 targe
 
 F4 still selects neither S1 targeted fsync nor S2 syncfs. The next measurement must run candidate barriers through this same seal-aware replay oracle before any production durability patch is considered.
 
+### OPT-A1-M5 candidate durability replay
+
+A1-M5 reuses the exact seal-aware Tier-2 oracle that falsified S3 and changes only the new-snapshot durability protocol.
+
+Two candidate strategies are measured independently from the same synchronized old-authority baseline:
+
+- **S1 targeted fsync:** recursively fsync every regular file in the staging snapshot, fsync all directories bottom-up including the staging root, atomically rename staging to the final snapshot path, fsync the final snapshot's parent directory, then activate the Control DB generation.
+- **S2 syncfs comparator:** call `syncfs()` on the staging snapshot filesystem, atomically rename staging to final, fsync the final snapshot's parent directory, then activate the Control DB generation.
+
+The parent-directory fsync is common to both candidates because synchronizing file contents before rename does not by itself establish persistence of the destination directory entry. Linux documents `syncfs()` as filesystem-wide synchronization and `fsync()` as synchronization scoped to the referenced file; the candidate protocol therefore keeps S1's narrow AtM-only scope distinct from S2's broader filesystem scope.
+
+Immediately after Control DB activation, the workflow emits a dm-log-writes target mark without a clean unmount being used as the durability proof. Replay to that mark is mounted and verified in a fresh process by recomputing the active snapshot seal.
+
+M5 intentionally records a failing candidate instead of forcing the measurement job to fail solely because the strong invariant is not satisfied. Mechanical failures in setup/replay still fail the workflow. Candidate selection remains a later explicit review step that must combine this Tier-2 result with the M1 EWD/CBD/RMD performance evidence and scope/error-propagation tradeoffs.
+
 ### Recovery fault qualification
 
 The OPT-A0 recovery harness is test-only. Native checkpoint calls compile to no-ops in the production application; only the dedicated recovery helper is built with `ATM_TEST_FAULT_INJECTION`.
