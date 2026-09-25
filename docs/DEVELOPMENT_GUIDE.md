@@ -1482,6 +1482,25 @@ Tests cover protected and canonical-quarantine exclusion, malformed quarantine r
 
 A candidate is still only an advisory inventory item. A later destructive pass must acquire B0, rebuild/revalidate durable and B2-live roots, obtain the relevant exclusive generation exclusion, and revalidate the exact source object immediately before any same-filesystem isolation rename.
 
+### OPT-C1-I4 isolate-to-trash primitive
+
+I4 introduces only the narrow storage primitive for phase-1 snapshot isolation. It does not decide reachability and it is not called by `RepositoryLifecycleService`.
+
+The caller remains responsible for holding the global repository mutation lease and for performing the fresh durable/live-root revalidation required by C1 immediately before isolation.
+
+The native primitive:
+
+- accepts only fixed-catalog repository IDs and canonical lowercase 40-hex snapshot SHAs;
+- opens the trusted data root and the `Repositories/<repo>/snapshots` chain with directory descriptors and `O_NOFOLLOW`;
+- revalidates the exact source as the same real directory across path inspection and opened descriptor;
+- creates/qualifies `Repositories/.trash/<repo>` under the same data root with directory durability barriers;
+- uses `renameat2(..., RENAME_NOREPLACE)` so an existing trash identity is never overwritten;
+- treats `EXDEV` as a hard failure rather than falling back to copy/delete;
+- after rename, fsyncs the destination trash repository directory and then the source snapshots directory, matching the selected A1 destination→source namespace durability order;
+- never unlinks or recursively deletes trash.
+
+Process-crash checkpoints bracket the rename and both post-rename directory barriers so the next qualification step can replay the exact isolation boundaries without enabling production GC.
+
 ### Recovery fault qualification
 
 The OPT-A0 recovery harness is test-only. Native checkpoint calls compile to no-ops in the production application; only the dedicated recovery helper is built with `ATM_TEST_FAULT_INJECTION`.
