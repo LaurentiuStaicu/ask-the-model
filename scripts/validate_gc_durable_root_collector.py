@@ -20,6 +20,8 @@ def main() -> int:
     control_native = read("src/ControlStateNative.vala")
     lifecycle = read("src/RepositoryLifecycleService.vala")
     meson = read("meson.build")
+    test_source = read("tests/repository_gc_durable_roots_test.vala")
+    test_support = read("tests/repository_gc_durable_roots_test_support.c")
 
     required = (
         "RepositoryGcDurableRootCollector",
@@ -79,6 +81,23 @@ def main() -> int:
 
     if "'repository-gc-durable-roots'" not in meson:
         fail("GC durable-root test registration is missing")
+
+    for marker in (
+        "/repository-gc-roots/empty-complete-generation-fail-closed",
+        "test_empty_complete_generation_fails_closed",
+        "positive protected repository generation contains no catalog repository state",
+    ):
+        if marker not in test_source:
+            fail(f"empty COMPLETE fail-closed test lost: {marker}")
+
+    for marker in (
+        "atm_c1_test_publish_empty_complete_generation",
+        "INSERT INTO repository_generations",
+        "SET lifecycle='COMPLETE'",
+        "SET active_repository_generation=2",
+    ):
+        if marker not in test_support:
+            fail(f"empty COMPLETE test fixture drifted: {marker}")
 
     print(
         "gc durable-root collector validation passed: "
