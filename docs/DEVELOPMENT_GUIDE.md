@@ -958,6 +958,8 @@ The probe uses one disposable loop-backed ext4 filesystem and:
 
 The probe records the actual active `flakey` table and restored `linear` table rather than assuming reload success.
 
+After the deliberate EIO has been observed, the harness uses `dmsetup suspend --noflush --nolockfs` only to leave the injected fault state and restore the disposable mapping to `linear`. This is teardown machinery, not part of the candidate durability contract: a normal suspend may itself attempt filesystem synchronization and therefore legitimately rediscover the EIO being tested.
+
 If the hosted runner does not expose the `flakey` target, the result is `unsupported` evidence and the later error-injection qualification must move to an appropriate runner. The experiment must not be weakened to a different fault model merely to remain on hosted CI.
 
 This slice does not execute an AtM durability candidate and authorizes no production barrier. If capability is supported, the following measurement may inject `error_writes` into S1 and S2 at the pre-rename barrier, promoted-parent fsync and Control DB activation boundaries and require fail-closed old seal-valid authority.
