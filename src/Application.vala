@@ -9,6 +9,7 @@ namespace AskTheModel {
     private class ChatTabState : Object {
         public Gtk.Box page;
         public Gtk.TextView transcript;
+        public PresentationRenderer presentation;
         public Gtk.TextView prompt;
         public Gtk.Button send_button;
         public Gtk.Label placeholder;
@@ -48,6 +49,10 @@ namespace AskTheModel {
             Object ();
             this.page = page;
             this.transcript = transcript;
+            this.presentation =
+                new PresentationRenderer (
+                    transcript.buffer
+                );
             this.prompt = prompt;
             this.send_button = send_button;
             this.placeholder = placeholder;
@@ -2068,6 +2073,14 @@ namespace AskTheModel {
                     main_window.remove_css_class ("atm-dark");
                 }
             }
+
+            foreach (
+                ChatTabState state in chat_states
+            ) {
+                state.presentation.set_dark (
+                    use_dark
+                );
+            }
         }
 
         protected override void shutdown () {
@@ -2729,19 +2742,20 @@ namespace AskTheModel {
         }
 
         private void append_grounded_answer (
-            Gtk.TextView transcript,
+            ChatTabState state,
             string visible_answer,
             CitationResolution resolution
         ) {
-            append_transcript (
-                transcript,
-                "Assistant: " + visible_answer
+            state.presentation.append_assistant (
+                visible_answer
             );
 
             if (resolution.citation_count () == 0) {
                 return;
             }
 
+            Gtk.TextView transcript =
+                state.transcript;
             Gtk.TextBuffer buffer = transcript.buffer;
             Gtk.TextIter end;
             buffer.get_end_iter (out end);
@@ -3094,9 +3108,8 @@ namespace AskTheModel {
                     );
 
                 if (needs_clarification) {
-                    append_transcript (
-                        state.transcript,
-                        "Assistant: Please restate the question with the repository, variable, source, or topic you mean."
+                    state.presentation.append_assistant (
+                        "Please restate the question with the repository, variable, source, or topic you mean."
                     );
                 } else {
                     string answer;
@@ -3174,7 +3187,7 @@ namespace AskTheModel {
                             citation_resolution;
 
                         append_grounded_answer (
-                            state.transcript,
+                            state,
                             visible_answer,
                             citation_resolution
                         );
@@ -3205,9 +3218,8 @@ namespace AskTheModel {
                         title_answer = answer;
 
                         if (answer.length > 0) {
-                            append_transcript (
-                                state.transcript,
-                                "Assistant: " + answer
+                            state.presentation.append_assistant (
+                                answer
                             );
                             assistant_stream_started = true;
                         }
@@ -3416,6 +3428,9 @@ namespace AskTheModel {
                 ollama_provider.create_conversation (),
                 conversation_serial
             );
+            state.presentation.set_dark (
+                system_prefers_dark ()
+            );
             state.model_name = ollama_provider.model_name;
             state.model_digest = ollama_provider.model_digest;
             state.repository_ids =
@@ -3459,9 +3474,8 @@ namespace AskTheModel {
                     update_conversation_ui_state ();
                 }
 
-                append_transcript (
-                    transcript,
-                    "You: " + prompt
+                state.presentation.append_user (
+                    prompt
                 );
 
                 prompt_view.buffer.text = "";
@@ -3563,9 +3577,8 @@ namespace AskTheModel {
                     snapshot.messages[i];
 
                 if (message.role == "user") {
-                    append_transcript (
-                        state.transcript,
-                        "You: " + message.display_content
+                    state.presentation.append_user (
+                        message.display_content
                     );
                     continue;
                 }
@@ -3583,7 +3596,7 @@ namespace AskTheModel {
                         );
 
                     append_grounded_answer (
-                        state.transcript,
+                        state,
                         message.display_content,
                         resolution
                     );
@@ -3593,9 +3606,8 @@ namespace AskTheModel {
                     state.grounded_citations +=
                         resolution;
                 } else {
-                    append_transcript (
-                        state.transcript,
-                        "Assistant: " + message.display_content
+                    state.presentation.append_assistant (
+                        message.display_content
                     );
                 }
             }
