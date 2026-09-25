@@ -220,6 +220,77 @@ def main() -> int:
     if tier2.get("production_authorized") is not False:
         fail("Tier-2 direction must not authorize production")
 
+    capability = evidence.get("tier2_capability")
+    if not isinstance(capability, dict):
+        fail("Tier-2 capability evidence is missing")
+    if capability.get("probe_id") != (
+        "atm-a1-m2-dm-log-writes-capability-v1"
+    ):
+        fail("Tier-2 capability probe identity drifted")
+    if capability.get("status") != "supported":
+        fail("reviewed Tier-2 capability must remain supported")
+    if capability.get("production_durability_authorized") is not False:
+        fail("capability evidence must not authorize production durability")
+
+    cap_source = capability.get("source")
+    if not isinstance(cap_source, dict):
+        fail("Tier-2 capability source is missing")
+    if cap_source.get("actions_run_id") != 36117390930:
+        fail("Tier-2 capability Actions run drifted")
+    if cap_source.get("artifact_id") != 10855264761:
+        fail("Tier-2 capability artifact ID drifted")
+    if cap_source.get("artifact_name") != (
+        "atm-a1-m2-dm-log-writes-36117390930-1"
+    ):
+        fail("Tier-2 capability artifact name drifted")
+    cap_digest = cap_source.get("artifact_sha256")
+    if not isinstance(cap_digest, str) or SHA256.fullmatch(cap_digest) is None:
+        fail("Tier-2 capability artifact digest is invalid")
+    if cap_digest != (
+        "4c88f7a4934c8c6470fa62d6857ec4253ef79bcc6c10eb0bf5bdd999f33b0415"
+    ):
+        fail("Tier-2 capability artifact digest drifted")
+    cap_head = cap_source.get("atm_source_commit")
+    if not isinstance(cap_head, str) or SHA40.fullmatch(cap_head) is None:
+        fail("Tier-2 capability source commit is invalid")
+    if cap_head != "d6e1feb16990e1bbffb9e7bcce8c475c472e4272":
+        fail("Tier-2 capability source commit drifted")
+
+    if capability.get("kernel") != {
+        "system": "Linux",
+        "release": "6.17.0-1022-azure",
+        "machine": "x86_64",
+    }:
+        fail("Tier-2 capability kernel context drifted")
+
+    if capability.get("upstream") != {
+        "repository": "josefbacik/log-writes",
+        "commit": "7b70d8a6863c5de30933d42a7672d35d01d2dc6c",
+    }:
+        fail("Tier-2 replay-log upstream pin drifted")
+
+    expected_capability_checks = {
+        "dm_log_writes_target_available": True,
+        "loop_device_available": True,
+        "mapping_created": True,
+        "ext4_mounted": True,
+        "replay_log_built": True,
+        "fsync_mark_found": True,
+    }
+    if capability.get("checks") != expected_capability_checks:
+        fail("Tier-2 capability check matrix drifted")
+
+    cap_conclusion = str(
+        capability.get("reviewed_conclusion", "")
+    ).lower()
+    for phrase in (
+        "minimum dm-log-writes/replay-log mark mechanism",
+        "capability evidence only",
+        "does not establish replay durability",
+    ):
+        if phrase not in cap_conclusion:
+            fail(f"Tier-2 capability limitation lost: {phrase}")
+
     print(
         "durability evidence validation passed: "
         "A1-M1 CBD/EWD/RMD medians frozen, "
