@@ -112,11 +112,79 @@ def main() -> int:
         if required not in native_vala:
             fail(f"RepositoryNative durable-ingest bridge lost: {required}")
 
-    if "RepositoryNative.ingest_archive_durable" in lifecycle:
-        fail(
-            "RepositoryLifecycleService activates durable ingest before "
-            "the separate ON-only lifecycle slice"
-        )
+    for required in (
+        "optimized_preexisting_final_must_fail_closed",
+        "bool durable_ingest",
+        "RepositoryNative.ingest_archive_durable",
+        "RepositoryNative.ingest_archive (",
+        "Durable repository snapshot seal changed across promotion.",
+        "Optimized durable ingest refuses an unqualified pre-existing final snapshot target.",
+    ):
+        if required not in lifecycle:
+            fail(f"RepositoryLifecycleService runtime durability wiring lost: {required}")
+
+    require_order(
+        lifecycle,
+        [
+            "bool optimized_operation =",
+            "optimization_mode_snapshot ();",
+            "optimized_preexisting_final_must_fail_closed (",
+            "yield client.download_archive_to_staging (",
+            "RepositoryNative.ingest_archive_durable",
+            "Durable repository snapshot seal changed across promotion.",
+            "RepositoryNative.ensure_index (",
+            "require_state_commit_capacity (",
+            "state_store.set_current (",
+        ],
+        "ON-only lifecycle durable ingest",
+    )
+
+    grounding_call = (
+        "result = yield prepare_snapshot (\n"
+        "                        descriptor,\n"
+        "                        sha,\n"
+        "                        null,\n"
+        "                        expected_seal,\n"
+        "                        optimized_operation,\n"
+        "                        false\n"
+        "                    );"
+    )
+    if grounding_call not in lifecycle:
+        fail("grounding path must keep durable_ingest=false")
+
+    install_call = (
+        "yield prepare_snapshot (\n"
+        "                                descriptor,\n"
+        "                                sha,\n"
+        "                                archive_path,\n"
+        "                                null,\n"
+        "                                optimized_operation,\n"
+        "                                optimized_operation\n"
+        "                            );"
+    )
+    if install_call not in lifecycle:
+        fail("download/update path must snapshot ON into durable_ingest routing")
+
+    durable_branch = lifecycle.find("if (durable_ingest) {")
+    baseline_branch = lifecycle.find(
+        "} else if (!RepositoryNative.ingest_archive (",
+        durable_branch,
+    )
+    if durable_branch < 0 or baseline_branch < 0:
+        fail("durable/baseline ingest branch pair is incomplete")
+
+    preexisting_guard = lifecycle.find(
+        "optimized_preexisting_final_must_fail_closed ("
+    )
+    download_call = lifecycle.find(
+        "yield client.download_archive_to_staging (",
+        preexisting_guard,
+    )
+    if preexisting_guard < 0 or download_call < 0 or preexisting_guard > download_call:
+        fail("optimized pre-existing final must fail closed before download/reuse")
+
+    if "syncfs" in lifecycle:
+        fail("lifecycle must not introduce a syncfs fallback")
 
     if "runtime_integration_selected" not in read(
         ROOT / "qualification" / "durability-policy-v1.json"
@@ -154,7 +222,7 @@ def main() -> int:
 
     print(
         "durable ingest primitive wiring validation passed: "
-        "namespace-complete native primitive and Vala bridge present, lifecycle unwired"
+        "namespace-complete primitive and Vala bridge present; ON-only lifecycle wiring qualified"
     )
     return 0
 
