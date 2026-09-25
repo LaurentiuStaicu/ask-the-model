@@ -1256,6 +1256,34 @@ Together with M10 process-crash replay and the Linux containing-directory fsync 
 
 Automatic orphan deletion remains outside this evidence decision. I1b zero-reference evidence still lacks authority-wide exclusion covering every Control DB writer, so no recovery deletion/quarantine authorization follows from F11b.
 
+### OPT-A1-P2b namespace policy re-selection after M11b
+
+P2b is the separate policy review authorized by F11b. It restores `S1_DEST_SOURCE` as the selected namespace sequence while preserving the existing `S1_TARGETED_FSYNC` content strategy.
+
+The evidence is interpreted narrowly. M10 did not empirically rank `S1_PARENT_ONLY`, `S1_DEST_CHAIN` and `S1_DEST_SOURCE`: all three remained authority-safe on the reviewed ext4 crash-replay matrix. P2b therefore does not claim that the shorter candidates were falsified. Selection is contract-driven because Linux requires explicit fsync of the containing directory to guarantee persistence of a directory entry, and the selected sequence explicitly covers the fresh destination hierarchy plus both namespace sides of the cross-directory rename. M11b adds exact fail-closed EIO qualification for hierarchy child, containing parent, promoted destination parent and staging source parent. This policy follows the Linux `fsync(2)` containing-directory durability contract.
+
+The selected durable promotion order is:
+
+1. extract to staging;
+2. validate repository identity and version;
+3. compute the pre-barrier snapshot seal;
+4. fsync every regular file in the staging tree;
+5. fsync staging directories bottom-up including the staging root;
+6. durably prepare `Repositories/<repo>/snapshots` from the trusted data-root boundary;
+7. atomically rename staging to the final snapshot path;
+8. fsync the final snapshot destination parent;
+9. fsync the staging source parent so removal of the `.part` name is explicitly persisted;
+10. build or validate the derived retrieval index;
+11. recompute the snapshot seal and require equality with the pre-barrier seal;
+12. recheck state capacity;
+13. advance guarded Control DB authority.
+
+A failure while durably preparing the final hierarchy aborts before promotion or authority. A destination- or source-parent fsync failure after rename aborts before authority and leaves any final snapshot only as an unreferenced recovery artifact. There is no automatic `syncfs()` fallback.
+
+P2b is still policy-only. `runtime_integration_selected=false` and `durable_ingest_namespace_complete=false` remain intentional. The next slice is I1c2, which must refine the dormant native durable-ingest primitive to this selected order without adding a Vala/lifecycle caller.
+
+Automatic orphan recovery is not selected. I1b's zero-reference query remains point-in-time evidence only; authority-wide exclusion across every Control DB writer is still required before any automatic final-target deletion or quarantine can be authorized.
+
 ### Recovery fault qualification
 
 The OPT-A0 recovery harness is test-only. Native checkpoint calls compile to no-ops in the production application; only the dedicated recovery helper is built with `ATM_TEST_FAULT_INJECTION`.
