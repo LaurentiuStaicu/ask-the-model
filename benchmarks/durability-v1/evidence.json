@@ -437,5 +437,47 @@
       }
     },
     "reviewed_conclusion": "S1 targeted fsync and S2 syncfs both preserve the old seal-valid authority at all pre-authority candidate boundaries and recover the new seal-valid authority immediately after Control DB activation. All eight M6 Tier-2 replay scenarios satisfy the strong old-valid/new-valid invariant. This still selects no production barrier because explicit writeback-error propagation and final scope/performance policy review remain."
+  },
+  "tier2_error_injection_capability": {
+    "measurement_id": "atm-a1-m7-dm-flakey-capability-v1",
+    "status": "supported",
+    "production_durability_authorized": false,
+    "source": {
+      "actions_run_id": 36129126875,
+      "artifact_name": "atm-a1-m7-dm-flakey-36129126875-1",
+      "artifact_id": 10861465335,
+      "artifact_sha256": "f4b6dbd83466bc27e4c8d5e473f269dfb8e3b26e1ada916e4afaf2e0163d5519",
+      "atm_source_commit": "b2bf4b2d3d81cc5287b56391702ce3ab0ae222fe"
+    },
+    "kernel": {
+      "system": "Linux",
+      "release": "6.17.0-1022-azure",
+      "machine": "x86_64"
+    },
+    "method": {
+      "initial_target": "linear",
+      "injected_target": "flakey",
+      "flakey_up_interval_seconds": 1,
+      "flakey_down_interval_seconds": 600,
+      "feature": "error_writes",
+      "reload_while_ext4_mounted": true,
+      "write_probe_inode_precreated_and_synced": true,
+      "fault_teardown_suspend_noflush_nolockfs": true
+    },
+    "checks": {
+      "dm_flakey_target_available": true,
+      "mounted_linear_mapping_reloaded_to_flakey": true,
+      "reads_survive_error_writes_mode": true,
+      "write_fsync_returns_eio": true,
+      "mapping_restored_to_linear": true,
+      "baseline_content_preserved_after_recovery": true
+    },
+    "observations": {
+      "write_probe_errno": 5,
+      "e2fsck_exit_code": 0,
+      "baseline_sha256": "92187c175d34346bd01eab321fd4c1647fd94c2097cf8862b367fbef38d8555c",
+      "restored_sha256": "92187c175d34346bd01eab321fd4c1647fd94c2097cf8862b367fbef38d8555c"
+    },
+    "reviewed_conclusion": "The reviewed GitHub-hosted runner supports mounted dm-flakey error_writes injection: reads remain correct, a pre-existing write+fsync probe surfaces EIO, the mapping can be restored to linear with fault-mode teardown that does not resynchronize the failed filesystem, and the synchronized baseline survives recovery. This is capability evidence only; it does not yet exercise S1/S2 or authorize a production durability barrier."
   }
 }

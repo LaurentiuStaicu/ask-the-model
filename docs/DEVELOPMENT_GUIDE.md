@@ -964,6 +964,22 @@ If the hosted runner does not expose the `flakey` target, the result is `unsuppo
 
 This slice does not execute an AtM durability candidate and authorizes no production barrier. If capability is supported, the following measurement may inject `error_writes` into S1 and S2 at the pre-rename barrier, promoted-parent fsync and Control DB activation boundaries and require fail-closed old seal-valid authority.
 
+### OPT-A1-F7 frozen dm-flakey capability evidence
+
+A1-F7 freezes the successful hosted-runner result from run `36129126875`, artifact `10861465335`, artifact SHA-256 `f4b6dbd83466bc27e4c8d5e473f269dfb8e3b26e1ada916e4afaf2e0163d5519`, measured at head `b2bf4b2d3d81cc5287b56391702ce3ab0ae222fe`.
+
+The reviewed capability record requires all of the following to remain true:
+- the `dm-flakey` target is available;
+- the mounted mapping is actually reloaded from `linear` to `flakey`;
+- reads remain correct while `error_writes` is active;
+- a write+fsync to a pre-created inode returns `EIO` / errno 5;
+- the mapping is verified back in `linear` mode;
+- the synchronized baseline survives filesystem recovery with the exact original SHA-256.
+
+The reviewed run returned `e2fsck=0` and baseline/restored SHA-256 `92187c175d34346bd01eab321fd4c1647fd94c2097cf8862b367fbef38d8555c`.
+
+This evidence authorizes only the next **measurement**: application-level S1/S2 error-propagation qualification. It does not prove either candidate handles the injected error correctly and does not select a production durability barrier.
+
 ### Recovery fault qualification
 
 The OPT-A0 recovery harness is test-only. Native checkpoint calls compile to no-ops in the production application; only the dedicated recovery helper is built with `ATM_TEST_FAULT_INJECTION`.

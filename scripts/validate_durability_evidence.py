@@ -792,6 +792,97 @@ def main() -> int:
         if phrase not in boundary_conclusion:
             fail(f"Tier-2 boundary conclusion lost: {phrase}")
 
+    error_capability = evidence.get("tier2_error_injection_capability")
+    if not isinstance(error_capability, dict):
+        fail("Tier-2 error-injection capability evidence is missing")
+    if error_capability.get("measurement_id") != (
+        "atm-a1-m7-dm-flakey-capability-v1"
+    ):
+        fail("Tier-2 error-injection capability identity drifted")
+    if error_capability.get("status") != "supported":
+        fail("reviewed dm-flakey capability must remain supported")
+    if error_capability.get("production_durability_authorized") is not False:
+        fail("dm-flakey capability must not authorize production durability")
+
+    error_source = error_capability.get("source")
+    expected_error_source = {
+        "actions_run_id": 36129126875,
+        "artifact_name": "atm-a1-m7-dm-flakey-36129126875-1",
+        "artifact_id": 10861465335,
+        "artifact_sha256": (
+            "f4b6dbd83466bc27e4c8d5e473f269dfb8e3b26e1ada916e4afaf2e0163d5519"
+        ),
+        "atm_source_commit": (
+            "b2bf4b2d3d81cc5287b56391702ce3ab0ae222fe"
+        ),
+    }
+    if error_source != expected_error_source:
+        fail("Tier-2 error-injection capability provenance drifted")
+    if SHA256.fullmatch(error_source["artifact_sha256"]) is None:
+        fail("Tier-2 error-injection artifact digest is invalid")
+    if SHA40.fullmatch(error_source["atm_source_commit"]) is None:
+        fail("Tier-2 error-injection source commit is invalid")
+
+    if error_capability.get("kernel") != {
+        "system": "Linux",
+        "release": "6.17.0-1022-azure",
+        "machine": "x86_64",
+    }:
+        fail("Tier-2 error-injection kernel context drifted")
+
+    if error_capability.get("method") != {
+        "initial_target": "linear",
+        "injected_target": "flakey",
+        "flakey_up_interval_seconds": 1,
+        "flakey_down_interval_seconds": 600,
+        "feature": "error_writes",
+        "reload_while_ext4_mounted": True,
+        "write_probe_inode_precreated_and_synced": True,
+        "fault_teardown_suspend_noflush_nolockfs": True,
+    }:
+        fail("Tier-2 error-injection method drifted")
+
+    expected_error_checks = {
+        "dm_flakey_target_available": True,
+        "mounted_linear_mapping_reloaded_to_flakey": True,
+        "reads_survive_error_writes_mode": True,
+        "write_fsync_returns_eio": True,
+        "mapping_restored_to_linear": True,
+        "baseline_content_preserved_after_recovery": True,
+    }
+    if error_capability.get("checks") != expected_error_checks:
+        fail("Tier-2 error-injection check matrix drifted")
+
+    error_observations = error_capability.get("observations")
+    expected_baseline = (
+        "92187c175d34346bd01eab321fd4c1647fd94c2097cf8862b367fbef38d8555c"
+    )
+    if not isinstance(error_observations, dict):
+        fail("Tier-2 error-injection observations are missing")
+    if error_observations.get("write_probe_errno") != 5:
+        fail("dm-flakey write probe must retain EIO/errno 5")
+    if error_observations.get("e2fsck_exit_code") not in (0, 1, 2):
+        fail("dm-flakey recovery is not clean/corrected")
+    if error_observations.get("baseline_sha256") != expected_baseline:
+        fail("dm-flakey baseline digest drifted")
+    if error_observations.get("restored_sha256") != expected_baseline:
+        fail("dm-flakey restored baseline digest drifted")
+
+    error_conclusion = str(
+        error_capability.get("reviewed_conclusion", "")
+    ).lower()
+    for phrase in (
+        "reads remain correct",
+        "surfaces eio",
+        "restored to linear",
+        "baseline survives recovery",
+        "capability evidence only",
+        "does not yet exercise s1/s2",
+        "authorize a production durability barrier",
+    ):
+        if phrase not in error_conclusion:
+            fail(f"Tier-2 error-injection conclusion lost: {phrase}")
+
     print(
         "durability evidence validation passed: "
         "A1-M1 CBD/EWD/RMD medians frozen, "
