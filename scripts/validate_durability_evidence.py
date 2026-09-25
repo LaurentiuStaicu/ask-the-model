@@ -1034,6 +1034,180 @@ def main() -> int:
         if phrase not in candidate_error_conclusion:
             fail(f"Tier-2 candidate EIO conclusion lost: {phrase}")
 
+    repair = evidence.get("tier2_same_sha_repair")
+    if not isinstance(repair, dict):
+        fail("Tier-2 same-SHA repair evidence is missing")
+    if repair.get("measurement_id") != (
+        "atm-a1-m9-same-sha-repair-replay-v1"
+    ):
+        fail("Tier-2 same-SHA repair identity drifted")
+    if repair.get("status") != "qualified":
+        fail("Tier-2 same-SHA repair evidence must remain qualified")
+    if repair.get("production_barrier_selected") is not False:
+        fail("M9 must not select a production barrier")
+    if repair.get("production_durability_authorized") is not False:
+        fail("M9 must not authorize production durability")
+
+    repair_source = repair.get("source")
+    expected_repair_source = {
+        "actions_run_id": 36133608393,
+        "artifact_name": "atm-a1-m9-same-sha-repair-36133608393-1",
+        "artifact_id": 10862142895,
+        "artifact_sha256": (
+            "7efbbcbf0112fc12aae2f0c3c4fe6fca9c73a1bb59b67f166549ddf23cb2317c"
+        ),
+        "atm_source_commit": (
+            "821ec5a1329a446d4617fe9687c31ba26889cd9b"
+        ),
+    }
+    if repair_source != expected_repair_source:
+        fail("Tier-2 same-SHA repair provenance drifted")
+    if SHA256.fullmatch(repair_source["artifact_sha256"]) is None:
+        fail("Tier-2 same-SHA repair artifact digest is invalid")
+    if SHA40.fullmatch(repair_source["atm_source_commit"]) is None:
+        fail("Tier-2 same-SHA repair source commit is invalid")
+
+    if repair.get("kernel") != {
+        "system": "Linux",
+        "release": "6.17.0-1022-azure",
+        "machine": "x86_64",
+    }:
+        fail("Tier-2 same-SHA repair kernel context drifted")
+    if repair.get("upstream") != {
+        "repository": "josefbacik/log-writes",
+        "commit": "7b70d8a6863c5de30933d42a7672d35d01d2dc6c",
+    }:
+        fail("Tier-2 same-SHA repair upstream pin drifted")
+
+    expected_repair_protocol = {
+        "baseline_is_durable_corrupted_same_sha": True,
+        "control_db_retains_pre_corruption_seal": True,
+        "fresh_process_repair_verifier_after_replay": True,
+        "clean_unmount_not_used_as_target_mark": True,
+        "quarantine_parent_fsync_added": False,
+        "candidate_set": [
+            "S1_TARGETED_FSYNC",
+            "S2_SYNCFS",
+        ],
+        "boundary_order": [
+            "post_quarantine",
+            "post_barrier_pre_rename",
+            "post_rename_pre_parent_fsync",
+            "post_parent_fsync_pre_authority",
+            "after_authority",
+        ],
+    }
+    if repair.get("protocol") != expected_repair_protocol:
+        fail("Tier-2 same-SHA repair protocol drifted")
+
+    expected_repair_seals = {
+        "pre_corruption_stored": (
+            "39d5b5c5ff8fe2d5a0fbee8238abab546f39b07774ad29aeaeb06c4d25aac780"
+        ),
+        "corrupted_snapshot": (
+            "4c00a0e9415c1767aa2fdccff7767a6fead1fe04e2c5d216fcd36378065e47b8"
+        ),
+        "repaired_snapshot": (
+            "e29de108cffcb56692455588995515f7e057b3d14cd30233cc5d38d575672c96"
+        ),
+    }
+    if repair.get("seals") != expected_repair_seals:
+        fail("Tier-2 same-SHA repair seals drifted")
+
+    repair_matrix = repair.get("matrix")
+    if not isinstance(repair_matrix, dict) or set(repair_matrix) != {
+        "S1_TARGETED_FSYNC",
+        "S2_SYNCFS",
+    }:
+        fail("Tier-2 same-SHA repair strategy matrix drifted")
+
+    expected_repair_entries = {
+        "S1_TARGETED_FSYNC": {
+            "post_quarantine": (182, 183),
+            "post_barrier_pre_rename": (182, 201),
+            "post_rename_pre_parent_fsync": (182, 201),
+            "post_parent_fsync_pre_authority": (181, 207),
+            "after_authority": (182, 229),
+        },
+        "S2_SYNCFS": {
+            "post_quarantine": (182, 183),
+            "post_barrier_pre_rename": (182, 201),
+            "post_rename_pre_parent_fsync": (182, 201),
+            "post_parent_fsync_pre_authority": (181, 215),
+            "after_authority": (182, 237),
+        },
+    }
+    expected_repair_boundaries = set(
+        expected_repair_protocol["boundary_order"]
+    )
+
+    for strategy, records in repair_matrix.items():
+        if not isinstance(records, dict):
+            fail(f"{strategy} same-SHA repair records are missing")
+        if set(records) != expected_repair_boundaries:
+            fail(f"{strategy} same-SHA repair boundary set drifted")
+
+        for boundary_name, record in records.items():
+            if not isinstance(record, dict):
+                fail(f"{strategy}.{boundary_name} repair record is invalid")
+
+            baseline_entry, scenario_entry = (
+                expected_repair_entries[strategy][boundary_name]
+            )
+            if record.get("baseline_entry") != baseline_entry:
+                fail(f"{strategy}.{boundary_name} baseline entry drifted")
+            if record.get("scenario_entry") != scenario_entry:
+                fail(f"{strategy}.{boundary_name} scenario entry drifted")
+            if scenario_entry <= baseline_entry:
+                fail(f"{strategy}.{boundary_name} must follow baseline")
+            if record.get("e2fsck_exit_code") != 1:
+                fail(f"{strategy}.{boundary_name} e2fsck result drifted")
+
+            after_authority = boundary_name == "after_authority"
+            if after_authority:
+                if record.get("active_generation_id") != 2:
+                    fail(f"{strategy} repaired generation drifted")
+                if record.get("classification") != "REPAIRED_AUTHORITY_VALID":
+                    fail(f"{strategy} repaired authority classification drifted")
+                if record.get("qualified") is not True:
+                    fail(f"{strategy} repaired authority lost qualification")
+                if record.get("seal_match") is not True:
+                    fail(f"{strategy} repaired authority seal no longer matches")
+            else:
+                if record.get("active_generation_id") != 1:
+                    fail(
+                        f"{strategy}.{boundary_name} pre-authority generation drifted"
+                    )
+                if record.get("classification") != "REPAIR_REQUIRED":
+                    fail(
+                        f"{strategy}.{boundary_name} must remain REPAIR_REQUIRED"
+                    )
+                if record.get("qualified") is not False:
+                    fail(
+                        f"{strategy}.{boundary_name} must remain unqualified"
+                    )
+
+    for key in (
+        "all_repair_invariants_satisfied",
+        "all_pre_authority_fail_closed",
+        "all_after_authority_repaired_valid",
+    ):
+        if repair.get(key) is not True:
+            fail(f"Tier-2 same-SHA repair aggregate lost: {key}")
+
+    repair_conclusion = str(
+        repair.get("reviewed_conclusion", "")
+    ).lower()
+    for phrase in (
+        "both keep all four pre-authority same-sha repair boundaries",
+        "repair_required",
+        "repaired_authority_valid",
+        "without adding a quarantine parent fsync",
+        "no extra quarantine durability cost",
+    ):
+        if phrase not in repair_conclusion:
+            fail(f"Tier-2 same-SHA repair conclusion lost: {phrase}")
+
     print(
         "durability evidence validation passed: "
         "A1-M1 CBD/EWD/RMD medians frozen, "
