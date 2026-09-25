@@ -398,9 +398,9 @@ def main() -> int:
         "vala_durable_ingest_bridge_available": True,
         "runtime_wiring_authorized": True,
         "on_only_durable_ingest_wired": True,
-        "runtime_fault_qualification_complete": False,
+        "runtime_fault_qualification_complete": True,
         "next_required_slice": (
-            "P4_RUNTIME_FAULT_QUALIFICATION_REVIEW"
+            "A1_COMPLETE_WITHIN_SELECTED_RUNTIME_DURABILITY_SCOPE"
         ),
     }:
         fail("implementation staging contract drifted")
@@ -449,6 +449,35 @@ def main() -> int:
             "and unqualified preexisting final targets remain untouched and fail "
             "closed."
         ),
+        "runtime_fault_qualification": {
+            "complete": True,
+            "scope": (
+                "LOCAL_POST_DOWNLOAD_AUTHORITY_PIPELINE_WITH_SELECTED_"
+                "DURABILITY_ERROR_PROPAGATION"
+            ),
+            "evidence_composition": {
+                "same_sha_repair": "M9",
+                "fresh_namespace_replay": "M10",
+                "exact_namespace_fsync_failure_paths": "M11B_F11B",
+                "runtime_authority_process_interruption": "M12A_F12",
+                "runtime_lifecycle_exact_fsync_eio": "M12B_F12",
+            },
+            "physical_power_loss_universal_claim": False,
+            "network_download_fault_qualification_in_scope": False,
+            "network_or_remote_filesystem_durability_claim": False,
+            "automatic_orphan_recovery_authorized": False,
+            "off_mode_preserves_baseline": True,
+            "reason": (
+                "P4 completes the bounded runtime durability qualification by "
+                "composing the frozen filesystem/namespace evidence with M12a "
+                "authority sequencing and M12b lifecycle error propagation. "
+                "Completion applies only to the selected local-filesystem "
+                "Optimizations-ON post-download authority pipeline. It does not "
+                "claim universal physical-power-loss behavior, does not qualify "
+                "HTTP download or remote filesystems, and does not authorize "
+                "automatic orphan recovery."
+            ),
+        },
     }
     if runtime != expected_runtime:
         fail("runtime durability integration policy drifted")
@@ -463,7 +492,7 @@ def main() -> int:
 
     print(
         "durability production policy validation passed: "
-        "S1 + S1_DEST_SOURCE selected; M12a+M12b frozen; P4 runtime qualification review pending"
+        "S1 + S1_DEST_SOURCE selected; bounded ON-only runtime durability qualification complete"
     )
     return 0
 

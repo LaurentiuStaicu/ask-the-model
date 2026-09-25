@@ -1383,6 +1383,32 @@ The v3 validator reconstructs and hashes both original measured JSON payloads ex
 
 The combined evidence does not retest HTTP download, does not claim physical power-loss durability and does not authorize automatic orphan recovery. Filesystem durability and block-layer EIO properties remain grounded separately in M10/M11b.
 
+### OPT-A1-P4 bounded runtime durability qualification
+
+P4 is a policy review only. It changes no runtime code. After the complete F12 freeze, the already-wired Optimizations-ON durability path is marked `runtime_fault_qualification_complete=true` for the selected scope.
+
+The completion is compositional rather than a claim that one test covers every failure mode:
+
+- M9 qualifies same-SHA repair authority behavior;
+- M10 provides fresh-install ext4 replay evidence;
+- M11b/F11b qualify the selected namespace fsync failure paths, including block-layer evidence where observable and exact syscall propagation where ext4 may issue no new write;
+- M12a/F12 qualify deterministic process interruption across the local post-download authority sequence and the pre-barrier seal chain;
+- M12b/F12 qualify exact fsync EIO propagation through the real Optimizations-ON `RepositoryLifecycleService.download_or_update()` entrypoint.
+
+The machine-readable scope is `LOCAL_POST_DOWNLOAD_AUTHORITY_PIPELINE_WITH_SELECTED_DURABILITY_ERROR_PROPAGATION`. Within that scope, failures before guarded Control DB publication remain fail-closed and do not create repository authority.
+
+The completion does not mean:
+
+- universal physical-power-loss behavior on arbitrary filesystems;
+- durability guarantees for network or remote filesystems;
+- HTTP-download fault qualification as part of snapshot authority preparation;
+- automatic orphan deletion or quarantine;
+- permission to replace the selected targeted fsync strategy with `syncfs()`.
+
+Optimizations OFF continues to use the established baseline ingest path. HTTP download remains outside this durability-publication scope because it precedes local snapshot authority preparation; failed download cannot itself publish a Control DB generation. Automatic orphan recovery remains unselected because zero-reference evidence is not deletion authority without authority-wide writer exclusion.
+
+P4 leaves the A1 runtime durability workstream complete only within the selected bounded contract. Any future expansion of filesystem scope, orphan recovery, network-storage durability or stronger physical-power-loss claims requires separate qualification rather than inheriting this flag.
+
 ### Recovery fault qualification
 
 The OPT-A0 recovery harness is test-only. Native checkpoint calls compile to no-ops in the production application; only the dedicated recovery helper is built with `ATM_TEST_FAULT_INJECTION`.
