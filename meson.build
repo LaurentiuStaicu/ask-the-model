@@ -1745,6 +1745,29 @@ test(
   presentation_normalize_test
 )
 
+
+presentation_document_test = executable(
+  'presentation-document-test',
+  [
+    'src/presentation_document.c',
+    'tests/presentation_document_test.c'
+  ],
+  include_directories: [
+    include_directories('src'),
+    md4c_inc
+  ],
+  dependencies: [
+    glib_dep,
+    md4c_dep
+  ],
+  install: false
+)
+
+test(
+  'presentation-document',
+  presentation_document_test
+)
+
 subdir('data')
 
 icon_sizes = ['16', '24', '32', '48', '64', '128']
