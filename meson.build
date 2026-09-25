@@ -44,6 +44,7 @@ executable(
     'src/Application.vala',
     'src/presentation_document.c',
     'src/presentation_normalize.c',
+    'src/PresentationNative.vapi',
     'src/ActivityRing.vala',
     'src/SelectorTriangle.vala',
     'src/ChatRequestBuilder.vala',
@@ -1723,6 +1724,28 @@ structured_json_test = executable(
 test(
   'structured-json',
   structured_json_test
+)
+
+
+presentation_native_test = executable(
+  'presentation-native-test',
+  [
+    'src/PresentationNative.vapi',
+    'src/presentation_document.c',
+    'src/presentation_normalize.c',
+    'tests/presentation_native_test.vala'
+  ],
+  include_directories: include_directories('src'),
+  dependencies: [
+    glib_dep,
+    md4c_dep
+  ],
+  install: false
+)
+
+test(
+  'presentation-native',
+  presentation_native_test
 )
 
 presentation_normalize_test = executable(
