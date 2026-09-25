@@ -34,10 +34,32 @@ def main() -> int:
 
     if policy.get("schema_version") != 1:
         fail("schema_version must remain 1")
-    if policy.get("status") != "selected-not-wired":
-        fail("policy must remain selected-not-wired in F10")
-    if policy.get("runtime_integration_selected") is not False:
-        fail("F10 must not activate runtime admission")
+    if policy.get("status") != "selected-runtime-wired":
+        fail("production capacity policy must remain runtime-wired")
+    if policy.get("runtime_integration_selected") is not True:
+        fail("production capacity runtime integration must remain selected")
+
+    integration = policy.get("runtime_integration")
+    if integration != {
+        "gate": "OPTIMIZATIONS_OPERATION_SNAPSHOT",
+        "off_path": "POST_V0_5_0_BASELINE",
+        "runtime_source": "src/RepositoryLifecycleService.vala",
+        "authority_lease_required": True,
+        "checkpoints": [
+            "PRE_DOWNLOAD",
+            "POST_DOWNLOAD_PRE_MUTATION",
+            "STATE_PUBLICATION",
+        ],
+        "same_sha_repair_pre_quarantine": True,
+        "no_space_error_class": "RepositoryError.NO_SPACE",
+        "unknown_sha_byte_behavior": (
+            "NO_PROACTIVE_DATA_CACHE_BYTE_REJECTION"
+        ),
+        "post_admission_error_behavior": (
+            "PRESERVE_EXISTING_FAIL_CLOSED_PATH"
+        ),
+    }:
+        fail("runtime integration contract drifted")
 
     gate = policy.get("runtime_gate")
     if gate != {
@@ -300,7 +322,7 @@ def main() -> int:
     print(
         "capacity production policy validation passed: "
         "exact-profile-only bytes + 128 KiB/4-inode state headroom, "
-        "runtime not wired"
+        "runtime wired behind default-OFF Optimizations"
     )
     return 0
 
