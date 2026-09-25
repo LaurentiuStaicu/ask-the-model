@@ -2,15 +2,14 @@
 #include "repository_ingest.h"
 #include "repository_manifest.h"
 #include "snapshot_seal.h"
+#include "snapshot_durability.h"
 
 #include <glib.h>
 #include <glib/gstdio.h>
 #include <json-glib/json-glib.h>
 
-#include <dirent.h>
 #include <errno.h>
 #include <fcntl.h>
-#include <string.h>
 #include <sys/stat.h>
 #include <unistd.h>
 
@@ -72,219 +71,24 @@ remove_tree_best_effort (
 }
 
 static gboolean
-fsync_retry (
-    int fd,
-    const char *context,
-    GError **error
-)
-{
-    for (;;) {
-        if (fsync (fd) == 0) {
-            return TRUE;
-        }
-
-        if (errno == EINTR) {
-            continue;
-        }
-
-        g_set_error (
-            error,
-            G_FILE_ERROR,
-            g_file_error_from_errno (errno),
-            "%s: %s",
-            context,
-            g_strerror (errno)
-        );
-        return FALSE;
-    }
-}
-
-static gboolean
-sync_tree_directory (
-    int directory_fd,
-    BarrierCounters *counters,
-    GError **error
-)
-{
-    int scan_fd = dup (directory_fd);
-    DIR *directory = NULL;
-
-    if (scan_fd < 0) {
-        g_set_error (
-            error,
-            G_FILE_ERROR,
-            g_file_error_from_errno (errno),
-            "Could not duplicate directory descriptor: %s",
-            g_strerror (errno)
-        );
-        return FALSE;
-    }
-
-    directory = fdopendir (scan_fd);
-    if (directory == NULL) {
-        g_set_error (
-            error,
-            G_FILE_ERROR,
-            g_file_error_from_errno (errno),
-            "Could not enumerate durability benchmark tree: %s",
-            g_strerror (errno)
-        );
-        close (scan_fd);
-        return FALSE;
-    }
-
-    struct dirent *item;
-
-    while ((item = readdir (directory)) != NULL) {
-        struct stat st;
-
-        if (strcmp (item->d_name, ".") == 0 ||
-            strcmp (item->d_name, "..") == 0) {
-            continue;
-        }
-
-        if (fstatat (
-                directory_fd,
-                item->d_name,
-                &st,
-                AT_SYMLINK_NOFOLLOW
-            ) != 0) {
-            g_set_error (
-                error,
-                G_FILE_ERROR,
-                g_file_error_from_errno (errno),
-                "Could not inspect durability benchmark entry: %s",
-                g_strerror (errno)
-            );
-            closedir (directory);
-            return FALSE;
-        }
-
-        if (S_ISLNK (st.st_mode) ||
-            (!S_ISREG (st.st_mode) &&
-             !S_ISDIR (st.st_mode))) {
-            g_set_error_literal (
-                error,
-                G_FILE_ERROR,
-                G_FILE_ERROR_INVAL,
-                "Durability benchmark tree contains an unsupported entry."
-            );
-            closedir (directory);
-            return FALSE;
-        }
-
-        if (S_ISDIR (st.st_mode)) {
-            int child_fd = openat (
-                directory_fd,
-                item->d_name,
-                O_RDONLY | O_DIRECTORY |
-                    O_NOFOLLOW | O_CLOEXEC
-            );
-
-            if (child_fd < 0) {
-                g_set_error (
-                    error,
-                    G_FILE_ERROR,
-                    g_file_error_from_errno (errno),
-                    "Could not open durability benchmark directory: %s",
-                    g_strerror (errno)
-                );
-                closedir (directory);
-                return FALSE;
-            }
-
-            gboolean ok = sync_tree_directory (
-                child_fd,
-                counters,
-                error
-            );
-            close (child_fd);
-
-            if (!ok) {
-                closedir (directory);
-                return FALSE;
-            }
-
-            continue;
-        }
-
-        int file_fd = openat (
-            directory_fd,
-            item->d_name,
-            O_RDONLY | O_NOFOLLOW | O_CLOEXEC
-        );
-
-        if (file_fd < 0) {
-            g_set_error (
-                error,
-                G_FILE_ERROR,
-                g_file_error_from_errno (errno),
-                "Could not open durability benchmark file: %s",
-                g_strerror (errno)
-            );
-            closedir (directory);
-            return FALSE;
-        }
-
-        if (!fsync_retry (
-                file_fd,
-                "Could not fsync durability benchmark file",
-                error
-            )) {
-            close (file_fd);
-            closedir (directory);
-            return FALSE;
-        }
-
-        counters->file_fsync_calls++;
-        close (file_fd);
-    }
-
-    closedir (directory);
-
-    if (!fsync_retry (
-            directory_fd,
-            "Could not fsync durability benchmark directory",
-            error
-        )) {
-        return FALSE;
-    }
-
-    counters->directory_fsync_calls++;
-    return TRUE;
-}
-
-static gboolean
 run_targeted_barrier (
     const char *snapshot_root,
     BarrierCounters *counters,
     GError **error
 )
 {
-    int root_fd = open (
+    AtmSnapshotDurabilityStats stats = { 0 };
+    gboolean ok = atm_snapshot_durability_sync_tree (
         snapshot_root,
-        O_RDONLY | O_DIRECTORY |
-            O_NOFOLLOW | O_CLOEXEC
-    );
-
-    if (root_fd < 0) {
-        g_set_error (
-            error,
-            G_FILE_ERROR,
-            g_file_error_from_errno (errno),
-            "Could not open benchmark snapshot root: %s",
-            g_strerror (errno)
-        );
-        return FALSE;
-    }
-
-    gboolean ok = sync_tree_directory (
-        root_fd,
-        counters,
+        &stats,
         error
     );
 
-    close (root_fd);
+    counters->file_fsync_calls +=
+        stats.file_fsync_calls;
+    counters->directory_fsync_calls +=
+        stats.directory_fsync_calls;
+
     return ok;
 }
 

@@ -3,6 +3,7 @@
 #include "fault_injection_test_hook.h"
 #include "repository_storage.h"
 #include "snapshot_seal.h"
+#include "snapshot_durability.h"
 
 #include <glib.h>
 #include <glib/gstdio.h>
@@ -187,190 +188,6 @@ typedef struct {
 } CandidateBarrierCounters;
 
 static gboolean
-fsync_retry (
-    int fd,
-    const char *context,
-    GError **error
-)
-{
-    for (;;) {
-        if (fsync (fd) == 0) {
-            return TRUE;
-        }
-
-        if (errno == EINTR) {
-            continue;
-        }
-
-        g_set_error (
-            error,
-            G_FILE_ERROR,
-            g_file_error_from_errno (errno),
-            "%s: %s",
-            context,
-            g_strerror (errno)
-        );
-        return FALSE;
-    }
-}
-
-static gboolean
-sync_tree_directory (
-    int directory_fd,
-    CandidateBarrierCounters *counters,
-    GError **error
-)
-{
-    int scan_fd = dup (directory_fd);
-
-    if (scan_fd < 0) {
-        g_set_error (
-            error,
-            G_FILE_ERROR,
-            g_file_error_from_errno (errno),
-            "Could not duplicate candidate durability directory: %s",
-            g_strerror (errno)
-        );
-        return FALSE;
-    }
-
-    DIR *directory = fdopendir (scan_fd);
-
-    if (directory == NULL) {
-        g_set_error (
-            error,
-            G_FILE_ERROR,
-            g_file_error_from_errno (errno),
-            "Could not enumerate candidate durability tree: %s",
-            g_strerror (errno)
-        );
-        close (scan_fd);
-        return FALSE;
-    }
-
-    struct dirent *item;
-
-    while ((item = readdir (directory)) != NULL) {
-        struct stat st;
-
-        if (strcmp (item->d_name, ".") == 0 ||
-            strcmp (item->d_name, "..") == 0) {
-            continue;
-        }
-
-        if (fstatat (
-                directory_fd,
-                item->d_name,
-                &st,
-                AT_SYMLINK_NOFOLLOW
-            ) != 0) {
-            g_set_error (
-                error,
-                G_FILE_ERROR,
-                g_file_error_from_errno (errno),
-                "Could not inspect candidate durability entry: %s",
-                g_strerror (errno)
-            );
-            closedir (directory);
-            return FALSE;
-        }
-
-        if (S_ISLNK (st.st_mode) ||
-            (!S_ISREG (st.st_mode) &&
-             !S_ISDIR (st.st_mode))) {
-            g_set_error_literal (
-                error,
-                G_FILE_ERROR,
-                G_FILE_ERROR_INVAL,
-                "Candidate durability tree contains an unsupported entry."
-            );
-            closedir (directory);
-            return FALSE;
-        }
-
-        if (S_ISDIR (st.st_mode)) {
-            int child_fd = openat (
-                directory_fd,
-                item->d_name,
-                O_RDONLY | O_DIRECTORY |
-                    O_NOFOLLOW | O_CLOEXEC
-            );
-
-            if (child_fd < 0) {
-                g_set_error (
-                    error,
-                    G_FILE_ERROR,
-                    g_file_error_from_errno (errno),
-                    "Could not open candidate durability directory: %s",
-                    g_strerror (errno)
-                );
-                closedir (directory);
-                return FALSE;
-            }
-
-            gboolean ok = sync_tree_directory (
-                child_fd,
-                counters,
-                error
-            );
-            close (child_fd);
-
-            if (!ok) {
-                closedir (directory);
-                return FALSE;
-            }
-
-            continue;
-        }
-
-        int file_fd = openat (
-            directory_fd,
-            item->d_name,
-            O_RDONLY | O_NOFOLLOW | O_CLOEXEC
-        );
-
-        if (file_fd < 0) {
-            g_set_error (
-                error,
-                G_FILE_ERROR,
-                g_file_error_from_errno (errno),
-                "Could not open candidate durability file: %s",
-                g_strerror (errno)
-            );
-            closedir (directory);
-            return FALSE;
-        }
-
-        gboolean ok = fsync_retry (
-            file_fd,
-            "Could not fsync candidate durability file",
-            error
-        );
-        close (file_fd);
-
-        if (!ok) {
-            closedir (directory);
-            return FALSE;
-        }
-
-        counters->file_fsync_calls++;
-    }
-
-    closedir (directory);
-
-    if (!fsync_retry (
-            directory_fd,
-            "Could not fsync candidate durability directory",
-            error
-        )) {
-        return FALSE;
-    }
-
-    counters->directory_fsync_calls++;
-    return TRUE;
-}
-
-static gboolean
 run_candidate_pre_rename_barrier (
     const char *staging,
     CandidateStrategy strategy,
@@ -378,6 +195,22 @@ run_candidate_pre_rename_barrier (
     GError **error
 )
 {
+    if (strategy == CANDIDATE_S1_TARGETED_FSYNC) {
+        AtmSnapshotDurabilityStats stats = { 0 };
+        gboolean ok = atm_snapshot_durability_sync_tree (
+            staging,
+            &stats,
+            error
+        );
+
+        counters->file_fsync_calls +=
+            stats.file_fsync_calls;
+        counters->directory_fsync_calls +=
+            stats.directory_fsync_calls;
+
+        return ok;
+    }
+
     int root_fd = open (
         staging,
         O_RDONLY | O_DIRECTORY |
@@ -395,37 +228,27 @@ run_candidate_pre_rename_barrier (
         return FALSE;
     }
 
-    gboolean ok = FALSE;
+    int rc;
 
-    if (strategy == CANDIDATE_S1_TARGETED_FSYNC) {
-        ok = sync_tree_directory (
-            root_fd,
-            counters,
-            error
+    do {
+        rc = syncfs (root_fd);
+    } while (rc != 0 && errno == EINTR);
+
+    if (rc != 0) {
+        g_set_error (
+            error,
+            G_FILE_ERROR,
+            g_file_error_from_errno (errno),
+            "Candidate syncfs barrier failed: %s",
+            g_strerror (errno)
         );
-    } else {
-        int rc;
-
-        do {
-            rc = syncfs (root_fd);
-        } while (rc != 0 && errno == EINTR);
-
-        if (rc != 0) {
-            g_set_error (
-                error,
-                G_FILE_ERROR,
-                g_file_error_from_errno (errno),
-                "Candidate syncfs barrier failed: %s",
-                g_strerror (errno)
-            );
-        } else {
-            counters->syncfs_calls++;
-            ok = TRUE;
-        }
+        close (root_fd);
+        return FALSE;
     }
 
+    counters->syncfs_calls++;
     close (root_fd);
-    return ok;
+    return TRUE;
 }
 
 static gboolean
@@ -435,38 +258,18 @@ fsync_promoted_parent (
     GError **error
 )
 {
-    char *parent = g_path_get_dirname (
-        promoted_path
-    );
-    int parent_fd = open (
-        parent,
-        O_RDONLY | O_DIRECTORY |
-            O_NOFOLLOW | O_CLOEXEC
-    );
-    g_free (parent);
-
-    if (parent_fd < 0) {
-        g_set_error (
-            error,
-            G_FILE_ERROR,
-            g_file_error_from_errno (errno),
-            "Could not open promoted snapshot parent: %s",
-            g_strerror (errno)
-        );
-        return FALSE;
-    }
-
-    gboolean ok = fsync_retry (
-        parent_fd,
-        "Could not fsync promoted snapshot parent",
+    AtmSnapshotDurabilityStats stats = { 0 };
+    gboolean ok = atm_snapshot_durability_sync_parent (
+        promoted_path,
+        &stats,
         error
     );
 
     if (ok) {
-        counters->parent_fsync_calls++;
+        counters->parent_fsync_calls +=
+            stats.parent_fsync_calls;
     }
 
-    close (parent_fd);
     return ok;
 }
 
