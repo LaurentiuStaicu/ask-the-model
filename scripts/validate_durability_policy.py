@@ -33,11 +33,11 @@ def main() -> int:
     if policy.get("selected_strategy") != "S1_TARGETED_FSYNC":
         fail("selected durability strategy drifted")
     if policy.get("selected_namespace_strategy") is not None:
-        fail("namespace strategy must remain unselected pending M11b")
+        fail("namespace strategy must remain unselected pending separate P2b review")
     if policy.get("production_barrier_selected") is not True:
         fail("production barrier selection was lost")
     if policy.get("production_namespace_sequence_selected") is not False:
-        fail("namespace sequence must remain unselected pending M11b")
+        fail("namespace sequence must remain unselected pending separate P2b review")
     if policy.get("runtime_integration_selected") is not False:
         fail("namespace-policy correction must not wire runtime behavior")
 
@@ -57,7 +57,7 @@ def main() -> int:
     if namespace_evidence.get(
         "production_namespace_sequence_selected"
     ) is not False:
-        fail("F10 evidence must remain separate from P2 policy")
+        fail("F11b evidence must remain separate from P2b policy")
 
     basis = policy.get("selection_basis")
     if not isinstance(basis, dict):
@@ -205,7 +205,7 @@ def main() -> int:
     if m11.get("protocol", {}).get("candidate") != "S1_DEST_SOURCE":
         fail("M11 candidate drifted")
     if interpretation.get("candidate_for_policy_review") != "S1_DEST_SOURCE":
-        fail("F10 policy-review candidate drifted")
+        fail("F11b policy-review candidate drifted")
     if interpretation.get("m11b_completed") is not True:
         fail("F11b M11b completion marker was lost")
     if interpretation.get("policy_review_ready") is not True:
@@ -215,9 +215,9 @@ def main() -> int:
     if interpretation.get("m11b_required") is not False:
         fail("F11b must clear the M11b evidence requirement")
     if interpretation.get("production_namespace_sequence_selected") is not False:
-        fail("F10 evidence must not select policy")
+        fail("F11b evidence must not select policy")
     if interpretation.get("automatic_orphan_recovery_authorized") is not False:
-        fail("F10 must not authorize orphan recovery")
+        fail("F11b must not authorize orphan recovery")
 
     evidence_refs = policy.get("qualified_evidence")
     expected_refs = {
@@ -337,7 +337,7 @@ def main() -> int:
 
     print(
         "durability production policy validation passed: "
-        "S1 selected; namespace selection suspended pending M11b"
+        "S1 selected; namespace evidence frozen, separate P2b review pending"
     )
     return 0
 
