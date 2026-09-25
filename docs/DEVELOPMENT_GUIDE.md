@@ -1017,6 +1017,31 @@ This closes the planned A1 candidate write-error-propagation qualification. It s
 - M8 explicit write-error fail-closed behavior;
 - the documented operational scope difference between targeted fsync and filesystem-wide syncfs.
 
+### OPT-A1-M9 same-SHA repair and quarantine replay
+
+A1-M9 closes the remaining A1 operation-class gap created by integrity repair. A same-SHA repair cannot use the normal update invariant verbatim because the old snapshot is already known invalid and is quarantined before replacement.
+
+Each scenario therefore starts from:
+- Control DB generation 1 pointing to the test SHA with the original valid seal;
+- the active snapshot bytes deliberately modified so that the stored seal no longer matches;
+- that corrupted baseline explicitly synchronized before the dm-log-writes `baseline` mark.
+
+For each of S1 targeted fsync and S2 syncfs, independent replay scenarios stop at five boundaries:
+
+1. **post quarantine** — the invalid final snapshot has just been renamed to the AtM `.invalid-*` namespace; no new quarantine fsync is added;
+2. **post barrier / pre rename** — the same-SHA replacement staging tree has passed the candidate durability barrier;
+3. **post rename / pre parent fsync** — replacement is back at the final snapshot path but namespace persistence is not yet explicitly established;
+4. **post parent fsync / pre authority** — replacement namespace is durable but Control DB still retains generation 1 / the pre-corruption seal;
+5. **after authority** — Control DB generation 2 stores the replacement seal.
+
+The fresh-process repair verifier uses a different classification contract from normal update replay:
+- before the authority commit, the only accepted result is `REPAIR_REQUIRED` with `qualified=false`; final snapshot absence, the old corrupted snapshot reappearing, or replacement bytes with the old stored seal must all remain fail-closed;
+- after the authority commit, the required result is `REPAIRED_AUTHORITY_VALID` with generation 2, the same repository SHA, a matching recomputed seal and `qualified=true`.
+
+This design deliberately does not require the quarantine rename itself to survive as an audit artifact. For repository authority correctness, it is sufficient that any ambiguous pre-authority replay remains unqualified and cannot be mistaken for a valid repository. An extra quarantine parent-directory fsync should be introduced only if M9 evidence demonstrates that this fail-closed contract is insufficient.
+
+M9 is qualification-only. It changes no production repair behavior and still selects no S1/S2 production barrier.
+
 ### Recovery fault qualification
 
 The OPT-A0 recovery harness is test-only. Native checkpoint calls compile to no-ops in the production application; only the dedicated recovery helper is built with `ATM_TEST_FAULT_INJECTION`.

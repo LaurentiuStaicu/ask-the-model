@@ -618,6 +618,49 @@ initialize_old (
 }
 
 static gboolean
+corrupt_old_snapshot (
+    const char *root,
+    GError **error
+)
+{
+    char *data_root = data_root_for (root);
+    char *snapshot = atm_repository_snapshot_path (
+        data_root,
+        REPOSITORY_ID,
+        OLD_SHA
+    );
+    char *status = g_build_filename (
+        snapshot,
+        "STATUS.md",
+        NULL
+    );
+    gboolean ok = g_file_set_contents (
+        status,
+        "# A1-M9 deliberately corrupted same-SHA snapshot\n",
+        -1,
+        error
+    );
+
+    g_free (status);
+    g_free (snapshot);
+    g_free (data_root);
+    return ok;
+}
+
+static gboolean
+initialize_invalid_repair (
+    const char *root,
+    GError **error
+)
+{
+    if (!initialize_old (root, error)) {
+        return FALSE;
+    }
+
+    return corrupt_old_snapshot (root, error);
+}
+
+static gboolean
 promote_new (
     const char *root,
     const char *checkpoint,
@@ -838,6 +881,220 @@ out:
     return ok;
 }
 
+static gboolean
+repair_checkpoint_valid (
+    const char *checkpoint
+)
+{
+    return
+        g_strcmp0 (
+            checkpoint,
+            "repair_post_quarantine"
+        ) == 0 ||
+        g_strcmp0 (
+            checkpoint,
+            "repair_post_barrier_pre_rename"
+        ) == 0 ||
+        g_strcmp0 (
+            checkpoint,
+            "repair_post_rename_pre_parent_fsync"
+        ) == 0 ||
+        g_strcmp0 (
+            checkpoint,
+            "repair_post_parent_fsync_pre_authority"
+        ) == 0 ||
+        g_strcmp0 (
+            checkpoint,
+            "repair_after_authority"
+        ) == 0;
+}
+
+static gboolean
+repair_same_sha_candidate (
+    const char *root,
+    const char *strategy_name,
+    const char *checkpoint,
+    GError **error
+)
+{
+    CandidateStrategy strategy;
+
+    if (!parse_candidate_strategy (
+            strategy_name,
+            &strategy
+        )) {
+        g_set_error_literal (
+            error,
+            G_FILE_ERROR,
+            G_FILE_ERROR_INVAL,
+            "Unknown A1 repair durability candidate strategy."
+        );
+        return FALSE;
+    }
+
+    if (!repair_checkpoint_valid (checkpoint)) {
+        g_set_error_literal (
+            error,
+            G_FILE_ERROR,
+            G_FILE_ERROR_INVAL,
+            "Unknown A1 same-SHA repair replay checkpoint."
+        );
+        return FALSE;
+    }
+
+    char *data_root = data_root_for (root);
+    char *control_path = control_path_for (root);
+    char *staging = NULL;
+    char *promoted = NULL;
+    char *quarantine = NULL;
+    char *seal = NULL;
+    guint64 file_count = 0;
+    guint64 total_bytes = 0;
+    CandidateBarrierCounters counters = { 0 };
+    gboolean ok = FALSE;
+
+    atm_test_fault_configure (
+        checkpoint,
+        CHECKPOINT_FD,
+        CONTROL_FD
+    );
+
+    if (!atm_repository_quarantine_snapshot (
+            data_root,
+            REPOSITORY_ID,
+            OLD_SHA,
+            &quarantine,
+            error
+        )) {
+        goto out;
+    }
+
+    atm_test_fault_checkpoint (
+        "repair_post_quarantine"
+    );
+
+    staging = atm_repository_extraction_staging_path (
+        data_root,
+        REPOSITORY_ID,
+        OLD_SHA
+    );
+
+    if (staging == NULL ||
+        g_mkdir_with_parents (staging, 0700) != 0) {
+        g_set_error_literal (
+            error,
+            G_FILE_ERROR,
+            G_FILE_ERROR_FAILED,
+            "Could not create A1 same-SHA repair staging."
+        );
+        goto out;
+    }
+
+    if (!write_fixture (
+            staging,
+            "repaired",
+            error
+        ) ||
+        !atm_snapshot_seal_compute (
+            staging,
+            &seal,
+            &file_count,
+            &total_bytes,
+            error
+        )) {
+        goto out;
+    }
+
+    if (!run_candidate_pre_rename_barrier (
+            staging,
+            strategy,
+            &counters,
+            error
+        )) {
+        goto out;
+    }
+
+    atm_test_fault_checkpoint (
+        "repair_post_barrier_pre_rename"
+    );
+
+    if (!atm_repository_promote_snapshot (
+            data_root,
+            REPOSITORY_ID,
+            OLD_SHA,
+            staging,
+            &promoted,
+            error
+        )) {
+        goto out;
+    }
+
+    atm_test_fault_checkpoint (
+        "repair_post_rename_pre_parent_fsync"
+    );
+
+    if (!fsync_promoted_parent (
+            promoted,
+            &counters,
+            error
+        )) {
+        goto out;
+    }
+
+    atm_test_fault_checkpoint (
+        "repair_post_parent_fsync_pre_authority"
+    );
+
+    if (!atm_control_state_set_current_values (
+            control_path,
+            REPOSITORY_ID,
+            OLD_SHA,
+            "0.0-repaired",
+            seal,
+            error
+        )) {
+        goto out;
+    }
+
+    atm_test_fault_checkpoint (
+        "repair_after_authority"
+    );
+
+    g_print (
+        "{"
+        "\"strategy\":\"%s\","
+        "\"sha\":\"%s\","
+        "\"seal\":\"%s\","
+        "\"file_count\":%" G_GUINT64_FORMAT ","
+        "\"total_bytes\":%" G_GUINT64_FORMAT ","
+        "\"file_fsync_calls\":%" G_GUINT64_FORMAT ","
+        "\"directory_fsync_calls\":%" G_GUINT64_FORMAT ","
+        "\"syncfs_calls\":%" G_GUINT64_FORMAT ","
+        "\"parent_fsync_calls\":%" G_GUINT64_FORMAT
+        "}\n",
+        strategy_name,
+        OLD_SHA,
+        seal,
+        file_count,
+        total_bytes,
+        counters.file_fsync_calls,
+        counters.directory_fsync_calls,
+        counters.syncfs_calls,
+        counters.parent_fsync_calls
+    );
+
+    ok = TRUE;
+
+out:
+    g_free (seal);
+    g_free (quarantine);
+    g_free (promoted);
+    g_free (staging);
+    g_free (control_path);
+    g_free (data_root);
+    return ok;
+}
+
 static void
 print_invalid (
     const char *reason_code
@@ -1006,6 +1263,164 @@ out:
     return TRUE;
 }
 
+static gboolean
+verify_replayed_repair (
+    const char *root
+)
+{
+    char *data_root = data_root_for (root);
+    char *control_path = control_path_for (root);
+    char *snapshot_path = atm_repository_snapshot_path (
+        data_root,
+        REPOSITORY_ID,
+        OLD_SHA
+    );
+    char *staging_path =
+        atm_repository_extraction_staging_path (
+            data_root,
+            REPOSITORY_ID,
+            OLD_SHA
+        );
+    gint64 generation_id = 0;
+    gboolean present = FALSE;
+    char *active_sha = NULL;
+    char *version = NULL;
+    char *stored_seal = NULL;
+    char *computed_seal = NULL;
+    guint64 file_count = 0;
+    guint64 total_bytes = 0;
+    GError *error = NULL;
+    const char *classification = "REPAIR_REQUIRED";
+    const char *reason_code = "repair_not_committed";
+    gboolean seal_match = FALSE;
+    gboolean qualified = FALSE;
+    gboolean final_exists =
+        path_exists_any (snapshot_path);
+    gboolean staging_exists =
+        path_exists_any (staging_path);
+
+    if (!atm_control_state_active_generation_id (
+            control_path,
+            &generation_id,
+            &error
+        ) ||
+        generation_id <= 0 ||
+        !atm_control_state_load_repository_values_at_generation (
+            control_path,
+            generation_id,
+            REPOSITORY_ID,
+            &present,
+            &active_sha,
+            &version,
+            &stored_seal,
+            &error
+        ) ||
+        !present ||
+        active_sha == NULL ||
+        stored_seal == NULL) {
+        g_clear_error (&error);
+        classification = "INVALID_AUTHORITY";
+        reason_code = "control_state_unreadable_or_missing";
+        goto print;
+    }
+
+    if (g_strcmp0 (active_sha, OLD_SHA) != 0) {
+        classification = "INVALID_AUTHORITY";
+        reason_code = "unexpected_active_sha";
+        goto print;
+    }
+
+    if (!final_exists) {
+        classification = "REPAIR_REQUIRED";
+        reason_code = "active_snapshot_missing_during_repair";
+        goto print;
+    }
+
+    if (!atm_snapshot_seal_compute (
+            snapshot_path,
+            &computed_seal,
+            &file_count,
+            &total_bytes,
+            &error
+        )) {
+        g_clear_error (&error);
+        classification = "REPAIR_REQUIRED";
+        reason_code = "active_snapshot_unreadable_during_repair";
+        goto print;
+    }
+
+    seal_match =
+        g_strcmp0 (stored_seal, computed_seal) == 0;
+
+    if (!seal_match) {
+        classification = "REPAIR_REQUIRED";
+        reason_code = "active_snapshot_seal_mismatch_during_repair";
+    } else if (generation_id >= 2) {
+        classification = "REPAIRED_AUTHORITY_VALID";
+        reason_code = "repaired_generation_and_seal_valid";
+        qualified = TRUE;
+    } else {
+        classification = "OLD_AUTHORITY_VALID";
+        reason_code = "old_generation_and_seal_valid";
+        qualified = TRUE;
+    }
+
+print:
+    char *active_sha_json = active_sha != NULL
+        ? g_strdup_printf ("\"%s\"", active_sha)
+        : g_strdup ("null");
+    char *stored_seal_json = stored_seal != NULL
+        ? g_strdup_printf ("\"%s\"", stored_seal)
+        : g_strdup ("null");
+    char *computed_seal_json = computed_seal != NULL
+        ? g_strdup_printf ("\"%s\"", computed_seal)
+        : g_strdup ("null");
+
+    g_print (
+        "{"
+        "\"schema_version\":1,"
+        "\"classification\":\"%s\","
+        "\"active_generation_id\":%" G_GINT64_FORMAT ","
+        "\"active_repository_sha\":%s,"
+        "\"stored_seal\":%s,"
+        "\"computed_seal\":%s,"
+        "\"seal_match\":%s,"
+        "\"active_file_count\":%" G_GUINT64_FORMAT ","
+        "\"active_total_bytes\":%" G_GUINT64_FORMAT ","
+        "\"snapshot_final_exists\":%s,"
+        "\"snapshot_staging_exists\":%s,"
+        "\"qualified\":%s,"
+        "\"reason_code\":\"%s\""
+        "}\n",
+        classification,
+        generation_id,
+        active_sha_json,
+        stored_seal_json,
+        computed_seal_json,
+        seal_match ? "true" : "false",
+        file_count,
+        total_bytes,
+        final_exists ? "true" : "false",
+        staging_exists ? "true" : "false",
+        qualified ? "true" : "false",
+        reason_code
+    );
+
+    g_free (computed_seal_json);
+    g_free (stored_seal_json);
+    g_free (active_sha_json);
+    g_clear_error (&error);
+    g_free (computed_seal);
+    g_free (stored_seal);
+    g_free (version);
+    g_free (active_sha);
+    g_free (staging_path);
+    g_free (snapshot_path);
+    g_free (control_path);
+    g_free (data_root);
+    return TRUE;
+}
+
 static int
 report_error (GError *error)
 {
@@ -1026,6 +1441,15 @@ main (int argc, char **argv)
     if (argc == 3 &&
         g_strcmp0 (argv[1], "--initialize-old") == 0) {
         ok = initialize_old (argv[2], &error);
+    } else if (argc == 3 &&
+               g_strcmp0 (
+                   argv[1],
+                   "--initialize-invalid-repair"
+               ) == 0) {
+        ok = initialize_invalid_repair (
+            argv[2],
+            &error
+        );
     } else if (argc == 4 &&
                g_strcmp0 (argv[1], "--promote-new") == 0) {
         ok = promote_new (
@@ -1055,17 +1479,37 @@ main (int argc, char **argv)
             argv[4],
             &error
         );
+    } else if (argc == 5 &&
+               g_strcmp0 (
+                   argv[1],
+                   "--repair-same-sha-candidate-boundary"
+               ) == 0) {
+        ok = repair_same_sha_candidate (
+            argv[2],
+            argv[3],
+            argv[4],
+            &error
+        );
     } else if (argc == 3 &&
                g_strcmp0 (argv[1], "--verify") == 0) {
         ok = verify_replayed_authority (argv[2]);
+    } else if (argc == 3 &&
+               g_strcmp0 (
+                   argv[1],
+                   "--verify-repair"
+               ) == 0) {
+        ok = verify_replayed_repair (argv[2]);
     } else {
         g_printerr (
             "Usage: a1-snapshot-replay-helper "
             "--initialize-old ROOT | "
+            "--initialize-invalid-repair ROOT | "
             "--promote-new ROOT CHECKPOINT | "
             "--promote-new-candidate ROOT STRATEGY | "
             "--promote-new-candidate-boundary ROOT STRATEGY CHECKPOINT | "
-            "--verify ROOT\n"
+            "--repair-same-sha-candidate-boundary ROOT STRATEGY CHECKPOINT | "
+            "--verify ROOT | "
+            "--verify-repair ROOT\n"
         );
         return 64;
     }
