@@ -9,10 +9,33 @@ namespace AskTheModel.ControlStateNative {
     ) throws GLib.Error;
 
     [CCode (
+        cname = "atm_control_state_active_generation_id_readonly",
+        cheader_filename = "control_state.h"
+    )]
+    public static extern bool active_generation_id_readonly (
+        string path,
+        out int64 generation_id
+    ) throws GLib.Error;
+
+    [CCode (
         cname = "atm_control_state_load_repository_values_at_generation",
         cheader_filename = "control_state.h"
     )]
     public static extern bool load_repository_values_at_generation (
+        string path,
+        int64 generation_id,
+        string repository_id,
+        out bool present,
+        out string? snapshot_sha,
+        out string? repository_version,
+        out string? snapshot_seal_sha256
+    ) throws GLib.Error;
+
+    [CCode (
+        cname = "atm_control_state_load_repository_values_at_generation_readonly",
+        cheader_filename = "control_state.h"
+    )]
+    public static extern bool load_repository_values_at_generation_readonly (
         string path,
         int64 generation_id,
         string repository_id,

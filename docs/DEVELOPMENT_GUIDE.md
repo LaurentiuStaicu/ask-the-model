@@ -1431,6 +1431,26 @@ A root that appears after an earlier scan must still prevent collection. Lock fi
 
 I0 tests the current-schema positive path, duplicate-generation deduplication, strict read-only active-generation lookup, missing-main-database non-creation and refusal to migrate v1 state. Candidate directory enumeration, reclaimable-byte measurement, same-filesystem `.trash` rename and purge are separate later C1 slices.
 
+### OPT-C1-I1 non-destructive durable protected-root collector
+
+I1 composes the I0 primitives into a proof-only protected-root set. It still adds no candidate discovery, isolation, trash namespace, purge, unlink or lifecycle caller.
+
+`RepositoryGcDurableRootCollector` receives the application's already-open `ConversationPersistenceStore` and the qualified Control DB path. The conversation store is used only to enumerate/load current durable conversation snapshots and cross-check their repository pins; I1 does not create a second conversation-store lifecycle.
+
+All Control DB reads are routed through the I0 strict read-only bindings:
+
+- `active_generation_id_readonly()` supplies the current positive active root;
+- `load_repository_values_at_generation_readonly()` resolves and cross-checks immutable generation rows;
+- no collector path calls the legacy read/write Control DB open helpers.
+
+The collector protects the active positive generation and every positive generation pinned by a currently present durable conversation. It deduplicates generations and exact repository/SHA roots, validates repository identity/version/SHA, and requires each durable conversation pin to match its immutable Control DB generation. Generation zero is accepted only with an empty repository scope. Missing, malformed or contradictory metadata fails closed rather than producing a partial root set.
+
+This is still not deletion authority. Collection is not one atomic snapshot across the conversation store and Control DB, and legitimate writers may advance authority or create/delete conversations after an earlier scan. A destructive C1 phase must establish authority-wide writer coordination, acquire the relevant live-generation exclusions, re-read durable roots, and revalidate candidate unreachability immediately before same-filesystem isolation.
+
+The I0 path-based conversation generation query remains available for that later inexpensive re-read. I1 deliberately keeps the already-open Vala store for the richer semantic cross-check while the collector is dormant.
+
+Structural CI requires the strict read-only bindings, forbids the legacy writable Control DB reads inside the collector, forbids destructive filesystem primitives, and keeps `RepositoryLifecycleService` unwired.
+
 ### Recovery fault qualification
 
 The OPT-A0 recovery harness is test-only. Native checkpoint calls compile to no-ops in the production application; only the dedicated recovery helper is built with `ATM_TEST_FAULT_INJECTION`.
