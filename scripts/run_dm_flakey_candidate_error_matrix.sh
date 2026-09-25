@@ -118,6 +118,12 @@ run_error_scenario() {
     # scenario is meant to subject to error_writes.
     sudo dmsetup suspend --noflush --nolockfs "$mapper_name"
     sudo dmsetup reload "$mapper_name"         --table "0 $sectors flakey $data_loop 0 1 600 1 error_writes"
+
+    # The flakey interval begins when the table is loaded. Keep the mapper
+    # suspended until the 1-second healthy interval has elapsed so no dirty
+    # candidate state can reach the device before error_writes is active.
+    sleep 2
+
     sudo dmsetup resume "$mapper_name"
 
     local flakey_active=false
@@ -125,8 +131,6 @@ run_error_scenario() {
         grep -Fq " flakey "; then
         flakey_active=true
     fi
-
-    sleep 2
 
     printf 'C' >&4
     exec 4>&-
