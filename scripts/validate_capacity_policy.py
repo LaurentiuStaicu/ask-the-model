@@ -218,15 +218,15 @@ def main() -> int:
 
     profile_source = PROFILE_INC_PATH.read_text(encoding="utf-8")
     profile_pattern = re.compile(
-        r'ATM_CAPACITY_EXACT_PROFILE\\(\\s*'
-        r'"(?P<repository_id>[a-z0-9_-]+)"\\s*,\\s*'
-        r'"(?P<repository_sha>[0-9a-f]{40})"\\s*,\\s*'
-        r'(?P<archive>\\d+)\\s*,\\s*'
-        r'(?P<snapshot>\\d+)\\s*,\\s*'
-        r'(?P<fresh>\\d+)\\s*,\\s*'
-        r'(?P<index>\\d+)\\s*,\\s*'
-        r'(?P<repair>\\d+)\\s*'
-        r'\\)',
+        r'ATM_CAPACITY_EXACT_PROFILE\(\s*'
+        r'"(?P<repository_id>[a-z0-9_-]+)"\s*,\s*'
+        r'"(?P<repository_sha>[0-9a-f]{40})"\s*,\s*'
+        r'(?P<archive>\d+)\s*,\s*'
+        r'(?P<snapshot>\d+)\s*,\s*'
+        r'(?P<fresh>\d+)\s*,\s*'
+        r'(?P<index>\d+)\s*,\s*'
+        r'(?P<repair>\d+)\s*'
+        r'\)',
         re.MULTILINE,
     )
     compiled_profiles = {}
@@ -278,8 +278,8 @@ def main() -> int:
     }
     for name, expected in required_constants.items():
         pattern = re.compile(
-            rf"#define\\s+{re.escape(name)}\\s+"
-            rf"\\(\\(guint64\\)\\s+{expected}\\)"
+            rf"#define\s+{re.escape(name)}\s+"
+            rf"\(\(guint64\)\s+{expected}\)"
         )
         if pattern.search(policy_header) is None:
             fail(f"compiled policy constant drifted: {name}")
