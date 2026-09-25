@@ -846,6 +846,21 @@ The old baseline is deliberately synchronized before its `baseline` mark so ever
 
 M4 is therefore the first Tier-2 test of **bytes + snapshot namespace + Control DB authority together**. It is still measurement-only. If `after_authority` produces an invalid authority, that is retained as evidence rather than hidden by failing the measurement harness; candidate S1/S2 barriers belong to the next experiment.
 
+### OPT-A1-F4 frozen S3 Tier-2 baseline
+
+A1-F4 freezes the reviewed A1-M4 result into the durability evidence registry before any candidate barrier is evaluated.
+
+The frozen baseline records run `36121072400`, artifact `10858715370`, artifact SHA-256 `7e8e1f16cd92d854be76a6848b0a44138d67d3255e9ca6328af841a3990a68e5`, tested head `4a926fcbccbf0c43a2ccd43817ceee70d788e6d5`, the Linux 6.17.0-1022-azure qualification environment and the pinned replay-log commit.
+
+Reviewed boundary results are:
+- `pre_rename`: old SHA remains active and its recomputed seal equals the stored seal;
+- `post_rename`: old SHA remains active and seal-valid;
+- `after_authority`: Control DB generation 2 points to the new SHA, but the replayed snapshot seal `7299f3e8…` differs from the stored seal `acebf979…`, producing `INVALID_AUTHORITY / active_snapshot_seal_mismatch`.
+
+This result falsifies the current S3 baseline against A1's stronger Tier-2 target: after the authority-changing operation is reported complete, replay may recover **new authority metadata without the exact snapshot bytes whose seal was committed**. The kernel dm-log-writes mechanism is specifically intended to replay completed writes/flush ordering at power-failure boundaries, so this fixture is materially stronger evidence than a process-kill test alone. citeturn620592search0
+
+F4 still selects neither S1 targeted fsync nor S2 syncfs. The next measurement must run candidate barriers through this same seal-aware replay oracle before any production durability patch is considered.
+
 ### Recovery fault qualification
 
 The OPT-A0 recovery harness is test-only. Native checkpoint calls compile to no-ops in the production application; only the dedicated recovery helper is built with `ATM_TEST_FAULT_INJECTION`.
