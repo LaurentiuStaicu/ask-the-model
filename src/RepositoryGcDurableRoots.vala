@@ -256,13 +256,94 @@ namespace AskTheModel {
             }
         }
 
+        private static void
+        add_live_generation_roots (
+            RepositoryGcDurableRoots roots,
+            string state_root,
+            string control_state_path
+        ) throws GLib.Error {
+            int64[] complete_generations;
+
+            if (!ControlStateNative.
+                    list_complete_generation_ids_readonly (
+                        control_state_path,
+                        out complete_generations
+                    )) {
+                throw new GLib.IOError.FAILED (
+                    "GC live-root probe could not enumerate COMPLETE Control DB generations."
+                );
+            }
+
+            foreach (
+                int64 generation_id
+                in complete_generations
+            ) {
+                if (generation_id <= 0) {
+                    throw new GLib.IOError.INVALID_DATA (
+                        "GC live-root probe observed an invalid COMPLETE generation identifier."
+                    );
+                }
+
+                if (roots.protects_generation (
+                        generation_id
+                    )) {
+                    continue;
+                }
+
+                int lease_fd = -1;
+                bool contended = false;
+
+                if (!RepositoryNative.
+                        try_acquire_generation_lease_exclusive (
+                            state_root,
+                            generation_id,
+                            out lease_fd,
+                            out contended
+                        )) {
+                    throw new GLib.IOError.FAILED (
+                        "GC live-root probe could not test a generation lease."
+                    );
+                }
+
+                if (contended) {
+                    if (lease_fd >= 0) {
+                        RepositoryNative.
+                            release_generation_lease (
+                                lease_fd
+                            );
+                        throw new GLib.IOError.INVALID_DATA (
+                            "Contended generation lease unexpectedly returned an owned file descriptor."
+                        );
+                    }
+
+                    roots.add_generation (
+                        generation_id
+                    );
+                    continue;
+                }
+
+                if (lease_fd < 0) {
+                    throw new GLib.IOError.INVALID_DATA (
+                        "Uncontended generation lease probe returned no owned file descriptor."
+                    );
+                }
+
+                RepositoryNative.release_generation_lease (
+                    lease_fd
+                );
+            }
+        }
+
+
         public static RepositoryGcDurableRoots collect (
+            string state_root,
             string control_state_path,
             ConversationPersistenceStore conversation_store
         ) throws GLib.Error {
-            if (control_state_path.length == 0) {
+            if (state_root.length == 0 ||
+                control_state_path.length == 0) {
                 throw new GLib.IOError.INVALID_ARGUMENT (
-                    "GC durable-root collection requires a Control DB path."
+                    "GC durable-root collection requires state and Control DB paths."
                 );
             }
 
@@ -309,6 +390,12 @@ namespace AskTheModel {
                     snapshot.repository_generation_id
                 );
             }
+
+            add_live_generation_roots (
+                roots,
+                state_root,
+                control_state_path
+            );
 
             for (
                 uint i = 0;
