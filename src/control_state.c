@@ -2570,6 +2570,187 @@ publish_no_replace (
 
 
 static gboolean
+configure_readonly_connection (
+    sqlite3 *db,
+    GError **error
+)
+{
+    if (sqlite3_libversion_number () < 3037000) {
+        g_set_error (
+            error,
+            ATM_CONTROL_STATE_ERROR,
+            ATM_CONTROL_STATE_ERROR_SCHEMA,
+            "Control-state requires SQLite >= 3.37.0; runtime is %s.",
+            sqlite3_libversion ()
+        );
+        return FALSE;
+    }
+
+    int main_readonly = sqlite3_db_readonly (
+        db,
+        "main"
+    );
+
+    if (main_readonly != 1) {
+        g_set_error (
+            error,
+            ATM_CONTROL_STATE_ERROR,
+            ATM_CONTROL_STATE_ERROR_IO,
+            main_readonly == 0
+                ? "Control-state read-only query opened a writable main database."
+                : "Control-state main database handle is unavailable."
+        );
+        return FALSE;
+    }
+
+    if (sqlite3_busy_timeout (db, 5000) != SQLITE_OK) {
+        set_sqlite_error (
+            db,
+            error,
+            ATM_CONTROL_STATE_ERROR_SQLITE,
+            "Could not configure read-only control-state busy timeout"
+        );
+        return FALSE;
+    }
+
+    if (!configure_db_flag (
+            db,
+            SQLITE_DBCONFIG_DEFENSIVE,
+            1,
+            "defensive",
+            error
+        ) ||
+        !configure_db_flag (
+            db,
+            SQLITE_DBCONFIG_TRUSTED_SCHEMA,
+            0,
+            "trusted_schema",
+            error
+        ) ||
+        !configure_db_flag (
+            db,
+            SQLITE_DBCONFIG_DQS_DML,
+            0,
+            "dqs_dml",
+            error
+        ) ||
+        !configure_db_flag (
+            db,
+            SQLITE_DBCONFIG_DQS_DDL,
+            0,
+            "dqs_ddl",
+            error
+        ) ||
+        !configure_db_flag (
+            db,
+            SQLITE_DBCONFIG_ENABLE_TRIGGER,
+            1,
+            "enable_trigger",
+            error
+        )) {
+        return FALSE;
+    }
+
+    if (!exec_sql (
+            db,
+            "PRAGMA query_only=ON;",
+            error
+        )) {
+        return FALSE;
+    }
+
+    gint64 query_only = 0;
+
+    if (!query_single_int64 (
+            db,
+            "PRAGMA query_only;",
+            &query_only,
+            error
+        )) {
+        return FALSE;
+    }
+
+    if (query_only != 1) {
+        g_set_error_literal (
+            error,
+            ATM_CONTROL_STATE_ERROR,
+            ATM_CONTROL_STATE_ERROR_SCHEMA,
+            "Control-state read-only query could not enforce query_only."
+        );
+        return FALSE;
+    }
+
+    return TRUE;
+}
+
+
+static gboolean
+open_existing_control_state_readonly (
+    const char *path,
+    AtmControlStateStore **out_store,
+    GError **error
+)
+{
+    if (!nonempty (path) ||
+        out_store == NULL ||
+        *out_store != NULL) {
+        g_set_error_literal (
+            error,
+            ATM_CONTROL_STATE_ERROR,
+            ATM_CONTROL_STATE_ERROR_ARGUMENT,
+            "Read-only control-state open received invalid arguments."
+        );
+        return FALSE;
+    }
+
+    sqlite3 *db = NULL;
+    int rc = sqlite3_open_v2 (
+        path,
+        &db,
+        SQLITE_OPEN_READONLY |
+        SQLITE_OPEN_FULLMUTEX |
+        SQLITE_OPEN_NOFOLLOW,
+        NULL
+    );
+
+    if (rc != SQLITE_OK) {
+        set_sqlite_error (
+            db,
+            error,
+            ATM_CONTROL_STATE_ERROR_IO,
+            "Could not open existing control-state database read-only"
+        );
+        if (db != NULL) {
+            sqlite3_close (db);
+        }
+        return FALSE;
+    }
+
+    AtmControlStateStore *store = g_new0 (
+        AtmControlStateStore,
+        1
+    );
+    store->db = db;
+    store->path = g_strdup (path);
+
+    if (!configure_readonly_connection (
+            db,
+            error
+        ) ||
+        !atm_control_state_validate (
+            store,
+            error
+        )) {
+        atm_control_state_close (store);
+        return FALSE;
+    }
+
+    *out_store = store;
+    return TRUE;
+}
+
+
+static gboolean
 open_existing_control_state (
     const char *path,
     AtmControlStateStore **out_store,
@@ -3325,6 +3506,151 @@ atm_control_state_active_generation_id (
     atm_control_state_close (store);
     return ok;
 }
+
+gboolean
+atm_control_state_count_complete_snapshot_references (
+    const char *path,
+    const char *repository_id,
+    const char *snapshot_sha,
+    guint64 *out_reference_count,
+    GError **error
+)
+{
+    if (!nonempty (path) ||
+        !legacy_repository_id_known (
+            repository_id
+        ) ||
+        !lower_hex_exact (
+            snapshot_sha,
+            40
+        ) ||
+        out_reference_count == NULL) {
+        g_set_error_literal (
+            error,
+            ATM_CONTROL_STATE_ERROR,
+            ATM_CONTROL_STATE_ERROR_ARGUMENT,
+            "Control-state snapshot-reference read received invalid arguments."
+        );
+        return FALSE;
+    }
+
+    AtmControlStateStore *store = NULL;
+
+    if (!open_existing_control_state_readonly (
+            path,
+            &store,
+            error
+        )) {
+        return FALSE;
+    }
+
+    sqlite3_stmt *statement = NULL;
+    gboolean ok = FALSE;
+
+    if (!prepare_statement (
+            store->db,
+            "SELECT count(*) "
+            "FROM generation_repositories gr "
+            "JOIN repository_generations g "
+            "ON g.generation_id=gr.generation_id "
+            "WHERE g.lifecycle='COMPLETE' "
+            "AND gr.repository_id=?1 "
+            "AND gr.snapshot_sha=?2;",
+            &statement,
+            error
+        )) {
+        goto done;
+    }
+
+    int rc = sqlite3_bind_text (
+        statement,
+        1,
+        repository_id,
+        -1,
+        SQLITE_STATIC
+    );
+
+    if (rc == SQLITE_OK) {
+        rc = sqlite3_bind_text (
+            statement,
+            2,
+            snapshot_sha,
+            -1,
+            SQLITE_STATIC
+        );
+    }
+
+    if (rc != SQLITE_OK) {
+        set_sqlite_error (
+            store->db,
+            error,
+            ATM_CONTROL_STATE_ERROR_SQLITE,
+            "Could not bind complete snapshot reference query"
+        );
+        goto done;
+    }
+
+    rc = sqlite3_step (statement);
+
+    if (rc != SQLITE_ROW) {
+        set_sqlite_error (
+            store->db,
+            error,
+            ATM_CONTROL_STATE_ERROR_SQLITE,
+            "Could not count complete snapshot references"
+        );
+        goto done;
+    }
+
+    sqlite3_int64 count =
+        sqlite3_column_int64 (
+            statement,
+            0
+        );
+
+    if (count < 0) {
+        g_set_error_literal (
+            error,
+            ATM_CONTROL_STATE_ERROR,
+            ATM_CONTROL_STATE_ERROR_INTEGRITY,
+            "Control-state snapshot-reference count is invalid."
+        );
+        goto done;
+    }
+
+    rc = sqlite3_step (statement);
+
+    if (rc == SQLITE_ROW) {
+        g_set_error_literal (
+            error,
+            ATM_CONTROL_STATE_ERROR,
+            ATM_CONTROL_STATE_ERROR_SCHEMA,
+            "Control-state snapshot-reference query returned multiple rows."
+        );
+        goto done;
+    }
+
+    if (rc != SQLITE_DONE) {
+        set_sqlite_error (
+            store->db,
+            error,
+            ATM_CONTROL_STATE_ERROR_SQLITE,
+            "Could not finish complete snapshot reference query"
+        );
+        goto done;
+    }
+
+    *out_reference_count = (guint64) count;
+    ok = TRUE;
+
+done:
+    if (statement != NULL) {
+        sqlite3_finalize (statement);
+    }
+    atm_control_state_close (store);
+    return ok;
+}
+
 
 gboolean
 atm_control_state_load_repository_values_at_generation (

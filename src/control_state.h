@@ -63,6 +63,21 @@ gboolean atm_control_state_load_repository_values_at_generation (
     GError **error
 );
 
+/*
+ * Counts immutable COMPLETE-generation references to one exact repository
+ * snapshot through a genuinely read-only Control DB connection. This query
+ * never bootstraps or migrates schema. A zero count is proof of Control DB
+ * non-protection only; any future filesystem recovery action must additionally
+ * hold an authority-wide exclusion that covers every Control DB writer.
+ */
+gboolean atm_control_state_count_complete_snapshot_references (
+    const char *path,
+    const char *repository_id,
+    const char *snapshot_sha,
+    guint64 *out_reference_count,
+    GError **error
+);
+
 gboolean atm_control_state_load_repository_values (
     const char *path,
     const char *repository_id,

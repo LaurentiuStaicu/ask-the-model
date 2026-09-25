@@ -1128,15 +1128,25 @@ The public native helper is deliberately scoped as the pre-rename barrier for an
 
 This step is qualification infrastructure only. It does not call the helper from repository ingest or lifecycle code, does not change Optimizations OFF/ON behavior, and does not alter the derived retrieval-index durability contract. Runtime integration remains a later reviewed slice.
 
-### OPT-A1-I1b durable ingest primitive
+### OPT-A1-I1b COMPLETE-generation snapshot reference query
 
-I1b composes the shared S1 implementation with the real native repository ingest path while keeping application runtime behavior unchanged. The new `atm_repository_ingest_archive_durable()` path extracts into deterministic staging, validates repository identity and version, computes the pre-barrier snapshot seal, executes the shared targeted-fsync tree barrier, performs the existing atomic promotion, fsyncs the promoted snapshot parent, and returns the pre-barrier seal to its future caller.
+I1b adds a genuinely read-only Control DB primitive for the later P1 recovery decision. `atm_control_state_count_complete_snapshot_references()` opens the existing authority with `SQLITE_OPEN_READONLY|SQLITE_OPEN_NOFOLLOW`, enforces `query_only` on that connection, validates schema v2/integrity without bootstrapping or migrating, and counts every immutable COMPLETE generation whose `generation_repositories` row matches one exact `(repository_id, snapshot_sha)`.
 
-The returned seal identifies the exact snapshot bytes covered by the pre-rename S1 barrier. A later runtime slice must compare the post-prepare/post-index seal with this value before advancing Control DB authority. I1b itself does not build the retrieval index and does not write Control DB state.
+The query intentionally does not consult only `active_state`. Copy-on-write generations preserve historical repository rows, and those historical COMPLETE generations remain protected even after active authority advances. A query or database qualification failure is not interpreted as zero references; the output count is changed only after a successful query. A schema-v1 authority is rejected without migration, preserving I1b's non-mutating boundary.
 
-Failure remains fail-closed. Before promotion, failure removes the operation-owned staging tree. If the promotion-parent fsync fails after rename, the operation reports failure and leaves the final directory as an unreferenced recovery artifact; no authority is advanced by I1b. A preexisting final target is never overwritten or treated as durability evidence.
+A successful zero count proves only that the Control DB currently contains no COMPLETE-generation reference to that exact snapshot. It does not authorize deletion, quarantine, promotion or authority advance. Any future automatic filesystem recovery decision that relies on zero must use an authority-wide exclusion/transaction that covers every Control DB writer until isolation is complete. The current Optimizations-ON repository-mutation lease alone is insufficient because an Optimizations-OFF process deliberately does not participate in it.
 
-The existing `atm_repository_ingest_archive_cancellable()` wrapper still selects the non-durable internal path, preserving the baseline used when Optimizations is OFF. The durable primitive has no Vala binding and no `RepositoryLifecycleService` caller in I1b; structural CI enforces that separation. Automatic recovery/removal of preexisting final targets is not introduced here.
+I1b changes no repository lifecycle behavior and adds no final-tree durability requalification path.
+
+### OPT-A1-I1c durable ingest primitive
+
+I1c composes the shared S1 implementation with the real native repository ingest path while keeping application runtime behavior unchanged. The new `atm_repository_ingest_archive_durable()` path extracts into deterministic staging, validates repository identity and version, computes the pre-barrier snapshot seal, executes the shared targeted-fsync tree barrier, performs the existing atomic promotion, fsyncs the promoted snapshot parent, and returns the pre-barrier seal to its future caller.
+
+The returned seal identifies the exact snapshot bytes covered by the pre-rename S1 barrier. A later runtime slice must compare the post-prepare/post-index seal with this value before advancing Control DB authority. I1c itself does not build the retrieval index and does not write Control DB state.
+
+Failure remains fail-closed. Before promotion, failure removes the operation-owned staging tree. If the promotion-parent fsync fails after rename, the operation reports failure and leaves the final directory as an unreferenced recovery artifact; no authority is advanced by I1c. A preexisting final target is never overwritten or treated as durability evidence.
+
+The existing `atm_repository_ingest_archive_cancellable()` wrapper still selects the non-durable internal path, preserving the baseline used when Optimizations is OFF. The durable primitive has no Vala binding and no `RepositoryLifecycleService` caller in I1c; structural CI enforces that separation. Automatic recovery/removal of preexisting final targets is not introduced here.
 
 ### Recovery fault qualification
 
