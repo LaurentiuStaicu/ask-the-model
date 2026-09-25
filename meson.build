@@ -210,6 +210,25 @@ test(
 )
 
 
+snapshot_durability_test = executable(
+  'snapshot-durability-test',
+  [
+    'src/snapshot_durability.c',
+    'tests/snapshot_durability_test.c'
+  ],
+  include_directories: include_directories('src'),
+  dependencies: [
+    glib_dep
+  ],
+  install: false
+)
+
+test(
+  'snapshot-durability',
+  snapshot_durability_test
+)
+
+
 startup_qualification_record_test = executable(
   'startup-qualification-record-test',
   [

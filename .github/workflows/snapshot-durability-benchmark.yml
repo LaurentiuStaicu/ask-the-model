@@ -13,6 +13,8 @@ on:
       - 'src/cff_version.h'
       - 'src/snapshot_seal.c'
       - 'src/snapshot_seal.h'
+      - 'src/snapshot_durability.c'
+      - 'src/snapshot_durability.h'
       - 'tests/snapshot_durability_benchmark.c'
       - '.github/workflows/snapshot-durability-benchmark.yml'
 
@@ -77,6 +79,7 @@ jobs:
             src/repository_manifest.c \
             src/cff_version.c \
             src/snapshot_seal.c \
+            src/snapshot_durability.c \
             /tmp/snapshot-durability-benchmark.o \
             $(pkg-config --cflags --libs \
               glib-2.0 \

@@ -10,6 +10,8 @@ on:
       - 'src/control_state.h'
       - 'src/snapshot_seal.c'
       - 'src/snapshot_seal.h'
+      - 'src/snapshot_durability.c'
+      - 'src/snapshot_durability.h'
       - 'tests/a1_snapshot_replay_helper.c'
       - 'scripts/run_dm_log_writes_candidate_replay.sh'
       - '.github/workflows/dm-log-writes-candidate-replay.yml'
@@ -107,6 +109,10 @@ jobs:
             -o /tmp/snapshot_seal.o
 
           cc $COMMON_FLAGS $CFLAGS \
+            -c src/snapshot_durability.c \
+            -o /tmp/snapshot_durability.o
+
+          cc $COMMON_FLAGS $CFLAGS \
             -D_GNU_SOURCE \
             -DATM_TEST_FAULT_INJECTION \
             -c tests/fault_injection_support.c \
@@ -126,6 +132,7 @@ jobs:
             /tmp/control_state.o \
             /tmp/repository_storage.o \
             /tmp/snapshot_seal.o \
+            /tmp/snapshot_durability.o \
             /tmp/fault_injection_support.o \
             /tmp/a1_snapshot_replay_helper.o \
             /tmp/atm-a1-m5-resources.o \

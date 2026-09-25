@@ -1118,6 +1118,16 @@ If a required fsync operation is unsupported or returns an error while Optimizat
 
 The machine-readable decision is `qualification/durability-policy-v1.json`. Its status is `selected-not-wired`; `runtime_integration_selected=false` is intentional. Runtime implementation must be a separate reviewed slice.
 
+### OPT-A1-I1a shared S1 implementation qualification
+
+I1a removes the implementation split between the A1 durability measurements/harnesses and the native helper intended for later production wiring. The targeted-fsync tree walk and promoted-parent fsync are provided by `src/snapshot_durability.c`; M1 and the M4/M5/M6/M8/M9 helper use that module directly instead of carrying private S1 copies.
+
+The shared helper retains the reviewed S1 semantics: no-follow traversal, regular files and directories only, EINTR-safe fsync, regular-file fsync before directory fsync, directories synchronized bottom-up including the snapshot root, and a separate promoted-parent fsync. Directory enumeration errors fail closed; an opened file is revalidated as a regular file before fsync, and nonblocking open prevents a concurrent FIFO substitution from hanging the durability walk.
+
+The public native helper is deliberately scoped as the pre-rename barrier for an already validated, operation-owned prepared tree. Calling it on a preexisting final snapshot is not a qualified final-tree requalification path and must not be used to bypass the P1 recovery rule.
+
+This step is qualification infrastructure only. It does not call the helper from repository ingest or lifecycle code, does not change Optimizations OFF/ON behavior, and does not alter the derived retrieval-index durability contract. Runtime integration remains a later reviewed slice.
+
 ### Recovery fault qualification
 
 The OPT-A0 recovery harness is test-only. Native checkpoint calls compile to no-ops in the production application; only the dedicated recovery helper is built with `ATM_TEST_FAULT_INJECTION`.
