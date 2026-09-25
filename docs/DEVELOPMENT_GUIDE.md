@@ -980,6 +980,21 @@ The reviewed run returned `e2fsck=0` and baseline/restored SHA-256 `92187c175d34
 
 This evidence authorizes only the next **measurement**: application-level S1/S2 error-propagation qualification. It does not prove either candidate handles the injected error correctly and does not select a production durability barrier.
 
+### OPT-A1-M8 candidate EIO qualification
+
+A1-M8 composes the reviewed M7 `dm-flakey error_writes` mechanism with the actual S1 and S2 candidate durability paths.
+
+Each strategy is exercised independently at three boundaries:
+- **pre-rename barrier** — the new staging snapshot has been written and seal-computed, then EIO is enabled before S1 tree fsync or S2 syncfs;
+- **promoted-parent fsync** — the candidate barrier and atomic rename complete while healthy, then EIO is enabled before the destination parent-directory fsync;
+- **Control DB activation** — candidate barrier, rename and parent-directory fsync complete while healthy, then EIO is enabled immediately before guarded authority activation.
+
+Each scenario starts from a synchronized old authority. The helper pauses at the selected test-only checkpoint over the A0 FD handshake; the shell reloads the mounted mapping to `flakey ... error_writes`, waits for the documented down interval, and releases the helper. The candidate operation is required to return a non-zero result with an explicit I/O error.
+
+After fault-mode teardown the mapping is restored to `linear`, ext4 recovery is allowed only for clean/corrected exit codes 0/1/2, and a fresh verifier process recomputes the active snapshot seal. Qualification requires **OLD_AUTHORITY_VALID** with a matching seal in all six S1/S2 scenarios.
+
+This is error-propagation qualification, not a production patch. Passing M8 would demonstrate that both candidates fail closed for the reviewed EIO boundaries; it would still leave final S1-vs-S2 policy selection to a separate evidence review combining M1 performance/scope cost with M5/M6 replay correctness and M8 error behavior.
+
 ### Recovery fault qualification
 
 The OPT-A0 recovery harness is test-only. Native checkpoint calls compile to no-ops in the production application; only the dedicated recovery helper is built with `ATM_TEST_FAULT_INJECTION`.
