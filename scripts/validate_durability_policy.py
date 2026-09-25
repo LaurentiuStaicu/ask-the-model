@@ -294,6 +294,9 @@ def main() -> int:
             "REMAIN_FAIL_CLOSED_REPAIR_REQUIRED"
         ),
         "automatic_syncfs_fallback": False,
+        "durable_data_root_invalid": (
+            "ABORT_BEFORE_STAGING_OR_NAMESPACE_MUTATION"
+        ),
     }
     if policy.get("failure_contract") != expected_failure:
         fail("durability failure contract drifted")
@@ -301,10 +304,10 @@ def main() -> int:
     implementation = policy.get("implementation_state")
     if implementation != {
         "namespace_policy_selected": True,
-        "durable_ingest_namespace_complete": False,
+        "durable_ingest_namespace_complete": True,
         "runtime_wiring_authorized": False,
         "next_required_slice": (
-            "REFINE_DORMANT_I1C_PRIMITIVE_TO_SELECTED_NAMESPACE_ORDER"
+            "RUNTIME_BRIDGE_AND_LIFECYCLE_INTEGRATION_REVIEW"
         ),
     }:
         fail("implementation staging contract drifted")
@@ -318,6 +321,10 @@ def main() -> int:
         fail("qualified filesystem drifted")
     if storage.get("directory_fsync_required") is not True:
         fail("directory fsync requirement was lost")
+    if storage.get(
+        "durable_data_root_preexisting_real_directory_required"
+    ) is not True:
+        fail("trusted durable data-root requirement was lost")
     if storage.get("on_mode_unsupported_or_failed_barrier") != "FAIL_CLOSED":
         fail("failed-barrier policy drifted")
     if storage.get("off_mode_preserves_baseline") is not True:
@@ -333,7 +340,7 @@ def main() -> int:
 
     print(
         "durability production policy validation passed: "
-        "S1 + S1_DEST_SOURCE selected, runtime not wired"
+        "S1 + S1_DEST_SOURCE selected, dormant ingest namespace-complete, runtime not wired"
     )
     return 0
 

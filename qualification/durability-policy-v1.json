@@ -74,7 +74,8 @@
     "network_or_remote_filesystem_durability_claim": false,
     "on_mode_unsupported_or_failed_barrier": "FAIL_CLOSED",
     "off_mode_preserves_baseline": true,
-    "note": "The selected calls are narrower than syncfs but are not claimed to isolate AtM from every storage-level writeback error."
+    "note": "The selected calls are narrower than syncfs but are not claimed to isolate AtM from every storage-level writeback error.",
+    "durable_data_root_preexisting_real_directory_required": true
   },
   "normal_promotion_order": [
     "EXTRACT_TO_STAGING",
@@ -115,7 +116,8 @@
     "control_db_activation_failure": "ABORT_WITHOUT_NEW_AUTHORITY_AND_TREAT_FINAL_AS_UNREFERENCED_RECOVERY_ARTIFACT",
     "preexisting_target_reference_unresolved": "FAIL_CLOSED_WITHOUT_REMOVAL_OR_AUTHORITY_ADVANCE",
     "same_sha_repair_pre_authority_failure": "REMAIN_FAIL_CLOSED_REPAIR_REQUIRED",
-    "automatic_syncfs_fallback": false
+    "automatic_syncfs_fallback": false,
+    "durable_data_root_invalid": "ABORT_BEFORE_STAGING_OR_NAMESPACE_MUTATION"
   },
   "retrieval_index": {
     "authority_role": "DERIVED_CACHE",
@@ -128,8 +130,8 @@
   "production_namespace_sequence_selected": true,
   "implementation_state": {
     "namespace_policy_selected": true,
-    "durable_ingest_namespace_complete": false,
+    "durable_ingest_namespace_complete": true,
     "runtime_wiring_authorized": false,
-    "next_required_slice": "REFINE_DORMANT_I1C_PRIMITIVE_TO_SELECTED_NAMESPACE_ORDER"
+    "next_required_slice": "RUNTIME_BRIDGE_AND_LIFECYCLE_INTEGRATION_REVIEW"
   }
 }

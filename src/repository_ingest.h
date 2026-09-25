@@ -34,6 +34,13 @@ gboolean atm_repository_ingest_archive_cancellable (
     GError **error
 );
 
+/*
+ * Durable snapshot-authority ingest. data_root must already exist as a real
+ * trusted directory. The durable path applies the selected S1 content
+ * barrier, durably prepares the final parent hierarchy, promotes by rename,
+ * fsyncs the destination parent, then fsyncs the staging source parent.
+ * It does not publish Control DB authority.
+ */
 gboolean atm_repository_ingest_archive_durable (
     const char *data_root,
     const char *archive_path,
