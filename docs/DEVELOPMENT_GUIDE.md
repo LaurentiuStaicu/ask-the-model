@@ -822,6 +822,30 @@ The validator requires the fsync mark to remain after the mkfs mark, accepts onl
 
 This closes the replay-mechanism qualification only. It does **not** yet establish that AtM's snapshot promotion + parent-directory durability + Control DB activation sequence survives a replayed power-loss boundary. The next A1 measurement must place the existing A0 repository recovery fixture onto the logged filesystem and classify fresh-process authority after replay.
 
+### OPT-A1-M4 AtM replay oracle qualification
+
+A1-M4 composes the qualified dm-log-writes replay mechanism with AtM's repository-storage and Control DB primitives.
+
+Unlike the original A0 empty-authority fixture, M4 first establishes a known-good **old** EWD test snapshot and Control DB authority, synchronizes that baseline, and then attempts a distinct **new** snapshot promotion. Both fixture snapshots use the production snapshot-seal algorithm rather than a synthetic seal string.
+
+Three replay boundaries are recorded on independent disposable ext4/log/replay devices:
+- `pre_rename`: immediately before the new staging directory is renamed;
+- `post_rename`: immediately after rename, before Control DB activation;
+- `after_authority`: immediately after the current production-style promotion + Control DB update completes, with **no new candidate durability barrier or explicit sync added before the mark**.
+
+For pre/post rename, the test-only fault hook pauses the helper, the workflow emits the dm-log-writes mark, and the helper is killed. For after-authority, the mark is emitted immediately after helper completion. Clean unmount writes occur only after the target mark and are therefore excluded by replay to that mark.
+
+Each scenario is replayed from the beginning onto a blank block image, repaired/recovered with e2fsck when required, mounted, and inspected by a fresh helper process. The verifier:
+- loads the active Control DB generation;
+- resolves the active old/new SHA;
+- recomputes the complete snapshot seal from replayed bytes;
+- requires stored and recomputed seals to match before classifying `OLD_AUTHORITY_VALID` or `NEW_AUTHORITY_VALID`;
+- otherwise returns `INVALID_AUTHORITY`.
+
+The old baseline is deliberately synchronized before its `baseline` mark so every scenario begins from one known-good durable authority. The new operation remains the current S3 behavior: M4 measures it but does not add S1 targeted fsync or S2 syncfs.
+
+M4 is therefore the first Tier-2 test of **bytes + snapshot namespace + Control DB authority together**. It is still measurement-only. If `after_authority` produces an invalid authority, that is retained as evidence rather than hidden by failing the measurement harness; candidate S1/S2 barriers belong to the next experiment.
+
 ### Recovery fault qualification
 
 The OPT-A0 recovery harness is test-only. Native checkpoint calls compile to no-ops in the production application; only the dedicated recovery helper is built with `ATM_TEST_FAULT_INJECTION`.
