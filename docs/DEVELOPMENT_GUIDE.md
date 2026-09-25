@@ -1190,6 +1190,27 @@ The fault transition uses `dmsetup suspend --noflush --nolockfs` so switching th
 
 Namespace residue is recorded but is not allowed to masquerade as authority. M11 selects no automatic orphan cleanup and does not use `syncfs` as a fallback. Passing M11 is a prerequisite to refining P1/I1c for fresh-install namespace durability; authority-wide exclusion for any future automatic recovery remains a separate problem.
 
+### OPT-A1-P2 namespace durability policy refinement
+
+P2 reviews the frozen F10 evidence and refines, rather than replaces, the existing P1 decision. The selected snapshot-content strategy remains `S1_TARGETED_FSYNC`. The selected namespace sequence is now `S1_DEST_SOURCE`.
+
+For the durable path, the selected pre-authority ordering is therefore:
+
+1. extract and validate staging;
+2. compute the pre-barrier seal;
+3. fsync staging regular files and directories bottom-up;
+4. prepare `Repositories/<repo>/snapshots` from the trusted data root and durably synchronize each namespace edge;
+5. atomically rename staging to the final snapshot path;
+6. fsync the final snapshot destination parent;
+7. fsync the staging source parent so removal of the `.part` name is explicitly persisted;
+8. only then continue with retrieval-index preparation, post-prepare seal equality, state-capacity recheck and guarded Control DB publication.
+
+M10 does not empirically rank the three namespace candidates on the reviewed ext4 replay fixture. Selection of `S1_DEST_SOURCE` is instead contract-driven: Linux does not guarantee that fsync of an object persists the containing directory entry, while this candidate explicitly covers the fresh destination hierarchy and both sides of the cross-directory rename. M11 then shows explicit EIO at each newly required namespace barrier aborts before authority.
+
+P2 also narrows retry policy. A successful I1b zero-reference query is not deletion authority because the current Optimizations-ON mutation lease does not exclude Optimizations-OFF Control DB writers. The first runtime integration therefore selects no automatic orphan cleanup: a preexisting final target that is not handled by an already-qualified repair path remains untouched and causes fail-closed operation. Future automatic recovery requires authority-wide exclusion across every writer and the filesystem mutation window.
+
+The machine-readable policy remains `selected-not-wired`. `runtime_integration_selected=false` is unchanged. The dormant I1c primitive still lacks the newly selected destination-hierarchy and source-parent barriers, so it must be refined in a separate implementation slice before any Vala/lifecycle caller is allowed.
+
 ### Recovery fault qualification
 
 The OPT-A0 recovery harness is test-only. Native checkpoint calls compile to no-ops in the production application; only the dedicated recovery helper is built with `ATM_TEST_FAULT_INJECTION`.
