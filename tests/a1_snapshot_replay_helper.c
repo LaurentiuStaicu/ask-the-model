@@ -881,6 +881,220 @@ out:
     return ok;
 }
 
+static gboolean
+repair_checkpoint_valid (
+    const char *checkpoint
+)
+{
+    return
+        g_strcmp0 (
+            checkpoint,
+            "repair_post_quarantine"
+        ) == 0 ||
+        g_strcmp0 (
+            checkpoint,
+            "repair_post_barrier_pre_rename"
+        ) == 0 ||
+        g_strcmp0 (
+            checkpoint,
+            "repair_post_rename_pre_parent_fsync"
+        ) == 0 ||
+        g_strcmp0 (
+            checkpoint,
+            "repair_post_parent_fsync_pre_authority"
+        ) == 0 ||
+        g_strcmp0 (
+            checkpoint,
+            "repair_after_authority"
+        ) == 0;
+}
+
+static gboolean
+repair_same_sha_candidate (
+    const char *root,
+    const char *strategy_name,
+    const char *checkpoint,
+    GError **error
+)
+{
+    CandidateStrategy strategy;
+
+    if (!parse_candidate_strategy (
+            strategy_name,
+            &strategy
+        )) {
+        g_set_error_literal (
+            error,
+            G_FILE_ERROR,
+            G_FILE_ERROR_INVAL,
+            "Unknown A1 repair durability candidate strategy."
+        );
+        return FALSE;
+    }
+
+    if (!repair_checkpoint_valid (checkpoint)) {
+        g_set_error_literal (
+            error,
+            G_FILE_ERROR,
+            G_FILE_ERROR_INVAL,
+            "Unknown A1 same-SHA repair replay checkpoint."
+        );
+        return FALSE;
+    }
+
+    char *data_root = data_root_for (root);
+    char *control_path = control_path_for (root);
+    char *staging = NULL;
+    char *promoted = NULL;
+    char *quarantine = NULL;
+    char *seal = NULL;
+    guint64 file_count = 0;
+    guint64 total_bytes = 0;
+    CandidateBarrierCounters counters = { 0 };
+    gboolean ok = FALSE;
+
+    atm_test_fault_configure (
+        checkpoint,
+        CHECKPOINT_FD,
+        CONTROL_FD
+    );
+
+    if (!atm_repository_quarantine_snapshot (
+            data_root,
+            REPOSITORY_ID,
+            OLD_SHA,
+            &quarantine,
+            error
+        )) {
+        goto out;
+    }
+
+    atm_test_fault_checkpoint (
+        "repair_post_quarantine"
+    );
+
+    staging = atm_repository_extraction_staging_path (
+        data_root,
+        REPOSITORY_ID,
+        OLD_SHA
+    );
+
+    if (staging == NULL ||
+        g_mkdir_with_parents (staging, 0700) != 0) {
+        g_set_error_literal (
+            error,
+            G_FILE_ERROR,
+            G_FILE_ERROR_FAILED,
+            "Could not create A1 same-SHA repair staging."
+        );
+        goto out;
+    }
+
+    if (!write_fixture (
+            staging,
+            "repaired",
+            error
+        ) ||
+        !atm_snapshot_seal_compute (
+            staging,
+            &seal,
+            &file_count,
+            &total_bytes,
+            error
+        )) {
+        goto out;
+    }
+
+    if (!run_candidate_pre_rename_barrier (
+            staging,
+            strategy,
+            &counters,
+            error
+        )) {
+        goto out;
+    }
+
+    atm_test_fault_checkpoint (
+        "repair_post_barrier_pre_rename"
+    );
+
+    if (!atm_repository_promote_snapshot (
+            data_root,
+            REPOSITORY_ID,
+            OLD_SHA,
+            staging,
+            &promoted,
+            error
+        )) {
+        goto out;
+    }
+
+    atm_test_fault_checkpoint (
+        "repair_post_rename_pre_parent_fsync"
+    );
+
+    if (!fsync_promoted_parent (
+            promoted,
+            &counters,
+            error
+        )) {
+        goto out;
+    }
+
+    atm_test_fault_checkpoint (
+        "repair_post_parent_fsync_pre_authority"
+    );
+
+    if (!atm_control_state_set_current_values (
+            control_path,
+            REPOSITORY_ID,
+            OLD_SHA,
+            "0.0-repaired",
+            seal,
+            error
+        )) {
+        goto out;
+    }
+
+    atm_test_fault_checkpoint (
+        "repair_after_authority"
+    );
+
+    g_print (
+        "{"
+        "\"strategy\":\"%s\","
+        "\"sha\":\"%s\","
+        "\"seal\":\"%s\","
+        "\"file_count\":%" G_GUINT64_FORMAT ","
+        "\"total_bytes\":%" G_GUINT64_FORMAT ","
+        "\"file_fsync_calls\":%" G_GUINT64_FORMAT ","
+        "\"directory_fsync_calls\":%" G_GUINT64_FORMAT ","
+        "\"syncfs_calls\":%" G_GUINT64_FORMAT ","
+        "\"parent_fsync_calls\":%" G_GUINT64_FORMAT
+        "}\n",
+        strategy_name,
+        OLD_SHA,
+        seal,
+        file_count,
+        total_bytes,
+        counters.file_fsync_calls,
+        counters.directory_fsync_calls,
+        counters.syncfs_calls,
+        counters.parent_fsync_calls
+    );
+
+    ok = TRUE;
+
+out:
+    g_free (seal);
+    g_free (quarantine);
+    g_free (promoted);
+    g_free (staging);
+    g_free (control_path);
+    g_free (data_root);
+    return ok;
+}
+
 static void
 print_invalid (
     const char *reason_code
