@@ -562,6 +562,20 @@ The machine-readable contract lives at `qualification/capacity-policy-v1.json` a
 - insufficient capacity maps specifically to `RepositoryError.NO_SPACE`;
 - external capacity loss after admission still fails closed.
 
+### C0P-F11A native policy helper
+
+C0P-F11A materializes the selected F10 policy as a small native helper without connecting it to application runtime.
+
+The helper has two outputs:
+- a pre-download prediction containing one archive-file inode and an exact-profile archive byte value only when the repository ID + SHA matches a qualified C0-M1 profile;
+- a post-download mutation prediction containing operation-specific exact-profile snapshot bytes, exact-profile index bytes, four index/cache inode slots and the selected 128 KiB / four-slot state-commit headroom.
+
+For an unknown SHA, snapshot/index/archive byte fields remain zero and `byte_prediction_qualified=false`. This is not a zero-byte prediction: callers must interpret it as **no proactive data/cache byte rejection** while preserving F2/structural inode admission, state publication headroom and fail-closed runtime exhaustion.
+
+The compiled exact-profile table lives in `src/repository_capacity_profiles.inc`. The production-policy validator parses that table and requires it to match the exact C0-M1 evidence rows byte-for-byte, while the C unit test independently exercises exact-profile, unknown-SHA and invalid-input behavior. Policy constants in `repository_capacity_policy.h` are also checked against `qualification/capacity-policy-v1.json`.
+
+The application executable does not yet compile or call this helper. Runtime wiring remains a later slice so a failure in this helper can be reviewed independently of repository mutation behavior.
+
 ### Repository authority-mutation lease
 
 When an operation snapshots optimization mode ON, repository Download/Update uses one application-owned exclusive nonblocking lease at `<state_root>/repository-mutation.lock` before any selected-repository staging or authority mutation begins.

@@ -10,6 +10,8 @@ POLICY_PATH = ROOT / "qualification" / "capacity-policy-v1.json"
 V1_PATH = ROOT / "benchmarks" / "capacity-v1" / "evidence.json"
 V2_PATH = ROOT / "benchmarks" / "capacity-v2" / "evidence.json"
 V3_PATH = ROOT / "benchmarks" / "capacity-v3" / "evidence.json"
+PROFILE_INC_PATH = ROOT / "src" / "repository_capacity_profiles.inc"
+POLICY_HEADER_PATH = ROOT / "src" / "repository_capacity_policy.h"
 
 SHA40 = re.compile(r"^[0-9a-f]{40}$")
 SHA256 = re.compile(r"^[0-9a-f]{64}$")
@@ -213,6 +215,74 @@ def main() -> int:
         fail("state inode headroom rationale drifted")
     if m7.get("selected_to_minimum_ratio") != 2:
         fail("state inode headroom ratio metadata drifted")
+
+    profile_source = PROFILE_INC_PATH.read_text(encoding="utf-8")
+    profile_pattern = re.compile(
+        r'ATM_CAPACITY_EXACT_PROFILE\(\s*'
+        r'"(?P<repository_id>[a-z0-9_-]+)"\s*,\s*'
+        r'"(?P<repository_sha>[0-9a-f]{40})"\s*,\s*'
+        r'(?P<archive>\d+)\s*,\s*'
+        r'(?P<snapshot>\d+)\s*,\s*'
+        r'(?P<fresh>\d+)\s*,\s*'
+        r'(?P<index>\d+)\s*,\s*'
+        r'(?P<repair>\d+)\s*'
+        r'\)',
+        re.MULTILINE,
+    )
+    compiled_profiles = {}
+    for match in profile_pattern.finditer(profile_source):
+        rid = match.group("repository_id")
+        if rid in compiled_profiles:
+            fail(f"duplicate compiled exact profile for {rid}")
+        compiled_profiles[rid] = {
+            "repository_sha": match.group("repository_sha"),
+            "archive_allocated_bytes": int(match.group("archive")),
+            "snapshot_allocated_bytes": int(match.group("snapshot")),
+            "fresh_data_additional_peak_bytes": int(match.group("fresh")),
+            "index_cache_additional_peak_bytes": int(match.group("index")),
+            "same_sha_repair_data_additional_peak_bytes": int(
+                match.group("repair")
+            ),
+        }
+
+    evidence_profiles = {
+        item["repository_id"]: {
+            "repository_sha": item["repository_sha"],
+            "archive_allocated_bytes": item["archive_allocated_bytes"],
+            "snapshot_allocated_bytes": item["snapshot_allocated_bytes"],
+            "fresh_data_additional_peak_bytes": (
+                item["fresh_data_additional_peak_bytes"]
+            ),
+            "index_cache_additional_peak_bytes": (
+                item["index_cache_additional_peak_bytes"]
+            ),
+            "same_sha_repair_data_additional_peak_bytes": (
+                item["same_sha_repair_data_additional_peak_bytes"]
+            ),
+        }
+        for item in v1["c0_m1"]["observations"]
+    }
+    if compiled_profiles != evidence_profiles:
+        fail("compiled exact-SHA profile table drifted from C0-M1 evidence")
+
+    policy_header = POLICY_HEADER_PATH.read_text(encoding="utf-8")
+    required_constants = {
+        "ATM_CAPACITY_STATE_COMMIT_HEADROOM_BYTES": state["selected_bytes"],
+        "ATM_CAPACITY_STATE_COMMIT_HEADROOM_INODES": state["selected_inodes"],
+        "ATM_CAPACITY_INDEX_BUILD_INODES": (
+            inode_policy["index_build_cache_entries"]
+        ),
+        "ATM_CAPACITY_ARCHIVE_FILE_INODES": (
+            inode_policy["pre_download_archive_file_entries"]
+        ),
+    }
+    for name, expected in required_constants.items():
+        pattern = re.compile(
+            rf"#define\s+{re.escape(name)}\s+"
+            rf"\(\(guint64\)\s+{expected}\)"
+        )
+        if pattern.search(policy_header) is None:
+            fail(f"compiled policy constant drifted: {name}")
 
     contract = policy.get("operation_contract")
     expected_contract = {
