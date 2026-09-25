@@ -232,6 +232,25 @@ test(
 )
 
 
+snapshot_namespace_durability_test = executable(
+  'snapshot-namespace-durability-test',
+  [
+    'src/snapshot_namespace_durability.c',
+    'tests/snapshot_namespace_durability_test.c'
+  ],
+  include_directories: include_directories('src'),
+  dependencies: [
+    glib_dep
+  ],
+  install: false
+)
+
+test(
+  'snapshot-namespace-durability',
+  snapshot_namespace_durability_test
+)
+
+
 startup_qualification_record_test = executable(
   'startup-qualification-record-test',
   [
