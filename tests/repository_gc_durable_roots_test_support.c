@@ -2,6 +2,9 @@
 
 #include <sqlite3.h>
 
+#include <errno.h>
+#include <unistd.h>
+
 static gboolean
 exec_sql (
     sqlite3 *db,
@@ -96,4 +99,32 @@ atm_c1_test_publish_empty_complete_generation (
 
     sqlite3_close (db);
     return ok;
+}
+
+
+gboolean
+atm_c1_test_make_symlink (
+    const char *target_path,
+    const char *link_path,
+    GError **error
+)
+{
+    g_return_val_if_fail (target_path != NULL, FALSE);
+    g_return_val_if_fail (link_path != NULL, FALSE);
+
+    if (symlink (
+            target_path,
+            link_path
+        ) == 0) {
+        return TRUE;
+    }
+
+    g_set_error (
+        error,
+        G_FILE_ERROR,
+        g_file_error_from_errno (errno),
+        "Could not create C1 test symlink: %s",
+        g_strerror (errno)
+    );
+    return FALSE;
 }

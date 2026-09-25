@@ -8,6 +8,15 @@ namespace AskTheModel.C1TestSupport {
     public static extern bool publish_empty_complete_generation (
         string control_path
     ) throws GLib.Error;
+
+    [CCode (
+        cname = "atm_c1_test_make_symlink",
+        cheader_filename = "repository_gc_durable_roots_test_support.h"
+    )]
+    public static extern bool make_symlink (
+        string target_path,
+        string link_path
+    ) throws GLib.Error;
 }
 
 private static string
@@ -480,6 +489,417 @@ test_live_generation_lease_protects_historical_root () {
 }
 
 
+private static string
+snapshot_root_for (
+    string root,
+    string repository_id
+) {
+    return Path.build_filename (
+        root,
+        "Repositories",
+        repository_id,
+        "snapshots"
+    );
+}
+
+
+private static void
+test_candidate_discovery_filters_protected_and_quarantine () {
+    const string PROTECTED_SHA =
+        "1111111111111111111111111111111111111111";
+    const string CANDIDATE_SHA =
+        "2222222222222222222222222222222222222222";
+    const string UNKNOWN_REPO_SHA =
+        "3333333333333333333333333333333333333333";
+
+    string root = new_temp_root ();
+
+    try {
+        string ewd_snapshots =
+            snapshot_root_for (
+                root,
+                "ewd"
+            );
+        assert (
+            DirUtils.create_with_parents (
+                Path.build_filename (
+                    ewd_snapshots,
+                    PROTECTED_SHA
+                ),
+                0700
+            ) == 0
+        );
+        assert (
+            DirUtils.create_with_parents (
+                Path.build_filename (
+                    ewd_snapshots,
+                    CANDIDATE_SHA
+                ),
+                0700
+            ) == 0
+        );
+        assert (
+            DirUtils.create_with_parents (
+                Path.build_filename (
+                    ewd_snapshots,
+                    ".invalid-%s-1-0".printf (
+                        CANDIDATE_SHA
+                    )
+                ),
+                0700
+            ) == 0
+        );
+
+        assert (
+            DirUtils.create_with_parents (
+                Path.build_filename (
+                    root,
+                    "Repositories",
+                    "unknown-repository",
+                    "snapshots",
+                    UNKNOWN_REPO_SHA
+                ),
+                0700
+            ) == 0
+        );
+
+        var protected_roots =
+            new AskTheModel.RepositoryGcDurableRoots ();
+        protected_roots.add_snapshot (
+            "ewd",
+            PROTECTED_SHA
+        );
+
+        AskTheModel.RepositoryGcCandidateSet candidates =
+            AskTheModel.RepositoryGcCandidateDiscovery.
+                discover (
+                    root,
+                    protected_roots
+                );
+
+        assert (candidates.count () == 1);
+        assert (
+            candidates.contains (
+                "ewd",
+                CANDIDATE_SHA
+            )
+        );
+        assert (
+            !candidates.contains (
+                "ewd",
+                PROTECTED_SHA
+            )
+        );
+        assert (
+            !candidates.contains (
+                "unknown-repository",
+                UNKNOWN_REPO_SHA
+            )
+        );
+        assert (
+            candidates.quarantine_entry_count () == 1
+        );
+    } catch (Error error) {
+        critical ("%s", error.message);
+        assert_not_reached ();
+    } finally {
+        remove_tree_best_effort (root);
+    }
+}
+
+
+private static void
+test_candidate_discovery_rejects_malformed_entry () {
+    string root = new_temp_root ();
+
+    try {
+        assert (
+            DirUtils.create_with_parents (
+                Path.build_filename (
+                    snapshot_root_for (
+                        root,
+                        "ewd"
+                    ),
+                    "not-a-snapshot-sha"
+                ),
+                0700
+            ) == 0
+        );
+
+        bool rejected = false;
+
+        try {
+            AskTheModel.RepositoryGcCandidateDiscovery.
+                discover (
+                    root,
+                    new AskTheModel.RepositoryGcDurableRoots ()
+                );
+        } catch (Error error) {
+            rejected =
+                error.message.index_of (
+                    "unexpected entry"
+                ) >= 0;
+        }
+
+        assert (rejected);
+    } catch (Error error) {
+        critical ("%s", error.message);
+        assert_not_reached ();
+    } finally {
+        remove_tree_best_effort (root);
+    }
+}
+
+
+private static void
+test_candidate_discovery_rejects_symlink_entry () {
+    const string SHA =
+        "4444444444444444444444444444444444444444";
+
+    string root = new_temp_root ();
+
+    try {
+        string snapshots =
+            snapshot_root_for (
+                root,
+                "ewd"
+            );
+        string target =
+            Path.build_filename (
+                root,
+                "real-target"
+            );
+        assert (
+            DirUtils.create_with_parents (
+                snapshots,
+                0700
+            ) == 0
+        );
+        assert (
+            DirUtils.create_with_parents (
+                target,
+                0700
+            ) == 0
+        );
+
+        AskTheModel.C1TestSupport.make_symlink (
+            target,
+            Path.build_filename (
+                snapshots,
+                SHA
+            )
+        );
+
+        bool rejected = false;
+
+        try {
+            AskTheModel.RepositoryGcCandidateDiscovery.
+                discover (
+                    root,
+                    new AskTheModel.RepositoryGcDurableRoots ()
+                );
+        } catch (Error error) {
+            rejected =
+                error.message.index_of (
+                    "not a real directory"
+                ) >= 0;
+        }
+
+        assert (rejected);
+    } catch (Error error) {
+        critical ("%s", error.message);
+        assert_not_reached ();
+    } finally {
+        remove_tree_best_effort (root);
+    }
+}
+
+
+private static void
+test_candidate_discovery_rejects_regular_file_entry () {
+    const string SHA =
+        "5555555555555555555555555555555555555555";
+
+    string root = new_temp_root ();
+
+    try {
+        string snapshots =
+            snapshot_root_for (
+                root,
+                "ewd"
+            );
+        assert (
+            DirUtils.create_with_parents (
+                snapshots,
+                0700
+            ) == 0
+        );
+
+        FileUtils.set_contents (
+            Path.build_filename (
+                snapshots,
+                SHA
+            ),
+            "not-a-directory"
+        );
+
+        bool rejected = false;
+
+        try {
+            AskTheModel.RepositoryGcCandidateDiscovery.
+                discover (
+                    root,
+                    new AskTheModel.RepositoryGcDurableRoots ()
+                );
+        } catch (Error error) {
+            rejected =
+                error.message.index_of (
+                    "not a real directory"
+                ) >= 0;
+        }
+
+        assert (rejected);
+    } catch (Error error) {
+        critical ("%s", error.message);
+        assert_not_reached ();
+    } finally {
+        remove_tree_best_effort (root);
+    }
+}
+
+
+private static void
+test_candidate_discovery_rejects_symlink_snapshot_root () {
+    string root = new_temp_root ();
+
+    try {
+        string repository_root =
+            Path.build_filename (
+                root,
+                "Repositories",
+                "ewd"
+            );
+        string target =
+            Path.build_filename (
+                root,
+                "snapshot-root-target"
+            );
+
+        assert (
+            DirUtils.create_with_parents (
+                repository_root,
+                0700
+            ) == 0
+        );
+        assert (
+            DirUtils.create_with_parents (
+                target,
+                0700
+            ) == 0
+        );
+
+        AskTheModel.C1TestSupport.make_symlink (
+            target,
+            Path.build_filename (
+                repository_root,
+                "snapshots"
+            )
+        );
+
+        bool rejected = false;
+
+        try {
+            AskTheModel.RepositoryGcCandidateDiscovery.
+                discover (
+                    root,
+                    new AskTheModel.RepositoryGcDurableRoots ()
+                );
+        } catch (Error error) {
+            rejected =
+                error.message.index_of (
+                    "without following links"
+                ) >= 0;
+        }
+
+        assert (rejected);
+    } catch (Error error) {
+        critical ("%s", error.message);
+        assert_not_reached ();
+    } finally {
+        remove_tree_best_effort (root);
+    }
+}
+
+
+private static void
+test_candidate_discovery_rejects_intermediate_repository_symlink () {
+    const string SHA =
+        "6666666666666666666666666666666666666666";
+
+    string root = new_temp_root ();
+
+    try {
+        string repositories_root =
+            Path.build_filename (
+                root,
+                "Repositories"
+            );
+        string target_repository =
+            Path.build_filename (
+                root,
+                "repository-target"
+            );
+
+        assert (
+            DirUtils.create_with_parents (
+                Path.build_filename (
+                    target_repository,
+                    "snapshots",
+                    SHA
+                ),
+                0700
+            ) == 0
+        );
+        assert (
+            DirUtils.create_with_parents (
+                repositories_root,
+                0700
+            ) == 0
+        );
+
+        AskTheModel.C1TestSupport.make_symlink (
+            target_repository,
+            Path.build_filename (
+                repositories_root,
+                "ewd"
+            )
+        );
+
+        bool rejected = false;
+
+        try {
+            AskTheModel.RepositoryGcCandidateDiscovery.
+                discover (
+                    root,
+                    new AskTheModel.RepositoryGcDurableRoots ()
+                );
+        } catch (Error error) {
+            rejected =
+                error.message.index_of (
+                    "without following links"
+                ) >= 0;
+        }
+
+        assert (rejected);
+    } catch (Error error) {
+        critical ("%s", error.message);
+        assert_not_reached ();
+    } finally {
+        remove_tree_best_effort (root);
+    }
+}
+
+
 public static int
 main (string[] args) {
     Test.init (ref args);
@@ -499,6 +919,30 @@ main (string[] args) {
     Test.add_func (
         "/repository-gc-roots/live-generation-lease-protected",
         test_live_generation_lease_protects_historical_root
+    );
+    Test.add_func (
+        "/repository-gc-candidates/protected-and-quarantine-filtered",
+        test_candidate_discovery_filters_protected_and_quarantine
+    );
+    Test.add_func (
+        "/repository-gc-candidates/malformed-entry-fail-closed",
+        test_candidate_discovery_rejects_malformed_entry
+    );
+    Test.add_func (
+        "/repository-gc-candidates/symlink-entry-fail-closed",
+        test_candidate_discovery_rejects_symlink_entry
+    );
+    Test.add_func (
+        "/repository-gc-candidates/regular-file-entry-fail-closed",
+        test_candidate_discovery_rejects_regular_file_entry
+    );
+    Test.add_func (
+        "/repository-gc-candidates/symlink-root-fail-closed",
+        test_candidate_discovery_rejects_symlink_snapshot_root
+    );
+    Test.add_func (
+        "/repository-gc-candidates/intermediate-symlink-fail-closed",
+        test_candidate_discovery_rejects_intermediate_repository_symlink
     );
     return Test.run ();
 }
