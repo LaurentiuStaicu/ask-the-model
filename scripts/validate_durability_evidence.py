@@ -291,6 +291,99 @@ def main() -> int:
         if phrase not in cap_conclusion:
             fail(f"Tier-2 capability limitation lost: {phrase}")
 
+    replay = evidence.get("tier2_replay")
+    if not isinstance(replay, dict):
+        fail("Tier-2 replay evidence is missing")
+    if replay.get("measurement_id") != (
+        "atm-a1-m3-block-replay-smoke-v1"
+    ):
+        fail("Tier-2 replay measurement identity drifted")
+    if replay.get("status") != "qualified":
+        fail("Tier-2 replay must remain qualified")
+    if replay.get("production_durability_authorized") is not False:
+        fail("Tier-2 replay evidence must not authorize production durability")
+
+    replay_source = replay.get("source")
+    if not isinstance(replay_source, dict):
+        fail("Tier-2 replay source is missing")
+    if replay_source.get("actions_run_id") != 36118334996:
+        fail("Tier-2 replay Actions run drifted")
+    if replay_source.get("artifact_id") != 10856600862:
+        fail("Tier-2 replay artifact ID drifted")
+    if replay_source.get("artifact_name") != (
+        "atm-a1-m3-replay-smoke-36118334996-1"
+    ):
+        fail("Tier-2 replay artifact name drifted")
+    replay_digest = replay_source.get("artifact_sha256")
+    if (
+        not isinstance(replay_digest, str)
+        or SHA256.fullmatch(replay_digest) is None
+        or replay_digest != (
+            "fb4da03b7d7d1ade93a12c407efc413f8ca4cd12c946e8bf9014736971829cc9"
+        )
+    ):
+        fail("Tier-2 replay artifact digest drifted")
+    replay_head = replay_source.get("atm_source_commit")
+    if (
+        not isinstance(replay_head, str)
+        or SHA40.fullmatch(replay_head) is None
+        or replay_head != "4260c0db0d4c8c0bf929aabbf0950435c7ed75a7"
+    ):
+        fail("Tier-2 replay source commit drifted")
+
+    if replay.get("kernel") != {
+        "system": "Linux",
+        "release": "6.17.0-1022-azure",
+        "machine": "x86_64",
+    }:
+        fail("Tier-2 replay kernel context drifted")
+    if replay.get("upstream") != {
+        "repository": "josefbacik/log-writes",
+        "commit": "7b70d8a6863c5de30933d42a7672d35d01d2dc6c",
+    }:
+        fail("Tier-2 replay upstream pin drifted")
+
+    marks = replay.get("marks")
+    if marks != {
+        "mkfs_entry": 35,
+        "fsync_entry": 57,
+    }:
+        fail("Tier-2 replay mark positions drifted")
+    if marks["fsync_entry"] <= marks["mkfs_entry"]:
+        fail("Tier-2 fsync mark must remain after mkfs mark")
+
+    replay_result = replay.get("replay")
+    if not isinstance(replay_result, dict):
+        fail("Tier-2 replay result is missing")
+    if replay_result.get("end_mark") != "fsync":
+        fail("Tier-2 replay must remain bounded by fsync mark")
+    if replay_result.get("e2fsck_exit_code") not in (0, 1, 2):
+        fail("Tier-2 replay e2fsck result is not a corrected/clean outcome")
+    expected_sha = replay_result.get("expected_sha256")
+    replayed_sha = replay_result.get("replayed_sha256")
+    for value, context in (
+        (expected_sha, "expected replay SHA"),
+        (replayed_sha, "replayed SHA"),
+    ):
+        if not isinstance(value, str) or SHA256.fullmatch(value) is None:
+            fail(f"{context} is invalid")
+    if expected_sha != replayed_sha:
+        fail("Tier-2 replay payload digest mismatch")
+    if replay_result.get("content_match") is not True:
+        fail("Tier-2 replay content_match must remain true")
+
+    replay_conclusion = str(
+        replay.get("reviewed_conclusion", "")
+    ).lower()
+    for phrase in (
+        "replay mechanism only",
+        "does not yet exercise atm snapshot promotion",
+        "control db authority",
+        "authorize a production durability barrier",
+    ):
+        if phrase not in replay_conclusion:
+            fail(f"Tier-2 replay limitation lost: {phrase}")
+
     print(
         "durability evidence validation passed: "
         "A1-M1 CBD/EWD/RMD medians frozen, "
