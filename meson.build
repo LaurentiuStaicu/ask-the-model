@@ -1745,6 +1745,31 @@ test(
   presentation_normalize_test
 )
 
+
+presentation_golden_test = executable(
+  'presentation-golden-test',
+  [
+    'src/presentation_document.c',
+    'src/presentation_normalize.c',
+    'tests/presentation_golden_test.c'
+  ],
+  include_directories: include_directories('src'),
+  dependencies: [
+    glib_dep,
+    json_glib_dep,
+    md4c_dep
+  ],
+  install: false
+)
+
+test(
+  'presentation-golden',
+  presentation_golden_test,
+  env: {
+    'ATM_PRESENTATION_GOLDEN_V1': meson.current_source_dir() / 'tests/fixtures/presentation/golden-v1.json'
+  }
+)
+
 subdir('data')
 
 icon_sizes = ['16', '24', '32', '48', '64', '128']

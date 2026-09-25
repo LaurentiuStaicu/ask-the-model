@@ -1,0 +1,180 @@
+{
+  "schema": "atm-presentation-golden/1",
+  "cases": [
+    {
+      "name": "plain-prose",
+      "input": "Convingerile se formează în timp.",
+      "visible_text": "Convingerile se formează în timp.",
+      "fallback": false,
+      "block_types": ["paragraph"]
+    },
+    {
+      "name": "strong-flattened",
+      "input": "Acesta este **important**.",
+      "visible_text": "Acesta este important.",
+      "fallback": false,
+      "block_types": ["paragraph"]
+    },
+    {
+      "name": "emphasis-flattened",
+      "input": "Acesta este *important*.",
+      "visible_text": "Acesta este important.",
+      "fallback": false,
+      "block_types": ["paragraph"]
+    },
+    {
+      "name": "triple-emphasis-flattened",
+      "input": "Acesta este ***foarte important***.",
+      "visible_text": "Acesta este foarte important.",
+      "fallback": false,
+      "block_types": ["paragraph"]
+    },
+    {
+      "name": "literal-multiplication-star",
+      "input": "Cost = 2 * 3 = 6.",
+      "visible_text": "Cost = 2 * 3 = 6.",
+      "fallback": false,
+      "block_types": ["paragraph"]
+    },
+    {
+      "name": "literal-wildcard",
+      "input": "Fișierele sunt în forma *.csv.",
+      "visible_text": "Fișierele sunt în forma *.csv.",
+      "fallback": false,
+      "block_types": ["paragraph"]
+    },
+    {
+      "name": "escaped-marker",
+      "input": "\\*literal\\*",
+      "visible_text": "*literal*",
+      "fallback": false,
+      "block_types": ["paragraph"]
+    },
+    {
+      "name": "atx-heading",
+      "input": "## Formarea convingerilor",
+      "visible_text": "Formarea convingerilor",
+      "fallback": false,
+      "block_types": ["heading"]
+    },
+    {
+      "name": "setext-heading",
+      "input": "Formarea convingerilor\n=======================",
+      "visible_text": "Formarea convingerilor",
+      "fallback": false,
+      "block_types": ["heading"]
+    },
+    {
+      "name": "heading-and-paragraph",
+      "input": "## Rezultat\n\nTextul rămâne regular.",
+      "visible_text": "Rezultat\n\nTextul rămâne regular.",
+      "fallback": false,
+      "block_types": ["heading", "paragraph"]
+    },
+    {
+      "name": "soft-break-collapsed",
+      "input": "Prima parte\na doua parte.",
+      "visible_text": "Prima parte a doua parte.",
+      "fallback": false,
+      "block_types": ["paragraph"]
+    },
+    {
+      "name": "hard-break-preserved",
+      "input": "Prima parte\\\na doua parte.",
+      "visible_text": "Prima parte\na doua parte.",
+      "fallback": false,
+      "block_types": ["paragraph"]
+    },
+    {
+      "name": "unordered-list-dash",
+      "input": "- primul\n- al doilea",
+      "visible_text": "• primul\n• al doilea",
+      "fallback": false,
+      "block_types": ["list-item", "list-item"]
+    },
+    {
+      "name": "unordered-list-star",
+      "input": "* primul\n* al doilea",
+      "visible_text": "• primul\n• al doilea",
+      "fallback": false,
+      "block_types": ["list-item", "list-item"]
+    },
+    {
+      "name": "ordered-list-start-three",
+      "input": "3. trei\n4. patru",
+      "visible_text": "3. trei\n4. patru",
+      "fallback": false,
+      "block_types": ["list-item", "list-item"]
+    },
+    {
+      "name": "nested-list",
+      "input": "- exterior\n  - interior",
+      "visible_text": "• exterior\n  • interior",
+      "fallback": false,
+      "block_types": ["list-item", "list-item"]
+    },
+    {
+      "name": "cbd-list-strong-labels",
+      "input": "* **Efectele expunerilor repetate:** Cum pot întâlnirile repetitive...\n* **Timpul corecțiilor:** Cum o corecție poate avea...",
+      "visible_text": "• Efectele expunerilor repetate: Cum pot întâlnirile repetitive...\n• Timpul corecțiilor: Cum o corecție poate avea...",
+      "fallback": false,
+      "block_types": ["list-item", "list-item"]
+    },
+    {
+      "name": "blockquote",
+      "input": "> Modelul nu stabilește adevărul.",
+      "visible_text": "Modelul nu stabilește adevărul.",
+      "fallback": false,
+      "block_types": ["quote"]
+    },
+    {
+      "name": "inline-code-verbatim",
+      "input": "Folosește `**x**` exact.",
+      "visible_text": "Folosește **x** exact.",
+      "fallback": false,
+      "block_types": ["paragraph"]
+    },
+    {
+      "name": "fenced-code-verbatim",
+      "input": "```python\nfiles = \"*.csv\"\nx = \"**not bold**\"\n```",
+      "visible_text": "files = \"*.csv\"\nx = \"**not bold**\"\n",
+      "fallback": false,
+      "block_types": ["code"]
+    },
+    {
+      "name": "thematic-break-as-spacing",
+      "input": "Înainte.\n\n---\n\nDupă.",
+      "visible_text": "Înainte.\n\nDupă.",
+      "fallback": false,
+      "block_types": ["paragraph", "spacer", "paragraph"]
+    },
+    {
+      "name": "raw-html-inert",
+      "input": "<b>text</b> <script>alert(1)</script>",
+      "visible_text": "<b>text</b> <script>alert(1)</script>",
+      "fallback": false,
+      "block_types": ["paragraph"]
+    },
+    {
+      "name": "unicode-romanian-greek-math",
+      "input": "Română: ș ț ă î â; Ελληνικά; Δx = 2π.",
+      "visible_text": "Română: ș ț ă î â; Ελληνικά; Δx = 2π.",
+      "fallback": false,
+      "block_types": ["paragraph"]
+    },
+    {
+      "name": "unicode-cjk",
+      "input": "信念は時間とともに変化する。",
+      "visible_text": "信念は時間とともに変化する。",
+      "fallback": false,
+      "block_types": ["paragraph"]
+    },
+    {
+      "name": "multiple-paragraphs",
+      "input": "Primul paragraf.\n\nAl doilea paragraf.",
+      "visible_text": "Primul paragraf.\n\nAl doilea paragraf.",
+      "fallback": false,
+      "block_types": ["paragraph", "paragraph"]
+    }
+  ]
+}
