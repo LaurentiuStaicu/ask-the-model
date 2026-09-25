@@ -653,6 +653,145 @@ def main() -> int:
         if phrase not in candidate_conclusion:
             fail(f"Tier-2 candidate replay conclusion lost: {phrase}")
 
+    boundary = evidence.get("tier2_candidate_boundary_replay")
+    if not isinstance(boundary, dict):
+        fail("Tier-2 candidate boundary evidence is missing")
+    if boundary.get("measurement_id") != (
+        "atm-a1-m6-candidate-boundary-replay-v1"
+    ):
+        fail("Tier-2 candidate boundary identity drifted")
+    if boundary.get("status") != "qualification-only":
+        fail("Tier-2 candidate boundary status drifted")
+    if boundary.get("production_barrier_selected") is not False:
+        fail("M6 must not select a production barrier")
+    if boundary.get("all_strong_invariants_satisfied") is not True:
+        fail("M6 strong-invariant aggregate was lost")
+    if boundary.get("all_expected_classifications_match") is not True:
+        fail("M6 expected-classification aggregate was lost")
+
+    boundary_source = boundary.get("source")
+    if not isinstance(boundary_source, dict):
+        fail("Tier-2 candidate boundary source is missing")
+    expected_boundary_source = {
+        "actions_run_id": 36127799616,
+        "artifact_name": (
+            "atm-a1-m6-candidate-boundary-replay-36127799616-1"
+        ),
+        "artifact_id": 10860237993,
+        "artifact_sha256": (
+            "1ce58499533b1a3f8c65cbe3c3a212f808008b415d5d92623bbb3e4bbbdf76e1"
+        ),
+        "atm_source_commit": (
+            "549ad076111bf2cdb5ae44e3cda68ca6b84c2fb2"
+        ),
+    }
+    if boundary_source != expected_boundary_source:
+        fail("Tier-2 candidate boundary provenance drifted")
+    if SHA256.fullmatch(boundary_source["artifact_sha256"]) is None:
+        fail("Tier-2 candidate boundary artifact digest is invalid")
+    if SHA40.fullmatch(boundary_source["atm_source_commit"]) is None:
+        fail("Tier-2 candidate boundary source commit is invalid")
+
+    if boundary.get("kernel") != {
+        "system": "Linux",
+        "release": "6.17.0-1022-azure",
+        "machine": "x86_64",
+    }:
+        fail("Tier-2 candidate boundary kernel context drifted")
+    if boundary.get("upstream") != {
+        "repository": "josefbacik/log-writes",
+        "commit": "7b70d8a6863c5de30933d42a7672d35d01d2dc6c",
+    }:
+        fail("Tier-2 candidate boundary upstream pin drifted")
+
+    boundary_matrix = boundary.get("matrix")
+    if not isinstance(boundary_matrix, dict) or set(boundary_matrix) != {
+        "S1_TARGETED_FSYNC",
+        "S2_SYNCFS",
+    }:
+        fail("Tier-2 candidate boundary strategy set drifted")
+
+    expected_boundary_entries = {
+        "S1_TARGETED_FSYNC": {
+            "post_barrier_pre_rename": (162, 186),
+            "post_rename_pre_parent_fsync": (162, 186),
+            "post_parent_fsync_pre_authority": (161, 192),
+            "after_authority": (162, 214),
+        },
+        "S2_SYNCFS": {
+            "post_barrier_pre_rename": (162, 186),
+            "post_rename_pre_parent_fsync": (162, 186),
+            "post_parent_fsync_pre_authority": (161, 199),
+            "after_authority": (162, 221),
+        },
+    }
+    expected_boundaries = {
+        "post_barrier_pre_rename",
+        "post_rename_pre_parent_fsync",
+        "post_parent_fsync_pre_authority",
+        "after_authority",
+    }
+    old_sha = "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa"
+    new_sha = "bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb"
+    old_seal = (
+        "39d5b5c5ff8fe2d5a0fbee8238abab546f39b07774ad29aeaeb06c4d25aac780"
+    )
+    new_seal = (
+        "acebf979895f9efd073014fa707038d47ec71b411f4e12a32aa619e9c63f3132"
+    )
+
+    for strategy, records in boundary_matrix.items():
+        if not isinstance(records, dict) or set(records) != expected_boundaries:
+            fail(f"{strategy} M6 boundary set drifted")
+        for boundary_name, record in records.items():
+            baseline_entry, scenario_entry = (
+                expected_boundary_entries[strategy][boundary_name]
+            )
+            if record.get("baseline_entry") != baseline_entry:
+                fail(f"{strategy}.{boundary_name} baseline entry drifted")
+            if record.get("scenario_entry") != scenario_entry:
+                fail(f"{strategy}.{boundary_name} scenario entry drifted")
+            if scenario_entry <= baseline_entry:
+                fail(f"{strategy}.{boundary_name} scenario must follow baseline")
+            if record.get("e2fsck_exit_code") not in (0, 1, 2):
+                fail(f"{strategy}.{boundary_name} e2fsck result is unsafe")
+
+            after_authority = boundary_name == "after_authority"
+            expected_classification = (
+                "NEW_AUTHORITY_VALID"
+                if after_authority
+                else "OLD_AUTHORITY_VALID"
+            )
+            expected_sha = new_sha if after_authority else old_sha
+            expected_seal = new_seal if after_authority else old_seal
+
+            if record.get("classification") != expected_classification:
+                fail(f"{strategy}.{boundary_name} classification drifted")
+            if record.get("active_repository_sha") != expected_sha:
+                fail(f"{strategy}.{boundary_name} active SHA drifted")
+            if record.get("stored_seal") != expected_seal:
+                fail(f"{strategy}.{boundary_name} stored seal drifted")
+            if record.get("computed_seal") != expected_seal:
+                fail(f"{strategy}.{boundary_name} computed seal drifted")
+            if record.get("seal_match") is not True:
+                fail(f"{strategy}.{boundary_name} seal match was lost")
+            if record.get("qualified") is not True:
+                fail(f"{strategy}.{boundary_name} qualification was lost")
+
+    boundary_conclusion = str(
+        boundary.get("reviewed_conclusion", "")
+    ).lower()
+    for phrase in (
+        "both preserve the old seal-valid authority",
+        "recover the new seal-valid authority",
+        "all eight",
+        "selects no production barrier",
+        "writeback-error propagation",
+        "scope/performance",
+    ):
+        if phrase not in boundary_conclusion:
+            fail(f"Tier-2 boundary conclusion lost: {phrase}")
+
     print(
         "durability evidence validation passed: "
         "A1-M1 CBD/EWD/RMD medians frozen, "
