@@ -206,6 +206,7 @@ test_active_and_conversation_roots_are_unioned () {
         AskTheModel.RepositoryGcDurableRoots roots =
             AskTheModel.RepositoryGcDurableRootCollector.
                 collect (
+                    root,
                     control_path_for (root),
                     conversations
                 );
@@ -292,6 +293,7 @@ test_conversation_pin_mismatch_fails_closed () {
         try {
             AskTheModel.RepositoryGcDurableRootCollector.
                 collect (
+                    root,
                     control_path_for (root),
                     conversations
                 );
@@ -341,6 +343,7 @@ test_empty_complete_generation_fails_closed () {
         try {
             AskTheModel.RepositoryGcDurableRootCollector.
                 collect (
+                    root,
                     control_path_for (root),
                     conversations
                 );
@@ -352,6 +355,122 @@ test_empty_complete_generation_fails_closed () {
         }
 
         assert (rejected);
+    } catch (Error error) {
+        critical ("%s", error.message);
+        assert_not_reached ();
+    } finally {
+        remove_tree_best_effort (root);
+    }
+}
+
+
+private static void
+test_live_generation_lease_protects_historical_root () {
+    const string OLD_EWD_SHA =
+        "dddddddddddddddddddddddddddddddddddddddd";
+    const string NEW_EWD_SHA =
+        "eeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeee";
+
+    string root = new_temp_root ();
+
+    try {
+        publish_generation_one (
+            root,
+            OLD_EWD_SHA
+        );
+
+        var conversations =
+            new AskTheModel.ConversationPersistenceStore (
+                root,
+                Path.build_filename (
+                    root,
+                    "exports"
+                )
+            );
+
+        var control =
+            new AskTheModel.ControlRepositoryStateStore (
+                root
+            );
+        assert (
+            control.load_status ==
+            AskTheModel.RepositoryStateLoadStatus.VALID
+        );
+        assert (control.repository_generation_id == 1);
+
+        control.set_current (
+            "ewd",
+            NEW_EWD_SHA,
+            "0.2.0"
+        );
+        assert (control.repository_generation_id == 2);
+
+        int reader_fd = -1;
+        bool reader_contended = false;
+
+        assert (
+            AskTheModel.RepositoryNative.
+                try_acquire_generation_lease_shared (
+                    root,
+                    1,
+                    out reader_fd,
+                    out reader_contended
+                )
+        );
+        assert (!reader_contended);
+        assert (reader_fd >= 0);
+
+        AskTheModel.RepositoryGcDurableRoots live_roots =
+            AskTheModel.RepositoryGcDurableRootCollector.
+                collect (
+                    root,
+                    control_path_for (root),
+                    conversations
+                );
+
+        assert (live_roots.protects_generation (1));
+        assert (live_roots.protects_generation (2));
+        assert (
+            live_roots.protects_snapshot (
+                "ewd",
+                OLD_EWD_SHA
+            )
+        );
+        assert (
+            live_roots.protects_snapshot (
+                "ewd",
+                NEW_EWD_SHA
+            )
+        );
+
+        AskTheModel.RepositoryNative.
+            release_generation_lease (
+                reader_fd
+            );
+        reader_fd = -1;
+
+        AskTheModel.RepositoryGcDurableRoots after_release =
+            AskTheModel.RepositoryGcDurableRootCollector.
+                collect (
+                    root,
+                    control_path_for (root),
+                    conversations
+                );
+
+        assert (!after_release.protects_generation (1));
+        assert (after_release.protects_generation (2));
+        assert (
+            !after_release.protects_snapshot (
+                "ewd",
+                OLD_EWD_SHA
+            )
+        );
+        assert (
+            after_release.protects_snapshot (
+                "ewd",
+                NEW_EWD_SHA
+            )
+        );
     } catch (Error error) {
         critical ("%s", error.message);
         assert_not_reached ();
@@ -376,6 +495,10 @@ main (string[] args) {
     Test.add_func (
         "/repository-gc-roots/empty-complete-generation-fail-closed",
         test_empty_complete_generation_fails_closed
+    );
+    Test.add_func (
+        "/repository-gc-roots/live-generation-lease-protected",
+        test_live_generation_lease_protects_historical_root
     );
     return Test.run ();
 }

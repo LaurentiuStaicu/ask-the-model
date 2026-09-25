@@ -131,6 +131,21 @@ void atm_control_state_snapshot_references_free (
     gsize count
 );
 
+/*
+ * Lists every persisted COMPLETE repository generation in ascending identifier
+ * order through the strict read-only/no-follow Control DB path. The database
+ * must already exist at the current schema; this function never bootstraps or
+ * migrates authority.
+ *
+ * The returned array is owned by the caller and must be released with g_free().
+ */
+gboolean atm_control_state_list_complete_generation_ids_readonly (
+    const char *path,
+    gint64 **out_generation_ids,
+    gint *out_count,
+    GError **error
+);
+
 gboolean atm_control_state_load_repository_values (
     const char *path,
     const char *repository_id,

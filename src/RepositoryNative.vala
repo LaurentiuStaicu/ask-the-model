@@ -150,4 +150,35 @@ namespace AskTheModel.RepositoryNative {
     public static extern void release_mutation_lease (
         int lease_fd
     );
+
+
+    [CCode (
+        cname = "atm_repository_generation_lease_try_acquire_shared",
+        cheader_filename = "repository_generation_lease.h"
+    )]
+    public static extern bool try_acquire_generation_lease_shared (
+        string state_root,
+        int64 generation_id,
+        out int lease_fd,
+        out bool contended
+    ) throws GLib.Error;
+
+    [CCode (
+        cname = "atm_repository_generation_lease_try_acquire_exclusive",
+        cheader_filename = "repository_generation_lease.h"
+    )]
+    public static extern bool try_acquire_generation_lease_exclusive (
+        string state_root,
+        int64 generation_id,
+        out int lease_fd,
+        out bool contended
+    ) throws GLib.Error;
+
+    [CCode (
+        cname = "atm_repository_generation_lease_release",
+        cheader_filename = "repository_generation_lease.h"
+    )]
+    public static extern void release_generation_lease (
+        int lease_fd
+    );
 }

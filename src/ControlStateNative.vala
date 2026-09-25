@@ -18,6 +18,15 @@ namespace AskTheModel.ControlStateNative {
     ) throws GLib.Error;
 
     [CCode (
+        cname = "atm_control_state_list_complete_generation_ids_readonly",
+        cheader_filename = "control_state.h"
+    )]
+    public static extern bool list_complete_generation_ids_readonly (
+        string path,
+        [CCode (array_length_type = "gint")] out int64[] generation_ids
+    ) throws GLib.Error;
+
+    [CCode (
         cname = "atm_control_state_load_repository_values_at_generation",
         cheader_filename = "control_state.h"
     )]
