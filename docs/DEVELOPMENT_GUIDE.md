@@ -1057,6 +1057,67 @@ No quarantine parent-directory fsync was present in M9. Because the repository a
 
 With F9, the planned candidate correctness evidence now covers normal promotion ordering, candidate interruption boundaries, explicit write EIO, and same-SHA repair/quarantine semantics. Final S1-vs-S2 policy review can therefore proceed separately from measurement evidence.
 
+### OPT-A1-P1 production durability policy selection
+
+A1-P1 converts the completed A1 evidence record into one explicit production-policy decision while deliberately leaving runtime behavior unchanged.
+
+The selected candidate is **S1 targeted fsync**.
+
+This is not a claim that S1 is more correct than S2 in the reviewed tests. The evidence says the opposite: after S3 was falsified, both S1 and S2 satisfy the reviewed candidate replay matrix, explicit EIO fail-closed matrix and same-SHA repair matrix. Selection therefore turns on the remaining engineering trade-off.
+
+M1 measured S2 as faster on the reviewed GitHub runner. The additional S1 cost relative to S2 was approximately:
+- CBD: 27.877 ms;
+- EWD: 29.807 ms;
+- RMD: 194.303 ms.
+
+S2 is nevertheless not selected because Linux `syncfs()` deliberately synchronizes the entire filesystem containing the supplied file descriptor. Its EIO may originate from any file or filesystem metadata in that filesystem. S1 instead invokes `fsync()` only for regular files and directories in the AtM snapshot tree plus the final promotion parent. Linux still permits an fsync EIO to reflect wider storage-level writeback problems, so S1 is described as **narrower in requested scope**, not perfectly error-isolated.
+
+S2 remains a benchmark/reference strategy. There is no automatic S1→S2 fallback: silently switching to a filesystem-wide barrier after a targeted barrier failure would change the selected scope and error model inside one operation.
+
+#### Selected ordering
+
+For a new or replacement snapshot while the operation-level Optimizations snapshot is ON:
+
+1. extract into the deterministic staging tree;
+2. validate repository identity and version;
+3. compute the snapshot seal that will be associated with these bytes;
+4. fsync every regular file in the staging tree;
+5. fsync directories bottom-up, including the staging root;
+6. atomically rename staging to the final snapshot path;
+7. fsync the destination parent directory;
+8. build or validate the derived retrieval index;
+9. recompute the snapshot seal and require it to equal the pre-barrier seal;
+10. recheck the selected state-root capacity headroom;
+11. perform the guarded Control DB `set_current`.
+
+The pre/post seal equality is part of the durability contract, not merely integrity diagnostics. It prevents authority from being committed for bytes that differ from those covered by the selected durability barrier.
+
+#### Failure and retry contract
+
+A pre-rename barrier failure aborts without promotion or authority advance.
+
+A destination-parent fsync failure occurs after rename but still before authority. The final snapshot is therefore treated as an **unreferenced recovery artifact**, not as proof that durability completed.
+
+A Control DB activation failure likewise leaves no new authority. The already-promoted snapshot remains an unreferenced recovery artifact.
+
+For the first production implementation, the mere existence of a final snapshot for the target SHA must never bypass the qualified staging sequence. If the runtime can positively establish that the target is an unreferenced recovery artifact, it may isolate or remove that artifact and rebuild through the selected sequence. If the target is protected by retained state, is historically required, or its disposability cannot be established, Optimizations ON must leave it untouched and fail closed without advancing authority. Reusing such a preexisting final tree would require a separately qualified final-tree durability requalification path; that path is not inferred from the current evidence.
+
+#### Same-SHA repair
+
+M9 shows that the quarantine rename does not need its own snapshot-authority-level parent fsync for correctness. Before replacement authority is committed, ambiguous repair states remain `REPAIR_REQUIRED` and unqualified. The replacement itself uses the selected S1 ordering; after the Control DB update it must become `REPAIRED_AUTHORITY_VALID` with the same repository SHA and matching replacement seal.
+
+#### Retrieval index scope
+
+The selected S1 barrier applies to **repository snapshot authority**, not automatically to the retrieval index. The index remains deterministic derived cache: it must validate or be absent/rebuildable, with its existing per-SHA single-flight and stale-staging recovery contract. A1-P1 selects no new fsync/syncfs barrier for index-cache promotion.
+
+#### Storage contract and gate
+
+Tier-2 replay qualification was performed on disposable ext4 filesystems under Linux. The selected production contract is local Linux storage supporting the required regular-file and directory fsync operations. The project does not claim that the reviewed Tier-2 result proves equivalent power-loss behavior for remote/network filesystems.
+
+If a required fsync operation is unsupported or returns an error while Optimizations is ON, the mutation fails closed. It does not fall back to syncfs. Optimizations OFF continues to preserve the current baseline path.
+
+The machine-readable decision is `qualification/durability-policy-v1.json`. Its status is `selected-not-wired`; `runtime_integration_selected=false` is intentional. Runtime implementation must be a separate reviewed slice.
+
 ### Recovery fault qualification
 
 The OPT-A0 recovery harness is test-only. Native checkpoint calls compile to no-ops in the production application; only the dedicated recovery helper is built with `ATM_TEST_FAULT_INJECTION`.
