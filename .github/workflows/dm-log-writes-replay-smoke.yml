@@ -1,0 +1,75 @@
+name: A1-M3 block replay semantics smoke
+
+on:
+  workflow_dispatch:
+  pull_request:
+    paths:
+      - 'scripts/run_dm_log_writes_replay_smoke.sh'
+      - '.github/workflows/dm-log-writes-replay-smoke.yml'
+
+permissions:
+  contents: read
+
+concurrency:
+  group: durability-a1-m3-${{ github.event.pull_request.number || github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  replay:
+    runs-on: ubuntu-24.04
+    timeout-minutes: 15
+
+    steps:
+      - name: Checkout AtM
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+
+      - name: Install replay dependencies
+        shell: bash
+        run: |
+          set -euo pipefail
+          sudo apt-get update
+          sudo apt-get install -y --no-install-recommends \
+            build-essential \
+            e2fsprogs \
+            git \
+            lvm2
+
+      - name: Build pinned replay-log
+        shell: bash
+        env:
+          LOG_WRITES_COMMIT: 7b70d8a6863c5de30933d42a7672d35d01d2dc6c
+        run: |
+          set -euo pipefail
+          git init /tmp/log-writes
+          git -C /tmp/log-writes remote add origin \
+            https://github.com/josefbacik/log-writes.git
+          git -C /tmp/log-writes fetch \
+            --depth=1 \
+            origin "$LOG_WRITES_COMMIT"
+          git -C /tmp/log-writes checkout --detach FETCH_HEAD
+          test "$(git -C /tmp/log-writes rev-parse HEAD)" = \
+            "$LOG_WRITES_COMMIT"
+          make -C /tmp/log-writes
+          test -x /tmp/log-writes/replay-log
+
+      - name: Replay ext4 state through fsync mark
+        shell: bash
+        env:
+          LOG_WRITES_COMMIT: 7b70d8a6863c5de30933d42a7672d35d01d2dc6c
+        run: |
+          set -euo pipefail
+          mkdir -p /tmp/atm-a1-m3-results
+
+          bash scripts/run_dm_log_writes_replay_smoke.sh \
+            /tmp/atm-a1-m3-results/replay-smoke.json \
+            /tmp/log-writes \
+            "$LOG_WRITES_COMMIT"
+
+      - name: Upload A1-M3 replay result
+        if: always()
+        uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7.0.1
+        with:
+          name: atm-a1-m3-replay-smoke-${{ github.run_id }}-${{ github.run_attempt }}
+          path: /tmp/atm-a1-m3-results/replay-smoke.json
+          if-no-files-found: error
+          retention-days: 90

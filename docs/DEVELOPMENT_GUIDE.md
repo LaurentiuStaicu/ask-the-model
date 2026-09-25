@@ -788,6 +788,21 @@ This closes only the **environment capability** question. It does not yet replay
 
 A1-M3 may therefore use the standard GitHub-hosted qualification runner for its first replay prototype instead of requiring self-hosted infrastructure.
 
+### OPT-A1-M3 block replay semantics smoke
+
+A1-M3 qualifies the block-replay mechanism itself before the AtM recovery oracle is layered on top.
+
+The workflow uses three disposable block images:
+- a live data device behind `dm-log-writes`;
+- the separate write-log device;
+- a blank replay target of the same size as the live data device.
+
+The live mapping is formatted as ext4, marked after `mkfs`, then mounted. A deterministic payload plus its expected SHA-256 are written; the payload file and containing directory are explicitly `fsync()`ed before a named `fsync` mark is emitted. After unmount and mapping removal, `replay-log` must locate both marks and replay the log from the beginning through the `fsync` mark onto the previously blank replay device.
+
+The replay device is then passed through ext4 recovery/fsck and mounted read-only. Qualification requires the recovered payload and the recovered expected-digest file to match the original SHA-256 exactly.
+
+This is still **not** the A1 production durability result. It proves only that the reviewed dm-log-writes environment can reconstruct synchronized block state through an explicit mark. A later replay slice must place the existing A0 snapshot-promotion/Control-DB fixture on the logged filesystem and apply the existing fresh-process restart classification to the replayed state.
+
 ### Recovery fault qualification
 
 The OPT-A0 recovery harness is test-only. Native checkpoint calls compile to no-ops in the production application; only the dedicated recovery helper is built with `ATM_TEST_FAULT_INJECTION`.
