@@ -365,6 +365,50 @@ test_v1_to_v2_migration (void)
         ");"
     );
 
+    gint64 *generation_ids = NULL;
+    gsize generation_count = 0;
+    GError *readonly_error = NULL;
+
+    g_assert_false (
+        atm_conversation_store_list_repository_generation_ids_readonly (
+            path,
+            &generation_ids,
+            &generation_count,
+            &readonly_error
+        )
+    );
+    g_assert_error (
+        readonly_error,
+        ATM_CONVERSATION_STORE_ERROR,
+        ATM_CONVERSATION_STORE_ERROR_SCHEMA
+    );
+    g_assert_null (generation_ids);
+    g_assert_cmpuint (
+        generation_count,
+        ==,
+        0
+    );
+    g_clear_error (&readonly_error);
+    g_assert_cmpint (
+        raw_int64 (
+            path,
+            "PRAGMA user_version;"
+        ),
+        ==,
+        1
+    );
+    char *readonly_schema_id = raw_text (
+        path,
+        "SELECT schema_id FROM installation "
+        "WHERE singleton_id=1;"
+    );
+    g_assert_cmpstr (
+        readonly_schema_id,
+        ==,
+        "atm-conversation-store/1"
+    );
+    g_free (readonly_schema_id);
+
     AtmConversationStore *store = NULL;
     GError *error = NULL;
 
@@ -1897,6 +1941,179 @@ test_archive_delete_lifecycle (void)
 }
 
 static void
+test_readonly_repository_generation_roots (void)
+{
+    char *root = new_temp_root (
+        "atm-conversation-generation-roots-XXXXXX"
+    );
+    char *path = store_path (root);
+    AtmConversationStore *store = NULL;
+    GError *error = NULL;
+
+    g_assert_true (
+        atm_conversation_store_open (
+            path,
+            &store,
+            &error
+        )
+    );
+    g_assert_no_error (error);
+
+    char *plain_id = NULL;
+
+    g_assert_true (
+        atm_conversation_store_create_conversation (
+            store,
+            "Plain",
+            1,
+            "model",
+            NULL,
+            0,
+            NULL,
+            0,
+            &plain_id,
+            &error
+        )
+    );
+    g_assert_no_error (error);
+
+    AtmConversationRepositoryInput repository = {
+        .repository_id = "rmd",
+        .repository_version = "0.1.0",
+        .snapshot_sha =
+            "1111111111111111111111111111111111111111"
+    };
+
+    char *first_id = NULL;
+    char *duplicate_id = NULL;
+    char *second_id = NULL;
+
+    g_assert_true (
+        atm_conversation_store_create_conversation (
+            store,
+            "Pinned seven",
+            2,
+            "model",
+            NULL,
+            7,
+            &repository,
+            1,
+            &first_id,
+            &error
+        )
+    );
+    g_assert_no_error (error);
+
+    g_assert_true (
+        atm_conversation_store_create_conversation (
+            store,
+            "Pinned seven again",
+            3,
+            "model",
+            NULL,
+            7,
+            &repository,
+            1,
+            &duplicate_id,
+            &error
+        )
+    );
+    g_assert_no_error (error);
+
+    repository.snapshot_sha =
+        "2222222222222222222222222222222222222222";
+
+    g_assert_true (
+        atm_conversation_store_create_conversation (
+            store,
+            "Pinned eleven",
+            4,
+            "model",
+            NULL,
+            11,
+            &repository,
+            1,
+            &second_id,
+            &error
+        )
+    );
+    g_assert_no_error (error);
+
+    atm_conversation_store_close (store);
+
+    gint64 *generation_ids = NULL;
+    gsize generation_count = 0;
+
+    g_assert_true (
+        atm_conversation_store_list_repository_generation_ids_readonly (
+            path,
+            &generation_ids,
+            &generation_count,
+            &error
+        )
+    );
+    g_assert_no_error (error);
+    g_assert_cmpuint (
+        generation_count,
+        ==,
+        2
+    );
+    g_assert_nonnull (generation_ids);
+    g_assert_cmpint (
+        generation_ids[0],
+        ==,
+        7
+    );
+    g_assert_cmpint (
+        generation_ids[1],
+        ==,
+        11
+    );
+    g_free (generation_ids);
+
+    char *missing = g_build_filename (
+        root,
+        "missing.sqlite3",
+        NULL
+    );
+    generation_ids = NULL;
+    generation_count = 0;
+
+    g_assert_false (
+        atm_conversation_store_list_repository_generation_ids_readonly (
+            missing,
+            &generation_ids,
+            &generation_count,
+            &error
+        )
+    );
+    g_assert_nonnull (error);
+    g_assert_null (generation_ids);
+    g_assert_cmpuint (
+        generation_count,
+        ==,
+        0
+    );
+    g_assert_false (
+        g_file_test (
+            missing,
+            G_FILE_TEST_EXISTS
+        )
+    );
+    g_clear_error (&error);
+
+    g_free (missing);
+    g_free (plain_id);
+    g_free (first_id);
+    g_free (duplicate_id);
+    g_free (second_id);
+    g_free (path);
+    remove_tree_best_effort (root);
+    g_free (root);
+}
+
+
+static void
 test_symlink_rejected (void)
 {
     char *root = new_temp_root (
@@ -1996,6 +2213,10 @@ main (int argc, char **argv)
     g_test_add_func (
         "/conversation-store/archive-delete-lifecycle",
         test_archive_delete_lifecycle
+    );
+    g_test_add_func (
+        "/conversation-store/readonly-repository-generation-roots",
+        test_readonly_repository_generation_roots
     );
     g_test_add_func (
         "/conversation-store/nofollow-symlink",

@@ -174,6 +174,22 @@ gboolean atm_conversation_store_list_conversations (
     GError **error
 );
 
+/*
+ * Lists distinct positive repository generation IDs pinned by durable
+ * conversation rows through a strictly read-only, no-follow SQLite
+ * connection. The database must already exist at the current schema;
+ * this function never bootstraps or migrates it.
+ *
+ * The returned array is owned by the caller and must be released with
+ * g_free(). An empty result returns count 0.
+ */
+gboolean atm_conversation_store_list_repository_generation_ids_readonly (
+    const char *path,
+    gint64 **out_generation_ids,
+    gsize *out_count,
+    GError **error
+);
+
 void atm_conversation_list_free (
     AtmConversationList *list
 );

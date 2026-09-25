@@ -24,6 +24,11 @@ typedef enum {
 
 typedef struct AtmControlStateStore AtmControlStateStore;
 
+typedef struct {
+    char *repository_id;
+    char *snapshot_sha;
+} AtmControlStateSnapshotReference;
+
 typedef enum {
     ATM_CONTROL_STATE_CUTOVER_EMPTY,
     ATM_CONTROL_STATE_CUTOVER_IMPORTED_LEGACY
@@ -52,6 +57,33 @@ gboolean atm_control_state_active_generation_id (
     GError **error
 );
 
+/*
+ * Reads the active COMPLETE repository generation through the strict
+ * read-only/no-follow Control DB path. The database must already exist at the
+ * current schema; this function never bootstraps or migrates authority.
+ */
+gboolean atm_control_state_active_generation_id_readonly (
+    const char *path,
+    gint64 *out_generation_id,
+    GError **error
+);
+
+/*
+ * Reads one repository row from an immutable COMPLETE generation through the
+ * strict read-only/no-follow Control DB path. The database must already exist
+ * at the current schema; this function never bootstraps or migrates authority.
+ */
+gboolean atm_control_state_load_repository_values_at_generation_readonly (
+    const char *path,
+    gint64 generation_id,
+    const char *repository_id,
+    gboolean *out_present,
+    char **out_snapshot_sha,
+    char **out_repository_version,
+    char **out_snapshot_seal_sha256,
+    GError **error
+);
+
 gboolean atm_control_state_load_repository_values_at_generation (
     const char *path,
     gint64 generation_id,
@@ -76,6 +108,27 @@ gboolean atm_control_state_count_complete_snapshot_references (
     const char *snapshot_sha,
     guint64 *out_reference_count,
     GError **error
+);
+
+/*
+ * Resolves one immutable COMPLETE repository generation to the exact
+ * repository/SHA pairs it protects. The query opens the Control DB through
+ * the strict read-only/no-follow path and never bootstraps or migrates state.
+ *
+ * The returned array is owned by the caller and must be released with
+ * atm_control_state_snapshot_references_free().
+ */
+gboolean atm_control_state_list_generation_snapshot_references_readonly (
+    const char *path,
+    gint64 generation_id,
+    AtmControlStateSnapshotReference **out_references,
+    gsize *out_count,
+    GError **error
+);
+
+void atm_control_state_snapshot_references_free (
+    AtmControlStateSnapshotReference *references,
+    gsize count
 );
 
 gboolean atm_control_state_load_repository_values (

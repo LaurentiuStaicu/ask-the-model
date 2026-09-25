@@ -543,6 +543,121 @@ configure_connection_security (
 }
 
 static gboolean
+configure_readonly_connection_security (
+    sqlite3 *db,
+    GError **error
+)
+{
+    if (sqlite3_libversion_number () <
+        3037000) {
+        g_set_error (
+            error,
+            ATM_CONVERSATION_STORE_ERROR,
+            ATM_CONVERSATION_STORE_ERROR_SCHEMA,
+            "Conversation store requires SQLite >= 3.37.0; runtime is %s.",
+            sqlite3_libversion ()
+        );
+        return FALSE;
+    }
+
+    if (sqlite3_db_readonly (
+            db,
+            "main"
+        ) != 1) {
+        g_set_error_literal (
+            error,
+            ATM_CONVERSATION_STORE_ERROR,
+            ATM_CONVERSATION_STORE_ERROR_IO,
+            "Conversation-store root query did not open the database read-only."
+        );
+        return FALSE;
+    }
+
+    if (sqlite3_busy_timeout (
+            db,
+            5000
+        ) != SQLITE_OK) {
+        set_sqlite_error (
+            db,
+            error,
+            ATM_CONVERSATION_STORE_ERROR_SQLITE,
+            "Could not configure read-only conversation-store busy timeout"
+        );
+        return FALSE;
+    }
+
+    if (!configure_db_flag (
+            db,
+            SQLITE_DBCONFIG_DEFENSIVE,
+            1,
+            "defensive",
+            error
+        ) ||
+        !configure_db_flag (
+            db,
+            SQLITE_DBCONFIG_TRUSTED_SCHEMA,
+            0,
+            "trusted_schema",
+            error
+        ) ||
+        !configure_db_flag (
+            db,
+            SQLITE_DBCONFIG_DQS_DML,
+            0,
+            "dqs_dml",
+            error
+        ) ||
+        !configure_db_flag (
+            db,
+            SQLITE_DBCONFIG_DQS_DDL,
+            0,
+            "dqs_ddl",
+            error
+        ) ||
+        !configure_db_flag (
+            db,
+            SQLITE_DBCONFIG_ENABLE_TRIGGER,
+            1,
+            "enable_trigger",
+            error
+        )) {
+        return FALSE;
+    }
+
+    if (!exec_sql (
+            db,
+            "PRAGMA query_only=ON;",
+            error
+        )) {
+        return FALSE;
+    }
+
+    gint64 query_only = 0;
+
+    if (!query_single_int64 (
+            db,
+            "PRAGMA query_only;",
+            &query_only,
+            error
+        )) {
+        return FALSE;
+    }
+
+    if (query_only != 1) {
+        g_set_error_literal (
+            error,
+            ATM_CONVERSATION_STORE_ERROR,
+            ATM_CONVERSATION_STORE_ERROR_SCHEMA,
+            "Conversation-store read-only root query could not enforce query_only."
+        );
+        return FALSE;
+    }
+
+    return TRUE;
+}
+
+
+static gboolean
 configure_store_journal (
     sqlite3 *db,
     GError **error
@@ -1994,6 +2109,75 @@ atm_conversation_store_validate (
 }
 
 static gboolean
+open_existing_conversation_store_readonly (
+    const char *path,
+    AtmConversationStore **out_store,
+    GError **error
+)
+{
+    if (!nonempty (path) ||
+        out_store == NULL ||
+        *out_store != NULL) {
+        g_set_error_literal (
+            error,
+            ATM_CONVERSATION_STORE_ERROR,
+            ATM_CONVERSATION_STORE_ERROR_ARGUMENT,
+            "Read-only conversation-root query received invalid open arguments."
+        );
+        return FALSE;
+    }
+
+    sqlite3 *db = NULL;
+    int rc = sqlite3_open_v2 (
+        path,
+        &db,
+        SQLITE_OPEN_READONLY |
+        SQLITE_OPEN_FULLMUTEX |
+        SQLITE_OPEN_NOFOLLOW,
+        NULL
+    );
+
+    if (rc != SQLITE_OK) {
+        set_sqlite_error (
+            db,
+            error,
+            ATM_CONVERSATION_STORE_ERROR_IO,
+            "Could not open existing conversation store read-only"
+        );
+        if (db != NULL) {
+            sqlite3_close (db);
+        }
+        return FALSE;
+    }
+
+    AtmConversationStore *store =
+        g_new0 (
+            AtmConversationStore,
+            1
+        );
+    store->db = db;
+    store->path = g_strdup (path);
+
+    if (!configure_readonly_connection_security (
+            db,
+            error
+        ) ||
+        !atm_conversation_store_validate (
+            store,
+            error
+        )) {
+        atm_conversation_store_close (
+            store
+        );
+        return FALSE;
+    }
+
+    *out_store = store;
+    return TRUE;
+}
+
+
+static gboolean
 validate_v1_for_migration (
     sqlite3 *db,
     GError **error
@@ -2353,6 +2537,143 @@ atm_conversation_store_open (
 
     *out_store = store;
     return TRUE;
+}
+
+
+gboolean
+atm_conversation_store_list_repository_generation_ids_readonly (
+    const char *path,
+    gint64 **out_generation_ids,
+    gsize *out_count,
+    GError **error
+)
+{
+    if (!nonempty (path) ||
+        out_generation_ids == NULL ||
+        out_count == NULL) {
+        g_set_error_literal (
+            error,
+            ATM_CONVERSATION_STORE_ERROR,
+            ATM_CONVERSATION_STORE_ERROR_ARGUMENT,
+            "Conversation generation-root query received invalid arguments."
+        );
+        return FALSE;
+    }
+
+    *out_generation_ids = NULL;
+    *out_count = 0;
+
+    AtmConversationStore *store = NULL;
+
+    if (!open_existing_conversation_store_readonly (
+            path,
+            &store,
+            error
+        )) {
+        return FALSE;
+    }
+
+    sqlite3_stmt *statement = NULL;
+    GArray *generation_ids =
+        g_array_new (
+            FALSE,
+            FALSE,
+            sizeof (gint64)
+        );
+    gboolean ok = FALSE;
+
+    if (!prepare_statement (
+            store->db,
+            "SELECT DISTINCT repository_generation_id "
+            "FROM conversations "
+            "ORDER BY repository_generation_id;",
+            &statement,
+            error
+        )) {
+        goto done;
+    }
+
+    int rc;
+
+    while ((rc = sqlite3_step (
+                statement
+            )) == SQLITE_ROW) {
+        if (sqlite3_column_type (
+                statement,
+                0
+            ) != SQLITE_INTEGER) {
+            g_set_error_literal (
+                error,
+                ATM_CONVERSATION_STORE_ERROR,
+                ATM_CONVERSATION_STORE_ERROR_INTEGRITY,
+                "Conversation repository generation root is not an integer."
+            );
+            goto done;
+        }
+
+        gint64 generation_id =
+            sqlite3_column_int64 (
+                statement,
+                0
+            );
+
+        if (generation_id < 0) {
+            g_set_error_literal (
+                error,
+                ATM_CONVERSATION_STORE_ERROR,
+                ATM_CONVERSATION_STORE_ERROR_INTEGRITY,
+                "Conversation repository generation root is negative."
+            );
+            goto done;
+        }
+
+        if (generation_id == 0) {
+            continue;
+        }
+
+        g_array_append_val (
+            generation_ids,
+            generation_id
+        );
+    }
+
+    if (rc != SQLITE_DONE) {
+        set_sqlite_error (
+            store->db,
+            error,
+            ATM_CONVERSATION_STORE_ERROR_SQLITE,
+            "Could not list conversation repository generation roots"
+        );
+        goto done;
+    }
+
+    *out_count = generation_ids->len;
+    *out_generation_ids =
+        (gint64 *) g_array_free (
+            generation_ids,
+            FALSE
+        );
+    generation_ids = NULL;
+    ok = TRUE;
+
+done:
+    if (statement != NULL) {
+        sqlite3_finalize (
+            statement
+        );
+    }
+
+    if (generation_ids != NULL) {
+        g_array_free (
+            generation_ids,
+            TRUE
+        );
+    }
+
+    atm_conversation_store_close (
+        store
+    );
+    return ok;
 }
 
 
