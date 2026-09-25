@@ -1,0 +1,112 @@
+{
+  "schema_version": 1,
+  "policy_id": "atm-snapshot-durability-production-policy-v1",
+  "status": "selected-not-wired",
+  "runtime_gate": {
+    "name": "Optimizations",
+    "default_enabled": false,
+    "operation_snapshot_required": true
+  },
+  "selected_strategy": "S1_TARGETED_FSYNC",
+  "production_barrier_selected": true,
+  "runtime_integration_selected": false,
+  "selection_basis": {
+    "s3_baseline": {
+      "selected": false,
+      "reason": "A1-M4 falsified the current baseline against the old-valid/new-valid Tier-2 authority invariant."
+    },
+    "s1_targeted_fsync": {
+      "selected": true,
+      "correctness": "QUALIFIED",
+      "scope": "ATM_SNAPSHOT_TREE_PLUS_PROMOTION_PARENT",
+      "reason": "S1 matches S2 on reviewed replay, EIO and same-SHA repair correctness while avoiding deliberate filesystem-wide writeback."
+    },
+    "s2_syncfs": {
+      "selected": false,
+      "correctness": "QUALIFIED",
+      "scope": "ENTIRE_CONTAINING_FILESYSTEM",
+      "role": "BENCHMARK_AND_REFERENCE",
+      "reason": "S2 is faster in A1-M1 but syncfs deliberately synchronizes the entire containing filesystem and can report writeback errors originating outside the AtM snapshot tree."
+    },
+    "correctness_tie_between_s1_s2": true,
+    "automatic_s1_to_s2_fallback": false
+  },
+  "m1_reviewed_cost_us": {
+    "cbd": {
+      "s1_total_over_control": 30348,
+      "s2_total_over_control": 2471,
+      "s1_minus_s2": 27877
+    },
+    "ewd": {
+      "s1_total_over_control": 55321,
+      "s2_total_over_control": 25514,
+      "s1_minus_s2": 29807
+    },
+    "rmd": {
+      "s1_total_over_control": 285974,
+      "s2_total_over_control": 91671,
+      "s1_minus_s2": 194303
+    }
+  },
+  "qualified_evidence": {
+    "performance_and_scope": "benchmarks/durability-v1/evidence.json#summary",
+    "s3_falsification": "benchmarks/durability-v1/evidence.json#tier2_atm_replay_baseline",
+    "candidate_after_authority": "benchmarks/durability-v1/evidence.json#tier2_candidate_replay",
+    "candidate_boundary_matrix": "benchmarks/durability-v1/evidence.json#tier2_candidate_boundary_replay",
+    "candidate_eio": "benchmarks/durability-v1/evidence.json#tier2_candidate_error_injection",
+    "same_sha_repair": "benchmarks/durability-v1/evidence.json#tier2_same_sha_repair"
+  },
+  "storage_contract": {
+    "platform": "Linux",
+    "tier2_qualified_filesystem": "ext4",
+    "production_scope": "LOCAL_FILESYSTEM",
+    "regular_file_fsync_required": true,
+    "directory_fsync_required": true,
+    "network_or_remote_filesystem_durability_claim": false,
+    "on_mode_unsupported_or_failed_barrier": "FAIL_CLOSED",
+    "off_mode_preserves_baseline": true,
+    "note": "The selected calls are narrower than syncfs but are not claimed to isolate AtM from every storage-level writeback error."
+  },
+  "normal_promotion_order": [
+    "EXTRACT_TO_STAGING",
+    "VALIDATE_IDENTITY_AND_VERSION",
+    "COMPUTE_PRE_BARRIER_SNAPSHOT_SEAL",
+    "FSYNC_EVERY_REGULAR_FILE_IN_STAGING_TREE",
+    "FSYNC_DIRECTORIES_BOTTOM_UP_INCLUDING_STAGING_ROOT",
+    "ATOMIC_RENAME_STAGING_TO_FINAL",
+    "FSYNC_FINAL_SNAPSHOT_PARENT",
+    "BUILD_OR_VALIDATE_DERIVED_RETRIEVAL_INDEX",
+    "COMPUTE_POST_PREPARE_SNAPSHOT_SEAL",
+    "REQUIRE_PRE_AND_POST_SEALS_EQUAL",
+    "STATE_CAPACITY_RECHECK",
+    "GUARDED_CONTROL_DB_SET_CURRENT"
+  ],
+  "same_sha_repair": {
+    "quarantine_parent_fsync_selected": false,
+    "pre_authority_state": "REPAIR_REQUIRED",
+    "post_authority_state": "REPAIRED_AUTHORITY_VALID",
+    "replacement_uses_selected_s1_order": true
+  },
+  "retry_recovery": {
+    "preexisting_final_snapshot_may_bypass_barrier": false,
+    "unreferenced_recovery_artifact_action": "REBUILD_THROUGH_SELECTED_S1_SEQUENCE_ONLY_AFTER_NON_PROTECTION_IS_ESTABLISHED",
+    "unresolved_or_protected_preexisting_target": "FAIL_CLOSED_WITHOUT_REMOVAL_OR_AUTHORITY_ADVANCE",
+    "future_final_tree_requalification_requires_separate_qualification": true,
+    "reason": "Final-directory existence is not durability evidence. A target proven to be an unreferenced recovery artifact may be isolated or removed and rebuilt through the qualified staging sequence; a target that is protected, historically required, or not proven disposable must remain untouched and fail closed until a separately qualified final-tree requalification path exists."
+  },
+  "failure_contract": {
+    "pre_rename_barrier_failure": "ABORT_WITHOUT_PROMOTION_OR_AUTHORITY_ADVANCE",
+    "promotion_parent_fsync_failure": "ABORT_WITHOUT_AUTHORITY_ADVANCE_AND_TREAT_FINAL_AS_UNREFERENCED_RECOVERY_ARTIFACT",
+    "control_db_activation_failure": "ABORT_WITHOUT_NEW_AUTHORITY_AND_TREAT_FINAL_AS_UNREFERENCED_RECOVERY_ARTIFACT",
+    "preexisting_target_reference_unresolved": "FAIL_CLOSED_WITHOUT_REMOVAL_OR_AUTHORITY_ADVANCE",
+    "same_sha_repair_pre_authority_failure": "REMAIN_FAIL_CLOSED_REPAIR_REQUIRED",
+    "automatic_syncfs_fallback": false
+  },
+  "retrieval_index": {
+    "authority_role": "DERIVED_CACHE",
+    "inherits_snapshot_authority_barrier": false,
+    "new_durability_barrier_selected": false,
+    "recovery_contract": "VALID_OR_ABSENT_REBUILDABLE",
+    "reason": "A1-P1 selects durability for repository snapshot authority only. The deterministic retrieval index remains governed by its existing validation, single-flight and rebuild recovery contract."
+  }
+}
