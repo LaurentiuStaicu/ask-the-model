@@ -333,6 +333,39 @@ namespace AskTheModel.Tests {
                     SAME_SHA_REPAIR
             );
 
+            assert (
+                !RepositoryLifecycleService.
+                    optimized_preexisting_final_must_fail_closed (
+                        false,
+                        false,
+                        true
+                    )
+            );
+            assert (
+                RepositoryLifecycleService.
+                    optimized_preexisting_final_must_fail_closed (
+                        true,
+                        false,
+                        true
+                    )
+            );
+            assert (
+                !RepositoryLifecycleService.
+                    optimized_preexisting_final_must_fail_closed (
+                        true,
+                        true,
+                        true
+                    )
+            );
+            assert (
+                !RepositoryLifecycleService.
+                    optimized_preexisting_final_must_fail_closed (
+                        true,
+                        false,
+                        false
+                    )
+            );
+
             assert (!service.repository_operations_allowed ());
             assert (
                 service.repository_state_status () ==
