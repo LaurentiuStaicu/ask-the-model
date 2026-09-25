@@ -238,57 +238,57 @@ jobs:
             "$MARKER" \
             "$ROOT/candidate.stderr" \
             "$ROOT/verify.json" <<'PY'
-import json
-import pathlib
-import sys
-
-output, rc, marker_path, stderr_path, verify_path = sys.argv[1:]
-
-failed_call = int(pathlib.Path(marker_path).read_text().strip())
-stderr = pathlib.Path(stderr_path).read_text(
-    encoding="utf-8",
-    errors="replace",
-).strip()
-with open(verify_path, encoding="utf-8") as handle:
-    verify = json.load(handle)
-
-context = "Could not fsync promoted snapshot parent"
-record = {
-    "schema_version": 1,
-    "probe_id": "atm-a1-m11b-source-parent-fsync-eio-v1",
-    "injection": "snapshot-durability-fsync-return-eio-on-call-6",
-    "helper_exit_code": int(rc),
-    "failed_fsync_call": failed_call,
-    "error_context_match": context.lower() in stderr.lower(),
-    "io_error_observed": any(
-        token in stderr.lower()
-        for token in ("input/output error", "i/o error")
-    ),
-    "classification": verify["classification"],
-    "active_generation_id": verify["active_generation_id"],
-    "active_repository_sha": verify.get("active_repository_sha"),
-    "final_snapshot_exists": verify["final_snapshot_exists"],
-    "staging_exists": verify["staging_exists"],
-    "namespace_clean": verify["namespace_clean"],
-}
-record["qualified"] = (
-    record["helper_exit_code"] != 0
-    and record["failed_fsync_call"] == 6
-    and record["error_context_match"]
-    and record["io_error_observed"]
-    and record["classification"] == "EMPTY_AUTHORITY_VALID"
-    and record["active_generation_id"] == 0
-    and record["active_repository_sha"] is None
-)
-
-pathlib.Path(output).write_text(
-    json.dumps(record, indent=2, sort_keys=True) + "\n",
-    encoding="utf-8",
-)
-
-if not record["qualified"]:
-    raise SystemExit("M11b source-parent exact EIO probe failed")
-PY
+          import json
+          import pathlib
+          import sys
+          
+          output, rc, marker_path, stderr_path, verify_path = sys.argv[1:]
+          
+          failed_call = int(pathlib.Path(marker_path).read_text().strip())
+          stderr = pathlib.Path(stderr_path).read_text(
+              encoding="utf-8",
+              errors="replace",
+          ).strip()
+          with open(verify_path, encoding="utf-8") as handle:
+              verify = json.load(handle)
+          
+          context = "Could not fsync promoted snapshot parent"
+          record = {
+              "schema_version": 1,
+              "probe_id": "atm-a1-m11b-source-parent-fsync-eio-v1",
+              "injection": "snapshot-durability-fsync-return-eio-on-call-6",
+              "helper_exit_code": int(rc),
+              "failed_fsync_call": failed_call,
+              "error_context_match": context.lower() in stderr.lower(),
+              "io_error_observed": any(
+                  token in stderr.lower()
+                  for token in ("input/output error", "i/o error")
+              ),
+              "classification": verify["classification"],
+              "active_generation_id": verify["active_generation_id"],
+              "active_repository_sha": verify.get("active_repository_sha"),
+              "final_snapshot_exists": verify["final_snapshot_exists"],
+              "staging_exists": verify["staging_exists"],
+              "namespace_clean": verify["namespace_clean"],
+          }
+          record["qualified"] = (
+              record["helper_exit_code"] != 0
+              and record["failed_fsync_call"] == 6
+              and record["error_context_match"]
+              and record["io_error_observed"]
+              and record["classification"] == "EMPTY_AUTHORITY_VALID"
+              and record["active_generation_id"] == 0
+              and record["active_repository_sha"] is None
+          )
+          
+          pathlib.Path(output).write_text(
+              json.dumps(record, indent=2, sort_keys=True) + "\n",
+              encoding="utf-8",
+          )
+          
+          if not record["qualified"]:
+              raise SystemExit("M11b source-parent exact EIO probe failed")
+          PY
 
           python3 -m json.tool \
             /tmp/atm-a1-m11-results/source-parent-eio-probe.json
