@@ -246,6 +246,51 @@ namespace AskTheModel.Tests {
 
             assert (catalog.length == 3);
 
+            var capacity_record =
+                new RepositoryLocalRecord (
+                    catalog[0].id
+                );
+            var capacity_info =
+                new RepositoryRuntimeInfo (
+                    catalog[0],
+                    capacity_record,
+                    root
+                );
+
+            assert (
+                RepositoryLifecycleService.
+                    capacity_operation_kind (
+                        capacity_info,
+                        false
+                    ) ==
+                RepositoryNative.CapacityOperationKind.
+                    FRESH_INSTALL
+            );
+
+            capacity_record.current_sha =
+                "1111111111111111111111111111111111111111";
+            capacity_record.version = "0.1.0";
+
+            assert (
+                RepositoryLifecycleService.
+                    capacity_operation_kind (
+                        capacity_info,
+                        false
+                    ) ==
+                RepositoryNative.CapacityOperationKind.
+                    DIFFERENT_SHA_UPDATE
+            );
+
+            assert (
+                RepositoryLifecycleService.
+                    capacity_operation_kind (
+                        capacity_info,
+                        true
+                    ) ==
+                RepositoryNative.CapacityOperationKind.
+                    SAME_SHA_REPAIR
+            );
+
             assert (!service.repository_operations_allowed ());
             assert (
                 service.repository_state_status () ==
