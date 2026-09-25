@@ -33,6 +33,7 @@ Current AtM Development adds an OFF-by-default, session-only **Optimizations** g
 With Optimizations ON, the currently qualified repository-lifecycle optimizations are:
 - one global cross-process repository authority-mutation lease for Download/Update;
 - one per-SHA retrieval-index single-flight for missing/invalid derived indexes;
+- shared read leases for positive repository generations used by repository-backed conversation grounding/History requalification, held for the active session lifetime so future GC can recognize live runtime roots;
 - production local-capacity admission for Download/Update, using pre-download, post-download/pre-mutation and immediate pre-Control-DB-publication checkpoints.
 
 Capacity admission is deliberately conservative. Exact C0-M1 repository ID + SHA profiles may use their frozen allocated-byte evidence. A new/unknown SHA receives no inherited historical snapshot/index byte prediction because structural stress falsified that predictor as a conservative bound. Structural inode checks and the selected 128 KiB / four-inode Control DB publication headroom remain active. Only proven preflight insufficiency is surfaced as `NO SPACE`; post-admission storage failures retain the established fail-closed path.
