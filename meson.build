@@ -1815,16 +1815,17 @@ test(
 
 
 c_compiler = meson.get_compiler('c')
-presentation_sanitizers_supported =
+presentation_sanitize_compile_supported =
   c_compiler.has_multi_arguments(
     '-fsanitize=address,undefined',
     '-fno-omit-frame-pointer'
-  ) and
+  )
+presentation_sanitize_link_supported =
   c_compiler.has_link_argument(
     '-fsanitize=address,undefined'
   )
 
-if presentation_sanitizers_supported
+if presentation_sanitize_compile_supported and presentation_sanitize_link_supported
   presentation_sanitizer_test = executable(
     'presentation-sanitizer-test',
     [
