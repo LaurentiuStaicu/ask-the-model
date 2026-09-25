@@ -75,8 +75,6 @@ run_boundary() {
             kill -9 "$child_pid" >/dev/null 2>&1 || true
             wait "$child_pid" >/dev/null 2>&1 || true
         fi
-        exec 3>&- 2>/dev/null || true
-        exec 4>&- 2>/dev/null || true
         set -e
     }
 
