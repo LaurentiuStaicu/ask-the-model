@@ -66,13 +66,26 @@ def main() -> int:
         "if (generation_id <= 0)",
         "generation-zero guard",
     )
-    zero_guard = require(
+    acquire_start = require(
         gen,
+        "static gboolean\nacquire_generation_lease (",
+        "generation lease acquisition",
+    )
+    acquire_end = gen.find(
+        "\ngboolean\natm_repository_generation_lease_try_acquire_shared (",
+        acquire_start,
+    )
+    if acquire_end < 0:
+        fail("generation lease acquisition boundary missing")
+    acquire_body = gen[acquire_start:acquire_end]
+
+    zero_guard = require(
+        acquire_body,
         "if (generation_id <= 0)",
         "generation-zero guard",
     )
     dir_create = require(
-        gen,
+        acquire_body,
         "ensure_lease_directory (",
         "generation lease directory",
     )
