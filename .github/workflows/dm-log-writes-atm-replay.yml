@@ -81,26 +81,58 @@ jobs:
             --generate-source \
             --target=/tmp/atm-a1-m4-resources.c
 
-          cc \
-            -std=c11 \
+          CFLAGS="$(pkg-config --cflags \
+            glib-2.0 \
+            gio-2.0 \
+            json-glib-1.0 \
+            sqlite3)"
+          LIBS="$(pkg-config --libs \
+            glib-2.0 \
+            gio-2.0 \
+            json-glib-1.0 \
+            sqlite3)"
+
+          COMMON_FLAGS="-std=c11 -O2 -Wall -Wextra -Werror -Isrc -Itests"
+
+          cc $COMMON_FLAGS $CFLAGS \
+            -c src/control_state.c \
+            -o /tmp/control_state.o
+
+          cc $COMMON_FLAGS $CFLAGS \
+            -D_GNU_SOURCE \
             -DATM_TEST_FAULT_INJECTION \
-            -O2 \
-            -Wall \
-            -Wextra \
-            -Werror \
-            -Isrc \
-            -Itests \
-            src/repository_storage.c \
-            src/control_state.c \
-            src/snapshot_seal.c \
-            tests/fault_injection_support.c \
-            tests/a1_snapshot_replay_helper.c \
-            /tmp/atm-a1-m4-resources.c \
-            $(pkg-config --cflags --libs \
-              glib-2.0 \
-              gio-2.0 \
-              json-glib-1.0 \
-              sqlite3) \
+            -c src/repository_storage.c \
+            -o /tmp/repository_storage.o
+
+          cc $COMMON_FLAGS $CFLAGS \
+            -D_GNU_SOURCE \
+            -c src/snapshot_seal.c \
+            -o /tmp/snapshot_seal.o
+
+          cc $COMMON_FLAGS $CFLAGS \
+            -D_GNU_SOURCE \
+            -DATM_TEST_FAULT_INJECTION \
+            -c tests/fault_injection_support.c \
+            -o /tmp/fault_injection_support.o
+
+          cc $COMMON_FLAGS $CFLAGS \
+            -D_GNU_SOURCE \
+            -DATM_TEST_FAULT_INJECTION \
+            -c tests/a1_snapshot_replay_helper.c \
+            -o /tmp/a1_snapshot_replay_helper.o
+
+          cc $COMMON_FLAGS $CFLAGS \
+            -c /tmp/atm-a1-m4-resources.c \
+            -o /tmp/atm-a1-m4-resources.o
+
+          cc \
+            /tmp/control_state.o \
+            /tmp/repository_storage.o \
+            /tmp/snapshot_seal.o \
+            /tmp/fault_injection_support.o \
+            /tmp/a1_snapshot_replay_helper.o \
+            /tmp/atm-a1-m4-resources.o \
+            $LIBS \
             -o /tmp/atm-a1-m4-replay-helper
 
           test -x /tmp/atm-a1-m4-replay-helper
