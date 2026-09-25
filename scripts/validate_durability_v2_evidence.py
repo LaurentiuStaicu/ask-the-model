@@ -206,6 +206,24 @@ def main() -> int:
     if m11.get("results") != expected_results:
         fail("M11 exact reviewed boundary results drifted")
 
+    expected_scope_review = {
+        "destination_hierarchy_checkpoint_preceded_namespace_helper": True,
+        "destination_hierarchy_fsync_isolated": False,
+        "destination_hierarchy_result_scope": (
+            "broad destination-hierarchy write-error fail-closed evidence only"
+        ),
+        "destination_parent_fsync_isolated": True,
+        "source_parent_fsync_isolated": False,
+        "source_parent_result_scope": (
+            "checkpoint is immediately before source-parent fsync, but the frozen "
+            "artifact records only generic EIO and does not prove that this fsync "
+            "returned the error"
+        ),
+        "superseding_gate": "A1-M11b exact namespace fsync EIO qualification",
+    }
+    if m11.get("scope_review") != expected_scope_review:
+        fail("M11 reviewed evidence scope drifted")
+
     interpretation = evidence.get("interpretation", {})
     if interpretation.get("m10_empirically_distinguished_candidates") is not False:
         fail("M10 empirical tie interpretation drifted")
@@ -213,8 +231,12 @@ def main() -> int:
         fail("M11 completion marker drifted")
     if interpretation.get("candidate_for_policy_review") != "S1_DEST_SOURCE":
         fail("policy-review candidate drifted")
-    if interpretation.get("policy_review_ready") is not True:
-        fail("policy review readiness was lost")
+    if interpretation.get("policy_review_ready") is not False:
+        fail("policy review must remain blocked pending M11b")
+    if interpretation.get("m11_exact_fsync_qualification_complete") is not False:
+        fail("M11 exact-fsync completion must remain false pending M11b")
+    if interpretation.get("m11b_required") is not True:
+        fail("M11b requirement was lost")
     if interpretation.get("production_namespace_sequence_selected") is not False:
         fail("F10 must remain evidence-only")
     if interpretation.get("automatic_orphan_recovery_authorized") is not False:
@@ -236,8 +258,11 @@ def main() -> int:
         "fresh destination hierarchy",
         "destination rename-parent",
         "source staging-parent",
-        "m11 shows explicit eio",
-        "fails closed before authority",
+        "historical m11 destination-parent result fsync-specific",
+        "hierarchy checkpoint preceded mkdirat/open/fstat",
+        "source-parent testing showed that fsync can return successfully",
+        "later control db write",
+        "blocked on m11b",
     ):
         if phrase not in reason:
             fail(f"review rationale lost: {phrase}")
@@ -251,6 +276,10 @@ def main() -> int:
         "does not weaken the linux directory-entry durability contract",
         "production namespace sequencing remains unselected",
         "authority-wide exclusion",
+        "does not isolate fsync from preceding mkdirat/open/fstat",
+        "suspended until m11b",
+        "source-parent checkpoint is positioned immediately before",
+        "may not force write i/o at that call",
     ):
         if phrase not in limitations:
             fail(f"reviewed limitation lost: {phrase}")

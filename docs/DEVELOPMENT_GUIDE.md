@@ -1172,9 +1172,9 @@ M10 deliberately does not select the production namespace sequence. The ext4 fix
 
 `benchmarks/durability-v2/evidence.json` freezes the final reviewed M10 replay and M11 EIO evidence as one namespace qualification record. The M11 source is Actions `36147082278`, artifact `10870456523`, artifact SHA-256 `e11a8a6c4b9d198c223a355d1129a9807da445cbdf564daaa11ce706fe9cb754`, measured head `3682bcd555b3f1aa2a3f778270896cac43fbd30e`.
 
-The frozen M11 matrix contains exactly three `S1_DEST_SOURCE` EIO boundaries: destination hierarchy fsync, destination-parent fsync and source-parent fsync. Every candidate call exits non-zero with explicit I/O failure; each recovered filesystem is e2fsck-clean/correctable; and every fresh verifier remains `EMPTY_AUTHORITY_VALID`, generation 0, with no active repository SHA. At the source-parent fault the final snapshot may already exist while authority remains empty, explicitly preserving the unreferenced-artifact distinction.
+The frozen historical M11 matrix contains three `S1_DEST_SOURCE` fault scenarios and preserves exact run/artifact provenance. Post-freeze review narrows their interpretation: the destination-hierarchy checkpoint precedes the complete namespace helper and cannot isolate `fsync()` from `mkdirat/open/fstat`; the source-parent checkpoint is immediately before its fsync, but the frozen artifact retained only generic EIO and later exact testing showed the block fault can surface at a later Control DB write instead. Only the historical destination-parent result remains fsync-specific.
 
-F10 remains evidence-only. It records `S1_DEST_SOURCE` as ready for separate policy review, but `production_namespace_sequence_selected=false` and automatic orphan deletion remains unauthorized. A later policy slice must update the selected ordering before I1c is changed or runtime wiring begins.
+F10 remains evidence-only. `S1_DEST_SOURCE` remains the contract-complete candidate for later policy review, but `policy_review_ready=false`, `production_namespace_sequence_selected=false`, and automatic orphan deletion remains unauthorized until M11b exact-fsync evidence is reviewed and frozen.
 
 ### OPT-A1-M11 fresh-install namespace EIO qualification
 
@@ -1210,6 +1210,21 @@ M10 does not empirically rank the three namespace candidates on the reviewed ext
 P2 also narrows retry policy. A successful I1b zero-reference query is not deletion authority because the current Optimizations-ON mutation lease does not exclude Optimizations-OFF Control DB writers. The first runtime integration therefore selects no automatic orphan cleanup: a preexisting final target that is not handled by an already-qualified repair path remains untouched and causes fail-closed operation. Future automatic recovery requires authority-wide exclusion across every writer and the filesystem mutation window.
 
 The machine-readable policy remains `selected-not-wired`. `runtime_integration_selected=false` is unchanged. The dormant I1c primitive still lacks the newly selected destination-hierarchy and source-parent barriers, so it must be refined in a separate implementation slice before any Vala/lifecycle caller is allowed.
+
+### OPT-A1-P2a namespace-selection suspension
+
+P2 is retained as historical decision provenance, but its namespace selection is not current policy. Post-freeze review of M11 found that the evidence used by P2 was too broadly interpreted: the destination-hierarchy scenario did not isolate the intended fsync from earlier namespace operations, and the source-parent artifact did not prove that the source-parent fsync itself returned the observed generic EIO.
+
+The production policy therefore keeps the already-qualified content strategy `S1_TARGETED_FSYNC` but suspends the namespace sub-policy:
+
+- `selected_namespace_strategy = null`;
+- `production_namespace_sequence_selected = false`;
+- `S1_DEST_SOURCE` remains `candidate_for_review`, not a selected production sequence;
+- `m11_eio_correctness = PARTIAL_SCOPE_REVIEWED`;
+- `m11b_required = true`;
+- runtime integration remains unauthorized.
+
+The policy's active promotion order reverts to the P1 content-durability sequence until M11b is reviewed. The extra destination-hierarchy and source-parent steps remain candidate operations only; no application caller may rely on them as selected policy. PRs that implement the P2 namespace order must remain draft/blocked until a later freeze restores policy readiness.
 
 ### Recovery fault qualification
 

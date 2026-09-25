@@ -32,14 +32,14 @@ def main() -> int:
         fail("policy must remain selected-not-wired")
     if policy.get("selected_strategy") != "S1_TARGETED_FSYNC":
         fail("selected durability strategy drifted")
-    if policy.get("selected_namespace_strategy") != "S1_DEST_SOURCE":
-        fail("selected namespace strategy drifted")
+    if policy.get("selected_namespace_strategy") is not None:
+        fail("namespace strategy must remain unselected pending M11b")
     if policy.get("production_barrier_selected") is not True:
         fail("production barrier selection was lost")
-    if policy.get("production_namespace_sequence_selected") is not True:
-        fail("P2 must select the namespace sequence")
+    if policy.get("production_namespace_sequence_selected") is not False:
+        fail("namespace sequence must remain unselected pending M11b")
     if policy.get("runtime_integration_selected") is not False:
-        fail("P2 must not wire runtime behavior")
+        fail("namespace-policy correction must not wire runtime behavior")
 
     if policy.get("runtime_gate") != {
         "name": "Optimizations",
@@ -78,25 +78,27 @@ def main() -> int:
     namespace_basis = basis.get("namespace_durability")
     if not isinstance(namespace_basis, dict):
         fail("namespace selection basis is missing")
-    if namespace_basis.get("selected") != "S1_DEST_SOURCE":
-        fail("namespace selected candidate drifted")
+    if namespace_basis.get("selected") is not None:
+        fail("namespace policy must remain unselected pending M11b")
+    if namespace_basis.get("candidate_for_review") != "S1_DEST_SOURCE":
+        fail("namespace review candidate drifted")
     if namespace_basis.get("m10_replay_correctness") != "QUALIFIED":
         fail("M10 qualification was lost")
-    if namespace_basis.get("m11_eio_correctness") != "QUALIFIED":
-        fail("M11 qualification was lost")
+    if namespace_basis.get("m11_eio_correctness") != "PARTIAL_SCOPE_REVIEWED":
+        fail("M11 reviewed partial scope was lost")
+    if namespace_basis.get("m11b_required") is not True:
+        fail("M11b requirement was lost")
     if namespace_basis.get("linux_directory_entry_contract_driven") is not True:
         fail("Linux directory-entry contract basis was lost")
     namespace_reason = str(namespace_basis.get("reason", "")).lower()
     for phrase in (
-        "does not guarantee containing-directory entry persistence",
-        "fresh destination hierarchy",
-        "destination rename parent",
-        "source staging parent",
-        "m11 shows explicit eio",
-        "fails closed before authority",
+        "s1_dest_source remains the conservative contract-complete candidate",
+        "m11 did not isolate hierarchy fsync",
+        "did not prove source-parent fsync returned the observed eio",
+        "suspended until m11b",
     ):
         if phrase not in namespace_reason:
-            fail(f"namespace selection rationale lost: {phrase}")
+            fail(f"namespace review rationale lost: {phrase}")
 
     reviewed_cost = policy.get("m1_reviewed_cost_us")
     expected_cost = {
@@ -198,8 +200,12 @@ def main() -> int:
         fail("M11 candidate drifted")
     if interpretation.get("candidate_for_policy_review") != "S1_DEST_SOURCE":
         fail("F10 policy-review candidate drifted")
-    if interpretation.get("policy_review_ready") is not True:
-        fail("F10 policy-review readiness was lost")
+    if interpretation.get("policy_review_ready") is not False:
+        fail("F10 policy review must remain blocked pending M11b")
+    if interpretation.get("m11_exact_fsync_qualification_complete") is not False:
+        fail("M11 exact-fsync qualification must remain incomplete")
+    if interpretation.get("m11b_required") is not True:
+        fail("F10 M11b requirement was lost")
     if interpretation.get("production_namespace_sequence_selected") is not False:
         fail("F10 evidence must not select policy")
     if interpretation.get("automatic_orphan_recovery_authorized") is not False:
@@ -225,10 +231,8 @@ def main() -> int:
         "COMPUTE_PRE_BARRIER_SNAPSHOT_SEAL",
         "FSYNC_EVERY_REGULAR_FILE_IN_STAGING_TREE",
         "FSYNC_DIRECTORIES_BOTTOM_UP_INCLUDING_STAGING_ROOT",
-        "PREPARE_AND_DURABLY_SYNC_FINAL_PARENT_HIERARCHY",
         "ATOMIC_RENAME_STAGING_TO_FINAL",
         "FSYNC_FINAL_SNAPSHOT_PARENT",
-        "FSYNC_STAGING_SOURCE_PARENT_AFTER_RENAME",
         "BUILD_OR_VALIDATE_DERIVED_RETRIEVAL_INDEX",
         "COMPUTE_POST_PREPARE_SNAPSHOT_SEAL",
         "REQUIRE_PRE_AND_POST_SEALS_EQUAL",
@@ -272,14 +276,7 @@ def main() -> int:
 
     expected_failure = {
         "pre_rename_barrier_failure": "ABORT_WITHOUT_PROMOTION_OR_AUTHORITY_ADVANCE",
-        "destination_hierarchy_fsync_failure": (
-            "ABORT_BEFORE_PROMOTION_WITHOUT_AUTHORITY_ADVANCE"
-        ),
         "promotion_parent_fsync_failure": (
-            "ABORT_WITHOUT_AUTHORITY_ADVANCE_AND_TREAT_FINAL_AS_"
-            "UNREFERENCED_RECOVERY_ARTIFACT"
-        ),
-        "source_parent_fsync_failure": (
             "ABORT_WITHOUT_AUTHORITY_ADVANCE_AND_TREAT_FINAL_AS_"
             "UNREFERENCED_RECOVERY_ARTIFACT"
         ),
@@ -300,12 +297,10 @@ def main() -> int:
 
     implementation = policy.get("implementation_state")
     if implementation != {
-        "namespace_policy_selected": True,
+        "namespace_policy_selected": False,
         "durable_ingest_namespace_complete": False,
         "runtime_wiring_authorized": False,
-        "next_required_slice": (
-            "REFINE_DORMANT_I1C_PRIMITIVE_TO_SELECTED_NAMESPACE_ORDER"
-        ),
+        "next_required_slice": "COMPLETE_M11B_EXACT_NAMESPACE_FSYNC_QUALIFICATION",
     }:
         fail("implementation staging contract drifted")
 
@@ -333,7 +328,7 @@ def main() -> int:
 
     print(
         "durability production policy validation passed: "
-        "S1 + S1_DEST_SOURCE selected, runtime not wired"
+        "S1 selected; namespace selection suspended pending M11b"
     )
     return 0
 
