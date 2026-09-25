@@ -118,5 +118,35 @@
     "preferred_first_prototype": "dm-log-writes replay qualification",
     "purpose": "replay completed writes/flush ordering to explicit marks and verify restart authority using the existing recovery oracle",
     "production_authorized": false
+  },
+  "tier2_capability": {
+    "probe_id": "atm-a1-m2-dm-log-writes-capability-v1",
+    "status": "supported",
+    "production_durability_authorized": false,
+    "source": {
+      "actions_run_id": 36117390930,
+      "artifact_name": "atm-a1-m2-dm-log-writes-36117390930-1",
+      "artifact_id": 10855264761,
+      "artifact_sha256": "4c88f7a4934c8c6470fa62d6857ec4253ef79bcc6c10eb0bf5bdd999f33b0415",
+      "atm_source_commit": "d6e1feb16990e1bbffb9e7bcce8c475c472e4272"
+    },
+    "kernel": {
+      "system": "Linux",
+      "release": "6.17.0-1022-azure",
+      "machine": "x86_64"
+    },
+    "upstream": {
+      "repository": "josefbacik/log-writes",
+      "commit": "7b70d8a6863c5de30933d42a7672d35d01d2dc6c"
+    },
+    "checks": {
+      "dm_log_writes_target_available": true,
+      "loop_device_available": true,
+      "mapping_created": true,
+      "ext4_mounted": true,
+      "replay_log_built": true,
+      "fsync_mark_found": true
+    },
+    "reviewed_conclusion": "The standard GitHub-hosted Ubuntu runner supports the minimum dm-log-writes/replay-log mark mechanism required to prototype A1-M3; this is capability evidence only and does not establish replay durability."
   }
 }
