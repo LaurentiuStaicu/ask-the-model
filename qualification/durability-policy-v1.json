@@ -31,11 +31,13 @@
     "correctness_tie_between_s1_s2": true,
     "automatic_s1_to_s2_fallback": false,
     "namespace_durability": {
-      "selected": "S1_DEST_SOURCE",
+      "selected": null,
+      "candidate_for_review": "S1_DEST_SOURCE",
       "m10_replay_correctness": "QUALIFIED",
-      "m11_eio_correctness": "QUALIFIED",
+      "m11_eio_correctness": "PARTIAL_SCOPE_REVIEWED",
+      "m11b_required": true,
       "linux_directory_entry_contract_driven": true,
-      "reason": "M10 kept parent-only, destination-chain, and destination+source authority-safe on the reviewed ext4 replay fixture, but Linux does not guarantee containing-directory entry persistence from object fsync alone. S1_DEST_SOURCE explicitly persists the fresh destination hierarchy, destination rename parent, and source staging parent, and M11 shows explicit EIO at each added namespace barrier fails closed before authority."
+      "reason": "M10 kept parent-only, destination-chain, and destination+source authority-safe on the reviewed ext4 replay fixture, while Linux still requires explicit containing-directory fsync for directory-entry durability. S1_DEST_SOURCE remains the conservative contract-complete candidate, but post-freeze review found that M11 did not isolate hierarchy fsync and did not prove source-parent fsync returned the observed EIO. Namespace selection is therefore suspended until M11b exact-fsync evidence is reviewed and frozen."
     }
   },
   "m1_reviewed_cost_us": {
@@ -82,10 +84,8 @@
     "COMPUTE_PRE_BARRIER_SNAPSHOT_SEAL",
     "FSYNC_EVERY_REGULAR_FILE_IN_STAGING_TREE",
     "FSYNC_DIRECTORIES_BOTTOM_UP_INCLUDING_STAGING_ROOT",
-    "PREPARE_AND_DURABLY_SYNC_FINAL_PARENT_HIERARCHY",
     "ATOMIC_RENAME_STAGING_TO_FINAL",
     "FSYNC_FINAL_SNAPSHOT_PARENT",
-    "FSYNC_STAGING_SOURCE_PARENT_AFTER_RENAME",
     "BUILD_OR_VALIDATE_DERIVED_RETRIEVAL_INDEX",
     "COMPUTE_POST_PREPARE_SNAPSHOT_SEAL",
     "REQUIRE_PRE_AND_POST_SEALS_EQUAL",
@@ -109,9 +109,7 @@
   },
   "failure_contract": {
     "pre_rename_barrier_failure": "ABORT_WITHOUT_PROMOTION_OR_AUTHORITY_ADVANCE",
-    "destination_hierarchy_fsync_failure": "ABORT_BEFORE_PROMOTION_WITHOUT_AUTHORITY_ADVANCE",
     "promotion_parent_fsync_failure": "ABORT_WITHOUT_AUTHORITY_ADVANCE_AND_TREAT_FINAL_AS_UNREFERENCED_RECOVERY_ARTIFACT",
-    "source_parent_fsync_failure": "ABORT_WITHOUT_AUTHORITY_ADVANCE_AND_TREAT_FINAL_AS_UNREFERENCED_RECOVERY_ARTIFACT",
     "control_db_activation_failure": "ABORT_WITHOUT_NEW_AUTHORITY_AND_TREAT_FINAL_AS_UNREFERENCED_RECOVERY_ARTIFACT",
     "preexisting_target_reference_unresolved": "FAIL_CLOSED_WITHOUT_REMOVAL_OR_AUTHORITY_ADVANCE",
     "same_sha_repair_pre_authority_failure": "REMAIN_FAIL_CLOSED_REPAIR_REQUIRED",
@@ -124,12 +122,12 @@
     "recovery_contract": "VALID_OR_ABSENT_REBUILDABLE",
     "reason": "A1-P1 selects durability for repository snapshot authority only. The deterministic retrieval index remains governed by its existing validation, single-flight and rebuild recovery contract."
   },
-  "selected_namespace_strategy": "S1_DEST_SOURCE",
-  "production_namespace_sequence_selected": true,
+  "selected_namespace_strategy": null,
+  "production_namespace_sequence_selected": false,
   "implementation_state": {
-    "namespace_policy_selected": true,
+    "namespace_policy_selected": false,
     "durable_ingest_namespace_complete": false,
     "runtime_wiring_authorized": false,
-    "next_required_slice": "REFINE_DORMANT_I1C_PRIMITIVE_TO_SELECTED_NAMESPACE_ORDER"
+    "next_required_slice": "COMPLETE_M11B_EXACT_NAMESPACE_FSYNC_QUALIFICATION"
   }
 }
