@@ -1,5 +1,6 @@
 #!/usr/bin/env python3
 
+import json
 import pathlib
 import sys
 
@@ -97,13 +98,16 @@ def main() -> int:
     ):
         if "ingest_archive_durable" in runtime_text:
             fail(
-                f"{runtime_path} activates I1b before the separate runtime slice"
+                f"{runtime_path} activates I1c before the separate runtime slice"
             )
 
-    if "runtime_integration_selected" not in read(
-        ROOT / "qualification" / "durability-policy-v1.json"
-    ):
-        fail("durability policy runtime gate marker is missing")
+    policy = json.loads(
+        read(ROOT / "qualification" / "durability-policy-v1.json")
+    )
+    if policy.get("status") != "selected-not-wired":
+        fail("durability policy must remain selected-not-wired in I1c")
+    if policy.get("runtime_integration_selected") is not False:
+        fail("I1c must not authorize runtime durability integration")
 
     for required in (
         "'src/snapshot_durability.c'",
@@ -132,7 +136,7 @@ def main() -> int:
 
     print(
         "durable ingest primitive wiring validation passed: "
-        "native primitive present, capacity runners linked, runtime unwired"
+        "I1c native primitive present, capacity runners linked, runtime unwired"
     )
     return 0
 
