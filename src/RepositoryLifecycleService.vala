@@ -128,6 +128,207 @@ namespace AskTheModel {
             return optimization_policy.snapshot_enabled ();
         }
 
+        private void require_download_capacity (
+            RepositoryDescriptor descriptor,
+            string sha
+        ) throws RepositoryError {
+            string partial_path =
+                RepositoryClient.staging_archive_path (
+                    descriptor,
+                    sha.down (),
+                    true
+                );
+            string? staging_directory =
+                GLib.Path.get_dirname (
+                    partial_path
+                );
+
+            if (staging_directory == null ||
+                GLib.DirUtils.create_with_parents (
+                    staging_directory,
+                    0700
+                ) != 0) {
+                throw new RepositoryError.STORAGE (
+                    "Repository staging directory could not be prepared for local-capacity admission."
+                );
+            }
+
+            try {
+                bool admitted;
+                bool byte_prediction_qualified;
+                string detail;
+
+                if (!RepositoryNative.capacity_download_preflight (
+                        staging_directory,
+                        descriptor.id,
+                        sha,
+                        out admitted,
+                        out byte_prediction_qualified,
+                        out detail
+                    )) {
+                    throw new RepositoryError.STORAGE (
+                        "Pre-download local-capacity admission returned no decision."
+                    );
+                }
+
+                stdout.printf (
+                    "AtM: capacity A repository=%s sha=%s byte_profile=%s admitted=%s\n",
+                    descriptor.id,
+                    sha,
+                    byte_prediction_qualified ? "exact" : "unqualified",
+                    admitted ? "yes" : "no"
+                );
+
+                if (!admitted) {
+                    throw new RepositoryError.NO_SPACE (
+                        "%s: %s".printf (
+                            descriptor.acronym,
+                            detail
+                        )
+                    );
+                }
+            } catch (RepositoryError error) {
+                throw error;
+            } catch (GLib.Error error) {
+                throw new RepositoryError.STORAGE (
+                    "Pre-download local-capacity admission could not be evaluated: %s".printf (
+                        error.message
+                    )
+                );
+            }
+        }
+
+        private static RepositoryNative.CapacityOperationKind
+        capacity_operation_kind (
+            RepositoryRuntimeInfo info,
+            bool repairing_same_snapshot
+        ) {
+            if (repairing_same_snapshot) {
+                return RepositoryNative.CapacityOperationKind.
+                    SAME_SHA_REPAIR;
+            }
+
+            if (!info.local.is_ready ()) {
+                return RepositoryNative.CapacityOperationKind.
+                    FRESH_INSTALL;
+            }
+
+            return RepositoryNative.CapacityOperationKind.
+                DIFFERENT_SHA_UPDATE;
+        }
+
+        private void require_mutation_capacity (
+            RepositoryDescriptor descriptor,
+            string sha,
+            string archive_path,
+            RepositoryNative.CapacityOperationKind operation_kind
+        ) throws RepositoryError {
+            try {
+                bool admitted;
+                bool byte_prediction_qualified;
+                bool must_admit_before_quarantine;
+                string detail;
+
+                if (!RepositoryNative.capacity_mutation_preflight (
+                        data_root,
+                        cache_root,
+                        state_root,
+                        archive_path,
+                        descriptor.id,
+                        sha,
+                        operation_kind,
+                        out admitted,
+                        out byte_prediction_qualified,
+                        out must_admit_before_quarantine,
+                        out detail
+                    )) {
+                    throw new RepositoryError.STORAGE (
+                        "Post-download local-capacity admission returned no decision."
+                    );
+                }
+
+                bool expected_pre_quarantine =
+                    operation_kind ==
+                    RepositoryNative.CapacityOperationKind.
+                        SAME_SHA_REPAIR;
+
+                if (must_admit_before_quarantine !=
+                    expected_pre_quarantine) {
+                    throw new RepositoryError.STORAGE (
+                        "Post-download local-capacity admission returned inconsistent quarantine semantics."
+                    );
+                }
+
+                stdout.printf (
+                    "AtM: capacity B repository=%s sha=%s byte_profile=%s admitted=%s pre_quarantine=%s\n",
+                    descriptor.id,
+                    sha,
+                    byte_prediction_qualified ? "exact" : "unqualified",
+                    admitted ? "yes" : "no",
+                    must_admit_before_quarantine ? "yes" : "no"
+                );
+
+                if (!admitted) {
+                    throw new RepositoryError.NO_SPACE (
+                        "%s: %s".printf (
+                            descriptor.acronym,
+                            detail
+                        )
+                    );
+                }
+            } catch (RepositoryError error) {
+                throw error;
+            } catch (GLib.Error error) {
+                throw new RepositoryError.STORAGE (
+                    "Post-download local-capacity admission could not be evaluated: %s".printf (
+                        error.message
+                    )
+                );
+            }
+        }
+
+        private void require_state_commit_capacity (
+            RepositoryDescriptor descriptor
+        ) throws RepositoryError {
+            try {
+                bool admitted;
+                string detail;
+
+                if (!RepositoryNative.capacity_state_commit_preflight (
+                        state_root,
+                        out admitted,
+                        out detail
+                    )) {
+                    throw new RepositoryError.STORAGE (
+                        "State-publication local-capacity admission returned no decision."
+                    );
+                }
+
+                stdout.printf (
+                    "AtM: capacity state repository=%s admitted=%s\n",
+                    descriptor.id,
+                    admitted ? "yes" : "no"
+                );
+
+                if (!admitted) {
+                    throw new RepositoryError.NO_SPACE (
+                        "%s: %s".printf (
+                            descriptor.acronym,
+                            detail
+                        )
+                    );
+                }
+            } catch (RepositoryError error) {
+                throw error;
+            } catch (GLib.Error error) {
+                throw new RepositoryError.STORAGE (
+                    "State-publication local-capacity admission could not be evaluated: %s".printf (
+                        error.message
+                    )
+                );
+            }
+        }
+
         private void rebuild_repository_runtime () {
             repositories = {};
 
@@ -845,12 +1046,36 @@ namespace AskTheModel {
                                         descriptor.acronym
                                     )
                             );
+                            if (optimized_operation) {
+                                require_download_capacity (
+                                    descriptor,
+                                    sha
+                                );
+                            }
+
                             archive_path =
                                 yield client.download_archive_to_staging (
                                     descriptor,
                                     sha,
                                     cancellable
                                 );
+                        }
+
+                        if (optimized_operation &&
+                            archive_path != null) {
+                            RepositoryNative.CapacityOperationKind
+                                operation_kind =
+                                capacity_operation_kind (
+                                    info,
+                                    repairing_same_snapshot
+                                );
+
+                            require_mutation_capacity (
+                                descriptor,
+                                sha,
+                                archive_path,
+                                operation_kind
+                            );
                         }
 
                         if (repairing_same_snapshot) {
@@ -898,6 +1123,12 @@ namespace AskTheModel {
                         if (result.version != info.remote_version) {
                             throw new RepositoryError.INVALID_RESPONSE (
                                 "Validated repository version does not match the exact-SHA remote metadata."
+                            );
+                        }
+
+                        if (optimized_operation) {
+                            require_state_commit_capacity (
+                                descriptor
                             );
                         }
 
