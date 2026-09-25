@@ -1,0 +1,154 @@
+{
+  "schema_version": 1,
+  "evidence_id": "atm-a1-fresh-namespace-evidence-v1",
+  "status": "qualification-only",
+  "production_namespace_sequence_selected": false,
+  "m10_replay": {
+    "source": {
+      "actions_run_id": 36145303682,
+      "artifact_name": "atm-a1-m10-fresh-namespace-replay-36145303682-1",
+      "artifact_id": 10869154094,
+      "artifact_sha256": "c85d998ac5c51ca1beed3c33f36cf6545c449b6875f45f5bbe6b349288725cae",
+      "atm_source_commit": "1a5aa2f4d19082ab7a611897e0c2247d303c1fcd"
+    },
+    "kernel": {
+      "machine": "x86_64",
+      "release": "6.17.0-1022-azure",
+      "system": "Linux"
+    },
+    "upstream": {
+      "repository": "josefbacik/log-writes",
+      "commit": "7b70d8a6863c5de30933d42a7672d35d01d2dc6c"
+    },
+    "protocol": {
+      "baseline_synced_before_candidate": true,
+      "fresh_control_db_without_repository_authority": true,
+      "repositories_hierarchy_absent_at_baseline": true,
+      "fresh_process_seal_verifier_after_replay": true,
+      "clean_unmount_not_used_as_target_mark": true,
+      "candidate_set": [
+        "S1_PARENT_ONLY",
+        "S1_DEST_CHAIN",
+        "S1_DEST_SOURCE"
+      ],
+      "boundary_order": [
+        "post_barrier_pre_destination_hierarchy",
+        "post_destination_hierarchy_pre_rename",
+        "post_rename_pre_destination_parent_fsync",
+        "post_destination_parent_fsync_pre_source_parent_fsync",
+        "post_source_parent_fsync_pre_authority",
+        "after_authority"
+      ]
+    },
+    "scenario_count": 18,
+    "all_e2fsck_recoverable": true,
+    "strategy_summaries": {
+      "S1_PARENT_ONLY": {
+        "all_pre_authority_empty_valid": true,
+        "after_authority_new_valid": true,
+        "after_authority_namespace_clean": true,
+        "post_source_boundary_namespace_clean": true
+      },
+      "S1_DEST_CHAIN": {
+        "all_pre_authority_empty_valid": true,
+        "after_authority_new_valid": true,
+        "after_authority_namespace_clean": true,
+        "post_source_boundary_namespace_clean": true
+      },
+      "S1_DEST_SOURCE": {
+        "all_pre_authority_empty_valid": true,
+        "after_authority_new_valid": true,
+        "after_authority_namespace_clean": true,
+        "post_source_boundary_namespace_clean": true
+      }
+    }
+  },
+  "m11_eio": {
+    "source": {
+      "actions_run_id": 36147082278,
+      "artifact_name": "atm-a1-m11-namespace-eio-36147082278-1",
+      "artifact_id": 10870456523,
+      "artifact_sha256": "e11a8a6c4b9d198c223a355d1129a9807da445cbdf564daaa11ce706fe9cb754",
+      "atm_source_commit": "3682bcd555b3f1aa2a3f778270896cac43fbd30e"
+    },
+    "kernel": {
+      "machine": "x86_64",
+      "release": "6.17.0-1022-azure",
+      "system": "Linux"
+    },
+    "protocol": {
+      "candidate": "S1_DEST_SOURCE",
+      "device_mapper_target": "flakey",
+      "feature": "error_writes",
+      "empty_authority_synced_before_each_scenario": true,
+      "fault_teardown_suspend_noflush_nolockfs": true,
+      "fresh_process_verifier_after_recovery": true,
+      "no_syncfs_fallback": true,
+      "boundaries": [
+        "destination_hierarchy_fsync",
+        "destination_parent_fsync",
+        "source_parent_fsync"
+      ]
+    },
+    "scenario_count": 3,
+    "all_authority_fail_closed": true,
+    "all_e2fsck_recoverable": true,
+    "results": {
+      "destination_hierarchy_fsync": {
+        "checkpoint": "fresh_post_barrier_pre_destination_hierarchy",
+        "helper_exit_code": 2,
+        "e2fsck_exit_code": 1,
+        "io_error_observed": true,
+        "classification": "EMPTY_AUTHORITY_VALID",
+        "active_generation_id": 0,
+        "active_repository_sha": null,
+        "final_snapshot_exists": false,
+        "staging_exists": true,
+        "namespace_clean": false,
+        "authority_fail_closed": true
+      },
+      "destination_parent_fsync": {
+        "checkpoint": "fresh_post_rename_pre_destination_parent_fsync",
+        "helper_exit_code": 2,
+        "e2fsck_exit_code": 1,
+        "io_error_observed": true,
+        "classification": "EMPTY_AUTHORITY_VALID",
+        "active_generation_id": 0,
+        "active_repository_sha": null,
+        "final_snapshot_exists": false,
+        "staging_exists": true,
+        "namespace_clean": false,
+        "authority_fail_closed": true
+      },
+      "source_parent_fsync": {
+        "checkpoint": "fresh_post_destination_parent_fsync_pre_source_parent_fsync",
+        "helper_exit_code": 2,
+        "e2fsck_exit_code": 0,
+        "io_error_observed": true,
+        "classification": "EMPTY_AUTHORITY_VALID",
+        "active_generation_id": 0,
+        "active_repository_sha": null,
+        "final_snapshot_exists": true,
+        "staging_exists": false,
+        "namespace_clean": true,
+        "authority_fail_closed": true
+      }
+    }
+  },
+  "interpretation": {
+    "linux_directory_entry_contract": "fsync of an object does not necessarily persist the containing directory entry; explicit fsync of the containing directory is required for that guarantee.",
+    "m10_empirically_distinguished_candidates": false,
+    "m11_completed": true,
+    "candidate_for_policy_review": "S1_DEST_SOURCE",
+    "policy_review_ready": true,
+    "production_namespace_sequence_selected": false,
+    "automatic_orphan_recovery_authorized": false,
+    "reason": "S1_DEST_SOURCE is the measured candidate that explicitly covers fresh destination hierarchy persistence, destination rename-parent persistence, and source staging-parent persistence after cross-directory rename, and M11 shows explicit EIO at each added namespace barrier fails closed before authority."
+  },
+  "limitations": [
+    "M10/M11 are ext4 Linux qualification evidence, not a universal filesystem or physical-power-loss proof.",
+    "Clean ext4 replay for parent-only does not weaken the Linux directory-entry durability contract.",
+    "F10 freezes evidence only; production namespace sequencing remains unselected until a separate policy review.",
+    "M11 does not authorize automatic orphan deletion; that still requires authority-wide exclusion covering every Control DB writer."
+  ]
+}

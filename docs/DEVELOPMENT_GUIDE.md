@@ -1158,6 +1158,24 @@ Failure remains fail-closed. Before promotion, failure removes the operation-own
 
 The existing `atm_repository_ingest_archive_cancellable()` wrapper still selects the non-durable internal path, preserving the baseline used when Optimizations is OFF. The durable primitive has no Vala binding and no `RepositoryLifecycleService` caller in I1c; structural CI enforces that separation. Automatic recovery/removal of preexisting final targets is not introduced here.
 
+### OPT-A1-M10 fresh-install namespace replay
+
+M10 closes the evidence gap left by M5/M6 for a first repository install. Each scenario begins from a synchronized ext4 baseline with a valid empty schema-v2 Control DB, an existing trusted data root, no repository authority and no `data/Repositories` hierarchy.
+
+The selected S1 tree barrier is held constant while three namespace protocols are measured: `S1_PARENT_ONLY`, `S1_DEST_CHAIN`, and `S1_DEST_SOURCE`. Each protocol is replayed at six boundaries from post-tree-barrier through post-authority. The fresh-process oracle distinguishes `EMPTY_AUTHORITY_VALID` from `NEW_AUTHORITY_VALID`, recomputes the active snapshot seal and reports final/staging namespace state.
+
+The final reviewed run is Actions `36145303682`, artifact `10869154094`, artifact SHA-256 `c85d998ac5c51ca1beed3c33f36cf6545c449b6875f45f5bbe6b349288725cae`, measured head `1a5aa2f4d19082ab7a611897e0c2247d303c1fcd` and replay-log `7b70d8a6863c5de30933d42a7672d35d01d2dc6c`. All 18 scenarios are e2fsck-recoverable; all pre-authority scenarios retain `EMPTY_AUTHORITY_VALID`; and every after-authority scenario recovers `NEW_AUTHORITY_VALID` with stored/computed seal equality and a clean final namespace.
+
+M10 deliberately does not select the production namespace sequence. The ext4 fixture did not empirically distinguish the three candidates, so Linux directory-entry durability semantics remain the deciding contract constraint carried into M11.
+
+### OPT-A1-F10 frozen fresh-install namespace evidence
+
+`benchmarks/durability-v2/evidence.json` freezes the final reviewed M10 replay and M11 EIO evidence as one namespace qualification record. The M11 source is Actions `36147082278`, artifact `10870456523`, artifact SHA-256 `e11a8a6c4b9d198c223a355d1129a9807da445cbdf564daaa11ce706fe9cb754`, measured head `3682bcd555b3f1aa2a3f778270896cac43fbd30e`.
+
+The frozen M11 matrix contains exactly three `S1_DEST_SOURCE` EIO boundaries: destination hierarchy fsync, destination-parent fsync and source-parent fsync. Every candidate call exits non-zero with explicit I/O failure; each recovered filesystem is e2fsck-clean/correctable; and every fresh verifier remains `EMPTY_AUTHORITY_VALID`, generation 0, with no active repository SHA. At the source-parent fault the final snapshot may already exist while authority remains empty, explicitly preserving the unreferenced-artifact distinction.
+
+F10 remains evidence-only. It records `S1_DEST_SOURCE` as ready for separate policy review, but `production_namespace_sequence_selected=false` and automatic orphan deletion remains unauthorized. A later policy slice must update the selected ordering before I1c is changed or runtime wiring begins.
+
 ### OPT-A1-M11 fresh-install namespace EIO qualification
 
 M11 is qualification-only and carries forward the contract-complete M10 candidate `S1_DEST_SOURCE`. It does not change repository ingest, Vala bindings, lifecycle behavior or the default-OFF Optimizations path.
