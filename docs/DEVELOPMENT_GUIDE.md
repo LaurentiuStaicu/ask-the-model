@@ -1326,6 +1326,20 @@ An Optimizations-ON mutation must not reuse an unqualified pre-existing final ta
 
 P3 sets `runtime_integration_selected=true` while retaining `runtime_wiring_authorized=false`. I1d2 is the separate implementation slice that must prove ON/OFF routing, the pre-barrier seal chain, fail-closed pre-existing-target handling, and unchanged OFF behavior before runtime wiring can be authorized.
 
+### OPT-A1-I1d2 ON-only durable-ingest runtime wiring
+
+I1d2 implements the P3 runtime contract in `RepositoryLifecycleService`. The `Optimizations` value is still snapshotted once at the start of each Download/Update operation. That frozen value now controls snapshot ingest independently from retrieval-index coordination.
+
+For Optimizations OFF, archive installation continues through the existing `RepositoryNative.ingest_archive()` baseline path. For Optimizations ON, archive installation uses `RepositoryNative.ingest_archive_durable()`, including same-SHA repair after the already-qualified quarantine step.
+
+The durable call returns the S1 pre-barrier snapshot seal. After promotion, lifecycle recomputes the snapshot seal and requires equality with that returned value before retrieval-index preparation. It then retains the existing post-index hash, file-count and byte-count equality check. State-capacity admission still occurs after snapshot/index preparation and before `state_store.set_current()`.
+
+An ON operation that encounters a pre-existing final target for the incoming SHA outside same-SHA repair fails closed before installation or authority publication. The target is not reused, removed or quarantined. A race that creates the target later remains protected by the native durable promotion primitive's fail-closed behavior.
+
+The machine-readable state is now `selected-wired`: `runtime_wiring_authorized=true` and `on_only_durable_ingest_wired=true`. This does not claim end-to-end runtime fault qualification. `runtime_fault_qualification_complete=false` remains explicit, and M12 must exercise the real lifecycle ON path under failure/interruption conditions and verify that Control DB authority does not advance.
+
+Automatic orphan recovery remains outside I1d2 and M12 unless separately selected later.
+
 ### Recovery fault qualification
 
 The OPT-A0 recovery harness is test-only. Native checkpoint calls compile to no-ops in the production application; only the dedicated recovery helper is built with `ATM_TEST_FAULT_INJECTION`.

@@ -1,7 +1,7 @@
 {
   "schema_version": 1,
   "policy_id": "atm-snapshot-durability-production-policy-v1",
-  "status": "selected-not-wired",
+  "status": "selected-wired",
   "runtime_gate": {
     "name": "Optimizations",
     "default_enabled": false,
@@ -139,9 +139,11 @@
   "implementation_state": {
     "namespace_policy_selected": true,
     "durable_ingest_namespace_complete": true,
-    "runtime_wiring_authorized": false,
-    "next_required_slice": "IMPLEMENT_ON_ONLY_DURABLE_INGEST_RUNTIME_WIRING",
-    "vala_durable_ingest_bridge_available": true
+    "vala_durable_ingest_bridge_available": true,
+    "runtime_wiring_authorized": true,
+    "on_only_durable_ingest_wired": true,
+    "runtime_fault_qualification_complete": false,
+    "next_required_slice": "M12_RUNTIME_DURABILITY_FAULT_QUALIFICATION"
   },
   "runtime_integration": {
     "selected": true,
@@ -152,6 +154,7 @@
     "preexisting_final_target_action": "FAIL_CLOSED_NO_REUSE_NO_REMOVAL",
     "same_sha_repair_uses_durable_ingest": true,
     "automatic_orphan_recovery_selected": false,
-    "reason": "The native durable ingest sequence and Vala ABI are qualified separately. Runtime selection is limited to the operation-level Optimizations ON snapshot; OFF preserves the baseline ingest path. The returned pre-barrier seal must be chained through post-promotion and post-index verification before guarded authority publication, and unqualified preexisting final targets remain untouched and fail closed."
+    "reason": "The native durable ingest sequence and Vala ABI are qualified separately. Runtime selection is limited to the operation-level Optimizations ON snapshot; OFF preserves the baseline ingest path. The returned pre-barrier seal must be chained through post-promotion and post-index verification before guarded authority publication, and unqualified preexisting final targets remain untouched and fail closed.",
+    "implemented": true
   }
 }
