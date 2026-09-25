@@ -1,7 +1,7 @@
 {
   "schema_version": 1,
   "policy_id": "atm-capacity-production-policy-v1",
-  "status": "selected-not-wired",
+  "status": "selected-runtime-wired",
   "runtime_gate": {
     "name": "Optimizations",
     "default_enabled": false,
@@ -93,5 +93,20 @@
     "preflight_error_class": "RepositoryError.NO_SPACE",
     "generic_sqlite_ioerr_is_no_space": false
   },
-  "runtime_integration_selected": false
+  "runtime_integration_selected": true,
+  "runtime_integration": {
+    "gate": "OPTIMIZATIONS_OPERATION_SNAPSHOT",
+    "off_path": "POST_V0_5_0_BASELINE",
+    "runtime_source": "src/RepositoryLifecycleService.vala",
+    "authority_lease_required": true,
+    "checkpoints": [
+      "PRE_DOWNLOAD",
+      "POST_DOWNLOAD_PRE_MUTATION",
+      "STATE_PUBLICATION"
+    ],
+    "same_sha_repair_pre_quarantine": true,
+    "no_space_error_class": "RepositoryError.NO_SPACE",
+    "unknown_sha_byte_behavior": "NO_PROACTIVE_DATA_CACHE_BYTE_REJECTION",
+    "post_admission_error_behavior": "PRESERVE_EXISTING_FAIL_CLOSED_PATH"
+  }
 }
