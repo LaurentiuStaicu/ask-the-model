@@ -19,6 +19,8 @@ def main() -> int:
     collector = read("src/RepositoryGcDurableRoots.vala")
     control_native = read("src/ControlStateNative.vala")
     repository_native = read("src/RepositoryNative.vala")
+    candidates = read("src/RepositoryGcCandidates.vala")
+    candidate_scan = read("src/repository_gc_candidate_scan.c")
     lifecycle = read("src/RepositoryLifecycleService.vala")
     meson = read("meson.build")
     test_source = read("tests/repository_gc_durable_roots_test.vala")
@@ -87,11 +89,75 @@ def main() -> int:
         if marker not in repository_native:
             fail(f"B2 live-root binding lost: {marker}")
 
+    for marker in (
+        "RepositoryGcCandidateDiscovery",
+        "RepositoryCatalog.all ()",
+        "RepositoryGcCandidateNative.scan (",
+        "protected_roots.protects_snapshot (",
+        "RepositoryGcSnapshotCandidate",
+        "RepositoryGcCandidateDiagnostic",
+    ):
+        if marker not in candidates:
+            fail(f"I3 candidate discovery contract lost: {marker}")
+
+    for marker in (
+        "O_DIRECTORY",
+        "O_NOFOLLOW",
+        "O_CLOEXEC",
+        "openat (",
+        "AT_SYMLINK_NOFOLLOW",
+        "fdopendir (",
+        "readdir (",
+        "sha40_lower_is_valid",
+        "unexpected-basename",
+        "not-real-directory",
+    ):
+        if marker not in candidate_scan:
+            fail(f"I3 no-follow scanner contract lost: {marker}")
+
+    for marker in (
+        "rename (",
+        "renameat",
+        "unlink",
+        "remove (",
+        "rmdir",
+        "mkdir",
+        ".trash",
+        "quarantine",
+        "purge",
+    ):
+        if marker in candidate_scan:
+            fail(f"I3 native candidate scan must remain non-destructive: {marker}")
+        if marker in candidates:
+            fail(f"I3 Vala candidate discovery must remain non-destructive: {marker}")
+
+    if "RepositoryCatalog.all ()" not in candidates:
+        fail("I3 must derive repository IDs from the fixed catalog")
+
+    for marker in (
+        "Dir.open",
+        "read_name",
+        "Repositories).enumerate",
+        "repository-generation-leases",
+        ".lock",
+    ):
+        if marker in candidates:
+            fail(f"I3 must not discover repositories/liveness from filesystem metadata: {marker}")
+
+    if "RepositoryGcCandidateDiscovery" in lifecycle:
+        fail("I3 candidate discovery must remain dormant in RepositoryLifecycleService")
+
     if "RepositoryGcDurableRootCollector" in lifecycle:
         fail("I1 collector must remain dormant in RepositoryLifecycleService")
 
     if "'src/RepositoryGcDurableRoots.vala'" not in meson:
         fail("application build lost dormant GC root collector")
+    for marker in (
+        "'src/RepositoryGcCandidates.vala'",
+        "'src/repository_gc_candidate_scan.c'",
+    ):
+        if marker not in meson:
+            fail(f"application/test build lost C1-I3 candidate source: {marker}")
 
     if "repository_gc_durable_roots_test = executable(" not in meson:
         fail("GC durable-root test target is missing")
@@ -112,6 +178,19 @@ def main() -> int:
             fail(f"empty COMPLETE fail-closed test lost: {marker}")
 
     for marker in (
+        "/repository-gc-candidates/filter-and-diagnostics",
+        "/repository-gc-candidates/reject-symlinked-snapshots-root",
+        "/repository-gc-candidates/absent-namespace-empty",
+        "candidate_set_contains",
+        "diagnostic_set_contains",
+        "unknown-repository",
+        "not-real-directory",
+        "unexpected-basename",
+    ):
+        if marker not in test_source:
+            fail(f"I3 candidate-discovery test lost: {marker}")
+
+    for marker in (
         "atm_c1_test_publish_empty_complete_generation",
         "INSERT INTO repository_generations",
         "SET lifecycle='COMPLETE'",
@@ -122,7 +201,7 @@ def main() -> int:
 
     print(
         "gc durable-root collector validation passed: "
-        "active + conversation + B2 live roots mapped read-only; lifecycle unwired"
+        "durable/live roots + no-follow candidate discovery validated; lifecycle/destruction unwired"
     )
     return 0
 
