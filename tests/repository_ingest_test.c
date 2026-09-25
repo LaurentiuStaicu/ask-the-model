@@ -1,5 +1,6 @@
 #include "repository_ingest.h"
 #include "repository_storage.h"
+#include "snapshot_seal.h"
 
 #include <archive.h>
 #include <archive_entry.h>
@@ -249,6 +250,198 @@ test_successful_ingest (void)
     g_free (expected);
     g_free (snapshot_path);
     g_free (version);
+    g_free (manifest);
+    g_free (archive_path);
+    g_free (data_root);
+    remove_tree_best_effort (root);
+    g_free (root);
+}
+
+static void
+test_durable_ingest_success (void)
+{
+    char *root = new_temp_root ();
+    char *data_root = g_build_filename (root, "data", NULL);
+    char *archive_path = g_build_filename (
+        root,
+        "snapshot.tar.gz",
+        NULL
+    );
+    char *manifest = valid_manifest ("ewd");
+    char *pre_barrier_seal = NULL;
+    char *version = NULL;
+    char *snapshot_path = NULL;
+    char *final_seal = NULL;
+    guint64 entries = 0;
+    guint64 total_bytes = 0;
+    guint64 sealed_files = 0;
+    guint64 sealed_bytes = 0;
+    GError *error = NULL;
+
+    write_archive (archive_path, manifest);
+
+    g_assert_true (
+        atm_repository_ingest_archive_durable (
+            data_root,
+            archive_path,
+            "ewd",
+            "EWD",
+            "Empirical World3 Dynamics",
+            test_sha (),
+            &pre_barrier_seal,
+            &version,
+            &snapshot_path,
+            &entries,
+            &total_bytes,
+            &error
+        )
+    );
+    g_assert_no_error (error);
+    g_assert_nonnull (pre_barrier_seal);
+    g_assert_cmpstr (version, ==, "0.1.0");
+    g_assert_cmpuint (entries, ==, 8);
+    g_assert_cmpuint (total_bytes, >, 0);
+    g_assert_true (
+        g_file_test (
+            snapshot_path,
+            G_FILE_TEST_IS_DIR
+        )
+    );
+
+    g_assert_true (
+        atm_snapshot_seal_compute (
+            snapshot_path,
+            &final_seal,
+            &sealed_files,
+            &sealed_bytes,
+            &error
+        )
+    );
+    g_assert_no_error (error);
+    g_assert_cmpstr (
+        final_seal,
+        ==,
+        pre_barrier_seal
+    );
+    g_assert_cmpuint (sealed_files, ==, 5);
+    g_assert_cmpuint (sealed_bytes, >, 0);
+
+    char *staging = atm_repository_extraction_staging_path (
+        data_root,
+        "ewd",
+        test_sha ()
+    );
+    g_assert_false (
+        g_file_test (
+            staging,
+            G_FILE_TEST_EXISTS
+        )
+    );
+
+    g_free (staging);
+    g_free (final_seal);
+    g_free (snapshot_path);
+    g_free (version);
+    g_free (pre_barrier_seal);
+    g_free (manifest);
+    g_free (archive_path);
+    g_free (data_root);
+    remove_tree_best_effort (root);
+    g_free (root);
+}
+
+static void
+test_durable_existing_final_is_preserved (void)
+{
+    char *root = new_temp_root ();
+    char *data_root = g_build_filename (root, "data", NULL);
+    char *archive_path = g_build_filename (
+        root,
+        "snapshot.tar.gz",
+        NULL
+    );
+    char *manifest = valid_manifest ("ewd");
+    char *final_path = atm_repository_snapshot_path (
+        data_root,
+        "ewd",
+        test_sha ()
+    );
+    char *sentinel = g_build_filename (
+        final_path,
+        "sentinel.txt",
+        NULL
+    );
+    char *pre_barrier_seal = NULL;
+    char *version = NULL;
+    char *snapshot_path = NULL;
+    GError *error = NULL;
+
+    write_archive (archive_path, manifest);
+    g_assert_cmpint (
+        g_mkdir_with_parents (
+            final_path,
+            0700
+        ),
+        ==,
+        0
+    );
+    g_assert_true (
+        g_file_set_contents (
+            sentinel,
+            "keep\n",
+            -1,
+            &error
+        )
+    );
+    g_assert_no_error (error);
+
+    g_assert_false (
+        atm_repository_ingest_archive_durable (
+            data_root,
+            archive_path,
+            "ewd",
+            "EWD",
+            "Empirical World3 Dynamics",
+            test_sha (),
+            &pre_barrier_seal,
+            &version,
+            &snapshot_path,
+            NULL,
+            NULL,
+            &error
+        )
+    );
+    g_assert_error (
+        error,
+        ATM_STORAGE_ERROR,
+        ATM_STORAGE_ERROR_EXISTS
+    );
+    g_assert_null (pre_barrier_seal);
+    g_assert_null (version);
+    g_assert_null (snapshot_path);
+    g_assert_true (
+        g_file_test (
+            sentinel,
+            G_FILE_TEST_EXISTS
+        )
+    );
+
+    char *staging = atm_repository_extraction_staging_path (
+        data_root,
+        "ewd",
+        test_sha ()
+    );
+    g_assert_false (
+        g_file_test (
+            staging,
+            G_FILE_TEST_EXISTS
+        )
+    );
+
+    g_clear_error (&error);
+    g_free (staging);
+    g_free (sentinel);
+    g_free (final_path);
     g_free (manifest);
     g_free (archive_path);
     g_free (data_root);
@@ -621,6 +814,14 @@ main (int argc, char **argv)
     g_test_add_func (
         "/ingest/successful",
         test_successful_ingest
+    );
+    g_test_add_func (
+        "/ingest/durable-successful",
+        test_durable_ingest_success
+    );
+    g_test_add_func (
+        "/ingest/durable-existing-final-preserved",
+        test_durable_existing_final_is_preserved
     );
     g_test_add_func (
         "/ingest/validation-failure-cleans-staging",
