@@ -883,6 +883,157 @@ def main() -> int:
         if phrase not in error_conclusion:
             fail(f"Tier-2 error-injection conclusion lost: {phrase}")
 
+    candidate_error = evidence.get("tier2_candidate_error_injection")
+    if not isinstance(candidate_error, dict):
+        fail("Tier-2 candidate EIO evidence is missing")
+    if candidate_error.get("measurement_id") != (
+        "atm-a1-m8-candidate-error-injection-v1"
+    ):
+        fail("Tier-2 candidate EIO measurement identity drifted")
+    if candidate_error.get("status") != "qualified":
+        fail("Tier-2 candidate EIO evidence must remain qualified")
+    if candidate_error.get("production_barrier_selected") is not False:
+        fail("M8 must not select a production barrier")
+    if candidate_error.get("production_durability_authorized") is not False:
+        fail("M8 must not authorize production durability")
+
+    candidate_error_source = candidate_error.get("source")
+    expected_candidate_error_source = {
+        "actions_run_id": 36131967444,
+        "artifact_name": "atm-a1-m8-candidate-errors-36131967444-1",
+        "artifact_id": 10862980361,
+        "artifact_sha256": (
+            "67c1d8072aaa4b4b0d773bc52476dedf7fcead3666bf64375fcf0123efb0b1ce"
+        ),
+        "atm_source_commit": (
+            "44aa462920eb1a81950cab9c6638b1911d7d207b"
+        ),
+    }
+    if candidate_error_source != expected_candidate_error_source:
+        fail("Tier-2 candidate EIO provenance drifted")
+    if (
+        SHA256.fullmatch(candidate_error_source["artifact_sha256"])
+        is None
+    ):
+        fail("Tier-2 candidate EIO artifact digest is invalid")
+    if (
+        SHA40.fullmatch(candidate_error_source["atm_source_commit"])
+        is None
+    ):
+        fail("Tier-2 candidate EIO source commit is invalid")
+
+    if candidate_error.get("kernel") != {
+        "system": "Linux",
+        "release": "6.17.0-1022-azure",
+        "machine": "x86_64",
+    }:
+        fail("Tier-2 candidate EIO kernel context drifted")
+
+    expected_candidate_error_protocol = {
+        "device_mapper_target": "flakey",
+        "feature": "error_writes",
+        "flakey_up_interval_seconds": 1,
+        "flakey_down_interval_seconds": 600,
+        "old_authority_synced_before_each_scenario": True,
+        "fault_entry_suspend_noflush_nolockfs": True,
+        "fault_teardown_suspend_noflush_nolockfs": True,
+        "fresh_process_seal_verifier_after_recovery": True,
+        "candidate_set": [
+            "S1_TARGETED_FSYNC",
+            "S2_SYNCFS",
+        ],
+        "boundary_order": [
+            "pre_rename_barrier",
+            "promoted_parent_fsync",
+            "control_db_activation",
+        ],
+    }
+    if candidate_error.get("protocol") != expected_candidate_error_protocol:
+        fail("Tier-2 candidate EIO protocol drifted")
+
+    candidate_error_results = candidate_error.get("results")
+    if not isinstance(candidate_error_results, list):
+        fail("Tier-2 candidate EIO result matrix is missing")
+    if len(candidate_error_results) != 6:
+        fail("Tier-2 candidate EIO must contain exactly six scenarios")
+
+    expected_candidate_error_matrix = {
+        ("S1_TARGETED_FSYNC", "pre_rename_barrier"): (
+            "candidate_pre_barrier", 0
+        ),
+        ("S1_TARGETED_FSYNC", "promoted_parent_fsync"): (
+            "candidate_post_rename_pre_parent_fsync", 1
+        ),
+        ("S1_TARGETED_FSYNC", "control_db_activation"): (
+            "candidate_post_parent_fsync_pre_authority", 0
+        ),
+        ("S2_SYNCFS", "pre_rename_barrier"): (
+            "candidate_pre_barrier", 1
+        ),
+        ("S2_SYNCFS", "promoted_parent_fsync"): (
+            "candidate_post_rename_pre_parent_fsync", 1
+        ),
+        ("S2_SYNCFS", "control_db_activation"): (
+            "candidate_post_parent_fsync_pre_authority", 0
+        ),
+    }
+
+    seen_candidate_error = set()
+    for record in candidate_error_results:
+        if not isinstance(record, dict):
+            fail("Tier-2 candidate EIO result record is invalid")
+        key = (
+            record.get("strategy"),
+            record.get("boundary"),
+        )
+        if key not in expected_candidate_error_matrix:
+            fail(f"unexpected Tier-2 candidate EIO scenario: {key}")
+        if key in seen_candidate_error:
+            fail(f"duplicate Tier-2 candidate EIO scenario: {key}")
+        seen_candidate_error.add(key)
+
+        expected_checkpoint, expected_fsck = (
+            expected_candidate_error_matrix[key]
+        )
+        if record.get("checkpoint") != expected_checkpoint:
+            fail(f"{key} candidate EIO checkpoint drifted")
+        if record.get("helper_exit_code") != 2:
+            fail(f"{key} candidate EIO helper exit drifted")
+        if record.get("io_error_observed") is not True:
+            fail(f"{key} lost explicit I/O error observation")
+        if record.get("e2fsck_exit_code") != expected_fsck:
+            fail(f"{key} candidate EIO e2fsck result drifted")
+        if record.get("classification") != "OLD_AUTHORITY_VALID":
+            fail(f"{key} no longer preserves old authority")
+        if record.get("seal_match") is not True:
+            fail(f"{key} old authority seal no longer matches")
+        if record.get("qualified") is not True:
+            fail(f"{key} old authority is no longer qualified")
+        if record.get("fail_closed") is not True:
+            fail(f"{key} is no longer fail-closed")
+
+    if seen_candidate_error != set(expected_candidate_error_matrix):
+        fail("Tier-2 candidate EIO matrix is incomplete")
+    for key in (
+        "all_candidates_failed_on_eio",
+        "all_old_authority_preserved",
+        "all_fail_closed",
+    ):
+        if candidate_error.get(key) is not True:
+            fail(f"Tier-2 candidate EIO aggregate lost: {key}")
+
+    candidate_error_conclusion = str(
+        candidate_error.get("reviewed_conclusion", "")
+    ).lower()
+    for phrase in (
+        "both s1 targeted fsync and s2 syncfs fail closed",
+        "all six scenarios preserve the old seal-valid authority",
+        "closes the planned candidate write-error propagation gate",
+        "does not by itself select a production durability barrier",
+    ):
+        if phrase not in candidate_error_conclusion:
+            fail(f"Tier-2 candidate EIO conclusion lost: {phrase}")
+
     print(
         "durability evidence validation passed: "
         "A1-M1 CBD/EWD/RMD medians frozen, "
