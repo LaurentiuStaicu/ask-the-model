@@ -642,6 +642,10 @@ candidate_checkpoint_valid (
     return
         g_strcmp0 (
             checkpoint,
+            "candidate_pre_barrier"
+        ) == 0 ||
+        g_strcmp0 (
+            checkpoint,
             "candidate_post_barrier_pre_rename"
         ) == 0 ||
         g_strcmp0 (
@@ -740,6 +744,10 @@ promote_new_candidate (
             CONTROL_FD
         );
     }
+
+    atm_test_fault_checkpoint (
+        "candidate_pre_barrier"
+    );
 
     if (!run_candidate_pre_rename_barrier (
             staging,
