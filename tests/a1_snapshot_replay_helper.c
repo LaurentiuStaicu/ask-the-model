@@ -755,6 +755,10 @@ promote_new_candidate (
             &counters,
             error
         )) {
+        g_prefix_error (
+            error,
+            "candidate barrier failed: "
+        );
         goto out;
     }
 
@@ -782,6 +786,10 @@ promote_new_candidate (
             &counters,
             error
         )) {
+        g_prefix_error (
+            error,
+            "candidate parent fsync failed: "
+        );
         goto out;
     }
 
@@ -797,6 +805,10 @@ promote_new_candidate (
             seal,
             error
         )) {
+        g_prefix_error (
+            error,
+            "candidate authority activation failed: "
+        );
         goto out;
     }
 
