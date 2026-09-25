@@ -3,6 +3,8 @@
 #include "archive_extract.h"
 #include "repository_manifest.h"
 #include "repository_storage.h"
+#include "snapshot_durability.h"
+#include "snapshot_seal.h"
 
 #include <glib/gstdio.h>
 
@@ -48,8 +50,8 @@ remove_tree_best_effort (const char *path)
     g_rmdir (path);
 }
 
-gboolean
-atm_repository_ingest_archive_cancellable (
+static gboolean
+repository_ingest_archive_internal (
     const char *data_root,
     const char *archive_path,
     const char *repository_id,
@@ -57,6 +59,8 @@ atm_repository_ingest_archive_cancellable (
     const char *repository_display_name,
     const char *sha,
     GCancellable *cancellable,
+    gboolean durable,
+    char **out_pre_barrier_seal,
     char **out_version,
     char **out_snapshot_path,
     guint64 *out_entries,
@@ -70,8 +74,12 @@ atm_repository_ingest_archive_cancellable (
     char *staging_parent = NULL;
     char *version = NULL;
     char *snapshot_path = NULL;
+    char *pre_barrier_seal = NULL;
     guint64 entries = 0;
     guint64 total_bytes = 0;
+    guint64 sealed_files = 0;
+    guint64 sealed_bytes = 0;
+    AtmSnapshotDurabilityStats durability_stats = { 0 };
     gboolean staging_created = FALSE;
     gboolean ok = FALSE;
     AtmArchiveLimits limits = {
@@ -90,6 +98,10 @@ atm_repository_ingest_archive_cancellable (
     g_return_val_if_fail (*out_version == NULL, FALSE);
     g_return_val_if_fail (out_snapshot_path != NULL, FALSE);
     g_return_val_if_fail (*out_snapshot_path == NULL, FALSE);
+    if (durable) {
+        g_return_val_if_fail (out_pre_barrier_seal != NULL, FALSE);
+        g_return_val_if_fail (*out_pre_barrier_seal == NULL, FALSE);
+    }
 
     if (out_entries != NULL) {
         *out_entries = 0;
@@ -200,6 +212,34 @@ atm_repository_ingest_archive_cancellable (
         goto out;
     }
 
+    if (durable) {
+        if (!atm_snapshot_seal_compute (
+                staging_path,
+                &pre_barrier_seal,
+                &sealed_files,
+                &sealed_bytes,
+                error
+            )) {
+            goto out;
+        }
+
+        if (!atm_snapshot_durability_sync_tree (
+                staging_path,
+                &durability_stats,
+                error
+            )) {
+            goto out;
+        }
+
+        if (cancellable != NULL &&
+            g_cancellable_set_error_if_cancelled (
+                cancellable,
+                error
+            )) {
+            goto out;
+        }
+    }
+
     if (!atm_repository_promote_snapshot (
             data_root,
             repository_id,
@@ -212,6 +252,20 @@ atm_repository_ingest_archive_cancellable (
     }
 
     staging_created = FALSE;
+
+    if (durable &&
+        !atm_snapshot_durability_sync_parent (
+            snapshot_path,
+            &durability_stats,
+            error
+        )) {
+        goto out;
+    }
+
+    if (durable) {
+        *out_pre_barrier_seal =
+            g_steal_pointer (&pre_barrier_seal);
+    }
 
     *out_version = g_steal_pointer (&version);
     *out_snapshot_path = g_steal_pointer (&snapshot_path);
@@ -231,11 +285,80 @@ out:
         remove_tree_best_effort (staging_path);
     }
 
+    g_clear_pointer (&pre_barrier_seal, g_free);
     g_clear_pointer (&snapshot_path, g_free);
     g_clear_pointer (&version, g_free);
     g_clear_pointer (&staging_parent, g_free);
     g_clear_pointer (&staging_path, g_free);
     return ok;
+}
+
+gboolean
+atm_repository_ingest_archive_cancellable (
+    const char *data_root,
+    const char *archive_path,
+    const char *repository_id,
+    const char *repository_acronym,
+    const char *repository_display_name,
+    const char *sha,
+    GCancellable *cancellable,
+    char **out_version,
+    char **out_snapshot_path,
+    guint64 *out_entries,
+    guint64 *out_total_bytes,
+    GError **error
+)
+{
+    return repository_ingest_archive_internal (
+        data_root,
+        archive_path,
+        repository_id,
+        repository_acronym,
+        repository_display_name,
+        sha,
+        cancellable,
+        FALSE,
+        NULL,
+        out_version,
+        out_snapshot_path,
+        out_entries,
+        out_total_bytes,
+        error
+    );
+}
+
+gboolean
+atm_repository_ingest_archive_durable (
+    const char *data_root,
+    const char *archive_path,
+    const char *repository_id,
+    const char *repository_acronym,
+    const char *repository_display_name,
+    const char *sha,
+    char **out_pre_barrier_seal,
+    char **out_version,
+    char **out_snapshot_path,
+    guint64 *out_entries,
+    guint64 *out_total_bytes,
+    GError **error
+)
+{
+    return repository_ingest_archive_internal (
+        data_root,
+        archive_path,
+        repository_id,
+        repository_acronym,
+        repository_display_name,
+        sha,
+        NULL,
+        TRUE,
+        out_pre_barrier_seal,
+        out_version,
+        out_snapshot_path,
+        out_entries,
+        out_total_bytes,
+        error
+    );
 }
 
 gboolean
