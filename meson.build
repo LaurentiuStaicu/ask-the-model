@@ -492,10 +492,14 @@ repository_gc_durable_roots_test = executable(
     'src/control_state.c',
     'src/conversation_store.c',
     'src/cff_version.c',
+    'tests/repository_gc_durable_roots_test_support.c',
     'tests/repository_gc_durable_roots_test.vala',
     resources
   ],
-  include_directories: include_directories('src'),
+  include_directories: [
+    include_directories('src'),
+    include_directories('tests')
+  ],
   dependencies: [
     glib_dep,
     gio_dep,
