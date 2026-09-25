@@ -300,6 +300,36 @@ test_round_robin_labels_and_untrusted_quoting (void)
     );
     g_assert_nonnull (
         strstr (
+            atm_grounding_system_instructions (),
+            "explicit technical distinctions"
+        )
+    );
+    g_assert_nonnull (
+        strstr (
+            atm_grounding_system_instructions (),
+            "X is A but not B"
+        )
+    );
+    g_assert_nonnull (
+        strstr (
+            atm_grounding_system_instructions (),
+            "canonical terms"
+        )
+    );
+    g_assert_nonnull (
+        strstr (
+            atm_grounding_post_evidence_reminder (),
+            "preserve explicit distinctions"
+        )
+    );
+    g_assert_nonnull (
+        strstr (
+            atm_grounding_post_evidence_reminder (),
+            "canonical technical terms"
+        )
+    );
+    g_assert_nonnull (
+        strstr (
             atm_grounding_post_evidence_reminder (),
             "untrusted data"
         )
