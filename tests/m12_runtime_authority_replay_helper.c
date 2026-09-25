@@ -1,5 +1,6 @@
 #include "control_state.h"
 #include "fault_injection_support.h"
+#include "fault_injection_test_hook.h"
 #include "repository_capacity_ui_bridge.h"
 #include "repository_ingest.h"
 #include "repository_mutation_lease.h"
@@ -798,6 +799,14 @@ verify_root (
     qualified = TRUE;
 
 print:
+    char *active_sha_json =
+        active_sha != NULL
+            ? g_strdup_printf (
+                "\"%s\"",
+                active_sha
+            )
+            : g_strdup ("null");
+
     g_print (
         "{"
         "\"schema_version\":1,"
@@ -810,12 +819,7 @@ print:
         "}\n",
         classification,
         generation_id,
-        active_sha != NULL
-            ? g_strdup_printf (
-                "\"%s\"",
-                active_sha
-            )
-            : "null",
+        active_sha_json,
         has_seal_match
             ? (seal_match ? "true" : "false")
             : "null",
@@ -823,6 +827,7 @@ print:
         reason_code
     );
 
+    g_free (active_sha_json);
     g_clear_error (&error);
     g_free (computed_seal);
     g_free (stored_seal);
