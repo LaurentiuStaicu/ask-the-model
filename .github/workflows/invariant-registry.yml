@@ -34,3 +34,4 @@ jobs:
           python3 scripts/validate_generation_lease_wiring.py
           python3 scripts/validate_durability_evidence.py
           python3 scripts/validate_durability_policy.py
+          python3 scripts/validate_presentation_performance_evidence.py
