@@ -1476,9 +1476,9 @@ The native scanner opens the data root and every namespace component with `O_DIR
 
 A structurally eligible candidate must have a canonical lowercase 40-hex basename and `fstatat(..., AT_SYMLINK_NOFOLLOW)` must identify a real directory. Exact repository/SHA pairs already protected by active, durable-conversation or B2-live roots are excluded.
 
-A real-directory `.invalid-*` entry is counted as quarantine evidence and never becomes an ordinary candidate. Any other malformed basename, SHA-named symlink, SHA-named regular file, or malformed quarantine object fails the discovery pass closed as a repair condition.
+Only a real-directory quarantine entry matching the producer grammar `.invalid-<40-lower-hex-sha>-<canonical-decimal-timestamp>-<attempt-0..99>` is counted as quarantine evidence and never becomes an ordinary candidate. A merely prefixed or otherwise malformed `.invalid-*` name, any other malformed basename, SHA-named symlink, SHA-named regular file, or malformed quarantine object fails the discovery pass closed as a repair condition.
 
-Tests cover protected and quarantine exclusion, unknown repository-directory non-discovery, malformed names, symlink and regular-file SHA entries, a symlinked `snapshots` root, and an intermediate repository-component symlink. The scanner creates no namespace and performs no rename, unlink, purge or lease mutation.
+Tests cover protected and canonical-quarantine exclusion, malformed quarantine rejection, unknown repository-directory non-discovery, malformed names, symlink and regular-file SHA entries, a symlinked `snapshots` root, and an intermediate repository-component symlink. The scanner creates no namespace and performs no rename, unlink, purge or lease mutation.
 
 A candidate is still only an advisory inventory item. A later destructive pass must acquire B0, rebuild/revalidate durable and B2-live roots, obtain the relevant exclusive generation exclusion, and revalidate the exact source object immediately before any same-filesystem isolation rename.
 

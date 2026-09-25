@@ -652,6 +652,57 @@ test_candidate_discovery_rejects_malformed_entry () {
 
 
 private static void
+test_candidate_discovery_rejects_malformed_quarantine_entry () {
+    const string SHA =
+        "7777777777777777777777777777777777777777";
+
+    string root = new_temp_root ();
+
+    try {
+        string snapshots =
+            snapshot_root_for (
+                root,
+                "ewd"
+            );
+
+        assert (
+            DirUtils.create_with_parents (
+                Path.build_filename (
+                    snapshots,
+                    ".invalid-%s-not-a-timestamp-0".printf (
+                        SHA
+                    )
+                ),
+                0700
+            ) == 0
+        );
+
+        bool rejected = false;
+
+        try {
+            AskTheModel.RepositoryGcCandidateDiscovery.
+                discover (
+                    root,
+                    new AskTheModel.RepositoryGcDurableRoots ()
+                );
+        } catch (Error error) {
+            rejected =
+                error.message.index_of (
+                    "malformed quarantine entry"
+                ) >= 0;
+        }
+
+        assert (rejected);
+    } catch (Error error) {
+        critical ("%s", error.message);
+        assert_not_reached ();
+    } finally {
+        remove_tree_best_effort (root);
+    }
+}
+
+
+private static void
 test_candidate_discovery_rejects_symlink_entry () {
     const string SHA =
         "4444444444444444444444444444444444444444";
@@ -927,6 +978,10 @@ main (string[] args) {
     Test.add_func (
         "/repository-gc-candidates/malformed-entry-fail-closed",
         test_candidate_discovery_rejects_malformed_entry
+    );
+    Test.add_func (
+        "/repository-gc-candidates/malformed-quarantine-fail-closed",
+        test_candidate_discovery_rejects_malformed_quarantine_entry
     );
     Test.add_func (
         "/repository-gc-candidates/symlink-entry-fail-closed",
