@@ -301,6 +301,267 @@ jobs:
           )
           PY
 
+      - name: Execute candidate context-policy sweep
+        shell: bash
+        run: |
+          set -euo pipefail
+
+          for policy in \
+            candidate-results5 \
+            candidate-sources8 \
+            candidate-sources7 \
+            candidate-sources6 \
+            candidate-sources5 \
+            candidate-sources4 \
+            candidate-sources3 \
+            candidate-sources2 \
+            candidate-sources1 \
+            candidate-bytes16k \
+            candidate-compact
+          do
+            stem="/tmp/atm-retrieval-${policy}"
+
+            /tmp/atm-retrieval-benchmark-runner               benchmarks/retrieval-v1/benchmark.json               "${stem}-run.json"               "github-${policy}-${GITHUB_RUN_ID}-${GITHUB_RUN_ATTEMPT}"               "${policy}"
+
+            python3 scripts/evaluate_retrieval_benchmark.py               benchmarks/retrieval-v1/benchmark.json               "${stem}-run.json"               --pretty               > "${stem}-evaluation.json"
+          done
+
+          python3 - <<'PY'
+          import json
+
+          policies = [
+              "production",
+              "candidate-results5",
+              "candidate-sources8",
+              "candidate-sources7",
+              "candidate-sources6",
+              "candidate-sources5",
+              "candidate-sources4",
+              "candidate-sources3",
+              "candidate-sources2",
+              "candidate-sources1",
+              "candidate-bytes16k",
+              "candidate-compact",
+          ]
+
+          def load(policy):
+              if policy == "production":
+                  path = (
+                      "/tmp/atm-retrieval-production-policy-"
+                      "evaluation.json"
+                  )
+              else:
+                  path = f"/tmp/atm-retrieval-{policy}-evaluation.json"
+
+              with open(path, encoding="utf-8") as handle:
+                  return json.load(handle)
+
+          baseline = load("production")
+          baseline_metrics = baseline["metrics"]
+          baseline_topics = {
+              item["topic_id"]: item
+              for item in baseline["topic_diagnostics"]
+          }
+          rows = []
+          epsilon = 1e-12
+
+          for policy in policies:
+              evaluation = load(policy)
+              metrics = evaluation["metrics"]
+              candidate_topics = {
+                  item["topic_id"]: item
+                  for item in evaluation["topic_diagnostics"]
+              }
+
+              if candidate_topics.keys() != baseline_topics.keys():
+                  missing = sorted(
+                      baseline_topics.keys() - candidate_topics.keys()
+                  )
+                  extra = sorted(
+                      candidate_topics.keys() - baseline_topics.keys()
+                  )
+                  raise RuntimeError(
+                      f"{policy}: topic set differs from production; "
+                      f"missing={missing} extra={extra}"
+                  )
+
+              topic_regressions = []
+              topic_improvements = []
+
+              for topic_id in sorted(baseline_topics):
+                  baseline_topic = baseline_topics[topic_id]
+                  candidate_topic = candidate_topics[topic_id]
+                  baseline_recall = baseline_topic.get(
+                      "context_required_recall"
+                  )
+                  candidate_recall = candidate_topic.get(
+                      "context_required_recall"
+                  )
+
+                  if (
+                      baseline_recall is None
+                      or candidate_recall is None
+                  ):
+                      continue
+
+                  delta = candidate_recall - baseline_recall
+
+                  diagnostic = {
+                      "topic_id": topic_id,
+                      "information_need_id": candidate_topic.get(
+                          "information_need_id"
+                      ),
+                      "topic_type": candidate_topic.get("topic_type"),
+                      "language": candidate_topic.get("language"),
+                      "baseline_context_required_recall": (
+                          baseline_recall
+                      ),
+                      "candidate_context_required_recall": (
+                          candidate_recall
+                      ),
+                      "delta_context_required_recall": delta,
+                  }
+
+                  if delta < -epsilon:
+                      topic_regressions.append(diagnostic)
+                  elif delta > epsilon:
+                      topic_improvements.append(diagnostic)
+
+              aggregate_recall_delta = (
+                  metrics.get("context_required_recall")
+                  - baseline_metrics.get("context_required_recall")
+              )
+              worst_topic_delta = min(
+                  (
+                      item["delta_context_required_recall"]
+                      for item in topic_regressions
+                  ),
+                  default=0.0,
+              )
+              passes_quality = evaluation[
+                  "passes_provisional_targets"
+              ]
+              promotion_eligible_observational = (
+                  passes_quality
+                  and aggregate_recall_delta >= -epsilon
+                  and not topic_regressions
+              )
+
+              rows.append(
+                  {
+                      "policy": policy,
+                      "context_precision": metrics.get(
+                          "context_precision"
+                      ),
+                      "context_required_recall": metrics.get(
+                          "context_required_recall"
+                      ),
+                      "context_source_count_mean": metrics.get(
+                          "context_source_count_mean"
+                      ),
+                      "context_source_count_max": metrics.get(
+                          "context_source_count_max"
+                      ),
+                      "evidence_bytes_mean": metrics.get(
+                          "evidence_bytes_mean"
+                      ),
+                      "evidence_bytes_max": metrics.get(
+                          "evidence_bytes_max"
+                      ),
+                      "canonical_required_recall_at_5": metrics.get(
+                          "canonical_required_recall_at_5"
+                      ),
+                      "ndcg_at_5": metrics.get("ndcg_at_5"),
+                      "exact_id_success_at_1": metrics.get(
+                          "exact_id_success_at_1"
+                      ),
+                      "passes_existing_quality_gates": passes_quality,
+                      "delta_context_precision": (
+                          metrics.get("context_precision")
+                          - baseline_metrics.get("context_precision")
+                      ),
+                      "delta_context_required_recall": (
+                          aggregate_recall_delta
+                      ),
+                      "delta_evidence_bytes_mean": (
+                          metrics.get("evidence_bytes_mean")
+                          - baseline_metrics.get(
+                              "evidence_bytes_mean"
+                          )
+                      ),
+                      "topic_context_recall_regression_count": (
+                          len(topic_regressions)
+                      ),
+                      "worst_topic_context_recall_delta": (
+                          worst_topic_delta
+                      ),
+                      "topic_context_recall_regressions": (
+                          topic_regressions
+                      ),
+                      "topic_context_recall_improvements": (
+                          topic_improvements
+                      ),
+                      "promotion_eligible_observational": (
+                          promotion_eligible_observational
+                      ),
+                  }
+              )
+
+          with open(
+              "/tmp/atm-retrieval-policy-sweep-summary.json",
+              "w",
+              encoding="utf-8",
+          ) as handle:
+              json.dump(
+                  {
+                      "schema_version": 2,
+                      "baseline": "production",
+                      "policies": rows,
+                  },
+                  handle,
+                  indent=2,
+                  sort_keys=True,
+              )
+              handle.write("\n")
+
+          print("Candidate context-policy sweep:")
+          for row in rows:
+              print(
+                  "  "
+                  f"{row['policy']}: "
+                  f"precision={row['context_precision']:.6f} "
+                  f"context_recall={row['context_required_recall']:.6f} "
+                  f"sources_mean={row['context_source_count_mean']:.3f} "
+                  f"sources_max={row['context_source_count_max']} "
+                  f"bytes_mean={row['evidence_bytes_mean']:.1f} "
+                  f"bytes_max={row['evidence_bytes_max']} "
+                  f"quality_gates={row['passes_existing_quality_gates']} "
+                  f"topic_regressions="
+                  f"{row['topic_context_recall_regression_count']} "
+                  f"worst_topic_delta="
+                  f"{row['worst_topic_context_recall_delta']:.6f} "
+                  f"promotion_eligible="
+                  f"{row['promotion_eligible_observational']}"
+              )
+
+              for regression in row[
+                  "topic_context_recall_regressions"
+              ]:
+                  print(
+                      "    recall_regression "
+                      f"topic={regression['topic_id']} "
+                      f"need={regression['information_need_id']} "
+                      f"type={regression['topic_type']} "
+                      f"language={regression['language']} "
+                      f"baseline="
+                      f"{regression['baseline_context_required_recall']:.6f} "
+                      f"candidate="
+                      f"{regression['candidate_context_required_recall']:.6f} "
+                      f"delta="
+                      f"{regression['delta_context_required_recall']:.6f}"
+                  )
+          PY
+
       - name: Enforce provisional R5 gates
         shell: bash
         run: |
@@ -338,5 +599,28 @@ jobs:
             /tmp/atm-retrieval-benchmark-evaluation.json
             /tmp/atm-retrieval-production-policy-run.json
             /tmp/atm-retrieval-production-policy-evaluation.json
+            /tmp/atm-retrieval-candidate-results5-run.json
+            /tmp/atm-retrieval-candidate-results5-evaluation.json
+            /tmp/atm-retrieval-candidate-sources8-run.json
+            /tmp/atm-retrieval-candidate-sources8-evaluation.json
+            /tmp/atm-retrieval-candidate-sources7-run.json
+            /tmp/atm-retrieval-candidate-sources7-evaluation.json
+            /tmp/atm-retrieval-candidate-sources6-run.json
+            /tmp/atm-retrieval-candidate-sources6-evaluation.json
+            /tmp/atm-retrieval-candidate-sources5-run.json
+            /tmp/atm-retrieval-candidate-sources5-evaluation.json
+            /tmp/atm-retrieval-candidate-sources4-run.json
+            /tmp/atm-retrieval-candidate-sources4-evaluation.json
+            /tmp/atm-retrieval-candidate-sources3-run.json
+            /tmp/atm-retrieval-candidate-sources3-evaluation.json
+            /tmp/atm-retrieval-candidate-sources2-run.json
+            /tmp/atm-retrieval-candidate-sources2-evaluation.json
+            /tmp/atm-retrieval-candidate-sources1-run.json
+            /tmp/atm-retrieval-candidate-sources1-evaluation.json
+            /tmp/atm-retrieval-candidate-bytes16k-run.json
+            /tmp/atm-retrieval-candidate-bytes16k-evaluation.json
+            /tmp/atm-retrieval-candidate-compact-run.json
+            /tmp/atm-retrieval-candidate-compact-evaluation.json
+            /tmp/atm-retrieval-policy-sweep-summary.json
           if-no-files-found: warn
           retention-days: 14

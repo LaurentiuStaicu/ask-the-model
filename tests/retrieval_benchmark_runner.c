@@ -37,6 +37,83 @@ static const BenchmarkPolicy PRODUCTION_POLICY = {
     ATM_PRODUCTION_GROUNDING_MAX_CONTEXT_BYTES
 };
 
+static const BenchmarkPolicy CANDIDATE_RESULTS5_POLICY = {
+    "candidate-results5",
+    5,
+    ATM_PRODUCTION_GROUNDING_MAX_SOURCES,
+    ATM_PRODUCTION_GROUNDING_MAX_CONTEXT_BYTES
+};
+
+static const BenchmarkPolicy CANDIDATE_SOURCES8_POLICY = {
+    "candidate-sources8",
+    ATM_PRODUCTION_RETRIEVAL_RESULTS_PER_REPOSITORY,
+    8,
+    ATM_PRODUCTION_GROUNDING_MAX_CONTEXT_BYTES
+};
+
+static const BenchmarkPolicy CANDIDATE_SOURCES7_POLICY = {
+    "candidate-sources7",
+    ATM_PRODUCTION_RETRIEVAL_RESULTS_PER_REPOSITORY,
+    7,
+    ATM_PRODUCTION_GROUNDING_MAX_CONTEXT_BYTES
+};
+
+static const BenchmarkPolicy CANDIDATE_SOURCES6_POLICY = {
+    "candidate-sources6",
+    ATM_PRODUCTION_RETRIEVAL_RESULTS_PER_REPOSITORY,
+    6,
+    ATM_PRODUCTION_GROUNDING_MAX_CONTEXT_BYTES
+};
+
+static const BenchmarkPolicy CANDIDATE_SOURCES5_POLICY = {
+    "candidate-sources5",
+    ATM_PRODUCTION_RETRIEVAL_RESULTS_PER_REPOSITORY,
+    5,
+    ATM_PRODUCTION_GROUNDING_MAX_CONTEXT_BYTES
+};
+
+static const BenchmarkPolicy CANDIDATE_SOURCES4_POLICY = {
+    "candidate-sources4",
+    ATM_PRODUCTION_RETRIEVAL_RESULTS_PER_REPOSITORY,
+    4,
+    ATM_PRODUCTION_GROUNDING_MAX_CONTEXT_BYTES
+};
+
+static const BenchmarkPolicy CANDIDATE_SOURCES3_POLICY = {
+    "candidate-sources3",
+    ATM_PRODUCTION_RETRIEVAL_RESULTS_PER_REPOSITORY,
+    3,
+    ATM_PRODUCTION_GROUNDING_MAX_CONTEXT_BYTES
+};
+
+static const BenchmarkPolicy CANDIDATE_SOURCES2_POLICY = {
+    "candidate-sources2",
+    ATM_PRODUCTION_RETRIEVAL_RESULTS_PER_REPOSITORY,
+    2,
+    ATM_PRODUCTION_GROUNDING_MAX_CONTEXT_BYTES
+};
+
+static const BenchmarkPolicy CANDIDATE_SOURCES1_POLICY = {
+    "candidate-sources1",
+    ATM_PRODUCTION_RETRIEVAL_RESULTS_PER_REPOSITORY,
+    1,
+    ATM_PRODUCTION_GROUNDING_MAX_CONTEXT_BYTES
+};
+
+static const BenchmarkPolicy CANDIDATE_BYTES16K_POLICY = {
+    "candidate-bytes16k",
+    ATM_PRODUCTION_RETRIEVAL_RESULTS_PER_REPOSITORY,
+    ATM_PRODUCTION_GROUNDING_MAX_SOURCES,
+    16 * 1024
+};
+
+static const BenchmarkPolicy CANDIDATE_COMPACT_POLICY = {
+    "candidate-compact",
+    5,
+    8,
+    16 * 1024
+};
+
 typedef struct {
     char *repository_id;
     char *expected_version;
@@ -1184,7 +1261,12 @@ main (int argc, char **argv)
 {
     if (argc != 4 && argc != 5) {
         g_printerr (
-            "Usage: %s BENCHMARK_JSON OUTPUT_JSON RUN_ID [frozen|production]\n",
+            "Usage: %s BENCHMARK_JSON OUTPUT_JSON RUN_ID "
+            "[frozen|production|candidate-results5|candidate-sources8|"
+            "candidate-sources7|candidate-sources6|candidate-sources5|"
+            "candidate-sources4|candidate-sources3|candidate-sources2|"
+            "candidate-sources1|candidate-bytes16k|"
+            "candidate-compact]\n",
             argv[0]
         );
         return 2;
@@ -1201,9 +1283,64 @@ main (int argc, char **argv)
         policy = &FROZEN_R5_POLICY;
     } else if (g_strcmp0 (policy_name, "production") == 0) {
         policy = &PRODUCTION_POLICY;
+    } else if (g_strcmp0 (
+                   policy_name,
+                   "candidate-results5"
+               ) == 0) {
+        policy = &CANDIDATE_RESULTS5_POLICY;
+    } else if (g_strcmp0 (
+                   policy_name,
+                   "candidate-sources8"
+               ) == 0) {
+        policy = &CANDIDATE_SOURCES8_POLICY;
+    } else if (g_strcmp0 (
+                   policy_name,
+                   "candidate-sources7"
+               ) == 0) {
+        policy = &CANDIDATE_SOURCES7_POLICY;
+    } else if (g_strcmp0 (
+                   policy_name,
+                   "candidate-sources6"
+               ) == 0) {
+        policy = &CANDIDATE_SOURCES6_POLICY;
+    } else if (g_strcmp0 (
+                   policy_name,
+                   "candidate-sources5"
+               ) == 0) {
+        policy = &CANDIDATE_SOURCES5_POLICY;
+    } else if (g_strcmp0 (
+                   policy_name,
+                   "candidate-sources4"
+               ) == 0) {
+        policy = &CANDIDATE_SOURCES4_POLICY;
+    } else if (g_strcmp0 (
+                   policy_name,
+                   "candidate-sources3"
+               ) == 0) {
+        policy = &CANDIDATE_SOURCES3_POLICY;
+    } else if (g_strcmp0 (
+                   policy_name,
+                   "candidate-sources2"
+               ) == 0) {
+        policy = &CANDIDATE_SOURCES2_POLICY;
+    } else if (g_strcmp0 (
+                   policy_name,
+                   "candidate-sources1"
+               ) == 0) {
+        policy = &CANDIDATE_SOURCES1_POLICY;
+    } else if (g_strcmp0 (
+                   policy_name,
+                   "candidate-bytes16k"
+               ) == 0) {
+        policy = &CANDIDATE_BYTES16K_POLICY;
+    } else if (g_strcmp0 (
+                   policy_name,
+                   "candidate-compact"
+               ) == 0) {
+        policy = &CANDIDATE_COMPACT_POLICY;
     } else {
         g_printerr (
-            "Unknown benchmark policy '%s'; expected frozen or production.\n",
+            "Unknown benchmark policy '%s'.\n",
             policy_name
         );
         return 2;
