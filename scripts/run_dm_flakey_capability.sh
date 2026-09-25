@@ -158,7 +158,7 @@ BASELINE_SHA="$(
 sync -f "$LIVE_MOUNT"
 
 sudo dmsetup suspend "$MAPPER_NAME"
-sudo dmsetup reload "$MAPPER_NAME"     --table "0 $SECTORS flakey $DATA_LOOP 0 0 600 1 error_writes"
+sudo dmsetup reload "$MAPPER_NAME"     --table "0 $SECTORS flakey $DATA_LOOP 0 1 600 1 error_writes"
 sudo dmsetup resume "$MAPPER_NAME"
 
 FLAKEY_TABLE_ACTIVE=false
@@ -166,6 +166,9 @@ if sudo dmsetup table "$MAPPER_NAME" |
     grep -Fq " flakey "; then
     FLAKEY_TABLE_ACTIVE=true
 fi
+
+# Enter the documented unreliable interval (1 s up, then 600 s down).
+sleep 2
 
 READ_SHA="$(
     sha256sum "$LIVE_MOUNT/baseline.bin" |
@@ -311,7 +314,7 @@ record = {
     "method": {
         "initial_target": "linear",
         "injected_target": "flakey",
-        "flakey_up_interval_seconds": 0,
+        "flakey_up_interval_seconds": 1,
         "flakey_down_interval_seconds": 600,
         "feature": "error_writes",
         "reload_while_ext4_mounted": True,
