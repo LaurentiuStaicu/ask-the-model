@@ -83,7 +83,6 @@ jobs:
 
           cc \
             -std=c11 \
-            -D_GNU_SOURCE \
             -DATM_TEST_FAULT_INJECTION \
             -O2 \
             -Wall \
