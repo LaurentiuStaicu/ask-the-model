@@ -45,6 +45,7 @@ executable(
     'src/presentation_document.c',
     'src/presentation_normalize.c',
     'src/PresentationNative.vapi',
+    'src/PresentationTranscriptRenderer.vala',
     'src/ActivityRing.vala',
     'src/SelectorTriangle.vala',
     'src/ChatRequestBuilder.vala',
@@ -1726,6 +1727,30 @@ test(
   structured_json_test
 )
 
+
+
+presentation_transcript_renderer_test = executable(
+  'presentation-transcript-renderer-test',
+  [
+    'src/PresentationNative.vapi',
+    'src/PresentationTranscriptRenderer.vala',
+    'src/presentation_document.c',
+    'src/presentation_normalize.c',
+    'tests/presentation_transcript_renderer_test.vala'
+  ],
+  include_directories: include_directories('src'),
+  dependencies: [
+    gtk_dep,
+    glib_dep,
+    md4c_dep
+  ],
+  install: false
+)
+
+test(
+  'presentation-transcript-renderer',
+  presentation_transcript_renderer_test
+)
 
 presentation_native_test = executable(
   'presentation-native-test',
