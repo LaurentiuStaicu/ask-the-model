@@ -162,8 +162,10 @@ run_scenario() {
     "$HELPER" --verify "$verify_mount" >"$work/verify.json"
     python3 -m json.tool "$work/verify.json" >/dev/null
 
+    local result_path="$RESULTS_DIR/$slug-$boundary.json"
+
     python3 - \
-        "$work/result.json" \
+        "$result_path" \
         "$strategy" \
         "$boundary" \
         "$checkpoint" \
@@ -241,7 +243,7 @@ PY
     sudo losetup -d "$loop_dev"
     loop_dev=""
 
-    python3 -m json.tool "$work/result.json" >/dev/null
+    python3 -m json.tool "$result_path" >/dev/null
 }
 
 for strategy in S1_TARGETED_FSYNC S2_SYNCFS; do
