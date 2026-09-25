@@ -319,5 +319,123 @@
       }
     },
     "reviewed_conclusion": "S1 targeted fsync and S2 syncfs both satisfy the seal-aware Tier-2 after-authority replay fixture that falsified S3. This establishes candidate correctness for this boundary only; it does not select a production barrier. Final policy review must still combine boundary qualification with M1 EWD/CBD/RMD performance evidence, scope, and error-propagation tradeoffs."
+  },
+  "tier2_candidate_boundary_replay": {
+    "measurement_id": "atm-a1-m6-candidate-boundary-replay-v1",
+    "status": "qualification-only",
+    "production_barrier_selected": false,
+    "source": {
+      "actions_run_id": 36127799616,
+      "artifact_name": "atm-a1-m6-candidate-boundary-replay-36127799616-1",
+      "artifact_id": 10860237993,
+      "artifact_sha256": "1ce58499533b1a3f8c65cbe3c3a212f808008b415d5d92623bbb3e4bbbdf76e1",
+      "atm_source_commit": "549ad076111bf2cdb5ae44e3cda68ca6b84c2fb2"
+    },
+    "kernel": {
+      "system": "Linux",
+      "release": "6.17.0-1022-azure",
+      "machine": "x86_64"
+    },
+    "upstream": {
+      "repository": "josefbacik/log-writes",
+      "commit": "7b70d8a6863c5de30933d42a7672d35d01d2dc6c"
+    },
+    "all_strong_invariants_satisfied": true,
+    "all_expected_classifications_match": true,
+    "matrix": {
+      "S1_TARGETED_FSYNC": {
+        "post_barrier_pre_rename": {
+          "baseline_entry": 162,
+          "scenario_entry": 186,
+          "e2fsck_exit_code": 1,
+          "classification": "OLD_AUTHORITY_VALID",
+          "active_repository_sha": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+          "stored_seal": "39d5b5c5ff8fe2d5a0fbee8238abab546f39b07774ad29aeaeb06c4d25aac780",
+          "computed_seal": "39d5b5c5ff8fe2d5a0fbee8238abab546f39b07774ad29aeaeb06c4d25aac780",
+          "seal_match": true,
+          "qualified": true
+        },
+        "post_rename_pre_parent_fsync": {
+          "baseline_entry": 162,
+          "scenario_entry": 186,
+          "e2fsck_exit_code": 1,
+          "classification": "OLD_AUTHORITY_VALID",
+          "active_repository_sha": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+          "stored_seal": "39d5b5c5ff8fe2d5a0fbee8238abab546f39b07774ad29aeaeb06c4d25aac780",
+          "computed_seal": "39d5b5c5ff8fe2d5a0fbee8238abab546f39b07774ad29aeaeb06c4d25aac780",
+          "seal_match": true,
+          "qualified": true
+        },
+        "post_parent_fsync_pre_authority": {
+          "baseline_entry": 161,
+          "scenario_entry": 192,
+          "e2fsck_exit_code": 1,
+          "classification": "OLD_AUTHORITY_VALID",
+          "active_repository_sha": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+          "stored_seal": "39d5b5c5ff8fe2d5a0fbee8238abab546f39b07774ad29aeaeb06c4d25aac780",
+          "computed_seal": "39d5b5c5ff8fe2d5a0fbee8238abab546f39b07774ad29aeaeb06c4d25aac780",
+          "seal_match": true,
+          "qualified": true
+        },
+        "after_authority": {
+          "baseline_entry": 162,
+          "scenario_entry": 214,
+          "e2fsck_exit_code": 1,
+          "classification": "NEW_AUTHORITY_VALID",
+          "active_repository_sha": "bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb",
+          "stored_seal": "acebf979895f9efd073014fa707038d47ec71b411f4e12a32aa619e9c63f3132",
+          "computed_seal": "acebf979895f9efd073014fa707038d47ec71b411f4e12a32aa619e9c63f3132",
+          "seal_match": true,
+          "qualified": true
+        }
+      },
+      "S2_SYNCFS": {
+        "post_barrier_pre_rename": {
+          "baseline_entry": 162,
+          "scenario_entry": 186,
+          "e2fsck_exit_code": 1,
+          "classification": "OLD_AUTHORITY_VALID",
+          "active_repository_sha": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+          "stored_seal": "39d5b5c5ff8fe2d5a0fbee8238abab546f39b07774ad29aeaeb06c4d25aac780",
+          "computed_seal": "39d5b5c5ff8fe2d5a0fbee8238abab546f39b07774ad29aeaeb06c4d25aac780",
+          "seal_match": true,
+          "qualified": true
+        },
+        "post_rename_pre_parent_fsync": {
+          "baseline_entry": 162,
+          "scenario_entry": 186,
+          "e2fsck_exit_code": 1,
+          "classification": "OLD_AUTHORITY_VALID",
+          "active_repository_sha": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+          "stored_seal": "39d5b5c5ff8fe2d5a0fbee8238abab546f39b07774ad29aeaeb06c4d25aac780",
+          "computed_seal": "39d5b5c5ff8fe2d5a0fbee8238abab546f39b07774ad29aeaeb06c4d25aac780",
+          "seal_match": true,
+          "qualified": true
+        },
+        "post_parent_fsync_pre_authority": {
+          "baseline_entry": 161,
+          "scenario_entry": 199,
+          "e2fsck_exit_code": 1,
+          "classification": "OLD_AUTHORITY_VALID",
+          "active_repository_sha": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+          "stored_seal": "39d5b5c5ff8fe2d5a0fbee8238abab546f39b07774ad29aeaeb06c4d25aac780",
+          "computed_seal": "39d5b5c5ff8fe2d5a0fbee8238abab546f39b07774ad29aeaeb06c4d25aac780",
+          "seal_match": true,
+          "qualified": true
+        },
+        "after_authority": {
+          "baseline_entry": 162,
+          "scenario_entry": 221,
+          "e2fsck_exit_code": 1,
+          "classification": "NEW_AUTHORITY_VALID",
+          "active_repository_sha": "bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb",
+          "stored_seal": "acebf979895f9efd073014fa707038d47ec71b411f4e12a32aa619e9c63f3132",
+          "computed_seal": "acebf979895f9efd073014fa707038d47ec71b411f4e12a32aa619e9c63f3132",
+          "seal_match": true,
+          "qualified": true
+        }
+      }
+    },
+    "reviewed_conclusion": "S1 targeted fsync and S2 syncfs both preserve the old seal-valid authority at all pre-authority candidate boundaries and recover the new seal-valid authority immediately after Control DB activation. All eight M6 Tier-2 replay scenarios satisfy the strong old-valid/new-valid invariant. This still selects no production barrier because explicit writeback-error propagation and final scope/performance policy review remain."
   }
 }
