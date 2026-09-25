@@ -92,6 +92,9 @@ namespace AskTheModel {
         private string cache_root;
         private OptimizationPolicy optimization_policy =
             new OptimizationPolicy ();
+#if ATM_M12_TEST
+        private string? archive_download_override_for_test = null;
+#endif
         private bool installation_qualification_complete = false;
         private bool installation_qualified = false;
 
@@ -127,6 +130,14 @@ namespace AskTheModel {
         public bool optimization_mode_snapshot () {
             return optimization_policy.snapshot_enabled ();
         }
+
+#if ATM_M12_TEST
+        internal void set_archive_download_override_for_test (
+            string? archive_path
+        ) {
+            archive_download_override_for_test = archive_path;
+        }
+#endif
 
         private void require_download_capacity (
             RepositoryDescriptor descriptor,
@@ -1144,12 +1155,22 @@ namespace AskTheModel {
                                 );
                             }
 
-                            archive_path =
-                                yield client.download_archive_to_staging (
-                                    descriptor,
-                                    sha,
-                                    cancellable
-                                );
+#if ATM_M12_TEST
+                            if (archive_download_override_for_test !=
+                                null) {
+                                archive_path =
+                                    archive_download_override_for_test;
+                            } else {
+#endif
+                                archive_path =
+                                    yield client.download_archive_to_staging (
+                                        descriptor,
+                                        sha,
+                                        cancellable
+                                    );
+#if ATM_M12_TEST
+                            }
+#endif
                         }
 
                         if (optimized_operation &&
