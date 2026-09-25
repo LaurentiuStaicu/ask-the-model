@@ -857,7 +857,7 @@ Reviewed boundary results are:
 - `post_rename`: old SHA remains active and seal-valid;
 - `after_authority`: Control DB generation 2 points to the new SHA, but the replayed snapshot seal `7299f3e8…` differs from the stored seal `acebf979…`, producing `INVALID_AUTHORITY / active_snapshot_seal_mismatch`.
 
-This result falsifies the current S3 baseline against A1's stronger Tier-2 target: after the authority-changing operation is reported complete, replay may recover **new authority metadata without the exact snapshot bytes whose seal was committed**. The kernel dm-log-writes mechanism is specifically intended to replay completed writes/flush ordering at power-failure boundaries, so this fixture is materially stronger evidence than a process-kill test alone. citeturn620592search0
+This result falsifies the current S3 baseline against A1's stronger Tier-2 target: after the authority-changing operation is reported complete, replay may recover **new authority metadata without the exact snapshot bytes whose seal was committed**. The dm-log-writes mechanism records completed write/flush ordering for replay at power-failure boundaries, so this fixture provides a stronger storage-ordering qualification than a process-kill test alone.
 
 F4 still selects neither S1 targeted fsync nor S2 syncfs. The next measurement must run candidate barriers through this same seal-aware replay oracle before any production durability patch is considered.
 
