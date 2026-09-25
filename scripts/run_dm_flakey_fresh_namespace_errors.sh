@@ -369,7 +369,7 @@ artifact = {
             "ordering and fresh-authority classification."
         ),
         (
-            "Passing M11 does not authorize automatic orphan deletion or "
+            "Passing M11b does not authorize automatic orphan deletion or "
             "replace the separate authority-wide recovery-exclusion problem."
         ),
     ],
