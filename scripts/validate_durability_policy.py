@@ -28,8 +28,8 @@ def main() -> int:
 
     if policy.get("schema_version") != 1:
         fail("schema_version must remain 1")
-    if policy.get("status") != "selected-not-wired":
-        fail("policy must remain selected-not-wired")
+    if policy.get("status") != "selected-wired":
+        fail("runtime durability policy must remain selected-wired")
     if policy.get("selected_strategy") != "S1_TARGETED_FSYNC":
         fail("selected durability strategy drifted")
     if policy.get("selected_namespace_strategy") != "S1_DEST_SOURCE":
@@ -345,11 +345,13 @@ def main() -> int:
     if implementation != {
         "namespace_policy_selected": True,
         "durable_ingest_namespace_complete": True,
-        "runtime_wiring_authorized": False,
-        "next_required_slice": (
-            "IMPLEMENT_ON_ONLY_DURABLE_INGEST_RUNTIME_WIRING"
-        ),
         "vala_durable_ingest_bridge_available": True,
+        "runtime_wiring_authorized": True,
+        "on_only_durable_ingest_wired": True,
+        "runtime_fault_qualification_complete": False,
+        "next_required_slice": (
+            "M12_RUNTIME_DURABILITY_FAULT_QUALIFICATION"
+        ),
     }:
         fail("implementation staging contract drifted")
 
@@ -381,6 +383,7 @@ def main() -> int:
         "preexisting_final_target_action": "FAIL_CLOSED_NO_REUSE_NO_REMOVAL",
         "same_sha_repair_uses_durable_ingest": True,
         "automatic_orphan_recovery_selected": False,
+        "implemented": True,
         "reason": (
             "The native durable ingest sequence and Vala ABI are qualified "
             "separately. Runtime selection is limited to the operation-level "
@@ -404,7 +407,7 @@ def main() -> int:
 
     print(
         "durability production policy validation passed: "
-        "S1 + S1_DEST_SOURCE selected; ON-only runtime policy selected; wiring remains unauthorized"
+        "S1 + S1_DEST_SOURCE selected; ON-only runtime wired; M12 fault qualification pending"
     )
     return 0
 
