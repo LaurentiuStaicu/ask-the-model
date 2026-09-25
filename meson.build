@@ -885,6 +885,62 @@ test(
   repository_generation_lease_test
 )
 
+m12_runtime_authority_replay_helper = executable(
+  'm12-runtime-authority-replay-helper',
+  [
+    'src/control_state.c',
+    'src/cff_version.c',
+    'src/archive_extract.c',
+    'src/capacity_admission_model.c',
+    'src/capacity_operation_plan.c',
+    'src/capacity_measurement.c',
+    'src/repository_capacity_policy.c',
+    'src/repository_capacity_admission.c',
+    'src/repository_capacity_ui_bridge.c',
+    'src/repository_manifest.c',
+    'src/repository_storage.c',
+    'src/repository_mutation_lease.c',
+    'src/repository_ingest.c',
+    'src/snapshot_seal.c',
+    'src/snapshot_durability.c',
+    'src/snapshot_namespace_durability.c',
+    'src/repository_ui_bridge.c',
+    'src/repository_sources.c',
+    'src/markdown_sections.c',
+    'src/csv_table.c',
+    'src/structured_json.c',
+    'src/retrieval_index.c',
+    'src/coordination_lease.c',
+    'src/repository_generation_lease.c',
+    'src/retrieval_index_lifecycle.c',
+    'src/retrieval_query.c',
+    'src/retrieval_rank.c',
+    'src/retrieval_scope.c',
+    'src/retrieval_normalize.c',
+    'src/retrieval_router.c',
+    'src/retrieval_conversation.c',
+    'src/grounding_context.c',
+    'src/citation_labels.c',
+    'src/conversation_grounding.c',
+    'tests/fault_injection_support.c',
+    'tests/m12_runtime_authority_replay_helper.c',
+    resources
+  ],
+  include_directories: include_directories('src', 'tests'),
+  dependencies: [
+    glib_dep,
+    gio_dep,
+    json_glib_dep,
+    sqlite_dep,
+    archive_dep,
+    yaml_dep
+  ],
+  c_args: [
+    '-DATM_TEST_FAULT_INJECTION'
+  ],
+  install: false
+)
+
 repository_ingest_test = executable(
   'repository-ingest-test',
   [
