@@ -1,6 +1,7 @@
 #include "repository_ingest.h"
 
 #include "archive_extract.h"
+#include "fault_injection_test_hook.h"
 #include "repository_manifest.h"
 #include "repository_storage.h"
 #include "snapshot_durability.h"
@@ -242,6 +243,10 @@ repository_ingest_archive_internal (
             goto out;
         }
 
+        atm_test_fault_checkpoint (
+            "runtime_ingest_before_tree_fsync"
+        );
+
         if (!atm_snapshot_durability_sync_tree (
                 staging_path,
                 &durability_stats,
@@ -281,6 +286,12 @@ repository_ingest_archive_internal (
 
     staging_created = FALSE;
 
+    if (durable) {
+        atm_test_fault_checkpoint (
+            "runtime_ingest_before_destination_parent_fsync"
+        );
+    }
+
     if (durable &&
         !atm_snapshot_durability_sync_parent (
             snapshot_path,
@@ -288,6 +299,12 @@ repository_ingest_archive_internal (
             error
         )) {
         goto out;
+    }
+
+    if (durable) {
+        atm_test_fault_checkpoint (
+            "runtime_ingest_before_source_parent_fsync"
+        );
     }
 
     if (durable &&

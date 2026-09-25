@@ -1,0 +1,185 @@
+name: A1-M12b lifecycle fsync EIO qualification
+
+on:
+  workflow_dispatch:
+  pull_request:
+    paths:
+      - 'src/RepositoryLifecycleService.vala'
+      - 'src/repository_ingest.c'
+      - 'src/snapshot_durability.c'
+      - 'src/snapshot_namespace_durability.c'
+      - 'tests/repository_lifecycle_durability_fault_support.c'
+      - 'tests/repository_lifecycle_durability_fault_support.h'
+      - 'tests/repository_lifecycle_durability_fault_test.vala'
+      - '.github/workflows/m12b-lifecycle-fsync-eio.yml'
+      - 'meson.build'
+  push:
+    branches:
+      - main
+    paths:
+      - 'src/RepositoryLifecycleService.vala'
+      - 'src/repository_ingest.c'
+      - 'src/snapshot_durability.c'
+      - 'src/snapshot_namespace_durability.c'
+      - 'tests/repository_lifecycle_durability_fault_support.c'
+      - 'tests/repository_lifecycle_durability_fault_support.h'
+      - 'tests/repository_lifecycle_durability_fault_test.vala'
+      - '.github/workflows/m12b-lifecycle-fsync-eio.yml'
+      - 'meson.build'
+
+permissions:
+  contents: read
+
+jobs:
+  qualify:
+    runs-on: ubuntu-24.04
+    timeout-minutes: 15
+
+    steps:
+      - name: Checkout AtM
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+
+      - name: Install qualification dependencies
+        shell: bash
+        run: |
+          set -euo pipefail
+          sudo apt-get update
+          sudo apt-get install -y \
+            build-essential \
+            meson \
+            ninja-build \
+            valac \
+            pkg-config \
+            libglib2.0-dev \
+            libgtk-4-dev \
+            libgranite-7-dev \
+            libsoup-3.0-dev \
+            libjson-glib-dev \
+            libsqlite3-dev \
+            libarchive-dev \
+            libyaml-dev
+
+      - name: Configure and compile M12b target
+        shell: bash
+        run: |
+          set -euo pipefail
+          meson setup build-m12b
+          meson compile -C build-m12b \
+            repository-lifecycle-durability-fault-test
+
+      - name: Run M12b lifecycle fault matrix
+        shell: bash
+        env:
+          ATM_SOURCE_COMMIT: ${{ github.event.pull_request.head.sha || github.sha }}
+        run: |
+          set -euo pipefail
+          meson test \
+            -C build-m12b \
+            repository-lifecycle-durability-fault \
+            --no-rebuild \
+            --verbose \
+            2>&1 | tee build-m12b/m12b-test.log
+
+          python3 - <<'PY'
+          import json
+          import os
+          import platform
+          import re
+          from pathlib import Path
+
+          log = Path("build-m12b/m12b-test.log").read_text(
+              encoding="utf-8",
+              errors="replace",
+          )
+
+          expected = [
+              "runtime_ingest_before_tree_fsync",
+              "namespace_repository_before_child_fsync",
+              "runtime_ingest_before_destination_parent_fsync",
+              "runtime_ingest_before_source_parent_fsync",
+          ]
+
+          found = re.findall(
+              r"M12 runtime fault qualified checkpoint=([^ ]+) generation=([0-9]+)",
+              log,
+          )
+
+          if [name for name, _ in found] != expected:
+              raise SystemExit(
+                  f"M12b checkpoint result drift: {found!r}"
+              )
+
+          generations = [int(value) for _, value in found]
+          if generations != [0, 0, 0, 0]:
+              raise SystemExit(
+                  f"M12b authority generation advanced: {generations!r}"
+              )
+
+          artifact = {
+              "schema_version": 1,
+              "measurement_id": "atm-a1-m12b-lifecycle-fsync-eio-v1",
+              "status": "measurement-only",
+              "source_commit": os.environ["ATM_SOURCE_COMMIT"],
+              "kernel": {
+                  "system": platform.system(),
+                  "release": platform.release(),
+                  "machine": platform.machine(),
+              },
+              "protocol": {
+                  "real_lifecycle_entrypoint": (
+                      "RepositoryLifecycleService.download_or_update"
+                  ),
+                  "optimizations_snapshot": "ON",
+                  "network_download_excluded_with_test_only_local_archive_seam": True,
+                  "fault_injection_scope": "M12_TEST_TARGET_ONLY",
+                  "physical_power_loss_claim": False,
+                  "block_layer_claim": False,
+                  "m11b_remains_block_layer_evidence": True,
+              },
+              "boundaries": [
+                  {
+                      "checkpoint": name,
+                      "control_generation_after": generation,
+                      "control_authority_unchanged": True,
+                      "repository_remains_unready": True,
+                  }
+                  for (name, _), generation in zip(found, generations)
+              ],
+              "summary": {
+                  "scenario_count": len(found),
+                  "all_requested_faults_reached": len(found) == 4,
+                  "all_lifecycle_operations_failed_closed": True,
+                  "all_control_generations_unchanged": True,
+                  "all_repository_authority_absent": True,
+              },
+              "runtime_fault_qualification_complete": False,
+              "limitations": [
+                  (
+                      "M12b qualifies exact fsync EIO propagation through the "
+                      "real lifecycle entrypoint with deterministic syscall "
+                      "injection. It is not a block-device or physical "
+                      "power-loss experiment."
+                  ),
+                  (
+                      "M12a separately qualifies process-interruption authority "
+                      "sequencing; M11b remains the ext4 block-layer EIO evidence."
+                  ),
+              ],
+          }
+
+          Path("build-m12b/m12b-lifecycle-fsync-eio.json").write_text(
+              json.dumps(artifact, indent=2, sort_keys=True) + "\n",
+              encoding="utf-8",
+          )
+          PY
+
+          python3 -m json.tool \
+            build-m12b/m12b-lifecycle-fsync-eio.json >/dev/null
+
+      - name: Upload M12b evidence
+        uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4
+        with:
+          name: a1-m12b-lifecycle-fsync-eio
+          path: build-m12b/m12b-lifecycle-fsync-eio.json
+          if-no-files-found: error
+          retention-days: 30

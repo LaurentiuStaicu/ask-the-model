@@ -1760,6 +1760,87 @@ test(
   repository_lifecycle_service_test
 )
 
+repository_lifecycle_durability_fault_test = executable(
+  'repository-lifecycle-durability-fault-test',
+  [
+    'src/RepositoryService.vala',
+    'src/RepositoryNative.vala',
+    'src/RepositoryState.vala',
+    'src/ControlStateNative.vala',
+    'src/ControlRepositoryState.vala',
+    'src/OptimizationPolicy.vala',
+    'src/RepositoryLifecycleService.vala',
+    'src/control_state.c',
+    'src/ConversationGrounding.vala',
+    'src/ConversationSession.vala',
+    'src/cff_version.c',
+    'src/archive_extract.c',
+    'src/capacity_admission_model.c',
+    'src/capacity_operation_plan.c',
+    'src/capacity_measurement.c',
+    'src/repository_capacity_policy.c',
+    'src/repository_capacity_admission.c',
+    'src/repository_capacity_ui_bridge.c',
+    'src/repository_manifest.c',
+    'src/repository_storage.c',
+    'src/repository_mutation_lease.c',
+    'src/snapshot_namespace_durability.c',
+    'src/repository_ingest.c',
+    'src/snapshot_seal.c',
+    'src/snapshot_durability.c',
+    'src/repository_ui_bridge.c',
+    'src/repository_sources.c',
+    'src/markdown_sections.c',
+    'src/csv_table.c',
+    'src/structured_json.c',
+    'src/retrieval_index.c',
+    'src/coordination_lease.c',
+    'src/repository_generation_lease.c',
+    'src/retrieval_index_lifecycle.c',
+    'src/retrieval_query.c',
+    'src/retrieval_rank.c',
+    'src/retrieval_scope.c',
+    'src/retrieval_normalize.c',
+    'src/retrieval_router.c',
+    'src/retrieval_conversation.c',
+    'src/grounding_context.c',
+    'src/citation_labels.c',
+    'src/conversation_grounding.c',
+    'tests/repository_lifecycle_durability_fault_support.c',
+    'tests/repository_lifecycle_durability_fault_test.vala',
+    resources
+  ],
+  include_directories: [
+    include_directories('src'),
+    include_directories('tests')
+  ],
+  dependencies: [
+    glib_dep,
+    gio_dep,
+    soup_dep,
+    json_glib_dep,
+    sqlite_dep
+  ],
+  c_args: [
+    '-DATM_TEST_FAULT_INJECTION',
+    '-Dfsync=atm_m12_test_fsync'
+  ],
+  vala_args: [
+    '--define=ATM_M12_TEST'
+  ],
+  link_args: [
+    '-larchive',
+    '-lyaml',
+    '-lsqlite3'
+  ],
+  install: false
+)
+
+test(
+  'repository-lifecycle-durability-fault',
+  repository_lifecycle_durability_fault_test
+)
+
 repository_sources_test = executable(
   'repository-sources-test',
   [
