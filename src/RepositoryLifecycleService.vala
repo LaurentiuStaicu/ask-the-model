@@ -198,7 +198,7 @@ namespace AskTheModel {
             }
         }
 
-        private static RepositoryNative.CapacityOperationKind
+        internal static RepositoryNative.CapacityOperationKind
         capacity_operation_kind (
             RepositoryRuntimeInfo info,
             bool repairing_same_snapshot
