@@ -144,8 +144,8 @@
     "vala_durable_ingest_bridge_available": true,
     "runtime_wiring_authorized": true,
     "on_only_durable_ingest_wired": true,
-    "runtime_fault_qualification_complete": false,
-    "next_required_slice": "P4_RUNTIME_FAULT_QUALIFICATION_REVIEW"
+    "runtime_fault_qualification_complete": true,
+    "next_required_slice": "NO_REQUIRED_SLICE_WITHIN_SELECTED_RUNTIME_DURABILITY_SCOPE"
   },
   "runtime_integration": {
     "selected": true,
@@ -162,5 +162,22 @@
     "m12_policy_review_ready": true,
     "m12_scope": "PROCESS_INTERRUPTION_PLUS_LIFECYCLE_EXACT_FSYNC_ERROR_PROPAGATION",
     "m12_lifecycle_fsync_eio_correctness": "QUALIFIED_WITHIN_DECLARED_SCOPE"
+  },
+  "runtime_fault_qualification": {
+    "complete": true,
+    "scope": "OPTIMIZATIONS_ON_LOCAL_LINUX_EXT4_RUNTIME_AUTHORITY_PIPELINE",
+    "basis": [
+      "benchmarks/durability-v3/evidence.json#m12_runtime_authority",
+      "benchmarks/durability-v3/evidence.json#m12b_lifecycle_fsync_eio",
+      "benchmarks/durability-v2/evidence.json#m11b_exact_eio",
+      "benchmarks/durability-v2/evidence.json#m10_replay"
+    ],
+    "process_interruption_qualified": true,
+    "real_lifecycle_fsync_eio_qualified": true,
+    "selected_filesystem_barrier_evidence_retained": true,
+    "physical_power_loss_claim": false,
+    "network_or_remote_filesystem_claim": false,
+    "automatic_orphan_recovery_authorized": false,
+    "reason": "P4 reviews the frozen F12 M12a+M12b evidence together with the previously selected M10/M11b filesystem barrier evidence. Within the declared local Linux/ext4 Optimizations-ON authority pipeline, process interruptions before authority fail closed, post-authority recovery is seal-valid, promoted-snapshot seal mismatch fails closed, and exact selected fsync EIO propagates through the real lifecycle without Control DB authority advance. This completion does not claim arbitrary physical power-loss behavior, network/remote filesystem durability, or automatic orphan recovery."
   }
 }
