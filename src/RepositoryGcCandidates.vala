@@ -255,6 +255,12 @@ namespace AskTheModel {
                         );
                     }
 
+                    if (reason == "malformed-quarantine") {
+                        throw new GLib.IOError.INVALID_DATA (
+                            "Repository snapshot directory contains a malformed quarantine entry."
+                        );
+                    }
+
                     if (reason == "not-real-directory") {
                         throw new GLib.IOError.INVALID_DATA (
                             "Repository snapshot candidate is not a real directory."

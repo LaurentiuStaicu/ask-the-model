@@ -45,7 +45,9 @@ def main() -> int:
         "fdopendir (",
         "readdir (",
         "sha40_lower_is_valid",
+        "quarantine_name_is_valid",
         '"quarantine-entry"',
+        '"malformed-quarantine"',
         '"unexpected-basename"',
         '"not-real-directory"',
     ):
@@ -94,6 +96,7 @@ def main() -> int:
     for marker in (
         "/repository-gc-candidates/protected-and-quarantine-filtered",
         "/repository-gc-candidates/malformed-entry-fail-closed",
+        "/repository-gc-candidates/malformed-quarantine-fail-closed",
         "/repository-gc-candidates/symlink-entry-fail-closed",
         "/repository-gc-candidates/regular-file-entry-fail-closed",
         "/repository-gc-candidates/symlink-root-fail-closed",
