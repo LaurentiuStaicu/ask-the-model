@@ -1441,6 +1441,15 @@ main (int argc, char **argv)
     if (argc == 3 &&
         g_strcmp0 (argv[1], "--initialize-old") == 0) {
         ok = initialize_old (argv[2], &error);
+    } else if (argc == 3 &&
+               g_strcmp0 (
+                   argv[1],
+                   "--initialize-invalid-repair"
+               ) == 0) {
+        ok = initialize_invalid_repair (
+            argv[2],
+            &error
+        );
     } else if (argc == 4 &&
                g_strcmp0 (argv[1], "--promote-new") == 0) {
         ok = promote_new (
@@ -1470,17 +1479,37 @@ main (int argc, char **argv)
             argv[4],
             &error
         );
+    } else if (argc == 5 &&
+               g_strcmp0 (
+                   argv[1],
+                   "--repair-same-sha-candidate-boundary"
+               ) == 0) {
+        ok = repair_same_sha_candidate (
+            argv[2],
+            argv[3],
+            argv[4],
+            &error
+        );
     } else if (argc == 3 &&
                g_strcmp0 (argv[1], "--verify") == 0) {
         ok = verify_replayed_authority (argv[2]);
+    } else if (argc == 3 &&
+               g_strcmp0 (
+                   argv[1],
+                   "--verify-repair"
+               ) == 0) {
+        ok = verify_replayed_repair (argv[2]);
     } else {
         g_printerr (
             "Usage: a1-snapshot-replay-helper "
             "--initialize-old ROOT | "
+            "--initialize-invalid-repair ROOT | "
             "--promote-new ROOT CHECKPOINT | "
             "--promote-new-candidate ROOT STRATEGY | "
             "--promote-new-candidate-boundary ROOT STRATEGY CHECKPOINT | "
-            "--verify ROOT\n"
+            "--repair-same-sha-candidate-boundary ROOT STRATEGY CHECKPOINT | "
+            "--verify ROOT | "
+            "--verify-repair ROOT\n"
         );
         return 64;
     }
