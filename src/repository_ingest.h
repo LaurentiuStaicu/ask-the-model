@@ -34,6 +34,21 @@ gboolean atm_repository_ingest_archive_cancellable (
     GError **error
 );
 
+gboolean atm_repository_ingest_archive_durable (
+    const char *data_root,
+    const char *archive_path,
+    const char *repository_id,
+    const char *repository_acronym,
+    const char *repository_display_name,
+    const char *sha,
+    char **out_pre_barrier_seal,
+    char **out_version,
+    char **out_snapshot_path,
+    guint64 *out_entries,
+    guint64 *out_total_bytes,
+    GError **error
+);
+
 gboolean atm_repository_ingest_archive (
     const char *data_root,
     const char *archive_path,
