@@ -279,6 +279,14 @@ test_durable_ingest_success (void)
     GError *error = NULL;
 
     write_archive (archive_path, manifest);
+    g_assert_cmpint (
+        g_mkdir_with_parents (
+            data_root,
+            0700
+        ),
+        ==,
+        0
+    );
 
     g_assert_true (
         atm_repository_ingest_archive_durable (
@@ -343,6 +351,67 @@ test_durable_ingest_success (void)
     g_free (snapshot_path);
     g_free (version);
     g_free (pre_barrier_seal);
+    g_free (manifest);
+    g_free (archive_path);
+    g_free (data_root);
+    remove_tree_best_effort (root);
+    g_free (root);
+}
+
+static void
+test_durable_ingest_requires_existing_data_root (void)
+{
+    char *root = new_temp_root ();
+    char *data_root = g_build_filename (
+        root,
+        "missing-data",
+        NULL
+    );
+    char *archive_path = g_build_filename (
+        root,
+        "snapshot.tar.gz",
+        NULL
+    );
+    char *manifest = valid_manifest ("ewd");
+    char *pre_barrier_seal = NULL;
+    char *version = NULL;
+    char *snapshot_path = NULL;
+    GError *error = NULL;
+
+    write_archive (archive_path, manifest);
+
+    g_assert_false (
+        atm_repository_ingest_archive_durable (
+            data_root,
+            archive_path,
+            "ewd",
+            "EWD",
+            "Empirical World3 Dynamics",
+            test_sha (),
+            &pre_barrier_seal,
+            &version,
+            &snapshot_path,
+            NULL,
+            NULL,
+            &error
+        )
+    );
+    g_assert_error (
+        error,
+        ATM_INGEST_ERROR,
+        ATM_INGEST_ERROR_IO
+    );
+    g_assert_null (pre_barrier_seal);
+    g_assert_null (version);
+    g_assert_null (snapshot_path);
+    g_assert_false (
+        g_file_test (
+            data_root,
+            G_FILE_TEST_EXISTS
+        )
+    );
+
+    g_clear_error (&error);
     g_free (manifest);
     g_free (archive_path);
     g_free (data_root);
@@ -818,6 +887,10 @@ main (int argc, char **argv)
     g_test_add_func (
         "/ingest/durable-successful",
         test_durable_ingest_success
+    );
+    g_test_add_func (
+        "/ingest/durable-requires-existing-data-root",
+        test_durable_ingest_requires_existing_data_root
     );
     g_test_add_func (
         "/ingest/durable-existing-final-preserved",

@@ -48,16 +48,27 @@ def main() -> int:
 
     for required in (
         '#include "snapshot_durability.h"',
+        '#include "snapshot_namespace_durability.h"',
         '#include "snapshot_seal.h"',
         "repository_ingest_archive_internal",
         "atm_repository_ingest_archive_durable",
         "out_pre_barrier_seal",
+        "Durable repository ingest requires an existing real data root.",
     ):
         if required not in ingest_c:
             fail(f"repository ingest lost durable primitive: {required}")
 
     if "atm_repository_ingest_archive_durable" not in ingest_h:
         fail("durable ingest public C prototype is missing")
+    for required in (
+        "Durable snapshot-authority ingest.",
+        "data_root must already exist as a real",
+        "fsyncs the destination parent",
+        "fsyncs the staging source parent",
+        "does not publish Control DB authority",
+    ):
+        if required not in ingest_h:
+            fail(f"durable ingest public contract lost: {required}")
 
     require_order(
         ingest_c,
@@ -65,7 +76,9 @@ def main() -> int:
             "atm_repository_validate_snapshot",
             "atm_snapshot_seal_compute",
             "atm_snapshot_durability_sync_tree",
+            "atm_snapshot_namespace_prepare_final_parent",
             "atm_repository_promote_snapshot",
+            "atm_snapshot_durability_sync_parent",
             "atm_snapshot_durability_sync_parent",
         ],
         "durable ingest",
@@ -97,7 +110,7 @@ def main() -> int:
     ):
         if "ingest_archive_durable" in runtime_text:
             fail(
-                f"{runtime_path} activates I1b before the separate runtime slice"
+                f"{runtime_path} activates I1c2 before the separate runtime slice"
             )
 
     if "runtime_integration_selected" not in read(
@@ -107,6 +120,7 @@ def main() -> int:
 
     for required in (
         "'src/snapshot_durability.c'",
+        "'src/snapshot_namespace_durability.c'",
         "'src/snapshot_seal.c'",
         "'src/repository_ingest.c'",
     ):
@@ -120,8 +134,11 @@ def main() -> int:
             "'src/snapshot_seal.h'",
             "'src/snapshot_durability.c'",
             "'src/snapshot_durability.h'",
+            "'src/snapshot_namespace_durability.c'",
+            "'src/snapshot_namespace_durability.h'",
             "src/snapshot_seal.c \\",
             "src/snapshot_durability.c \\",
+            "src/snapshot_namespace_durability.c \\",
             "src/repository_ingest.c \\",
         ):
             if required not in workflow:
@@ -132,7 +149,7 @@ def main() -> int:
 
     print(
         "durable ingest primitive wiring validation passed: "
-        "native primitive present, capacity runners linked, runtime unwired"
+        "namespace-complete native primitive present, capacity runners linked, runtime unwired"
     )
     return 0
 
