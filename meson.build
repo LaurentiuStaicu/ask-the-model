@@ -83,6 +83,7 @@ executable(
     'src/repository_manifest.c',
     'src/repository_reconcile.c',
     'src/repository_storage.c',
+    'src/repository_gc_isolation.c',
     'src/repository_mutation_lease.c',
     'src/snapshot_namespace_durability.c',
     'src/repository_ingest.c',
@@ -668,6 +669,64 @@ repository_storage_test = executable(
 test(
   'repository-storage',
   repository_storage_test
+)
+
+repository_gc_isolation_test = executable(
+  'repository-gc-isolation-test',
+  [
+    'src/repository_gc_isolation.c',
+    'tests/repository_gc_isolation_test.c'
+  ],
+  include_directories: include_directories('src'),
+  dependencies: [
+    glib_dep
+  ],
+  install: false
+)
+
+test(
+  'repository-gc-isolation',
+  repository_gc_isolation_test
+)
+
+repository_gc_isolation_fault_helper = executable(
+  'repository-gc-isolation-fault-helper',
+  [
+    'src/repository_gc_isolation.c',
+    'tests/fault_injection_support.c',
+    'tests/gc_isolation_fault_helper.c'
+  ],
+  include_directories: [
+    include_directories('src'),
+    include_directories('tests')
+  ],
+  dependencies: [
+    glib_dep
+  ],
+  c_args: [
+    '-DATM_TEST_FAULT_INJECTION'
+  ],
+  install: false
+)
+
+repository_gc_isolation_fault_test = executable(
+  'repository-gc-isolation-fault-test',
+  'tests/gc_isolation_fault_test.c',
+  dependencies: [
+    glib_dep,
+    gio_dep
+  ],
+  install: false
+)
+
+test(
+  'repository-gc-isolation-fault',
+  repository_gc_isolation_fault_test,
+  env: {
+    'ATM_GC_ISOLATION_FAULT_HELPER':
+      repository_gc_isolation_fault_helper.full_path()
+  },
+  timeout: 60
 )
 
 capacity_measurement_test = executable(
