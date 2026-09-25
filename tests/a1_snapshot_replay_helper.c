@@ -6,8 +6,12 @@
 #include <glib.h>
 #include <glib/gstdio.h>
 
+#include <dirent.h>
+#include <errno.h>
+#include <fcntl.h>
 #include <string.h>
 #include <sys/stat.h>
+#include <unistd.h>
 
 #define CHECKPOINT_FD 3
 #define CONTROL_FD 4
@@ -169,6 +173,321 @@ out:
     return ok;
 }
 
+typedef enum {
+    CANDIDATE_S1_TARGETED_FSYNC,
+    CANDIDATE_S2_SYNCFS
+} CandidateStrategy;
+
+typedef struct {
+    guint64 file_fsync_calls;
+    guint64 directory_fsync_calls;
+    guint64 syncfs_calls;
+    guint64 parent_fsync_calls;
+} CandidateBarrierCounters;
+
+static gboolean
+fsync_retry (
+    int fd,
+    const char *context,
+    GError **error
+)
+{
+    for (;;) {
+        if (fsync (fd) == 0) {
+            return TRUE;
+        }
+
+        if (errno == EINTR) {
+            continue;
+        }
+
+        g_set_error (
+            error,
+            G_FILE_ERROR,
+            g_file_error_from_errno (errno),
+            "%s: %s",
+            context,
+            g_strerror (errno)
+        );
+        return FALSE;
+    }
+}
+
+static gboolean
+sync_tree_directory (
+    int directory_fd,
+    CandidateBarrierCounters *counters,
+    GError **error
+)
+{
+    int scan_fd = dup (directory_fd);
+
+    if (scan_fd < 0) {
+        g_set_error (
+            error,
+            G_FILE_ERROR,
+            g_file_error_from_errno (errno),
+            "Could not duplicate candidate durability directory: %s",
+            g_strerror (errno)
+        );
+        return FALSE;
+    }
+
+    DIR *directory = fdopendir (scan_fd);
+
+    if (directory == NULL) {
+        g_set_error (
+            error,
+            G_FILE_ERROR,
+            g_file_error_from_errno (errno),
+            "Could not enumerate candidate durability tree: %s",
+            g_strerror (errno)
+        );
+        close (scan_fd);
+        return FALSE;
+    }
+
+    struct dirent *item;
+
+    while ((item = readdir (directory)) != NULL) {
+        struct stat st;
+
+        if (strcmp (item->d_name, ".") == 0 ||
+            strcmp (item->d_name, "..") == 0) {
+            continue;
+        }
+
+        if (fstatat (
+                directory_fd,
+                item->d_name,
+                &st,
+                AT_SYMLINK_NOFOLLOW
+            ) != 0) {
+            g_set_error (
+                error,
+                G_FILE_ERROR,
+                g_file_error_from_errno (errno),
+                "Could not inspect candidate durability entry: %s",
+                g_strerror (errno)
+            );
+            closedir (directory);
+            return FALSE;
+        }
+
+        if (S_ISLNK (st.st_mode) ||
+            (!S_ISREG (st.st_mode) &&
+             !S_ISDIR (st.st_mode))) {
+            g_set_error_literal (
+                error,
+                G_FILE_ERROR,
+                G_FILE_ERROR_INVAL,
+                "Candidate durability tree contains an unsupported entry."
+            );
+            closedir (directory);
+            return FALSE;
+        }
+
+        if (S_ISDIR (st.st_mode)) {
+            int child_fd = openat (
+                directory_fd,
+                item->d_name,
+                O_RDONLY | O_DIRECTORY |
+                    O_NOFOLLOW | O_CLOEXEC
+            );
+
+            if (child_fd < 0) {
+                g_set_error (
+                    error,
+                    G_FILE_ERROR,
+                    g_file_error_from_errno (errno),
+                    "Could not open candidate durability directory: %s",
+                    g_strerror (errno)
+                );
+                closedir (directory);
+                return FALSE;
+            }
+
+            gboolean ok = sync_tree_directory (
+                child_fd,
+                counters,
+                error
+            );
+            close (child_fd);
+
+            if (!ok) {
+                closedir (directory);
+                return FALSE;
+            }
+
+            continue;
+        }
+
+        int file_fd = openat (
+            directory_fd,
+            item->d_name,
+            O_RDONLY | O_NOFOLLOW | O_CLOEXEC
+        );
+
+        if (file_fd < 0) {
+            g_set_error (
+                error,
+                G_FILE_ERROR,
+                g_file_error_from_errno (errno),
+                "Could not open candidate durability file: %s",
+                g_strerror (errno)
+            );
+            closedir (directory);
+            return FALSE;
+        }
+
+        gboolean ok = fsync_retry (
+            file_fd,
+            "Could not fsync candidate durability file",
+            error
+        );
+        close (file_fd);
+
+        if (!ok) {
+            closedir (directory);
+            return FALSE;
+        }
+
+        counters->file_fsync_calls++;
+    }
+
+    closedir (directory);
+
+    if (!fsync_retry (
+            directory_fd,
+            "Could not fsync candidate durability directory",
+            error
+        )) {
+        return FALSE;
+    }
+
+    counters->directory_fsync_calls++;
+    return TRUE;
+}
+
+static gboolean
+run_candidate_pre_rename_barrier (
+    const char *staging,
+    CandidateStrategy strategy,
+    CandidateBarrierCounters *counters,
+    GError **error
+)
+{
+    int root_fd = open (
+        staging,
+        O_RDONLY | O_DIRECTORY |
+            O_NOFOLLOW | O_CLOEXEC
+    );
+
+    if (root_fd < 0) {
+        g_set_error (
+            error,
+            G_FILE_ERROR,
+            g_file_error_from_errno (errno),
+            "Could not open candidate snapshot root: %s",
+            g_strerror (errno)
+        );
+        return FALSE;
+    }
+
+    gboolean ok = FALSE;
+
+    if (strategy == CANDIDATE_S1_TARGETED_FSYNC) {
+        ok = sync_tree_directory (
+            root_fd,
+            counters,
+            error
+        );
+    } else {
+        int rc;
+
+        do {
+            rc = syncfs (root_fd);
+        } while (rc != 0 && errno == EINTR);
+
+        if (rc != 0) {
+            g_set_error (
+                error,
+                G_FILE_ERROR,
+                g_file_error_from_errno (errno),
+                "Candidate syncfs barrier failed: %s",
+                g_strerror (errno)
+            );
+        } else {
+            counters->syncfs_calls++;
+            ok = TRUE;
+        }
+    }
+
+    close (root_fd);
+    return ok;
+}
+
+static gboolean
+fsync_promoted_parent (
+    const char *promoted_path,
+    CandidateBarrierCounters *counters,
+    GError **error
+)
+{
+    char *parent = g_path_get_dirname (
+        promoted_path
+    );
+    int parent_fd = open (
+        parent,
+        O_RDONLY | O_DIRECTORY |
+            O_NOFOLLOW | O_CLOEXEC
+    );
+    g_free (parent);
+
+    if (parent_fd < 0) {
+        g_set_error (
+            error,
+            G_FILE_ERROR,
+            g_file_error_from_errno (errno),
+            "Could not open promoted snapshot parent: %s",
+            g_strerror (errno)
+        );
+        return FALSE;
+    }
+
+    gboolean ok = fsync_retry (
+        parent_fd,
+        "Could not fsync promoted snapshot parent",
+        error
+    );
+
+    if (ok) {
+        counters->parent_fsync_calls++;
+    }
+
+    close (parent_fd);
+    return ok;
+}
+
+static gboolean
+parse_candidate_strategy (
+    const char *name,
+    CandidateStrategy *out_strategy
+)
+{
+    if (g_strcmp0 (name, "S1_TARGETED_FSYNC") == 0) {
+        *out_strategy = CANDIDATE_S1_TARGETED_FSYNC;
+        return TRUE;
+    }
+
+    if (g_strcmp0 (name, "S2_SYNCFS") == 0) {
+        *out_strategy = CANDIDATE_S2_SYNCFS;
+        return TRUE;
+    }
+
+    return FALSE;
+}
+
 static gboolean
 prepare_and_activate (
     const char *root,
@@ -312,6 +631,130 @@ promote_new (
         checkpoint,
         error
     );
+}
+
+static gboolean
+promote_new_candidate (
+    const char *root,
+    const char *strategy_name,
+    GError **error
+)
+{
+    CandidateStrategy strategy;
+
+    if (!parse_candidate_strategy (
+            strategy_name,
+            &strategy
+        )) {
+        g_set_error_literal (
+            error,
+            G_FILE_ERROR,
+            G_FILE_ERROR_INVAL,
+            "Unknown A1-M5 durability candidate strategy."
+        );
+        return FALSE;
+    }
+
+    char *data_root = data_root_for (root);
+    char *control_path = control_path_for (root);
+    char *staging =
+        atm_repository_extraction_staging_path (
+            data_root,
+            REPOSITORY_ID,
+            NEW_SHA
+        );
+    char *promoted = NULL;
+    char *seal = NULL;
+    guint64 file_count = 0;
+    guint64 total_bytes = 0;
+    CandidateBarrierCounters counters = { 0 };
+    gboolean ok = FALSE;
+
+    if (staging == NULL ||
+        g_mkdir_with_parents (staging, 0700) != 0) {
+        g_set_error_literal (
+            error,
+            G_FILE_ERROR,
+            G_FILE_ERROR_FAILED,
+            "Could not create A1-M5 snapshot staging."
+        );
+        goto out;
+    }
+
+    if (!write_fixture (
+            staging,
+            "new",
+            error
+        ) ||
+        !atm_snapshot_seal_compute (
+            staging,
+            &seal,
+            &file_count,
+            &total_bytes,
+            error
+        ) ||
+        !run_candidate_pre_rename_barrier (
+            staging,
+            strategy,
+            &counters,
+            error
+        ) ||
+        !atm_repository_promote_snapshot (
+            data_root,
+            REPOSITORY_ID,
+            NEW_SHA,
+            staging,
+            &promoted,
+            error
+        ) ||
+        !fsync_promoted_parent (
+            promoted,
+            &counters,
+            error
+        ) ||
+        !atm_control_state_set_current_values (
+            control_path,
+            REPOSITORY_ID,
+            NEW_SHA,
+            "0.0-new",
+            seal,
+            error
+        )) {
+        goto out;
+    }
+
+    g_print (
+        "{"
+        "\"strategy\":\"%s\","
+        "\"sha\":\"%s\","
+        "\"seal\":\"%s\","
+        "\"file_count\":%" G_GUINT64_FORMAT ","
+        "\"total_bytes\":%" G_GUINT64_FORMAT ","
+        "\"file_fsync_calls\":%" G_GUINT64_FORMAT ","
+        "\"directory_fsync_calls\":%" G_GUINT64_FORMAT ","
+        "\"syncfs_calls\":%" G_GUINT64_FORMAT ","
+        "\"parent_fsync_calls\":%" G_GUINT64_FORMAT
+        "}\n",
+        strategy_name,
+        NEW_SHA,
+        seal,
+        file_count,
+        total_bytes,
+        counters.file_fsync_calls,
+        counters.directory_fsync_calls,
+        counters.syncfs_calls,
+        counters.parent_fsync_calls
+    );
+
+    ok = TRUE;
+
+out:
+    g_free (seal);
+    g_free (promoted);
+    g_free (staging);
+    g_free (control_path);
+    g_free (data_root);
+    return ok;
 }
 
 static void
@@ -509,6 +952,16 @@ main (int argc, char **argv)
             argv[3],
             &error
         );
+    } else if (argc == 4 &&
+               g_strcmp0 (
+                   argv[1],
+                   "--promote-new-candidate"
+               ) == 0) {
+        ok = promote_new_candidate (
+            argv[2],
+            argv[3],
+            &error
+        );
     } else if (argc == 3 &&
                g_strcmp0 (argv[1], "--verify") == 0) {
         ok = verify_replayed_authority (argv[2]);
@@ -517,6 +970,7 @@ main (int argc, char **argv)
             "Usage: a1-snapshot-replay-helper "
             "--initialize-old ROOT | "
             "--promote-new ROOT CHECKPOINT | "
+            "--promote-new-candidate ROOT STRATEGY | "
             "--verify ROOT\n"
         );
         return 64;
