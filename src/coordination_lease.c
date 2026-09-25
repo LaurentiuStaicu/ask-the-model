@@ -69,8 +69,9 @@ path_matches_opened_file (
 }
 
 gboolean
-atm_coordination_lease_acquire (
+atm_coordination_lease_acquire_mode (
     const char *path,
+    AtmCoordinationLeaseMode mode,
     gboolean nonblocking,
     gint *out_fd,
     gboolean *out_contended,
@@ -80,12 +81,17 @@ atm_coordination_lease_acquire (
 {
     struct stat opened_stat;
     gint fd = -1;
-    gint operation = LOCK_EX;
+    gint operation;
     gint64 wait_started_us;
     gboolean ok = FALSE;
 
     g_return_val_if_fail (path != NULL, FALSE);
     g_return_val_if_fail (path[0] != '\0', FALSE);
+    g_return_val_if_fail (
+        mode == ATM_COORDINATION_LEASE_MODE_SHARED ||
+        mode == ATM_COORDINATION_LEASE_MODE_EXCLUSIVE,
+        FALSE
+    );
     g_return_val_if_fail (out_fd != NULL, FALSE);
     g_return_val_if_fail (out_contended != NULL, FALSE);
     g_return_val_if_fail (out_wait_us != NULL, FALSE);
@@ -138,6 +144,11 @@ atm_coordination_lease_acquire (
         )) {
         goto out;
     }
+
+    operation =
+        mode == ATM_COORDINATION_LEASE_MODE_SHARED
+            ? LOCK_SH
+            : LOCK_EX;
 
     if (nonblocking) {
         operation |= LOCK_NB;
@@ -194,6 +205,27 @@ out:
     }
 
     return ok;
+}
+
+gboolean
+atm_coordination_lease_acquire (
+    const char *path,
+    gboolean nonblocking,
+    gint *out_fd,
+    gboolean *out_contended,
+    gint64 *out_wait_us,
+    GError **error
+)
+{
+    return atm_coordination_lease_acquire_mode (
+        path,
+        ATM_COORDINATION_LEASE_MODE_EXCLUSIVE,
+        nonblocking,
+        out_fd,
+        out_contended,
+        out_wait_us,
+        error
+    );
 }
 
 void

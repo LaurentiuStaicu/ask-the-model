@@ -67,6 +67,7 @@ executable(
     'src/repository_ui_bridge.c',
     'src/retrieval_index.c',
     'src/coordination_lease.c',
+    'src/repository_generation_lease.c',
     'src/retrieval_index_lifecycle.c',
     'src/retrieval_query.c',
     'src/scientific_profile.c',
@@ -801,6 +802,25 @@ test(
   repository_mutation_lease_test
 )
 
+repository_generation_lease_test = executable(
+  'repository-generation-lease-test',
+  [
+    'src/coordination_lease.c',
+    'src/repository_generation_lease.c',
+    'tests/repository_generation_lease_test.c'
+  ],
+  include_directories: include_directories('src'),
+  dependencies: [
+    glib_dep
+  ],
+  install: false
+)
+
+test(
+  'repository-generation-lease',
+  repository_generation_lease_test
+)
+
 repository_ingest_test = executable(
   'repository-ingest-test',
   [
@@ -1471,6 +1491,7 @@ conversation_grounding_vala_test = executable(
     'src/structured_json.c',
     'src/retrieval_index.c',
     'src/coordination_lease.c',
+    'src/repository_generation_lease.c',
     'src/retrieval_index_lifecycle.c',
     'src/retrieval_query.c',
     'src/retrieval_rank.c',
@@ -1514,6 +1535,7 @@ conversation_session_test = executable(
     'src/structured_json.c',
     'src/retrieval_index.c',
     'src/coordination_lease.c',
+    'src/repository_generation_lease.c',
     'src/retrieval_index_lifecycle.c',
     'src/retrieval_query.c',
     'src/retrieval_rank.c',
@@ -1578,6 +1600,7 @@ repository_lifecycle_service_test = executable(
     'src/structured_json.c',
     'src/retrieval_index.c',
     'src/coordination_lease.c',
+    'src/repository_generation_lease.c',
     'src/retrieval_index_lifecycle.c',
     'src/retrieval_query.c',
     'src/retrieval_rank.c',

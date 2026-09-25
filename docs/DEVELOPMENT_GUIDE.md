@@ -638,6 +638,38 @@ The production registry at `qualification/capacity-policy-v1.json` is now `selec
 
 The integrated Flatpak test suite must continue to run the native policy/admission tests and `repository-lifecycle-service` together.
 
+### Repository-generation shared read leases
+
+When a repository-backed grounding operation snapshots Optimizations ON and uses a positive Control DB generation, AtM acquires one nonblocking shared lease at:
+
+`<state_root>/repository-generation-leases/<generation_id>.lock`
+
+The shared lease is acquired before immutable generation values, snapshot paths or derived-index work are used. The resulting lock order is:
+
+`generation shared lease → optional per-SHA retrieval-index single-flight`
+
+A reader never acquires the global repository mutation lease while holding a shared generation lease, and AtM never converts a shared generation lease to exclusive in place. Linux `flock()` conversion is not guaranteed atomic; an operation that later requires authority mutation must leave the read path and restart through the normal mutation entry point.
+
+The lease is owned by `ConversationGrounding`. When grounding is transferred to `ConversationSession.begin()`, the shared lease therefore remains live across turns and is released when the session drops its grounding on reset/destruction. Saved-History exact-generation requalification follows the same path. A saved conversation remains a durable future-GC root independently of this runtime lease; the lease represents only live filesystem use.
+
+Generation 0 and zero-repository grounding perform no repository-generation lock I/O. Optimizations OFF also preserves the baseline lock-free reader path.
+
+The common defensive coordination helper now supports explicit shared/exclusive modes. Its original `atm_coordination_lease_acquire()` entry point remains an exclusive wrapper, so B0 global mutation and B1 per-SHA single-flight semantics do not change.
+
+The first B2 qualification matrix proves:
+- two shared readers may hold one generation concurrently;
+- an exclusive nonblocking probe is contended while any shared reader remains;
+- an exclusive holder prevents a new nonblocking shared reader from entering;
+- killing a reader releases the kernel lock;
+- different generations coordinate independently;
+- generation 0 creates no generation-lock directory;
+- lock files persist after release and are never used as the liveness signal;
+- the active conversation session keeps the lease after grounding preparation returns and releases it on `ConversationSession.reset()`;
+- a grounding preparation failure releases its shared lease;
+- restored historical generation grounding has the same session-lifetime behavior.
+
+The exclusive generation API introduced here is qualification/future-GC plumbing only. No destructive GC, Control DB pruning, snapshot deletion, scientific-plane lease, or lock-file garbage collection is introduced by B2.
+
 ### Repository authority-mutation lease
 
 When an operation snapshots optimization mode ON, repository Download/Update uses one application-owned exclusive nonblocking lease at `<state_root>/repository-mutation.lock` before any selected-repository staging or authority mutation begins.

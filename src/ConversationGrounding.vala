@@ -1,4 +1,121 @@
 namespace AskTheModel {
+    public errordomain RepositoryGenerationLeaseError {
+        BUSY,
+        IO
+    }
+
+    namespace RepositoryGenerationLeaseNative {
+        [CCode (
+            cname = "atm_repository_generation_lease_try_acquire_shared",
+            cheader_filename = "repository_generation_lease.h"
+        )]
+        public static extern bool try_acquire_shared (
+            string state_root,
+            int64 generation_id,
+            out int lease_fd,
+            out bool contended
+        ) throws GLib.Error;
+
+        [CCode (
+            cname = "atm_repository_generation_lease_try_acquire_exclusive",
+            cheader_filename = "repository_generation_lease.h"
+        )]
+        public static extern bool try_acquire_exclusive (
+            string state_root,
+            int64 generation_id,
+            out int lease_fd,
+            out bool contended
+        ) throws GLib.Error;
+
+        [CCode (
+            cname = "atm_repository_generation_lease_release",
+            cheader_filename = "repository_generation_lease.h"
+        )]
+        public static extern void release (
+            int lease_fd
+        );
+    }
+
+    public class RepositoryGenerationLease : Object {
+        private int lease_fd = -1;
+
+        public int64 generation_id {
+            get;
+            private set;
+            default = 0;
+        }
+
+        private RepositoryGenerationLease (
+            int lease_fd,
+            int64 generation_id
+        ) {
+            this.lease_fd = lease_fd;
+            this.generation_id = generation_id;
+        }
+
+        ~RepositoryGenerationLease () {
+            if (lease_fd >= 0) {
+                RepositoryGenerationLeaseNative.release (
+                    lease_fd
+                );
+                lease_fd = -1;
+            }
+        }
+
+        public static RepositoryGenerationLease
+        acquire_shared (
+            string state_root,
+            int64 generation_id
+        ) throws RepositoryGenerationLeaseError {
+            int lease_fd;
+            bool contended;
+
+            try {
+                bool acquired =
+                    RepositoryGenerationLeaseNative.
+                        try_acquire_shared (
+                            state_root,
+                            generation_id,
+                            out lease_fd,
+                            out contended
+                        );
+
+                if (!acquired) {
+                    throw new RepositoryGenerationLeaseError.IO (
+                        "Repository-generation shared coordination returned no result."
+                    );
+                }
+            } catch (GLib.Error error) {
+                throw new RepositoryGenerationLeaseError.IO (
+                    "Repository-generation shared coordination failed: %s".printf (
+                        error.message
+                    )
+                );
+            }
+
+            if (contended) {
+                throw new RepositoryGenerationLeaseError.BUSY (
+                    "Repository generation is temporarily unavailable because an exclusive lifecycle operation holds it."
+                );
+            }
+
+            if (lease_fd < 0) {
+                throw new RepositoryGenerationLeaseError.IO (
+                    "Repository-generation shared coordination returned no lease."
+                );
+            }
+
+            return new RepositoryGenerationLease (
+                lease_fd,
+                generation_id
+            );
+        }
+
+        internal bool is_held () {
+            return lease_fd >= 0;
+        }
+    }
+
     namespace ConversationGroundingNative {
         [CCode (
             cname = "atm_conversation_grounding_state_new",
@@ -303,16 +420,63 @@ namespace AskTheModel {
         private void* state = null;
         private int64 pinned_repository_generation_id = 0;
         private ConversationRepositoryPin[] pinned_repositories = {};
+        private RepositoryGenerationLease? generation_lease = null;
 
         public ConversationGrounding () {
             state = ConversationGroundingNative.state_new ();
         }
 
         ~ConversationGrounding () {
+            generation_lease = null;
+
             if (state != null) {
                 ConversationGroundingNative.state_free (state);
                 state = null;
             }
+        }
+
+        internal void hold_generation_lease (
+            RepositoryGenerationLease lease
+        ) throws GLib.Error {
+            if (is_frozen ()) {
+                throw new GLib.IOError.FAILED (
+                    "Repository-generation lease cannot change after conversation grounding is frozen."
+                );
+            }
+
+            if (lease.generation_id <= 0 ||
+                !lease.is_held ()) {
+                throw new GLib.IOError.INVALID_DATA (
+                    "Repository-generation lease is invalid."
+                );
+            }
+
+            if (generation_lease != null) {
+                throw new GLib.IOError.FAILED (
+                    "Conversation grounding already owns a repository-generation lease."
+                );
+            }
+
+            if (pinned_repository_generation_id > 0 &&
+                pinned_repository_generation_id !=
+                    lease.generation_id) {
+                throw new GLib.IOError.INVALID_DATA (
+                    "Repository-generation lease does not match the pinned generation."
+                );
+            }
+
+            generation_lease = lease;
+        }
+
+        internal bool has_generation_lease () {
+            return generation_lease != null &&
+                generation_lease.is_held ();
+        }
+
+        internal int64 generation_lease_id () {
+            return generation_lease != null
+                ? generation_lease.generation_id
+                : 0;
         }
 
         public bool add_ready_repository (
@@ -364,6 +528,14 @@ namespace AskTheModel {
                     generation_id) {
                 throw new GLib.IOError.INVALID_DATA (
                     "Conversation grounding already has a different repository generation."
+                );
+            }
+
+            if (generation_lease != null &&
+                generation_lease.generation_id !=
+                    generation_id) {
+                throw new GLib.IOError.INVALID_DATA (
+                    "Pinned repository generation does not match the held runtime lease."
                 );
             }
 
