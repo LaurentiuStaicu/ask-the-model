@@ -734,6 +734,39 @@ namespace AskTheModel {
                 );
             var grounding = new ConversationGrounding ();
 
+            if (optimized_operation) {
+                try {
+                    RepositoryGenerationLease lease =
+                        RepositoryGenerationLease.
+                            acquire_shared (
+                                state_root,
+                                generation_id
+                            );
+
+                    grounding.hold_generation_lease (
+                        lease
+                    );
+
+                    stdout.printf (
+                        "AtM: generation lease shared generation=%" + int64.FORMAT + "\n",
+                        generation_id
+                    );
+                } catch (
+                    RepositoryGenerationLeaseError error
+                ) {
+                    if (error is
+                        RepositoryGenerationLeaseError.BUSY) {
+                        throw new RepositoryError.BUSY (
+                            error.message
+                        );
+                    }
+
+                    throw new RepositoryError.STORAGE (
+                        error.message
+                    );
+                }
+            }
+
             foreach (
                 RepositoryDescriptor descriptor
                 in selected
