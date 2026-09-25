@@ -24,7 +24,19 @@ cleanup_root() {
     set -e
 }
 
+ACTIVE_MAPPER=""
+ACTIVE_LIVE_MOUNT=""
+ACTIVE_VERIFY_MOUNT=""
+ACTIVE_LOOP=""
+
 cleanup() {
+    if [[ -n "$ACTIVE_MAPPER" || -n "$ACTIVE_LOOP" ]]; then
+        cleanup_root \
+            "$ACTIVE_MAPPER" \
+            "$ACTIVE_LIVE_MOUNT" \
+            "$ACTIVE_VERIFY_MOUNT" \
+            "$ACTIVE_LOOP"
+    fi
     rm -rf "$WORK_ROOT"
 }
 trap cleanup EXIT
@@ -49,10 +61,16 @@ run_scenario() {
     local live_mounted=0
     local verify_mounted=0
 
+    ACTIVE_MAPPER="$mapper_name"
+    ACTIVE_LIVE_MOUNT="$live_mount"
+    ACTIVE_VERIFY_MOUNT="$verify_mount"
+    ACTIVE_LOOP=""
+
     mkdir -p "$work" "$live_mount" "$verify_mount"
 
     truncate -s 128M "$data_image"
     loop_dev="$(sudo losetup --find --show "$data_image")"
+    ACTIVE_LOOP="$loop_dev"
     local sectors
     sectors="$(sudo blockdev --getsz "$loop_dev")"
 
@@ -97,7 +115,10 @@ run_scenario() {
     IFS= read -r observed_checkpoint <&$CHECKPOINT_FD
     test "$observed_checkpoint" = "$checkpoint"
 
-    sudo dmsetup suspend "$mapper_name"
+    # Do not let the table switch itself synchronize the filesystem or
+    # flush outstanding I/O: the candidate durability operation under test
+    # must be the first durability boundary after this checkpoint.
+    sudo dmsetup suspend --noflush --nolockfs "$mapper_name"
     sudo dmsetup reload "$mapper_name" \
         --table "0 $sectors flakey $loop_dev 0 1 600 1 error_writes"
     sudo dmsetup resume "$mapper_name"
@@ -242,6 +263,11 @@ PY
     verify_mounted=0
     sudo losetup -d "$loop_dev"
     loop_dev=""
+
+    ACTIVE_MAPPER=""
+    ACTIVE_LIVE_MOUNT=""
+    ACTIVE_VERIFY_MOUNT=""
+    ACTIVE_LOOP=""
 
     python3 -m json.tool "$result_path" >/dev/null
 }
