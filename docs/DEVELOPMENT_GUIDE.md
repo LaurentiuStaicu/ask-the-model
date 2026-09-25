@@ -980,6 +980,38 @@ The reviewed run returned `e2fsck=0` and baseline/restored SHA-256 `92187c175d34
 
 This evidence authorizes only the next **measurement**: application-level S1/S2 error-propagation qualification. It does not prove either candidate handles the injected error correctly and does not select a production durability barrier.
 
+### OPT-A1-M8 candidate writeback-error qualification
+
+A1-M8 applies the M7-qualified `dm-flakey error_writes` mechanism to the two durability candidates. It tests error propagation, not another power-loss replay.
+
+Six independent scenarios are required:
+
+- S1 targeted fsync: inject immediately before the candidate barrier, immediately before promoted-parent fsync, and immediately before Control DB activation.
+- S2 syncfs: inject at the same three semantic stages.
+
+Every scenario begins from a fresh disposable ext4 filesystem with an explicitly synchronized old snapshot authority. The candidate helper pauses through the A0 file-descriptor handshake. The parent harness switches the mounted mapping from `linear` to `flakey error_writes` using `--noflush --nolockfs`, waits until the unreliable interval is active, then releases the helper.
+
+The helper prefixes failures with a stage-specific test-only context:
+- `candidate barrier failed:`
+- `candidate parent fsync failed:`
+- `candidate authority activation failed:`
+
+This prevents a later SQLite EIO from being misclassified as proof that an earlier filesystem barrier failed correctly.
+
+After the helper returns, the harness verifies:
+- the helper exit code is nonzero;
+- the error context matches the exact injected stage;
+- the device-mapper table is restored to `linear`;
+- ext4 recovery is clean/corrected;
+- a fresh verifier still loads `OLD_AUTHORITY_VALID`;
+- the active SHA is the old SHA;
+- the recomputed old snapshot seal matches the seal stored in Control DB;
+- Control DB authority therefore did not advance.
+
+The aggregate artifact records `all_fail_closed` but does not force an application-level unsafe result to disappear behind a generic workflow failure. Mechanical harness failures still fail CI.
+
+M8 intentionally excludes `drop_writes`: that mode silently ignores writes and models a different storage-failure class. M8 qualifies explicit write-error propagation only. No production barrier is selected by this measurement.
+
 ### Recovery fault qualification
 
 The OPT-A0 recovery harness is test-only. Native checkpoint calls compile to no-ops in the production application; only the dedicated recovery helper is built with `ATM_TEST_FAULT_INJECTION`.
