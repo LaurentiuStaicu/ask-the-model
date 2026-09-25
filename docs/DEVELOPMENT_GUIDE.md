@@ -770,6 +770,24 @@ All mount, mapper and loop resources are cleaned with a shell trap. The output J
 
 Passing A1-M2 only establishes that the environment can host the later replay experiment. The subsequent A1-M3 slice must copy/replay the logged block history to explicit marks and run the fresh-process repository recovery oracle before any physical-power-loss durability claim is considered.
 
+### OPT-A1-F2 Tier-2 capability evidence freeze
+
+A1-F2 extends the durability-v1 registry with the reviewed A1-M2 capability result.
+
+The frozen capability run confirms, on the reviewed GitHub-hosted Ubuntu kernel, that:
+- the `log-writes` device-mapper target is available;
+- disposable loop devices can be allocated;
+- a dm-log-writes mapping can be created;
+- ext4 can be mounted on that mapping;
+- upstream `replay-log` builds from the pinned commit;
+- a named mark emitted after file/directory `fsync()` can be located in the resulting write log.
+
+Exact workflow artifact ID/digest, measured AtM head, kernel identity and upstream `josefbacik/log-writes` commit are preserved in `benchmarks/durability-v1/evidence.json`.
+
+This closes only the **environment capability** question. It does not yet replay logged block history to a simulated crash boundary, it does not invoke the repository restart oracle on a replayed filesystem, and it does not authorize S1, S2 or any production durability barrier.
+
+A1-M3 may therefore use the standard GitHub-hosted qualification runner for its first replay prototype instead of requiring self-hosted infrastructure.
+
 ### Recovery fault qualification
 
 The OPT-A0 recovery harness is test-only. Native checkpoint calls compile to no-ops in the production application; only the dedicated recovery helper is built with `ATM_TEST_FAULT_INJECTION`.
