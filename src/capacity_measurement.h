@@ -17,6 +17,7 @@ typedef struct {
     guint64 device_id;
     guint64 available_bytes;
     guint64 available_inodes;
+    gboolean inode_budget_known;
     guint64 fragment_size;
 } AtmFilesystemCapacityMeasurement;
 

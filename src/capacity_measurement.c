@@ -175,6 +175,13 @@ atm_capacity_measure_filesystem (
                 available_bytes;
             out_measurement->available_inodes =
                 (guint64) fs.f_favail;
+            /*
+             * Some Linux filesystems have no fixed inode budget and
+             * report f_files == 0. In that case a zero f_favail must
+             * not be interpreted as proven inode exhaustion.
+             */
+            out_measurement->inode_budget_known =
+                fs.f_files != 0;
             out_measurement->fragment_size =
                 fragment_size;
             ok = TRUE;

@@ -628,6 +628,31 @@ test(
   repository_capacity_policy_test
 )
 
+repository_capacity_admission_test = executable(
+  'repository-capacity-admission-test',
+  [
+    'src/repository_capacity_admission.c',
+    'src/repository_capacity_policy.c',
+    'src/capacity_operation_plan.c',
+    'src/capacity_admission_model.c',
+    'src/capacity_measurement.c',
+    'src/archive_extract.c',
+    'tests/repository_capacity_admission_test.c'
+  ],
+  include_directories: include_directories('src'),
+  dependencies: [
+    glib_dep,
+    gio_dep,
+    archive_dep
+  ],
+  install: false
+)
+
+test(
+  'repository-capacity-admission',
+  repository_capacity_admission_test
+)
+
 capacity_measurement_probe = executable(
   'capacity-measurement-probe',
   [

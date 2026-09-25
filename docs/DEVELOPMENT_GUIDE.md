@@ -576,6 +576,34 @@ The compiled exact-profile table lives in `src/repository_capacity_profiles.inc`
 
 The application executable does not yet compile or call this helper. Runtime wiring remains a later slice so a failure in this helper can be reviewed independently of repository mutation behavior.
 
+### C0P-F11B native admission bridge
+
+C0P-F11B composes the selected F10/F11A policy with the existing C0 measurement, F1 admission and F3 operation-plan primitives, while still leaving the application runtime path unchanged.
+
+The bridge provides three independently testable decisions:
+
+1. **Checkpoint A — pre-download.** The cache filesystem is evaluated against the exact-profile archive allocation when the repository ID + SHA is qualified. Unknown SHAs keep `byte_prediction_qualified=false`; their data/cache byte requirement remains intentionally unqualified, while the one archive-file inode requirement is still enforced when the filesystem exposes a fixed inode budget.
+
+2. **Checkpoint B — post-download / pre-mutation.** The completed archive is inspected with the same ingest limits used by production extraction. F2 materialized entries feed the data-root inode requirement; F11A supplies exact-profile bytes when available, four index/cache inode slots and the selected state headroom. F1 then aggregates simultaneous phase demand by `st_dev`, so one shared filesystem sums data/cache/state demand while split filesystems are checked independently. Same-SHA repair carries `must_admit_before_quarantine=true`.
+
+3. **Immediate state-publication guard.** Immediately before the later guarded Control DB mutation, the state filesystem can be remeasured and required to retain 128 KiB plus four inode/file slots. This guard is deliberately separate from checkpoint B. It matters especially for an unknown SHA: unqualified snapshot/index bytes may have consumed capacity after checkpoint B, so the earlier state headroom observation is not treated as a guarantee at publication time.
+
+The bridge distinguishes a fixed inode budget from an unknown one. `statvfs().f_favail` remains the unprivileged free-inode value, while `f_files == 0` is treated as no fixed inode budget reported; F1 then preserves its existing rule that an unknown inode budget must not create a false proactive rejection.
+
+The pre-download one-inode archive requirement assumes the deterministic staging parent directories have already been created/validated before the checkpoint and that availability is then remeasured before the `.part` file is created. Those parent directories therefore belong to the measured baseline instead of being omitted from incremental demand.
+
+The deterministic unit matrix covers:
+- exact-profile download at and below the byte boundary;
+- unknown-SHA download with byte rejection disabled but inode rejection retained;
+- shared-filesystem aggregation;
+- split-filesystem independent checks;
+- unknown-SHA mutation with F2/index/state inode guards;
+- unknown inode-budget non-rejection;
+- same-SHA repair pre-quarantine semantics;
+- exact 128 KiB / four-slot state-publication boundary.
+
+No Vala method calls these functions in F11B, no `RepositoryError.NO_SPACE` is emitted by the application yet, and `runtime_integration_selected=false` remains unchanged.
+
 ### Repository authority-mutation lease
 
 When an operation snapshots optimization mode ON, repository Download/Update uses one application-owned exclusive nonblocking lease at `<state_root>/repository-mutation.lock` before any selected-repository staging or authority mutation begins.
