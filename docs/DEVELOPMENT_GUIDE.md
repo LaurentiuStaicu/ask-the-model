@@ -1042,6 +1042,21 @@ This design deliberately does not require the quarantine rename itself to surviv
 
 M9 is qualification-only. It changes no production repair behavior and still selects no S1/S2 production barrier.
 
+### OPT-A1-F9 frozen same-SHA repair evidence
+
+A1-F9 freezes the successful M9 result from Actions run `36133608393`, artifact `10862142895`, artifact SHA-256 `7efbbcbf0112fc12aae2f0c3c4fe6fca9c73a1bb59b67f166549ddf23cb2317c`, measured at head `821ec5a1329a446d4617fe9687c31ba26889cd9b`.
+
+The evidence registry freezes all ten S1/S2 × repair-boundary observations. In particular:
+- every replay returned `e2fsck=1` (corrected);
+- the four pre-authority boundaries for each candidate remain Control DB generation 1 and `REPAIR_REQUIRED / qualified=false`;
+- the after-authority boundary for each candidate is generation 2, `REPAIRED_AUTHORITY_VALID`, and recomputes the exact stored replacement seal `e29de108cffcb56692455588995515f7e057b3d14cd30233cc5d38d575672c96`;
+- the deliberately corrupted pre-repair bytes have seal `4c00a0e9415c1767aa2fdccff7767a6fead1fe04e2c5d216fcd36378065e47b8`, distinct from the pre-corruption Control DB seal;
+- replay immediately after quarantine remains unqualified even though the invalid final snapshot can reappear, demonstrating that namespace ambiguity is caught by seal qualification.
+
+No quarantine parent-directory fsync was present in M9. Because the repository authority remains fail-closed at that boundary and becomes qualified only after replacement bytes and the new seal are committed, F9 does not justify adding snapshot-authority-level fsync cost to quarantine bookkeeping.
+
+With F9, the planned candidate correctness evidence now covers normal promotion ordering, candidate interruption boundaries, explicit write EIO, and same-SHA repair/quarantine semantics. Final S1-vs-S2 policy review can therefore proceed separately from measurement evidence.
+
 ### Recovery fault qualification
 
 The OPT-A0 recovery harness is test-only. Native checkpoint calls compile to no-ops in the production application; only the dedicated recovery helper is built with `ATM_TEST_FAULT_INJECTION`.
