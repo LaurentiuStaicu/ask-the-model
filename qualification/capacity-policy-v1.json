@@ -1,0 +1,97 @@
+{
+  "schema_version": 1,
+  "policy_id": "atm-capacity-production-policy-v1",
+  "status": "selected-not-wired",
+  "runtime_gate": {
+    "name": "Optimizations",
+    "default_enabled": false,
+    "operation_snapshot_required": true
+  },
+  "byte_prediction": {
+    "strategy": "EXACT_PROFILE_ONLY",
+    "exact_profile_source": "benchmarks/capacity-v1/evidence.json",
+    "profile_key": [
+      "repository_id",
+      "repository_sha"
+    ],
+    "field_mapping": {
+      "pre_download_archive_bytes": "archive_allocated_bytes",
+      "fresh_install_snapshot_bytes": "fresh_data_additional_peak_bytes",
+      "different_sha_update_snapshot_bytes": "snapshot_allocated_bytes",
+      "same_sha_repair_snapshot_bytes": "same_sha_repair_data_additional_peak_bytes",
+      "index_build_bytes": "index_cache_additional_peak_bytes"
+    },
+    "unknown_sha": {
+      "data_cache_byte_rejection": "DISABLED_UNQUALIFIED",
+      "inode_admission": "ENFORCE_F2_AND_STRUCTURAL",
+      "state_headroom": "ENFORCE",
+      "post_admission_exhaustion": "FAIL_CLOSED"
+    },
+    "historical_hybrid": {
+      "selected": false,
+      "evidence_source": "benchmarks/capacity-v2/evidence.json",
+      "holdout_source": "benchmarks/capacity-v3/evidence.json",
+      "reason": "M6 structural stress falsified the frozen historical hybrid as a conservative unknown-SHA retrieval-index predictor."
+    }
+  },
+  "inode_policy": {
+    "pre_download_archive_file_entries": 1,
+    "post_download_snapshot_entries": "F2_MATERIALIZED_ENTRIES",
+    "fresh_install_extra_data_directories": 5,
+    "index_build_cache_entries": 4
+  },
+  "state_commit_headroom": {
+    "selected_bytes": 131072,
+    "selected_inodes": 4,
+    "byte_semantics": "Minimum unprivileged free byte headroom required for the guarded Control DB publication phase after accounting for coexisting snapshot/index demand.",
+    "inode_semantics": "Minimum unprivileged free inode/file-slot headroom required for the guarded Control DB publication phase after accounting for coexisting snapshot/index demand.",
+    "byte_evidence": {
+      "tmpfs_source": "benchmarks/capacity-v1/evidence.json#c0_m2",
+      "ext4_source": "benchmarks/capacity-v1/evidence.json#c0_m3",
+      "maximum_observed_lowest_successful_bytes": 65536,
+      "selected_to_frontier_ratio": 2
+    },
+    "inode_evidence": {
+      "actions_run_id": 36044937017,
+      "artifact_name": "atm-c0p-m7-state-inodes-36044937017-1",
+      "artifact_id": 10827339334,
+      "artifact_sha256": "62f71248cd8104ef05b2c000ba10af328909e20c3a64dec41d8ecdc20678c6b8",
+      "qualified_head": "b99b68880ddd702c6c24853b2dd68fd03f2cfc44",
+      "available_bytes_before_each_case": 16736256,
+      "observations": [
+        {
+          "available_inodes": 1,
+          "classification": "FAIL_CLOSED_OLD_AUTHORITY"
+        },
+        {
+          "available_inodes": 2,
+          "classification": "SUCCESS_ATOMIC"
+        },
+        {
+          "available_inodes": 3,
+          "classification": "SUCCESS_ATOMIC"
+        },
+        {
+          "available_inodes": 4,
+          "classification": "SUCCESS_ATOMIC"
+        },
+        {
+          "available_inodes": 8,
+          "classification": "SUCCESS_ATOMIC"
+        }
+      ],
+      "minimum_observed_successful_inodes": 2,
+      "selected_to_minimum_ratio": 2
+    }
+  },
+  "operation_contract": {
+    "two_checkpoint_admission": true,
+    "same_sha_repair_must_admit_before_quarantine": true,
+    "completed_archive_not_double_counted_post_download": true,
+    "shared_filesystem_requirements_grouped_by_device": true,
+    "automatic_reclamation_for_admission": false,
+    "preflight_error_class": "RepositoryError.NO_SPACE",
+    "generic_sqlite_ioerr_is_no_space": false
+  },
+  "runtime_integration_selected": false
+}
