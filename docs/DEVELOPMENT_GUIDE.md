@@ -18,7 +18,7 @@ Ask the Model
 
 AtM is not the AI provider, does not own external AI-model files, and is not itself one of the scientific dynamical models it helps explore.
 
-## Current v0.4 architecture
+## Current development architecture
 
 ### Provider layer
 
@@ -86,9 +86,19 @@ The deterministic v1 retrieval stack is split across:
 
 ### Presentation
 
-`Application.vala` owns the GTK shell, selectors, status LCD, tabs, transcript, prompt composer and source-detail windows.
+The Presentation layer is a display-time projection boundary; it does not modify provider history, persisted conversation content, grounding provenance or scientific repository state.
 
-Repository excerpts are treated as untrusted data. Markdown evidence is converted to readable plain text for display rather than executed as GTK/Pango markup.
+`presentation_document.c/.h` owns the small semantic document model. `presentation_normalize.c/.h` uses vendored MD4C to parse complete assistant responses into that model while flattening emphasis/strong/link/image syntax to visible text, keeping links/images inert, disabling raw HTML/indented-code interpretation, and falling back to complete safe plain text when input cannot be qualified.
+
+`PresentationNative.vapi` exposes only an opaque owned document plus read-only block/segment accessors to Vala. GTK code must not depend on the internal `GPtrArray` representation or MD4C parser structures.
+
+`PresentationRenderer.vala` projects the qualified document into the existing per-chat `Gtk.TextBuffer` with ordinary text tags rather than executable Pango/HTML markup. User messages are preserved literally. Assistant headings, lists, quotes and code receive restrained structural presentation; Markdown emphasis is not reintroduced as bold/italic. Bold weight is reserved for the `You:` / `Assistant:` speaker labels, whose colors remain within the neutral AtM light/dark palette.
+
+`Application.vala` owns one renderer per chat tab. The active Send, clarification, ordinary assistant, grounded assistant and History-restore paths use that renderer. Grounded source buttons remain a separate provenance surface below the answer.
+
+The existing provider chunk callback is deliberately not normalized per chunk. Current visible transcript insertion is full-response; if visible streaming is re-enabled later, Presentation must receive a whole-message/finalization boundary because Markdown delimiters may span provider chunks.
+
+Repository excerpts remain untrusted data and are never executed as GTK/Pango markup.
 
 ## Non-negotiable invariants
 

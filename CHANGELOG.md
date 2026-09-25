@@ -4,6 +4,12 @@ All notable public releases of Ask the Model are recorded here.
 
 ## Unreleased
 
+### Presentation layer
+
+- added a qualified display-only Presentation pipeline for assistant responses: a vendored-MD4C normalizer projects complete response text into a small semantic document, flattens emphasis/strong/link/image syntax to visible text, keeps repository/provider content inert, and preserves a full safe plain-text fallback without changing provider or persisted conversation content;
+- added deterministic golden/adversarial/Unicode/stress qualification, isolated ASan/UBSan execution and frozen cross-run performance evidence; the measured non-UI normalization/projection path remained approximately linear through 1 MiB, while no production latency threshold or input-size limit was selected from hosted-runner measurements;
+- added the GTK transcript renderer and active Application wiring: user text remains literal; assistant headings/lists/quotes/code receive restrained text-tag presentation; Markdown emphasis is not reintroduced as bold/italic; `You:` and `Assistant:` are the only bold transcript labels and use neutral light/dark palette colors; grounded Sources buttons remain separate below the answer; the dormant provider-chunk handler is intentionally not normalized per chunk.
+
 ### Optimization controls
 
 - added one global session-only instrument-style `Optimizations  [switch]` control in the header for the post-v0.5.0 optimization program; every process starts OFF, the state is deliberately not persisted, the switch uses a warm red/green case with a neutral metallic slider and the same ridge-border language as the application frame, the LCD mirrors the state as `OPT OFF` / `OPT ON`, and future runtime optimizations must preserve the baseline path while OFF;
