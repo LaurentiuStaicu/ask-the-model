@@ -128,6 +128,16 @@ namespace AskTheModel {
             return optimization_policy.snapshot_enabled ();
         }
 
+        internal static bool optimized_preexisting_final_must_fail_closed (
+            bool optimized_operation,
+            bool repairing_same_snapshot,
+            bool final_target_exists
+        ) {
+            return optimized_operation &&
+                !repairing_same_snapshot &&
+                final_target_exists;
+        }
+
         private void require_download_capacity (
             RepositoryDescriptor descriptor,
             string sha
@@ -529,7 +539,8 @@ namespace AskTheModel {
             string sha,
             string? archive_path,
             string? expected_seal,
-            bool coordinated_index
+            bool coordinated_index,
+            bool durable_ingest
         ) throws RepositoryError {
             SourceFunc callback = prepare_snapshot.callback;
             RepositoryInstallResult? worker_result = null;
@@ -562,8 +573,32 @@ namespace AskTheModel {
 
                             uint64 entries;
                             uint64 total_bytes;
+                            string? durable_pre_barrier_seal = null;
 
-                            if (!RepositoryNative.ingest_archive (
+                            if (durable_ingest) {
+                                string returned_pre_barrier_seal;
+
+                                if (!RepositoryNative.ingest_archive_durable (
+                                        data_root,
+                                        archive_path,
+                                        descriptor.id,
+                                        descriptor.acronym,
+                                        descriptor.display_name,
+                                        sha,
+                                        out returned_pre_barrier_seal,
+                                        out ingest_version,
+                                        out snapshot,
+                                        out entries,
+                                        out total_bytes
+                                    )) {
+                                    throw new RepositoryError.STORAGE (
+                                        "Durable repository snapshot validation failed."
+                                    );
+                                }
+
+                                durable_pre_barrier_seal =
+                                    returned_pre_barrier_seal;
+                            } else if (!RepositoryNative.ingest_archive (
                                     data_root,
                                     archive_path,
                                     descriptor.id,
@@ -578,6 +613,31 @@ namespace AskTheModel {
                                 throw new RepositoryError.STORAGE (
                                     "Repository snapshot validation failed."
                                 );
+                            }
+
+                            if (durable_pre_barrier_seal != null) {
+                                string promoted_pre_index_seal;
+                                uint64 promoted_pre_index_files;
+                                uint64 promoted_pre_index_bytes;
+
+                                if (!RepositoryNative.compute_snapshot_seal (
+                                        snapshot,
+                                        out promoted_pre_index_seal,
+                                        out promoted_pre_index_files,
+                                        out promoted_pre_index_bytes
+                                    )) {
+                                    throw new RepositoryError.STORAGE (
+                                        "Durable repository snapshot seal could not be recomputed after promotion."
+                                    );
+                                }
+
+                                if (durable_pre_barrier_seal !=
+                                    promoted_pre_index_seal) {
+                                    integrity_failure = true;
+                                    throw new RepositoryError.NOT_READY (
+                                        "Durable repository snapshot seal changed across promotion."
+                                    );
+                                }
                             }
                         }
 
@@ -847,7 +907,8 @@ namespace AskTheModel {
                         sha,
                         null,
                         expected_seal,
-                        optimized_operation
+                        optimized_operation,
+                        false
                     );
                 } catch (RepositoryError error) {
                     if (mark_runtime_integrity_failure &&
@@ -1063,6 +1124,25 @@ namespace AskTheModel {
                             expected_snapshot,
                             GLib.FileTest.EXISTS
                         );
+                    bool final_target_exists =
+                        GLib.FileUtils.test (
+                            expected_snapshot,
+                            GLib.FileTest.EXISTS
+                        ) ||
+                        GLib.FileUtils.test (
+                            expected_snapshot,
+                            GLib.FileTest.IS_SYMLINK
+                        );
+
+                    if (optimized_preexisting_final_must_fail_closed (
+                            optimized_operation,
+                            repairing_same_snapshot,
+                            final_target_exists
+                        )) {
+                        throw new RepositoryError.NOT_READY (
+                            "Optimized durable ingest refuses an unqualified pre-existing final snapshot target."
+                        );
+                    }
 
                     try {
                         if (repairing_same_snapshot ||
@@ -1150,6 +1230,7 @@ namespace AskTheModel {
                                 sha,
                                 archive_path,
                                 null,
+                                optimized_operation,
                                 optimized_operation
                             );
 
