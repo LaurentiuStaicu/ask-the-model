@@ -88,9 +88,10 @@ static void
 test_long_unmatched_delimiter_retains_payload (void)
 {
     GString *input = g_string_sized_new (8192);
+    g_string_append (input, "prefix ");
     for (guint i = 0; i < 4097; i++)
         g_string_append_c (input, '`');
-    g_string_append (input, "payload");
+    g_string_append (input, " payload");
 
     AtmPresentationDocument *document =
         normalize_bytes (input->str, input->len);
