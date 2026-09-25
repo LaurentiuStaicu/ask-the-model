@@ -1,5 +1,3 @@
-#define _GNU_SOURCE
-
 #include "archive_extract.h"
 #include "repository_ingest.h"
 #include "repository_manifest.h"
