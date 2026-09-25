@@ -148,5 +148,38 @@
       "fsync_mark_found": true
     },
     "reviewed_conclusion": "The standard GitHub-hosted Ubuntu runner supports the minimum dm-log-writes/replay-log mark mechanism required to prototype A1-M3; this is capability evidence only and does not establish replay durability."
+  },
+  "tier2_replay": {
+    "measurement_id": "atm-a1-m3-block-replay-smoke-v1",
+    "status": "qualified",
+    "production_durability_authorized": false,
+    "source": {
+      "actions_run_id": 36118334996,
+      "artifact_name": "atm-a1-m3-replay-smoke-36118334996-1",
+      "artifact_id": 10856600862,
+      "artifact_sha256": "fb4da03b7d7d1ade93a12c407efc413f8ca4cd12c946e8bf9014736971829cc9",
+      "atm_source_commit": "4260c0db0d4c8c0bf929aabbf0950435c7ed75a7"
+    },
+    "kernel": {
+      "system": "Linux",
+      "release": "6.17.0-1022-azure",
+      "machine": "x86_64"
+    },
+    "upstream": {
+      "repository": "josefbacik/log-writes",
+      "commit": "7b70d8a6863c5de30933d42a7672d35d01d2dc6c"
+    },
+    "marks": {
+      "mkfs_entry": 35,
+      "fsync_entry": 57
+    },
+    "replay": {
+      "end_mark": "fsync",
+      "e2fsck_exit_code": 1,
+      "expected_sha256": "5d53a5ae5705f401182a1c3d52618b34aab4c9097b6894cc01bebe3fb6a08a94",
+      "replayed_sha256": "5d53a5ae5705f401182a1c3d52618b34aab4c9097b6894cc01bebe3fb6a08a94",
+      "content_match": true
+    },
+    "reviewed_conclusion": "The qualified runner can replay dm-log-writes history from the beginning through an explicit fsync mark onto a blank device and recover the synchronized ext4 payload exactly after e2fsck; this validates the replay mechanism only and does not yet exercise AtM snapshot promotion, Control DB authority, or authorize a production durability barrier."
   }
 }
