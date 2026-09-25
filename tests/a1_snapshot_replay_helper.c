@@ -1,5 +1,6 @@
 #include "control_state.h"
 #include "fault_injection_support.h"
+#include "fault_injection_test_hook.h"
 #include "repository_storage.h"
 #include "snapshot_seal.h"
 
@@ -634,9 +635,34 @@ promote_new (
 }
 
 static gboolean
+candidate_checkpoint_valid (
+    const char *checkpoint
+)
+{
+    return
+        g_strcmp0 (
+            checkpoint,
+            "candidate_post_barrier_pre_rename"
+        ) == 0 ||
+        g_strcmp0 (
+            checkpoint,
+            "candidate_post_rename_pre_parent_fsync"
+        ) == 0 ||
+        g_strcmp0 (
+            checkpoint,
+            "candidate_post_parent_fsync_pre_authority"
+        ) == 0 ||
+        g_strcmp0 (
+            checkpoint,
+            "candidate_after_authority"
+        ) == 0;
+}
+
+static gboolean
 promote_new_candidate (
     const char *root,
     const char *strategy_name,
+    const char *checkpoint,
     GError **error
 )
 {
@@ -650,7 +676,18 @@ promote_new_candidate (
             error,
             G_FILE_ERROR,
             G_FILE_ERROR_INVAL,
-            "Unknown A1-M5 durability candidate strategy."
+            "Unknown A1 durability candidate strategy."
+        );
+        return FALSE;
+    }
+
+    if (checkpoint != NULL &&
+        !candidate_checkpoint_valid (checkpoint)) {
+        g_set_error_literal (
+            error,
+            G_FILE_ERROR,
+            G_FILE_ERROR_INVAL,
+            "Unknown A1 candidate replay checkpoint."
         );
         return FALSE;
     }
@@ -676,7 +713,7 @@ promote_new_candidate (
             error,
             G_FILE_ERROR,
             G_FILE_ERROR_FAILED,
-            "Could not create A1-M5 snapshot staging."
+            "Could not create A1 candidate snapshot staging."
         );
         goto out;
     }
@@ -692,27 +729,59 @@ promote_new_candidate (
             &file_count,
             &total_bytes,
             error
-        ) ||
-        !run_candidate_pre_rename_barrier (
+        )) {
+        goto out;
+    }
+
+    if (checkpoint != NULL) {
+        atm_test_fault_configure (
+            checkpoint,
+            CHECKPOINT_FD,
+            CONTROL_FD
+        );
+    }
+
+    if (!run_candidate_pre_rename_barrier (
             staging,
             strategy,
             &counters,
             error
-        ) ||
-        !atm_repository_promote_snapshot (
+        )) {
+        goto out;
+    }
+
+    atm_test_fault_checkpoint (
+        "candidate_post_barrier_pre_rename"
+    );
+
+    if (!atm_repository_promote_snapshot (
             data_root,
             REPOSITORY_ID,
             NEW_SHA,
             staging,
             &promoted,
             error
-        ) ||
-        !fsync_promoted_parent (
+        )) {
+        goto out;
+    }
+
+    atm_test_fault_checkpoint (
+        "candidate_post_rename_pre_parent_fsync"
+    );
+
+    if (!fsync_promoted_parent (
             promoted,
             &counters,
             error
-        ) ||
-        !atm_control_state_set_current_values (
+        )) {
+        goto out;
+    }
+
+    atm_test_fault_checkpoint (
+        "candidate_post_parent_fsync_pre_authority"
+    );
+
+    if (!atm_control_state_set_current_values (
             control_path,
             REPOSITORY_ID,
             NEW_SHA,
@@ -722,6 +791,10 @@ promote_new_candidate (
         )) {
         goto out;
     }
+
+    atm_test_fault_checkpoint (
+        "candidate_after_authority"
+    );
 
     g_print (
         "{"
@@ -960,6 +1033,18 @@ main (int argc, char **argv)
         ok = promote_new_candidate (
             argv[2],
             argv[3],
+            NULL,
+            &error
+        );
+    } else if (argc == 5 &&
+               g_strcmp0 (
+                   argv[1],
+                   "--promote-new-candidate-boundary"
+               ) == 0) {
+        ok = promote_new_candidate (
+            argv[2],
+            argv[3],
+            argv[4],
             &error
         );
     } else if (argc == 3 &&
@@ -971,6 +1056,7 @@ main (int argc, char **argv)
             "--initialize-old ROOT | "
             "--promote-new ROOT CHECKPOINT | "
             "--promote-new-candidate ROOT STRATEGY | "
+            "--promote-new-candidate-boundary ROOT STRATEGY CHECKPOINT | "
             "--verify ROOT\n"
         );
         return 64;
