@@ -855,16 +855,208 @@ namespace AskTheModel.Tests {
                 true
             );
 
-            ConversationGrounding coordinated_rebuild =
+            string generation_lock_root =
+                GLib.Path.build_filename (
+                    sealed_state_root,
+                    "repository-generation-leases"
+                );
+            string generation_five_lock =
+                GLib.Path.build_filename (
+                    generation_lock_root,
+                    "5.lock"
+                );
+            string generation_two_lock =
+                GLib.Path.build_filename (
+                    generation_lock_root,
+                    "2.lock"
+                );
+            string generation_9999_lock =
+                GLib.Path.build_filename (
+                    generation_lock_root,
+                    "9999.lock"
+                );
+
+            assert (
+                !GLib.FileUtils.test (
+                    generation_lock_root,
+                    GLib.FileTest.EXISTS
+                )
+            );
+
+            ConversationGrounding optimized_zero =
+                yield sealed_service.
+                    prepare_conversation_grounding_at_generation (
+                        {},
+                        0
+                    );
+            assert (optimized_zero.is_frozen ());
+            assert (
+                optimized_zero.repository_count () == 0
+            );
+            assert (
+                !GLib.FileUtils.test (
+                    generation_lock_root,
+                    GLib.FileTest.EXISTS
+                )
+            );
+
+            ConversationGrounding? coordinated_rebuild =
                 yield sealed_service.prepare_conversation_grounding (
                     sealed_selection
                 );
             assert (coordinated_rebuild.is_frozen ());
             assert (
+                coordinated_rebuild.has_generation_lease ()
+            );
+            assert (
+                coordinated_rebuild.generation_lease_id () == 5
+            );
+            assert (
+                GLib.FileUtils.test (
+                    generation_five_lock,
+                    GLib.FileTest.IS_REGULAR
+                )
+            );
+            assert (
                 GLib.FileUtils.test (
                     index_lock_path,
                     GLib.FileTest.IS_REGULAR
                 )
+            );
+
+            var generation_session =
+                new ConversationSession ();
+            generation_session.begin (
+                coordinated_rebuild,
+                "test-model"
+            );
+            coordinated_rebuild = null;
+
+            int generation_exclusive_fd = -1;
+            bool generation_exclusive_contended = false;
+            assert (
+                RepositoryGenerationLeaseNative.
+                    try_acquire_exclusive (
+                        sealed_state_root,
+                        5,
+                        out generation_exclusive_fd,
+                        out generation_exclusive_contended
+                    )
+            );
+            assert (generation_exclusive_contended);
+            assert (generation_exclusive_fd == -1);
+
+            generation_session.reset ();
+
+            generation_exclusive_contended = false;
+            assert (
+                RepositoryGenerationLeaseNative.
+                    try_acquire_exclusive (
+                        sealed_state_root,
+                        5,
+                        out generation_exclusive_fd,
+                        out generation_exclusive_contended
+                    )
+            );
+            assert (!generation_exclusive_contended);
+            assert (generation_exclusive_fd >= 0);
+            RepositoryGenerationLeaseNative.release (
+                generation_exclusive_fd
+            );
+
+            bool leased_missing_generation_rejected = false;
+            try {
+                yield sealed_service.
+                    prepare_conversation_grounding_at_generation (
+                        sealed_selection,
+                        9999
+                    );
+            } catch (GLib.Error error) {
+                leased_missing_generation_rejected = true;
+            }
+            assert (leased_missing_generation_rejected);
+            assert (
+                GLib.FileUtils.test (
+                    generation_9999_lock,
+                    GLib.FileTest.IS_REGULAR
+                )
+            );
+
+            generation_exclusive_fd = -1;
+            generation_exclusive_contended = false;
+            assert (
+                RepositoryGenerationLeaseNative.
+                    try_acquire_exclusive (
+                        sealed_state_root,
+                        9999,
+                        out generation_exclusive_fd,
+                        out generation_exclusive_contended
+                    )
+            );
+            assert (!generation_exclusive_contended);
+            assert (generation_exclusive_fd >= 0);
+            RepositoryGenerationLeaseNative.release (
+                generation_exclusive_fd
+            );
+
+            ConversationGrounding? leased_historical =
+                yield sealed_service.
+                    prepare_conversation_grounding_at_generation (
+                        sealed_selection,
+                        2
+                    );
+            assert (leased_historical.is_frozen ());
+            assert (
+                leased_historical.has_generation_lease ()
+            );
+            assert (
+                leased_historical.generation_lease_id () == 2
+            );
+            assert (
+                GLib.FileUtils.test (
+                    generation_two_lock,
+                    GLib.FileTest.IS_REGULAR
+                )
+            );
+
+            var historical_lease_session =
+                new ConversationSession ();
+            historical_lease_session.begin (
+                leased_historical,
+                "test-model"
+            );
+            leased_historical = null;
+
+            generation_exclusive_fd = -1;
+            generation_exclusive_contended = false;
+            assert (
+                RepositoryGenerationLeaseNative.
+                    try_acquire_exclusive (
+                        sealed_state_root,
+                        2,
+                        out generation_exclusive_fd,
+                        out generation_exclusive_contended
+                    )
+            );
+            assert (generation_exclusive_contended);
+            assert (generation_exclusive_fd == -1);
+
+            historical_lease_session.reset ();
+
+            generation_exclusive_contended = false;
+            assert (
+                RepositoryGenerationLeaseNative.
+                    try_acquire_exclusive (
+                        sealed_state_root,
+                        2,
+                        out generation_exclusive_fd,
+                        out generation_exclusive_contended
+                    )
+            );
+            assert (!generation_exclusive_contended);
+            assert (generation_exclusive_fd >= 0);
+            RepositoryGenerationLeaseNative.release (
+                generation_exclusive_fd
             );
 
             sealed_optimization_policy.set_enabled_for_session (
