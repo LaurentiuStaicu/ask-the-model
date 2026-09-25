@@ -30,6 +30,8 @@ At publication time, the tagged v0.5.0 release and `main` share this capability 
 
 Current AtM Development adds an OFF-by-default, session-only **Optimizations** gate without changing the tagged v0.5.0 capability boundary. The gate is snapshotted once per operation; switching the UI later does not change an operation already in progress.
 
+Current Development also adds a qualified display-only **Presentation layer** for chat transcripts. Assistant responses are normalized as complete messages into an AtM-owned semantic document and rendered into the existing GTK text buffer with restrained headings, lists, quotes and code presentation. Markdown emphasis is flattened rather than shown as raw delimiters or reintroduced as bold/italic; bold is reserved for the `You:` and `Assistant:` labels, using neutral light/dark palette colors. User text is preserved literally, grounded Sources buttons remain separate, and provider/persistence/retrieval/scientific content is unchanged by the presentation projection. This capability is post-v0.5.0 development behavior and is not retroactively attributed to the tagged v0.5.0 release.
+
 With Optimizations ON, the currently qualified repository-lifecycle optimizations are:
 - one global cross-process repository authority-mutation lease for Download/Update;
 - one per-SHA retrieval-index single-flight for missing/invalid derived indexes;
