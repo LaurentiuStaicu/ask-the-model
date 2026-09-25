@@ -1,0 +1,163 @@
+name: A1-M9 same-SHA repair durability replay
+
+on:
+  workflow_dispatch:
+  pull_request:
+    paths:
+      - 'src/repository_storage.c'
+      - 'src/repository_storage.h'
+      - 'src/control_state.c'
+      - 'src/control_state.h'
+      - 'src/snapshot_seal.c'
+      - 'src/snapshot_seal.h'
+      - 'tests/a1_snapshot_replay_helper.c'
+      - 'tests/fault_injection_support.c'
+      - 'tests/fault_injection_support.h'
+      - 'scripts/run_dm_log_writes_same_sha_repair.sh'
+      - '.github/workflows/dm-log-writes-same-sha-repair.yml'
+      - 'data/io.github.laurentiustaicu.ask_the_model.gresource.xml'
+      - 'data/schemas/control-state-v1.sql'
+      - 'data/schemas/control-state-v2.sql'
+      - 'data/schemas/control-state-v1-to-v2.sql'
+
+permissions:
+  contents: read
+
+concurrency:
+  group: durability-a1-m9-${{ github.event.pull_request.number || github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  replay:
+    runs-on: ubuntu-24.04
+    timeout-minutes: 30
+
+    steps:
+      - name: Checkout AtM
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+
+      - name: Install replay dependencies
+        shell: bash
+        run: |
+          set -euo pipefail
+          sudo apt-get update
+          sudo apt-get install -y --no-install-recommends \
+            build-essential \
+            e2fsprogs \
+            git \
+            lvm2 \
+            pkg-config \
+            libglib2.0-dev \
+            libjson-glib-dev \
+            libsqlite3-dev
+
+      - name: Build pinned replay-log
+        shell: bash
+        env:
+          LOG_WRITES_COMMIT: 7b70d8a6863c5de30933d42a7672d35d01d2dc6c
+        run: |
+          set -euo pipefail
+          git init /tmp/log-writes
+          git -C /tmp/log-writes remote add origin \
+            https://github.com/josefbacik/log-writes.git
+          git -C /tmp/log-writes fetch \
+            --depth=1 \
+            origin "$LOG_WRITES_COMMIT"
+          git -C /tmp/log-writes checkout --detach FETCH_HEAD
+          test "$(git -C /tmp/log-writes rev-parse HEAD)" = \
+            "$LOG_WRITES_COMMIT"
+          make -C /tmp/log-writes
+          test -x /tmp/log-writes/replay-log
+
+      - name: Build same-SHA repair replay helper
+        shell: bash
+        run: |
+          set -euo pipefail
+
+          glib-compile-resources \
+            data/io.github.laurentiustaicu.ask_the_model.gresource.xml \
+            --sourcedir=data \
+            --generate-source \
+            --target=/tmp/atm-a1-m9-resources.c
+
+          CFLAGS="$(pkg-config --cflags \
+            glib-2.0 \
+            gio-2.0 \
+            json-glib-1.0 \
+            sqlite3)"
+          LIBS="$(pkg-config --libs \
+            glib-2.0 \
+            gio-2.0 \
+            json-glib-1.0 \
+            sqlite3)"
+
+          COMMON_FLAGS="-std=c11 -O2 -Wall -Wextra -Werror -Isrc -Itests"
+
+          cc $COMMON_FLAGS $CFLAGS \
+            -c src/control_state.c \
+            -o /tmp/control_state.o
+
+          cc $COMMON_FLAGS $CFLAGS \
+            -D_GNU_SOURCE \
+            -DATM_TEST_FAULT_INJECTION \
+            -c src/repository_storage.c \
+            -o /tmp/repository_storage.o
+
+          cc $COMMON_FLAGS $CFLAGS \
+            -D_GNU_SOURCE \
+            -c src/snapshot_seal.c \
+            -o /tmp/snapshot_seal.o
+
+          cc $COMMON_FLAGS $CFLAGS \
+            -D_GNU_SOURCE \
+            -DATM_TEST_FAULT_INJECTION \
+            -c tests/fault_injection_support.c \
+            -o /tmp/fault_injection_support.o
+
+          cc $COMMON_FLAGS $CFLAGS \
+            -D_GNU_SOURCE \
+            -DATM_TEST_FAULT_INJECTION \
+            -c tests/a1_snapshot_replay_helper.c \
+            -o /tmp/a1_snapshot_replay_helper.o
+
+          cc $COMMON_FLAGS $CFLAGS \
+            -c /tmp/atm-a1-m9-resources.c \
+            -o /tmp/atm-a1-m9-resources.o
+
+          cc \
+            /tmp/control_state.o \
+            /tmp/repository_storage.o \
+            /tmp/snapshot_seal.o \
+            /tmp/fault_injection_support.o \
+            /tmp/a1_snapshot_replay_helper.o \
+            /tmp/atm-a1-m9-resources.o \
+            $LIBS \
+            -o /tmp/atm-a1-m9-helper
+
+          test -x /tmp/atm-a1-m9-helper
+
+      - name: Replay same-SHA repair boundaries
+        shell: bash
+        env:
+          LOG_WRITES_COMMIT: 7b70d8a6863c5de30933d42a7672d35d01d2dc6c
+        run: |
+          set -euo pipefail
+          mkdir -p /tmp/atm-a1-m9-results
+
+          bash scripts/run_dm_log_writes_same_sha_repair.sh \
+            /tmp/atm-a1-m9-results/same-sha-repair.json \
+            /tmp/log-writes \
+            "$LOG_WRITES_COMMIT" \
+            /tmp/atm-a1-m9-helper
+
+          python3 -m json.tool \
+            /tmp/atm-a1-m9-results/same-sha-repair.json
+
+      - name: Upload A1-M9 result
+        if: always()
+        uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7.0.1
+        with:
+          name: atm-a1-m9-same-sha-repair-${{ github.run_id }}-${{ github.run_attempt }}
+          path: /tmp/atm-a1-m9-results/same-sha-repair.json
+          if-no-files-found: error
+          retention-days: 90
