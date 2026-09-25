@@ -995,6 +995,28 @@ After fault-mode teardown the mapping is restored to `linear`, ext4 recovery is 
 
 This is error-propagation qualification, not a production patch. Passing M8 would demonstrate that both candidates fail closed for the reviewed EIO boundaries; it would still leave final S1-vs-S2 policy selection to a separate evidence review combining M1 performance/scope cost with M5/M6 replay correctness and M8 error behavior.
 
+### OPT-A1-F8 frozen candidate EIO evidence
+
+A1-F8 freezes the reviewed M8 result from Actions run `36131967444`, artifact `10862980361`, artifact SHA-256 `67c1d8072aaa4b4b0d773bc52476dedf7fcead3666bf64375fcf0123efb0b1ce`, measured at head `44aa462920eb1a81950cab9c6638b1911d7d207b`.
+
+The frozen matrix contains six scenarios: S1 targeted fsync and S2 syncfs, each faulted at the pre-rename candidate barrier, promoted-parent fsync, and Control DB activation boundary. Every scenario:
+- returned helper exit code 2;
+- surfaced an explicit I/O error under `dm-flakey error_writes`;
+- recovered ext4 with `e2fsck` exit 0 or 1;
+- retained `OLD_AUTHORITY_VALID`;
+- recomputed a matching active snapshot seal;
+- remained qualified in a fresh verifier process;
+- satisfied the fail-closed predicate.
+
+The registry also freezes the exact per-scenario e2fsck result rather than only the aggregate booleans. The aggregate contract remains `all_candidates_failed_on_eio=true`, `all_old_authority_preserved=true`, and `all_fail_closed=true`.
+
+This closes the planned A1 candidate write-error-propagation qualification. It still does **not** select a production barrier. Final candidate selection must review the complete evidence together:
+- M1 comparative cost and scope;
+- M4 falsification of the S3/current baseline;
+- M5/M6 S1/S2 replay correctness across promotion boundaries;
+- M8 explicit write-error fail-closed behavior;
+- the documented operational scope difference between targeted fsync and filesystem-wide syncfs.
+
 ### Recovery fault qualification
 
 The OPT-A0 recovery harness is test-only. Native checkpoint calls compile to no-ops in the production application; only the dedicated recovery helper is built with `ATM_TEST_FAULT_INJECTION`.
