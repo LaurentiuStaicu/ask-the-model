@@ -5,10 +5,11 @@ OUTPUT="${1:?output JSON path required}"
 
 WORK_ROOT="$(mktemp -d /tmp/atm-a1-m7-XXXXXX)"
 DATA_IMAGE="$WORK_ROOT/data.img"
-BASELINE_MOUNT="$WORK_ROOT/live"
+LIVE_MOUNT="$WORK_ROOT/live"
 VERIFY_MOUNT="$WORK_ROOT/verify"
 MAPPER_NAME="atm-a1-m7-${GITHUB_RUN_ID:-$$}"
 MAPPER_PATH="/dev/mapper/$MAPPER_NAME"
+
 DATA_LOOP=""
 MAPPER_CREATED=0
 LIVE_MOUNTED=0
@@ -16,27 +17,36 @@ VERIFY_MOUNTED=0
 
 cleanup() {
     set +e
+
     if [[ "$VERIFY_MOUNTED" -eq 1 ]]; then
         sudo umount "$VERIFY_MOUNT" >/dev/null 2>&1 || true
     fi
+
     if [[ "$LIVE_MOUNTED" -eq 1 ]]; then
-        sudo umount "$BASELINE_MOUNT" >/dev/null 2>&1 || true
+        sudo umount "$LIVE_MOUNT" >/dev/null 2>&1 || true
     fi
+
     if [[ "$MAPPER_CREATED" -eq 1 ]]; then
         sudo dmsetup remove --retry "$MAPPER_NAME" >/dev/null 2>&1 || true
     fi
+
     if [[ -n "$DATA_LOOP" ]]; then
         sudo losetup -d "$DATA_LOOP" >/dev/null 2>&1 || true
     fi
+
     rm -rf "$WORK_ROOT"
 }
+
 trap cleanup EXIT
 
-mkdir -p "$BASELINE_MOUNT" "$VERIFY_MOUNT" "$(dirname "$OUTPUT")"
+mkdir -p     "$LIVE_MOUNT"     "$VERIFY_MOUNT"     "$(dirname "$OUTPUT")"
 
 sudo modprobe dm-flakey >/dev/null 2>&1 || true
+
 TARGET_AVAILABLE=false
-if sudo dmsetup targets | awk '{print $1}' | grep -Fxq "flakey"; then
+if sudo dmsetup targets |
+    awk '{print $1}' |
+    grep -Fxq "flakey"; then
     TARGET_AVAILABLE=true
 fi
 
@@ -48,6 +58,7 @@ import platform
 import sys
 
 output = sys.argv[1]
+
 record = {
     "schema_version": 1,
     "measurement_id": "atm-a1-m7-dm-flakey-capability-v1",
@@ -67,6 +78,7 @@ record = {
         "move to a different runner rather than weakening the experiment."
     ),
 }
+
 pathlib.Path(output).write_text(
     json.dumps(record, indent=2, sort_keys=True) + "\n",
     encoding="utf-8",
@@ -84,23 +96,46 @@ sudo dmsetup create "$MAPPER_NAME"     --table "0 $SECTORS linear $DATA_LOOP 0"
 MAPPER_CREATED=1
 
 sudo mkfs.ext4 -F -m 0 "$MAPPER_PATH" >/dev/null
-sudo mount "$MAPPER_PATH" "$BASELINE_MOUNT"
-LIVE_MOUNTED=1
-sudo chown "$(id -u):$(id -g)" "$BASELINE_MOUNT"
 
-python3 - "$BASELINE_MOUNT" <<'PY'
-import hashlib
+sudo mount "$MAPPER_PATH" "$LIVE_MOUNT"
+LIVE_MOUNTED=1
+sudo chown "$(id -u):$(id -g)" "$LIVE_MOUNT"
+
+python3 - "$LIVE_MOUNT" <<'PY'
 import os
 import pathlib
 import sys
 
 root = pathlib.Path(sys.argv[1])
-path = root / "baseline.bin"
-payload = b"atm-a1-m7-dm-flakey-baseline\n" * 4096
 
-fd = os.open(path, os.O_WRONLY | os.O_CREAT | os.O_TRUNC, 0o600)
+baseline_path = root / "baseline.bin"
+baseline_payload = b"atm-a1-m7-dm-flakey-baseline\n" * 4096
+
+fd = os.open(
+    baseline_path,
+    os.O_WRONLY | os.O_CREAT | os.O_TRUNC,
+    0o600,
+)
 try:
-    view = memoryview(payload)
+    view = memoryview(baseline_payload)
+    offset = 0
+    while offset < len(view):
+        offset += os.write(fd, view[offset:])
+    os.fsync(fd)
+finally:
+    os.close(fd)
+
+# Pre-create the write-probe inode while the mapping is healthy. The later
+# fault observation therefore targets write I/O rather than directory-entry
+# creation or inode allocation.
+probe_path = root / "must-fail.bin"
+fd = os.open(
+    probe_path,
+    os.O_WRONLY | os.O_CREAT | os.O_TRUNC,
+    0o600,
+)
+try:
+    view = memoryview(b"0" * 4096)
     offset = 0
     while offset < len(view):
         offset += os.write(fd, view[offset:])
@@ -113,41 +148,29 @@ try:
     os.fsync(dir_fd)
 finally:
     os.close(dir_fd)
-
-print(hashlib.sha256(payload).hexdigest())
-PY
-BASELINE_SHA="$(sha256sum "$BASELINE_MOUNT/baseline.bin" | awk '{print $1}')"
-
-# Pre-create and durably commit the write-probe inode before fault injection.
-# This keeps the capability observation focused on write I/O failure rather
-# than on a new directory-entry allocation under the flakey target.
-python3 - "$BASELINE_MOUNT" <<'PY'
-import os
-import pathlib
-import sys
-
-path = pathlib.Path(sys.argv[1]) / "must-fail.bin"
-fd = os.open(path, os.O_WRONLY | os.O_CREAT | os.O_TRUNC, 0o600)
-try:
-    os.write(fd, b"0" * 4096)
-    os.fsync(fd)
-finally:
-    os.close(fd)
-
-dir_fd = os.open(path.parent, os.O_RDONLY | os.O_DIRECTORY)
-try:
-    os.fsync(dir_fd)
-finally:
-    os.close(dir_fd)
 PY
 
-sync -f "$BASELINE_MOUNT"
+BASELINE_SHA="$(
+    sha256sum "$LIVE_MOUNT/baseline.bin" |
+    awk '{print $1}'
+)"
+
+sync -f "$LIVE_MOUNT"
 
 sudo dmsetup suspend "$MAPPER_NAME"
 sudo dmsetup reload "$MAPPER_NAME"     --table "0 $SECTORS flakey $DATA_LOOP 0 0 600 1 error_writes"
 sudo dmsetup resume "$MAPPER_NAME"
 
-READ_SHA="$(sha256sum "$BASELINE_MOUNT/baseline.bin" | awk '{print $1}')"
+FLAKEY_TABLE_ACTIVE=false
+if sudo dmsetup table "$MAPPER_NAME" |
+    grep -Fq " flakey "; then
+    FLAKEY_TABLE_ACTIVE=true
+fi
+
+READ_SHA="$(
+    sha256sum "$LIVE_MOUNT/baseline.bin" |
+    awk '{print $1}'
+)"
 READ_SURVIVED=false
 if [[ "$READ_SHA" == "$BASELINE_SHA" ]]; then
     READ_SURVIVED=true
@@ -155,7 +178,7 @@ fi
 
 set +e
 ERROR_ERRNO="$(
-python3 - "$BASELINE_MOUNT" <<'PY'
+python3 - "$LIVE_MOUNT" <<'PY'
 import errno
 import os
 import pathlib
@@ -187,7 +210,8 @@ ERROR_PROBE_RC=$?
 set -e
 
 ERROR_WRITES_TRIGGERED=false
-if [[ "$ERROR_PROBE_RC" -eq 0 && "$ERROR_ERRNO" -eq 5 ]]; then
+if [[ "$ERROR_PROBE_RC" -eq 0 &&
+      "$ERROR_ERRNO" -eq 5 ]]; then
     ERROR_WRITES_TRIGGERED=true
 fi
 
@@ -195,10 +219,17 @@ sudo dmsetup suspend "$MAPPER_NAME"
 sudo dmsetup reload "$MAPPER_NAME"     --table "0 $SECTORS linear $DATA_LOOP 0"
 sudo dmsetup resume "$MAPPER_NAME"
 
+LINEAR_TABLE_RESTORED=false
+if sudo dmsetup table "$MAPPER_NAME" |
+    grep -Fq " linear "; then
+    LINEAR_TABLE_RESTORED=true
+fi
+
 set +e
-sudo umount "$BASELINE_MOUNT"
+sudo umount "$LIVE_MOUNT"
 UMOUNT_RC=$?
 set -e
+
 if [[ "$UMOUNT_RC" -ne 0 ]]; then
     exit "$UMOUNT_RC"
 fi
@@ -208,9 +239,10 @@ sudo dmsetup remove --retry "$MAPPER_NAME"
 MAPPER_CREATED=0
 
 set +e
-sudo e2fsck -fy "$DATA_LOOP" >"$WORK_ROOT/e2fsck.txt" 2>&1
+sudo e2fsck -fy "$DATA_LOOP"     >"$WORK_ROOT/e2fsck.txt" 2>&1
 E2FSCK_RC=$?
 set -e
+
 if [[ "$E2FSCK_RC" -gt 2 ]]; then
     cat "$WORK_ROOT/e2fsck.txt" >&2
     exit "$E2FSCK_RC"
@@ -218,15 +250,20 @@ fi
 
 sudo mount -o ro "$DATA_LOOP" "$VERIFY_MOUNT"
 VERIFY_MOUNTED=1
-RESTORED_SHA="$(sudo sha256sum "$VERIFY_MOUNT/baseline.bin" | awk '{print $1}')"
+
+RESTORED_SHA="$(
+    sudo sha256sum "$VERIFY_MOUNT/baseline.bin" |
+    awk '{print $1}'
+)"
 BASELINE_PRESERVED=false
 if [[ "$RESTORED_SHA" == "$BASELINE_SHA" ]]; then
     BASELINE_PRESERVED=true
 fi
+
 sudo umount "$VERIFY_MOUNT"
 VERIFY_MOUNTED=0
 
-python3 -     "$OUTPUT"     "$TARGET_AVAILABLE"     "$READ_SURVIVED"     "$ERROR_WRITES_TRIGGERED"     "$ERROR_ERRNO"     "$E2FSCK_RC"     "$BASELINE_SHA"     "$RESTORED_SHA"     "$BASELINE_PRESERVED" <<'PY'
+python3 -     "$OUTPUT"     "$TARGET_AVAILABLE"     "$FLAKEY_TABLE_ACTIVE"     "$READ_SURVIVED"     "$ERROR_WRITES_TRIGGERED"     "$LINEAR_TABLE_RESTORED"     "$ERROR_ERRNO"     "$E2FSCK_RC"     "$BASELINE_SHA"     "$RESTORED_SHA"     "$BASELINE_PRESERVED" <<'PY'
 import json
 import pathlib
 import platform
@@ -235,8 +272,10 @@ import sys
 (
     output,
     target_available,
+    flakey_table_active,
     read_survived,
     error_writes_triggered,
+    linear_table_restored,
     error_errno,
     e2fsck_rc,
     baseline_sha,
@@ -246,10 +285,14 @@ import sys
 
 checks = {
     "dm_flakey_target_available": target_available == "true",
-    "mounted_linear_mapping_reloaded_to_flakey": True,
+    "mounted_linear_mapping_reloaded_to_flakey": (
+        flakey_table_active == "true"
+    ),
     "reads_survive_error_writes_mode": read_survived == "true",
     "write_fsync_returns_eio": error_writes_triggered == "true",
-    "mapping_restored_to_linear": True,
+    "mapping_restored_to_linear": (
+        linear_table_restored == "true"
+    ),
     "baseline_content_preserved_after_recovery": (
         baseline_preserved == "true"
     ),
@@ -272,6 +315,7 @@ record = {
         "flakey_down_interval_seconds": 600,
         "feature": "error_writes",
         "reload_while_ext4_mounted": True,
+        "write_probe_inode_precreated_and_synced": True,
     },
     "checks": checks,
     "observations": {
