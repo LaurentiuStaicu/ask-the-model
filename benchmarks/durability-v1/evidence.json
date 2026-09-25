@@ -479,5 +479,120 @@
       "restored_sha256": "92187c175d34346bd01eab321fd4c1647fd94c2097cf8862b367fbef38d8555c"
     },
     "reviewed_conclusion": "The reviewed GitHub-hosted runner supports mounted dm-flakey error_writes injection: reads remain correct, a pre-existing write+fsync probe surfaces EIO, the mapping can be restored to linear with fault-mode teardown that does not resynchronize the failed filesystem, and the synchronized baseline survives recovery. This is capability evidence only; it does not yet exercise S1/S2 or authorize a production durability barrier."
+  },
+  "tier2_candidate_error_injection": {
+    "measurement_id": "atm-a1-m8-candidate-error-injection-v1",
+    "status": "qualified",
+    "production_barrier_selected": false,
+    "production_durability_authorized": false,
+    "source": {
+      "actions_run_id": 36131967444,
+      "artifact_name": "atm-a1-m8-candidate-errors-36131967444-1",
+      "artifact_id": 10862980361,
+      "artifact_sha256": "67c1d8072aaa4b4b0d773bc52476dedf7fcead3666bf64375fcf0123efb0b1ce",
+      "atm_source_commit": "44aa462920eb1a81950cab9c6638b1911d7d207b"
+    },
+    "kernel": {
+      "system": "Linux",
+      "release": "6.17.0-1022-azure",
+      "machine": "x86_64"
+    },
+    "protocol": {
+      "device_mapper_target": "flakey",
+      "feature": "error_writes",
+      "flakey_up_interval_seconds": 1,
+      "flakey_down_interval_seconds": 600,
+      "old_authority_synced_before_each_scenario": true,
+      "fault_entry_suspend_noflush_nolockfs": true,
+      "fault_teardown_suspend_noflush_nolockfs": true,
+      "fresh_process_seal_verifier_after_recovery": true,
+      "candidate_set": [
+        "S1_TARGETED_FSYNC",
+        "S2_SYNCFS"
+      ],
+      "boundary_order": [
+        "pre_rename_barrier",
+        "promoted_parent_fsync",
+        "control_db_activation"
+      ]
+    },
+    "results": [
+      {
+        "strategy": "S1_TARGETED_FSYNC",
+        "boundary": "pre_rename_barrier",
+        "checkpoint": "candidate_pre_barrier",
+        "helper_exit_code": 2,
+        "io_error_observed": true,
+        "e2fsck_exit_code": 0,
+        "classification": "OLD_AUTHORITY_VALID",
+        "seal_match": true,
+        "qualified": true,
+        "fail_closed": true
+      },
+      {
+        "strategy": "S1_TARGETED_FSYNC",
+        "boundary": "promoted_parent_fsync",
+        "checkpoint": "candidate_post_rename_pre_parent_fsync",
+        "helper_exit_code": 2,
+        "io_error_observed": true,
+        "e2fsck_exit_code": 1,
+        "classification": "OLD_AUTHORITY_VALID",
+        "seal_match": true,
+        "qualified": true,
+        "fail_closed": true
+      },
+      {
+        "strategy": "S1_TARGETED_FSYNC",
+        "boundary": "control_db_activation",
+        "checkpoint": "candidate_post_parent_fsync_pre_authority",
+        "helper_exit_code": 2,
+        "io_error_observed": true,
+        "e2fsck_exit_code": 0,
+        "classification": "OLD_AUTHORITY_VALID",
+        "seal_match": true,
+        "qualified": true,
+        "fail_closed": true
+      },
+      {
+        "strategy": "S2_SYNCFS",
+        "boundary": "pre_rename_barrier",
+        "checkpoint": "candidate_pre_barrier",
+        "helper_exit_code": 2,
+        "io_error_observed": true,
+        "e2fsck_exit_code": 1,
+        "classification": "OLD_AUTHORITY_VALID",
+        "seal_match": true,
+        "qualified": true,
+        "fail_closed": true
+      },
+      {
+        "strategy": "S2_SYNCFS",
+        "boundary": "promoted_parent_fsync",
+        "checkpoint": "candidate_post_rename_pre_parent_fsync",
+        "helper_exit_code": 2,
+        "io_error_observed": true,
+        "e2fsck_exit_code": 1,
+        "classification": "OLD_AUTHORITY_VALID",
+        "seal_match": true,
+        "qualified": true,
+        "fail_closed": true
+      },
+      {
+        "strategy": "S2_SYNCFS",
+        "boundary": "control_db_activation",
+        "checkpoint": "candidate_post_parent_fsync_pre_authority",
+        "helper_exit_code": 2,
+        "io_error_observed": true,
+        "e2fsck_exit_code": 0,
+        "classification": "OLD_AUTHORITY_VALID",
+        "seal_match": true,
+        "qualified": true,
+        "fail_closed": true
+      }
+    ],
+    "all_candidates_failed_on_eio": true,
+    "all_old_authority_preserved": true,
+    "all_fail_closed": true,
+    "reviewed_conclusion": "Both S1 targeted fsync and S2 syncfs fail closed under the reviewed dm-flakey error_writes injections at the pre-rename barrier, promoted-parent fsync and Control DB activation boundaries. All six scenarios preserve the old seal-valid authority. This closes the planned candidate write-error propagation gate but does not by itself select a production durability barrier."
   }
 }
