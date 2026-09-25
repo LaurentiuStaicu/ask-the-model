@@ -1,0 +1,80 @@
+name: Presentation Performance
+
+on:
+  pull_request:
+    paths:
+      - 'src/presentation_document.c'
+      - 'src/presentation_document.h'
+      - 'src/presentation_normalize.c'
+      - 'src/presentation_normalize.h'
+      - 'third_party/md4c/**'
+      - 'tests/presentation_performance_probe.c'
+      - '.github/workflows/presentation-performance.yml'
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  measure:
+    runs-on: ubuntu-24.04
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+
+      - name: Install measurement dependency
+        shell: bash
+        run: |
+          set -euo pipefail
+          sudo apt-get update
+          sudo apt-get install -y --no-install-recommends \
+            libglib2.0-dev
+
+      - name: Record environment
+        shell: bash
+        run: |
+          set -euo pipefail
+          uname -a
+          cc --version
+          pkg-config --modversion glib-2.0
+          dpkg-query -W -f='libglib2.0-dev=${Version}\n' \
+            libglib2.0-dev
+          lscpu | sed -n '1,24p'
+
+      - name: Build presentation performance probe
+        shell: bash
+        run: |
+          set -euo pipefail
+          cc \
+            -O2 \
+            -g \
+            -std=c11 \
+            -Wall \
+            -Wextra \
+            -Isrc \
+            -Ithird_party/md4c \
+            $(pkg-config --cflags glib-2.0) \
+            src/presentation_document.c \
+            src/presentation_normalize.c \
+            third_party/md4c/md4c.c \
+            tests/presentation_performance_probe.c \
+            $(pkg-config --libs glib-2.0) \
+            -o presentation-performance-probe
+
+      - name: Measure presentation core
+        shell: bash
+        run: |
+          set -euo pipefail
+          ./presentation-performance-probe \
+            | tee presentation-performance.txt
+          grep '^ATM_PRESENTATION_PERF' \
+            presentation-performance.txt
+
+      - name: Upload measurement
+        uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4
+        with:
+          name: presentation-performance-${{ github.run_id }}-${{ github.run_attempt }}
+          path: presentation-performance.txt
+          if-no-files-found: error
+          retention-days: 14
