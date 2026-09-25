@@ -732,6 +732,21 @@ Linux documents that `fsync()` of a file does not by itself guarantee persistenc
 
 A1-M1 does **not** benchmark the final rename or Control DB activation and does not claim physical-power-loss durability. It is comparative cost evidence only. Production promotion still requires the Tier-2 durability result required by OPT-A1 and a separate reviewed runtime patch behind the default-OFF Optimizations gate.
 
+### OPT-A1-F1 durability evidence freeze
+
+A1-F1 freezes the reviewed A1-M1 benchmark under `benchmarks/durability-v1/evidence.json`.
+
+The registry records exact workflow/artifact provenance, the pinned EWD/CBD/RMD SHAs, the observed GitHub runner ext4 mount context, per-repository median control/S1/S2 costs and the S1 file/directory sync-call counts. The validator cross-checks the durability corpus against the existing retrieval-v1 pins and prevents the reviewed timing relationships from silently changing.
+
+The reviewed measurement result is descriptive:
+- S2 `syncfs()` was faster than S1 targeted `fsync()` for CBD, EWD and RMD on the measured runner;
+- S1 cost increased strongly with the number of synchronized files/directories;
+- S2's whole-filesystem scope remains a separate correctness/operational tradeoff;
+- the benchmark excludes promotion rename, destination-parent durability and Control DB activation;
+- the benchmark is not physical-power-loss proof.
+
+Therefore A1-F1 still enforces `production_barrier_selected=false`. The next durability gate is a Tier-2 replay experiment, with `dm-log-writes` as the preferred first prototype because it can record completed writes/flush ordering and replay to explicit marks for restart verification.
+
 ### Recovery fault qualification
 
 The OPT-A0 recovery harness is test-only. Native checkpoint calls compile to no-ops in the production application; only the dedicated recovery helper is built with `ATM_TEST_FAULT_INJECTION`.
