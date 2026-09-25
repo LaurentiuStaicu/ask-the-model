@@ -1791,6 +1791,28 @@ test(
   presentation_adversarial_test
 )
 
+
+presentation_stress_test = executable(
+  'presentation-stress-test',
+  [
+    'src/presentation_document.c',
+    'src/presentation_normalize.c',
+    'tests/presentation_stress_test.c'
+  ],
+  include_directories: include_directories('src'),
+  dependencies: [
+    glib_dep,
+    md4c_dep
+  ],
+  install: false
+)
+
+test(
+  'presentation-stress',
+  presentation_stress_test,
+  timeout: 15
+)
+
 subdir('data')
 
 icon_sizes = ['16', '24', '32', '48', '64', '128']
