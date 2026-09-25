@@ -31,7 +31,11 @@
         "index_cache_additional_peak_bytes": 1011712,
         "same_sha_repair_data_additional_peak_bytes": 966656,
         "same_device_operation_peak_bytes": 3178496,
-        "same_device_operation_peak_entries": 265
+        "same_device_operation_peak_entries": 265,
+        "snapshot_entries": 126,
+        "fresh_data_additional_peak_entries": 132,
+        "index_cache_additional_peak_entries": 4,
+        "same_sha_repair_data_additional_peak_entries": 127
       },
       {
         "repository_id": "ewd",
@@ -43,7 +47,11 @@
         "index_cache_additional_peak_bytes": 13336576,
         "same_sha_repair_data_additional_peak_bytes": 5124096,
         "same_device_operation_peak_bytes": 24858624,
-        "same_device_operation_peak_entries": 397
+        "same_device_operation_peak_entries": 397,
+        "snapshot_entries": 192,
+        "fresh_data_additional_peak_entries": 198,
+        "index_cache_additional_peak_entries": 4,
+        "same_sha_repair_data_additional_peak_entries": 193
       },
       {
         "repository_id": "rmd",
@@ -55,7 +63,11 @@
         "index_cache_additional_peak_bytes": 1323008,
         "same_sha_repair_data_additional_peak_bytes": 17354752,
         "same_device_operation_peak_bytes": 39813120,
-        "same_device_operation_peak_entries": 1859
+        "same_device_operation_peak_entries": 1859,
+        "snapshot_entries": 923,
+        "fresh_data_additional_peak_entries": 929,
+        "index_cache_additional_peak_entries": 4,
+        "same_sha_repair_data_additional_peak_entries": 924
       }
     ]
   },
@@ -101,7 +113,8 @@
     "No fixed percentage, reserve size, refusal threshold or production NO_SPACE behavior is selected by this evidence manifest.",
     "C0-M2 and C0-M3 state-root frontiers are environment-specific qualification observations; they strengthen reserve rationale but do not themselves select a reserve.",
     "State-root reserve policy must remain separate from total Control DB size because M2/M3 observed a stable transaction-headroom frontier while database allocation increased materially.",
-    "C0-M2 sidecar sensitivity shows that a pre-existing 32 KiB SQLite SHM sidecar can reduce additional transaction headroom; admission must use the cold-sidecar/worst-case baseline rather than assuming warm sidecars."
+    "C0-M2 sidecar sensitivity shows that a pre-existing 32 KiB SQLite SHM sidecar can reduce additional transaction headroom; admission must use the cold-sidecar/worst-case baseline rather than assuming warm sidecars.",
+    "C0-M1 phase inode observations show a fixed four-inode cache/index peak for CBD/EWD/RMD and a fresh-install data-root peak exactly five entries above same-SHA replacement, matching AtM storage-tree structure outside the archive materialization tree."
   ],
   "c0_m2": {
     "actions_run_id": 36029835402,
