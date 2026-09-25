@@ -51,6 +51,133 @@ sha40_lower_is_valid (
     return TRUE;
 }
 
+static gboolean
+decimal_component_is_canonical (
+    const char *value,
+    gsize length
+)
+{
+    if (value == NULL ||
+        length == 0) {
+        return FALSE;
+    }
+
+    if (length > 1 &&
+        value[0] == '0') {
+        return FALSE;
+    }
+
+    for (gsize i = 0; i < length; i++) {
+        if (value[i] < '0' ||
+            value[i] > '9') {
+            return FALSE;
+        }
+    }
+
+    return TRUE;
+}
+
+static gboolean
+quarantine_name_is_valid (
+    const char *name
+)
+{
+    static const char prefix[] = ".invalid-";
+    const gsize prefix_length =
+        sizeof (prefix) - 1;
+
+    if (name == NULL ||
+        !g_str_has_prefix (
+            name,
+            prefix
+        )) {
+        return FALSE;
+    }
+
+    const char *sha =
+        name + prefix_length;
+
+    if (strlen (sha) < 44) {
+        return FALSE;
+    }
+
+    char sha_copy[41];
+    memcpy (
+        sha_copy,
+        sha,
+        40
+    );
+    sha_copy[40] = '\0';
+
+    if (!sha40_lower_is_valid (
+            sha_copy
+        ) ||
+        sha[40] != '-') {
+        return FALSE;
+    }
+
+    const char *timestamp =
+        sha + 41;
+    const char *separator =
+        strchr (
+            timestamp,
+            '-'
+        );
+
+    if (separator == NULL ||
+        !decimal_component_is_canonical (
+            timestamp,
+            (gsize) (
+                separator - timestamp
+            )
+        )) {
+        return FALSE;
+    }
+
+    errno = 0;
+    char *timestamp_end = NULL;
+    guint64 timestamp_value =
+        g_ascii_strtoull (
+            timestamp,
+            &timestamp_end,
+            10
+        );
+
+    if (errno == ERANGE ||
+        timestamp_end != separator ||
+        timestamp_value >
+            G_MAXINT64) {
+        return FALSE;
+    }
+
+    const char *attempt =
+        separator + 1;
+    gsize attempt_length =
+        strlen (attempt);
+
+    if (!decimal_component_is_canonical (
+            attempt,
+            attempt_length
+        )) {
+        return FALSE;
+    }
+
+    errno = 0;
+    char *attempt_end = NULL;
+    guint64 attempt_value =
+        g_ascii_strtoull (
+            attempt,
+            &attempt_end,
+            10
+        );
+
+    return
+        errno != ERANGE &&
+        attempt_end != attempt &&
+        *attempt_end == '\0' &&
+        attempt_value <= 99;
+}
+
 static void
 diagnostic_free (
     gpointer data
@@ -395,13 +522,25 @@ scan_snapshot_directory (
         if (g_str_has_prefix (
                 item->d_name,
                 ".invalid-"
-            ) &&
-            real_directory) {
-            add_diagnostic (
-                scan,
-                item->d_name,
-                "quarantine-entry"
-            );
+            )) {
+            if (real_directory &&
+                quarantine_name_is_valid (
+                    item->d_name
+                )) {
+                add_diagnostic (
+                    scan,
+                    item->d_name,
+                    "quarantine-entry"
+                );
+            } else {
+                add_diagnostic (
+                    scan,
+                    item->d_name,
+                    real_directory
+                        ? "malformed-quarantine"
+                        : "not-real-directory"
+                );
+            }
             continue;
         }
 
