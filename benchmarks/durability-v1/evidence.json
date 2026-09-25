@@ -181,5 +181,75 @@
       "content_match": true
     },
     "reviewed_conclusion": "The qualified runner can replay dm-log-writes history from the beginning through an explicit fsync mark onto a blank device and recover the synchronized ext4 payload exactly after e2fsck; this validates the replay mechanism only and does not yet exercise AtM snapshot promotion, Control DB authority, or authorize a production durability barrier."
+  },
+  "tier2_atm_replay_baseline": {
+    "measurement_id": "atm-a1-m4-atm-replay-oracle-v1",
+    "status": "qualification-only",
+    "strategy": "S3_CURRENT_BASELINE",
+    "production_durability_authorized": false,
+    "source": {
+      "actions_run_id": 36121072400,
+      "artifact_name": "atm-a1-m4-atm-replay-36121072400-1",
+      "artifact_id": 10858715370,
+      "artifact_sha256": "7e8e1f16cd92d854be76a6848b0a44138d67d3255e9ca6328af841a3990a68e5",
+      "atm_source_commit": "4a926fcbccbf0c43a2ccd43817ceee70d788e6d5"
+    },
+    "kernel": {
+      "system": "Linux",
+      "release": "6.17.0-1022-azure",
+      "machine": "x86_64"
+    },
+    "upstream": {
+      "repository": "josefbacik/log-writes",
+      "commit": "7b70d8a6863c5de30933d42a7672d35d01d2dc6c"
+    },
+    "protocol": {
+      "old_authority_synced_before_baseline_mark": true,
+      "new_snapshot_uses_real_snapshot_seal": true,
+      "fresh_process_verifier_after_replay": true,
+      "candidate_durability_barrier_added": false,
+      "clean_unmount_not_used_as_target_mark": true
+    },
+    "scenarios": {
+      "pre_rename": {
+        "baseline_entry": 162,
+        "scenario_entry": 163,
+        "e2fsck_exit_code": 1,
+        "expected_classification": "OLD_AUTHORITY_VALID",
+        "observed_classification": "OLD_AUTHORITY_VALID",
+        "active_repository_sha": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+        "stored_seal": "39d5b5c5ff8fe2d5a0fbee8238abab546f39b07774ad29aeaeb06c4d25aac780",
+        "computed_seal": "39d5b5c5ff8fe2d5a0fbee8238abab546f39b07774ad29aeaeb06c4d25aac780",
+        "seal_match": true,
+        "strong_invariant_satisfied": true
+      },
+      "post_rename": {
+        "baseline_entry": 162,
+        "scenario_entry": 163,
+        "e2fsck_exit_code": 1,
+        "expected_classification": "OLD_AUTHORITY_VALID",
+        "observed_classification": "OLD_AUTHORITY_VALID",
+        "active_repository_sha": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+        "stored_seal": "39d5b5c5ff8fe2d5a0fbee8238abab546f39b07774ad29aeaeb06c4d25aac780",
+        "computed_seal": "39d5b5c5ff8fe2d5a0fbee8238abab546f39b07774ad29aeaeb06c4d25aac780",
+        "seal_match": true,
+        "strong_invariant_satisfied": true
+      },
+      "after_authority": {
+        "baseline_entry": 162,
+        "scenario_entry": 195,
+        "e2fsck_exit_code": 1,
+        "expected_classification": "NEW_AUTHORITY_VALID",
+        "observed_classification": "INVALID_AUTHORITY",
+        "active_generation_id": 2,
+        "active_repository_sha": "bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb",
+        "stored_seal": "acebf979895f9efd073014fa707038d47ec71b411f4e12a32aa619e9c63f3132",
+        "computed_seal": "7299f3e88c9a88995a62ef415e0da959ba4571df5f62976e9f9ac49d4660a3d8",
+        "seal_match": false,
+        "reason_code": "active_snapshot_seal_mismatch",
+        "strong_invariant_satisfied": false
+      }
+    },
+    "reviewed_conclusion": "The current S3 baseline preserves the old seal-valid authority at pre-rename and post-rename replay boundaries, but after current authority activation dm-log-writes replay recovers Control DB generation 2 pointing to the new SHA while the replayed snapshot seal differs from the stored seal. S3 is therefore falsified against the A1 old-valid/new-valid Tier-2 target in this deterministic fixture. This result selects neither S1 nor S2 and authorizes no production durability barrier."
   }
 }
