@@ -8,6 +8,15 @@ namespace AskTheModel.C1TestSupport {
     public static extern bool publish_empty_complete_generation (
         string control_path
     ) throws GLib.Error;
+
+    [CCode (
+        cname = "atm_c1_test_make_symlink",
+        cheader_filename = "repository_gc_durable_roots_test_support.h"
+    )]
+    public static extern bool make_symlink (
+        string target,
+        string link_path
+    ) throws GLib.Error;
 }
 
 private static string
@@ -480,6 +489,301 @@ test_live_generation_lease_protects_historical_root () {
 }
 
 
+private static bool
+candidate_set_contains (
+    AskTheModel.RepositoryGcCandidateSet candidates,
+    string repository_id,
+    string snapshot_sha
+) {
+    for (
+        uint i = 0;
+        i < candidates.candidate_count ();
+        i++
+    ) {
+        AskTheModel.RepositoryGcSnapshotCandidate? candidate =
+            candidates.candidate_at (i);
+
+        if (candidate != null &&
+            candidate.repository_id == repository_id &&
+            candidate.snapshot_sha == snapshot_sha) {
+            return true;
+        }
+    }
+
+    return false;
+}
+
+private static bool
+diagnostic_set_contains (
+    AskTheModel.RepositoryGcCandidateSet candidates,
+    string repository_id,
+    string entry_name,
+    string reason
+) {
+    for (
+        uint i = 0;
+        i < candidates.diagnostic_count ();
+        i++
+    ) {
+        AskTheModel.RepositoryGcCandidateDiagnostic? diagnostic =
+            candidates.diagnostic_at (i);
+
+        if (diagnostic != null &&
+            diagnostic.repository_id == repository_id &&
+            diagnostic.entry_name == entry_name &&
+            diagnostic.reason == reason) {
+            return true;
+        }
+    }
+
+    return false;
+}
+
+private static void
+test_candidate_discovery_filters_roots_and_reports_unexpected_entries () {
+    const string CANDIDATE_SHA =
+        "1111111111111111111111111111111111111111";
+    const string PROTECTED_SHA =
+        "2222222222222222222222222222222222222222";
+    const string SYMLINK_SHA =
+        "3333333333333333333333333333333333333333";
+    const string UNKNOWN_REPOSITORY_SHA =
+        "4444444444444444444444444444444444444444";
+
+    string root = new_temp_root ();
+    string data_root = Path.build_filename (
+        root,
+        "data"
+    );
+
+    try {
+        string ewd_snapshots = Path.build_filename (
+            data_root,
+            "Repositories",
+            "ewd",
+            "snapshots"
+        );
+        assert (
+            DirUtils.create_with_parents (
+                Path.build_filename (
+                    ewd_snapshots,
+                    CANDIDATE_SHA
+                ),
+                0700
+            ) == 0
+        );
+        assert (
+            DirUtils.create_with_parents (
+                Path.build_filename (
+                    ewd_snapshots,
+                    PROTECTED_SHA
+                ),
+                0700
+            ) == 0
+        );
+
+        FileUtils.set_contents (
+            Path.build_filename (
+                ewd_snapshots,
+                "unexpected.txt"
+            ),
+            "not a snapshot\n"
+        );
+
+        AskTheModel.C1TestSupport.make_symlink (
+            CANDIDATE_SHA,
+            Path.build_filename (
+                ewd_snapshots,
+                SYMLINK_SHA
+            )
+        );
+
+        string unknown_snapshots =
+            Path.build_filename (
+                data_root,
+                "Repositories",
+                "unknown-repository",
+                "snapshots",
+                UNKNOWN_REPOSITORY_SHA
+            );
+        assert (
+            DirUtils.create_with_parents (
+                unknown_snapshots,
+                0700
+            ) == 0
+        );
+
+        var protected_roots =
+            new AskTheModel.RepositoryGcDurableRoots ();
+        protected_roots.add_snapshot (
+            "ewd",
+            PROTECTED_SHA
+        );
+
+        AskTheModel.RepositoryGcCandidateSet candidates =
+            AskTheModel.RepositoryGcCandidateDiscovery.
+                discover (
+                    data_root,
+                    protected_roots
+                );
+
+        assert (candidates.candidate_count () == 1);
+        assert (
+            candidate_set_contains (
+                candidates,
+                "ewd",
+                CANDIDATE_SHA
+            )
+        );
+        assert (
+            !candidate_set_contains (
+                candidates,
+                "ewd",
+                PROTECTED_SHA
+            )
+        );
+        assert (
+            !candidate_set_contains (
+                candidates,
+                "unknown-repository",
+                UNKNOWN_REPOSITORY_SHA
+            )
+        );
+
+        assert (candidates.diagnostic_count () == 2);
+        assert (
+            diagnostic_set_contains (
+                candidates,
+                "ewd",
+                "unexpected.txt",
+                "unexpected-basename"
+            )
+        );
+        assert (
+            diagnostic_set_contains (
+                candidates,
+                "ewd",
+                SYMLINK_SHA,
+                "not-real-directory"
+            )
+        );
+    } catch (Error error) {
+        critical ("%s", error.message);
+        assert_not_reached ();
+    } finally {
+        remove_tree_best_effort (root);
+    }
+}
+
+private static void
+test_candidate_discovery_rejects_symlinked_snapshots_namespace () {
+    const string TARGET_SHA =
+        "5555555555555555555555555555555555555555";
+
+    string root = new_temp_root ();
+    string data_root = Path.build_filename (
+        root,
+        "data"
+    );
+
+    try {
+        string repository_root =
+            Path.build_filename (
+                data_root,
+                "Repositories",
+                "ewd"
+            );
+        string real_snapshots =
+            Path.build_filename (
+                data_root,
+                "real-snapshots"
+            );
+
+        assert (
+            DirUtils.create_with_parents (
+                Path.build_filename (
+                    real_snapshots,
+                    TARGET_SHA
+                ),
+                0700
+            ) == 0
+        );
+        assert (
+            DirUtils.create_with_parents (
+                repository_root,
+                0700
+            ) == 0
+        );
+
+        AskTheModel.C1TestSupport.make_symlink (
+            real_snapshots,
+            Path.build_filename (
+                repository_root,
+                "snapshots"
+            )
+        );
+
+        bool rejected = false;
+
+        try {
+            var protected_roots =
+                new AskTheModel.RepositoryGcDurableRoots ();
+
+            AskTheModel.RepositoryGcCandidateDiscovery.
+                discover (
+                    data_root,
+                    protected_roots
+                );
+        } catch (Error error) {
+            rejected = true;
+        }
+
+        assert (rejected);
+    } catch (Error error) {
+        critical ("%s", error.message);
+        assert_not_reached ();
+    } finally {
+        remove_tree_best_effort (root);
+    }
+}
+
+private static void
+test_candidate_discovery_allows_absent_repository_namespace () {
+    string root = new_temp_root ();
+    string data_root = Path.build_filename (
+        root,
+        "data"
+    );
+
+    try {
+        assert (
+            DirUtils.create_with_parents (
+                data_root,
+                0700
+            ) == 0
+        );
+
+        var protected_roots =
+            new AskTheModel.RepositoryGcDurableRoots ();
+
+        AskTheModel.RepositoryGcCandidateSet candidates =
+            AskTheModel.RepositoryGcCandidateDiscovery.
+                discover (
+                    data_root,
+                    protected_roots
+                );
+
+        assert (candidates.candidate_count () == 0);
+        assert (candidates.diagnostic_count () == 0);
+    } catch (Error error) {
+        critical ("%s", error.message);
+        assert_not_reached ();
+    } finally {
+        remove_tree_best_effort (root);
+    }
+}
+
+
 public static int
 main (string[] args) {
     Test.init (ref args);
@@ -499,6 +803,18 @@ main (string[] args) {
     Test.add_func (
         "/repository-gc-roots/live-generation-lease-protected",
         test_live_generation_lease_protects_historical_root
+    );
+    Test.add_func (
+        "/repository-gc-candidates/filter-and-diagnostics",
+        test_candidate_discovery_filters_roots_and_reports_unexpected_entries
+    );
+    Test.add_func (
+        "/repository-gc-candidates/reject-symlinked-snapshots-root",
+        test_candidate_discovery_rejects_symlinked_snapshots_namespace
+    );
+    Test.add_func (
+        "/repository-gc-candidates/absent-namespace-empty",
+        test_candidate_discovery_allows_absent_repository_namespace
     );
     return Test.run ();
 }
