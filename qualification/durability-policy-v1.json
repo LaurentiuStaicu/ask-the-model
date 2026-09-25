@@ -9,7 +9,7 @@
   },
   "selected_strategy": "S1_TARGETED_FSYNC",
   "production_barrier_selected": true,
-  "runtime_integration_selected": false,
+  "runtime_integration_selected": true,
   "selection_basis": {
     "s3_baseline": {
       "selected": false,
@@ -124,7 +124,8 @@
     "automatic_syncfs_fallback": false,
     "destination_hierarchy_durability_failure": "ABORT_WITHOUT_PROMOTION_OR_AUTHORITY_ADVANCE",
     "source_parent_fsync_failure": "ABORT_WITHOUT_AUTHORITY_ADVANCE_AND_TREAT_FINAL_AS_UNREFERENCED_RECOVERY_ARTIFACT",
-    "durable_data_root_invalid": "ABORT_BEFORE_STAGING_OR_NAMESPACE_MUTATION"
+    "durable_data_root_invalid": "ABORT_BEFORE_STAGING_OR_NAMESPACE_MUTATION",
+    "durable_pre_barrier_seal_mismatch": "ABORT_WITHOUT_AUTHORITY_ADVANCE"
   },
   "retrieval_index": {
     "authority_role": "DERIVED_CACHE",
@@ -139,7 +140,18 @@
     "namespace_policy_selected": true,
     "durable_ingest_namespace_complete": true,
     "runtime_wiring_authorized": false,
-    "next_required_slice": "LIFECYCLE_ON_ONLY_DURABLE_INGEST_ACTIVATION_REVIEW",
+    "next_required_slice": "IMPLEMENT_ON_ONLY_DURABLE_INGEST_RUNTIME_WIRING",
     "vala_durable_ingest_bridge_available": true
+  },
+  "runtime_integration": {
+    "selected": true,
+    "optimized_on_ingest": "DURABLE_S1_DEST_SOURCE",
+    "optimized_off_ingest": "BASELINE_NON_DURABLE",
+    "operation_snapshot_required": true,
+    "pre_barrier_seal_chain_required": true,
+    "preexisting_final_target_action": "FAIL_CLOSED_NO_REUSE_NO_REMOVAL",
+    "same_sha_repair_uses_durable_ingest": true,
+    "automatic_orphan_recovery_selected": false,
+    "reason": "The native durable ingest sequence and Vala ABI are qualified separately. Runtime selection is limited to the operation-level Optimizations ON snapshot; OFF preserves the baseline ingest path. The returned pre-barrier seal must be chained through post-promotion and post-index verification before guarded authority publication, and unqualified preexisting final targets remain untouched and fail closed."
   }
 }
