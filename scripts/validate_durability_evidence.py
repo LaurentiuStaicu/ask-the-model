@@ -1208,10 +1208,76 @@ def main() -> int:
         if phrase not in repair_conclusion:
             fail(f"Tier-2 same-SHA repair conclusion lost: {phrase}")
 
+    policy = evidence.get("production_policy_selection")
+    if not isinstance(policy, dict):
+        fail("A1 production policy selection is missing")
+    if policy.get("selection_id") != "atm-a1-production-policy-v1":
+        fail("A1 production policy identity drifted")
+    if policy.get("status") != "selected-not-wired":
+        fail("A1 production policy status drifted")
+    if policy.get("selected_strategy") != "S1_TARGETED_FSYNC":
+        fail("A1 selected production strategy drifted")
+    if policy.get("reference_strategy") != "S2_SYNCFS":
+        fail("A1 reference strategy drifted")
+    if policy.get("rejected_baseline") != "S3_CURRENT_BASELINE":
+        fail("A1 rejected baseline drifted")
+    if policy.get("runtime_behavior_changed") is not False:
+        fail("A1 policy-selection evidence must not change runtime behavior")
+    if policy.get("implementation_status") != "ready-for-separate-runtime-pr":
+        fail("A1 implementation status drifted")
+    if policy.get("requires_optimizations_gate") is not True:
+        fail("A1 runtime implementation must remain behind Optimizations")
+    expected_selected_protocol = [
+        "fsync every validated snapshot regular file",
+        "fsync snapshot directories bottom-up including the staging root",
+        "atomic rename staging snapshot to final snapshot path",
+        "fsync the promoted snapshot parent directory",
+        "advance guarded Control DB authority only after all durability steps succeed",
+    ]
+    if policy.get("selected_protocol") != expected_selected_protocol:
+        fail("A1 selected S1 protocol drifted")
+
+    retry_rule = str(policy.get("retry_rule", "")).lower()
+    for phrase in (
+        "unreferenced final snapshot",
+        "must not bypass",
+        "requalify durability or rebuild deterministically",
+        "before control db authority advances",
+    ):
+        if phrase not in retry_rule:
+            fail(f"A1 retry safety rule lost: {phrase}")
+
+    quarantine_policy = str(policy.get("quarantine_policy", "")).lower()
+    for phrase in (
+        "no additional quarantine parent-directory fsync",
+        "same-sha replay evidence remains fail-closed",
+    ):
+        if phrase not in quarantine_policy:
+            fail(f"A1 quarantine policy drifted: {phrase}")
+
+    retrieval_scope = str(policy.get("retrieval_index_scope", "")).lower()
+    if "does not automatically apply" not in retrieval_scope:
+        fail("A1 retrieval-index scope distinction was lost")
+
+    basis = policy.get("basis")
+    if not isinstance(basis, list) or len(basis) != 6:
+        fail("A1 production policy basis is incomplete")
+    joined_basis = "\n".join(str(item) for item in basis).lower()
+    for phrase in (
+        "m4 falsified",
+        "m5 and m6 qualified both s1 and s2",
+        "m8 qualified both s1 and s2",
+        "m9 qualified both s1 and s2",
+        "s2 faster than s1",
+        "narrower atm-owned synchronization scope",
+    ):
+        if phrase not in joined_basis:
+            fail(f"A1 production policy basis lost: {phrase}")
+
     print(
         "durability evidence validation passed: "
-        "A1-M1 CBD/EWD/RMD medians frozen, "
-        "S2 faster on reviewed runner, no production barrier selected"
+        "A1-M1 through A1-M9 evidence frozen; "
+        "S1 targeted fsync selected as policy, runtime not yet wired"
     )
     return 0
 

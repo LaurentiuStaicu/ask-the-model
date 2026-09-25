@@ -731,5 +731,33 @@
     "all_pre_authority_fail_closed": true,
     "all_after_authority_repaired_valid": true,
     "reviewed_conclusion": "S1 targeted fsync and S2 syncfs both keep all four pre-authority same-SHA repair boundaries explicitly REPAIR_REQUIRED and unqualified, then recover generation 2 as REPAIRED_AUTHORITY_VALID with the same SHA and matching replacement seal. The post-quarantine replay remains fail-closed without adding a quarantine parent fsync, so no extra quarantine durability cost is required for repository-authority correctness in this qualified fixture."
+  },
+  "production_policy_selection": {
+    "selection_id": "atm-a1-production-policy-v1",
+    "status": "selected-not-wired",
+    "selected_strategy": "S1_TARGETED_FSYNC",
+    "reference_strategy": "S2_SYNCFS",
+    "rejected_baseline": "S3_CURRENT_BASELINE",
+    "runtime_behavior_changed": false,
+    "implementation_status": "ready-for-separate-runtime-pr",
+    "requires_optimizations_gate": true,
+    "selected_protocol": [
+      "fsync every validated snapshot regular file",
+      "fsync snapshot directories bottom-up including the staging root",
+      "atomic rename staging snapshot to final snapshot path",
+      "fsync the promoted snapshot parent directory",
+      "advance guarded Control DB authority only after all durability steps succeed"
+    ],
+    "retry_rule": "An unreferenced final snapshot left by a pre-authority failure or crash must not bypass the selected S1 durability barrier on retry; runtime integration must requalify durability or rebuild deterministically before Control DB authority advances.",
+    "quarantine_policy": "No additional quarantine parent-directory fsync is selected for repository-authority correctness; same-SHA replay evidence remains fail-closed without that extra cost.",
+    "retrieval_index_scope": "The selected snapshot-authority durability policy does not automatically apply to the deterministic retrieval-index cache.",
+    "basis": [
+      "M4 falsified the S3 current baseline against the old-valid/new-valid Tier-2 authority target.",
+      "M5 and M6 qualified both S1 and S2 for after-authority replay and the full candidate interruption matrix.",
+      "M8 qualified both S1 and S2 to fail closed under explicit EIO at the barrier, promoted-parent fsync and Control DB activation boundaries.",
+      "M9 qualified both S1 and S2 for same-SHA repair and quarantine replay without requiring an extra quarantine fsync.",
+      "M1 measured S2 faster than S1 on CBD, EWD and RMD, but S2 has filesystem-wide synchronization and error scope while S1 confines the durability barrier to the AtM snapshot tree.",
+      "With safety evidence equivalent across the qualified matrices, the narrower AtM-owned synchronization scope is selected over the broader filesystem-wide comparator."
+    ]
   }
 }
