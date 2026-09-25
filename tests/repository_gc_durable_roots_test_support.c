@@ -1,4 +1,5 @@
 #include "repository_gc_durable_roots_test_support.h"
+#include "repository_generation_lease.h"
 
 #include <sqlite3.h>
 
@@ -96,4 +97,56 @@ atm_c1_test_publish_empty_complete_generation (
 
     sqlite3_close (db);
     return ok;
+}
+
+
+gint
+atm_c1_test_acquire_shared_generation_lease (
+    const char *state_root,
+    gint64 generation_id,
+    GError **error
+)
+{
+    gint lease_fd = -1;
+    gboolean contended = FALSE;
+
+    if (!atm_repository_generation_lease_try_acquire_shared (
+            state_root,
+            generation_id,
+            &lease_fd,
+            &contended,
+            error
+        )) {
+        return -1;
+    }
+
+    if (contended || lease_fd < 0) {
+        if (lease_fd >= 0) {
+            atm_repository_generation_lease_release (
+                lease_fd
+            );
+        }
+
+        g_set_error_literal (
+            error,
+            G_FILE_ERROR,
+            G_FILE_ERROR_FAILED,
+            "Could not acquire C1-I2 shared generation lease fixture."
+        );
+        return -1;
+    }
+
+    return lease_fd;
+}
+
+void
+atm_c1_test_release_generation_lease (
+    gint lease_fd
+)
+{
+    if (lease_fd >= 0) {
+        atm_repository_generation_lease_release (
+            lease_fd
+        );
+    }
 }

@@ -1451,6 +1451,24 @@ The I0 path-based conversation generation query remains available for that later
 
 Structural CI requires the strict read-only bindings, forbids the legacy writable Control DB reads inside the collector, forbids destructive filesystem primitives, and keeps `RepositoryLifecycleService` unwired.
 
+### OPT-C1-I2 live-generation protected-root union
+
+I2 extends the proof-only C1 root collector with B2 live-reader protection while remaining non-destructive and lifecycle-unwired.
+
+A strict Control DB query, `atm_control_state_list_complete_generation_ids_readonly()`, enumerates the positive immutable `COMPLETE` generation IDs through the same `READONLY | NOFOLLOW | query_only` boundary used by I0. It does not bootstrap, migrate or infer generations from lock filenames.
+
+`RepositoryGcDurableRootCollector.collect_with_live_roots()` first builds the I1 durable roots. Only COMPLETE generations that are not already durable roots are then tested for current cooperative use. For each such generation, `RepositoryGcLiveRootProbe` attempts the existing B2 exclusive nonblocking generation lease:
+
+- contention means a shared/live holder exists, so the generation is added as a live root for this pass and mapped through immutable Control DB state to its exact repository/SHA snapshot roots;
+- successful exclusive acquisition means no cooperative B2 holder is observed at that instant; the exclusive lease is released immediately and the generation is not added as a live root solely on that observation;
+- an inconsistent or failed lease result fails closed.
+
+The probe does not enumerate or parse `.lock` names and does not inspect lock-file contents. This follows the B2 coordination contract: kernel `flock()` ownership is the liveness signal, while the lock path is only coordination metadata. The existing lease helper may create its qualified state-root coordination directory/file as part of probing; I2 still performs no repository snapshot candidate discovery or destructive storage operation.
+
+The dedicated test keeps a shared lease on an inactive historical generation that has no durable conversation root. I2 protects that generation and its exact snapshot while the lease is held. After the lease is released, the lock file remains available as coordination metadata but the same generation is no longer added as a live root, proving that file existence is not treated as liveness.
+
+A negative live probe is not deletion authority. Future destructive isolation must still run under the global repository mutation lease, re-read durable roots after coordination is established, obtain/hold the relevant exclusive generation exclusion, and revalidate exact candidate unreachability immediately before same-filesystem isolation. Candidate directory enumeration, `.trash` creation, rename, purge/unlink and `RepositoryLifecycleService` wiring remain later C1 slices.
+
 ### Recovery fault qualification
 
 The OPT-A0 recovery harness is test-only. Native checkpoint calls compile to no-ops in the production application; only the dedicated recovery helper is built with `ATM_TEST_FAULT_INJECTION`.

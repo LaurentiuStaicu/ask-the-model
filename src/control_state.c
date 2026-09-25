@@ -3719,6 +3719,144 @@ atm_control_state_snapshot_references_free (
 
 
 gboolean
+atm_control_state_list_complete_generation_ids_readonly (
+    const char *path,
+    gint64 **out_generation_ids,
+    gsize *out_count,
+    GError **error
+)
+{
+    if (!nonempty (path) ||
+        out_generation_ids == NULL ||
+        out_count == NULL) {
+        g_set_error_literal (
+            error,
+            ATM_CONTROL_STATE_ERROR,
+            ATM_CONTROL_STATE_ERROR_ARGUMENT,
+            "Control-state COMPLETE-generation list received invalid arguments."
+        );
+        return FALSE;
+    }
+
+    *out_generation_ids = NULL;
+    *out_count = 0;
+
+    AtmControlStateStore *store = NULL;
+
+    if (!open_existing_control_state_readonly (
+            path,
+            &store,
+            error
+        )) {
+        return FALSE;
+    }
+
+    sqlite3_stmt *statement = NULL;
+    GArray *generation_ids = g_array_new (
+        FALSE,
+        FALSE,
+        sizeof (gint64)
+    );
+    gboolean ok = FALSE;
+
+    if (!prepare_statement (
+            store->db,
+            "SELECT generation_id "
+            "FROM repository_generations "
+            "WHERE lifecycle='COMPLETE' "
+            "ORDER BY generation_id;",
+            &statement,
+            error
+        )) {
+        goto done;
+    }
+
+    int rc;
+
+    while ((rc = sqlite3_step (
+                statement
+            )) == SQLITE_ROW) {
+        if (sqlite3_column_type (
+                statement,
+                0
+            ) != SQLITE_INTEGER) {
+            g_set_error_literal (
+                error,
+                ATM_CONTROL_STATE_ERROR,
+                ATM_CONTROL_STATE_ERROR_INTEGRITY,
+                "COMPLETE repository generation identifier is not an integer."
+            );
+            goto done;
+        }
+
+        gint64 generation_id =
+            sqlite3_column_int64 (
+                statement,
+                0
+            );
+
+        if (generation_id <= 0) {
+            g_set_error_literal (
+                error,
+                ATM_CONTROL_STATE_ERROR,
+                ATM_CONTROL_STATE_ERROR_INTEGRITY,
+                "COMPLETE repository generation identifier is not positive."
+            );
+            goto done;
+        }
+
+        g_array_append_val (
+            generation_ids,
+            generation_id
+        );
+    }
+
+    if (rc != SQLITE_DONE) {
+        set_sqlite_error (
+            store->db,
+            error,
+            ATM_CONTROL_STATE_ERROR_SQLITE,
+            "Could not list COMPLETE repository generations"
+        );
+        goto done;
+    }
+
+    *out_count = generation_ids->len;
+
+    if (generation_ids->len > 0) {
+        *out_generation_ids =
+            (gint64 *) g_array_free (
+                generation_ids,
+                FALSE
+            );
+    } else {
+        g_array_free (
+            generation_ids,
+            TRUE
+        );
+    }
+
+    generation_ids = NULL;
+    ok = TRUE;
+
+done:
+    if (statement != NULL) {
+        sqlite3_finalize (statement);
+    }
+
+    if (generation_ids != NULL) {
+        g_array_free (
+            generation_ids,
+            TRUE
+        );
+    }
+
+    atm_control_state_close (store);
+    return ok;
+}
+
+
+gboolean
 atm_control_state_list_generation_snapshot_references_readonly (
     const char *path,
     gint64 generation_id,

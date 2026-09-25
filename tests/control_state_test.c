@@ -2447,6 +2447,29 @@ test_readonly_generation_snapshot_roots (void)
         3
     );
 
+    gint64 *complete_generation_ids = NULL;
+    gsize complete_generation_count = 0;
+
+    g_assert_true (
+        atm_control_state_list_complete_generation_ids_readonly (
+            control,
+            &complete_generation_ids,
+            &complete_generation_count,
+            &error
+        )
+    );
+    g_assert_no_error (error);
+    g_assert_cmpuint (
+        complete_generation_count,
+        ==,
+        3
+    );
+    g_assert_nonnull (complete_generation_ids);
+    g_assert_cmpint (complete_generation_ids[0], ==, 1);
+    g_assert_cmpint (complete_generation_ids[1], ==, 2);
+    g_assert_cmpint (complete_generation_ids[2], ==, 3);
+    g_free (complete_generation_ids);
+
     gboolean present = FALSE;
     char *snapshot_sha = NULL;
     char *repository_version = NULL;
@@ -2638,6 +2661,31 @@ test_readonly_generation_snapshot_roots (void)
     );
     g_clear_error (&error);
 
+    complete_generation_ids = NULL;
+    complete_generation_count = 0;
+    g_assert_false (
+        atm_control_state_list_complete_generation_ids_readonly (
+            missing,
+            &complete_generation_ids,
+            &complete_generation_count,
+            &error
+        )
+    );
+    g_assert_error (
+        error,
+        ATM_CONTROL_STATE_ERROR,
+        ATM_CONTROL_STATE_ERROR_IO
+    );
+    g_assert_null (complete_generation_ids);
+    g_assert_cmpuint (complete_generation_count, ==, 0);
+    g_assert_false (
+        g_file_test (
+            missing,
+            G_FILE_TEST_EXISTS
+        )
+    );
+    g_clear_error (&error);
+
     g_free (missing);
     g_free (control);
     remove_tree_best_effort (root);
@@ -2753,6 +2801,26 @@ test_complete_snapshot_reference_read_does_not_migrate_v1 (void)
         ==,
         G_MAXUINT64
     );
+    g_clear_error (&error);
+
+    gint64 *complete_generation_ids = NULL;
+    gsize complete_generation_count = 0;
+
+    g_assert_false (
+        atm_control_state_list_complete_generation_ids_readonly (
+            path,
+            &complete_generation_ids,
+            &complete_generation_count,
+            &error
+        )
+    );
+    g_assert_error (
+        error,
+        ATM_CONTROL_STATE_ERROR,
+        ATM_CONTROL_STATE_ERROR_SCHEMA
+    );
+    g_assert_null (complete_generation_ids);
+    g_assert_cmpuint (complete_generation_count, ==, 0);
     g_clear_error (&error);
 
     AtmControlStateSnapshotReference *root_references = NULL;

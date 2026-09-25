@@ -8,6 +8,23 @@ namespace AskTheModel.C1TestSupport {
     public static extern bool publish_empty_complete_generation (
         string control_path
     ) throws GLib.Error;
+
+    [CCode (
+        cname = "atm_c1_test_acquire_shared_generation_lease",
+        cheader_filename = "repository_gc_durable_roots_test_support.h"
+    )]
+    public static extern int acquire_shared_generation_lease (
+        string state_root,
+        int64 generation_id
+    ) throws GLib.Error;
+
+    [CCode (
+        cname = "atm_c1_test_release_generation_lease",
+        cheader_filename = "repository_gc_durable_roots_test_support.h"
+    )]
+    public static extern void release_generation_lease (
+        int lease_fd
+    );
 }
 
 private static string
@@ -361,6 +378,125 @@ test_empty_complete_generation_fails_closed () {
 }
 
 
+private static void
+test_live_historical_generation_is_protected_only_while_contended () {
+    const string OLD_SHA =
+        "dddddddddddddddddddddddddddddddddddddddd";
+    const string NEW_SHA =
+        "eeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeee";
+
+    string root = new_temp_root ();
+    int lease_fd = -1;
+
+    try {
+        publish_generation_one (
+            root,
+            OLD_SHA
+        );
+
+        var conversations =
+            new AskTheModel.ConversationPersistenceStore (
+                root,
+                Path.build_filename (
+                    root,
+                    "exports"
+                )
+            );
+
+        var control =
+            new AskTheModel.ControlRepositoryStateStore (
+                root
+            );
+        assert (
+            control.load_status ==
+            AskTheModel.RepositoryStateLoadStatus.VALID
+        );
+        assert (control.repository_generation_id == 1);
+
+        control.set_current (
+            "ewd",
+            NEW_SHA,
+            "0.2.0"
+        );
+        assert (control.repository_generation_id == 2);
+
+        lease_fd =
+            AskTheModel.C1TestSupport.
+                acquire_shared_generation_lease (
+                    root,
+                    1
+                );
+        assert (lease_fd >= 0);
+
+        AskTheModel.RepositoryGcDurableRoots roots =
+            AskTheModel.RepositoryGcDurableRootCollector.
+                collect_with_live_roots (
+                    control_path_for (root),
+                    root,
+                    conversations
+                );
+
+        assert (roots.generation_count () == 2);
+        assert (roots.protects_generation (2));
+        assert (roots.protects_generation (1));
+        assert (
+            roots.protects_snapshot (
+                "ewd",
+                OLD_SHA
+            )
+        );
+        assert (
+            roots.protects_snapshot (
+                "ewd",
+                NEW_SHA
+            )
+        );
+
+        AskTheModel.C1TestSupport.
+            release_generation_lease (
+                lease_fd
+            );
+        lease_fd = -1;
+
+        AskTheModel.RepositoryGcDurableRoots after_release =
+            AskTheModel.RepositoryGcDurableRootCollector.
+                collect_with_live_roots (
+                    control_path_for (root),
+                    root,
+                    conversations
+                );
+
+        assert (after_release.generation_count () == 1);
+        assert (after_release.protects_generation (2));
+        assert (!after_release.protects_generation (1));
+        assert (
+            !after_release.protects_snapshot (
+                "ewd",
+                OLD_SHA
+            )
+        );
+        assert (
+            after_release.protects_snapshot (
+                "ewd",
+                NEW_SHA
+            )
+        );
+    } catch (Error error) {
+        critical ("%s", error.message);
+        assert_not_reached ();
+    } finally {
+        if (lease_fd >= 0) {
+            AskTheModel.C1TestSupport.
+                release_generation_lease (
+                    lease_fd
+                );
+        }
+
+        remove_tree_best_effort (root);
+    }
+}
+
+
 public static int
 main (string[] args) {
     Test.init (ref args);
@@ -376,6 +512,10 @@ main (string[] args) {
     Test.add_func (
         "/repository-gc-roots/empty-complete-generation-fail-closed",
         test_empty_complete_generation_fails_closed
+    );
+    Test.add_func (
+        "/repository-gc-roots/live-historical-generation",
+        test_live_historical_generation_is_protected_only_while_contended
     );
     return Test.run ();
 }

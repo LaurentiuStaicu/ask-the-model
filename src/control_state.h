@@ -118,6 +118,22 @@ gboolean atm_control_state_count_complete_snapshot_references (
  * The returned array is owned by the caller and must be released with
  * atm_control_state_snapshot_references_free().
  */
+/*
+ * Lists every positive immutable COMPLETE repository generation through the
+ * strict read-only/no-follow Control DB path, ordered by generation_id.
+ * The database must already exist at the current schema; this function never
+ * bootstraps or migrates authority.
+ *
+ * The returned array is owned by the caller and must be released with
+ * g_free(). An empty result returns count 0 and a NULL array.
+ */
+gboolean atm_control_state_list_complete_generation_ids_readonly (
+    const char *path,
+    gint64 **out_generation_ids,
+    gsize *out_count,
+    GError **error
+);
+
 gboolean atm_control_state_list_generation_snapshot_references_readonly (
     const char *path,
     gint64 generation_id,

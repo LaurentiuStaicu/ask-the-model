@@ -343,5 +343,70 @@ namespace AskTheModel {
 
             return roots;
         }
+
+        public static RepositoryGcDurableRoots
+        collect_with_live_roots (
+            string control_state_path,
+            string state_root,
+            ConversationPersistenceStore conversation_store
+        ) throws GLib.Error {
+            if (state_root.length == 0) {
+                throw new GLib.IOError.INVALID_ARGUMENT (
+                    "GC live-root collection requires a state root."
+                );
+            }
+
+            RepositoryGcDurableRoots roots = collect (
+                control_state_path,
+                conversation_store
+            );
+
+            int64[] complete_generation_ids;
+            if (!ControlStateNative.
+                    list_complete_generation_ids_readonly (
+                        control_state_path,
+                        out complete_generation_ids
+                    )) {
+                throw new GLib.IOError.FAILED (
+                    "GC live-root collection could not enumerate COMPLETE repository generations."
+                );
+            }
+
+            foreach (
+                int64 generation_id
+                in complete_generation_ids
+            ) {
+                if (generation_id <= 0) {
+                    throw new GLib.IOError.INVALID_DATA (
+                        "GC live-root collection observed a non-positive COMPLETE generation."
+                    );
+                }
+
+                if (roots.protects_generation (
+                        generation_id
+                    )) {
+                    continue;
+                }
+
+                if (!RepositoryGcLiveRootProbe.
+                        generation_is_live (
+                            state_root,
+                            generation_id
+                        )) {
+                    continue;
+                }
+
+                roots.add_generation (
+                    generation_id
+                );
+                add_generation_snapshots (
+                    roots,
+                    control_state_path,
+                    generation_id
+                );
+            }
+
+            return roots;
+        }
     }
 }
