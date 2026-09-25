@@ -925,6 +925,22 @@ The aggregate artifact retains invariant failures as measurement results rather 
 
 M6 remains qualification-only. It does not test explicit EIO/writeback-error propagation and does not choose S1 or S2 for production. A separate error-injection/review gate remains necessary before policy selection.
 
+### OPT-A1-F6 frozen candidate-boundary evidence
+
+A1-F6 freezes the reviewed M6 matrix from run `36127799616` / artifact `10860237993` / digest `1ce58499533b1a3f8c65cbe3c3a212f808008b415d5d92623bbb3e4bbbdf76e1`, measured at head `549ad076111bf2cdb5ae44e3cda68ca6b84c2fb2`.
+
+All eight candidate/boundary combinations satisfy the strong replay invariant:
+- S1 and S2 after pre-rename barrier: old authority seal-valid;
+- S1 and S2 after rename but before parent fsync: old authority seal-valid;
+- S1 and S2 after parent fsync but before Control DB activation: old authority seal-valid;
+- S1 and S2 immediately after Control DB activation: new authority seal-valid.
+
+Every replayed filesystem returned e2fsck exit code 1 (corrected), and every active snapshot recomputed to the exact seal stored in Control DB.
+
+The log-entry counts are frozen as provenance of this exact run rather than treated as portable thresholds. Their useful ordering property is that each scenario mark follows its own synchronized baseline.
+
+M6 therefore closes the candidate power-loss ordering matrix for the deterministic fixture, but it still does not justify production selection. The remaining safety question is explicit writeback-error propagation: a candidate barrier must fail closed when storage reports an error and must not allow Control DB authority to advance. Scope and M1 performance remain part of the final policy review after that gate.
+
 ### Recovery fault qualification
 
 The OPT-A0 recovery harness is test-only. Native checkpoint calls compile to no-ops in the production application; only the dedicated recovery helper is built with `ATM_TEST_FAULT_INJECTION`.
