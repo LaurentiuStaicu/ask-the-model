@@ -384,6 +384,141 @@ def main() -> int:
         if phrase not in replay_conclusion:
             fail(f"Tier-2 replay limitation lost: {phrase}")
 
+    atm_replay = evidence.get("tier2_atm_replay_baseline")
+    if not isinstance(atm_replay, dict):
+        fail("Tier-2 AtM replay baseline evidence is missing")
+    if atm_replay.get("measurement_id") != (
+        "atm-a1-m4-atm-replay-oracle-v1"
+    ):
+        fail("Tier-2 AtM replay measurement identity drifted")
+    if atm_replay.get("status") != "qualification-only":
+        fail("Tier-2 AtM replay status drifted")
+    if atm_replay.get("strategy") != "S3_CURRENT_BASELINE":
+        fail("Tier-2 AtM replay strategy drifted")
+    if atm_replay.get("production_durability_authorized") is not False:
+        fail("Tier-2 AtM replay must not authorize production durability")
+
+    atm_source = atm_replay.get("source")
+    if not isinstance(atm_source, dict):
+        fail("Tier-2 AtM replay source is missing")
+    if atm_source.get("actions_run_id") != 36121072400:
+        fail("Tier-2 AtM replay Actions run drifted")
+    if atm_source.get("artifact_name") != (
+        "atm-a1-m4-atm-replay-36121072400-1"
+    ):
+        fail("Tier-2 AtM replay artifact name drifted")
+    if atm_source.get("artifact_id") != 10858715370:
+        fail("Tier-2 AtM replay artifact ID drifted")
+    if atm_source.get("artifact_sha256") != (
+        "7e8e1f16cd92d854be76a6848b0a44138d67d3255e9ca6328af841a3990a68e5"
+    ):
+        fail("Tier-2 AtM replay artifact digest drifted")
+    if atm_source.get("atm_source_commit") != (
+        "4a926fcbccbf0c43a2ccd43817ceee70d788e6d5"
+    ):
+        fail("Tier-2 AtM replay source commit drifted")
+
+    if atm_replay.get("kernel") != {
+        "system": "Linux",
+        "release": "6.17.0-1022-azure",
+        "machine": "x86_64",
+    }:
+        fail("Tier-2 AtM replay kernel context drifted")
+    if atm_replay.get("upstream") != {
+        "repository": "josefbacik/log-writes",
+        "commit": "7b70d8a6863c5de30933d42a7672d35d01d2dc6c",
+    }:
+        fail("Tier-2 AtM replay upstream pin drifted")
+
+    protocol = atm_replay.get("protocol")
+    if protocol != {
+        "old_authority_synced_before_baseline_mark": True,
+        "new_snapshot_uses_real_snapshot_seal": True,
+        "fresh_process_verifier_after_replay": True,
+        "candidate_durability_barrier_added": False,
+        "clean_unmount_not_used_as_target_mark": True,
+    }:
+        fail("Tier-2 AtM replay protocol drifted")
+
+    scenarios = atm_replay.get("scenarios")
+    if not isinstance(scenarios, dict) or set(scenarios) != {
+        "pre_rename",
+        "post_rename",
+        "after_authority",
+    }:
+        fail("Tier-2 AtM replay scenario set drifted")
+
+    old_sha = "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa"
+    new_sha = "bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb"
+    old_seal = (
+        "39d5b5c5ff8fe2d5a0fbee8238abab546f39b07774ad29aeaeb06c4d25aac780"
+    )
+
+    for name in ("pre_rename", "post_rename"):
+        scenario = scenarios[name]
+        if scenario.get("baseline_entry") != 162:
+            fail(f"{name} baseline entry drifted")
+        if scenario.get("scenario_entry") != 163:
+            fail(f"{name} scenario entry drifted")
+        if scenario.get("e2fsck_exit_code") != 1:
+            fail(f"{name} e2fsck result drifted")
+        if scenario.get("expected_classification") != "OLD_AUTHORITY_VALID":
+            fail(f"{name} expected classification drifted")
+        if scenario.get("observed_classification") != "OLD_AUTHORITY_VALID":
+            fail(f"{name} old-authority result drifted")
+        if scenario.get("active_repository_sha") != old_sha:
+            fail(f"{name} active repository SHA drifted")
+        if scenario.get("stored_seal") != old_seal:
+            fail(f"{name} stored old seal drifted")
+        if scenario.get("computed_seal") != old_seal:
+            fail(f"{name} computed old seal drifted")
+        if scenario.get("seal_match") is not True:
+            fail(f"{name} old authority must remain seal-valid")
+        if scenario.get("strong_invariant_satisfied") is not True:
+            fail(f"{name} strong invariant must remain satisfied")
+
+    after = scenarios["after_authority"]
+    if after.get("baseline_entry") != 162:
+        fail("after-authority baseline entry drifted")
+    if after.get("scenario_entry") != 195:
+        fail("after-authority scenario entry drifted")
+    if after.get("e2fsck_exit_code") != 1:
+        fail("after-authority e2fsck result drifted")
+    if after.get("expected_classification") != "NEW_AUTHORITY_VALID":
+        fail("after-authority expected classification drifted")
+    if after.get("observed_classification") != "INVALID_AUTHORITY":
+        fail("S3 falsification classification was lost")
+    if after.get("active_generation_id") != 2:
+        fail("after-authority active generation drifted")
+    if after.get("active_repository_sha") != new_sha:
+        fail("after-authority new active SHA drifted")
+    if after.get("stored_seal") != (
+        "acebf979895f9efd073014fa707038d47ec71b411f4e12a32aa619e9c63f3132"
+    ):
+        fail("after-authority stored seal drifted")
+    if after.get("computed_seal") != (
+        "7299f3e88c9a88995a62ef415e0da959ba4571df5f62976e9f9ac49d4660a3d8"
+    ):
+        fail("after-authority replayed seal drifted")
+    if after.get("seal_match") is not False:
+        fail("S3 falsification must retain seal mismatch")
+    if after.get("reason_code") != "active_snapshot_seal_mismatch":
+        fail("S3 falsification reason drifted")
+    if after.get("strong_invariant_satisfied") is not False:
+        fail("S3 strong-invariant failure was lost")
+
+    conclusion = str(
+        atm_replay.get("reviewed_conclusion", "")
+    ).lower()
+    for phrase in (
+        "s3 is therefore falsified",
+        "old-valid/new-valid tier-2 target",
+        "selects neither s1 nor s2",
+        "authorizes no production durability barrier",
+    ):
+        if phrase not in conclusion:
+            fail(f"Tier-2 AtM replay conclusion lost: {phrase}")
+
     print(
         "durability evidence validation passed: "
         "A1-M1 CBD/EWD/RMD medians frozen, "
