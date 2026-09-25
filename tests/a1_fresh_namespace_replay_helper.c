@@ -293,6 +293,14 @@ checkpoint_valid (
     return
         g_strcmp0 (
             checkpoint,
+            "namespace_repository_before_child_fsync"
+        ) == 0 ||
+        g_strcmp0 (
+            checkpoint,
+            "namespace_repository_before_parent_fsync"
+        ) == 0 ||
+        g_strcmp0 (
+            checkpoint,
             "fresh_post_barrier_pre_destination_hierarchy"
         ) == 0 ||
         g_strcmp0 (

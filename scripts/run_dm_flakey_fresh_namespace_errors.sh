@@ -3,6 +3,8 @@ set -euo pipefail
 
 OUTPUT="${1:?output JSON path required}"
 HELPER="${2:?A1 fresh namespace helper required}"
+PARENT_FSYNC_PROBE="${3:?parent fsync EIO probe JSON required}"
+SOURCE_FSYNC_PROBE="${4:?source fsync EIO probe JSON required}"
 
 WORK_ROOT="$(mktemp -d /tmp/atm-a1-m11-XXXXXX)"
 RESULTS_DIR="$WORK_ROOT/results"
@@ -44,6 +46,7 @@ sudo dmsetup targets | awk '{print $1}' | grep -Fxq "flakey"
 run_scenario() {
     local checkpoint="$1"
     local boundary="$2"
+    local expected_error_context="$3"
 
     local work="$WORK_ROOT/$boundary"
     local data_image="$work/data.img"
@@ -129,6 +132,14 @@ run_scenario() {
         exit 1
     fi
 
+    if ! grep -Fqi "$expected_error_context" "$work/helper.stderr"; then
+        printf '%s\n' \
+            "M11b error occurred outside the exact fsync context at $boundary" \
+            >&2
+        cat "$work/helper.stderr" >&2 || true
+        exit 1
+    fi
+
     sudo dmsetup suspend --noflush --nolockfs "$mapper_name"
     sudo dmsetup reload "$mapper_name"         --table "0 $sectors linear $loop_dev 0"
     sudo dmsetup resume "$mapper_name"
@@ -164,7 +175,7 @@ run_scenario() {
 
     local result_path="$RESULTS_DIR/$boundary.json"
 
-    python3 -         "$result_path"         "$boundary"         "$checkpoint"         "$helper_rc"         "$e2fsck_rc"         "$work/helper.stderr"         "$work/verify.json" <<'PY'
+    python3 -         "$result_path"         "$boundary"         "$checkpoint"         "$helper_rc"         "$e2fsck_rc"         "$work/helper.stderr"         "$work/verify.json"         "$expected_error_context" <<'PY'
 import json
 import pathlib
 import sys
@@ -177,6 +188,7 @@ import sys
     e2fsck_rc,
     stderr_path,
     verify_path,
+    expected_error_context,
 ) = sys.argv[1:]
 
 with open(verify_path, encoding="utf-8") as handle:
@@ -201,6 +213,8 @@ record = {
             "disk i/o error",
         )
     ),
+    "expected_error_context": expected_error_context,
+    "error_context_match": expected_error_context.lower() in stderr.lower(),
     "e2fsck_exit_code": int(e2fsck_rc),
     "classification": verify["classification"],
     "active_generation_id": verify["active_generation_id"],
@@ -216,6 +230,7 @@ record = {
 record["authority_fail_closed"] = (
     record["candidate_failed"]
     and record["io_error_observed"]
+    and record["error_context_match"]
     and record["classification"] == "EMPTY_AUTHORITY_VALID"
     and record["active_generation_id"] == 0
     and record["active_repository_sha"] is None
@@ -241,41 +256,51 @@ PY
     python3 -m json.tool "$result_path" >/dev/null
 }
 
-run_scenario     fresh_post_barrier_pre_destination_hierarchy     destination_hierarchy_fsync
+run_scenario \
+    namespace_repository_before_child_fsync \
+    destination_hierarchy_child_fsync \
+    "Could not fsync snapshot namespace child directory"
 
-run_scenario     fresh_post_rename_pre_destination_parent_fsync     destination_parent_fsync
+run_scenario \
+    fresh_post_rename_pre_destination_parent_fsync \
+    destination_parent_fsync \
+    "Could not fsync promoted snapshot parent"
 
-run_scenario     fresh_post_destination_parent_fsync_pre_source_parent_fsync     source_parent_fsync
 
-python3 - "$OUTPUT" "$RESULTS_DIR" <<'PY'
+python3 - "$OUTPUT" "$RESULTS_DIR" "$PARENT_FSYNC_PROBE" "$SOURCE_FSYNC_PROBE" <<'PY'
 import json
 import pathlib
 import platform
 import sys
 
-output, results_dir = sys.argv[1:]
+output, results_dir, parent_probe_path, source_probe_path = sys.argv[1:]
 results = []
+
+with open(parent_probe_path, encoding="utf-8") as handle:
+    parent_probe = json.load(handle)
+
+with open(source_probe_path, encoding="utf-8") as handle:
+    source_probe = json.load(handle)
 
 for path in sorted(pathlib.Path(results_dir).glob("*.json")):
     with path.open(encoding="utf-8") as handle:
         results.append(json.load(handle))
 
 boundaries = {
-    "destination_hierarchy_fsync",
+    "destination_hierarchy_child_fsync",
     "destination_parent_fsync",
-    "source_parent_fsync",
 }
 
-if len(results) != 3:
-    raise SystemExit("A1-M11 must contain exactly three EIO scenarios")
+if len(results) != 2:
+    raise SystemExit("A1-M11b must contain exactly two dm-flakey EIO scenarios")
 if {item["boundary"] for item in results} != boundaries:
-    raise SystemExit("A1-M11 EIO boundary set is incomplete")
+    raise SystemExit("A1-M11b EIO boundary set is incomplete")
 if {item["strategy"] for item in results} != {"S1_DEST_SOURCE"}:
-    raise SystemExit("A1-M11 must test only S1_DEST_SOURCE")
+    raise SystemExit("A1-M11b must test only S1_DEST_SOURCE")
 
 artifact = {
     "schema_version": 1,
-    "measurement_id": "atm-a1-m11-namespace-eio-v1",
+    "measurement_id": "atm-a1-m11b-exact-namespace-fsync-eio-v2",
     "status": "measurement-only",
     "production_namespace_selected": False,
     "kernel": {
@@ -292,14 +317,18 @@ artifact = {
         "fault_teardown_suspend_noflush_nolockfs": True,
         "fresh_process_verifier_after_recovery": True,
         "candidate": "S1_DEST_SOURCE",
-        "boundaries": [
-            "destination_hierarchy_fsync",
+        "dm_flakey_boundaries": [
+            "destination_hierarchy_child_fsync",
             "destination_parent_fsync",
-            "source_parent_fsync",
         ],
+        "parent_fsync_probe": "synthetic-fsync-return-eio-on-exact-call",
+        "source_fsync_probe": "full-flow-synthetic-fsync-return-eio-on-call-6",
+        "exact_fsync_context_required": True,
         "no_syncfs_fallback": True,
     },
     "results": results,
+    "namespace_parent_fsync_probe": parent_probe,
+    "source_parent_fsync_probe": source_probe,
     "all_authority_fail_closed": all(
         item["authority_fail_closed"]
         for item in results
@@ -308,27 +337,54 @@ artifact = {
         item["e2fsck_exit_code"] <= 2
         for item in results
     ),
+    "all_exact_error_contexts": all(
+        item["error_context_match"]
+        for item in results
+    ),
+    "namespace_parent_fsync_probe_qualified": (
+        parent_probe.get("qualified") is True
+        and parent_probe.get("error_is_eio") is True
+        and parent_probe.get("error_context_match") is True
+        and parent_probe.get("fsync_calls") == 4
+    ),
+    "source_parent_fsync_probe_qualified": (
+        source_probe.get("qualified") is True
+        and source_probe.get("error_context_match") is True
+        and source_probe.get("failed_fsync_call") == 6
+        and source_probe.get("classification") == "EMPTY_AUTHORITY_VALID"
+        and source_probe.get("active_generation_id") == 0
+        and source_probe.get("active_repository_sha") is None
+    ),
     "limitations": [
         (
-            "M11 qualifies explicit writeback-error propagation for the "
-            "fresh-install namespace barriers on the ext4 dm-flakey fixture; "
-            "it is not application runtime wiring."
+            "M11b qualifies block-layer EIO at the exact hierarchy-child "
+            "and destination-parent fsync contexts on ext4. The containing-"
+            "parent namespace fsync and the post-rename source-parent fsync "
+            "use deterministic exact-syscall probes because a preceding "
+            "fsync can drain the shared journal and leave no block write "
+            "for dm-flakey to fail at those exact calls."
         ),
         (
             "M10 remains the process-crash replay evidence for namespace "
             "ordering and fresh-authority classification."
         ),
         (
-            "Passing M11 does not authorize automatic orphan deletion or "
+            "Passing M11b does not authorize automatic orphan deletion or "
             "replace the separate authority-wide recovery-exclusion problem."
         ),
     ],
 }
 
 if not artifact["all_authority_fail_closed"]:
-    raise SystemExit("A1-M11 observed a namespace EIO that did not fail closed")
+    raise SystemExit("A1-M11b observed an fsync EIO that did not fail closed")
 if not artifact["all_e2fsck_recoverable"]:
-    raise SystemExit("A1-M11 produced a non-recoverable filesystem image")
+    raise SystemExit("A1-M11b produced a non-recoverable filesystem image")
+if not artifact["all_exact_error_contexts"]:
+    raise SystemExit("A1-M11b did not isolate every dm-flakey fsync context")
+if not artifact["namespace_parent_fsync_probe_qualified"]:
+    raise SystemExit("A1-M11b exact namespace parent fsync EIO probe failed")
+if not artifact["source_parent_fsync_probe_qualified"]:
+    raise SystemExit("A1-M11b exact source-parent fsync EIO probe failed")
 
 pathlib.Path(output).write_text(
     json.dumps(artifact, indent=2, sort_keys=True) + "\n",

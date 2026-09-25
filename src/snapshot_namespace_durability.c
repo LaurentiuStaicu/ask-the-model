@@ -1,6 +1,7 @@
 #define _GNU_SOURCE
 
 #include "snapshot_namespace_durability.h"
+#include "fault_injection_test_hook.h"
 
 #include <errno.h>
 #include <fcntl.h>
@@ -49,6 +50,8 @@ static gboolean
 open_and_sync_component (
     int parent_fd,
     const char *name,
+    const char *pre_child_fsync_checkpoint,
+    const char *pre_parent_fsync_checkpoint,
     int *out_child_fd,
     AtmSnapshotNamespaceStats *stats,
     GError **error
@@ -124,6 +127,12 @@ open_and_sync_component (
         stats->directories_created++;
     }
 
+    if (pre_child_fsync_checkpoint != NULL) {
+        atm_test_fault_checkpoint (
+            pre_child_fsync_checkpoint
+        );
+    }
+
     if (!fsync_retry (
             child_fd,
             "Could not fsync snapshot namespace child directory",
@@ -135,6 +144,12 @@ open_and_sync_component (
 
     if (stats != NULL) {
         stats->directory_fsync_calls++;
+    }
+
+    if (pre_parent_fsync_checkpoint != NULL) {
+        atm_test_fault_checkpoint (
+            pre_parent_fsync_checkpoint
+        );
     }
 
     if (!fsync_retry (
@@ -201,6 +216,8 @@ atm_snapshot_namespace_prepare_final_parent (
     if (!open_and_sync_component (
             root_fd,
             "Repositories",
+            NULL,
+            NULL,
             &repositories_fd,
             stats,
             error
@@ -208,6 +225,8 @@ atm_snapshot_namespace_prepare_final_parent (
         !open_and_sync_component (
             repositories_fd,
             repository_id,
+            "namespace_repository_before_child_fsync",
+            "namespace_repository_before_parent_fsync",
             &repository_fd,
             stats,
             error
@@ -215,6 +234,8 @@ atm_snapshot_namespace_prepare_final_parent (
         !open_and_sync_component (
             repository_fd,
             "snapshots",
+            NULL,
+            NULL,
             &snapshots_fd,
             stats,
             error
