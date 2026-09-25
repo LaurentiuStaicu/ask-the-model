@@ -13,6 +13,7 @@ All notable public releases of Ask the Model are recorded here.
 
 ### Qualification infrastructure
 
+- selected the C0P-F10 production admission policy without wiring runtime behavior: proactive data/cache byte rejection is exact-profile-only, unknown SHAs retain fail-closed ENOSPC plus F2/structural inode checks, guarded Control DB publication requires 128 KiB byte headroom and 4 inode/file slots, and the policy remains subordinate to the default-OFF Optimizations operation snapshot; historical M4/M5 prediction evidence remains descriptive because M6 structurally falsified the unknown-SHA retrieval-index bound.
 - added C0P-F9 checked-in M1 phase inode evidence: the validator now locks same-SHA replacement to snapshot entries + 1 extraction root, fresh install to replacement + 5 AtM storage-tree directories, and retrieval-index construction to the four-entry cache peak observed independently for CBD/EWD/RMD;
 - corrected C0P-F8 fresh-install data-root inode admission to include the five AtM-owned storage-tree directories created outside the F2 archive materialization tree; M1 CBD/EWD/RMD measurements independently show the same +5 fresh-install peak versus same-SHA replacement, while update/repair and byte requirements remain unchanged;
 - added C0P-M7 state-root inode headroom measurement: the cold-sidecar guarded Control DB path is exercised with 1/2/3/4/8 unprivileged inode slots available while byte capacity remains abundant, preserving atomic success/fail-closed invariants without selecting a production inode reserve;

@@ -534,6 +534,34 @@ The validator enforces the cross-repository structural relationships observed in
 
 These are evidence constraints, not a universal byte predictor. They exist so production inode policy cannot silently drift away from the measured M1 storage topology.
 
+### C0P-F10 production capacity policy selection
+
+C0P-F10 converts the completed C0/C0P qualification record into one explicit production-policy contract while deliberately leaving Download/Update runtime behavior unchanged.
+
+The selected byte strategy is **exact-profile-only**:
+- an exact `repository_id + repository_sha` present in `benchmarks/capacity-v1/evidence.json` may use its reviewed allocated-byte observations for proactive admission;
+- a new/unknown SHA does **not** inherit the M4/M5 historical hybrid or any scalar margin;
+- unknown-SHA data/cache byte preflight therefore remains unqualified and non-rejecting, while F2 materialized-entry inode admission, fixed structural inode requirements and state-root headroom are still enforced once runtime wiring is added;
+- actual ENOSPC/SQLITE_FULL after admission remains fail-closed and authoritative state must not advance.
+
+This decision follows the M6 structural falsification: the frozen historical hybrid covered the real no-refit M5 holdout, but failed retrieval-index prediction in all six structural fixtures and reached 17.2604× actual/prediction in the limiting RMD case. A scalar multiplier large enough to cover that fixture would be fixture-fitting, not an independently established upper bound.
+
+The selected guarded Control DB publication headroom is:
+- **131,072 bytes (128 KiB)**;
+- **4 inode/file slots**.
+
+The byte value is twice the most conservative observed cold-sidecar success frontier (64 KiB) and the 128 KiB band was directly exercised successfully in the M2/M3 qualification matrices. The inode value is twice the M7 minimum observed successful headroom of two slots and was itself directly exercised successfully. SQLite WAL mode normally uses a separate `-shm` file whose common first allocation is 32 KiB, which is consistent with the measured cold-sidecar sensitivity; the local measurements, not this implementation detail alone, remain the policy basis.
+
+For F1/F3 runtime integration, the 128 KiB / 4-slot values are modeled as **state-commit phase headroom**. They are not added a second time as a generic post-operation reserve. This ensures that, when state/data/cache share one filesystem, snapshot and index demand must coexist with at least that much headroom immediately before guarded Control DB publication.
+
+The machine-readable contract lives at `qualification/capacity-policy-v1.json` and is validated against capacity-v1/v2/v3 evidence. Its status is `selected-not-wired`; `runtime_integration_selected=false` is intentional. A later runtime slice must prove:
+- Optimizations OFF preserves the v0.5.0 baseline path;
+- Optimizations ON applies the two checkpoints;
+- same-SHA repair passes checkpoint B before quarantine;
+- exact-profile and unknown-SHA behavior differ only in proactive byte prediction;
+- insufficient capacity maps specifically to `RepositoryError.NO_SPACE`;
+- external capacity loss after admission still fails closed.
+
 ### Repository authority-mutation lease
 
 When an operation snapshots optimization mode ON, repository Download/Update uses one application-owned exclusive nonblocking lease at `<state_root>/repository-mutation.lock` before any selected-repository staging or authority mutation begins.
