@@ -803,6 +803,25 @@ The replay device is then passed through ext4 recovery/fsck and mounted read-onl
 
 This is still **not** the A1 production durability result. It proves only that the reviewed dm-log-writes environment can reconstruct synchronized block state through an explicit mark. A later replay slice must place the existing A0 snapshot-promotion/Control-DB fixture on the logged filesystem and apply the existing fresh-process restart classification to the replayed state.
 
+### OPT-A1-F3 frozen block replay evidence
+
+A1-F3 freezes the reviewed A1-M3 replay result into the durability evidence registry.
+
+The qualified record preserves:
+- Actions run `36118334996` and artifact `10856600862`;
+- artifact SHA-256 `fb4da03b7d7d1ade93a12c407efc413f8ca4cd12c946e8bf9014736971829cc9`;
+- tested AtM head `4260c0db0d4c8c0bf929aabbf0950435c7ed75a7`;
+- Linux `6.17.0-1022-azure` x86_64 qualification context;
+- pinned `josefbacik/log-writes@7b70d8a6863c5de30933d42a7672d35d01d2dc6c`;
+- `mkfs` mark entry 35 and `fsync` mark entry 57;
+- replay through `fsync`;
+- `e2fsck` exit code 1 (filesystem errors corrected);
+- original/replayed SHA-256 `5d53a5ae5705f401182a1c3d52618b34aab4c9097b6894cc01bebe3fb6a08a94`.
+
+The validator requires the fsync mark to remain after the mkfs mark, accepts only clean/corrected e2fsck outcomes 0/1/2, requires exact digest equality, and keeps `production_durability_authorized=false`.
+
+This closes the replay-mechanism qualification only. It does **not** yet establish that AtM's snapshot promotion + parent-directory durability + Control DB activation sequence survives a replayed power-loss boundary. The next A1 measurement must place the existing A0 repository recovery fixture onto the logged filesystem and classify fresh-process authority after replay.
+
 ### Recovery fault qualification
 
 The OPT-A0 recovery harness is test-only. Native checkpoint calls compile to no-ops in the production application; only the dedicated recovery helper is built with `ATM_TEST_FAULT_INJECTION`.
