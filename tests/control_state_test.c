@@ -2369,6 +2369,283 @@ test_complete_snapshot_reference_count (void)
 
 
 static void
+test_readonly_generation_snapshot_roots (void)
+{
+    char *root = new_temp_root (
+        "atm-control-state-generation-roots-XXXXXX"
+    );
+    char *control =
+        control_state_path_for_root (root);
+    const char *rmd_sha_a =
+        "1111111111111111111111111111111111111111";
+    const char *rmd_sha_b =
+        "2222222222222222222222222222222222222222";
+    const char *ewd_sha =
+        "3333333333333333333333333333333333333333";
+    GError *error = NULL;
+    AtmControlStateStore *store = NULL;
+
+    g_assert_true (
+        atm_control_state_open (
+            control,
+            &store,
+            &error
+        )
+    );
+    g_assert_no_error (error);
+    atm_control_state_close (store);
+
+    g_assert_true (
+        atm_control_state_set_current_values (
+            control,
+            "rmd",
+            rmd_sha_a,
+            "0.1.0",
+            NULL,
+            &error
+        )
+    );
+    g_assert_no_error (error);
+
+    g_assert_true (
+        atm_control_state_set_current_values (
+            control,
+            "ewd",
+            ewd_sha,
+            "0.1.0",
+            NULL,
+            &error
+        )
+    );
+    g_assert_no_error (error);
+
+    g_assert_true (
+        atm_control_state_set_current_values (
+            control,
+            "rmd",
+            rmd_sha_b,
+            "0.2.0",
+            NULL,
+            &error
+        )
+    );
+    g_assert_no_error (error);
+
+    gint64 active_generation = -1;
+
+    g_assert_true (
+        atm_control_state_active_generation_id_readonly (
+            control,
+            &active_generation,
+            &error
+        )
+    );
+    g_assert_no_error (error);
+    g_assert_cmpint (
+        active_generation,
+        ==,
+        3
+    );
+
+    gboolean present = FALSE;
+    char *snapshot_sha = NULL;
+    char *repository_version = NULL;
+    char *snapshot_seal = NULL;
+
+    g_assert_true (
+        atm_control_state_load_repository_values_at_generation_readonly (
+            control,
+            2,
+            "rmd",
+            &present,
+            &snapshot_sha,
+            &repository_version,
+            &snapshot_seal,
+            &error
+        )
+    );
+    g_assert_no_error (error);
+    g_assert_true (present);
+    g_assert_cmpstr (snapshot_sha, ==, rmd_sha_a);
+    g_assert_cmpstr (repository_version, ==, "0.1.0");
+    g_assert_null (snapshot_seal);
+    g_free (snapshot_sha);
+    g_free (repository_version);
+    g_free (snapshot_seal);
+
+    AtmControlStateSnapshotReference *references = NULL;
+    gsize reference_count = 0;
+
+    g_assert_true (
+        atm_control_state_list_generation_snapshot_references_readonly (
+            control,
+            2,
+            &references,
+            &reference_count,
+            &error
+        )
+    );
+    g_assert_no_error (error);
+    g_assert_cmpuint (
+        reference_count,
+        ==,
+        2
+    );
+    g_assert_cmpstr (
+        references[0].repository_id,
+        ==,
+        "ewd"
+    );
+    g_assert_cmpstr (
+        references[0].snapshot_sha,
+        ==,
+        ewd_sha
+    );
+    g_assert_cmpstr (
+        references[1].repository_id,
+        ==,
+        "rmd"
+    );
+    g_assert_cmpstr (
+        references[1].snapshot_sha,
+        ==,
+        rmd_sha_a
+    );
+    atm_control_state_snapshot_references_free (
+        references,
+        reference_count
+    );
+
+    references = NULL;
+    reference_count = 0;
+
+    g_assert_true (
+        atm_control_state_list_generation_snapshot_references_readonly (
+            control,
+            3,
+            &references,
+            &reference_count,
+            &error
+        )
+    );
+    g_assert_no_error (error);
+    g_assert_cmpuint (
+        reference_count,
+        ==,
+        2
+    );
+    g_assert_cmpstr (
+        references[0].repository_id,
+        ==,
+        "ewd"
+    );
+    g_assert_cmpstr (
+        references[0].snapshot_sha,
+        ==,
+        ewd_sha
+    );
+    g_assert_cmpstr (
+        references[1].repository_id,
+        ==,
+        "rmd"
+    );
+    g_assert_cmpstr (
+        references[1].snapshot_sha,
+        ==,
+        rmd_sha_b
+    );
+    atm_control_state_snapshot_references_free (
+        references,
+        reference_count
+    );
+
+    references = NULL;
+    reference_count = 0;
+
+    g_assert_false (
+        atm_control_state_list_generation_snapshot_references_readonly (
+            control,
+            999,
+            &references,
+            &reference_count,
+            &error
+        )
+    );
+    g_assert_error (
+        error,
+        ATM_CONTROL_STATE_ERROR,
+        ATM_CONTROL_STATE_ERROR_INTEGRITY
+    );
+    g_assert_null (references);
+    g_assert_cmpuint (
+        reference_count,
+        ==,
+        0
+    );
+    g_clear_error (&error);
+
+    char *missing = g_build_filename (
+        root,
+        "missing-control.sqlite3",
+        NULL
+    );
+
+    active_generation = -1;
+    g_assert_false (
+        atm_control_state_active_generation_id_readonly (
+            missing,
+            &active_generation,
+            &error
+        )
+    );
+    g_assert_error (
+        error,
+        ATM_CONTROL_STATE_ERROR,
+        ATM_CONTROL_STATE_ERROR_IO
+    );
+    g_assert_cmpint (
+        active_generation,
+        ==,
+        0
+    );
+    g_assert_false (
+        g_file_test (
+            missing,
+            G_FILE_TEST_EXISTS
+        )
+    );
+    g_clear_error (&error);
+
+    g_assert_false (
+        atm_control_state_list_generation_snapshot_references_readonly (
+            missing,
+            1,
+            &references,
+            &reference_count,
+            &error
+        )
+    );
+    g_assert_error (
+        error,
+        ATM_CONTROL_STATE_ERROR,
+        ATM_CONTROL_STATE_ERROR_IO
+    );
+    g_assert_false (
+        g_file_test (
+            missing,
+            G_FILE_TEST_EXISTS
+        )
+    );
+    g_clear_error (&error);
+
+    g_free (missing);
+    g_free (control);
+    remove_tree_best_effort (root);
+    g_free (root);
+}
+
+
+static void
 test_complete_snapshot_reference_read_does_not_migrate_v1 (void)
 {
     char *root = new_temp_root (
@@ -2408,6 +2685,55 @@ test_complete_snapshot_reference_read_does_not_migrate_v1 (void)
     guint64 references = G_MAXUINT64;
     GError *error = NULL;
 
+    gint64 active_generation = -1;
+
+    g_assert_false (
+        atm_control_state_active_generation_id_readonly (
+            path,
+            &active_generation,
+            &error
+        )
+    );
+    g_assert_error (
+        error,
+        ATM_CONTROL_STATE_ERROR,
+        ATM_CONTROL_STATE_ERROR_SCHEMA
+    );
+    g_assert_cmpint (
+        active_generation,
+        ==,
+        0
+    );
+    g_clear_error (&error);
+
+    gboolean present = FALSE;
+    char *snapshot_sha = NULL;
+    char *repository_version = NULL;
+    char *snapshot_seal = NULL;
+
+    g_assert_false (
+        atm_control_state_load_repository_values_at_generation_readonly (
+            path,
+            1,
+            "rmd",
+            &present,
+            &snapshot_sha,
+            &repository_version,
+            &snapshot_seal,
+            &error
+        )
+    );
+    g_assert_error (
+        error,
+        ATM_CONTROL_STATE_ERROR,
+        ATM_CONTROL_STATE_ERROR_SCHEMA
+    );
+    g_assert_false (present);
+    g_assert_null (snapshot_sha);
+    g_assert_null (repository_version);
+    g_assert_null (snapshot_seal);
+    g_clear_error (&error);
+
     g_assert_false (
         atm_control_state_count_complete_snapshot_references (
             path,
@@ -2426,6 +2752,31 @@ test_complete_snapshot_reference_read_does_not_migrate_v1 (void)
         references,
         ==,
         G_MAXUINT64
+    );
+    g_clear_error (&error);
+
+    AtmControlStateSnapshotReference *root_references = NULL;
+    gsize root_reference_count = 0;
+
+    g_assert_false (
+        atm_control_state_list_generation_snapshot_references_readonly (
+            path,
+            1,
+            &root_references,
+            &root_reference_count,
+            &error
+        )
+    );
+    g_assert_error (
+        error,
+        ATM_CONTROL_STATE_ERROR,
+        ATM_CONTROL_STATE_ERROR_SCHEMA
+    );
+    g_assert_null (root_references);
+    g_assert_cmpuint (
+        root_reference_count,
+        ==,
+        0
     );
     g_clear_error (&error);
 
@@ -3155,6 +3506,10 @@ main (int argc, char **argv)
     g_test_add_func (
         "/control-state/complete-snapshot-reference-count",
         test_complete_snapshot_reference_count
+    );
+    g_test_add_func (
+        "/control-state/readonly-generation-snapshot-roots",
+        test_readonly_generation_snapshot_roots
     );
     g_test_add_func (
         "/control-state/complete-snapshot-reference-readonly-v1",

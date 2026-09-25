@@ -1409,6 +1409,28 @@ Optimizations OFF continues to use the established baseline ingest path. HTTP do
 
 P4 leaves the A1 runtime durability workstream complete only within the selected bounded contract. Any future expansion of filesystem scope, orphan recovery, network-storage durability or stronger physical-power-loss claims requires separate qualification rather than inheriting this flag.
 
+### OPT-C1-I0 read-only protected roots
+
+C1 begins with root discovery only. I0 adds no garbage collector, no candidate deletion and no trash namespace.
+
+The conversation store exposes a native path-based query that lists the distinct positive `repository_generation_id` values referenced by existing durable conversation rows. The query opens the already-existing database with SQLite `READONLY | NOFOLLOW`, enforces `query_only=ON`, validates the current schema/integrity/semantics, and then reads only the generation column. It never creates a parent directory, bootstraps an empty database or migrates an older schema.
+
+The Control DB exposes three strict read-only queries on the same `READONLY | NOFOLLOW | query_only` path: one reads the active COMPLETE generation, one reads a single repository row from a specified generation, and one resolves a positive COMPLETE generation to the exact `repository_id + snapshot_sha` pairs stored in that immutable generation. Missing, legacy, non-COMPLETE or malformed authority fails closed; neither query bootstraps or migrates Control DB state.
+
+These primitives are inputs to a later C1 root collector. They are not deletion authority by themselves. “Read-only” here means the main SQLite database is opened `SQLITE_OPEN_READONLY`, `query_only` is enforced, and AtM performs no schema/data write, bootstrap or migration. Because both stores use SQLite WAL, SQLite may still require or create its normal `-wal`/`-shm` coordination sidecars when opening a WAL database; I0 does not use `immutable=1` because future root reads must remain correct in the presence of legitimate concurrent writers.
+
+A future destructive GC pass must address a race that a one-time root scan cannot close. Conversation persistence can change independently of repository filesystem mutation. Therefore future snapshot isolation must, under the global mutation lease:
+
+1. collect durable conversation generation roots and the active generation;
+2. resolve them to protected repository/SHA pairs;
+3. coordinate with per-generation shared/exclusive leases for live readers;
+4. after obtaining any exclusive generation lease needed for a candidate, re-read durable roots;
+5. immediately before isolation, verify that the candidate is still unreachable from every durable/live root.
+
+A root that appears after an earlier scan must still prevent collection. Lock files are coordination metadata only; kernel lock ownership defines live protection.
+
+I0 tests the current-schema positive path, duplicate-generation deduplication, strict read-only active-generation lookup, missing-main-database non-creation and refusal to migrate v1 state. Candidate directory enumeration, reclaimable-byte measurement, same-filesystem `.trash` rename and purge are separate later C1 slices.
+
 ### Recovery fault qualification
 
 The OPT-A0 recovery harness is test-only. Native checkpoint calls compile to no-ops in the production application; only the dedicated recovery helper is built with `ATM_TEST_FAULT_INJECTION`.
