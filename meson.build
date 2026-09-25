@@ -1770,6 +1770,27 @@ test(
   }
 )
 
+
+presentation_adversarial_test = executable(
+  'presentation-adversarial-test',
+  [
+    'src/presentation_document.c',
+    'src/presentation_normalize.c',
+    'tests/presentation_adversarial_test.c'
+  ],
+  include_directories: include_directories('src'),
+  dependencies: [
+    glib_dep,
+    md4c_dep
+  ],
+  install: false
+)
+
+test(
+  'presentation-adversarial',
+  presentation_adversarial_test
+)
+
 subdir('data')
 
 icon_sizes = ['16', '24', '32', '48', '64', '128']

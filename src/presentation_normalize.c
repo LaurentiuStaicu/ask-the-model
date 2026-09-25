@@ -406,6 +406,38 @@ fallback_document (
     return document;
 }
 
+static char *
+make_safe_fallback_text (
+    const char *input,
+    gsize length
+)
+{
+    GString *without_nul = g_string_sized_new (
+        length
+    );
+
+    for (gsize i = 0; i < length; i++) {
+        if (input[i] == '\0') {
+            g_string_append (
+                without_nul,
+                "\xEF\xBF\xBD"
+            );
+        } else {
+            g_string_append_c (
+                without_nul,
+                input[i]
+            );
+        }
+    }
+
+    char *safe = g_utf8_make_valid (
+        without_nul->str,
+        (gssize) without_nul->len
+    );
+    g_string_free (without_nul, TRUE);
+    return safe;
+}
+
 gboolean
 atm_presentation_normalize (
     const char *input,
@@ -442,9 +474,9 @@ atm_presentation_normalize (
 
     char *safe_text = valid_utf8
         ? g_strndup (input, length)
-        : g_utf8_make_valid (
+        : make_safe_fallback_text (
             input,
-            (gssize) length
+            length
         );
 
     if (!valid_utf8) {
