@@ -706,6 +706,32 @@ The per-SHA lock is blocking by design in this first slice and no arbitrary time
 
 When Optimizations is OFF, the established post-v0.5.0 retrieval-index ensure path remains unchanged.
 
+### OPT-A1-M1 snapshot durability barrier benchmark
+
+A1-M1 is measurement-only. It compares the two durability candidates from OPT-A1 against the current no-barrier control without changing repository promotion, Control DB activation or production runtime.
+
+The benchmark uses the same exact pinned EWD/CBD/RMD SHAs as the retrieval/capacity qualification corpus. For each repository it runs three fresh preparations for each strategy, rotating strategy order across iterations:
+
+- `S3_CONTROL`: current extraction + manifest validation + snapshot seal, with no explicit durability barrier;
+- `S1_TARGETED_FSYNC`: after the same preparation, open the extracted tree with no-follow semantics, `fsync()` every regular file, then `fsync()` directories bottom-up including the snapshot root;
+- `S2_SYNCFS`: after the same preparation, issue one `syncfs()` on an fd belonging to the snapshot filesystem.
+
+The artifact records:
+- extraction elapsed time;
+- manifest-validation elapsed time;
+- snapshot-seal elapsed time;
+- durability-barrier elapsed time;
+- total prepared elapsed time;
+- archive materialized entries and extracted logical bytes;
+- seal file count and sealed bytes;
+- S1 regular-file and directory `fsync()` call counts;
+- S2 `syncfs()` call count;
+- per-repository medians across the three order-rotated runs.
+
+Linux documents that `fsync()` of a file does not by itself guarantee persistence of the containing directory entry, so the S1 candidate deliberately includes directory synchronization. Linux also documents `syncfs()` as a whole-filesystem synchronization boundary; its broader scope is why A1 treats it as a comparator rather than an automatically preferred production mechanism.
+
+A1-M1 does **not** benchmark the final rename or Control DB activation and does not claim physical-power-loss durability. It is comparative cost evidence only. Production promotion still requires the Tier-2 durability result required by OPT-A1 and a separate reviewed runtime patch behind the default-OFF Optimizations gate.
+
 ### Recovery fault qualification
 
 The OPT-A0 recovery harness is test-only. Native checkpoint calls compile to no-ops in the production application; only the dedicated recovery helper is built with `ATM_TEST_FAULT_INJECTION`.
