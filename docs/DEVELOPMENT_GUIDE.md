@@ -1340,6 +1340,49 @@ The machine-readable state is now `selected-wired`: `runtime_wiring_authorized=t
 
 Automatic orphan recovery remains outside I1d2 and M12 unless separately selected later.
 
+### OPT-A1-M12a runtime authority sequencing
+
+M12a qualifies the local post-download Optimizations-ON authority sequence under deterministic process interruption. It is not a physical power-loss experiment.
+
+The measured sequence is mutation lease → namespace-complete durable ingest → promoted pre-index seal equality → coordinated retrieval index → post-index seal/count equality → state-capacity preflight → guarded Control DB publication. Six interruption boundaries cover every step from immediately after durable ingest through after authority. All five boundaries before guarded publication reopen as `EMPTY_AUTHORITY_VALID`, generation 0, with no active repository SHA. The after-authority boundary reopens as `NEW_AUTHORITY_VALID`, generation 1, with the expected SHA and matching stored/computed seal.
+
+A separate forced mutation after durable ingest makes the promoted pre-index seal differ from the durable pre-barrier seal. M12a requires this mismatch to be detected and authority to remain empty.
+
+### OPT-A1-M12b lifecycle fsync EIO propagation
+
+M12b complements M12a by exercising the real `RepositoryLifecycleService.download_or_update()` entrypoint with the operation-level Optimizations snapshot ON. A Vala test-only local-archive seam avoids HTTP while preserving the real lifecycle mutation lease, capacity checks, durable ingest, seal/index chain and guarded authority boundary.
+
+Only the isolated M12b target redirects selected `fsync()` calls to deterministic one-shot EIO. Four exact checkpoints are qualified:
+
+1. the first S1 staging-tree fsync;
+2. the newly created final repository-directory child fsync;
+3. the promoted destination-parent fsync;
+4. the staging source-parent fsync.
+
+Every scenario must reach the requested fault, make the lifecycle operation fail, leave Control DB generation 0 and leave the repository absent/unready. M12b qualifies lifecycle error propagation and control-authority behavior. It is not block-device or physical power-loss evidence; M11b remains the ext4 block-layer qualification.
+
+### OPT-A1-F12 frozen runtime-fault evidence
+
+F12 freezes M12a and M12b from the same final source head `9ffc6b126e00e5b2f9ec5a28b327093d7351131d`.
+
+M12a provenance:
+
+- Actions run `36161193316`;
+- artifact `10875149763`, `a1-m12-runtime-authority-replay`;
+- artifact ZIP SHA-256 `ba1c080083fa43c6b6a43f6e213f3637108387321abb827655f673670535b27b`;
+- exact JSON SHA-256 `1e712ffb3d12f7406281b8c6852ad5629197f75732a91db75f6fafadd60b50f2`.
+
+M12b provenance:
+
+- Actions run `36161193052`;
+- artifact `10875790793`, `a1-m12b-lifecycle-fsync-eio`;
+- artifact ZIP SHA-256 `5fd3bf5ab048c8020ac9c03c76e631e3ba54cbede14b2cbca02ce66ce78d5803`;
+- exact JSON SHA-256 `ce0e9fe27bd3468eafb49a97ac80e6cb072feedb4dcd58a4636f143ee1211e76`.
+
+The v3 validator reconstructs and hashes both original measured JSON payloads exactly, then validates the full M12a boundary matrix and M12b lifecycle-fault matrix. F12 remains an evidence freeze, not the policy-completion step: `runtime_fault_qualification_complete=false`, `m12_policy_review_ready=true`, and P4 is the next required slice.
+
+The combined evidence does not retest HTTP download, does not claim physical power-loss durability and does not authorize automatic orphan recovery. Filesystem durability and block-layer EIO properties remain grounded separately in M10/M11b.
+
 ### Recovery fault qualification
 
 The OPT-A0 recovery harness is test-only. Native checkpoint calls compile to no-ops in the production application; only the dedicated recovery helper is built with `ATM_TEST_FAULT_INJECTION`.

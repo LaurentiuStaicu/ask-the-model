@@ -8,6 +8,7 @@ ROOT = pathlib.Path(__file__).resolve().parents[1]
 POLICY_PATH = ROOT / "qualification" / "durability-policy-v1.json"
 EVIDENCE_V1 = ROOT / "benchmarks" / "durability-v1" / "evidence.json"
 EVIDENCE_V2 = ROOT / "benchmarks" / "durability-v2" / "evidence.json"
+EVIDENCE_V3 = ROOT / "benchmarks" / "durability-v3" / "evidence.json"
 
 
 def fail(message: str) -> None:
@@ -25,6 +26,7 @@ def main() -> int:
     policy = load(POLICY_PATH)
     evidence = load(EVIDENCE_V1)
     namespace_evidence = load(EVIDENCE_V2)
+    runtime_evidence = load(EVIDENCE_V3)
 
     if policy.get("schema_version") != 1:
         fail("schema_version must remain 1")
@@ -58,6 +60,50 @@ def main() -> int:
         "production_namespace_sequence_selected"
     ) is not False:
         fail("F11b evidence must remain separate from P2b policy")
+    if runtime_evidence.get("status") != "qualification-only":
+        fail("durability-v3 evidence status drifted")
+    if runtime_evidence.get("runtime_fault_qualification_complete") is not False:
+        fail("F12 evidence must remain separate from P4 policy")
+    runtime_interpretation = runtime_evidence.get("interpretation", {})
+    if runtime_interpretation.get("m12a_completed") is not True:
+        fail("F12 M12a completion marker was lost")
+    if runtime_interpretation.get("m12b_completed") is not True:
+        fail("F12 M12b completion marker was lost")
+    if runtime_interpretation.get("policy_review_ready") is not True:
+        fail("F12 must mark M12 evidence ready for P4 review")
+    if runtime_interpretation.get(
+        "runtime_fault_qualification_complete"
+    ) is not False:
+        fail("F12 must not self-complete runtime fault qualification")
+    if runtime_interpretation.get(
+        "automatic_orphan_recovery_authorized"
+    ) is not False:
+        fail("F12 must not authorize orphan recovery")
+    frozen_m12 = runtime_evidence.get("m12_runtime_authority", {})
+    if frozen_m12.get("summary") != {
+        "after_authority_new_valid": True,
+        "all_pre_authority_interruptions_empty_valid": True,
+        "seal_mismatch_fail_closed": True,
+    }:
+        fail("F12 M12 policy-review prerequisite drifted")
+
+    frozen_m12b = runtime_evidence.get("m12b_lifecycle_fsync_eio", {})
+    if frozen_m12b.get("summary") != {
+        "all_control_generations_unchanged": True,
+        "all_lifecycle_operations_failed_closed": True,
+        "all_repository_authority_absent": True,
+        "all_requested_faults_reached": True,
+        "scenario_count": 4,
+    }:
+        fail("F12 M12b policy-review prerequisite drifted")
+    if frozen_m12b.get("protocol", {}).get(
+        "real_lifecycle_entrypoint"
+    ) != "RepositoryLifecycleService.download_or_update":
+        fail("F12 M12b lifecycle entrypoint drifted")
+    if frozen_m12b.get("protocol", {}).get(
+        "physical_power_loss_claim"
+    ) is not False:
+        fail("F12 M12b must not claim physical power-loss qualification")
 
     basis = policy.get("selection_basis")
     if not isinstance(basis, dict):
@@ -252,6 +298,10 @@ def main() -> int:
         "fresh_namespace_replay": "benchmarks/durability-v2/evidence.json#m10_replay",
         "fresh_namespace_eio": "benchmarks/durability-v2/evidence.json#m11_eio",
         "fresh_namespace_exact_eio": "benchmarks/durability-v2/evidence.json#m11b_exact_eio",
+        "runtime_authority_replay": "benchmarks/durability-v3/evidence.json#m12_runtime_authority",
+        "runtime_lifecycle_fsync_eio": (
+            "benchmarks/durability-v3/evidence.json#m12b_lifecycle_fsync_eio"
+        ),
     }
     if evidence_refs != expected_refs:
         fail("qualified evidence references drifted")
@@ -350,7 +400,7 @@ def main() -> int:
         "on_only_durable_ingest_wired": True,
         "runtime_fault_qualification_complete": False,
         "next_required_slice": (
-            "M12_RUNTIME_DURABILITY_FAULT_QUALIFICATION"
+            "P4_RUNTIME_FAULT_QUALIFICATION_REVIEW"
         ),
     }:
         fail("implementation staging contract drifted")
@@ -384,6 +434,12 @@ def main() -> int:
         "same_sha_repair_uses_durable_ingest": True,
         "automatic_orphan_recovery_selected": False,
         "implemented": True,
+        "m12_process_interruption_correctness": "QUALIFIED_WITHIN_DECLARED_SCOPE",
+        "m12_lifecycle_fsync_eio_correctness": "QUALIFIED_WITHIN_DECLARED_SCOPE",
+        "m12_policy_review_ready": True,
+        "m12_scope": (
+            "PROCESS_INTERRUPTION_PLUS_LIFECYCLE_EXACT_FSYNC_ERROR_PROPAGATION"
+        ),
         "reason": (
             "The native durable ingest sequence and Vala ABI are qualified "
             "separately. Runtime selection is limited to the operation-level "
@@ -407,7 +463,7 @@ def main() -> int:
 
     print(
         "durability production policy validation passed: "
-        "S1 + S1_DEST_SOURCE selected; ON-only runtime wired; M12 fault qualification pending"
+        "S1 + S1_DEST_SOURCE selected; M12a+M12b frozen; P4 runtime qualification review pending"
     )
     return 0
 

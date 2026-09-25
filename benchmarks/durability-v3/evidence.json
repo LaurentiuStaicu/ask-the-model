@@ -1,0 +1,255 @@
+{
+  "schema_version": 1,
+  "evidence_id": "atm-snapshot-durability-runtime-evidence-v1",
+  "status": "qualification-only",
+  "runtime_fault_qualification_complete": false,
+  "m12_runtime_authority": {
+    "source": {
+      "actions_run_id": 36161193316,
+      "artifact_name": "a1-m12-runtime-authority-replay",
+      "artifact_id": 10875149763,
+      "artifact_sha256": "ba1c080083fa43c6b6a43f6e213f3637108387321abb827655f673670535b27b",
+      "artifact_json_sha256": "1e712ffb3d12f7406281b8c6852ad5629197f75732a91db75f6fafadd60b50f2",
+      "atm_source_commit": "9ffc6b126e00e5b2f9ec5a28b327093d7351131d"
+    },
+    "kernel": {
+      "machine": "x86_64",
+      "release": "6.17.0-1022-azure",
+      "system": "Linux"
+    },
+    "limitations": [
+      "M12 qualifies process-interruption authority sequencing in the local post-download pipeline. It is not a physical power-loss durability experiment; M10/M11b cover the selected filesystem durability barriers separately.",
+      "HTTP download is excluded because it occurs before snapshot authority preparation and is not part of the new I1d2 durability publication sequence.",
+      "Automatic orphan recovery remains unselected and is not exercised."
+    ],
+    "measurement_id": "atm-a1-m12-runtime-authority-replay-v1",
+    "protocol": {
+      "boundary_order": [
+        "post_durable_ingest_pre_preindex_seal",
+        "post_preindex_seal_pre_index",
+        "post_index_pre_postindex_seal",
+        "post_postindex_seal_pre_state_capacity",
+        "post_state_capacity_pre_authority",
+        "after_authority"
+      ],
+      "local_sequence": [
+        "MUTATION_LEASE",
+        "DURABLE_INGEST_S1_DEST_SOURCE",
+        "PROMOTED_PRE_INDEX_SEAL_MATCHES_PRE_BARRIER_SEAL",
+        "COORDINATED_RETRIEVAL_INDEX",
+        "POST_INDEX_SEAL_AND_COUNTS_MATCH",
+        "STATE_CAPACITY_PREFLIGHT",
+        "GUARDED_CONTROL_DB_PUBLICATION"
+      ],
+      "network_download_excluded": true,
+      "physical_power_loss_claim": false,
+      "process_interruption_only": true
+    },
+    "results": [
+      {
+        "authority_target_satisfied": true,
+        "boundary": "after_authority",
+        "checkpoint": "runtime_after_authority",
+        "classification_match": true,
+        "expected_classification": "NEW_AUTHORITY_VALID",
+        "verification": {
+          "active_generation_id": 1,
+          "active_repository_sha": "0123456789abcdef0123456789abcdef01234567",
+          "classification": "NEW_AUTHORITY_VALID",
+          "qualified": true,
+          "reason_code": "guarded_generation_and_seal_valid",
+          "schema_version": 1,
+          "seal_match": true
+        }
+      },
+      {
+        "authority_target_satisfied": true,
+        "boundary": "post_durable_ingest_pre_preindex_seal",
+        "checkpoint": "runtime_post_durable_ingest_pre_preindex_seal",
+        "classification_match": true,
+        "expected_classification": "EMPTY_AUTHORITY_VALID",
+        "verification": {
+          "active_generation_id": 0,
+          "active_repository_sha": null,
+          "classification": "EMPTY_AUTHORITY_VALID",
+          "qualified": true,
+          "reason_code": "no_active_repository_generation",
+          "schema_version": 1,
+          "seal_match": null
+        }
+      },
+      {
+        "authority_target_satisfied": true,
+        "boundary": "post_index_pre_postindex_seal",
+        "checkpoint": "runtime_post_index_pre_postindex_seal",
+        "classification_match": true,
+        "expected_classification": "EMPTY_AUTHORITY_VALID",
+        "verification": {
+          "active_generation_id": 0,
+          "active_repository_sha": null,
+          "classification": "EMPTY_AUTHORITY_VALID",
+          "qualified": true,
+          "reason_code": "no_active_repository_generation",
+          "schema_version": 1,
+          "seal_match": null
+        }
+      },
+      {
+        "authority_target_satisfied": true,
+        "boundary": "post_postindex_seal_pre_state_capacity",
+        "checkpoint": "runtime_post_postindex_seal_pre_state_capacity",
+        "classification_match": true,
+        "expected_classification": "EMPTY_AUTHORITY_VALID",
+        "verification": {
+          "active_generation_id": 0,
+          "active_repository_sha": null,
+          "classification": "EMPTY_AUTHORITY_VALID",
+          "qualified": true,
+          "reason_code": "no_active_repository_generation",
+          "schema_version": 1,
+          "seal_match": null
+        }
+      },
+      {
+        "authority_target_satisfied": true,
+        "boundary": "post_preindex_seal_pre_index",
+        "checkpoint": "runtime_post_preindex_seal_pre_index",
+        "classification_match": true,
+        "expected_classification": "EMPTY_AUTHORITY_VALID",
+        "verification": {
+          "active_generation_id": 0,
+          "active_repository_sha": null,
+          "classification": "EMPTY_AUTHORITY_VALID",
+          "qualified": true,
+          "reason_code": "no_active_repository_generation",
+          "schema_version": 1,
+          "seal_match": null
+        }
+      },
+      {
+        "authority_target_satisfied": true,
+        "boundary": "post_state_capacity_pre_authority",
+        "checkpoint": "runtime_post_state_capacity_pre_authority",
+        "classification_match": true,
+        "expected_classification": "EMPTY_AUTHORITY_VALID",
+        "verification": {
+          "active_generation_id": 0,
+          "active_repository_sha": null,
+          "classification": "EMPTY_AUTHORITY_VALID",
+          "qualified": true,
+          "reason_code": "no_active_repository_generation",
+          "schema_version": 1,
+          "seal_match": null
+        }
+      }
+    ],
+    "runtime_fault_qualification_complete": false,
+    "schema_version": 1,
+    "seal_mismatch": {
+      "execution": {
+        "authority_published": false,
+        "schema_version": 1,
+        "seal_mismatch_detected": true
+      },
+      "verification": {
+        "active_generation_id": 0,
+        "active_repository_sha": null,
+        "classification": "EMPTY_AUTHORITY_VALID",
+        "qualified": true,
+        "reason_code": "no_active_repository_generation",
+        "schema_version": 1,
+        "seal_match": null
+      }
+    },
+    "status": "measurement-only",
+    "summary": {
+      "after_authority_new_valid": true,
+      "all_pre_authority_interruptions_empty_valid": true,
+      "seal_mismatch_fail_closed": true
+    }
+  },
+  "interpretation": {
+    "m12a_completed": true,
+    "m12b_completed": true,
+    "policy_review_ready": true,
+    "runtime_fault_qualification_complete": false,
+    "runtime_wiring_already_selected": true,
+    "automatic_orphan_recovery_authorized": false,
+    "scope": "PROCESS_INTERRUPTION_PLUS_LIFECYCLE_EXACT_FSYNC_ERROR_PROPAGATION",
+    "reason": "F12 freezes M12a and M12b from the same final source head. M12a proves that every deterministic interruption before guarded Control DB publication preserves empty valid authority, while the post-publication boundary recovers one seal-valid new generation and a forced promoted-snapshot seal mismatch fails closed. M12b proves through the real Optimizations-ON RepositoryLifecycleService.download_or_update entrypoint that exact fsync EIO at four selected durability boundaries propagates as operation failure with generation 0 and no repository authority. This combined evidence does not claim physical power-loss durability, does not retest HTTP download, and does not authorize automatic orphan recovery. A separate P4 policy review must decide whether runtime fault qualification may be marked complete."
+  },
+  "limitations": [
+    "F12 is an evidence freeze, not a policy-selection step; runtime_fault_qualification_complete remains false until separate P4 review.",
+    "M12a proves deterministic process-interruption sequencing for the local post-download pipeline, not physical power-loss behavior.",
+    "M12b proves lifecycle error propagation/control-authority behavior with deterministic syscall injection; it is not block-device or physical power-loss evidence.",
+    "Filesystem durability and block-layer EIO behavior of the selected S1_DEST_SOURCE barriers remain supported separately by M10/M11b evidence.",
+    "HTTP download is outside the M12 authority-preparation scope because it precedes snapshot publication; M12b uses a test-only local archive seam.",
+    "Automatic orphan recovery remains unselected; I1b zero-reference evidence is not deletion authority without authority-wide writer exclusion."
+  ],
+  "m12b_lifecycle_fsync_eio": {
+    "source": {
+      "actions_run_id": 36161193052,
+      "artifact_name": "a1-m12b-lifecycle-fsync-eio",
+      "artifact_id": 10875790793,
+      "artifact_sha256": "5fd3bf5ab048c8020ac9c03c76e631e3ba54cbede14b2cbca02ce66ce78d5803",
+      "artifact_json_sha256": "ce0e9fe27bd3468eafb49a97ac80e6cb072feedb4dcd58a4636f143ee1211e76",
+      "atm_source_commit": "9ffc6b126e00e5b2f9ec5a28b327093d7351131d"
+    },
+    "boundaries": [
+      {
+        "checkpoint": "runtime_ingest_before_tree_fsync",
+        "control_authority_unchanged": true,
+        "control_generation_after": 0,
+        "repository_remains_unready": true
+      },
+      {
+        "checkpoint": "namespace_repository_before_child_fsync",
+        "control_authority_unchanged": true,
+        "control_generation_after": 0,
+        "repository_remains_unready": true
+      },
+      {
+        "checkpoint": "runtime_ingest_before_destination_parent_fsync",
+        "control_authority_unchanged": true,
+        "control_generation_after": 0,
+        "repository_remains_unready": true
+      },
+      {
+        "checkpoint": "runtime_ingest_before_source_parent_fsync",
+        "control_authority_unchanged": true,
+        "control_generation_after": 0,
+        "repository_remains_unready": true
+      }
+    ],
+    "kernel": {
+      "machine": "x86_64",
+      "release": "6.17.0-1022-azure",
+      "system": "Linux"
+    },
+    "limitations": [
+      "M12b qualifies exact fsync EIO propagation through the real lifecycle entrypoint with deterministic syscall injection. It is not a block-device or physical power-loss experiment.",
+      "M12a separately qualifies process-interruption authority sequencing; M11b remains the ext4 block-layer EIO evidence."
+    ],
+    "measurement_id": "atm-a1-m12b-lifecycle-fsync-eio-v1",
+    "protocol": {
+      "block_layer_claim": false,
+      "fault_injection_scope": "M12_TEST_TARGET_ONLY",
+      "m11b_remains_block_layer_evidence": true,
+      "network_download_excluded_with_test_only_local_archive_seam": true,
+      "optimizations_snapshot": "ON",
+      "physical_power_loss_claim": false,
+      "real_lifecycle_entrypoint": "RepositoryLifecycleService.download_or_update"
+    },
+    "runtime_fault_qualification_complete": false,
+    "schema_version": 1,
+    "source_commit": "9ffc6b126e00e5b2f9ec5a28b327093d7351131d",
+    "status": "measurement-only",
+    "summary": {
+      "all_control_generations_unchanged": true,
+      "all_lifecycle_operations_failed_closed": true,
+      "all_repository_authority_absent": true,
+      "all_requested_faults_reached": true,
+      "scenario_count": 4
+    }
+  }
+}

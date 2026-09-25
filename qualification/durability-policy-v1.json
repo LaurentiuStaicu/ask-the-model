@@ -70,7 +70,9 @@
     "same_sha_repair": "benchmarks/durability-v1/evidence.json#tier2_same_sha_repair",
     "fresh_namespace_replay": "benchmarks/durability-v2/evidence.json#m10_replay",
     "fresh_namespace_eio": "benchmarks/durability-v2/evidence.json#m11_eio",
-    "fresh_namespace_exact_eio": "benchmarks/durability-v2/evidence.json#m11b_exact_eio"
+    "fresh_namespace_exact_eio": "benchmarks/durability-v2/evidence.json#m11b_exact_eio",
+    "runtime_authority_replay": "benchmarks/durability-v3/evidence.json#m12_runtime_authority",
+    "runtime_lifecycle_fsync_eio": "benchmarks/durability-v3/evidence.json#m12b_lifecycle_fsync_eio"
   },
   "storage_contract": {
     "platform": "Linux",
@@ -143,7 +145,7 @@
     "runtime_wiring_authorized": true,
     "on_only_durable_ingest_wired": true,
     "runtime_fault_qualification_complete": false,
-    "next_required_slice": "M12_RUNTIME_DURABILITY_FAULT_QUALIFICATION"
+    "next_required_slice": "P4_RUNTIME_FAULT_QUALIFICATION_REVIEW"
   },
   "runtime_integration": {
     "selected": true,
@@ -155,6 +157,10 @@
     "same_sha_repair_uses_durable_ingest": true,
     "automatic_orphan_recovery_selected": false,
     "reason": "The native durable ingest sequence and Vala ABI are qualified separately. Runtime selection is limited to the operation-level Optimizations ON snapshot; OFF preserves the baseline ingest path. The returned pre-barrier seal must be chained through post-promotion and post-index verification before guarded authority publication, and unqualified preexisting final targets remain untouched and fail closed.",
-    "implemented": true
+    "implemented": true,
+    "m12_process_interruption_correctness": "QUALIFIED_WITHIN_DECLARED_SCOPE",
+    "m12_policy_review_ready": true,
+    "m12_scope": "PROCESS_INTERRUPTION_PLUS_LIFECYCLE_EXACT_FSYNC_ERROR_PROPAGATION",
+    "m12_lifecycle_fsync_eio_correctness": "QUALIFIED_WITHIN_DECLARED_SCOPE"
   }
 }
