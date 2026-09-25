@@ -224,6 +224,134 @@ def main() -> int:
     if m11.get("scope_review") != expected_scope_review:
         fail("M11 reviewed evidence scope drifted")
 
+    m11b = evidence.get("m11b_exact_eio")
+    if not isinstance(m11b, dict):
+        fail("M11b exact-EIO evidence is missing")
+    require_source(
+        m11b.get("source"),
+        {
+            "actions_run_id": 36151935138,
+            "artifact_name": "atm-a1-m11b-exact-namespace-fsync-eio-36151935138-1",
+            "artifact_id": 10871264620,
+            "artifact_sha256": "f86852cb93ec3d2ba9ca77a78a2be0fd1630eba4730990f38e493599b5cbf99c",
+            "atm_source_commit": "d2eeee61466dccb85eab1ed94b248aac056f961f",
+        },
+        "M11b",
+    )
+    expected_m11b = {
+        "measurement_id": "atm-a1-m11b-exact-namespace-fsync-eio-v2",
+        "status": "measurement-only",
+        "production_namespace_selected": False,
+        "kernel": {
+            "machine": "x86_64",
+            "release": "6.17.0-1022-azure",
+            "system": "Linux",
+        },
+        "protocol": {
+            "candidate": "S1_DEST_SOURCE",
+            "device_mapper_target": "flakey",
+            "dm_flakey_boundaries": [
+                "destination_hierarchy_child_fsync",
+                "destination_parent_fsync",
+            ],
+            "empty_authority_synced_before_each_scenario": True,
+            "exact_fsync_context_required": True,
+            "fault_teardown_suspend_noflush_nolockfs": True,
+            "feature": "error_writes",
+            "flakey_down_interval_seconds": 600,
+            "flakey_up_interval_seconds": 1,
+            "fresh_process_verifier_after_recovery": True,
+            "no_syncfs_fallback": True,
+            "parent_fsync_probe": "synthetic-fsync-return-eio-on-exact-call",
+            "source_fsync_probe": "full-flow-synthetic-fsync-return-eio-on-call-6",
+        },
+        "results": [
+            {
+                "active_generation_id": 0,
+                "active_repository_sha": None,
+                "authority_fail_closed": True,
+                "boundary": "destination_hierarchy_child_fsync",
+                "candidate_failed": True,
+                "checkpoint": "namespace_repository_before_child_fsync",
+                "classification": "EMPTY_AUTHORITY_VALID",
+                "e2fsck_exit_code": 1,
+                "error_context_match": True,
+                "expected_classification": "EMPTY_AUTHORITY_VALID",
+                "expected_error_context": "Could not fsync snapshot namespace child directory",
+                "final_snapshot_exists": False,
+                "helper_exit_code": 2,
+                "io_error_observed": True,
+                "namespace_clean": False,
+                "qualified": True,
+                "reason_code": "no_repository_authority",
+                "staging_exists": True,
+                "strategy": "S1_DEST_SOURCE",
+            },
+            {
+                "active_generation_id": 0,
+                "active_repository_sha": None,
+                "authority_fail_closed": True,
+                "boundary": "destination_parent_fsync",
+                "candidate_failed": True,
+                "checkpoint": "fresh_post_rename_pre_destination_parent_fsync",
+                "classification": "EMPTY_AUTHORITY_VALID",
+                "e2fsck_exit_code": 1,
+                "error_context_match": True,
+                "expected_classification": "EMPTY_AUTHORITY_VALID",
+                "expected_error_context": "Could not fsync promoted snapshot parent",
+                "final_snapshot_exists": False,
+                "helper_exit_code": 2,
+                "io_error_observed": True,
+                "namespace_clean": False,
+                "qualified": True,
+                "reason_code": "no_repository_authority",
+                "staging_exists": True,
+                "strategy": "S1_DEST_SOURCE",
+            },
+        ],
+        "namespace_parent_fsync_probe": {
+            "directories_created_before_failure": 2,
+            "error_context_match": True,
+            "error_is_eio": True,
+            "fsync_calls": 4,
+            "injection": "fsync-return-eio-on-call-4",
+            "probe_id": "atm-a1-m11b-namespace-parent-fsync-eio-v1",
+            "qualified": True,
+            "schema_version": 1,
+            "successful_fsync_calls_before_failure": 3,
+        },
+        "namespace_parent_fsync_probe_qualified": True,
+        "source_parent_fsync_probe": {
+            "active_generation_id": 0,
+            "active_repository_sha": None,
+            "classification": "EMPTY_AUTHORITY_VALID",
+            "error_context_match": True,
+            "failed_fsync_call": 6,
+            "final_snapshot_exists": True,
+            "helper_exit_code": 2,
+            "injection": "snapshot-durability-fsync-return-eio-on-call-6",
+            "io_error_observed": True,
+            "namespace_clean": True,
+            "probe_id": "atm-a1-m11b-source-parent-fsync-eio-v1",
+            "qualified": True,
+            "schema_version": 1,
+            "staging_exists": False,
+        },
+        "source_parent_fsync_probe_qualified": True,
+        "all_authority_fail_closed": True,
+        "all_e2fsck_recoverable": True,
+        "all_exact_error_contexts": True,
+        "limitations": [
+            "M11b qualifies block-layer EIO at the exact hierarchy-child and destination-parent fsync contexts on ext4. The containing-parent namespace fsync and the post-rename source-parent fsync use deterministic exact-syscall probes because a preceding fsync can drain the shared journal and leave no block write for dm-flakey to fail at those exact calls.",
+            "M10 remains the process-crash replay evidence for namespace ordering and fresh-authority classification.",
+            "Passing M11b does not authorize automatic orphan deletion or replace the separate authority-wide recovery-exclusion problem.",
+        ],
+    }
+    actual_m11b = dict(m11b)
+    actual_m11b.pop("source", None)
+    if actual_m11b != expected_m11b:
+        fail("M11b exact frozen result drifted")
+
     interpretation = evidence.get("interpretation", {})
     if interpretation.get("m10_empirically_distinguished_candidates") is not False:
         fail("M10 empirical tie interpretation drifted")
@@ -231,12 +359,14 @@ def main() -> int:
         fail("M11 completion marker drifted")
     if interpretation.get("candidate_for_policy_review") != "S1_DEST_SOURCE":
         fail("policy-review candidate drifted")
-    if interpretation.get("policy_review_ready") is not False:
-        fail("policy review must remain blocked pending M11b")
-    if interpretation.get("m11_exact_fsync_qualification_complete") is not False:
-        fail("M11 exact-fsync completion must remain false pending M11b")
-    if interpretation.get("m11b_required") is not True:
-        fail("M11b requirement was lost")
+    if interpretation.get("m11b_completed") is not True:
+        fail("M11b completion marker was lost")
+    if interpretation.get("policy_review_ready") is not True:
+        fail("F11b must mark namespace evidence ready for separate policy review")
+    if interpretation.get("m11_exact_fsync_qualification_complete") is not True:
+        fail("M11b exact-fsync qualification completion was lost")
+    if interpretation.get("m11b_required") is not False:
+        fail("M11b must no longer remain required after F11b freeze")
     if interpretation.get("production_namespace_sequence_selected") is not False:
         fail("F10 must remain evidence-only")
     if interpretation.get("automatic_orphan_recovery_authorized") is not False:
@@ -255,14 +385,14 @@ def main() -> int:
 
     reason = str(interpretation.get("reason", "")).lower()
     for phrase in (
-        "fresh destination hierarchy",
-        "destination rename-parent",
-        "source staging-parent",
-        "historical m11 destination-parent result fsync-specific",
-        "hierarchy checkpoint preceded mkdirat/open/fstat",
-        "source-parent testing showed that fsync can return successfully",
-        "later control db write",
-        "blocked on m11b",
+        "contract-complete candidate for policy review",
+        "m10 shows fresh-install process-crash replay",
+        "linux requires explicit containing-directory fsync",
+        "hierarchy child and destination parent via dm-flakey",
+        "containing namespace parent via an exact syscall probe",
+        "source staging parent via a full-flow exact call-6 probe",
+        "every measured failure remains fail-closed before authority",
+        "does not select production namespace sequencing",
     ):
         if phrase not in reason:
             fail(f"review rationale lost: {phrase}")
@@ -275,11 +405,10 @@ def main() -> int:
         "not a universal filesystem",
         "does not weaken the linux directory-entry durability contract",
         "production namespace sequencing remains unselected",
+        "historical m11 hierarchy/source fsync-specific interpretation remains superseded",
+        "exact syscall error propagation and fail-closed control flow",
+        "not block-device writeback",
         "authority-wide exclusion",
-        "does not isolate fsync from preceding mkdirat/open/fstat",
-        "suspended until m11b",
-        "source-parent checkpoint is positioned immediately before",
-        "may not force write i/o at that call",
     ):
         if phrase not in limitations:
             fail(f"reviewed limitation lost: {phrase}")

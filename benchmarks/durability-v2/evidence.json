@@ -149,19 +149,136 @@
     "m10_empirically_distinguished_candidates": false,
     "m11_completed": true,
     "candidate_for_policy_review": "S1_DEST_SOURCE",
-    "policy_review_ready": false,
+    "policy_review_ready": true,
     "production_namespace_sequence_selected": false,
     "automatic_orphan_recovery_authorized": false,
-    "reason": "S1_DEST_SOURCE remains the candidate for policy review because it explicitly covers fresh destination hierarchy persistence, destination rename-parent persistence, and source staging-parent persistence after cross-directory rename. Post-freeze review leaves only the historical M11 destination-parent result fsync-specific: the hierarchy checkpoint preceded mkdirat/open/fstat, and later exact source-parent testing showed that fsync can return successfully while the still-active block fault is reported by a later Control DB write. Exact hierarchy/source fsync qualification remains blocked on M11b.",
-    "m11_exact_fsync_qualification_complete": false,
-    "m11b_required": true
+    "reason": "S1_DEST_SOURCE remains the contract-complete candidate for policy review. M10 shows fresh-install process-crash replay remains authority-safe across the reviewed namespace boundaries, while Linux requires explicit containing-directory fsync for durable directory entries. M11b now isolates the missing exact fsync failure paths: hierarchy child and destination parent via dm-flakey with exact error context, containing namespace parent via an exact syscall probe, and source staging parent via a full-flow exact call-6 probe. Every measured failure remains fail-closed before authority. Evidence is ready for separate policy review, but F11b does not select production namespace sequencing.",
+    "m11_exact_fsync_qualification_complete": true,
+    "m11b_required": false,
+    "m11b_completed": true
   },
   "limitations": [
-    "M10/M11 are ext4 Linux qualification evidence, not a universal filesystem or physical-power-loss proof.",
+    "M10/M11/M11b are Linux ext4 qualification evidence, not a universal filesystem or physical-power-loss proof.",
     "Clean ext4 replay for parent-only does not weaken the Linux directory-entry durability contract.",
-    "F10 freezes evidence only; production namespace sequencing remains unselected until a separate policy review.",
-    "M11 does not authorize automatic orphan deletion; that still requires authority-wide exclusion covering every Control DB writer.",
-    "The frozen M11 destination-hierarchy result does not isolate fsync from preceding mkdirat/open/fstat work; policy review readiness is suspended until M11b exact-fsync evidence is reviewed.",
-    "The frozen M11 source-parent checkpoint is positioned immediately before the source-parent fsync, but the artifact does not retain boundary-specific stderr; later exact testing showed dm-flakey may not force write I/O at that call, so its fsync-specific interpretation is suspended pending M11b."
-  ]
+    "F11b freezes evidence only; production namespace sequencing remains unselected until a separate policy review.",
+    "Historical M11 hierarchy/source fsync-specific interpretation remains superseded by M11b exact-fsync evidence.",
+    "M11b containing-parent and source-parent probes qualify exact syscall error propagation and fail-closed control flow, not block-device writeback at those two calls.",
+    "M11b does not authorize automatic orphan deletion; that still requires authority-wide exclusion covering every Control DB writer."
+  ],
+  "m11b_exact_eio": {
+    "source": {
+      "actions_run_id": 36151935138,
+      "artifact_name": "atm-a1-m11b-exact-namespace-fsync-eio-36151935138-1",
+      "artifact_id": 10871264620,
+      "artifact_sha256": "f86852cb93ec3d2ba9ca77a78a2be0fd1630eba4730990f38e493599b5cbf99c",
+      "atm_source_commit": "d2eeee61466dccb85eab1ed94b248aac056f961f"
+    },
+    "measurement_id": "atm-a1-m11b-exact-namespace-fsync-eio-v2",
+    "status": "measurement-only",
+    "production_namespace_selected": false,
+    "kernel": {
+      "machine": "x86_64",
+      "release": "6.17.0-1022-azure",
+      "system": "Linux"
+    },
+    "protocol": {
+      "candidate": "S1_DEST_SOURCE",
+      "device_mapper_target": "flakey",
+      "dm_flakey_boundaries": [
+        "destination_hierarchy_child_fsync",
+        "destination_parent_fsync"
+      ],
+      "empty_authority_synced_before_each_scenario": true,
+      "exact_fsync_context_required": true,
+      "fault_teardown_suspend_noflush_nolockfs": true,
+      "feature": "error_writes",
+      "flakey_down_interval_seconds": 600,
+      "flakey_up_interval_seconds": 1,
+      "fresh_process_verifier_after_recovery": true,
+      "no_syncfs_fallback": true,
+      "parent_fsync_probe": "synthetic-fsync-return-eio-on-exact-call",
+      "source_fsync_probe": "full-flow-synthetic-fsync-return-eio-on-call-6"
+    },
+    "results": [
+      {
+        "active_generation_id": 0,
+        "active_repository_sha": null,
+        "authority_fail_closed": true,
+        "boundary": "destination_hierarchy_child_fsync",
+        "candidate_failed": true,
+        "checkpoint": "namespace_repository_before_child_fsync",
+        "classification": "EMPTY_AUTHORITY_VALID",
+        "e2fsck_exit_code": 1,
+        "error_context_match": true,
+        "expected_classification": "EMPTY_AUTHORITY_VALID",
+        "expected_error_context": "Could not fsync snapshot namespace child directory",
+        "final_snapshot_exists": false,
+        "helper_exit_code": 2,
+        "io_error_observed": true,
+        "namespace_clean": false,
+        "qualified": true,
+        "reason_code": "no_repository_authority",
+        "staging_exists": true,
+        "strategy": "S1_DEST_SOURCE"
+      },
+      {
+        "active_generation_id": 0,
+        "active_repository_sha": null,
+        "authority_fail_closed": true,
+        "boundary": "destination_parent_fsync",
+        "candidate_failed": true,
+        "checkpoint": "fresh_post_rename_pre_destination_parent_fsync",
+        "classification": "EMPTY_AUTHORITY_VALID",
+        "e2fsck_exit_code": 1,
+        "error_context_match": true,
+        "expected_classification": "EMPTY_AUTHORITY_VALID",
+        "expected_error_context": "Could not fsync promoted snapshot parent",
+        "final_snapshot_exists": false,
+        "helper_exit_code": 2,
+        "io_error_observed": true,
+        "namespace_clean": false,
+        "qualified": true,
+        "reason_code": "no_repository_authority",
+        "staging_exists": true,
+        "strategy": "S1_DEST_SOURCE"
+      }
+    ],
+    "namespace_parent_fsync_probe": {
+      "directories_created_before_failure": 2,
+      "error_context_match": true,
+      "error_is_eio": true,
+      "fsync_calls": 4,
+      "injection": "fsync-return-eio-on-call-4",
+      "probe_id": "atm-a1-m11b-namespace-parent-fsync-eio-v1",
+      "qualified": true,
+      "schema_version": 1,
+      "successful_fsync_calls_before_failure": 3
+    },
+    "namespace_parent_fsync_probe_qualified": true,
+    "source_parent_fsync_probe": {
+      "active_generation_id": 0,
+      "active_repository_sha": null,
+      "classification": "EMPTY_AUTHORITY_VALID",
+      "error_context_match": true,
+      "failed_fsync_call": 6,
+      "final_snapshot_exists": true,
+      "helper_exit_code": 2,
+      "injection": "snapshot-durability-fsync-return-eio-on-call-6",
+      "io_error_observed": true,
+      "namespace_clean": true,
+      "probe_id": "atm-a1-m11b-source-parent-fsync-eio-v1",
+      "qualified": true,
+      "schema_version": 1,
+      "staging_exists": false
+    },
+    "source_parent_fsync_probe_qualified": true,
+    "all_authority_fail_closed": true,
+    "all_e2fsck_recoverable": true,
+    "all_exact_error_contexts": true,
+    "limitations": [
+      "M11b qualifies block-layer EIO at the exact hierarchy-child and destination-parent fsync contexts on ext4. The containing-parent namespace fsync and the post-rename source-parent fsync use deterministic exact-syscall probes because a preceding fsync can drain the shared journal and leave no block write for dm-flakey to fail at those exact calls.",
+      "M10 remains the process-crash replay evidence for namespace ordering and fresh-authority classification.",
+      "Passing M11b does not authorize automatic orphan deletion or replace the separate authority-wide recovery-exclusion problem."
+    ]
+  }
 }
