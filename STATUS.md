@@ -62,7 +62,7 @@ v0.5.0 provides:
 - local Ollama-compatible provider discovery on loopback;
 - provider-managed completion-capable AI-model discovery;
 - refreshable AI-model selector;
-- streamed text-chat responses;
+- text-chat responses assembled from the local provider's streamed `/api/chat` transport;
 - independent multi-chat tabs;
 - fixed EWD/CBD/RMD repository selection before first Send;
 - exact remote SHA/version Refresh;
@@ -77,7 +77,7 @@ v0.5.0 provides:
 - current-turn-only repository grounding;
 - compact numbered source references;
 - source-detail windows exposing repository/version, exact snapshot SHA, file/locator, logical source ID, readable excerpt and immutable source permalink;
-- ordinary zero-repository local chat as a separate streaming path;
+- ordinary zero-repository local chat as a separate local-provider path;
 - automatic desktop light/dark appearance.
 - asynchronous G-S0 startup qualification before local-provider discovery;
 - effective Flatpak deployment identity and platform fingerprint recording;
