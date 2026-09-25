@@ -461,6 +461,19 @@ test_read_only_control_state_is_rejected (void)
         ==,
         0
     );
+    guint64 references = G_MAXUINT64;
+    g_assert_true (
+        atm_control_state_count_complete_snapshot_references (
+            path,
+            "rmd",
+            "1111111111111111111111111111111111111111",
+            &references,
+            &error
+        )
+    );
+    g_assert_no_error (error);
+    g_assert_cmpuint (references, ==, 0);
+
     g_assert_cmpint (
         chmod (
             root,
@@ -2104,6 +2117,356 @@ test_runtime_mutations_are_copy_on_write (void)
 
 
 static void
+test_complete_snapshot_reference_count (void)
+{
+    char *root = new_temp_root (
+        "atm-control-state-reference-count-XXXXXX"
+    );
+    char *control =
+        control_state_path_for_root (root);
+    const char *rmd_sha_a =
+        "1111111111111111111111111111111111111111";
+    const char *rmd_sha_b =
+        "2222222222222222222222222222222222222222";
+    const char *ewd_sha =
+        "3333333333333333333333333333333333333333";
+    const char *seal =
+        "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa";
+    GError *error = NULL;
+    AtmControlStateStore *store = NULL;
+
+    g_assert_true (
+        atm_control_state_open (
+            control,
+            &store,
+            &error
+        )
+    );
+    g_assert_no_error (error);
+    atm_control_state_close (store);
+
+    guint64 references = G_MAXUINT64;
+
+    g_assert_true (
+        atm_control_state_count_complete_snapshot_references (
+            control,
+            "rmd",
+            rmd_sha_a,
+            &references,
+            &error
+        )
+    );
+    g_assert_no_error (error);
+    g_assert_cmpuint (references, ==, 0);
+
+    g_assert_true (
+        atm_control_state_set_current_values (
+            control,
+            "rmd",
+            rmd_sha_a,
+            "0.1.0",
+            NULL,
+            &error
+        )
+    );
+    g_assert_no_error (error);
+
+    g_assert_true (
+        atm_control_state_count_complete_snapshot_references (
+            control,
+            "rmd",
+            rmd_sha_a,
+            &references,
+            &error
+        )
+    );
+    g_assert_no_error (error);
+    g_assert_cmpuint (references, ==, 1);
+
+    g_assert_true (
+        atm_control_state_count_complete_snapshot_references (
+            control,
+            "ewd",
+            rmd_sha_a,
+            &references,
+            &error
+        )
+    );
+    g_assert_no_error (error);
+    g_assert_cmpuint (references, ==, 0);
+
+    g_assert_true (
+        atm_control_state_set_current_values (
+            control,
+            "ewd",
+            ewd_sha,
+            "0.2.0",
+            NULL,
+            &error
+        )
+    );
+    g_assert_no_error (error);
+
+    g_assert_true (
+        atm_control_state_count_complete_snapshot_references (
+            control,
+            "rmd",
+            rmd_sha_a,
+            &references,
+            &error
+        )
+    );
+    g_assert_no_error (error);
+    g_assert_cmpuint (references, ==, 2);
+
+    g_assert_true (
+        atm_control_state_set_current_values (
+            control,
+            "rmd",
+            rmd_sha_b,
+            "0.2.0",
+            NULL,
+            &error
+        )
+    );
+    g_assert_no_error (error);
+
+    g_assert_true (
+        atm_control_state_count_complete_snapshot_references (
+            control,
+            "rmd",
+            rmd_sha_a,
+            &references,
+            &error
+        )
+    );
+    g_assert_no_error (error);
+    g_assert_cmpuint (references, ==, 2);
+
+    g_assert_true (
+        atm_control_state_count_complete_snapshot_references (
+            control,
+            "rmd",
+            rmd_sha_b,
+            &references,
+            &error
+        )
+    );
+    g_assert_no_error (error);
+    g_assert_cmpuint (references, ==, 1);
+
+    g_assert_true (
+        atm_control_state_set_snapshot_seal_values (
+            control,
+            "rmd",
+            rmd_sha_b,
+            seal,
+            &error
+        )
+    );
+    g_assert_no_error (error);
+
+    g_assert_true (
+        atm_control_state_count_complete_snapshot_references (
+            control,
+            "rmd",
+            rmd_sha_b,
+            &references,
+            &error
+        )
+    );
+    g_assert_no_error (error);
+    g_assert_cmpuint (references, ==, 2);
+
+    g_assert_true (
+        atm_control_state_count_complete_snapshot_references (
+            control,
+            "ewd",
+            ewd_sha,
+            &references,
+            &error
+        )
+    );
+    g_assert_no_error (error);
+    g_assert_cmpuint (references, ==, 3);
+
+    references = G_MAXUINT64;
+    g_assert_false (
+        atm_control_state_count_complete_snapshot_references (
+            control,
+            "unknown",
+            rmd_sha_a,
+            &references,
+            &error
+        )
+    );
+    g_assert_error (
+        error,
+        ATM_CONTROL_STATE_ERROR,
+        ATM_CONTROL_STATE_ERROR_ARGUMENT
+    );
+    g_assert_cmpuint (
+        references,
+        ==,
+        G_MAXUINT64
+    );
+    g_clear_error (&error);
+
+    references = G_MAXUINT64;
+    g_assert_false (
+        atm_control_state_count_complete_snapshot_references (
+            control,
+            "rmd",
+            "not-a-sha",
+            &references,
+            &error
+        )
+    );
+    g_assert_error (
+        error,
+        ATM_CONTROL_STATE_ERROR,
+        ATM_CONTROL_STATE_ERROR_ARGUMENT
+    );
+    g_assert_cmpuint (
+        references,
+        ==,
+        G_MAXUINT64
+    );
+    g_clear_error (&error);
+
+    char *missing = g_build_filename (
+        root,
+        "missing-control.sqlite3",
+        NULL
+    );
+    references = G_MAXUINT64;
+    g_assert_false (
+        atm_control_state_count_complete_snapshot_references (
+            missing,
+            "rmd",
+            rmd_sha_a,
+            &references,
+            &error
+        )
+    );
+    g_assert_error (
+        error,
+        ATM_CONTROL_STATE_ERROR,
+        ATM_CONTROL_STATE_ERROR_IO
+    );
+    g_assert_cmpuint (
+        references,
+        ==,
+        G_MAXUINT64
+    );
+    g_clear_error (&error);
+
+    g_free (missing);
+    g_free (control);
+    remove_tree_best_effort (root);
+    g_free (root);
+}
+
+
+static void
+test_complete_snapshot_reference_read_does_not_migrate_v1 (void)
+{
+    char *root = new_temp_root (
+        "atm-control-state-reference-readonly-XXXXXX"
+    );
+    char *path = db_path (root);
+    const char *rmd_sha =
+        "0123456789abcdef0123456789abcdef01234567";
+
+    create_v1_control_db (
+        path,
+        TRUE,
+        FALSE
+    );
+
+    g_assert_cmpint (
+        raw_pragma_int64 (
+            path,
+            "PRAGMA user_version;"
+        ),
+        ==,
+        1
+    );
+
+    char *before_schema = raw_pragma_text (
+        path,
+        "SELECT schema_id FROM installation "
+        "WHERE singleton_id=1;"
+    );
+    g_assert_cmpstr (
+        before_schema,
+        ==,
+        "atm-control-state/1"
+    );
+    g_free (before_schema);
+
+    guint64 references = G_MAXUINT64;
+    GError *error = NULL;
+
+    g_assert_false (
+        atm_control_state_count_complete_snapshot_references (
+            path,
+            "rmd",
+            rmd_sha,
+            &references,
+            &error
+        )
+    );
+    g_assert_error (
+        error,
+        ATM_CONTROL_STATE_ERROR,
+        ATM_CONTROL_STATE_ERROR_SCHEMA
+    );
+    g_assert_cmpuint (
+        references,
+        ==,
+        G_MAXUINT64
+    );
+    g_clear_error (&error);
+
+    g_assert_cmpint (
+        raw_pragma_int64 (
+            path,
+            "PRAGMA user_version;"
+        ),
+        ==,
+        1
+    );
+
+    char *after_schema = raw_pragma_text (
+        path,
+        "SELECT schema_id FROM installation "
+        "WHERE singleton_id=1;"
+    );
+    g_assert_cmpstr (
+        after_schema,
+        ==,
+        "atm-control-state/1"
+    );
+    g_free (after_schema);
+
+    g_assert_cmpint (
+        raw_pragma_int64 (
+            path,
+            "SELECT count(*) FROM migration_ledger "
+            "WHERE migration_id='state-schema-v1-to-v2';"
+        ),
+        ==,
+        0
+    );
+
+    g_free (path);
+    remove_tree_best_effort (root);
+    g_free (root);
+}
+
+
+static void
 test_direct_complete_insert_is_rejected (void)
 {
     char *root = new_temp_root (
@@ -2788,6 +3151,14 @@ main (int argc, char **argv)
     g_test_add_func (
         "/control-state/runtime-copy-on-write",
         test_runtime_mutations_are_copy_on_write
+    );
+    g_test_add_func (
+        "/control-state/complete-snapshot-reference-count",
+        test_complete_snapshot_reference_count
+    );
+    g_test_add_func (
+        "/control-state/complete-snapshot-reference-readonly-v1",
+        test_complete_snapshot_reference_read_does_not_migrate_v1
     );
     g_test_add_func (
         "/control-state/direct-complete-insert-rejected",
