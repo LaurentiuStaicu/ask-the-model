@@ -1314,6 +1314,18 @@ This slice is deliberately ABI-only. `RepositoryLifecycleService` does not call 
 
 Separating the binding from lifecycle wiring lets the ordinary Flatpak/Vala build validate the C ABI and ownership/signature mapping before Optimizations ON is allowed to select the durable ingest path. The next slice must keep Optimizations OFF on the existing baseline ingest, select the durable call only from the operation-level ON snapshot, carry the returned pre-barrier seal through post-index verification, and reject unqualified pre-existing final targets without deleting them.
 
+### OPT-A1-P3 ON-only runtime integration policy
+
+P3 selects the first runtime integration contract but does not yet authorize the implementation. The operation-level `Optimizations` snapshot remains the sole runtime gate.
+
+When that snapshot is OFF, repository Download/Update continues through the existing baseline non-durable ingest path. When it is ON and a downloaded archive must be installed, the selected path is the namespace-complete `S1_DEST_SOURCE` durable ingest exposed by I1d1.
+
+The durable call returns the pre-barrier snapshot seal that identifies the bytes covered by the S1 content barrier. Lifecycle integration must recompute the promoted snapshot seal before indexing and require equality with that returned seal, then retain the existing post-index seal and file/byte-count equality check. Guarded Control DB publication may occur only after this seal chain and the existing state-capacity recheck succeed.
+
+An Optimizations-ON mutation must not reuse an unqualified pre-existing final target for the incoming SHA. Outside the already-qualified same-SHA repair flow, such a target is left untouched and the operation fails closed without authority advance. Same-SHA repair keeps its quarantine step and then uses durable ingest. Automatic orphan deletion or quarantine based on I1b zero-reference evidence remains unselected because authority-wide writer exclusion is still absent.
+
+P3 sets `runtime_integration_selected=true` while retaining `runtime_wiring_authorized=false`. I1d2 is the separate implementation slice that must prove ON/OFF routing, the pre-barrier seal chain, fail-closed pre-existing-target handling, and unchanged OFF behavior before runtime wiring can be authorized.
+
 ### Recovery fault qualification
 
 The OPT-A0 recovery harness is test-only. Native checkpoint calls compile to no-ops in the production application; only the dedicated recovery helper is built with `ATM_TEST_FAULT_INJECTION`.
