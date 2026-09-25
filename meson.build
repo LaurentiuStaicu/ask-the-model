@@ -935,6 +935,9 @@ m12_runtime_authority_replay_helper = executable(
     archive_dep,
     yaml_dep
   ],
+  c_args: [
+    '-DATM_TEST_FAULT_INJECTION'
+  ],
   install: false
 )
 
