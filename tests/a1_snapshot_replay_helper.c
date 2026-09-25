@@ -618,6 +618,49 @@ initialize_old (
 }
 
 static gboolean
+corrupt_old_snapshot (
+    const char *root,
+    GError **error
+)
+{
+    char *data_root = data_root_for (root);
+    char *snapshot = atm_repository_snapshot_path (
+        data_root,
+        REPOSITORY_ID,
+        OLD_SHA
+    );
+    char *status = g_build_filename (
+        snapshot,
+        "STATUS.md",
+        NULL
+    );
+    gboolean ok = g_file_set_contents (
+        status,
+        "# A1-M9 deliberately corrupted same-SHA snapshot\n",
+        -1,
+        error
+    );
+
+    g_free (status);
+    g_free (snapshot);
+    g_free (data_root);
+    return ok;
+}
+
+static gboolean
+initialize_invalid_repair (
+    const char *root,
+    GError **error
+)
+{
+    if (!initialize_old (root, error)) {
+        return FALSE;
+    }
+
+    return corrupt_old_snapshot (root, error);
+}
+
+static gboolean
 promote_new (
     const char *root,
     const char *checkpoint,
