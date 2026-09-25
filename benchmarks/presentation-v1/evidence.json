@@ -1,0 +1,95 @@
+{
+  "schema": "atm-presentation-performance-evidence/1",
+  "status": "frozen-measurement",
+  "scope": "qualification-only",
+  "source": {
+    "pull_request": 276,
+    "tested_head_sha": "20a484b095cd9e565aeb63c97015c083f6c61e57",
+    "workflow": "Presentation Performance",
+    "workflow_run_id": 36139661109,
+    "runner": "ubuntu-24.04",
+    "compiler": "gcc 13.3.0",
+    "glib_runtime": "2.80.0",
+    "glib_dev_package": "2.80.0-6ubuntu3.9"
+  },
+  "measurement_contract": {
+    "path": "normalize + semantic document + plain-text projection + cleanup",
+    "input_profile": "deterministic valid Markdown-like mixed-content fixture",
+    "warmup_iterations": 8,
+    "input_sizes_bytes": [
+      1024,
+      4096,
+      16384,
+      65536,
+      262144,
+      1048576
+    ],
+    "iterations_by_size": {
+      "1024": 500,
+      "4096": 250,
+      "16384": 100,
+      "65536": 30,
+      "262144": 10,
+      "1048576": 3
+    }
+  },
+  "attempts": [
+    {
+      "attempt": 1,
+      "artifact_id": 10866077220,
+      "artifact_name": "presentation-performance-36139661109-1",
+      "artifact_digest": "sha256:6c4cefd16dff0f0fc2f43fc71871b345887cad366bf8b9d28cc9b32d7e1806da",
+      "cpu_model": "INTEL(R) XEON(R) PLATINUM 8573C",
+      "cpu_count": 4,
+      "measurements": [
+        {"input_bytes": 1024, "iterations": 500, "output_bytes": 926, "median_us": 10, "p95_us": 12, "max_us": 26},
+        {"input_bytes": 4096, "iterations": 250, "output_bytes": 3661, "median_us": 40, "p95_us": 45, "max_us": 75},
+        {"input_bytes": 16384, "iterations": 100, "output_bytes": 14679, "median_us": 153, "p95_us": 165, "max_us": 182},
+        {"input_bytes": 65536, "iterations": 30, "output_bytes": 58742, "median_us": 587, "p95_us": 624, "max_us": 643},
+        {"input_bytes": 262144, "iterations": 10, "output_bytes": 234956, "median_us": 2315, "p95_us": 2731, "max_us": 2731},
+        {"input_bytes": 1048576, "iterations": 3, "output_bytes": 939859, "median_us": 9884, "p95_us": 9918, "max_us": 9918}
+      ]
+    },
+    {
+      "attempt": 2,
+      "artifact_id": 10866117386,
+      "artifact_name": "presentation-performance-36139661109-2",
+      "artifact_digest": "sha256:0a03fab1d3b4160d991926fee5a2f62414d106459b303da321f9bdc791cefe24",
+      "cpu_model": "AMD EPYC 7763 64-Core Processor",
+      "cpu_count": 4,
+      "measurements": [
+        {"input_bytes": 1024, "iterations": 500, "output_bytes": 926, "median_us": 14, "p95_us": 15, "max_us": 52},
+        {"input_bytes": 4096, "iterations": 250, "output_bytes": 3661, "median_us": 51, "p95_us": 59, "max_us": 68},
+        {"input_bytes": 16384, "iterations": 100, "output_bytes": 14679, "median_us": 193, "p95_us": 210, "max_us": 242},
+        {"input_bytes": 65536, "iterations": 30, "output_bytes": 58742, "median_us": 747, "p95_us": 809, "max_us": 815},
+        {"input_bytes": 262144, "iterations": 10, "output_bytes": 234956, "median_us": 2967, "p95_us": 3021, "max_us": 3021},
+        {"input_bytes": 1048576, "iterations": 3, "output_bytes": 939859, "median_us": 11776, "p95_us": 11810, "max_us": 11810}
+      ]
+    },
+    {
+      "attempt": 3,
+      "artifact_id": 10866287374,
+      "artifact_name": "presentation-performance-36139661109-3",
+      "artifact_digest": "sha256:9bd2a2f89adde162cb9f968de010948771a62d8f440fbcb19f7e51b5b3f903a9",
+      "cpu_model": "AMD EPYC 9V74 80-Core Processor",
+      "cpu_count": 4,
+      "measurements": [
+        {"input_bytes": 1024, "iterations": 500, "output_bytes": 926, "median_us": 13, "p95_us": 14, "max_us": 39},
+        {"input_bytes": 4096, "iterations": 250, "output_bytes": 3661, "median_us": 48, "p95_us": 74, "max_us": 101},
+        {"input_bytes": 16384, "iterations": 100, "output_bytes": 14679, "median_us": 184, "p95_us": 195, "max_us": 295},
+        {"input_bytes": 65536, "iterations": 30, "output_bytes": 58742, "median_us": 721, "p95_us": 1005, "max_us": 1043},
+        {"input_bytes": 262144, "iterations": 10, "output_bytes": 234956, "median_us": 2813, "p95_us": 3487, "max_us": 3487},
+        {"input_bytes": 1048576, "iterations": 3, "output_bytes": 939859, "median_us": 11265, "p95_us": 11380, "max_us": 11380}
+      ]
+    }
+  ],
+  "derived_review": {
+    "observed_scaling": "approximately-linear-over-measured-range",
+    "one_mib_median_us_min": 9884,
+    "one_mib_median_us_max": 11776,
+    "one_mib_p95_us_max": 11810,
+    "production_latency_threshold_selected": false,
+    "production_input_budget_selected": false,
+    "coverage_guided_fuzzing_required_for_runtime": false
+  }
+}
