@@ -118,6 +118,8 @@ def main() -> int:
         "RepositoryNative.ingest_archive_durable",
         "RepositoryNative.ingest_archive (",
         "Durable repository snapshot seal changed across promotion.",
+        "durable_pre_barrier_seal !=",
+        "pre_snapshot_seal",
         "Optimized durable ingest refuses an unqualified pre-existing final snapshot target.",
     ):
         if required not in lifecycle:
