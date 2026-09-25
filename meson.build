@@ -1813,6 +1813,58 @@ test(
   timeout: 15
 )
 
+
+c_compiler = meson.get_compiler('c')
+presentation_sanitizers_supported =
+  c_compiler.has_multi_arguments(
+    '-fsanitize=address,undefined',
+    '-fno-omit-frame-pointer'
+  ) and
+  c_compiler.has_link_argument(
+    '-fsanitize=address,undefined'
+  )
+
+if presentation_sanitizers_supported
+  presentation_sanitizer_test = executable(
+    'presentation-sanitizer-test',
+    [
+      'src/presentation_document.c',
+      'src/presentation_normalize.c',
+      'third_party/md4c/md4c.c',
+      'tests/presentation_stress_test.c'
+    ],
+    include_directories: [
+      include_directories('src'),
+      md4c_inc
+    ],
+    dependencies: [
+      glib_dep
+    ],
+    c_args: [
+      '-fsanitize=address,undefined',
+      '-fno-omit-frame-pointer',
+      '-O1',
+      '-g'
+    ],
+    link_args: [
+      '-fsanitize=address,undefined'
+    ],
+    install: false
+  )
+
+  test(
+    'presentation-sanitizer',
+    presentation_sanitizer_test,
+    timeout: 30,
+    env: {
+      'ASAN_OPTIONS':
+        'halt_on_error=1:abort_on_error=1:detect_leaks=1',
+      'UBSAN_OPTIONS':
+        'halt_on_error=1:abort_on_error=1:print_stacktrace=1'
+    }
+  )
+endif
+
 subdir('data')
 
 icon_sizes = ['16', '24', '32', '48', '64', '128']
