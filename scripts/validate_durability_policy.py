@@ -344,8 +344,9 @@ def main() -> int:
         "durable_ingest_namespace_complete": True,
         "runtime_wiring_authorized": False,
         "next_required_slice": (
-            "RUNTIME_BRIDGE_AND_LIFECYCLE_INTEGRATION_REVIEW"
+            "LIFECYCLE_ON_ONLY_DURABLE_INGEST_ACTIVATION_REVIEW"
         ),
+        "vala_durable_ingest_bridge_available": True,
     }:
         fail("implementation staging contract drifted")
 
@@ -377,7 +378,7 @@ def main() -> int:
 
     print(
         "durability production policy validation passed: "
-        "S1 + S1_DEST_SOURCE selected; dormant ingest namespace-complete; runtime remains unwired"
+        "S1 + S1_DEST_SOURCE selected; dormant Vala bridge available; lifecycle remains unwired"
     )
     return 0
 
