@@ -118,6 +118,29 @@ print(hashlib.sha256(payload).hexdigest())
 PY
 BASELINE_SHA="$(sha256sum "$BASELINE_MOUNT/baseline.bin" | awk '{print $1}')"
 
+# Pre-create and durably commit the write-probe inode before fault injection.
+# This keeps the capability observation focused on write I/O failure rather
+# than on a new directory-entry allocation under the flakey target.
+python3 - "$BASELINE_MOUNT" <<'PY'
+import os
+import pathlib
+import sys
+
+path = pathlib.Path(sys.argv[1]) / "must-fail.bin"
+fd = os.open(path, os.O_WRONLY | os.O_CREAT | os.O_TRUNC, 0o600)
+try:
+    os.write(fd, b"0" * 4096)
+    os.fsync(fd)
+finally:
+    os.close(fd)
+
+dir_fd = os.open(path.parent, os.O_RDONLY | os.O_DIRECTORY)
+try:
+    os.fsync(dir_fd)
+finally:
+    os.close(dir_fd)
+PY
+
 sync -f "$BASELINE_MOUNT"
 
 sudo dmsetup suspend "$MAPPER_NAME"
@@ -142,13 +165,13 @@ root = pathlib.Path(sys.argv[1])
 path = root / "must-fail.bin"
 
 try:
-    fd = os.open(
-        path,
-        os.O_WRONLY | os.O_CREAT | os.O_TRUNC,
-        0o600,
-    )
+    fd = os.open(path, os.O_WRONLY)
     try:
-        os.write(fd, b"x" * 4096)
+        os.lseek(fd, 0, os.SEEK_SET)
+        view = memoryview(b"x" * 4096)
+        offset = 0
+        while offset < len(view):
+            offset += os.write(fd, view[offset:])
         os.fsync(fd)
     finally:
         os.close(fd)
