@@ -1226,6 +1226,26 @@ The production policy therefore keeps the already-qualified content strategy `S1
 
 The policy's active promotion order reverts to the P1 content-durability sequence until M11b is reviewed. The extra destination-hierarchy and source-parent steps remain candidate operations only; no application caller may rely on them as selected policy. PRs that implement the P2 namespace order must remain draft/blocked until a later freeze restores policy readiness.
 
+### OPT-A1-M11b exact namespace fsync EIO qualification
+
+M11b is a measurement-only correction gate for the `S1_DEST_SOURCE` namespace candidate. It does not reselect that candidate, modify repository ingest, add a Vala/lifecycle caller, authorize automatic orphan recovery or change Optimizations behavior.
+
+The historical M11 evidence remains useful but is narrower than first interpreted: its destination-hierarchy fault was armed before the complete namespace helper, and its source-parent artifact recorded only a generic EIO that could be surfaced by a later Control DB write. M11b therefore isolates the missing fsync contexts instead of treating fault timing as syscall identity.
+
+The block-layer part uses `dm-flakey error_writes` at two exact contexts, with boundary-specific error text required:
+
+1. `fsync(child)` for the newly created final repository directory, after `mkdirat/open/fstat`;
+2. fsync of the promoted final snapshot destination parent after the cross-directory rename.
+
+Two additional calls use deterministic exact-syscall probes because a preceding fsync can drain ext4 journal work and leave no block write for `dm-flakey` to fail at the next call:
+
+3. the containing-parent namespace `fsync(parent)`, where a test-only namespace-module build forces the exact fourth hierarchy fsync to return `EIO` and verifies the parent-specific error context and counters;
+4. the post-rename staging source-parent fsync, where a test-only build replaces only the fsync symbol used by `snapshot_durability.c`, forces call 6 to return `EIO` after four staging-tree fsyncs and one successful destination-parent fsync, and runs the fresh authority oracle.
+
+The test-only namespace checkpoints compile to no-ops unless `ATM_TEST_FAULT_INJECTION` is defined. The synthetic fsync probes qualify exact syscall error propagation/control flow; they are not represented as block-device writeback experiments.
+
+Every block-layer failure and the full-flow source-parent exact probe must preserve `EMPTY_AUTHORITY_VALID`, active generation 0 and no active repository SHA. No `syncfs()` fallback is allowed. Passing M11b is not itself policy selection: the measured artifact must be reviewed and frozen separately before any namespace policy can be reselected.
+
 ### Recovery fault qualification
 
 The OPT-A0 recovery harness is test-only. Native checkpoint calls compile to no-ops in the production application; only the dedicated recovery helper is built with `ATM_TEST_FAULT_INJECTION`.

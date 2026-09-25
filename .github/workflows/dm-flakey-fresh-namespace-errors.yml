@@ -1,4 +1,4 @@
-name: A1-M11 namespace EIO qualification
+name: A1-M11b exact namespace fsync EIO qualification
 
 on:
   workflow_dispatch:
@@ -17,6 +17,8 @@ on:
       - 'tests/fault_injection_support.c'
       - 'tests/fault_injection_support.h'
       - 'tests/a1_fresh_namespace_replay_helper.c'
+      - 'tests/snapshot_namespace_parent_eio_test.c'
+      - 'tests/m11b_snapshot_fsync_fail_support.c'
       - 'scripts/run_dm_flakey_fresh_namespace_errors.sh'
       - '.github/workflows/dm-flakey-fresh-namespace-errors.yml'
       - 'data/io.github.laurentiustaicu.ask_the_model.gresource.xml'
@@ -28,7 +30,7 @@ permissions:
   contents: read
 
 concurrency:
-  group: durability-a1-m11-${{ github.event.pull_request.number || github.ref }}
+  group: durability-a1-m11b-${{ github.event.pull_request.number || github.ref }}
   cancel-in-progress: true
 
 jobs:
@@ -54,7 +56,7 @@ jobs:
             libjson-glib-dev \
             libsqlite3-dev
 
-      - name: Build fresh namespace EIO helper
+      - name: Build exact namespace fsync EIO helper
         shell: bash
         run: |
           set -euo pipefail
@@ -98,6 +100,7 @@ jobs:
             -o /tmp/snapshot_durability.o
 
           cc $COMMON_FLAGS $CFLAGS \
+            -DATM_TEST_FAULT_INJECTION \
             -c src/snapshot_namespace_durability.c \
             -o /tmp/snapshot_namespace_durability.o
 
@@ -131,7 +134,166 @@ jobs:
 
           test -x /tmp/atm-a1-m11-helper
 
-      - name: Inject EIO at namespace barriers
+
+          cc $COMMON_FLAGS $CFLAGS \
+            -Dfsync=atm_m11b_snapshot_fsync \
+            -c src/snapshot_durability.c \
+            -o /tmp/m11b-synthetic-snapshot-durability.o
+
+          cc $COMMON_FLAGS $CFLAGS \
+            -c tests/m11b_snapshot_fsync_fail_support.c \
+            -o /tmp/m11b-snapshot-fsync-fail-support.o
+
+          cc $COMMON_FLAGS $CFLAGS \
+            -D_GNU_SOURCE \
+            -c tests/a1_fresh_namespace_replay_helper.c \
+            -o /tmp/m11b-synthetic-helper.o
+
+          cc \
+            /tmp/control_state.o \
+            /tmp/repository_storage.o \
+            /tmp/snapshot_seal.o \
+            /tmp/m11b-synthetic-snapshot-durability.o \
+            /tmp/snapshot_namespace_durability.o \
+            /tmp/fault_injection_support.o \
+            /tmp/m11b-synthetic-helper.o \
+            /tmp/m11b-snapshot-fsync-fail-support.o \
+            /tmp/atm-a1-m11-resources.o \
+            $LIBS \
+            -o /tmp/atm-a1-m11b-source-synthetic-helper
+
+          test -x /tmp/atm-a1-m11b-source-synthetic-helper
+
+      - name: Test exact namespace parent fsync EIO propagation
+        shell: bash
+        run: |
+          set -euo pipefail
+          mkdir -p /tmp/atm-a1-m11-results
+
+          CFLAGS="$(pkg-config --cflags glib-2.0)"
+          LIBS="$(pkg-config --libs glib-2.0)"
+          COMMON_FLAGS="-std=c11 -O2 -Wall -Wextra -Werror -Isrc"
+
+          cc $COMMON_FLAGS $CFLAGS \
+            -Dfsync=atm_m11b_test_fsync \
+            -c src/snapshot_namespace_durability.c \
+            -o /tmp/m11b-namespace-parent-probe.o
+
+          cc $COMMON_FLAGS $CFLAGS \
+            -c tests/snapshot_namespace_parent_eio_test.c \
+            -o /tmp/m11b-namespace-parent-test.o
+
+          cc \
+            /tmp/m11b-namespace-parent-probe.o \
+            /tmp/m11b-namespace-parent-test.o \
+            $LIBS \
+            -o /tmp/m11b-namespace-parent-eio-test
+
+          /tmp/m11b-namespace-parent-eio-test \
+            > /tmp/atm-a1-m11-results/namespace-parent-eio-probe.json
+
+          python3 -m json.tool \
+            /tmp/atm-a1-m11-results/namespace-parent-eio-probe.json
+
+      - name: Test exact source parent fsync EIO in full flow
+        shell: bash
+        run: |
+          set -euo pipefail
+          mkdir -p /tmp/atm-a1-m11-results
+
+          ROOT="$(mktemp -d /tmp/atm-a1-m11b-source-XXXXXX)"
+          MARKER="$ROOT/failed-fsync-call.txt"
+          trap 'rm -rf "$ROOT"' EXIT
+
+          /tmp/atm-a1-m11-helper --initialize-empty "$ROOT" \
+            > "$ROOT/empty.json"
+
+          set +e
+          ATM_M11B_FAIL_FSYNC_CALL=6 \
+          ATM_M11B_FSYNC_MARKER="$MARKER" \
+            /tmp/atm-a1-m11b-source-synthetic-helper \
+              --promote-fresh-namespace-candidate-boundary \
+              "$ROOT" \
+              S1_DEST_SOURCE \
+              fresh_after_authority \
+              > "$ROOT/candidate.stdout" \
+              2> "$ROOT/candidate.stderr"
+          RC=$?
+          set -e
+
+          test "$RC" -ne 0
+          grep -Fqi "Could not fsync promoted snapshot parent" \
+            "$ROOT/candidate.stderr"
+          grep -Eiq 'input/output error|i/o error' \
+            "$ROOT/candidate.stderr"
+          test -f "$MARKER"
+          test "$(cat "$MARKER")" = "6"
+
+          /tmp/atm-a1-m11-helper --verify-fresh "$ROOT" \
+            > "$ROOT/verify.json"
+
+          python3 - \
+            /tmp/atm-a1-m11-results/source-parent-eio-probe.json \
+            "$RC" \
+            "$MARKER" \
+            "$ROOT/candidate.stderr" \
+            "$ROOT/verify.json" <<'PY'
+import json
+import pathlib
+import sys
+
+output, rc, marker_path, stderr_path, verify_path = sys.argv[1:]
+
+failed_call = int(pathlib.Path(marker_path).read_text().strip())
+stderr = pathlib.Path(stderr_path).read_text(
+    encoding="utf-8",
+    errors="replace",
+).strip()
+with open(verify_path, encoding="utf-8") as handle:
+    verify = json.load(handle)
+
+context = "Could not fsync promoted snapshot parent"
+record = {
+    "schema_version": 1,
+    "probe_id": "atm-a1-m11b-source-parent-fsync-eio-v1",
+    "injection": "snapshot-durability-fsync-return-eio-on-call-6",
+    "helper_exit_code": int(rc),
+    "failed_fsync_call": failed_call,
+    "error_context_match": context.lower() in stderr.lower(),
+    "io_error_observed": any(
+        token in stderr.lower()
+        for token in ("input/output error", "i/o error")
+    ),
+    "classification": verify["classification"],
+    "active_generation_id": verify["active_generation_id"],
+    "active_repository_sha": verify.get("active_repository_sha"),
+    "final_snapshot_exists": verify["final_snapshot_exists"],
+    "staging_exists": verify["staging_exists"],
+    "namespace_clean": verify["namespace_clean"],
+}
+record["qualified"] = (
+    record["helper_exit_code"] != 0
+    and record["failed_fsync_call"] == 6
+    and record["error_context_match"]
+    and record["io_error_observed"]
+    and record["classification"] == "EMPTY_AUTHORITY_VALID"
+    and record["active_generation_id"] == 0
+    and record["active_repository_sha"] is None
+)
+
+pathlib.Path(output).write_text(
+    json.dumps(record, indent=2, sort_keys=True) + "\n",
+    encoding="utf-8",
+)
+
+if not record["qualified"]:
+    raise SystemExit("M11b source-parent exact EIO probe failed")
+PY
+
+          python3 -m json.tool \
+            /tmp/atm-a1-m11-results/source-parent-eio-probe.json
+
+      - name: Inject EIO at exact fsync contexts
         shell: bash
         run: |
           set -euo pipefail
@@ -139,16 +301,18 @@ jobs:
 
           bash scripts/run_dm_flakey_fresh_namespace_errors.sh \
             /tmp/atm-a1-m11-results/namespace-eio.json \
-            /tmp/atm-a1-m11-helper
+            /tmp/atm-a1-m11-helper \
+            /tmp/atm-a1-m11-results/namespace-parent-eio-probe.json \
+            /tmp/atm-a1-m11-results/source-parent-eio-probe.json
 
           python3 -m json.tool \
             /tmp/atm-a1-m11-results/namespace-eio.json
 
-      - name: Upload A1-M11 namespace EIO result
+      - name: Upload A1-M11b exact fsync EIO result
         if: always()
         uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7.0.1
         with:
-          name: atm-a1-m11-namespace-eio-${{ github.run_id }}-${{ github.run_attempt }}
+          name: atm-a1-m11b-exact-namespace-fsync-eio-${{ github.run_id }}-${{ github.run_attempt }}
           path: /tmp/atm-a1-m11-results/namespace-eio.json
           if-no-files-found: error
           retention-days: 90
