@@ -902,6 +902,29 @@ The next durability measurement must qualify interruption boundaries inside the 
 
 At every boundary the fresh-process seal oracle must yield either the old seal-valid authority or the new seal-valid authority, never active authority referencing bytes that fail the stored seal. Production selection remains a later explicit policy step.
 
+### OPT-A1-M6 candidate interruption-boundary replay
+
+A1-M6 extends the M5 candidate result from one successful after-authority observation to the full authority-cutover boundary matrix.
+
+For each of S1 and S2, a fresh dm-log-writes/ext4 fixture starts from the same explicitly synchronized old authority. The candidate helper pauses through the existing A0 file-descriptor handshake at four test-only checkpoints:
+
+1. `candidate_post_barrier_pre_rename` — snapshot bytes have passed the candidate pre-rename barrier; old authority must remain seal-valid.
+2. `candidate_post_rename_pre_parent_fsync` — atomic rename has occurred but the destination parent has not yet been explicitly fsynced; old authority must remain seal-valid.
+3. `candidate_post_parent_fsync_pre_authority` — promoted namespace has passed parent-directory fsync but Control DB still points to the old generation; old authority must remain seal-valid.
+4. `candidate_after_authority` — guarded Control DB activation has completed; new authority must be seal-valid.
+
+At each checkpoint the parent workflow emits the dm-log-writes mark while the helper is paused, terminates the helper, tears down the live mapping only after the mark, replays to that mark on a blank device, runs ext4 recovery and invokes the seal-aware verifier in a fresh process.
+
+Expected classifications are therefore:
+- the first three boundaries: `OLD_AUTHORITY_VALID`;
+- after authority: `NEW_AUTHORITY_VALID`.
+
+A boundary is strong-invariant-safe only when classification is old-valid/new-valid, the recomputed active snapshot seal matches the stored seal, and the verifier reports `qualified=true`.
+
+The aggregate artifact retains invariant failures as measurement results rather than silently hiding them. Mechanical failures — missing dm target, replay failure, unrecoverable filesystem, malformed result set — still fail the workflow.
+
+M6 remains qualification-only. It does not test explicit EIO/writeback-error propagation and does not choose S1 or S2 for production. A separate error-injection/review gate remains necessary before policy selection.
+
 ### Recovery fault qualification
 
 The OPT-A0 recovery harness is test-only. Native checkpoint calls compile to no-ops in the production application; only the dedicated recovery helper is built with `ATM_TEST_FAULT_INJECTION`.
