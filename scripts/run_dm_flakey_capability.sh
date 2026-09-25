@@ -218,7 +218,7 @@ if [[ "$ERROR_PROBE_RC" -eq 0 &&
     ERROR_WRITES_TRIGGERED=true
 fi
 
-sudo dmsetup suspend "$MAPPER_NAME"
+sudo dmsetup suspend --noflush --nolockfs "$MAPPER_NAME"
 sudo dmsetup reload "$MAPPER_NAME"     --table "0 $SECTORS linear $DATA_LOOP 0"
 sudo dmsetup resume "$MAPPER_NAME"
 
@@ -319,6 +319,7 @@ record = {
         "feature": "error_writes",
         "reload_while_ext4_mounted": True,
         "write_probe_inode_precreated_and_synced": True,
+        "fault_teardown_suspend_noflush_nolockfs": True,
     },
     "checks": checks,
     "observations": {
