@@ -139,6 +139,7 @@
     "namespace_policy_selected": true,
     "durable_ingest_namespace_complete": true,
     "runtime_wiring_authorized": false,
-    "next_required_slice": "RUNTIME_BRIDGE_AND_LIFECYCLE_INTEGRATION_REVIEW"
+    "next_required_slice": "LIFECYCLE_ON_ONLY_DURABLE_INGEST_ACTIVATION_REVIEW",
+    "vala_durable_ingest_bridge_available": true
   }
 }

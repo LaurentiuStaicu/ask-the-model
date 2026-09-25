@@ -104,14 +104,19 @@ def main() -> int:
     if "TRUE,\n        out_pre_barrier_seal," not in durable_slice:
         fail("durable ingest no longer selects the durable internal path")
 
-    for runtime_path, runtime_text in (
-        ("RepositoryNative.vala", native_vala),
-        ("RepositoryLifecycleService.vala", lifecycle),
+    for required in (
+        'cname = "atm_repository_ingest_archive_durable"',
+        "public static extern bool ingest_archive_durable (",
+        "out string pre_barrier_seal",
     ):
-        if "ingest_archive_durable" in runtime_text:
-            fail(
-                f"{runtime_path} activates I1c2 before the separate runtime slice"
-            )
+        if required not in native_vala:
+            fail(f"RepositoryNative durable-ingest bridge lost: {required}")
+
+    if "RepositoryNative.ingest_archive_durable" in lifecycle:
+        fail(
+            "RepositoryLifecycleService activates durable ingest before "
+            "the separate ON-only lifecycle slice"
+        )
 
     if "runtime_integration_selected" not in read(
         ROOT / "qualification" / "durability-policy-v1.json"
@@ -149,7 +154,7 @@ def main() -> int:
 
     print(
         "durable ingest primitive wiring validation passed: "
-        "namespace-complete native primitive present, capacity runners linked, runtime unwired"
+        "namespace-complete native primitive and Vala bridge present, lifecycle unwired"
     )
     return 0
 

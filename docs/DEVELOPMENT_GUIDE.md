@@ -1306,6 +1306,14 @@ The existing cancellable/non-durable wrapper remains unchanged. No `RepositoryNa
 
 The machine-readable policy remains `selected-not-wired` with `runtime_integration_selected=false`. I1c2 changes only the dormant implementation state to `durable_ingest_namespace_complete=true`; the next step is a separate runtime bridge/lifecycle integration review. Automatic orphan recovery remains unselected and still requires authority-wide exclusion before any deletion/quarantine policy can be considered.
 
+### OPT-A1-I1d1 dormant Vala durable-ingest bridge
+
+I1d1 exposes the namespace-complete native primitive through `RepositoryNative.ingest_archive_durable()`. The binding returns the pre-barrier snapshot seal together with the validated version, promoted snapshot path, entry count and total extracted bytes.
+
+This slice is deliberately ABI-only. `RepositoryLifecycleService` does not call the durable binding, `runtime_integration_selected=false`, and `runtime_wiring_authorized=false` remain unchanged. Structural CI requires the Vala declaration while forbidding lifecycle activation.
+
+Separating the binding from lifecycle wiring lets the ordinary Flatpak/Vala build validate the C ABI and ownership/signature mapping before Optimizations ON is allowed to select the durable ingest path. The next slice must keep Optimizations OFF on the existing baseline ingest, select the durable call only from the operation-level ON snapshot, carry the returned pre-barrier seal through post-index verification, and reject unqualified pre-existing final targets without deleting them.
+
 ### Recovery fault qualification
 
 The OPT-A0 recovery harness is test-only. Native checkpoint calls compile to no-ops in the production application; only the dedicated recovery helper is built with `ATM_TEST_FAULT_INJECTION`.
