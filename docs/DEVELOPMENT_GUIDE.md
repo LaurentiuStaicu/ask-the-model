@@ -1464,6 +1464,24 @@ The Control DB is queried through a strict read-only/no-follow/query-only API fo
 
 I2 remains dormant in `RepositoryLifecycleService`. It does not enumerate snapshot directories, create `.trash`, rename, unlink, purge, prune Control DB metadata, or evict retrieval indexes.
 
+### OPT-C1-I3 advisory snapshot candidate discovery
+
+I3 adds a read-only candidate inventory above the qualified C1 protected-root set. It is intentionally advisory and cannot authorize isolation.
+
+For every fixed `RepositoryCatalog.all()` repository ID, discovery inspects only direct children of:
+
+`<data_root>/Repositories/<repository_id>/snapshots`
+
+The native scanner opens the data root and every namespace component with `O_DIRECTORY | O_NOFOLLOW`, then enumerates the final snapshots directory through its descriptor. It never derives repository IDs from directory names and never descends into snapshot contents. This also rejects a symlinked `Repositories`, repository component or `snapshots` component rather than traversing it.
+
+A structurally eligible candidate must have a canonical lowercase 40-hex basename and `fstatat(..., AT_SYMLINK_NOFOLLOW)` must identify a real directory. Exact repository/SHA pairs already protected by active, durable-conversation or B2-live roots are excluded.
+
+A real-directory `.invalid-*` entry is counted as quarantine evidence and never becomes an ordinary candidate. Any other malformed basename, SHA-named symlink, SHA-named regular file, or malformed quarantine object fails the discovery pass closed as a repair condition.
+
+Tests cover protected and quarantine exclusion, unknown repository-directory non-discovery, malformed names, symlink and regular-file SHA entries, a symlinked `snapshots` root, and an intermediate repository-component symlink. The scanner creates no namespace and performs no rename, unlink, purge or lease mutation.
+
+A candidate is still only an advisory inventory item. A later destructive pass must acquire B0, rebuild/revalidate durable and B2-live roots, obtain the relevant exclusive generation exclusion, and revalidate the exact source object immediately before any same-filesystem isolation rename.
+
 ### Recovery fault qualification
 
 The OPT-A0 recovery harness is test-only. Native checkpoint calls compile to no-ops in the production application; only the dedicated recovery helper is built with `ATM_TEST_FAULT_INJECTION`.
