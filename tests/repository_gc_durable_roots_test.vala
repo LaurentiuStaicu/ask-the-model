@@ -1,5 +1,15 @@
 using GLib;
 
+namespace AskTheModel.C1TestSupport {
+    [CCode (
+        cname = "atm_c1_test_publish_empty_complete_generation",
+        cheader_filename = "repository_gc_durable_roots_test_support.h"
+    )]
+    public static extern bool publish_empty_complete_generation (
+        string control_path
+    ) throws GLib.Error;
+}
+
 private static string
 new_temp_root () {
     Error? error = null;
@@ -299,6 +309,58 @@ test_conversation_pin_mismatch_fails_closed () {
 }
 
 
+private static void
+test_empty_complete_generation_fails_closed () {
+    const string EWD_SHA =
+        "cccccccccccccccccccccccccccccccccccccccc";
+
+    string root = new_temp_root ();
+
+    try {
+        publish_generation_one (
+            root,
+            EWD_SHA
+        );
+
+        var conversations =
+            new AskTheModel.ConversationPersistenceStore (
+                root,
+                Path.build_filename (
+                    root,
+                    "exports"
+                )
+            );
+
+        AskTheModel.C1TestSupport.
+            publish_empty_complete_generation (
+                control_path_for (root)
+            );
+
+        bool rejected = false;
+
+        try {
+            AskTheModel.RepositoryGcDurableRootCollector.
+                collect (
+                    control_path_for (root),
+                    conversations
+                );
+        } catch (Error error) {
+            rejected =
+                error.message.index_of (
+                    "positive protected repository generation contains no catalog repository state"
+                ) >= 0;
+        }
+
+        assert (rejected);
+    } catch (Error error) {
+        critical ("%s", error.message);
+        assert_not_reached ();
+    } finally {
+        remove_tree_best_effort (root);
+    }
+}
+
+
 public static int
 main (string[] args) {
     Test.init (ref args);
@@ -310,6 +372,10 @@ main (string[] args) {
     Test.add_func (
         "/repository-gc-roots/conversation-mismatch-fail-closed",
         test_conversation_pin_mismatch_fails_closed
+    );
+    Test.add_func (
+        "/repository-gc-roots/empty-complete-generation-fail-closed",
+        test_empty_complete_generation_fails_closed
     );
     return Test.run ();
 }
