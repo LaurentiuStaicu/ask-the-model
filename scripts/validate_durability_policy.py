@@ -32,12 +32,12 @@ def main() -> int:
         fail("policy must remain selected-not-wired")
     if policy.get("selected_strategy") != "S1_TARGETED_FSYNC":
         fail("selected durability strategy drifted")
-    if policy.get("selected_namespace_strategy") is not None:
-        fail("namespace strategy must remain unselected pending separate P2b review")
+    if policy.get("selected_namespace_strategy") != "S1_DEST_SOURCE":
+        fail("selected namespace strategy drifted")
     if policy.get("production_barrier_selected") is not True:
         fail("production barrier selection was lost")
-    if policy.get("production_namespace_sequence_selected") is not False:
-        fail("namespace sequence must remain unselected pending separate P2b review")
+    if policy.get("production_namespace_sequence_selected") is not True:
+        fail("selected namespace production sequence was lost")
     if policy.get("runtime_integration_selected") is not False:
         fail("namespace-policy correction must not wire runtime behavior")
 
@@ -78,12 +78,14 @@ def main() -> int:
     namespace_basis = basis.get("namespace_durability")
     if not isinstance(namespace_basis, dict):
         fail("namespace selection basis is missing")
-    if namespace_basis.get("selected") is not None:
-        fail("namespace policy must remain unselected pending separate P2b review")
+    if namespace_basis.get("selected") != "S1_DEST_SOURCE":
+        fail("namespace policy selection drifted")
     if namespace_basis.get("candidate_for_review") != "S1_DEST_SOURCE":
         fail("namespace review candidate drifted")
     if namespace_basis.get("m10_replay_correctness") != "QUALIFIED":
         fail("M10 qualification was lost")
+    if namespace_basis.get("m10_empirical_candidate_ranking") != "TIED":
+        fail("M10 empirical candidate tie was lost")
     if namespace_basis.get("m11_eio_correctness") != "PARTIAL_SCOPE_REVIEWED":
         fail("historical M11 reviewed partial scope was lost")
     if namespace_basis.get("m11b_exact_fsync_correctness") != "QUALIFIED":
@@ -94,14 +96,17 @@ def main() -> int:
         fail("namespace evidence must be ready for separate P2b review")
     if namespace_basis.get("linux_directory_entry_contract_driven") is not True:
         fail("Linux directory-entry contract basis was lost")
+    if namespace_basis.get("selection_basis") != (
+        "CONTRACT_DRIVEN_PLUS_EXACT_FAILURE_QUALIFICATION"
+    ):
+        fail("namespace policy selection basis drifted")
     namespace_reason = str(namespace_basis.get("reason", "")).lower()
     for phrase in (
-        "m10 preserves fresh-install authority correctness",
-        "linux requires explicit containing-directory fsync",
-        "historical m11 remains partial-scope evidence",
-        "frozen m11b now qualifies the exact",
-        "s1_dest_source remains unselected",
-        "separate p2b namespace policy review",
+        "did not empirically rank them",
+        "linux nevertheless requires explicit fsync of containing directories",
+        "frozen m11b qualifies the exact",
+        "contract-complete namespace sequence",
+        "without claiming that m10 falsified the shorter candidates",
     ):
         if phrase not in namespace_reason:
             fail(f"namespace review rationale lost: {phrase}")
@@ -219,6 +224,23 @@ def main() -> int:
     if interpretation.get("automatic_orphan_recovery_authorized") is not False:
         fail("F11b must not authorize orphan recovery")
 
+    m11b = namespace_evidence.get("m11b_exact_eio")
+    if not isinstance(m11b, dict):
+        fail("frozen M11b evidence is missing")
+    for key in (
+        "all_authority_fail_closed",
+        "all_e2fsck_recoverable",
+        "all_exact_error_contexts",
+        "namespace_parent_fsync_probe_qualified",
+        "source_parent_fsync_probe_qualified",
+    ):
+        if m11b.get(key) is not True:
+            fail(f"M11b policy-review prerequisite lost: {key}")
+    if m11b.get("production_namespace_selected") is not False:
+        fail("M11b measurement must remain non-selecting evidence")
+    if m11b.get("protocol", {}).get("candidate") != "S1_DEST_SOURCE":
+        fail("M11b policy-review candidate drifted")
+
     evidence_refs = policy.get("qualified_evidence")
     expected_refs = {
         "performance_and_scope": "benchmarks/durability-v1/evidence.json#summary",
@@ -240,8 +262,10 @@ def main() -> int:
         "COMPUTE_PRE_BARRIER_SNAPSHOT_SEAL",
         "FSYNC_EVERY_REGULAR_FILE_IN_STAGING_TREE",
         "FSYNC_DIRECTORIES_BOTTOM_UP_INCLUDING_STAGING_ROOT",
+        "DURABLY_PREPARE_FINAL_SNAPSHOT_PARENT_HIERARCHY",
         "ATOMIC_RENAME_STAGING_TO_FINAL",
         "FSYNC_FINAL_SNAPSHOT_PARENT",
+        "FSYNC_STAGING_SOURCE_PARENT",
         "BUILD_OR_VALIDATE_DERIVED_RETRIEVAL_INDEX",
         "COMPUTE_POST_PREPARE_SNAPSHOT_SEAL",
         "REQUIRE_PRE_AND_POST_SEALS_EQUAL",
@@ -300,16 +324,25 @@ def main() -> int:
             "REMAIN_FAIL_CLOSED_REPAIR_REQUIRED"
         ),
         "automatic_syncfs_fallback": False,
+        "destination_hierarchy_durability_failure": (
+            "ABORT_WITHOUT_PROMOTION_OR_AUTHORITY_ADVANCE"
+        ),
+        "source_parent_fsync_failure": (
+            "ABORT_WITHOUT_AUTHORITY_ADVANCE_AND_TREAT_FINAL_AS_"
+            "UNREFERENCED_RECOVERY_ARTIFACT"
+        ),
     }
     if policy.get("failure_contract") != expected_failure:
         fail("durability failure contract drifted")
 
     implementation = policy.get("implementation_state")
     if implementation != {
-        "namespace_policy_selected": False,
+        "namespace_policy_selected": True,
         "durable_ingest_namespace_complete": False,
         "runtime_wiring_authorized": False,
-        "next_required_slice": "REVIEW_NAMESPACE_POLICY_AFTER_M11B",
+        "next_required_slice": (
+            "REFINE_DORMANT_I1C_PRIMITIVE_TO_SELECTED_NAMESPACE_ORDER"
+        ),
     }:
         fail("implementation staging contract drifted")
 
@@ -337,7 +370,7 @@ def main() -> int:
 
     print(
         "durability production policy validation passed: "
-        "S1 selected; namespace evidence frozen, separate P2b review pending"
+        "S1 + S1_DEST_SOURCE selected; runtime remains unwired"
     )
     return 0
 

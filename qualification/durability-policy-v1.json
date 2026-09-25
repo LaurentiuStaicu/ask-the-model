@@ -31,15 +31,17 @@
     "correctness_tie_between_s1_s2": true,
     "automatic_s1_to_s2_fallback": false,
     "namespace_durability": {
-      "selected": null,
+      "selected": "S1_DEST_SOURCE",
       "candidate_for_review": "S1_DEST_SOURCE",
       "m10_replay_correctness": "QUALIFIED",
       "m11_eio_correctness": "PARTIAL_SCOPE_REVIEWED",
       "m11b_required": false,
       "linux_directory_entry_contract_driven": true,
-      "reason": "M10 preserves fresh-install authority correctness across the reviewed replay matrix, while Linux requires explicit containing-directory fsync for durable directory entries. Historical M11 remains partial-scope evidence, and frozen M11b now qualifies the exact hierarchy-child, containing-parent, destination-parent, and source-parent fsync failure paths as fail-closed. S1_DEST_SOURCE remains unselected until the separate P2b namespace policy review.",
+      "reason": "M10 kept S1_PARENT_ONLY, S1_DEST_CHAIN, and S1_DEST_SOURCE authority-safe on the reviewed ext4 crash-replay matrix and therefore did not empirically rank them. Linux nevertheless requires explicit fsync of containing directories for durable namespace entries. Frozen M11b qualifies the exact hierarchy-child, containing-parent, destination-parent, and source-parent fsync failure paths as fail-closed before authority. P2b therefore selects S1_DEST_SOURCE as the contract-complete namespace sequence without claiming that M10 falsified the shorter candidates.",
       "m11b_exact_fsync_correctness": "QUALIFIED",
-      "policy_review_ready": true
+      "policy_review_ready": true,
+      "m10_empirical_candidate_ranking": "TIED",
+      "selection_basis": "CONTRACT_DRIVEN_PLUS_EXACT_FAILURE_QUALIFICATION"
     }
   },
   "m1_reviewed_cost_us": {
@@ -87,8 +89,10 @@
     "COMPUTE_PRE_BARRIER_SNAPSHOT_SEAL",
     "FSYNC_EVERY_REGULAR_FILE_IN_STAGING_TREE",
     "FSYNC_DIRECTORIES_BOTTOM_UP_INCLUDING_STAGING_ROOT",
+    "DURABLY_PREPARE_FINAL_SNAPSHOT_PARENT_HIERARCHY",
     "ATOMIC_RENAME_STAGING_TO_FINAL",
     "FSYNC_FINAL_SNAPSHOT_PARENT",
+    "FSYNC_STAGING_SOURCE_PARENT",
     "BUILD_OR_VALIDATE_DERIVED_RETRIEVAL_INDEX",
     "COMPUTE_POST_PREPARE_SNAPSHOT_SEAL",
     "REQUIRE_PRE_AND_POST_SEALS_EQUAL",
@@ -116,7 +120,9 @@
     "control_db_activation_failure": "ABORT_WITHOUT_NEW_AUTHORITY_AND_TREAT_FINAL_AS_UNREFERENCED_RECOVERY_ARTIFACT",
     "preexisting_target_reference_unresolved": "FAIL_CLOSED_WITHOUT_REMOVAL_OR_AUTHORITY_ADVANCE",
     "same_sha_repair_pre_authority_failure": "REMAIN_FAIL_CLOSED_REPAIR_REQUIRED",
-    "automatic_syncfs_fallback": false
+    "automatic_syncfs_fallback": false,
+    "destination_hierarchy_durability_failure": "ABORT_WITHOUT_PROMOTION_OR_AUTHORITY_ADVANCE",
+    "source_parent_fsync_failure": "ABORT_WITHOUT_AUTHORITY_ADVANCE_AND_TREAT_FINAL_AS_UNREFERENCED_RECOVERY_ARTIFACT"
   },
   "retrieval_index": {
     "authority_role": "DERIVED_CACHE",
@@ -125,12 +131,12 @@
     "recovery_contract": "VALID_OR_ABSENT_REBUILDABLE",
     "reason": "A1-P1 selects durability for repository snapshot authority only. The deterministic retrieval index remains governed by its existing validation, single-flight and rebuild recovery contract."
   },
-  "selected_namespace_strategy": null,
-  "production_namespace_sequence_selected": false,
+  "selected_namespace_strategy": "S1_DEST_SOURCE",
+  "production_namespace_sequence_selected": true,
   "implementation_state": {
-    "namespace_policy_selected": false,
+    "namespace_policy_selected": true,
     "durable_ingest_namespace_complete": false,
     "runtime_wiring_authorized": false,
-    "next_required_slice": "REVIEW_NAMESPACE_POLICY_AFTER_M11B"
+    "next_required_slice": "REFINE_DORMANT_I1C_PRIMITIVE_TO_SELECTED_NAMESPACE_ORDER"
   }
 }
