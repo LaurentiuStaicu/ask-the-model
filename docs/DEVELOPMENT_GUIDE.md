@@ -1284,6 +1284,28 @@ P2b is still policy-only. `runtime_integration_selected=false` and `durable_inge
 
 Automatic orphan recovery is not selected. I1b's zero-reference query remains point-in-time evidence only; authority-wide exclusion across every Control DB writer is still required before any automatic final-target deletion or quarantine can be authorized.
 
+### OPT-A1-I1c2 namespace-complete dormant ingest
+
+I1c2 brings the dormant native durable-ingest primitive into exact agreement with the F11b-qualified, P2b-selected `S1_DEST_SOURCE` namespace order while leaving application runtime behavior unchanged.
+
+The durable C path now requires `data_root` to already exist as a real directory. That keeps the trust-root boundary explicit: durable ingest does not create its own data root before applying the qualified namespace operations.
+
+After extraction and repository validation, `atm_repository_ingest_archive_durable()` performs:
+
+1. compute the pre-barrier snapshot seal;
+2. execute the shared S1 regular-file and bottom-up directory fsync barrier on staging;
+3. call the shared namespace helper to prepare and durably synchronize `Repositories/<repo>/snapshots` from the trusted data root;
+4. atomically rename staging to the final snapshot path;
+5. fsync the final snapshot destination parent;
+6. fsync the staging source parent after rename, persisting removal of the `.part` source name;
+7. return the pre-barrier seal only after all selected snapshot-authority barriers have succeeded.
+
+A failure before promotion cleans the operation-owned staging tree. A destination- or source-parent fsync failure after rename reports failure while any final snapshot remains only an unreferenced artifact; this primitive still performs no Control DB authority publication. A pre-existing final target remains fail-closed and is never overwritten.
+
+The existing cancellable/non-durable wrapper remains unchanged. No `RepositoryNative.vala` binding and no `RepositoryLifecycleService.vala` caller are added, so Optimizations OFF and ordinary runtime behavior remain unchanged. Structural CI locks the selected order, trusted-root contract, Meson link dependencies, standalone capacity workflow dependencies, and absence of Vala/lifecycle activation.
+
+The machine-readable policy remains `selected-not-wired` with `runtime_integration_selected=false`. I1c2 changes only the dormant implementation state to `durable_ingest_namespace_complete=true`; the next step is a separate runtime bridge/lifecycle integration review. Automatic orphan recovery remains unselected and still requires authority-wide exclusion before any deletion/quarantine policy can be considered.
+
 ### Recovery fault qualification
 
 The OPT-A0 recovery harness is test-only. Native checkpoint calls compile to no-ops in the production application; only the dedicated recovery helper is built with `ATM_TEST_FAULT_INJECTION`.

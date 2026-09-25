@@ -4,6 +4,7 @@
 #include "repository_manifest.h"
 #include "repository_storage.h"
 #include "snapshot_durability.h"
+#include "snapshot_namespace_durability.h"
 #include "snapshot_seal.h"
 
 #include <glib/gstdio.h>
@@ -69,6 +70,7 @@ repository_ingest_archive_internal (
 )
 {
     GStatBuf archive_stat;
+    GStatBuf data_root_stat;
     GStatBuf staging_stat;
     char *staging_path = NULL;
     char *staging_parent = NULL;
@@ -80,6 +82,7 @@ repository_ingest_archive_internal (
     guint64 sealed_files = 0;
     guint64 sealed_bytes = 0;
     AtmSnapshotDurabilityStats durability_stats = { 0 };
+    AtmSnapshotNamespaceStats namespace_stats = { 0 };
     gboolean staging_created = FALSE;
     gboolean ok = FALSE;
     AtmArchiveLimits limits = {
@@ -124,6 +127,22 @@ repository_ingest_archive_internal (
             ATM_INGEST_ERROR,
             ATM_INGEST_ERROR_INVALID_ARCHIVE,
             "Repository archive must be a real regular file."
+        );
+        goto out;
+    }
+
+    if (durable &&
+        (g_lstat (
+             data_root,
+             &data_root_stat
+         ) != 0 ||
+         !S_ISDIR (data_root_stat.st_mode) ||
+         S_ISLNK (data_root_stat.st_mode))) {
+        g_set_error_literal (
+            error,
+            ATM_INGEST_ERROR,
+            ATM_INGEST_ERROR_IO,
+            "Durable repository ingest requires an existing real data root."
         );
         goto out;
     }
@@ -231,6 +250,15 @@ repository_ingest_archive_internal (
             goto out;
         }
 
+        if (!atm_snapshot_namespace_prepare_final_parent (
+                data_root,
+                repository_id,
+                &namespace_stats,
+                error
+            )) {
+            goto out;
+        }
+
         if (cancellable != NULL &&
             g_cancellable_set_error_if_cancelled (
                 cancellable,
@@ -256,6 +284,15 @@ repository_ingest_archive_internal (
     if (durable &&
         !atm_snapshot_durability_sync_parent (
             snapshot_path,
+            &durability_stats,
+            error
+        )) {
+        goto out;
+    }
+
+    if (durable &&
+        !atm_snapshot_durability_sync_parent (
+            staging_path,
             &durability_stats,
             error
         )) {
