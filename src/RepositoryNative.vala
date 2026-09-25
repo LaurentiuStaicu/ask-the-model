@@ -1,5 +1,16 @@
 namespace AskTheModel.RepositoryNative {
     [CCode (
+        cname = "AtmCapacityOperationKind",
+        cprefix = "ATM_CAPACITY_OPERATION_",
+        cheader_filename = "capacity_operation_plan.h"
+    )]
+    public enum CapacityOperationKind {
+        FRESH_INSTALL,
+        DIFFERENT_SHA_UPDATE,
+        SAME_SHA_REPAIR
+    }
+
+    [CCode (
         cname = "atm_cff_extract_version",
         cheader_filename = "cff_version.h"
     )]
@@ -61,6 +72,47 @@ namespace AskTheModel.RepositoryNative {
         string snapshot_sha,
         out string index_path,
         out string repository_version
+    ) throws GLib.Error;
+
+    [CCode (
+        cname = "atm_repository_capacity_ui_download_preflight",
+        cheader_filename = "repository_capacity_ui_bridge.h"
+    )]
+    public static extern bool capacity_download_preflight (
+        string cache_path,
+        string repository_id,
+        string repository_sha,
+        out bool admitted,
+        out bool byte_prediction_qualified,
+        out string detail
+    ) throws GLib.Error;
+
+    [CCode (
+        cname = "atm_repository_capacity_ui_mutation_preflight",
+        cheader_filename = "repository_capacity_ui_bridge.h"
+    )]
+    public static extern bool capacity_mutation_preflight (
+        string data_path,
+        string cache_path,
+        string state_path,
+        string archive_path,
+        string repository_id,
+        string repository_sha,
+        CapacityOperationKind operation_kind,
+        out bool admitted,
+        out bool byte_prediction_qualified,
+        out bool must_admit_before_quarantine,
+        out string detail
+    ) throws GLib.Error;
+
+    [CCode (
+        cname = "atm_repository_capacity_ui_state_commit_preflight",
+        cheader_filename = "repository_capacity_ui_bridge.h"
+    )]
+    public static extern bool capacity_state_commit_preflight (
+        string state_path,
+        out bool admitted,
+        out string detail
     ) throws GLib.Error;
 
     [CCode (

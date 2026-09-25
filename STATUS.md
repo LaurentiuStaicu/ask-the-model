@@ -26,6 +26,19 @@ The v0.5.0 capability boundary promotes the qualified post-v0.4.0 development wo
 
 At publication time, the tagged v0.5.0 release and `main` share this capability boundary. Later **AtM Development** builds may move ahead independently and must continue to expose their exact source `main` commit SHA.
 
+## Development after v0.5.0
+
+Current AtM Development adds an OFF-by-default, session-only **Optimizations** gate without changing the tagged v0.5.0 capability boundary. The gate is snapshotted once per operation; switching the UI later does not change an operation already in progress.
+
+With Optimizations ON, the currently qualified repository-lifecycle optimizations are:
+- one global cross-process repository authority-mutation lease for Download/Update;
+- one per-SHA retrieval-index single-flight for missing/invalid derived indexes;
+- production local-capacity admission for Download/Update, using pre-download, post-download/pre-mutation and immediate pre-Control-DB-publication checkpoints.
+
+Capacity admission is deliberately conservative. Exact C0-M1 repository ID + SHA profiles may use their frozen allocated-byte evidence. A new/unknown SHA receives no inherited historical snapshot/index byte prediction because structural stress falsified that predictor as a conservative bound. Structural inode checks and the selected 128 KiB / four-inode Control DB publication headroom remain active. Only proven preflight insufficiency is surfaced as `NO SPACE`; post-admission storage failures retain the established fail-closed path.
+
+With Optimizations OFF, these post-v0.5.0 optimization paths are not activated and the baseline repository behavior is retained.
+
 ## Canonical application role
 
 **Ask the Model (AtM) is a local conversational interface and retrieval/provenance layer for locally managed AI models and repositories of scientific dynamical models. It is not itself a scientific model and does not replace the canonical models maintained in those repositories.**

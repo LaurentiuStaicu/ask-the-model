@@ -604,6 +604,40 @@ The deterministic unit matrix covers:
 
 No Vala method calls these functions in F11B, no `RepositoryError.NO_SPACE` is emitted by the application yet, and `runtime_integration_selected=false` remains unchanged.
 
+### C0P-F11C runtime capacity admission
+
+C0P-F11C connects the F10/F11A/F11B production policy to repository Download/Update. The connection is subordinate to the single process-local Optimizations snapshot taken at operation start. If that snapshot is OFF, none of the capacity preflights run and the post-v0.5.0 repository path is preserved.
+
+When the snapshot is ON, the sequence is:
+
+1. acquire the existing global repository authority-mutation lease;
+2. create/validate the deterministic archive-staging parent directories, then run checkpoint A before the archive `.part` file is created;
+3. download the archive;
+4. if an archive was downloaded, run checkpoint B after the completed archive exists and before any same-SHA quarantine, extraction or promotion;
+5. run snapshot validation, retrieval-index preparation and integrity sealing through the existing path;
+6. remeasure state-root capacity immediately before guarded Control DB publication and require 128 KiB plus four inode/file slots;
+7. publish the new repository generation only if that final guard admits.
+
+Only a positive policy decision of insufficient local capacity becomes `RepositoryError.NO_SPACE`. Failure to measure capacity, invalid policy/bridge state, or internal admission errors remain `RepositoryError.STORAGE`. Failures that happen after an admission decision continue through their established ingest/index/SQLite error paths; in particular, generic SQLite `IOERR` is not reclassified as no-space.
+
+For an exact qualified `repository_id + repository_sha`, checkpoint A/B may use the frozen C0-M1 allocated-byte profile. For every other SHA, archive/snapshot/index byte prediction remains unqualified: AtM does not inherit the M4/M5 historical hybrid and does not apply a synthetic multiplier. F2 materialized-entry inode demand, the four-slot index structural demand and the final state-publication guard still apply.
+
+Checkpoint B is intentionally conditional on a completed archive. If a previously promoted exact snapshot already exists and no new archive is required, AtM does not invent an F2 archive inspection for that path; existing index/validation behavior runs and the immediate state-publication guard still protects the authoritative commit.
+
+The native bridge returns diagnostic device-level required/available byte or inode values for a rejected decision. The application exposes the semantic class as `NO SPACE` on the LCD while retaining the detailed message for diagnostics/accessibility.
+
+The production registry at `qualification/capacity-policy-v1.json` is now `selected-runtime-wired` with `runtime_integration_selected=true`. CI cross-checks that registry against:
+- the exact-profile policy/evidence validator;
+- the runtime source bindings and linked native sources;
+- the Optimizations default-OFF operation snapshot;
+- authority-lease-before-admission ordering;
+- checkpoint A before archive download;
+- checkpoint B before same-SHA quarantine and snapshot preparation;
+- the final state guard before `state_store.set_current()`;
+- exactly three proactive `RepositoryError.NO_SPACE` rejection sites.
+
+The integrated Flatpak test suite must continue to run the native policy/admission tests and `repository-lifecycle-service` together.
+
 ### Repository authority-mutation lease
 
 When an operation snapshots optimization mode ON, repository Download/Update uses one application-owned exclusive nonblocking lease at `<state_root>/repository-mutation.lock` before any selected-repository staging or authority mutation begins.
