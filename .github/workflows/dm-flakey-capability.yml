@@ -1,0 +1,54 @@
+name: A1-M7 dm-flakey error-writes capability
+
+on:
+  workflow_dispatch:
+  pull_request:
+    paths:
+      - 'scripts/run_dm_flakey_capability.sh'
+      - '.github/workflows/dm-flakey-capability.yml'
+
+permissions:
+  contents: read
+
+concurrency:
+  group: durability-a1-m7-${{ github.event.pull_request.number || github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  probe:
+    runs-on: ubuntu-24.04
+    timeout-minutes: 15
+
+    steps:
+      - name: Checkout AtM
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+
+      - name: Install device-mapper dependencies
+        shell: bash
+        run: |
+          set -euo pipefail
+          sudo apt-get update
+          sudo apt-get install -y --no-install-recommends \
+            e2fsprogs \
+            lvm2
+
+      - name: Probe mounted dm-flakey error_writes path
+        shell: bash
+        run: |
+          set -euo pipefail
+          mkdir -p /tmp/atm-a1-m7-results
+
+          bash scripts/run_dm_flakey_capability.sh \
+            /tmp/atm-a1-m7-results/dm-flakey-capability.json
+
+          python3 -m json.tool \
+            /tmp/atm-a1-m7-results/dm-flakey-capability.json
+
+      - name: Upload A1-M7 capability result
+        if: always()
+        uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7.0.1
+        with:
+          name: atm-a1-m7-dm-flakey-${{ github.run_id }}-${{ github.run_attempt }}
+          path: /tmp/atm-a1-m7-results/dm-flakey-capability.json
+          if-no-files-found: error
+          retention-days: 90

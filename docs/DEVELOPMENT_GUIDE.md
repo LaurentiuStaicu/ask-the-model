@@ -941,6 +941,29 @@ The log-entry counts are frozen as provenance of this exact run rather than trea
 
 M6 therefore closes the candidate power-loss ordering matrix for the deterministic fixture, but it still does not justify production selection. The remaining safety question is explicit writeback-error propagation: a candidate barrier must fail closed when storage reports an error and must not allow Control DB authority to advance. Scope and M1 performance remain part of the final policy review after that gate.
 
+### OPT-A1-M7 dm-flakey error-write capability
+
+A1-M7 qualifies the error-injection mechanism before applying it to S1/S2. It is intentionally analogous to the earlier M2 capability probe for dm-log-writes.
+
+The probe uses one disposable loop-backed ext4 filesystem and:
+- starts with a healthy `linear` device-mapper table;
+- writes, fsyncs and directory-fsyncs a deterministic baseline file plus a separate pre-created write-probe file;
+- calls `sync -f` to establish the known-good baseline;
+- suspends the mounted mapping and reloads it as `flakey` with a 1-second healthy interval followed by a 600-second unreliable interval using `error_writes`;
+- waits until the unreliable interval is active;
+- verifies baseline reads still return the exact SHA-256;
+- overwrites the already-created probe inode and requires write/fsync to surface `EIO`;
+- reloads the same mapping back to `linear`;
+- unmounts, accepts only clean/corrected e2fsck outcomes, and verifies the original baseline content is unchanged.
+
+The probe records the actual active `flakey` table and restored `linear` table rather than assuming reload success.
+
+After the deliberate EIO has been observed, the harness uses `dmsetup suspend --noflush --nolockfs` only to leave the injected fault state and restore the disposable mapping to `linear`. This is teardown machinery, not part of the candidate durability contract: a normal suspend may itself attempt filesystem synchronization and therefore legitimately rediscover the EIO being tested.
+
+If the hosted runner does not expose the `flakey` target, the result is `unsupported` evidence and the later error-injection qualification must move to an appropriate runner. The experiment must not be weakened to a different fault model merely to remain on hosted CI.
+
+This slice does not execute an AtM durability candidate and authorizes no production barrier. If capability is supported, the following measurement may inject `error_writes` into S1 and S2 at the pre-rename barrier, promoted-parent fsync and Control DB activation boundaries and require fail-closed old seal-valid authority.
+
 ### Recovery fault qualification
 
 The OPT-A0 recovery harness is test-only. Native checkpoint calls compile to no-ops in the production application; only the dedicated recovery helper is built with `ATM_TEST_FAULT_INJECTION`.
