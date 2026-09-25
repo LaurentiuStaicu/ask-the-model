@@ -123,20 +123,41 @@ def main() -> int:
         if required not in lifecycle:
             fail(f"RepositoryLifecycleService runtime durability wiring lost: {required}")
 
+    download_start = lifecycle.find("public async uint download_or_update (")
+    if download_start < 0:
+        fail("download_or_update entry point is missing")
+    download_slice = lifecycle[download_start:]
+
     require_order(
-        lifecycle,
+        download_slice,
         [
             "bool optimized_operation =",
             "optimization_mode_snapshot ();",
             "optimized_preexisting_final_must_fail_closed (",
             "yield client.download_archive_to_staging (",
-            "RepositoryNative.ingest_archive_durable",
-            "Durable repository snapshot seal changed across promotion.",
-            "RepositoryNative.ensure_index (",
+            "yield prepare_snapshot (",
             "require_state_commit_capacity (",
             "state_store.set_current (",
         ],
-        "ON-only lifecycle durable ingest",
+        "ON-only download/update lifecycle",
+    )
+
+    prepare_start = lifecycle.find("prepare_snapshot (")
+    download_method_start = lifecycle.find("public async uint download_or_update (")
+    if prepare_start < 0 or download_method_start < 0:
+        fail("prepare_snapshot/download_or_update boundary is missing")
+    prepare_slice = lifecycle[prepare_start:download_method_start]
+
+    require_order(
+        prepare_slice,
+        [
+            "if (durable_ingest) {",
+            "RepositoryNative.ingest_archive_durable",
+            "} else if (!RepositoryNative.ingest_archive (",
+            "Durable repository snapshot seal changed across promotion.",
+            "RepositoryNative.ensure_index (",
+        ],
+        "prepare_snapshot durable seal chain",
     )
 
     grounding_call = (
@@ -173,10 +194,10 @@ def main() -> int:
     if durable_branch < 0 or baseline_branch < 0:
         fail("durable/baseline ingest branch pair is incomplete")
 
-    preexisting_guard = lifecycle.find(
+    preexisting_guard = download_slice.find(
         "optimized_preexisting_final_must_fail_closed ("
     )
-    download_call = lifecycle.find(
+    download_call = download_slice.find(
         "yield client.download_archive_to_staging (",
         preexisting_guard,
     )
