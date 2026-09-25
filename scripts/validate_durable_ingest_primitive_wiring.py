@@ -112,11 +112,47 @@ def main() -> int:
         if required not in native_vala:
             fail(f"RepositoryNative durable-ingest bridge lost: {required}")
 
-    if "RepositoryNative.ingest_archive_durable" in lifecycle:
-        fail(
-            "RepositoryLifecycleService activates durable ingest before "
-            "the separate ON-only lifecycle slice"
-        )
+    for required in (
+        "bool durable_ingest,",
+        "if (durable_ingest) {",
+        "RepositoryNative.ingest_archive_durable (",
+        "} else if (!RepositoryNative.ingest_archive (",
+        "durable_pre_barrier_seal !=",
+        "Durable repository pre-barrier seal does not match the promoted snapshot.",
+        "reject_preexisting_final_target (",
+        "Optimizations ON refuses an unqualified pre-existing final repository snapshot target.",
+    ):
+        if required not in lifecycle:
+            fail(f"ON-only lifecycle durable-ingest wiring lost: {required}")
+
+    require_order(
+        lifecycle,
+        [
+            "RepositoryNative.ingest_archive_durable (",
+            "RepositoryNative.compute_snapshot_seal (",
+            "durable_pre_barrier_seal !=",
+            "RepositoryNative.ensure_index (",
+            "RepositoryNative.compute_snapshot_seal (",
+            "state_store.set_current (",
+        ],
+        "ON durable lifecycle seal chain",
+    )
+
+    if (
+        "null,\n                        expected_seal,\n                        false,\n"
+        "                        optimized_operation"
+    ) not in lifecycle:
+        fail("grounding path must never select durable ingest")
+
+    if (
+        "archive_path,\n                                null,\n"
+        "                                optimized_operation,\n"
+        "                                optimized_operation"
+    ) not in lifecycle:
+        fail("download/update lost operation-snapshot durable routing")
+
+    if "RepositoryNative.ingest_archive (" not in lifecycle:
+        fail("Optimizations OFF baseline ingest path was lost")
 
     if "runtime_integration_selected" not in read(
         ROOT / "qualification" / "durability-policy-v1.json"
@@ -154,7 +190,7 @@ def main() -> int:
 
     print(
         "durable ingest primitive wiring validation passed: "
-        "namespace-complete native primitive and Vala bridge present, lifecycle unwired"
+        "ON-only lifecycle durable ingest wired; OFF baseline preserved; seal chain locked"
     )
     return 0
 
