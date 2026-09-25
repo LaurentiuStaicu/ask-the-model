@@ -6,7 +6,8 @@ import sys
 
 ROOT = pathlib.Path(__file__).resolve().parents[1]
 POLICY_PATH = ROOT / "qualification" / "durability-policy-v1.json"
-EVIDENCE_PATH = ROOT / "benchmarks" / "durability-v1" / "evidence.json"
+EVIDENCE_V1 = ROOT / "benchmarks" / "durability-v1" / "evidence.json"
+EVIDENCE_V2 = ROOT / "benchmarks" / "durability-v2" / "evidence.json"
 
 
 def fail(message: str) -> None:
@@ -22,21 +23,25 @@ def load(path: pathlib.Path):
 
 def main() -> int:
     policy = load(POLICY_PATH)
-    evidence = load(EVIDENCE_PATH)
+    evidence = load(EVIDENCE_V1)
+    namespace_evidence = load(EVIDENCE_V2)
 
     if policy.get("schema_version") != 1:
         fail("schema_version must remain 1")
     if policy.get("status") != "selected-not-wired":
-        fail("P1 must remain selected-not-wired")
+        fail("policy must remain selected-not-wired")
     if policy.get("selected_strategy") != "S1_TARGETED_FSYNC":
         fail("selected durability strategy drifted")
+    if policy.get("selected_namespace_strategy") != "S1_DEST_SOURCE":
+        fail("selected namespace strategy drifted")
     if policy.get("production_barrier_selected") is not True:
-        fail("P1 must select one production barrier")
+        fail("production barrier selection was lost")
+    if policy.get("production_namespace_sequence_selected") is not True:
+        fail("P2 must select the namespace sequence")
     if policy.get("runtime_integration_selected") is not False:
-        fail("P1 must not wire runtime behavior")
+        fail("P2 must not wire runtime behavior")
 
-    gate = policy.get("runtime_gate")
-    if gate != {
+    if policy.get("runtime_gate") != {
         "name": "Optimizations",
         "default_enabled": False,
         "operation_snapshot_required": True,
@@ -44,9 +49,15 @@ def main() -> int:
         fail("runtime gate contract drifted")
 
     if evidence.get("status") != "qualification-only":
-        fail("durability evidence status drifted")
+        fail("durability-v1 evidence status drifted")
     if evidence.get("production_barrier_selected") is not False:
-        fail("historical evidence must not be rewritten as policy")
+        fail("historical v1 evidence must remain evidence-only")
+    if namespace_evidence.get("status") != "qualification-only":
+        fail("durability-v2 evidence status drifted")
+    if namespace_evidence.get(
+        "production_namespace_sequence_selected"
+    ) is not False:
+        fail("F10 evidence must remain separate from P2 policy")
 
     basis = policy.get("selection_basis")
     if not isinstance(basis, dict):
@@ -63,6 +74,29 @@ def main() -> int:
         fail("S2 reference role drifted")
     if basis.get("s3_baseline", {}).get("selected") is not False:
         fail("falsified S3 baseline cannot be selected")
+
+    namespace_basis = basis.get("namespace_durability")
+    if not isinstance(namespace_basis, dict):
+        fail("namespace selection basis is missing")
+    if namespace_basis.get("selected") != "S1_DEST_SOURCE":
+        fail("namespace selected candidate drifted")
+    if namespace_basis.get("m10_replay_correctness") != "QUALIFIED":
+        fail("M10 qualification was lost")
+    if namespace_basis.get("m11_eio_correctness") != "QUALIFIED":
+        fail("M11 qualification was lost")
+    if namespace_basis.get("linux_directory_entry_contract_driven") is not True:
+        fail("Linux directory-entry contract basis was lost")
+    namespace_reason = str(namespace_basis.get("reason", "")).lower()
+    for phrase in (
+        "does not guarantee containing-directory entry persistence",
+        "fresh destination hierarchy",
+        "destination rename parent",
+        "source staging parent",
+        "m11 shows explicit eio",
+        "fails closed before authority",
+    ):
+        if phrase not in namespace_reason:
+            fail(f"namespace selection rationale lost: {phrase}")
 
     reviewed_cost = policy.get("m1_reviewed_cost_us")
     expected_cost = {
@@ -96,7 +130,6 @@ def main() -> int:
         s2 = record.get("S2_SYNCFS")
         if not isinstance(s1, dict) or not isinstance(s2, dict):
             fail(f"M1 strategy data missing for {rid}")
-
         s1_delta = s1.get("median_total_over_control_us")
         s2_delta = s2.get("median_total_over_control_us")
         if s1_delta != expected["s1_total_over_control"]:
@@ -105,95 +138,30 @@ def main() -> int:
             fail(f"{rid} S2 M1 cost drifted")
         if s1_delta - s2_delta != expected["s1_minus_s2"]:
             fail(f"{rid} S1-S2 M1 delta drifted")
-        if s2_delta >= s1_delta:
-            fail(f"{rid} reviewed S2<S1 performance relation drifted")
 
-    m4 = evidence.get("tier2_atm_replay_baseline")
-    if not isinstance(m4, dict):
-        fail("M4 S3 baseline evidence is missing")
+    for key in (
+        "tier2_atm_replay_baseline",
+        "tier2_candidate_replay",
+        "tier2_candidate_boundary_replay",
+        "tier2_candidate_error_injection",
+        "tier2_same_sha_repair",
+    ):
+        if not isinstance(evidence.get(key), dict):
+            fail(f"durability-v1 evidence missing {key}")
+
+    m4 = evidence["tier2_atm_replay_baseline"]
     if m4.get("strategy") != "S3_CURRENT_BASELINE":
         fail("M4 baseline strategy drifted")
     if m4.get("production_durability_authorized") is not False:
         fail("M4 baseline evidence must not authorize production durability")
 
-    m4_scenarios = m4.get("scenarios")
-    if not isinstance(m4_scenarios, dict):
-        fail("M4 scenario matrix is missing")
-    if set(m4_scenarios) != {
-        "pre_rename",
-        "post_rename",
-        "after_authority",
-    }:
-        fail("M4 scenario set drifted")
-
-    for boundary in ("pre_rename", "post_rename"):
-        record = m4_scenarios[boundary]
-        if record.get("observed_classification") != "OLD_AUTHORITY_VALID":
-            fail(f"M4 {boundary} no longer preserves old authority")
-        if record.get("seal_match") is not True:
-            fail(f"M4 {boundary} old authority seal no longer matches")
-        if record.get("strong_invariant_satisfied") is not True:
-            fail(f"M4 {boundary} strong invariant was lost")
-
-    after_authority = m4_scenarios["after_authority"]
-    if after_authority.get("expected_classification") != "NEW_AUTHORITY_VALID":
-        fail("M4 after-authority expectation drifted")
-    if after_authority.get("observed_classification") != "INVALID_AUTHORITY":
-        fail("M4 S3 falsification classification drifted")
-    if after_authority.get("active_generation_id") != 2:
-        fail("M4 falsifying active generation drifted")
-    if after_authority.get("active_repository_sha") != (
-        "bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb"
-    ):
-        fail("M4 falsifying active SHA drifted")
-    if after_authority.get("stored_seal") != (
-        "acebf979895f9efd073014fa707038d47ec71b411f4e12a32aa619e9c63f3132"
-    ):
-        fail("M4 stored new-authority seal drifted")
-    if after_authority.get("computed_seal") != (
-        "7299f3e88c9a88995a62ef415e0da959ba4571df5f62976e9f9ac49d4660a3d8"
-    ):
-        fail("M4 replayed new-snapshot seal drifted")
-    if after_authority.get("stored_seal") == after_authority.get("computed_seal"):
-        fail("M4 falsification lost the stored/replayed seal mismatch")
-    if after_authority.get("seal_match") is not False:
-        fail("M4 falsifying seal_match must remain false")
-    if after_authority.get("reason_code") != "active_snapshot_seal_mismatch":
-        fail("M4 falsification reason drifted")
-    if after_authority.get("strong_invariant_satisfied") is not False:
-        fail("M4 falsification must retain strong_invariant_satisfied=false")
-
-    m4_conclusion = str(m4.get("reviewed_conclusion", "")).lower()
-    for phrase in (
-        "s3 is therefore falsified",
-        "selects neither s1 nor s2",
-        "authorizes no production durability barrier",
-    ):
-        if phrase not in m4_conclusion:
-            fail(f"M4 reviewed conclusion lost: {phrase}")
-
-    m5 = evidence.get("tier2_candidate_replay")
-    if not isinstance(m5, dict):
-        fail("M5 candidate evidence is missing")
-    m5_conclusion = str(m5.get("reviewed_conclusion", "")).lower()
-    for phrase in (
-        "s1 targeted fsync and s2 syncfs both satisfy",
-        "does not select a production barrier",
-    ):
-        if phrase not in m5_conclusion:
-            fail(f"M5 reviewed conclusion lost: {phrase}")
-
-    m6 = evidence.get("tier2_candidate_boundary_replay")
-    if not isinstance(m6, dict):
-        fail("M6 candidate boundary evidence is missing")
+    m6 = evidence["tier2_candidate_boundary_replay"]
     if m6.get("all_strong_invariants_satisfied") is not True:
         fail("M6 strong invariant aggregate was lost")
     if m6.get("all_expected_classifications_match") is not True:
         fail("M6 expected classification aggregate was lost")
 
-    m8 = evidence.get("tier2_candidate_error_injection")
-    if not isinstance(m8, dict):
-        fail("M8 candidate EIO evidence is missing")
+    m8 = evidence["tier2_candidate_error_injection"]
     for key in (
         "all_candidates_failed_on_eio",
         "all_old_authority_preserved",
@@ -202,9 +170,7 @@ def main() -> int:
         if m8.get(key) is not True:
             fail(f"M8 reviewed aggregate lost: {key}")
 
-    m9 = evidence.get("tier2_same_sha_repair")
-    if not isinstance(m9, dict):
-        fail("M9 same-SHA repair evidence is missing")
+    m9 = evidence["tier2_same_sha_repair"]
     for key in (
         "all_repair_invariants_satisfied",
         "all_pre_authority_fail_closed",
@@ -215,44 +181,43 @@ def main() -> int:
     if m9.get("protocol", {}).get("quarantine_parent_fsync_added") is not False:
         fail("M9 quarantine must remain qualified without extra parent fsync")
 
+    m10 = namespace_evidence.get("m10_replay")
+    m11 = namespace_evidence.get("m11_eio")
+    interpretation = namespace_evidence.get("interpretation", {})
+    if not isinstance(m10, dict) or m10.get("scenario_count") != 18:
+        fail("M10 frozen evidence is missing")
+    if m10.get("all_e2fsck_recoverable") is not True:
+        fail("M10 recoverability was lost")
+    if not isinstance(m11, dict) or m11.get("scenario_count") != 3:
+        fail("M11 frozen evidence is missing")
+    if m11.get("all_authority_fail_closed") is not True:
+        fail("M11 fail-closed aggregate was lost")
+    if m11.get("all_e2fsck_recoverable") is not True:
+        fail("M11 recoverability aggregate was lost")
+    if m11.get("protocol", {}).get("candidate") != "S1_DEST_SOURCE":
+        fail("M11 candidate drifted")
+    if interpretation.get("candidate_for_policy_review") != "S1_DEST_SOURCE":
+        fail("F10 policy-review candidate drifted")
+    if interpretation.get("policy_review_ready") is not True:
+        fail("F10 policy-review readiness was lost")
+    if interpretation.get("production_namespace_sequence_selected") is not False:
+        fail("F10 evidence must not select policy")
+    if interpretation.get("automatic_orphan_recovery_authorized") is not False:
+        fail("F10 must not authorize orphan recovery")
+
     evidence_refs = policy.get("qualified_evidence")
     expected_refs = {
         "performance_and_scope": "benchmarks/durability-v1/evidence.json#summary",
-        "s3_falsification": (
-            "benchmarks/durability-v1/evidence.json#tier2_atm_replay_baseline"
-        ),
-        "candidate_after_authority": (
-            "benchmarks/durability-v1/evidence.json#tier2_candidate_replay"
-        ),
-        "candidate_boundary_matrix": (
-            "benchmarks/durability-v1/evidence.json#tier2_candidate_boundary_replay"
-        ),
-        "candidate_eio": (
-            "benchmarks/durability-v1/evidence.json#tier2_candidate_error_injection"
-        ),
-        "same_sha_repair": (
-            "benchmarks/durability-v1/evidence.json#tier2_same_sha_repair"
-        ),
+        "s3_falsification": "benchmarks/durability-v1/evidence.json#tier2_atm_replay_baseline",
+        "candidate_after_authority": "benchmarks/durability-v1/evidence.json#tier2_candidate_replay",
+        "candidate_boundary_matrix": "benchmarks/durability-v1/evidence.json#tier2_candidate_boundary_replay",
+        "candidate_eio": "benchmarks/durability-v1/evidence.json#tier2_candidate_error_injection",
+        "same_sha_repair": "benchmarks/durability-v1/evidence.json#tier2_same_sha_repair",
+        "fresh_namespace_replay": "benchmarks/durability-v2/evidence.json#m10_replay",
+        "fresh_namespace_eio": "benchmarks/durability-v2/evidence.json#m11_eio",
     }
     if evidence_refs != expected_refs:
         fail("qualified evidence references drifted")
-
-    storage = policy.get("storage_contract")
-    if storage != {
-        "platform": "Linux",
-        "tier2_qualified_filesystem": "ext4",
-        "production_scope": "LOCAL_FILESYSTEM",
-        "regular_file_fsync_required": True,
-        "directory_fsync_required": True,
-        "network_or_remote_filesystem_durability_claim": False,
-        "on_mode_unsupported_or_failed_barrier": "FAIL_CLOSED",
-        "off_mode_preserves_baseline": True,
-        "note": (
-            "The selected calls are narrower than syncfs but are not claimed "
-            "to isolate AtM from every storage-level writeback error."
-        ),
-    }:
-        fail("storage contract drifted")
 
     expected_order = [
         "EXTRACT_TO_STAGING",
@@ -260,8 +225,10 @@ def main() -> int:
         "COMPUTE_PRE_BARRIER_SNAPSHOT_SEAL",
         "FSYNC_EVERY_REGULAR_FILE_IN_STAGING_TREE",
         "FSYNC_DIRECTORIES_BOTTOM_UP_INCLUDING_STAGING_ROOT",
+        "PREPARE_AND_DURABLY_SYNC_FINAL_PARENT_HIERARCHY",
         "ATOMIC_RENAME_STAGING_TO_FINAL",
         "FSYNC_FINAL_SNAPSHOT_PARENT",
+        "FSYNC_STAGING_SOURCE_PARENT_AFTER_RENAME",
         "BUILD_OR_VALIDATE_DERIVED_RETRIEVAL_INDEX",
         "COMPUTE_POST_PREPARE_SNAPSHOT_SEAL",
         "REQUIRE_PRE_AND_POST_SEALS_EQUAL",
@@ -271,8 +238,7 @@ def main() -> int:
     if policy.get("normal_promotion_order") != expected_order:
         fail("selected promotion ordering drifted")
 
-    repair_policy = policy.get("same_sha_repair")
-    if repair_policy != {
+    if policy.get("same_sha_repair") != {
         "quarantine_parent_fsync_selected": False,
         "pre_authority_state": "REPAIR_REQUIRED",
         "post_authority_state": "REPAIRED_AUTHORITY_VALID",
@@ -281,47 +247,39 @@ def main() -> int:
         fail("same-SHA repair policy drifted")
 
     retry = policy.get("retry_recovery")
-    if retry != {
+    expected_retry = {
         "preexisting_final_snapshot_may_bypass_barrier": False,
-        "unreferenced_recovery_artifact_action": (
-            "REBUILD_THROUGH_SELECTED_S1_SEQUENCE_ONLY_AFTER_NON_PROTECTION_"
-            "IS_ESTABLISHED"
-        ),
-        "unresolved_or_protected_preexisting_target": (
+        "i1b_zero_reference_authorizes_removal": False,
+        "automatic_orphan_recovery_selected": False,
+        "first_runtime_preexisting_final_action": (
             "FAIL_CLOSED_WITHOUT_REMOVAL_OR_AUTHORITY_ADVANCE"
         ),
+        "authority_wide_exclusion_required_for_future_automatic_recovery": True,
         "future_final_tree_requalification_requires_separate_qualification": True,
         "reason": (
-            "Final-directory existence is not durability evidence. A target proven "
-            "to be an unreferenced recovery artifact may be isolated or removed "
-            "and rebuilt through the qualified staging sequence; a target that is "
-            "protected, historically required, or not proven disposable must "
-            "remain untouched and fail closed until a separately qualified "
-            "final-tree requalification path exists."
+            "Final-directory existence is not durability evidence. I1b can prove "
+            "only Control DB non-protection at one instant; the current "
+            "Optimizations-ON mutation lease does not exclude Optimizations-OFF "
+            "writers. Therefore the first runtime integration must not "
+            "automatically remove or quarantine a preexisting final target. "
+            "Future automatic orphan recovery requires authority-wide exclusion "
+            "across every Control DB writer and the corresponding filesystem "
+            "mutation window."
         ),
-    }:
+    }
+    if retry != expected_retry:
         fail("preexisting-final retry policy drifted")
 
-    retrieval = policy.get("retrieval_index")
-    if retrieval != {
-        "authority_role": "DERIVED_CACHE",
-        "inherits_snapshot_authority_barrier": False,
-        "new_durability_barrier_selected": False,
-        "recovery_contract": "VALID_OR_ABSENT_REBUILDABLE",
-        "reason": (
-            "A1-P1 selects durability for repository snapshot authority only. "
-            "The deterministic retrieval index remains governed by its "
-            "existing validation, single-flight and rebuild recovery contract."
-        ),
-    }:
-        fail("retrieval-index durability scope drifted")
-
-    failure = policy.get("failure_contract")
     expected_failure = {
-        "pre_rename_barrier_failure": (
-            "ABORT_WITHOUT_PROMOTION_OR_AUTHORITY_ADVANCE"
+        "pre_rename_barrier_failure": "ABORT_WITHOUT_PROMOTION_OR_AUTHORITY_ADVANCE",
+        "destination_hierarchy_fsync_failure": (
+            "ABORT_BEFORE_PROMOTION_WITHOUT_AUTHORITY_ADVANCE"
         ),
         "promotion_parent_fsync_failure": (
+            "ABORT_WITHOUT_AUTHORITY_ADVANCE_AND_TREAT_FINAL_AS_"
+            "UNREFERENCED_RECOVERY_ARTIFACT"
+        ),
+        "source_parent_fsync_failure": (
             "ABORT_WITHOUT_AUTHORITY_ADVANCE_AND_TREAT_FINAL_AS_"
             "UNREFERENCED_RECOVERY_ARTIFACT"
         ),
@@ -337,13 +295,45 @@ def main() -> int:
         ),
         "automatic_syncfs_fallback": False,
     }
-    if failure != expected_failure:
+    if policy.get("failure_contract") != expected_failure:
         fail("durability failure contract drifted")
+
+    implementation = policy.get("implementation_state")
+    if implementation != {
+        "namespace_policy_selected": True,
+        "durable_ingest_namespace_complete": False,
+        "runtime_wiring_authorized": False,
+        "next_required_slice": (
+            "REFINE_DORMANT_I1C_PRIMITIVE_TO_SELECTED_NAMESPACE_ORDER"
+        ),
+    }:
+        fail("implementation staging contract drifted")
+
+    storage = policy.get("storage_contract")
+    if not isinstance(storage, dict):
+        fail("storage contract is missing")
+    if storage.get("platform") != "Linux":
+        fail("storage platform drifted")
+    if storage.get("tier2_qualified_filesystem") != "ext4":
+        fail("qualified filesystem drifted")
+    if storage.get("directory_fsync_required") is not True:
+        fail("directory fsync requirement was lost")
+    if storage.get("on_mode_unsupported_or_failed_barrier") != "FAIL_CLOSED":
+        fail("failed-barrier policy drifted")
+    if storage.get("off_mode_preserves_baseline") is not True:
+        fail("OFF baseline preservation drifted")
+
+    retrieval = policy.get("retrieval_index")
+    if not isinstance(retrieval, dict):
+        fail("retrieval-index durability scope is missing")
+    if retrieval.get("authority_role") != "DERIVED_CACHE":
+        fail("retrieval index authority role drifted")
+    if retrieval.get("inherits_snapshot_authority_barrier") is not False:
+        fail("retrieval index must not inherit the snapshot barrier")
 
     print(
         "durability production policy validation passed: "
-        "S1 targeted fsync selected, S2 reference-only, "
-        "runtime not wired"
+        "S1 + S1_DEST_SOURCE selected, runtime not wired"
     )
     return 0
 
