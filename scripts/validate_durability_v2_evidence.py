@@ -236,8 +236,8 @@ def main() -> int:
             ),
             "artifact_id": 10871264620,
             "artifact_sha256": (
-                "6a75983f58b0a79bab8d472290ff5248a9ccccb20a3d619105d1"
-                "dab82129e88e"
+                "f86852cb93ec3d2ba9ca77a78a2be0fd1630eba4730990f38e49"
+                "3599b5cbf99c"
             ),
             "atm_source_commit": (
                 "d2eeee61466dccb85eab1ed94b248aac056f961f"
