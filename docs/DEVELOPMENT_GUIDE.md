@@ -1252,7 +1252,7 @@ F11b freezes the final M11b measurement from Actions run `36151935138`, artifact
 
 The frozen result preserves all four exact failure classes used by M11b: hierarchy-child and destination-parent block-layer EIO with boundary-specific context, the containing-parent exact fsync-call-4 probe, and the source staging-parent full-flow fsync-call-6 probe. Both block-layer replay images are e2fsck-recoverable, every authority result remains `EMPTY_AUTHORITY_VALID` with active generation 0 and no active repository SHA, and both exact-syscall probes are qualified.
 
-Together with M10 process-crash replay and the Linux containing-directory fsync contract, M11b closes the exact-fsync evidence gap that caused P2a to suspend namespace selection. F11b therefore marks the evidence ready for a separate policy review. It does not itself restore `S1_DEST_SOURCE` as production policy: `production_namespace_sequence_selected=false` remains frozen here.
+Together with M10 process-crash replay and the Linux containing-directory fsync contract, M11b closes the exact-fsync evidence gap that caused P2a to suspend namespace selection. F11b therefore marks the evidence ready for a separate policy review and advances only the non-selecting policy staging marker to `REVIEW_NAMESPACE_POLICY_AFTER_M11B`. It does not itself restore `S1_DEST_SOURCE` as production policy: `selected_namespace_strategy=null`, `production_namespace_sequence_selected=false`, and `runtime_integration_selected=false` remain frozen here.
 
 Automatic orphan deletion remains outside this evidence decision. I1b zero-reference evidence still lacks authority-wide exclusion covering every Control DB writer, so no recovery deletion/quarantine authorization follows from F11b.
 
