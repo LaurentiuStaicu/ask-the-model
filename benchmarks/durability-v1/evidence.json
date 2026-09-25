@@ -594,5 +594,142 @@
     "all_old_authority_preserved": true,
     "all_fail_closed": true,
     "reviewed_conclusion": "Both S1 targeted fsync and S2 syncfs fail closed under the reviewed dm-flakey error_writes injections at the pre-rename barrier, promoted-parent fsync and Control DB activation boundaries. All six scenarios preserve the old seal-valid authority. This closes the planned candidate write-error propagation gate but does not by itself select a production durability barrier."
+  },
+  "tier2_same_sha_repair": {
+    "measurement_id": "atm-a1-m9-same-sha-repair-replay-v1",
+    "status": "qualified",
+    "production_barrier_selected": false,
+    "production_durability_authorized": false,
+    "source": {
+      "actions_run_id": 36133608393,
+      "artifact_name": "atm-a1-m9-same-sha-repair-36133608393-1",
+      "artifact_id": 10862142895,
+      "artifact_sha256": "7efbbcbf0112fc12aae2f0c3c4fe6fca9c73a1bb59b67f166549ddf23cb2317c",
+      "atm_source_commit": "821ec5a1329a446d4617fe9687c31ba26889cd9b"
+    },
+    "kernel": {
+      "system": "Linux",
+      "release": "6.17.0-1022-azure",
+      "machine": "x86_64"
+    },
+    "upstream": {
+      "repository": "josefbacik/log-writes",
+      "commit": "7b70d8a6863c5de30933d42a7672d35d01d2dc6c"
+    },
+    "protocol": {
+      "baseline_is_durable_corrupted_same_sha": true,
+      "control_db_retains_pre_corruption_seal": true,
+      "fresh_process_repair_verifier_after_replay": true,
+      "clean_unmount_not_used_as_target_mark": true,
+      "quarantine_parent_fsync_added": false,
+      "candidate_set": [
+        "S1_TARGETED_FSYNC",
+        "S2_SYNCFS"
+      ],
+      "boundary_order": [
+        "post_quarantine",
+        "post_barrier_pre_rename",
+        "post_rename_pre_parent_fsync",
+        "post_parent_fsync_pre_authority",
+        "after_authority"
+      ]
+    },
+    "seals": {
+      "pre_corruption_stored": "39d5b5c5ff8fe2d5a0fbee8238abab546f39b07774ad29aeaeb06c4d25aac780",
+      "corrupted_snapshot": "4c00a0e9415c1767aa2fdccff7767a6fead1fe04e2c5d216fcd36378065e47b8",
+      "repaired_snapshot": "e29de108cffcb56692455588995515f7e057b3d14cd30233cc5d38d575672c96"
+    },
+    "matrix": {
+      "S1_TARGETED_FSYNC": {
+        "post_quarantine": {
+          "baseline_entry": 182,
+          "scenario_entry": 183,
+          "e2fsck_exit_code": 1,
+          "active_generation_id": 1,
+          "classification": "REPAIR_REQUIRED",
+          "qualified": false
+        },
+        "post_barrier_pre_rename": {
+          "baseline_entry": 182,
+          "scenario_entry": 201,
+          "e2fsck_exit_code": 1,
+          "active_generation_id": 1,
+          "classification": "REPAIR_REQUIRED",
+          "qualified": false
+        },
+        "post_rename_pre_parent_fsync": {
+          "baseline_entry": 182,
+          "scenario_entry": 201,
+          "e2fsck_exit_code": 1,
+          "active_generation_id": 1,
+          "classification": "REPAIR_REQUIRED",
+          "qualified": false
+        },
+        "post_parent_fsync_pre_authority": {
+          "baseline_entry": 181,
+          "scenario_entry": 207,
+          "e2fsck_exit_code": 1,
+          "active_generation_id": 1,
+          "classification": "REPAIR_REQUIRED",
+          "qualified": false
+        },
+        "after_authority": {
+          "baseline_entry": 182,
+          "scenario_entry": 229,
+          "e2fsck_exit_code": 1,
+          "active_generation_id": 2,
+          "classification": "REPAIRED_AUTHORITY_VALID",
+          "qualified": true,
+          "seal_match": true
+        }
+      },
+      "S2_SYNCFS": {
+        "post_quarantine": {
+          "baseline_entry": 182,
+          "scenario_entry": 183,
+          "e2fsck_exit_code": 1,
+          "active_generation_id": 1,
+          "classification": "REPAIR_REQUIRED",
+          "qualified": false
+        },
+        "post_barrier_pre_rename": {
+          "baseline_entry": 182,
+          "scenario_entry": 201,
+          "e2fsck_exit_code": 1,
+          "active_generation_id": 1,
+          "classification": "REPAIR_REQUIRED",
+          "qualified": false
+        },
+        "post_rename_pre_parent_fsync": {
+          "baseline_entry": 182,
+          "scenario_entry": 201,
+          "e2fsck_exit_code": 1,
+          "active_generation_id": 1,
+          "classification": "REPAIR_REQUIRED",
+          "qualified": false
+        },
+        "post_parent_fsync_pre_authority": {
+          "baseline_entry": 181,
+          "scenario_entry": 215,
+          "e2fsck_exit_code": 1,
+          "active_generation_id": 1,
+          "classification": "REPAIR_REQUIRED",
+          "qualified": false
+        },
+        "after_authority": {
+          "baseline_entry": 182,
+          "scenario_entry": 237,
+          "e2fsck_exit_code": 1,
+          "active_generation_id": 2,
+          "classification": "REPAIRED_AUTHORITY_VALID",
+          "qualified": true,
+          "seal_match": true
+        }
+      }
+    },
+    "all_repair_invariants_satisfied": true,
+    "all_pre_authority_fail_closed": true,
+    "all_after_authority_repaired_valid": true,
+    "reviewed_conclusion": "S1 targeted fsync and S2 syncfs both keep all four pre-authority same-SHA repair boundaries explicitly REPAIR_REQUIRED and unqualified, then recover generation 2 as REPAIRED_AUTHORITY_VALID with the same SHA and matching replacement seal. The post-quarantine replay remains fail-closed without adding a quarantine parent fsync, so no extra quarantine durability cost is required for repository-authority correctness in this qualified fixture."
   }
 }
