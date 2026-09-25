@@ -610,6 +610,24 @@ test(
   capacity_operation_plan_test
 )
 
+repository_capacity_policy_test = executable(
+  'repository-capacity-policy-test',
+  [
+    'src/repository_capacity_policy.c',
+    'tests/repository_capacity_policy_test.c'
+  ],
+  include_directories: include_directories('src'),
+  dependencies: [
+    glib_dep
+  ],
+  install: false
+)
+
+test(
+  'repository-capacity-policy',
+  repository_capacity_policy_test
+)
+
 capacity_measurement_probe = executable(
   'capacity-measurement-probe',
   [
