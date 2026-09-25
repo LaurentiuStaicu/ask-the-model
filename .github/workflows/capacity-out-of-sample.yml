@@ -18,6 +18,10 @@ on:
       - 'src/repository_manifest.h'
       - 'src/repository_storage.c'
       - 'src/repository_storage.h'
+      - 'src/snapshot_seal.c'
+      - 'src/snapshot_seal.h'
+      - 'src/snapshot_durability.c'
+      - 'src/snapshot_durability.h'
       - 'src/repository_sources.c'
       - 'src/repository_sources.h'
       - 'src/markdown_sections.c'
@@ -103,6 +107,8 @@ jobs:
             src/archive_extract.c \
             src/repository_manifest.c \
             src/repository_storage.c \
+            src/snapshot_seal.c \
+            src/snapshot_durability.c \
             src/repository_ingest.c \
             src/repository_sources.c \
             src/markdown_sections.c \
