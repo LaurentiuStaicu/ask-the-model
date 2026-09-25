@@ -1263,6 +1263,164 @@ out:
     return TRUE;
 }
 
+static gboolean
+verify_replayed_repair (
+    const char *root
+)
+{
+    char *data_root = data_root_for (root);
+    char *control_path = control_path_for (root);
+    char *snapshot_path = atm_repository_snapshot_path (
+        data_root,
+        REPOSITORY_ID,
+        OLD_SHA
+    );
+    char *staging_path =
+        atm_repository_extraction_staging_path (
+            data_root,
+            REPOSITORY_ID,
+            OLD_SHA
+        );
+    gint64 generation_id = 0;
+    gboolean present = FALSE;
+    char *active_sha = NULL;
+    char *version = NULL;
+    char *stored_seal = NULL;
+    char *computed_seal = NULL;
+    guint64 file_count = 0;
+    guint64 total_bytes = 0;
+    GError *error = NULL;
+    const char *classification = "REPAIR_REQUIRED";
+    const char *reason_code = "repair_not_committed";
+    gboolean seal_match = FALSE;
+    gboolean qualified = FALSE;
+    gboolean final_exists =
+        path_exists_any (snapshot_path);
+    gboolean staging_exists =
+        path_exists_any (staging_path);
+
+    if (!atm_control_state_active_generation_id (
+            control_path,
+            &generation_id,
+            &error
+        ) ||
+        generation_id <= 0 ||
+        !atm_control_state_load_repository_values_at_generation (
+            control_path,
+            generation_id,
+            REPOSITORY_ID,
+            &present,
+            &active_sha,
+            &version,
+            &stored_seal,
+            &error
+        ) ||
+        !present ||
+        active_sha == NULL ||
+        stored_seal == NULL) {
+        g_clear_error (&error);
+        classification = "INVALID_AUTHORITY";
+        reason_code = "control_state_unreadable_or_missing";
+        goto print;
+    }
+
+    if (g_strcmp0 (active_sha, OLD_SHA) != 0) {
+        classification = "INVALID_AUTHORITY";
+        reason_code = "unexpected_active_sha";
+        goto print;
+    }
+
+    if (!final_exists) {
+        classification = "REPAIR_REQUIRED";
+        reason_code = "active_snapshot_missing_during_repair";
+        goto print;
+    }
+
+    if (!atm_snapshot_seal_compute (
+            snapshot_path,
+            &computed_seal,
+            &file_count,
+            &total_bytes,
+            &error
+        )) {
+        g_clear_error (&error);
+        classification = "REPAIR_REQUIRED";
+        reason_code = "active_snapshot_unreadable_during_repair";
+        goto print;
+    }
+
+    seal_match =
+        g_strcmp0 (stored_seal, computed_seal) == 0;
+
+    if (!seal_match) {
+        classification = "REPAIR_REQUIRED";
+        reason_code = "active_snapshot_seal_mismatch_during_repair";
+    } else if (generation_id >= 2) {
+        classification = "REPAIRED_AUTHORITY_VALID";
+        reason_code = "repaired_generation_and_seal_valid";
+        qualified = TRUE;
+    } else {
+        classification = "OLD_AUTHORITY_VALID";
+        reason_code = "old_generation_and_seal_valid";
+        qualified = TRUE;
+    }
+
+print:
+    char *active_sha_json = active_sha != NULL
+        ? g_strdup_printf ("\"%s\"", active_sha)
+        : g_strdup ("null");
+    char *stored_seal_json = stored_seal != NULL
+        ? g_strdup_printf ("\"%s\"", stored_seal)
+        : g_strdup ("null");
+    char *computed_seal_json = computed_seal != NULL
+        ? g_strdup_printf ("\"%s\"", computed_seal)
+        : g_strdup ("null");
+
+    g_print (
+        "{"
+        "\"schema_version\":1,"
+        "\"classification\":\"%s\","
+        "\"active_generation_id\":%" G_GINT64_FORMAT ","
+        "\"active_repository_sha\":%s,"
+        "\"stored_seal\":%s,"
+        "\"computed_seal\":%s,"
+        "\"seal_match\":%s,"
+        "\"active_file_count\":%" G_GUINT64_FORMAT ","
+        "\"active_total_bytes\":%" G_GUINT64_FORMAT ","
+        "\"snapshot_final_exists\":%s,"
+        "\"snapshot_staging_exists\":%s,"
+        "\"qualified\":%s,"
+        "\"reason_code\":\"%s\""
+        "}\n",
+        classification,
+        generation_id,
+        active_sha_json,
+        stored_seal_json,
+        computed_seal_json,
+        seal_match ? "true" : "false",
+        file_count,
+        total_bytes,
+        final_exists ? "true" : "false",
+        staging_exists ? "true" : "false",
+        qualified ? "true" : "false",
+        reason_code
+    );
+
+    g_free (computed_seal_json);
+    g_free (stored_seal_json);
+    g_free (active_sha_json);
+    g_clear_error (&error);
+    g_free (computed_seal);
+    g_free (stored_seal);
+    g_free (version);
+    g_free (active_sha);
+    g_free (staging_path);
+    g_free (snapshot_path);
+    g_free (control_path);
+    g_free (data_root);
+    return TRUE;
+}
+
 static int
 report_error (GError *error)
 {
