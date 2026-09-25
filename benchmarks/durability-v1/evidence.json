@@ -1,0 +1,122 @@
+{
+  "schema_version": 1,
+  "evidence_id": "atm-a1-m1-durability-barrier-evidence-v1",
+  "status": "qualification-only",
+  "production_barrier_selected": false,
+  "source": {
+    "actions_run_id": 36116289496,
+    "artifact_name": "atm-a1-m1-durability-36116289496-1",
+    "artifact_id": 10854573179,
+    "artifact_sha256": "4ffbbcc089af101324843756ae43f033a5704a266a0e08166c0f85f87c59cf2c",
+    "atm_source_commit": "092d16394c7f47d3fa12e1af94d02439523a7739",
+    "workflow_commit": "ec56e4860142a1f0e9867d8369d2e021821f6c86"
+  },
+  "runner_filesystem": {
+    "kernel_release": "6.17.0-1022-azure",
+    "filesystem": "ext4",
+    "source": "/dev/nvme0n1p1",
+    "mount_options_observed": [
+      "rw",
+      "relatime",
+      "discard",
+      "journal_async_commit",
+      "nobarrier",
+      "errors=remount-ro",
+      "commit=30",
+      "data=writeback"
+    ],
+    "interpretation": "Comparative qualification environment only; timings are not a desktop latency guarantee."
+  },
+  "method": {
+    "strategies": [
+      "S3_CONTROL",
+      "S1_TARGETED_FSYNC",
+      "S2_SYNCFS"
+    ],
+    "runs_per_strategy_per_repository": 3,
+    "order_rotated": true,
+    "S1": "fsync every regular file, then fsync each directory bottom-up including snapshot root",
+    "S2": "one syncfs call on an fd for the snapshot filesystem",
+    "scope": "fresh extraction + manifest validation + snapshot seal + candidate barrier; no rename, Control DB activation, or production wiring"
+  },
+  "corpus": {
+    "ewd": "795a6b8e42e2a19497f686a89e7c3a6056e6930c",
+    "cbd": "e6e3b3077b7d78e3f37d963e0734e9084e8a62ab",
+    "rmd": "a8b5ff89a951d3194fdedb59771bc79937fe7bc7"
+  },
+  "summary": {
+    "cbd": {
+      "seal_file_count": 108,
+      "seal_total_bytes": 633284,
+      "S3_CONTROL": {
+        "median_prepared_elapsed_us": 6814
+      },
+      "S1_TARGETED_FSYNC": {
+        "median_barrier_elapsed_us": 30532,
+        "median_prepared_elapsed_us": 37162,
+        "median_total_over_control_us": 30348,
+        "file_fsync_calls": 108,
+        "directory_fsync_calls": 19
+      },
+      "S2_SYNCFS": {
+        "median_barrier_elapsed_us": 2416,
+        "median_prepared_elapsed_us": 9285,
+        "median_total_over_control_us": 2471,
+        "syncfs_calls": 1
+      }
+    },
+    "ewd": {
+      "seal_file_count": 160,
+      "seal_total_bytes": 4616863,
+      "S3_CONTROL": {
+        "median_prepared_elapsed_us": 24667
+      },
+      "S1_TARGETED_FSYNC": {
+        "median_barrier_elapsed_us": 54657,
+        "median_prepared_elapsed_us": 79988,
+        "median_total_over_control_us": 55321,
+        "file_fsync_calls": 160,
+        "directory_fsync_calls": 33
+      },
+      "S2_SYNCFS": {
+        "median_barrier_elapsed_us": 25776,
+        "median_prepared_elapsed_us": 50181,
+        "median_total_over_control_us": 25514,
+        "syncfs_calls": 1
+      }
+    },
+    "rmd": {
+      "seal_file_count": 865,
+      "seal_total_bytes": 15387131,
+      "S3_CONTROL": {
+        "median_prepared_elapsed_us": 80747
+      },
+      "S1_TARGETED_FSYNC": {
+        "median_barrier_elapsed_us": 285953,
+        "median_prepared_elapsed_us": 366721,
+        "median_total_over_control_us": 285974,
+        "file_fsync_calls": 865,
+        "directory_fsync_calls": 59
+      },
+      "S2_SYNCFS": {
+        "median_barrier_elapsed_us": 90616,
+        "median_prepared_elapsed_us": 172418,
+        "median_total_over_control_us": 91671,
+        "syncfs_calls": 1
+      }
+    }
+  },
+  "reviewed_conclusions": [
+    "S2 syncfs was faster than S1 targeted fsync for CBD, EWD and RMD on this runner.",
+    "S1 targeted fsync cost increased materially with the number of files and directories.",
+    "S2 has filesystem-wide scope, so timing advantage alone does not justify production selection.",
+    "A1-M1 does not measure snapshot rename, parent-directory promotion sync, or Control DB activation.",
+    "A1-M1 is not a physical-power-loss durability proof.",
+    "No production durability barrier is selected until Tier-2 durability evidence is reviewed."
+  ],
+  "tier2_direction": {
+    "preferred_first_prototype": "dm-log-writes replay qualification",
+    "purpose": "replay completed writes/flush ordering to explicit marks and verify restart authority using the existing recovery oracle",
+    "production_authorized": false
+  }
+}
