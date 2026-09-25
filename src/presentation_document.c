@@ -208,3 +208,241 @@ atm_presentation_document_to_plain_text (
 
     return g_string_free (out, FALSE);
 }
+
+
+static const AtmPresentationBlock *
+presentation_block_at (
+    const AtmPresentationDocument *document,
+    guint block_index
+)
+{
+    if (document == NULL ||
+        document->blocks == NULL ||
+        block_index >= document->blocks->len) {
+        return NULL;
+    }
+
+    return g_ptr_array_index (
+        document->blocks,
+        block_index
+    );
+}
+
+static const AtmPresentationSegment *
+presentation_segment_at (
+    const AtmPresentationDocument *document,
+    guint block_index,
+    guint segment_index
+)
+{
+    const AtmPresentationBlock *block =
+        presentation_block_at (
+            document,
+            block_index
+        );
+
+    if (block == NULL ||
+        block->segments == NULL ||
+        segment_index >= block->segments->len) {
+        return NULL;
+    }
+
+    return g_ptr_array_index (
+        block->segments,
+        segment_index
+    );
+}
+
+gboolean
+atm_presentation_document_is_fallback (
+    const AtmPresentationDocument *document
+)
+{
+    return document != NULL && document->fallback;
+}
+
+const char *
+atm_presentation_document_fallback_reason (
+    const AtmPresentationDocument *document
+)
+{
+    if (document == NULL) {
+        return NULL;
+    }
+
+    return document->fallback_reason;
+}
+
+guint
+atm_presentation_document_block_count (
+    const AtmPresentationDocument *document
+)
+{
+    if (document == NULL || document->blocks == NULL) {
+        return 0;
+    }
+
+    return document->blocks->len;
+}
+
+AtmPresentationBlockType
+atm_presentation_document_block_type_at (
+    const AtmPresentationDocument *document,
+    guint block_index
+)
+{
+    const AtmPresentationBlock *block =
+        presentation_block_at (
+            document,
+            block_index
+        );
+
+    return block != NULL
+        ? block->type
+        : ATM_PRESENTATION_BLOCK_PARAGRAPH;
+}
+
+guint
+atm_presentation_document_heading_level_at (
+    const AtmPresentationDocument *document,
+    guint block_index
+)
+{
+    const AtmPresentationBlock *block =
+        presentation_block_at (
+            document,
+            block_index
+        );
+
+    return block != NULL ? block->heading_level : 0;
+}
+
+guint
+atm_presentation_document_nesting_level_at (
+    const AtmPresentationDocument *document,
+    guint block_index
+)
+{
+    const AtmPresentationBlock *block =
+        presentation_block_at (
+            document,
+            block_index
+        );
+
+    return block != NULL ? block->nesting_level : 0;
+}
+
+guint
+atm_presentation_document_quote_depth_at (
+    const AtmPresentationDocument *document,
+    guint block_index
+)
+{
+    const AtmPresentationBlock *block =
+        presentation_block_at (
+            document,
+            block_index
+        );
+
+    return block != NULL ? block->quote_depth : 0;
+}
+
+gboolean
+atm_presentation_document_ordered_at (
+    const AtmPresentationDocument *document,
+    guint block_index
+)
+{
+    const AtmPresentationBlock *block =
+        presentation_block_at (
+            document,
+            block_index
+        );
+
+    return block != NULL && block->ordered;
+}
+
+guint
+atm_presentation_document_ordinal_at (
+    const AtmPresentationDocument *document,
+    guint block_index
+)
+{
+    const AtmPresentationBlock *block =
+        presentation_block_at (
+            document,
+            block_index
+        );
+
+    return block != NULL ? block->ordinal : 0;
+}
+
+const char *
+atm_presentation_document_info_at (
+    const AtmPresentationDocument *document,
+    guint block_index
+)
+{
+    const AtmPresentationBlock *block =
+        presentation_block_at (
+            document,
+            block_index
+        );
+
+    return block != NULL ? block->info : NULL;
+}
+
+guint
+atm_presentation_document_segment_count_at (
+    const AtmPresentationDocument *document,
+    guint block_index
+)
+{
+    const AtmPresentationBlock *block =
+        presentation_block_at (
+            document,
+            block_index
+        );
+
+    if (block == NULL || block->segments == NULL) {
+        return 0;
+    }
+
+    return block->segments->len;
+}
+
+AtmPresentationSegmentType
+atm_presentation_document_segment_type_at (
+    const AtmPresentationDocument *document,
+    guint block_index,
+    guint segment_index
+)
+{
+    const AtmPresentationSegment *segment =
+        presentation_segment_at (
+            document,
+            block_index,
+            segment_index
+        );
+
+    return segment != NULL
+        ? segment->type
+        : ATM_PRESENTATION_SEGMENT_TEXT;
+}
+
+const char *
+atm_presentation_document_segment_text_at (
+    const AtmPresentationDocument *document,
+    guint block_index,
+    guint segment_index
+)
+{
+    const AtmPresentationSegment *segment =
+        presentation_segment_at (
+            document,
+            block_index,
+            segment_index
+        );
+
+    return segment != NULL ? segment->text : NULL;
+}

@@ -60,6 +60,76 @@ char *atm_presentation_document_to_plain_text (
     const AtmPresentationDocument *document
 );
 
+/*
+ * Read-only ABI for presentation consumers.
+ *
+ * Callers must treat AtmPresentationDocument as opaque and use these
+ * accessors rather than depending on its internal GPtrArray layout.
+ */
+gboolean atm_presentation_document_is_fallback (
+    const AtmPresentationDocument *document
+);
+
+const char *atm_presentation_document_fallback_reason (
+    const AtmPresentationDocument *document
+);
+
+guint atm_presentation_document_block_count (
+    const AtmPresentationDocument *document
+);
+
+AtmPresentationBlockType atm_presentation_document_block_type_at (
+    const AtmPresentationDocument *document,
+    guint block_index
+);
+
+guint atm_presentation_document_heading_level_at (
+    const AtmPresentationDocument *document,
+    guint block_index
+);
+
+guint atm_presentation_document_nesting_level_at (
+    const AtmPresentationDocument *document,
+    guint block_index
+);
+
+guint atm_presentation_document_quote_depth_at (
+    const AtmPresentationDocument *document,
+    guint block_index
+);
+
+gboolean atm_presentation_document_ordered_at (
+    const AtmPresentationDocument *document,
+    guint block_index
+);
+
+guint atm_presentation_document_ordinal_at (
+    const AtmPresentationDocument *document,
+    guint block_index
+);
+
+const char *atm_presentation_document_info_at (
+    const AtmPresentationDocument *document,
+    guint block_index
+);
+
+guint atm_presentation_document_segment_count_at (
+    const AtmPresentationDocument *document,
+    guint block_index
+);
+
+AtmPresentationSegmentType atm_presentation_document_segment_type_at (
+    const AtmPresentationDocument *document,
+    guint block_index,
+    guint segment_index
+);
+
+const char *atm_presentation_document_segment_text_at (
+    const AtmPresentationDocument *document,
+    guint block_index,
+    guint segment_index
+);
+
 G_END_DECLS
 
 #endif
