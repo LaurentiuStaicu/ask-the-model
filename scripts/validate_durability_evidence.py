@@ -519,6 +519,140 @@ def main() -> int:
         if phrase not in conclusion:
             fail(f"Tier-2 AtM replay conclusion lost: {phrase}")
 
+    candidate = evidence.get("tier2_candidate_replay")
+    if not isinstance(candidate, dict):
+        fail("Tier-2 candidate replay evidence is missing")
+    if candidate.get("measurement_id") != (
+        "atm-a1-m5-candidate-replay-v1"
+    ):
+        fail("Tier-2 candidate replay identity drifted")
+    if candidate.get("status") != "qualification-only":
+        fail("Tier-2 candidate replay status drifted")
+    if candidate.get("production_barrier_selected") is not False:
+        fail("M5 must not select a production barrier")
+
+    candidate_source = candidate.get("source")
+    if not isinstance(candidate_source, dict):
+        fail("Tier-2 candidate replay source is missing")
+    if candidate_source.get("actions_run_id") != 36122088947:
+        fail("Tier-2 candidate replay Actions run drifted")
+    if candidate_source.get("artifact_name") != (
+        "atm-a1-m5-candidate-replay-36122088947-1"
+    ):
+        fail("Tier-2 candidate replay artifact name drifted")
+    if candidate_source.get("artifact_id") != 10858682250:
+        fail("Tier-2 candidate replay artifact ID drifted")
+    candidate_digest = candidate_source.get("artifact_sha256")
+    if (
+        not isinstance(candidate_digest, str)
+        or SHA256.fullmatch(candidate_digest) is None
+        or candidate_digest != (
+            "a65f0db2a5f667434e0299fcf5067cdfad6686b1f38c489dc3ba917a33a67bc2"
+        )
+    ):
+        fail("Tier-2 candidate replay artifact digest drifted")
+    candidate_head = candidate_source.get("atm_source_commit")
+    if (
+        not isinstance(candidate_head, str)
+        or SHA40.fullmatch(candidate_head) is None
+        or candidate_head != "561ded6ed8e3d87c025a5dea7918162bfe076383"
+    ):
+        fail("Tier-2 candidate replay source commit drifted")
+
+    if candidate.get("kernel") != {
+        "system": "Linux",
+        "release": "6.17.0-1022-azure",
+        "machine": "x86_64",
+    }:
+        fail("Tier-2 candidate replay kernel context drifted")
+    if candidate.get("upstream") != {
+        "repository": "josefbacik/log-writes",
+        "commit": "7b70d8a6863c5de30933d42a7672d35d01d2dc6c",
+    }:
+        fail("Tier-2 candidate replay upstream pin drifted")
+
+    if candidate.get("protocol") != {
+        "old_authority_synced_before_baseline_mark": True,
+        "fresh_process_seal_verifier_after_replay": True,
+        "target_mark": "immediately after Control DB activation",
+        "common_post_rename_parent_fsync": True,
+    }:
+        fail("Tier-2 candidate replay protocol drifted")
+
+    candidates = candidate.get("candidates")
+    if not isinstance(candidates, dict) or set(candidates) != {
+        "S1_TARGETED_FSYNC",
+        "S2_SYNCFS",
+    }:
+        fail("Tier-2 candidate set drifted")
+
+    expected_candidate_counters = {
+        "S1_TARGETED_FSYNC": {
+            "file_fsync_calls": 2,
+            "directory_fsync_calls": 2,
+            "syncfs_calls": 0,
+            "parent_fsync_calls": 1,
+        },
+        "S2_SYNCFS": {
+            "file_fsync_calls": 0,
+            "directory_fsync_calls": 0,
+            "syncfs_calls": 1,
+            "parent_fsync_calls": 1,
+        },
+    }
+    expected_entries = {
+        "S1_TARGETED_FSYNC": 214,
+        "S2_SYNCFS": 221,
+    }
+    new_sha = "bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb"
+    new_seal = (
+        "acebf979895f9efd073014fa707038d47ec71b411f4e12a32aa619e9c63f3132"
+    )
+
+    for strategy in ("S1_TARGETED_FSYNC", "S2_SYNCFS"):
+        result = candidates[strategy]
+        if result.get("baseline_entry") != 162:
+            fail(f"{strategy} baseline entry drifted")
+        if result.get("scenario_entry") != expected_entries[strategy]:
+            fail(f"{strategy} scenario entry drifted")
+        if result.get("scenario_entry") <= result.get("baseline_entry"):
+            fail(f"{strategy} scenario must remain after baseline")
+        if result.get("e2fsck_exit_code") not in (0, 1, 2):
+            fail(f"{strategy} e2fsck result is not clean/corrected")
+        if result.get("barrier_counters") != expected_candidate_counters[strategy]:
+            fail(f"{strategy} barrier counters drifted")
+        if result.get("active_generation_id") != 2:
+            fail(f"{strategy} active generation drifted")
+        if result.get("active_repository_sha") != new_sha:
+            fail(f"{strategy} active SHA drifted")
+        if result.get("stored_seal") != new_seal:
+            fail(f"{strategy} stored seal drifted")
+        if result.get("computed_seal") != new_seal:
+            fail(f"{strategy} computed seal drifted")
+        if result.get("observed_classification") != "NEW_AUTHORITY_VALID":
+            fail(f"{strategy} no longer satisfies new-authority classification")
+        if result.get("seal_match") is not True:
+            fail(f"{strategy} replayed seal no longer matches")
+        if result.get("qualified") is not True:
+            fail(f"{strategy} replay qualification was lost")
+        if result.get("candidate_satisfied") is not True:
+            fail(f"{strategy} candidate satisfaction was lost")
+
+    candidate_conclusion = str(
+        candidate.get("reviewed_conclusion", "")
+    ).lower()
+    for phrase in (
+        "both satisfy",
+        "falsified s3",
+        "does not select a production barrier",
+        "boundary qualification",
+        "performance evidence",
+        "scope",
+        "error-propagation",
+    ):
+        if phrase not in candidate_conclusion:
+            fail(f"Tier-2 candidate replay conclusion lost: {phrase}")
+
     print(
         "durability evidence validation passed: "
         "A1-M1 CBD/EWD/RMD medians frozen, "
