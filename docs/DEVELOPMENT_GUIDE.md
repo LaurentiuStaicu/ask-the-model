@@ -1464,6 +1464,26 @@ The Control DB is queried through a strict read-only/no-follow/query-only API fo
 
 I2 remains dormant in `RepositoryLifecycleService`. It does not enumerate snapshot directories, create `.trash`, rename, unlink, purge, prune Control DB metadata, or evict retrieval indexes.
 
+### OPT-C1-I3 non-destructive snapshot candidate discovery
+
+I3 adds filesystem candidate discovery only. It does not isolate, rename, purge or authorize deletion.
+
+The native scanner starts from the qualified data root and opens each namespace component with `O_DIRECTORY | O_NOFOLLOW`. It never enumerates repository IDs from disk. Instead, the Vala layer iterates the fixed `RepositoryCatalog` and requests a scan only for `Repositories/<catalog-id>/snapshots`.
+
+Within each snapshots directory, I3 examines direct children only:
+
+- a lowercase 40-hex basename whose `fstatat(..., AT_SYMLINK_NOFOLLOW)` result is a real directory is a syntactically valid snapshot entry;
+- a syntactically valid snapshot already present in the I2 protected-root set is retained/protected and omitted from candidates;
+- a syntactically valid, real-directory snapshot not present in the protected-root set is returned as a non-destructive candidate;
+- an invalid basename is recorded as an `unexpected-basename` diagnostic;
+- a valid SHA basename that is a symlink, regular file or other non-directory is recorded as a `not-real-directory` diagnostic.
+
+Diagnostics are not candidates. An absent known repository/snapshots namespace means there is simply nothing to discover. A namespace component that exists but cannot be opened as a real no-follow directory fails the scan closed.
+
+The scanner does not descend into snapshot contents and does not inspect arbitrary repository directories placed under `Repositories`. Tests cover protected-root filtering, one valid unprotected candidate, malformed-entry diagnostics, a SHA-named symlink, an arbitrary unknown repository tree that remains undiscovered, a symlinked `snapshots` namespace that fails closed, and an absent repository namespace.
+
+I3 is still only a candidate inventory. Candidate presence is not deletion authority: liveness and durable roots can change immediately after the scan. Before any later same-filesystem isolation, C1 must still establish the global mutation exclusion, acquire/hold the relevant generation exclusions, re-read durable/live roots and revalidate the exact repository/SHA candidate immediately before rename.
+
 ### Recovery fault qualification
 
 The OPT-A0 recovery harness is test-only. Native checkpoint calls compile to no-ops in the production application; only the dedicated recovery helper is built with `ATM_TEST_FAULT_INJECTION`.
