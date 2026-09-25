@@ -45,6 +45,27 @@ def main() -> int:
     meson = MESON.read_text(encoding="utf-8")
     policy = json.loads(POLICY.read_text(encoding="utf-8"))
 
+    if policy.get("status") != "selected-runtime-wired":
+        fail("runtime wiring requires selected-runtime-wired policy status")
+    if policy.get("runtime_integration_selected") is not True:
+        fail("runtime wiring must be selected in the production policy")
+
+    integration = policy.get("runtime_integration")
+    if not isinstance(integration, dict):
+        fail("runtime integration metadata is missing")
+    if integration.get("runtime_source") != (
+        "src/RepositoryLifecycleService.vala"
+    ):
+        fail("runtime integration source drifted")
+    if integration.get("authority_lease_required") is not True:
+        fail("runtime integration lost the authority-lease prerequisite")
+    if integration.get("checkpoints") != [
+        "PRE_DOWNLOAD",
+        "POST_DOWNLOAD_PRE_MUTATION",
+        "STATE_PUBLICATION",
+    ]:
+        fail("runtime checkpoint registry drifted")
+
     gate = policy.get("runtime_gate")
     if not isinstance(gate, dict):
         fail("runtime gate is missing from production policy")
