@@ -35,9 +35,11 @@
       "candidate_for_review": "S1_DEST_SOURCE",
       "m10_replay_correctness": "QUALIFIED",
       "m11_eio_correctness": "PARTIAL_SCOPE_REVIEWED",
-      "m11b_required": true,
+      "m11b_exact_fsync_correctness": "QUALIFIED",
+      "m11b_required": false,
+      "policy_review_ready": true,
       "linux_directory_entry_contract_driven": true,
-      "reason": "M10 kept parent-only, destination-chain, and destination+source authority-safe on the reviewed ext4 replay fixture, while Linux still requires explicit containing-directory fsync for directory-entry durability. S1_DEST_SOURCE remains the conservative contract-complete candidate, but post-freeze review found that M11 did not isolate hierarchy fsync and did not prove source-parent fsync returned the observed EIO. Namespace selection is therefore suspended until M11b exact-fsync evidence is reviewed and frozen."
+      "reason": "M10 preserves fresh-install authority safety across all reviewed namespace candidates. Historical M11 remains partially scoped after post-freeze review. Frozen M11b now closes the exact-fsync error-propagation gap with block-layer EIO for hierarchy-child and destination-parent fsync plus deterministic exact-syscall EIO probes for the containing-parent and source staging-parent calls. S1_DEST_SOURCE is therefore ready for a new explicit policy review, but remains unselected until that review is performed."
     }
   },
   "m1_reviewed_cost_us": {
@@ -65,7 +67,8 @@
     "candidate_eio": "benchmarks/durability-v1/evidence.json#tier2_candidate_error_injection",
     "same_sha_repair": "benchmarks/durability-v1/evidence.json#tier2_same_sha_repair",
     "fresh_namespace_replay": "benchmarks/durability-v2/evidence.json#m10_replay",
-    "fresh_namespace_eio": "benchmarks/durability-v2/evidence.json#m11_eio"
+    "fresh_namespace_eio": "benchmarks/durability-v2/evidence.json#m11_eio",
+    "fresh_namespace_exact_eio": "benchmarks/durability-v2/evidence.json#m11b_exact_eio"
   },
   "storage_contract": {
     "platform": "Linux",
@@ -128,6 +131,6 @@
     "namespace_policy_selected": false,
     "durable_ingest_namespace_complete": false,
     "runtime_wiring_authorized": false,
-    "next_required_slice": "COMPLETE_M11B_EXACT_NAMESPACE_FSYNC_QUALIFICATION"
+    "next_required_slice": "REVIEW_M11B_AND_SELECT_OR_REJECT_NAMESPACE_POLICY"
   }
 }

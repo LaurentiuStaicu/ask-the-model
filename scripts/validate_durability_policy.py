@@ -86,16 +86,23 @@ def main() -> int:
         fail("M10 qualification was lost")
     if namespace_basis.get("m11_eio_correctness") != "PARTIAL_SCOPE_REVIEWED":
         fail("M11 reviewed partial scope was lost")
-    if namespace_basis.get("m11b_required") is not True:
-        fail("M11b requirement was lost")
+    if namespace_basis.get("m11b_exact_fsync_correctness") != "QUALIFIED":
+        fail("M11b exact-fsync qualification was lost")
+    if namespace_basis.get("m11b_required") is not False:
+        fail("M11b must no longer be pending after F11")
+    if namespace_basis.get("policy_review_ready") is not True:
+        fail("namespace candidate must be ready for explicit policy review")
     if namespace_basis.get("linux_directory_entry_contract_driven") is not True:
         fail("Linux directory-entry contract basis was lost")
     namespace_reason = str(namespace_basis.get("reason", "")).lower()
     for phrase in (
-        "s1_dest_source remains the conservative contract-complete candidate",
-        "m11 did not isolate hierarchy fsync",
-        "did not prove source-parent fsync returned the observed eio",
-        "suspended until m11b",
+        "m10 preserves fresh-install authority safety",
+        "historical m11 remains partially scoped",
+        "frozen m11b now closes the exact-fsync error-propagation gap",
+        "block-layer eio",
+        "deterministic exact-syscall eio probes",
+        "ready for a new explicit policy review",
+        "remains unselected",
     ):
         if phrase not in namespace_reason:
             fail(f"namespace review rationale lost: {phrase}")
@@ -198,14 +205,28 @@ def main() -> int:
         fail("M11 recoverability aggregate was lost")
     if m11.get("protocol", {}).get("candidate") != "S1_DEST_SOURCE":
         fail("M11 candidate drifted")
+    m11b = namespace_evidence.get("m11b_exact_eio")
+    if not isinstance(m11b, dict):
+        fail("M11b frozen evidence is missing")
+    if m11b.get("candidate") != "S1_DEST_SOURCE":
+        fail("M11b candidate drifted")
+    for key in (
+        "all_authority_fail_closed",
+        "all_e2fsck_recoverable",
+        "all_exact_error_contexts",
+        "namespace_parent_fsync_probe_qualified",
+        "source_parent_fsync_probe_qualified",
+    ):
+        if m11b.get(key) is not True:
+            fail(f"M11b frozen aggregate lost: {key}")
     if interpretation.get("candidate_for_policy_review") != "S1_DEST_SOURCE":
         fail("F10 policy-review candidate drifted")
-    if interpretation.get("policy_review_ready") is not False:
-        fail("F10 policy review must remain blocked pending M11b")
-    if interpretation.get("m11_exact_fsync_qualification_complete") is not False:
-        fail("M11 exact-fsync qualification must remain incomplete")
-    if interpretation.get("m11b_required") is not True:
-        fail("F10 M11b requirement was lost")
+    if interpretation.get("policy_review_ready") is not True:
+        fail("F11 policy-review readiness was lost")
+    if interpretation.get("m11_exact_fsync_qualification_complete") is not True:
+        fail("F11 exact-fsync completion marker was lost")
+    if interpretation.get("m11b_required") is not False:
+        fail("M11b must not remain pending after F11")
     if interpretation.get("production_namespace_sequence_selected") is not False:
         fail("F10 evidence must not select policy")
     if interpretation.get("automatic_orphan_recovery_authorized") is not False:
@@ -221,6 +242,9 @@ def main() -> int:
         "same_sha_repair": "benchmarks/durability-v1/evidence.json#tier2_same_sha_repair",
         "fresh_namespace_replay": "benchmarks/durability-v2/evidence.json#m10_replay",
         "fresh_namespace_eio": "benchmarks/durability-v2/evidence.json#m11_eio",
+        "fresh_namespace_exact_eio": (
+            "benchmarks/durability-v2/evidence.json#m11b_exact_eio"
+        ),
     }
     if evidence_refs != expected_refs:
         fail("qualified evidence references drifted")
@@ -300,7 +324,7 @@ def main() -> int:
         "namespace_policy_selected": False,
         "durable_ingest_namespace_complete": False,
         "runtime_wiring_authorized": False,
-        "next_required_slice": "COMPLETE_M11B_EXACT_NAMESPACE_FSYNC_QUALIFICATION",
+        "next_required_slice": "REVIEW_M11B_AND_SELECT_OR_REJECT_NAMESPACE_POLICY",
     }:
         fail("implementation staging contract drifted")
 
@@ -328,7 +352,7 @@ def main() -> int:
 
     print(
         "durability production policy validation passed: "
-        "S1 selected; namespace selection suspended pending M11b"
+        "S1 selected; M11b frozen; namespace candidate ready for policy review"
     )
     return 0
 

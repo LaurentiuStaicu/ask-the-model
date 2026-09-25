@@ -1226,25 +1226,37 @@ The production policy therefore keeps the already-qualified content strategy `S1
 
 The policy's active promotion order reverts to the P1 content-durability sequence until M11b is reviewed. The extra destination-hierarchy and source-parent steps remain candidate operations only; no application caller may rely on them as selected policy. PRs that implement the P2 namespace order must remain draft/blocked until a later freeze restores policy readiness.
 
-### OPT-A1-M11b exact namespace fsync EIO qualification
+### OPT-A1-M11b exact namespace-fsync qualification
 
-M11b is a measurement-only correction gate for the `S1_DEST_SOURCE` namespace candidate. It does not reselect that candidate, modify repository ingest, add a Vala/lifecycle caller, authorize automatic orphan recovery or change Optimizations behavior.
+M11b closes the evidence-scope gap identified after M11 without weakening the Linux directory-entry durability contract. It tests only the contract-complete candidate `S1_DEST_SOURCE` and keeps production namespace selection false.
 
-The historical M11 evidence remains useful but is narrower than first interpreted: its destination-hierarchy fault was armed before the complete namespace helper, and its source-parent artifact recorded only a generic EIO that could be surfaced by a later Control DB write. M11b therefore isolates the missing fsync contexts instead of treating fault timing as syscall identity.
+Two contexts use the real ext4 block path with `dm-flakey error_writes`:
 
-The block-layer part uses `dm-flakey error_writes` at two exact contexts, with boundary-specific error text required:
+1. the child fsync of the newly created final repository directory, with the fault armed after `mkdirat/open/fstat` and immediately before that fsync;
+2. the promoted destination-parent fsync after cross-directory rename.
 
-1. `fsync(child)` for the newly created final repository directory, after `mkdirat/open/fstat`;
-2. fsync of the promoted final snapshot destination parent after the cross-directory rename.
+Both scenarios require the boundary-specific fsync error text, explicit EIO, recoverable ext4 and a fresh verifier classification of `EMPTY_AUTHORITY_VALID`, generation 0, with no active repository SHA.
 
-Two additional calls use deterministic exact-syscall probes because a preceding fsync can drain ext4 journal work and leave no block write for `dm-flakey` to fail at the next call:
+Two additional fsync calls use deterministic test-only syscall injection because ext4 may have no new block write for `dm-flakey` to fail after a preceding successful fsync:
 
-3. the containing-parent namespace `fsync(parent)`, where a test-only namespace-module build forces the exact fourth hierarchy fsync to return `EIO` and verifies the parent-specific error context and counters;
-4. the post-rename staging source-parent fsync, where a test-only build replaces only the fsync symbol used by `snapshot_durability.c`, forces call 6 to return `EIO` after four staging-tree fsyncs and one successful destination-parent fsync, and runs the fresh authority oracle.
+3. the containing-parent fsync in destination hierarchy preparation is forced to return EIO on the exact fourth hierarchy fsync; the probe verifies three prior successful fsync calls, the parent-specific error context and EIO mapping;
+4. the staging source-parent fsync is forced to return EIO on snapshot-durability call 6 after the four tree fsyncs and successful destination-parent fsync; the full candidate flow exits before authority and a fresh verifier remains `EMPTY_AUTHORITY_VALID`.
 
-The test-only namespace checkpoints compile to no-ops unless `ATM_TEST_FAULT_INJECTION` is defined. The synthetic fsync probes qualify exact syscall error propagation/control flow; they are not represented as block-device writeback experiments.
+The deterministic probes qualify exact syscall error propagation and control flow; they are not described as physical-device or power-loss experiments. No `syncfs()` fallback, Vala caller, lifecycle wiring or automatic orphan cleanup is introduced.
 
-Every block-layer failure and the full-flow source-parent exact probe must preserve `EMPTY_AUTHORITY_VALID`, active generation 0 and no active repository SHA. No `syncfs()` fallback is allowed. Passing M11b is not itself policy selection: the measured artifact must be reviewed and frozen separately before any namespace policy can be reselected.
+### OPT-A1-F11 frozen M11b exact-fsync evidence
+
+F11 freezes the final rebased M11b measurement from Actions run `36151935138`, artifact `10871264620`, artifact SHA-256 `f86852cb93ec3d2ba9ca77a78a2be0fd1630eba4730990f38e493599b5cbf99c`, measured head `d2eeee61466dccb85eab1ed94b248aac056f961f`, on Linux `6.17.0-1022-azure` x86_64.
+
+The frozen evidence records:
+
+- two exact dm-flakey fsync scenarios, both fail-closed with empty authority and recoverable ext4;
+- the exact containing-parent EIO probe as qualified;
+- the full-flow source-parent EIO probe as qualified;
+- all exact error contexts matched;
+- no production namespace selection and no automatic recovery authorization.
+
+After F11, `policy_review_ready=true` and `m11_exact_fsync_qualification_complete=true`, but `selected_namespace_strategy` remains null and `production_namespace_sequence_selected=false`. The next slice is therefore an explicit policy review of `S1_DEST_SOURCE`, not automatic activation.
 
 ### Recovery fault qualification
 

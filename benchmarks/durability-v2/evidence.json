@@ -149,12 +149,12 @@
     "m10_empirically_distinguished_candidates": false,
     "m11_completed": true,
     "candidate_for_policy_review": "S1_DEST_SOURCE",
-    "policy_review_ready": false,
+    "policy_review_ready": true,
     "production_namespace_sequence_selected": false,
     "automatic_orphan_recovery_authorized": false,
-    "reason": "S1_DEST_SOURCE remains the candidate for policy review because it explicitly covers fresh destination hierarchy persistence, destination rename-parent persistence, and source staging-parent persistence after cross-directory rename. Post-freeze review leaves only the historical M11 destination-parent result fsync-specific: the hierarchy checkpoint preceded mkdirat/open/fstat, and later exact source-parent testing showed that fsync can return successfully while the still-active block fault is reported by a later Control DB write. Exact hierarchy/source fsync qualification remains blocked on M11b.",
-    "m11_exact_fsync_qualification_complete": false,
-    "m11b_required": true
+    "reason": "S1_DEST_SOURCE remains the contract-complete candidate for policy review. M10 establishes fresh-install replay authority safety; historical M11 is retained with corrected scope; M11b closes the exact-fsync error-propagation gap with block-layer EIO at the hierarchy-child and destination-parent fsync contexts plus deterministic exact-syscall EIO probes for the containing-parent and source staging-parent fsync calls. Every M11b path fails before authority, so policy review may resume without selecting the production namespace sequence in evidence.",
+    "m11_exact_fsync_qualification_complete": true,
+    "m11b_required": false
   },
   "limitations": [
     "M10/M11 are ext4 Linux qualification evidence, not a universal filesystem or physical-power-loss proof.",
@@ -162,6 +162,103 @@
     "F10 freezes evidence only; production namespace sequencing remains unselected until a separate policy review.",
     "M11 does not authorize automatic orphan deletion; that still requires authority-wide exclusion covering every Control DB writer.",
     "The frozen M11 destination-hierarchy result does not isolate fsync from preceding mkdirat/open/fstat work; policy review readiness is suspended until M11b exact-fsync evidence is reviewed.",
-    "The frozen M11 source-parent checkpoint is positioned immediately before the source-parent fsync, but the artifact does not retain boundary-specific stderr; later exact testing showed dm-flakey may not force write I/O at that call, so its fsync-specific interpretation is suspended pending M11b."
-  ]
+    "The frozen M11 source-parent checkpoint is positioned immediately before the source-parent fsync, but the artifact does not retain boundary-specific stderr; later exact testing showed dm-flakey may not force write I/O at that call, so its fsync-specific interpretation is suspended pending M11b.",
+    "M11b combines ext4 dm-flakey block-layer qualification with deterministic exact-syscall EIO probes; the synthetic probes qualify error propagation/control flow and are not physical-device or power-loss experiments."
+  ],
+  "m11b_exact_eio": {
+    "source": {
+      "actions_run_id": 36151935138,
+      "artifact_name": "atm-a1-m11b-exact-namespace-fsync-eio-36151935138-1",
+      "artifact_id": 10871264620,
+      "artifact_sha256": "f86852cb93ec3d2ba9ca77a78a2be0fd1630eba4730990f38e493599b5cbf99c",
+      "atm_source_commit": "d2eeee61466dccb85eab1ed94b248aac056f961f"
+    },
+    "kernel": {
+      "machine": "x86_64",
+      "release": "6.17.0-1022-azure",
+      "system": "Linux"
+    },
+    "measurement_id": "atm-a1-m11b-exact-namespace-fsync-eio-v2",
+    "status": "measurement-only",
+    "candidate": "S1_DEST_SOURCE",
+    "protocol": {
+      "dm_flakey": {
+        "target": "flakey",
+        "feature": "error_writes",
+        "boundaries": [
+          "destination_hierarchy_child_fsync",
+          "destination_parent_fsync"
+        ],
+        "empty_authority_synced_before_each_scenario": true,
+        "fault_teardown_suspend_noflush_nolockfs": true,
+        "fresh_process_verifier_after_recovery": true,
+        "exact_fsync_context_required": true
+      },
+      "deterministic_exact_syscall_probes": [
+        "namespace_containing_parent_fsync",
+        "source_staging_parent_fsync_full_flow"
+      ],
+      "no_syncfs_fallback": true
+    },
+    "dm_flakey_results": {
+      "destination_hierarchy_child_fsync": {
+        "checkpoint": "namespace_repository_before_child_fsync",
+        "helper_exit_code": 2,
+        "e2fsck_exit_code": 1,
+        "io_error_observed": true,
+        "error_context_match": true,
+        "classification": "EMPTY_AUTHORITY_VALID",
+        "active_generation_id": 0,
+        "active_repository_sha": null,
+        "final_snapshot_exists": false,
+        "staging_exists": true,
+        "namespace_clean": false,
+        "authority_fail_closed": true
+      },
+      "destination_parent_fsync": {
+        "checkpoint": "fresh_post_rename_pre_destination_parent_fsync",
+        "helper_exit_code": 2,
+        "e2fsck_exit_code": 1,
+        "io_error_observed": true,
+        "error_context_match": true,
+        "classification": "EMPTY_AUTHORITY_VALID",
+        "active_generation_id": 0,
+        "active_repository_sha": null,
+        "final_snapshot_exists": false,
+        "staging_exists": true,
+        "namespace_clean": false,
+        "authority_fail_closed": true
+      }
+    },
+    "namespace_parent_fsync_probe": {
+      "probe_id": "atm-a1-m11b-namespace-parent-fsync-eio-v1",
+      "injection": "fsync-return-eio-on-call-4",
+      "fsync_calls": 4,
+      "directories_created_before_failure": 2,
+      "successful_fsync_calls_before_failure": 3,
+      "error_is_eio": true,
+      "error_context_match": true,
+      "qualified": true
+    },
+    "source_parent_fsync_probe": {
+      "probe_id": "atm-a1-m11b-source-parent-fsync-eio-v1",
+      "injection": "snapshot-durability-fsync-return-eio-on-call-6",
+      "helper_exit_code": 2,
+      "failed_fsync_call": 6,
+      "error_context_match": true,
+      "io_error_observed": true,
+      "classification": "EMPTY_AUTHORITY_VALID",
+      "active_generation_id": 0,
+      "active_repository_sha": null,
+      "final_snapshot_exists": true,
+      "staging_exists": false,
+      "namespace_clean": true,
+      "qualified": true
+    },
+    "all_authority_fail_closed": true,
+    "all_e2fsck_recoverable": true,
+    "all_exact_error_contexts": true,
+    "namespace_parent_fsync_probe_qualified": true,
+    "source_parent_fsync_probe_qualified": true
+  }
 }
