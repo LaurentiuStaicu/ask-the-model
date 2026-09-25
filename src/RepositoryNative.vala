@@ -38,6 +38,24 @@ namespace AskTheModel.RepositoryNative {
     ) throws GLib.Error;
 
     [CCode (
+        cname = "atm_repository_ingest_archive_durable",
+        cheader_filename = "repository_ingest.h"
+    )]
+    public static extern bool ingest_archive_durable (
+        string data_root,
+        string archive_path,
+        string repository_id,
+        string repository_acronym,
+        string repository_display_name,
+        string sha,
+        out string pre_barrier_seal,
+        out string version,
+        out string snapshot_path,
+        out uint64 entries,
+        out uint64 total_bytes
+    ) throws GLib.Error;
+
+    [CCode (
         cname = "atm_repository_quarantine_snapshot",
         cheader_filename = "repository_storage.h"
     )]
