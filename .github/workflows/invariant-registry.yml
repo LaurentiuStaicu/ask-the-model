@@ -39,4 +39,5 @@ jobs:
           python3 scripts/validate_snapshot_durability_helper_wiring.py
           python3 scripts/validate_durable_ingest_primitive_wiring.py
           python3 scripts/validate_c1_i0_readonly_roots.py
+          python3 scripts/validate_gc_durable_root_collector.py
           python3 scripts/validate_presentation_performance_evidence.py

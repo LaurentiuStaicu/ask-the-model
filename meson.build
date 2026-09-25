@@ -67,6 +67,7 @@ executable(
     'src/snapshot_seal.c',
     'src/snapshot_durability.c',
     'src/RepositoryLifecycleService.vala',
+    'src/RepositoryGcDurableRoots.vala',
     'src/ConversationGrounding.vala',
     'src/ConversationSession.vala',
     'src/cff_version.c',
@@ -472,6 +473,49 @@ control_state_test = executable(
 test(
   'control-state',
   control_state_test
+)
+
+repository_gc_durable_roots_test = executable(
+  'repository-gc-durable-roots-test',
+  [
+    'src/RepositoryService.vala',
+    'src/RepositoryNative.vala',
+    'src/RepositoryState.vala',
+    'src/ControlStateNative.vala',
+    'src/ControlRepositoryState.vala',
+    'src/ConversationStoreNative.vapi',
+    'src/ConversationPersistenceStore.vala',
+    'src/ConversationExport.vala',
+    'src/OllamaProvider.vala',
+    'src/ChatRequestBuilder.vala',
+    'src/RepositoryGcDurableRoots.vala',
+    'src/control_state.c',
+    'src/conversation_store.c',
+    'src/cff_version.c',
+    'tests/repository_gc_durable_roots_test_support.c',
+    'tests/repository_gc_durable_roots_test.vala',
+    resources
+  ],
+  include_directories: [
+    include_directories('src'),
+    include_directories('tests')
+  ],
+  dependencies: [
+    glib_dep,
+    gio_dep,
+    soup_dep,
+    json_glib_dep,
+    sqlite_dep
+  ],
+  link_args: [
+    '-lyaml'
+  ],
+  install: false
+)
+
+test(
+  'repository-gc-durable-roots',
+  repository_gc_durable_roots_test
 )
 
 control_repository_state_test = executable(
