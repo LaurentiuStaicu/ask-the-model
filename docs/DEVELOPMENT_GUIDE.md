@@ -1383,6 +1383,20 @@ The v3 validator reconstructs and hashes both original measured JSON payloads ex
 
 The combined evidence does not retest HTTP download, does not claim physical power-loss durability and does not authorize automatic orphan recovery. Filesystem durability and block-layer EIO properties remain grounded separately in M10/M11b.
 
+### OPT-A1-P4 bounded runtime fault qualification
+
+P4 is the policy review that consumes the frozen F12 evidence. It changes no runtime code.
+
+Within the declared scope — the Optimizations-ON local Linux/ext4 repository authority pipeline — runtime fault qualification is complete. The basis is intentionally layered:
+
+- M12a qualifies deterministic process interruption across the I1d2 local authority sequence and the promoted-snapshot seal-mismatch guard;
+- M12b qualifies exact selected fsync EIO propagation through the real `RepositoryLifecycleService.download_or_update()` entrypoint with Control DB authority unchanged;
+- M10/M11b retain the separate filesystem replay and exact selected namespace-fsync evidence supporting the chosen `S1_DEST_SOURCE` barrier sequence.
+
+The policy therefore sets `runtime_fault_qualification_complete=true` and records no further required slice inside this selected runtime-durability scope.
+
+This is not a general power-loss claim. It does not extend qualification to network or remote filesystems. It does not authorize automatic recovery, removal or quarantine of unreferenced final snapshots; that would still require authority-wide writer exclusion and a separately selected recovery policy. Optimizations OFF remains the baseline path.
+
 ### Recovery fault qualification
 
 The OPT-A0 recovery harness is test-only. Native checkpoint calls compile to no-ops in the production application; only the dedicated recovery helper is built with `ATM_TEST_FAULT_INJECTION`.
