@@ -18,6 +18,19 @@ archive_dep = dependency('libarchive')
 yaml_dep = dependency('yaml-0.1')
 gnome = import('gnome')
 
+md4c_inc = include_directories('third_party/md4c')
+md4c_lib = static_library(
+  'atm-md4c',
+  'third_party/md4c/md4c.c',
+  include_directories: md4c_inc,
+  install: false
+)
+md4c_dep = declare_dependency(
+  link_with: md4c_lib,
+  include_directories: md4c_inc
+)
+
+
 resources = gnome.compile_resources(
   'ask-the-model-resources',
   'data/io.github.laurentiustaicu.ask_the_model.gresource.xml',
@@ -105,7 +118,8 @@ executable(
     granite_dep,
     soup_dep,
     json_glib_dep,
-    sqlite_dep
+    sqlite_dep,
+    md4c_dep
   ],
   link_args: [
     '-larchive',
