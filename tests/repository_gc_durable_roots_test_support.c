@@ -1,6 +1,8 @@
 #include "repository_gc_durable_roots_test_support.h"
 
 #include <sqlite3.h>
+#include <errno.h>
+#include <unistd.h>
 
 static gboolean
 exec_sql (
@@ -96,4 +98,32 @@ atm_c1_test_publish_empty_complete_generation (
 
     sqlite3_close (db);
     return ok;
+}
+
+
+gboolean
+atm_c1_test_make_symlink (
+    const char *target,
+    const char *link_path,
+    GError **error
+)
+{
+    g_return_val_if_fail (target != NULL, FALSE);
+    g_return_val_if_fail (link_path != NULL, FALSE);
+
+    if (symlink (
+            target,
+            link_path
+        ) != 0) {
+        g_set_error (
+            error,
+            G_FILE_ERROR,
+            g_file_error_from_errno (errno),
+            "Could not create C1 test symlink: %s",
+            g_strerror (errno)
+        );
+        return FALSE;
+    }
+
+    return TRUE;
 }
