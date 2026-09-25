@@ -747,6 +747,29 @@ The reviewed measurement result is descriptive:
 
 Therefore A1-F1 still enforces `production_barrier_selected=false`. The next durability gate is a Tier-2 replay experiment, with `dm-log-writes` as the preferred first prototype because it can record completed writes/flush ordering and replay to explicit marks for restart verification.
 
+### OPT-A1-M2 dm-log-writes capability probe
+
+A1-M2 is a platform-capability probe for the planned Tier-2 durability experiment. It is not a durability result.
+
+The probe runs only on disposable resources:
+- two temporary image files attached to loop devices;
+- one temporary `dm-log-writes` mapping;
+- one temporary ext4 filesystem and mount point.
+
+It verifies the minimum chain required by the kernel dm-log-writes replay model:
+1. the runner exposes the `log-writes` device-mapper target;
+2. loop devices can be allocated;
+3. a log-writes mapping can be created;
+4. ext4 can be created and mounted on that mapping;
+5. the probe writes a file, `fsync()`s the file and containing directory, then emits a named device-mapper mark;
+6. the userspace `replay-log` tool can locate that mark after unmount/removal of the mapping.
+
+The userspace helper is built from the explicitly pinned upstream `josefbacik/log-writes` commit `7b70d8a6863c5de30933d42a7672d35d01d2dc6c`. A runner that does not expose the kernel target or loop/device-mapper privileges is classified as `unsupported` rather than being misreported as a durability failure.
+
+All mount, mapper and loop resources are cleaned with a shell trap. The output JSON always keeps `production_durability_authorized=false`.
+
+Passing A1-M2 only establishes that the environment can host the later replay experiment. The subsequent A1-M3 slice must copy/replay the logged block history to explicit marks and run the fresh-process repository recovery oracle before any physical-power-loss durability claim is considered.
+
 ### Recovery fault qualification
 
 The OPT-A0 recovery harness is test-only. Native checkpoint calls compile to no-ops in the production application; only the dedicated recovery helper is built with `ATM_TEST_FAULT_INJECTION`.
