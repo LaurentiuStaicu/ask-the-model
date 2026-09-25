@@ -492,6 +492,8 @@ repository_gc_durable_roots_test = executable(
     'src/control_state.c',
     'src/conversation_store.c',
     'src/cff_version.c',
+    'src/coordination_lease.c',
+    'src/repository_generation_lease.c',
     'tests/repository_gc_durable_roots_test_support.c',
     'tests/repository_gc_durable_roots_test.vala',
     resources
