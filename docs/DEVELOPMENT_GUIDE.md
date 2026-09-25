@@ -1246,6 +1246,16 @@ The test-only namespace checkpoints compile to no-ops unless `ATM_TEST_FAULT_INJ
 
 Every block-layer failure and the full-flow source-parent exact probe must preserve `EMPTY_AUTHORITY_VALID`, active generation 0 and no active repository SHA. No `syncfs()` fallback is allowed. Passing M11b is not itself policy selection: the measured artifact must be reviewed and frozen separately before any namespace policy can be reselected.
 
+### OPT-A1-F11b frozen exact namespace fsync evidence
+
+F11b freezes the final M11b measurement from Actions run `36151935138`, artifact `10871264620` (`atm-a1-m11b-exact-namespace-fsync-eio-36151935138-1`), SHA-256 `f86852cb93ec3d2ba9ca77a78a2be0fd1630eba4730990f38e493599b5cbf99c`, measured head `d2eeee61466dccb85eab1ed94b248aac056f961f`, on Linux `6.17.0-1022-azure` x86_64.
+
+The frozen result preserves all four exact failure classes used by M11b: hierarchy-child and destination-parent block-layer EIO with boundary-specific context, the containing-parent exact fsync-call-4 probe, and the source staging-parent full-flow fsync-call-6 probe. Both block-layer replay images are e2fsck-recoverable, every authority result remains `EMPTY_AUTHORITY_VALID` with active generation 0 and no active repository SHA, and both exact-syscall probes are qualified.
+
+Together with M10 process-crash replay and the Linux containing-directory fsync contract, M11b closes the exact-fsync evidence gap that caused P2a to suspend namespace selection. F11b therefore marks the evidence ready for a separate policy review. It does not itself restore `S1_DEST_SOURCE` as production policy: `production_namespace_sequence_selected=false` remains frozen here.
+
+Automatic orphan deletion remains outside this evidence decision. I1b zero-reference evidence still lacks authority-wide exclusion covering every Control DB writer, so no recovery deletion/quarantine authorization follows from F11b.
+
 ### Recovery fault qualification
 
 The OPT-A0 recovery harness is test-only. Native checkpoint calls compile to no-ops in the production application; only the dedicated recovery helper is built with `ATM_TEST_FAULT_INJECTION`.
