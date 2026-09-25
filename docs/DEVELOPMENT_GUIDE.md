@@ -1451,6 +1451,19 @@ The I0 path-based conversation generation query remains available for that later
 
 Structural CI requires the strict read-only bindings, forbids the legacy writable Control DB reads inside the collector, forbids destructive filesystem primitives, and keeps `RepositoryLifecycleService` unwired.
 
+### OPT-C1-I2 live generation roots
+
+C1 I2 extends the dormant protected-root collector without adding candidate discovery or destructive storage behavior.
+
+The Control DB is queried through a strict read-only/no-follow/query-only API for the ordered set of persisted COMPLETE generation identifiers. For each COMPLETE generation that is not already protected by the active generation or a durable conversation pin, the collector performs the existing B2 exclusive nonblocking generation-lease probe.
+
+- contention means a cooperative reader currently holds the generation and the generation becomes a transient protected root for that pass;
+- successful exclusive acquisition means no cooperative B2 reader is observed at that instant, and the lease is released immediately;
+- persistent lock-file existence or lock-file text is never interpreted as liveness;
+- the observation is not deletion authority: any later isolation pass must still run under the global mutation lease and repeat durable/live protection immediately before rename.
+
+I2 remains dormant in `RepositoryLifecycleService`. It does not enumerate snapshot directories, create `.trash`, rename, unlink, purge, prune Control DB metadata, or evict retrieval indexes.
+
 ### Recovery fault qualification
 
 The OPT-A0 recovery harness is test-only. Native checkpoint calls compile to no-ops in the production application; only the dedicated recovery helper is built with `ATM_TEST_FAULT_INJECTION`.
