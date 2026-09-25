@@ -251,5 +251,73 @@
       }
     },
     "reviewed_conclusion": "The current S3 baseline preserves the old seal-valid authority at pre-rename and post-rename replay boundaries, but after current authority activation dm-log-writes replay recovers Control DB generation 2 pointing to the new SHA while the replayed snapshot seal differs from the stored seal. S3 is therefore falsified against the A1 old-valid/new-valid Tier-2 target in this deterministic fixture. This result selects neither S1 nor S2 and authorizes no production durability barrier."
+  },
+  "tier2_candidate_replay": {
+    "measurement_id": "atm-a1-m5-candidate-replay-v1",
+    "status": "qualification-only",
+    "production_barrier_selected": false,
+    "source": {
+      "actions_run_id": 36122088947,
+      "artifact_name": "atm-a1-m5-candidate-replay-36122088947-1",
+      "artifact_id": 10858682250,
+      "artifact_sha256": "a65f0db2a5f667434e0299fcf5067cdfad6686b1f38c489dc3ba917a33a67bc2",
+      "atm_source_commit": "561ded6ed8e3d87c025a5dea7918162bfe076383"
+    },
+    "kernel": {
+      "system": "Linux",
+      "release": "6.17.0-1022-azure",
+      "machine": "x86_64"
+    },
+    "upstream": {
+      "repository": "josefbacik/log-writes",
+      "commit": "7b70d8a6863c5de30933d42a7672d35d01d2dc6c"
+    },
+    "protocol": {
+      "old_authority_synced_before_baseline_mark": true,
+      "fresh_process_seal_verifier_after_replay": true,
+      "target_mark": "immediately after Control DB activation",
+      "common_post_rename_parent_fsync": true
+    },
+    "candidates": {
+      "S1_TARGETED_FSYNC": {
+        "baseline_entry": 162,
+        "scenario_entry": 214,
+        "e2fsck_exit_code": 1,
+        "barrier_counters": {
+          "file_fsync_calls": 2,
+          "directory_fsync_calls": 2,
+          "syncfs_calls": 0,
+          "parent_fsync_calls": 1
+        },
+        "active_generation_id": 2,
+        "active_repository_sha": "bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb",
+        "stored_seal": "acebf979895f9efd073014fa707038d47ec71b411f4e12a32aa619e9c63f3132",
+        "computed_seal": "acebf979895f9efd073014fa707038d47ec71b411f4e12a32aa619e9c63f3132",
+        "observed_classification": "NEW_AUTHORITY_VALID",
+        "seal_match": true,
+        "qualified": true,
+        "candidate_satisfied": true
+      },
+      "S2_SYNCFS": {
+        "baseline_entry": 162,
+        "scenario_entry": 221,
+        "e2fsck_exit_code": 1,
+        "barrier_counters": {
+          "file_fsync_calls": 0,
+          "directory_fsync_calls": 0,
+          "syncfs_calls": 1,
+          "parent_fsync_calls": 1
+        },
+        "active_generation_id": 2,
+        "active_repository_sha": "bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb",
+        "stored_seal": "acebf979895f9efd073014fa707038d47ec71b411f4e12a32aa619e9c63f3132",
+        "computed_seal": "acebf979895f9efd073014fa707038d47ec71b411f4e12a32aa619e9c63f3132",
+        "observed_classification": "NEW_AUTHORITY_VALID",
+        "seal_match": true,
+        "qualified": true,
+        "candidate_satisfied": true
+      }
+    },
+    "reviewed_conclusion": "S1 targeted fsync and S2 syncfs both satisfy the seal-aware Tier-2 after-authority replay fixture that falsified S3. This establishes candidate correctness for this boundary only; it does not select a production barrier. Final policy review must still combine boundary qualification with M1 EWD/CBD/RMD performance evidence, scope, and error-propagation tradeoffs."
   }
 }

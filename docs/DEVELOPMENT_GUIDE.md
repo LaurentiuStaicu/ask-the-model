@@ -876,6 +876,32 @@ Immediately after Control DB activation, the workflow emits a dm-log-writes targ
 
 M5 intentionally records a failing candidate instead of forcing the measurement job to fail solely because the strong invariant is not satisfied. Mechanical failures in setup/replay still fail the workflow. Candidate selection remains a later explicit review step that must combine this Tier-2 result with the M1 EWD/CBD/RMD performance evidence and scope/error-propagation tradeoffs.
 
+### OPT-A1-F5 frozen candidate replay evidence
+
+A1-F5 freezes the successful M5 candidate replay artifact rather than treating workflow success as a policy decision.
+
+The frozen record preserves:
+- run `36122088947`, artifact `10858682250`, digest `a65f0db2a5f667434e0299fcf5067cdfad6686b1f38c489dc3ba917a33a67bc2`;
+- tested head `561ded6ed8e3d87c025a5dea7918162bfe076383`;
+- the same Linux 6.17.0-1022-azure / pinned replay-log qualification context;
+- common synchronized old-authority baseline entry 162;
+- S1 scenario entry 214 with two file fsyncs, two directory fsyncs and one promoted-parent fsync;
+- S2 scenario entry 221 with one syncfs and one promoted-parent fsync;
+- e2fsck clean/corrected outcomes;
+- generation 2 / new SHA authority for both candidates;
+- identical stored and recomputed new-snapshot seal `acebf979895f9efd073014fa707038d47ec71b411f4e12a32aa619e9c63f3132`;
+- `NEW_AUTHORITY_VALID`, `seal_match=true`, and `candidate_satisfied=true` for both S1 and S2.
+
+This establishes that both candidate orderings repair the specific M4 S3 after-authority failure in the deterministic Tier-2 fixture. It does not make the candidates equivalent in production. M1 still shows materially different costs, and syncfs still has filesystem-wide scope while targeted fsync is limited to the AtM snapshot tree.
+
+The next durability measurement must qualify interruption boundaries inside the candidate sequence itself. At minimum it should replay:
+- after the pre-rename durability barrier but before rename;
+- after rename but before promoted-parent fsync;
+- after promoted-parent fsync but before Control DB activation;
+- immediately after Control DB activation.
+
+At every boundary the fresh-process seal oracle must yield either the old seal-valid authority or the new seal-valid authority, never active authority referencing bytes that fail the stored seal. Production selection remains a later explicit policy step.
+
 ### Recovery fault qualification
 
 The OPT-A0 recovery harness is test-only. Native checkpoint calls compile to no-ops in the production application; only the dedicated recovery helper is built with `ATM_TEST_FAULT_INJECTION`.
