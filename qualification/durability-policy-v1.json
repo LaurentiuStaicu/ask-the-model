@@ -144,8 +144,8 @@
     "vala_durable_ingest_bridge_available": true,
     "runtime_wiring_authorized": true,
     "on_only_durable_ingest_wired": true,
-    "runtime_fault_qualification_complete": false,
-    "next_required_slice": "P4_RUNTIME_FAULT_QUALIFICATION_REVIEW"
+    "runtime_fault_qualification_complete": true,
+    "next_required_slice": "A1_COMPLETE_WITHIN_SELECTED_RUNTIME_DURABILITY_SCOPE"
   },
   "runtime_integration": {
     "selected": true,
@@ -161,6 +161,23 @@
     "m12_process_interruption_correctness": "QUALIFIED_WITHIN_DECLARED_SCOPE",
     "m12_policy_review_ready": true,
     "m12_scope": "PROCESS_INTERRUPTION_PLUS_LIFECYCLE_EXACT_FSYNC_ERROR_PROPAGATION",
-    "m12_lifecycle_fsync_eio_correctness": "QUALIFIED_WITHIN_DECLARED_SCOPE"
+    "m12_lifecycle_fsync_eio_correctness": "QUALIFIED_WITHIN_DECLARED_SCOPE",
+    "runtime_fault_qualification": {
+      "complete": true,
+      "scope": "LOCAL_POST_DOWNLOAD_AUTHORITY_PIPELINE_WITH_SELECTED_DURABILITY_ERROR_PROPAGATION",
+      "evidence_composition": {
+        "same_sha_repair": "M9",
+        "fresh_namespace_replay": "M10",
+        "exact_namespace_fsync_failure_paths": "M11B_F11B",
+        "runtime_authority_process_interruption": "M12A_F12",
+        "runtime_lifecycle_exact_fsync_eio": "M12B_F12"
+      },
+      "physical_power_loss_universal_claim": false,
+      "network_download_fault_qualification_in_scope": false,
+      "network_or_remote_filesystem_durability_claim": false,
+      "automatic_orphan_recovery_authorized": false,
+      "off_mode_preserves_baseline": true,
+      "reason": "P4 completes the bounded runtime durability qualification by composing the frozen filesystem/namespace evidence with M12a authority sequencing and M12b lifecycle error propagation. Completion applies only to the selected local-filesystem Optimizations-ON post-download authority pipeline. It does not claim universal physical-power-loss behavior, does not qualify HTTP download or remote filesystems, and does not authorize automatic orphan recovery."
+    }
   }
 }
