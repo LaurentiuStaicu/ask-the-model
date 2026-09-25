@@ -224,9 +224,17 @@ stderr = pathlib.Path(stderr_path).read_text(
     errors="replace",
 ).strip()
 
+expected_error_marker = {
+    "barrier": "candidate barrier failed:",
+    "parent_fsync": "candidate parent fsync failed:",
+    "authority": "candidate authority activation failed:",
+}[stage]
+failure_stage_match = expected_error_marker in stderr.lower()
+
 fail_closed = (
     flakey_active == "true"
     and helper_failed == "true"
+    and failure_stage_match
     and linear_restored == "true"
     and verification.get("classification") == "OLD_AUTHORITY_VALID"
     and verification.get("active_repository_sha")
@@ -243,6 +251,8 @@ record = {
     "flakey_table_active": flakey_active == "true",
     "helper_exit_code": int(helper_rc),
     "helper_failed": helper_failed == "true",
+    "expected_error_marker": expected_error_marker,
+    "failure_stage_match": failure_stage_match,
     "helper_stderr": stderr[:1000],
     "linear_table_restored": linear_restored == "true",
     "post_fault_sync_exit_code": int(post_fault_sync_rc),
