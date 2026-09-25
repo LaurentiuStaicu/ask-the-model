@@ -1158,6 +1158,20 @@ Failure remains fail-closed. Before promotion, failure removes the operation-own
 
 The existing `atm_repository_ingest_archive_cancellable()` wrapper still selects the non-durable internal path, preserving the baseline used when Optimizations is OFF. The durable primitive has no Vala binding and no `RepositoryLifecycleService` caller in I1c; structural CI enforces that separation. Automatic recovery/removal of preexisting final targets is not introduced here.
 
+### OPT-A1-M11 fresh-install namespace EIO qualification
+
+M11 is qualification-only and carries forward the contract-complete M10 candidate `S1_DEST_SOURCE`. It does not change repository ingest, Vala bindings, lifecycle behavior or the default-OFF Optimizations path.
+
+Each scenario starts from the same durable fresh baseline used by M10: a valid empty schema-v2 Control DB and trusted data root with no repository authority. The M10 helper prepares one candidate snapshot with the shared S1 tree barrier. M11 then uses the established `dm-flakey error_writes` method to inject a writeback error independently immediately before:
+
+1. durable creation/fsync of the final `Repositories/<repo>/snapshots` hierarchy;
+2. fsync of the final snapshot destination parent after cross-directory rename;
+3. fsync of the staging source parent after rename, which persists removal of the `.part` source name.
+
+The fault transition uses `dmsetup suspend --noflush --nolockfs` so switching the block target is not itself a durability boundary. The candidate must return a non-zero result with an explicit I/O error. After restoring the linear mapping and allowing ext4 recovery, a fresh verifier must observe `EMPTY_AUTHORITY_VALID`, active generation 0 and no active repository SHA for all three scenarios.
+
+Namespace residue is recorded but is not allowed to masquerade as authority. M11 selects no automatic orphan cleanup and does not use `syncfs` as a fallback. Passing M11 is a prerequisite to refining P1/I1c for fresh-install namespace durability; authority-wide exclusion for any future automatic recovery remains a separate problem.
+
 ### Recovery fault qualification
 
 The OPT-A0 recovery harness is test-only. Native checkpoint calls compile to no-ops in the production application; only the dedicated recovery helper is built with `ATM_TEST_FAULT_INJECTION`.
