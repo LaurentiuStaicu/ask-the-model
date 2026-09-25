@@ -398,9 +398,9 @@ def main() -> int:
         "vala_durable_ingest_bridge_available": True,
         "runtime_wiring_authorized": True,
         "on_only_durable_ingest_wired": True,
-        "runtime_fault_qualification_complete": False,
+        "runtime_fault_qualification_complete": True,
         "next_required_slice": (
-            "P4_RUNTIME_FAULT_QUALIFICATION_REVIEW"
+            "NO_REQUIRED_SLICE_WITHIN_SELECTED_RUNTIME_DURABILITY_SCOPE"
         ),
     }:
         fail("implementation staging contract drifted")
@@ -453,6 +453,37 @@ def main() -> int:
     if runtime != expected_runtime:
         fail("runtime durability integration policy drifted")
 
+    runtime_fault = policy.get("runtime_fault_qualification")
+    expected_runtime_fault = {
+        "complete": True,
+        "scope": "OPTIMIZATIONS_ON_LOCAL_LINUX_EXT4_RUNTIME_AUTHORITY_PIPELINE",
+        "basis": [
+            "benchmarks/durability-v3/evidence.json#m12_runtime_authority",
+            "benchmarks/durability-v3/evidence.json#m12b_lifecycle_fsync_eio",
+            "benchmarks/durability-v2/evidence.json#m11b_exact_eio",
+            "benchmarks/durability-v2/evidence.json#m10_replay",
+        ],
+        "process_interruption_qualified": True,
+        "real_lifecycle_fsync_eio_qualified": True,
+        "selected_filesystem_barrier_evidence_retained": True,
+        "physical_power_loss_claim": False,
+        "network_or_remote_filesystem_claim": False,
+        "automatic_orphan_recovery_authorized": False,
+        "reason": (
+            "P4 reviews the frozen F12 M12a+M12b evidence together with the "
+            "previously selected M10/M11b filesystem barrier evidence. Within "
+            "the declared local Linux/ext4 Optimizations-ON authority pipeline, "
+            "process interruptions before authority fail closed, post-authority "
+            "recovery is seal-valid, promoted-snapshot seal mismatch fails "
+            "closed, and exact selected fsync EIO propagates through the real "
+            "lifecycle without Control DB authority advance. This completion "
+            "does not claim arbitrary physical power-loss behavior, "
+            "network/remote filesystem durability, or automatic orphan recovery."
+        ),
+    }
+    if runtime_fault != expected_runtime_fault:
+        fail("bounded runtime fault qualification policy drifted")
+
     retrieval = policy.get("retrieval_index")
     if not isinstance(retrieval, dict):
         fail("retrieval-index durability scope is missing")
@@ -463,7 +494,7 @@ def main() -> int:
 
     print(
         "durability production policy validation passed: "
-        "S1 + S1_DEST_SOURCE selected; M12a+M12b frozen; P4 runtime qualification review pending"
+        "S1 + S1_DEST_SOURCE selected; bounded runtime fault qualification complete"
     )
     return 0
 
