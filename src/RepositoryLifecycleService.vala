@@ -217,6 +217,17 @@ namespace AskTheModel {
                 DIFFERENT_SHA_UPDATE;
         }
 
+        internal static bool
+        reject_preexisting_final_target (
+            bool optimized_operation,
+            bool repairing_same_snapshot,
+            bool target_exists
+        ) {
+            return optimized_operation &&
+                target_exists &&
+                !repairing_same_snapshot;
+        }
+
         private void require_mutation_capacity (
             RepositoryDescriptor descriptor,
             string sha,
@@ -529,6 +540,7 @@ namespace AskTheModel {
             string sha,
             string? archive_path,
             string? expected_seal,
+            bool durable_ingest,
             bool coordinated_index
         ) throws RepositoryError {
             SourceFunc callback = prepare_snapshot.callback;
@@ -548,6 +560,7 @@ namespace AskTheModel {
                     try {
                         string snapshot = expected_snapshot;
                         string ingest_version = "";
+                        string? durable_pre_barrier_seal = null;
                         string index_path;
                         string index_version;
                         if (!GLib.FileUtils.test (
@@ -563,7 +576,30 @@ namespace AskTheModel {
                             uint64 entries;
                             uint64 total_bytes;
 
-                            if (!RepositoryNative.ingest_archive (
+                            if (durable_ingest) {
+                                string barrier_seal;
+
+                                if (!RepositoryNative.ingest_archive_durable (
+                                        data_root,
+                                        archive_path,
+                                        descriptor.id,
+                                        descriptor.acronym,
+                                        descriptor.display_name,
+                                        sha,
+                                        out barrier_seal,
+                                        out ingest_version,
+                                        out snapshot,
+                                        out entries,
+                                        out total_bytes
+                                    )) {
+                                    throw new RepositoryError.STORAGE (
+                                        "Durable repository snapshot validation failed."
+                                    );
+                                }
+
+                                durable_pre_barrier_seal =
+                                    barrier_seal;
+                            } else if (!RepositoryNative.ingest_archive (
                                     data_root,
                                     archive_path,
                                     descriptor.id,
@@ -593,6 +629,15 @@ namespace AskTheModel {
                             )) {
                             throw new RepositoryError.STORAGE (
                                 "Repository snapshot integrity seal could not be computed before indexing."
+                            );
+                        }
+
+                        if (durable_pre_barrier_seal != null &&
+                            durable_pre_barrier_seal !=
+                                pre_snapshot_seal) {
+                            integrity_failure = true;
+                            throw new RepositoryError.NOT_READY (
+                                "Durable repository pre-barrier seal does not match the promoted snapshot."
                             );
                         }
 
@@ -847,6 +892,7 @@ namespace AskTheModel {
                         sha,
                         null,
                         expected_seal,
+                        false,
                         optimized_operation
                     );
                 } catch (RepositoryError error) {
@@ -1056,13 +1102,25 @@ namespace AskTheModel {
                             sha
                         );
                     string? archive_path = null;
-                    bool repairing_same_snapshot =
-                        integrity_repair &&
-                        info.local.current_sha == sha &&
+                    bool final_target_exists =
                         GLib.FileUtils.test (
                             expected_snapshot,
                             GLib.FileTest.EXISTS
                         );
+                    bool repairing_same_snapshot =
+                        integrity_repair &&
+                        info.local.current_sha == sha &&
+                        final_target_exists;
+
+                    if (reject_preexisting_final_target (
+                            optimized_operation,
+                            repairing_same_snapshot,
+                            final_target_exists
+                        )) {
+                        throw new RepositoryError.STORAGE (
+                            "Optimizations ON refuses an unqualified pre-existing final repository snapshot target."
+                        );
+                    }
 
                     try {
                         if (repairing_same_snapshot ||
@@ -1150,6 +1208,7 @@ namespace AskTheModel {
                                 sha,
                                 archive_path,
                                 null,
+                                optimized_operation,
                                 optimized_operation
                             );
 
