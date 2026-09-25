@@ -166,6 +166,191 @@ test_unclosed_fence_preserves_code_text (void)
     atm_presentation_document_free (document);
 }
 
+static void
+test_dangerous_link_destinations_are_inert (void)
+{
+    const char *input =
+        "[js](javascript:alert) "
+        "[data](data:text/plain,x) "
+        "[file](file:///tmp/x)";
+
+    AtmPresentationDocument *document =
+        normalize_bytes (input, strlen (input));
+    char *plain =
+        atm_presentation_document_to_plain_text (
+            document
+        );
+
+    g_assert_false (document->fallback);
+    g_assert_cmpstr (plain, ==, "js data file");
+    g_assert_null (strstr (plain, "javascript:"));
+    g_assert_null (strstr (plain, "data:"));
+    g_assert_null (strstr (plain, "file:"));
+
+    g_free (plain);
+    atm_presentation_document_free (document);
+}
+
+static void
+test_image_sources_are_inert (void)
+{
+    const char *input =
+        "![remote](https://example.test/x.png) "
+        "![local](file:///tmp/x.png)";
+
+    AtmPresentationDocument *document =
+        normalize_bytes (input, strlen (input));
+    char *plain =
+        atm_presentation_document_to_plain_text (
+            document
+        );
+
+    g_assert_false (document->fallback);
+    g_assert_cmpstr (plain, ==, "remote local");
+    g_assert_null (strstr (plain, "https://"));
+    g_assert_null (strstr (plain, "file:"));
+
+    g_free (plain);
+    atm_presentation_document_free (document);
+}
+
+static void
+test_entities_remain_verbatim_text (void)
+{
+    const char *input = "A &amp; B &#35; C &#x41;";
+
+    AtmPresentationDocument *document =
+        normalize_bytes (input, strlen (input));
+    char *plain =
+        atm_presentation_document_to_plain_text (
+            document
+        );
+
+    g_assert_false (document->fallback);
+    g_assert_cmpstr (plain, ==, input);
+
+    g_free (plain);
+    atm_presentation_document_free (document);
+}
+
+static void
+test_unicode_controls_and_joiners_are_preserved (void)
+{
+    const char *input =
+        "é | العربية | 👩‍🔬 | "
+        "\xE2\x80\xAE" "abc" "\xE2\x80\xAC";
+
+    AtmPresentationDocument *document =
+        normalize_bytes (input, strlen (input));
+    char *plain =
+        atm_presentation_document_to_plain_text (
+            document
+        );
+
+    g_assert_false (document->fallback);
+    g_assert_true (g_utf8_validate (plain, -1, NULL));
+    g_assert_cmpstr (plain, ==, input);
+
+    g_free (plain);
+    atm_presentation_document_free (document);
+}
+
+static void
+test_very_long_line_is_not_truncated (void)
+{
+    GString *input = g_string_sized_new (65540);
+    for (guint i = 0; i < 65536; i++)
+        g_string_append_c (input, 'x');
+    g_string_append (input, "END");
+
+    AtmPresentationDocument *document =
+        normalize_bytes (input->str, input->len);
+    char *plain =
+        atm_presentation_document_to_plain_text (
+            document
+        );
+
+    g_assert_false (document->fallback);
+    g_assert_cmpuint (strlen (plain), ==, input->len);
+    g_assert_cmpstr (plain, ==, input->str);
+
+    g_free (plain);
+    atm_presentation_document_free (document);
+    g_string_free (input, TRUE);
+}
+
+static void
+test_table_syntax_stays_plain_without_extension (void)
+{
+    const char *input =
+        "| A | B |\n"
+        "|---|---|\n"
+        "| 1 | 2 |";
+
+    AtmPresentationDocument *document =
+        normalize_bytes (input, strlen (input));
+    char *plain =
+        atm_presentation_document_to_plain_text (
+            document
+        );
+
+    g_assert_false (document->fallback);
+    g_assert_cmpuint (document->blocks->len, ==, 1);
+
+    AtmPresentationBlock *block =
+        g_ptr_array_index (document->blocks, 0);
+    g_assert_cmpint (
+        block->type,
+        ==,
+        ATM_PRESENTATION_BLOCK_PARAGRAPH
+    );
+    g_assert_nonnull (strstr (plain, "| A | B |"));
+    g_assert_nonnull (strstr (plain, "|---|---|"));
+    g_assert_nonnull (strstr (plain, "| 1 | 2 |"));
+
+    g_free (plain);
+    atm_presentation_document_free (document);
+}
+
+static void
+test_malformed_link_retains_visible_payload (void)
+{
+    const char *input = "[label](javascript:";
+
+    AtmPresentationDocument *document =
+        normalize_bytes (input, strlen (input));
+    char *plain =
+        atm_presentation_document_to_plain_text (
+            document
+        );
+
+    g_assert_false (document->fallback);
+    g_assert_nonnull (strstr (plain, "label"));
+
+    g_free (plain);
+    atm_presentation_document_free (document);
+}
+
+static void
+test_normalizer_does_not_mutate_input (void)
+{
+    char input[] = "## Titlu\n\n- unu\n- doi";
+    char before[sizeof (input)];
+    memcpy (before, input, sizeof (input));
+
+    AtmPresentationDocument *document =
+        normalize_bytes (input, strlen (input));
+
+    g_assert_cmpmem (
+        input,
+        sizeof (input),
+        before,
+        sizeof (before)
+    );
+
+    atm_presentation_document_free (document);
+}
+
 int
 main (int argc, char **argv)
 {
@@ -190,6 +375,38 @@ main (int argc, char **argv)
     g_test_add_func (
         "/presentation-adversarial/unclosed-fence",
         test_unclosed_fence_preserves_code_text
+    );
+    g_test_add_func (
+        "/presentation-adversarial/dangerous-link-destinations",
+        test_dangerous_link_destinations_are_inert
+    );
+    g_test_add_func (
+        "/presentation-adversarial/image-sources",
+        test_image_sources_are_inert
+    );
+    g_test_add_func (
+        "/presentation-adversarial/entities-verbatim",
+        test_entities_remain_verbatim_text
+    );
+    g_test_add_func (
+        "/presentation-adversarial/unicode-controls-joiners",
+        test_unicode_controls_and_joiners_are_preserved
+    );
+    g_test_add_func (
+        "/presentation-adversarial/very-long-line",
+        test_very_long_line_is_not_truncated
+    );
+    g_test_add_func (
+        "/presentation-adversarial/table-syntax-plain",
+        test_table_syntax_stays_plain_without_extension
+    );
+    g_test_add_func (
+        "/presentation-adversarial/malformed-link",
+        test_malformed_link_retains_visible_payload
+    );
+    g_test_add_func (
+        "/presentation-adversarial/input-immutable",
+        test_normalizer_does_not_mutate_input
     );
 
     return g_test_run ();
