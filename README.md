@@ -183,7 +183,7 @@ flatpak run io.github.laurentiustaicu.ask_the_model
 
 - <small>discovers a supported local Ollama-compatible provider and completion-capable provider-managed models;</small>
 - <small>refreshes model discovery without restarting;</small>
-- <small>streams assistant responses in independent multi-chat tabs;</small>
+- <small>shows assistant responses in independent multi-chat tabs;</small>
 - <small>saves only explicitly selected conversations to History and reopens them through exact model/repository-context qualification;</small>
 - <small>maintains deterministic managed JSON mirrors for saved conversations under <code>~/Ask the Model/Conversation Exports</code>;</small>
 - <small>selects any combination of the fixed EWD/CBD/RMD repository catalog before the first Send;</small>
