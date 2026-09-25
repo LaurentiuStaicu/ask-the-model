@@ -38,8 +38,8 @@ def main() -> int:
         fail("production barrier selection was lost")
     if policy.get("production_namespace_sequence_selected") is not True:
         fail("selected namespace production sequence was lost")
-    if policy.get("runtime_integration_selected") is not False:
-        fail("namespace-policy correction must not wire runtime behavior")
+    if policy.get("runtime_integration_selected") is not True:
+        fail("P3 runtime integration selection was lost")
 
     if policy.get("runtime_gate") != {
         "name": "Optimizations",
@@ -334,6 +334,9 @@ def main() -> int:
         "durable_data_root_invalid": (
             "ABORT_BEFORE_STAGING_OR_NAMESPACE_MUTATION"
         ),
+        "durable_pre_barrier_seal_mismatch": (
+            "ABORT_WITHOUT_AUTHORITY_ADVANCE"
+        ),
     }
     if policy.get("failure_contract") != expected_failure:
         fail("durability failure contract drifted")
@@ -344,7 +347,7 @@ def main() -> int:
         "durable_ingest_namespace_complete": True,
         "runtime_wiring_authorized": False,
         "next_required_slice": (
-            "LIFECYCLE_ON_ONLY_DURABLE_INGEST_ACTIVATION_REVIEW"
+            "IMPLEMENT_ON_ONLY_DURABLE_INGEST_RUNTIME_WIRING"
         ),
         "vala_durable_ingest_bridge_available": True,
     }:
@@ -368,6 +371,29 @@ def main() -> int:
     if storage.get("off_mode_preserves_baseline") is not True:
         fail("OFF baseline preservation drifted")
 
+    runtime = policy.get("runtime_integration")
+    expected_runtime = {
+        "selected": True,
+        "optimized_on_ingest": "DURABLE_S1_DEST_SOURCE",
+        "optimized_off_ingest": "BASELINE_NON_DURABLE",
+        "operation_snapshot_required": True,
+        "pre_barrier_seal_chain_required": True,
+        "preexisting_final_target_action": "FAIL_CLOSED_NO_REUSE_NO_REMOVAL",
+        "same_sha_repair_uses_durable_ingest": True,
+        "automatic_orphan_recovery_selected": False,
+        "reason": (
+            "The native durable ingest sequence and Vala ABI are qualified "
+            "separately. Runtime selection is limited to the operation-level "
+            "Optimizations ON snapshot; OFF preserves the baseline ingest path. "
+            "The returned pre-barrier seal must be chained through post-promotion "
+            "and post-index verification before guarded authority publication, "
+            "and unqualified preexisting final targets remain untouched and fail "
+            "closed."
+        ),
+    }
+    if runtime != expected_runtime:
+        fail("runtime durability integration policy drifted")
+
     retrieval = policy.get("retrieval_index")
     if not isinstance(retrieval, dict):
         fail("retrieval-index durability scope is missing")
@@ -378,7 +404,7 @@ def main() -> int:
 
     print(
         "durability production policy validation passed: "
-        "S1 + S1_DEST_SOURCE selected; dormant Vala bridge available; lifecycle remains unwired"
+        "S1 + S1_DEST_SOURCE selected; ON-only runtime policy selected; wiring remains unauthorized"
     )
     return 0
 
