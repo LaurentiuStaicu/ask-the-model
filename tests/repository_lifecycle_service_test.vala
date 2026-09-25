@@ -224,6 +224,48 @@ namespace AskTheModel.Tests {
         );
     }
 
+    private static async ConversationSession
+    begin_leased_session (
+        RepositoryLifecycleService service,
+        RepositoryDescriptor[] selection,
+        int64 expected_generation,
+        bool use_explicit_generation
+    ) throws GLib.Error {
+        ConversationGrounding grounding;
+
+        if (use_explicit_generation) {
+            grounding =
+                yield service.
+                    prepare_conversation_grounding_at_generation (
+                        selection,
+                        expected_generation
+                    );
+        } else {
+            grounding =
+                yield service.prepare_conversation_grounding (
+                    selection
+                );
+        }
+
+        assert (grounding.is_frozen ());
+        assert (
+            grounding.repository_generation_id () ==
+            expected_generation
+        );
+        assert (grounding.has_generation_lease ());
+        assert (
+            grounding.generation_lease_id () ==
+            expected_generation
+        );
+
+        var session = new ConversationSession ();
+        session.begin (
+            grounding,
+            "test-model"
+        );
+        return session;
+    }
+
     private static async void run_checks (GLib.MainLoop loop) {
         string root = new_temp_root ();
 
@@ -886,7 +928,7 @@ namespace AskTheModel.Tests {
             ConversationGrounding optimized_zero =
                 yield sealed_service.
                     prepare_conversation_grounding_at_generation (
-                        {},
+                        none,
                         0
                     );
             assert (optimized_zero.is_frozen ());
@@ -900,17 +942,13 @@ namespace AskTheModel.Tests {
                 )
             );
 
-            ConversationGrounding? coordinated_rebuild =
-                yield sealed_service.prepare_conversation_grounding (
-                    sealed_selection
+            ConversationSession generation_session =
+                yield begin_leased_session (
+                    sealed_service,
+                    sealed_selection,
+                    5,
+                    false
                 );
-            assert (coordinated_rebuild.is_frozen ());
-            assert (
-                coordinated_rebuild.has_generation_lease ()
-            );
-            assert (
-                coordinated_rebuild.generation_lease_id () == 5
-            );
             assert (
                 GLib.FileUtils.test (
                     generation_five_lock,
@@ -923,14 +961,6 @@ namespace AskTheModel.Tests {
                     GLib.FileTest.IS_REGULAR
                 )
             );
-
-            var generation_session =
-                new ConversationSession ();
-            generation_session.begin (
-                coordinated_rebuild,
-                "test-model"
-            );
-            coordinated_rebuild = null;
 
             int generation_exclusive_fd = -1;
             bool generation_exclusive_contended = false;
@@ -999,33 +1029,19 @@ namespace AskTheModel.Tests {
                 generation_exclusive_fd
             );
 
-            ConversationGrounding? leased_historical =
-                yield sealed_service.
-                    prepare_conversation_grounding_at_generation (
-                        sealed_selection,
-                        2
-                    );
-            assert (leased_historical.is_frozen ());
-            assert (
-                leased_historical.has_generation_lease ()
-            );
-            assert (
-                leased_historical.generation_lease_id () == 2
-            );
+            ConversationSession historical_lease_session =
+                yield begin_leased_session (
+                    sealed_service,
+                    sealed_selection,
+                    2,
+                    true
+                );
             assert (
                 GLib.FileUtils.test (
                     generation_two_lock,
                     GLib.FileTest.IS_REGULAR
                 )
             );
-
-            var historical_lease_session =
-                new ConversationSession ();
-            historical_lease_session.begin (
-                leased_historical,
-                "test-model"
-            );
-            leased_historical = null;
 
             generation_exclusive_fd = -1;
             generation_exclusive_contended = false;
