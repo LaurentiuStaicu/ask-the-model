@@ -801,6 +801,25 @@ test(
   repository_mutation_lease_test
 )
 
+repository_generation_lease_test = executable(
+  'repository-generation-lease-test',
+  [
+    'src/coordination_lease.c',
+    'src/repository_generation_lease.c',
+    'tests/repository_generation_lease_test.c'
+  ],
+  include_directories: include_directories('src'),
+  dependencies: [
+    glib_dep
+  ],
+  install: false
+)
+
+test(
+  'repository-generation-lease',
+  repository_generation_lease_test
+)
+
 repository_ingest_test = executable(
   'repository-ingest-test',
   [
