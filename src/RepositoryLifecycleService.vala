@@ -561,6 +561,7 @@ namespace AskTheModel {
                         string ingest_version = "";
                         string index_path;
                         string index_version;
+                        string? durable_pre_barrier_seal = null;
                         if (!GLib.FileUtils.test (
                                 snapshot,
                                 GLib.FileTest.IS_DIR
@@ -573,7 +574,6 @@ namespace AskTheModel {
 
                             uint64 entries;
                             uint64 total_bytes;
-                            string? durable_pre_barrier_seal = null;
 
                             if (durable_ingest) {
                                 string returned_pre_barrier_seal;
@@ -615,30 +615,6 @@ namespace AskTheModel {
                                 );
                             }
 
-                            if (durable_pre_barrier_seal != null) {
-                                string promoted_pre_index_seal;
-                                uint64 promoted_pre_index_files;
-                                uint64 promoted_pre_index_bytes;
-
-                                if (!RepositoryNative.compute_snapshot_seal (
-                                        snapshot,
-                                        out promoted_pre_index_seal,
-                                        out promoted_pre_index_files,
-                                        out promoted_pre_index_bytes
-                                    )) {
-                                    throw new RepositoryError.STORAGE (
-                                        "Durable repository snapshot seal could not be recomputed after promotion."
-                                    );
-                                }
-
-                                if (durable_pre_barrier_seal !=
-                                    promoted_pre_index_seal) {
-                                    integrity_failure = true;
-                                    throw new RepositoryError.NOT_READY (
-                                        "Durable repository snapshot seal changed across promotion."
-                                    );
-                                }
-                            }
                         }
 
                         string pre_snapshot_seal;
@@ -653,6 +629,15 @@ namespace AskTheModel {
                             )) {
                             throw new RepositoryError.STORAGE (
                                 "Repository snapshot integrity seal could not be computed before indexing."
+                            );
+                        }
+
+                        if (durable_pre_barrier_seal != null &&
+                            durable_pre_barrier_seal !=
+                                pre_snapshot_seal) {
+                            integrity_failure = true;
+                            throw new RepositoryError.NOT_READY (
+                                "Durable repository snapshot seal changed across promotion."
                             );
                         }
 
