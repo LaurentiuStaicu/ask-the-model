@@ -134,6 +134,11 @@ test_filesystem_measurement_uses_existing_ancestor (void)
         ==,
         root_measurement.fragment_size
     );
+    g_assert_cmpint (
+        missing_measurement.inode_budget_known,
+        ==,
+        root_measurement.inode_budget_known
+    );
 
     g_free (missing);
     remove_tree_best_effort (root);
