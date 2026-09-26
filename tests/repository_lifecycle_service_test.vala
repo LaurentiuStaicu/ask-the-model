@@ -965,17 +965,19 @@ namespace AskTheModel.Tests {
                 )
             );
 
-            ConversationGrounding baseline_rebuild =
-                yield sealed_service.prepare_conversation_grounding (
-                    sealed_selection
+            {
+                ConversationGrounding baseline_rebuild =
+                    yield sealed_service.prepare_conversation_grounding (
+                        sealed_selection
+                    );
+                assert (baseline_rebuild.is_frozen ());
+                assert (
+                    !GLib.FileUtils.test (
+                        index_lock_root,
+                        GLib.FileTest.EXISTS
+                    )
                 );
-            assert (baseline_rebuild.is_frozen ());
-            assert (
-                !GLib.FileUtils.test (
-                    index_lock_root,
-                    GLib.FileTest.EXISTS
-                )
-            );
+            }
 
             remove_tree_best_effort (
                 sealed_cache_root
