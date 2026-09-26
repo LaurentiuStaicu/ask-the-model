@@ -1,0 +1,117 @@
+name: C1-I5 purge qualification
+
+on:
+  pull_request:
+    paths:
+      - 'src/repository_gc_isolation.c'
+      - 'src/repository_gc_isolation.h'
+      - 'src/repository_gc_purge.c'
+      - 'src/repository_gc_purge.h'
+      - 'tests/repository_gc_purge_test.c'
+      - 'tests/gc_purge_fault_helper.c'
+      - 'tests/gc_purge_fault_test.c'
+      - 'tests/fault_injection_support.c'
+      - 'tests/fault_injection_support.h'
+      - 'src/fault_injection_test_hook.h'
+      - 'scripts/validate_gc_purge.py'
+      - '.github/workflows/c1-i5-purge-qualification.yml'
+  push:
+    branches:
+      - main
+    paths:
+      - 'src/repository_gc_isolation.c'
+      - 'src/repository_gc_isolation.h'
+      - 'src/repository_gc_purge.c'
+      - 'src/repository_gc_purge.h'
+      - 'tests/repository_gc_purge_test.c'
+      - 'tests/gc_purge_fault_helper.c'
+      - 'tests/gc_purge_fault_test.c'
+      - 'tests/fault_injection_support.c'
+      - 'tests/fault_injection_support.h'
+      - 'src/fault_injection_test_hook.h'
+      - 'scripts/validate_gc_purge.py'
+      - '.github/workflows/c1-i5-purge-qualification.yml'
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: c1-i5-purge-${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  qualify:
+    runs-on: ubuntu-24.04
+    timeout-minutes: 15
+
+    steps:
+      - name: Checkout AtM
+        uses: actions/checkout@v4
+
+      - name: Install native build dependencies
+        shell: bash
+        run: |
+          set -euo pipefail
+          sudo apt-get update
+          sudo apt-get install -y --no-install-recommends \
+            gcc \
+            pkg-config \
+            libglib2.0-dev
+
+      - name: Build purge unit test
+        shell: bash
+        run: |
+          set -euo pipefail
+          CFLAGS="$(pkg-config --cflags glib-2.0)"
+          LIBS="$(pkg-config --libs glib-2.0)"
+          COMMON="-std=c11 -O2 -Wall -Wextra -Werror -Isrc -Itests"
+
+          cc $COMMON $CFLAGS \
+            src/repository_gc_isolation.c \
+            src/repository_gc_purge.c \
+            tests/repository_gc_purge_test.c \
+            $LIBS \
+            -o /tmp/repository-gc-purge-test
+
+      - name: Run purge unit test
+        shell: bash
+        run: |
+          set -euo pipefail
+          /tmp/repository-gc-purge-test
+
+      - name: Build purge interruption helpers
+        shell: bash
+        run: |
+          set -euo pipefail
+          CFLAGS="$(pkg-config --cflags glib-2.0 gio-2.0)"
+          LIBS="$(pkg-config --libs glib-2.0 gio-2.0)"
+          COMMON="-std=c11 -O2 -Wall -Wextra -Werror -Isrc -Itests"
+
+          cc $COMMON $CFLAGS \
+            -DATM_TEST_FAULT_INJECTION \
+            src/repository_gc_isolation.c \
+            src/repository_gc_purge.c \
+            tests/fault_injection_support.c \
+            tests/gc_purge_fault_helper.c \
+            $LIBS \
+            -o /tmp/repository-gc-purge-fault-helper
+
+          cc $COMMON $CFLAGS \
+            tests/gc_purge_fault_test.c \
+            $LIBS \
+            -o /tmp/repository-gc-purge-fault-test
+
+      - name: Run purge process-interruption replay
+        shell: bash
+        env:
+          ATM_GC_PURGE_FAULT_HELPER: /tmp/repository-gc-purge-fault-helper
+        run: |
+          set -euo pipefail
+          /tmp/repository-gc-purge-fault-test
+
+      - name: Run structural contract validator
+        shell: bash
+        run: |
+          set -euo pipefail
+          python3 scripts/validate_gc_purge.py

@@ -43,4 +43,5 @@ jobs:
           python3 scripts/validate_gc_candidate_discovery.py
           python3 scripts/validate_c1_coordination_policy.py
           python3 scripts/validate_gc_isolation.py
+          python3 scripts/validate_gc_purge.py
           python3 scripts/validate_presentation_performance_evidence.py
