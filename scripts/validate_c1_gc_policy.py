@@ -191,6 +191,66 @@ def main() -> int:
         "trash restore policy",
     )
 
+    trigger = policy.get("runtime_isolation_trigger_policy", {})
+    require_equal(
+        trigger.get("selected"),
+        "POST_SUCCESSFUL_CHANGED_REPOSITORY_ACTION",
+        "runtime isolation trigger",
+    )
+    for key in (
+        "operation_snapshot_required",
+        "optimizations_snapshot_must_be_on",
+        "repository_action_must_succeed",
+        "changed_repository_count_must_be_positive",
+        "trigger_after_writer_b0_release",
+        "use_same_operation_optimization_snapshot",
+        "live_switch_recheck_for_trigger_forbidden",
+        "loop_until_empty_forbidden",
+        "purge_in_same_trigger_forbidden",
+        "background_timer_or_idle_trigger_forbidden",
+        "startup_trigger_forbidden",
+        "optimization_toggle_trigger_forbidden",
+        "conversation_close_delete_archive_trigger_forbidden",
+        "enospc_or_capacity_failure_trigger_forbidden",
+        "repository_refresh_trigger_forbidden",
+    ):
+        require_equal(trigger.get(key), True, f"runtime trigger {key}")
+
+    require_equal(
+        trigger.get("max_isolation_attempts_per_repository_action"),
+        1,
+        "bounded isolation attempts",
+    )
+    require_equal(
+        trigger.get("candidate_scope"),
+        "GLOBAL_DETERMINISTIC_I6_FIRST_CANDIDATE",
+        "runtime candidate scope",
+    )
+    require_equal(
+        trigger.get("ui_trigger_added"),
+        False,
+        "runtime trigger UI boundary",
+    )
+    require_equal(
+        trigger.get("outcomes"),
+        {
+            "NOT_ENABLED": "NOOP",
+            "B0_CONTENDED": "NOOP_SKIP_CLEANUP",
+            "NO_CANDIDATE": "NOOP",
+            "B2_CONTENDED": "NOOP_SKIP_CANDIDATE",
+            "DURABLE_ROOT_APPEARED": "NOOP_SKIP_CANDIDATE",
+            "ISOLATED": "ONE_SNAPSHOT_STAGED_TO_TRASH_NO_PURGE",
+        },
+        "runtime trigger outcomes",
+    )
+    require_equal(
+        trigger.get("unexpected_failure"),
+        (
+            "DIAGNOSTIC_ONLY_ALREADY_COMMITTED_REPOSITORY_ACTION_REMAINS_SUCCESS"
+        ),
+        "runtime trigger failure boundary",
+    )
+
     implementation = policy.get("implementation_state", {})
     require_equal(
         implementation,
@@ -198,9 +258,12 @@ def main() -> int:
             "policy_selected": True,
             "dormant_orchestrator_implemented": True,
             "orchestrator_race_qualification_complete": True,
+            "runtime_trigger_policy_selected": True,
             "runtime_caller_present": False,
             "destructive_gc_authorized": False,
-            "next_required_slice": "SELECT_RUNTIME_ISOLATION_TRIGGER_POLICY",
+            "next_required_slice": (
+                "IMPLEMENT_AND_QUALIFY_BOUNDED_POST_MUTATION_ISOLATION_TRIGGER"
+            ),
         },
         "implementation state",
     )
@@ -369,9 +432,9 @@ def main() -> int:
         fail("I6 introduced a direct Application runtime caller")
 
     print(
-        "C1-I6 policy validation passed: B0 -> all relevant B2 EX -> "
-        "durable-only post-exclusion reread -> exact I4 isolation; "
-        "race qualification complete; purge separate; runtime still unwired"
+        "C1-P2 policy validation passed: I6 race qualification complete; "
+        "one post-successful changed repository action isolation attempt "
+        "selected; purge separate; runtime caller still absent"
     )
     return 0
 

@@ -1625,6 +1625,35 @@ Native-contract inconsistencies remain fail-closed: a contended B0/B2 result mus
 
 I6 remains dormant. `destructive_gc_authorized=false`, there is no runtime caller, I5 purge is not invoked, no ENOSPC trigger is selected, and conversation deletion does not trigger synchronous collection. The next reviewed slice is policy for whether/when the dormant isolation pass may be called at runtime; purge remains a separate phase.
 
+### OPT-C1-P2 bounded runtime isolation-trigger policy
+
+P2 selects the only runtime trigger that may be implemented in the next slice; it does not activate I6 itself.
+
+The selected trigger is one bounded post-mutation maintenance attempt. It is eligible only when all of the following are true:
+
+1. the user explicitly initiated a repository Download/Update action;
+2. that repository action completed successfully;
+3. its returned changed-repository count is greater than zero;
+4. the operation-level Optimizations snapshot captured for that repository action was ON;
+5. the repository writer has already released its B0 mutation lease before I6 attempts to acquire B0 for isolation.
+
+The implementation must carry the same operation snapshot through the action and cleanup decision. Re-reading the live switch after an `await` is forbidden because the switch may have changed while the operation was in flight.
+
+One successful repository action may request at most one I6 isolation attempt. The I6 candidate remains the global deterministic first candidate; the trigger must not loop until the candidate set is empty. `NO_CANDIDATE`, B0/B2 contention and a durable root appearing are cleanup skips/no-ops. A successful `ISOLATED` result stages exactly one unprotected snapshot into the qualified I4 trash namespace; it does not call I5 purge. An unexpected isolation failure is diagnostic cleanup failure only and must not roll back, downgrade or reinterpret the repository authority mutation that already committed successfully.
+
+P2 explicitly rejects these triggers:
+
+- application startup;
+- switching Optimizations from OFF to ON;
+- idle/timer/background collection;
+- repository refresh/check;
+- conversation close, archive or deletion;
+- ENOSPC or any C0 capacity-admission failure.
+
+Those triggers either hide destructive namespace mutation from the repository action that motivated it, violate P1's root-removal semantics, or turn a capacity failure into implicit destructive recovery. No new UI control is added.
+
+P2 remains policy-only. `destructive_gc_authorized=false`, no `RepositoryLifecycleService` or `Application` caller is permitted yet, I5 purge remains runtime-unauthorized, and no automatic space reclamation claim is made because isolation alone does not free the trash bytes. The next slice must implement and qualify exactly this bounded post-successful-mutation trigger before runtime authorization can change.
+
 ### Recovery fault qualification
 
 The OPT-A0 recovery harness is test-only. Native checkpoint calls compile to no-ops in the production application; only the dedicated recovery helper is built with `ATM_TEST_FAULT_INJECTION`.
