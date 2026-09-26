@@ -262,10 +262,8 @@ def main() -> int:
 
     # Existing readonly/root and storage primitives must remain available.
     for marker in (
-        "ControlStateNative.
-                    list_complete_generation_ids_readonly (",
-        "RepositoryNative.
-                        try_acquire_generation_lease_exclusive (",
+        "ControlStateNative.\n                    list_complete_generation_ids_readonly (",
+        "RepositoryNative.\n                        try_acquire_generation_lease_exclusive (",
         "RepositoryNative.release_generation_lease (",
     ):
         require_marker(roots, marker, "C1 root/live primitives")
