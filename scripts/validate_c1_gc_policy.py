@@ -365,6 +365,9 @@ def main() -> int:
         if marker in lifecycle:
             fail(f"P1 introduced destructive lifecycle marker: {marker}")
 
+    if "RepositoryGcIsolationOrchestrator" in application:
+        fail("I6 introduced a direct Application runtime caller")
+
     print(
         "C1-I6 policy validation passed: B0 -> all relevant B2 EX -> "
         "durable-only post-exclusion reread -> exact I4 isolation; "
