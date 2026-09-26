@@ -954,7 +954,7 @@ test_orphan_without_generation_reference_is_isolated () {
         );
         assert (result.repository_id == "ewd");
         assert (result.snapshot_sha == ORPHAN_SHA);
-        string trash_path = trash_path ?? "";
+        string trash_path = result.trash_path ?? "";
         assert (trash_path.length > 0);
         assert (
             !FileUtils.test (
@@ -976,7 +976,7 @@ test_orphan_without_generation_reference_is_isolated () {
         );
         assert (
             FileUtils.test (
-                result.trash_path,
+                trash_path,
                 FileTest.IS_DIR
             )
         );
