@@ -297,7 +297,7 @@ def main() -> int:
         "try_acquire_mutation_lease (",
         "RepositoryGcDurableRootCollector.\n                        collect (",
         "RepositoryGcCandidateDiscovery.\n                        discover (",
-        "referencing_generations (",
+        "int64[] references =\n                    referencing_generations (",
         "try_acquire_generation_lease_exclusive (",
         "\"after-b2-exclusions\"",
         "RepositoryGcDurableRootCollector.\n                        collect_durable_only (",
