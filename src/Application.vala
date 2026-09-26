@@ -1850,6 +1850,55 @@ namespace AskTheModel {
             qualify_restored_conversations.begin ();
         }
 
+        private void run_post_mutation_isolation_best_effort (
+            RepositoryMutationOutcome operation
+        ) {
+            if (!operation.optimized_operation ||
+                operation.changed == 0) {
+                return;
+            }
+
+            ConversationPersistenceStore? store =
+                conversation_store;
+
+            if (store == null) {
+                stderr.printf (
+                    "AtM: repository isolation maintenance skipped: conversation persistence is unavailable\n"
+                );
+                return;
+            }
+
+            string? isolation_failure;
+            RepositoryGcIsolationResult? isolation =
+                repository_lifecycle.
+                    run_post_mutation_isolation (
+                        operation,
+                        store,
+                        out isolation_failure
+                    );
+
+            if (isolation_failure != null) {
+                stderr.printf (
+                    "AtM: repository isolation maintenance failed after committed repository action: %s\n",
+                    isolation_failure
+                );
+                return;
+            }
+
+            if (isolation == null) {
+                return;
+            }
+
+            stdout.printf (
+                "AtM: repository isolation maintenance outcome=%d repository=%s sha=%s trash=%s\n",
+                (int) isolation.outcome,
+                isolation.repository_id ?? "-",
+                isolation.snapshot_sha ?? "-",
+                isolation.trash_path ?? "-"
+            );
+        }
+
+
         private async void download_or_update_selected_repositories () {
             if (!repository_lifecycle.repository_operations_allowed ()) {
                 finish_repository_operation (
@@ -1908,25 +1957,30 @@ namespace AskTheModel {
             }
 
             try {
-                uint changed =
-                    yield repository_lifecycle.download_or_update (
-                        selected
-                    );
+                RepositoryMutationOutcome operation =
+                    yield repository_lifecycle.
+                        download_or_update_with_context (
+                            selected
+                        );
 
                 finish_repository_operation (
                     RepositoryOperationOutcome.NORMAL
                 );
 
-                if (changed == 1) {
+                if (operation.changed == 1) {
                     stdout.printf (
                         "AtM: repository action completed; 1 repository changed\n"
                     );
                 } else {
                     stdout.printf (
                         "AtM: repository action completed; %u repositories changed\n",
-                        changed
+                        operation.changed
                     );
                 }
+
+                run_post_mutation_isolation_best_effort (
+                    operation
+                );
             } catch (RepositoryError error) {
                 RepositoryOperationOutcome outcome =
                     RepositoryOperationOutcome.ERROR;

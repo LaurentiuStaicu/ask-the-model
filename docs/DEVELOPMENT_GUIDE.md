@@ -1654,6 +1654,25 @@ Those triggers either hide destructive namespace mutation from the repository ac
 
 P2 remains policy-only. `destructive_gc_authorized=false`, no `RepositoryLifecycleService` or `Application` caller is permitted yet, I5 purge remains runtime-unauthorized, and no automatic space reclamation claim is made because isolation alone does not free the trash bytes. The next slice must implement and qualify exactly this bounded post-successful-mutation trigger before runtime authorization can change.
 
+### OPT-C1-I7 bounded post-mutation runtime isolation
+
+I7 implements exactly the P2 trigger and authorizes only phase-1 isolation-to-trash. It does not authorize I5 purge or claim that isolated bytes have been reclaimed.
+
+`RepositoryLifecycleService.download_or_update_with_context()` snapshots Optimizations once at operation start, drives the existing repository mutation using that frozen value, and returns both the changed-repository count and the exact snapshot in `RepositoryMutationOutcome`. The legacy `download_or_update()` API remains as a compatibility wrapper. The mutation's B0 writer lease is released in the internal operation before the context-returning method completes.
+
+`Application.download_or_update_selected_repositories()` uses the returned outcome rather than reading the live switch after `await`. Only a successful result with `changed > 0` and `optimized_operation=true` enters the cleanup wrapper. This preserves P2 behavior if the user changes the switch while the repository operation is in flight: the operation and its bounded maintenance decision use the same frozen snapshot.
+
+The cleanup seam is deliberately non-throwing. It calls I6 at most once and converts any internal isolation error into a diagnostic string. Consequently a repository update whose Control DB authority already committed remains a successful repository action even if best-effort isolation fails. If the conversation persistence store is unavailable, cleanup is skipped rather than attempting isolation without durable-conversation roots.
+
+The runtime outcomes retain I6 semantics:
+
+- `NO_CANDIDATE`, B0/B2 contention and `DURABLE_ROOT_APPEARED` are skip/no-op maintenance outcomes;
+- `ISOLATED` moves exactly one globally deterministic unprotected snapshot into the qualified I4 trash namespace;
+- there is no loop-until-empty and no call to I5 purge.
+
+Structural CI requires the order `download_or_update_with_context -> successful repository status -> one best-effort cleanup call`, forbids a live Optimizations reread in the cleanup path, freezes the single lifecycle orchestrator call site, and forbids phase-2 purge from Application/lifecycle. Lifecycle regression tests additionally prove OFF and zero-change no-op behavior, carried-ON behavior even while the current policy object is OFF, and conversion of an internal I6 failure into diagnostics rather than an exception.
+
+After I7, runtime isolation is authorized only under this bounded trigger. Startup, switch-toggle, refresh, background/idle, conversation close/archive/delete and ENOSPC/capacity-failure triggers remain forbidden. I5 remains dormant; `.trash` retention and any later purge authorization require a separate policy review.
 ### Recovery fault qualification
 
 The OPT-A0 recovery harness is test-only. Native checkpoint calls compile to no-ops in the production application; only the dedicated recovery helper is built with `ATM_TEST_FAULT_INJECTION`.

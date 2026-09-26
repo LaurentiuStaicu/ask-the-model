@@ -1,16 +1,17 @@
 {
   "schema_version": 1,
   "policy_id": "atm-c1-snapshot-gc-orchestration-v1",
-  "status": "selected-runtime-unwired",
+  "status": "selected-runtime-isolation-wired-purge-unwired",
   "scope": {
     "supported_storage": "qualified local Linux AtM storage only",
     "optimizations_required": true,
-    "destructive_gc_authorized": false,
+    "destructive_gc_authorized": true,
     "automatic_enospc_gc_authorized": false,
     "conversation_delete_cascade_authorized": false,
     "quarantine_purge_authorized": false,
     "retrieval_index_eviction_authorized": false,
-    "control_db_generation_pruning_authorized": false
+    "control_db_generation_pruning_authorized": false,
+    "runtime_isolation_authorized": true
   },
   "dependencies": {
     "authority_wide_coordination": "qualification/c1-coordination-policy-v1.json",
@@ -94,9 +95,11 @@
     "dormant_orchestrator_implemented": true,
     "orchestrator_race_qualification_complete": true,
     "runtime_trigger_policy_selected": true,
-    "runtime_caller_present": false,
-    "destructive_gc_authorized": false,
-    "next_required_slice": "IMPLEMENT_AND_QUALIFY_BOUNDED_POST_MUTATION_ISOLATION_TRIGGER"
+    "bounded_runtime_isolation_qualification_complete": true,
+    "runtime_caller_present": true,
+    "destructive_gc_authorized": true,
+    "purge_runtime_authorized": false,
+    "next_required_slice": "REVIEW_ISOLATED_TRASH_RETENTION_AND_PURGE_RUNTIME_POLICY"
   },
   "runtime_isolation_trigger_policy": {
     "selected": "POST_SUCCESSFUL_CHANGED_REPOSITORY_ACTION",
@@ -126,6 +129,10 @@
       "DURABLE_ROOT_APPEARED": "NOOP_SKIP_CANDIDATE",
       "ISOLATED": "ONE_SNAPSHOT_STAGED_TO_TRASH_NO_PURGE"
     },
-    "unexpected_failure": "DIAGNOSTIC_ONLY_ALREADY_COMMITTED_REPOSITORY_ACTION_REMAINS_SUCCESS"
+    "unexpected_failure": "DIAGNOSTIC_ONLY_ALREADY_COMMITTED_REPOSITORY_ACTION_REMAINS_SUCCESS",
+    "runtime_authorized": true,
+    "conversation_store_unavailable": "NOOP_SKIP_CLEANUP",
+    "isolation_failure_does_not_change_repository_action_outcome": true,
+    "isolation_does_not_reclaim_trash_bytes": true
   }
 }

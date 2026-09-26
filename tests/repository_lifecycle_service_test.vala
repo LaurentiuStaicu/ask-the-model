@@ -443,6 +443,129 @@ namespace AskTheModel.Tests {
 
             optimization_policy.set_enabled_for_session (false);
 
+            RepositoryMutationOutcome off_context =
+                yield service.download_or_update_with_context (
+                    none
+                );
+            assert (off_context.changed == 0);
+            assert (!off_context.optimized_operation);
+
+            optimization_policy.set_enabled_for_session (true);
+
+            RepositoryMutationOutcome on_context =
+                yield service.download_or_update_with_context (
+                    none
+                );
+            assert (on_context.changed == 0);
+            assert (on_context.optimized_operation);
+
+            optimization_policy.set_enabled_for_session (false);
+
+            string trigger_root = new_temp_root ();
+            var trigger_service =
+                new RepositoryLifecycleService (
+                    trigger_root,
+                    trigger_root,
+                    trigger_root
+                );
+            var trigger_policy =
+                new OptimizationPolicy ();
+            trigger_service.set_optimization_policy (
+                trigger_policy
+            );
+            assert (
+                !trigger_service.optimization_mode_snapshot ()
+            );
+
+            var trigger_store =
+                new ConversationPersistenceStore (
+                    trigger_root,
+                    GLib.Path.build_filename (
+                        trigger_root,
+                        "Export"
+                    )
+                );
+
+            int trigger_b0_fd = -1;
+            bool trigger_b0_contended = false;
+            assert (
+                RepositoryNative.try_acquire_mutation_lease (
+                    trigger_root,
+                    out trigger_b0_fd,
+                    out trigger_b0_contended
+                )
+            );
+            assert (!trigger_b0_contended);
+            assert (trigger_b0_fd >= 0);
+
+            string? cleanup_failure = null;
+
+            RepositoryGcIsolationResult? off_cleanup =
+                trigger_service.run_post_mutation_isolation (
+                    new RepositoryMutationOutcome (
+                        1,
+                        false
+                    ),
+                    trigger_store,
+                    out cleanup_failure
+                );
+            assert (off_cleanup == null);
+            assert (cleanup_failure == null);
+
+            RepositoryGcIsolationResult? zero_cleanup =
+                trigger_service.run_post_mutation_isolation (
+                    new RepositoryMutationOutcome (
+                        0,
+                        true
+                    ),
+                    trigger_store,
+                    out cleanup_failure
+                );
+            assert (zero_cleanup == null);
+            assert (cleanup_failure == null);
+
+            RepositoryGcIsolationResult? carried_on_cleanup =
+                trigger_service.run_post_mutation_isolation (
+                    new RepositoryMutationOutcome (
+                        1,
+                        true
+                    ),
+                    trigger_store,
+                    out cleanup_failure
+                );
+            assert (cleanup_failure == null);
+            if (carried_on_cleanup == null) {
+                assert_not_reached ();
+            }
+            assert (
+                carried_on_cleanup.outcome ==
+                RepositoryGcIsolationOutcome.B0_CONTENDED
+            );
+
+            RepositoryNative.release_mutation_lease (
+                trigger_b0_fd
+            );
+            trigger_b0_fd = -1;
+
+            RepositoryGcIsolationResult? failed_cleanup =
+                trigger_service.run_post_mutation_isolation (
+                    new RepositoryMutationOutcome (
+                        1,
+                        true
+                    ),
+                    trigger_store,
+                    out cleanup_failure
+                );
+            assert (failed_cleanup == null);
+            if (cleanup_failure == null) {
+                assert_not_reached ();
+            }
+            assert (cleanup_failure.length > 0);
+
+            remove_tree_best_effort (
+                trigger_root
+            );
+
             string guarded_root = new_temp_root ();
             publish_control_state (guarded_root);
 
