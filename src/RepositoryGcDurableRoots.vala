@@ -335,15 +335,14 @@ namespace AskTheModel {
         }
 
 
-        public static RepositoryGcDurableRoots collect (
-            string state_root,
+        public static RepositoryGcDurableRoots
+        collect_durable_only (
             string control_state_path,
             ConversationPersistenceStore conversation_store
         ) throws GLib.Error {
-            if (state_root.length == 0 ||
-                control_state_path.length == 0) {
+            if (control_state_path.length == 0) {
                 throw new GLib.IOError.INVALID_ARGUMENT (
-                    "GC durable-root collection requires state and Control DB paths."
+                    "GC durable-root collection requires a Control DB path."
                 );
             }
 
@@ -391,12 +390,6 @@ namespace AskTheModel {
                 );
             }
 
-            add_live_generation_roots (
-                roots,
-                state_root,
-                control_state_path
-            );
-
             for (
                 uint i = 0;
                 i < roots.generation_count ();
@@ -426,6 +419,45 @@ namespace AskTheModel {
                         );
                     }
                 }
+            }
+
+            return roots;
+        }
+
+        public static RepositoryGcDurableRoots collect (
+            string state_root,
+            string control_state_path,
+            ConversationPersistenceStore conversation_store
+        ) throws GLib.Error {
+            if (state_root.length == 0 ||
+                control_state_path.length == 0) {
+                throw new GLib.IOError.INVALID_ARGUMENT (
+                    "GC durable-root collection requires state and Control DB paths."
+                );
+            }
+
+            RepositoryGcDurableRoots roots =
+                collect_durable_only (
+                    control_state_path,
+                    conversation_store
+                );
+
+            add_live_generation_roots (
+                roots,
+                state_root,
+                control_state_path
+            );
+
+            for (
+                uint i = 0;
+                i < roots.generation_count ();
+                i++
+            ) {
+                add_generation_snapshots (
+                    roots,
+                    control_state_path,
+                    roots.generation_at (i)
+                );
             }
 
             return roots;

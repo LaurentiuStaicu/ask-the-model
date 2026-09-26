@@ -181,4 +181,17 @@ namespace AskTheModel.RepositoryNative {
     public static extern void release_generation_lease (
         int lease_fd
     );
+
+
+    [CCode (
+        cname = "atm_repository_gc_isolate_snapshot_to_trash",
+        cheader_filename = "repository_gc_isolation.h"
+    )]
+    public static extern bool gc_isolate_snapshot_to_trash (
+        string data_root,
+        string repository_id,
+        string snapshot_sha,
+        out string trash_path,
+        void* stats
+    ) throws GLib.Error;
 }
