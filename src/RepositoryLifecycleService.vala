@@ -790,37 +790,35 @@ namespace AskTheModel {
                 );
             var grounding = new ConversationGrounding ();
 
-            if (optimized_operation) {
-                try {
-                    RepositoryGenerationLease lease =
-                        RepositoryGenerationLease.
-                            acquire_shared (
-                                state_root,
-                                generation_id
-                            );
-
-                    grounding.hold_generation_lease (
-                        lease
-                    );
-
-                    stdout.printf (
-                        "AtM: generation lease shared generation=%" + int64.FORMAT + "\n",
-                        generation_id
-                    );
-                } catch (
-                    RepositoryGenerationLeaseError error
-                ) {
-                    if (error is
-                        RepositoryGenerationLeaseError.BUSY) {
-                        throw new RepositoryError.BUSY (
-                            error.message
+            try {
+                RepositoryGenerationLease lease =
+                    RepositoryGenerationLease.
+                        acquire_shared (
+                            state_root,
+                            generation_id
                         );
-                    }
 
-                    throw new RepositoryError.STORAGE (
+                grounding.hold_generation_lease (
+                    lease
+                );
+
+                stdout.printf (
+                    "AtM: generation lease shared generation=%" + int64.FORMAT + "\n",
+                    generation_id
+                );
+            } catch (
+                RepositoryGenerationLeaseError error
+            ) {
+                if (error is
+                    RepositoryGenerationLeaseError.BUSY) {
+                    throw new RepositoryError.BUSY (
                         error.message
                     );
                 }
+
+                throw new RepositoryError.STORAGE (
+                    error.message
+                );
             }
 
             foreach (
@@ -1037,40 +1035,38 @@ namespace AskTheModel {
                 optimization_mode_snapshot ();
             int mutation_lease_fd = -1;
 
-            if (optimized_operation) {
-                bool contended = false;
-                bool acquired = false;
+            bool mutation_contended = false;
+            bool mutation_acquired = false;
 
-                try {
-                    acquired =
-                        RepositoryNative.try_acquire_mutation_lease (
-                            state_root,
-                            out mutation_lease_fd,
-                            out contended
-                        );
-                } catch (GLib.Error error) {
-                    throw new RepositoryError.STORAGE (
-                        "Repository mutation coordination could not be established."
+            try {
+                mutation_acquired =
+                    RepositoryNative.try_acquire_mutation_lease (
+                        state_root,
+                        out mutation_lease_fd,
+                        out mutation_contended
                     );
-                }
+            } catch (GLib.Error error) {
+                throw new RepositoryError.STORAGE (
+                    "Repository mutation coordination could not be established."
+                );
+            }
 
-                if (!acquired) {
-                    throw new RepositoryError.STORAGE (
-                        "Repository mutation coordination could not be established."
-                    );
-                }
+            if (!mutation_acquired) {
+                throw new RepositoryError.STORAGE (
+                    "Repository mutation coordination could not be established."
+                );
+            }
 
-                if (contended) {
-                    throw new RepositoryError.BUSY (
-                        "Another Ask the Model instance is currently updating repository state. Try again after that operation finishes."
-                    );
-                }
+            if (mutation_contended) {
+                throw new RepositoryError.BUSY (
+                    "Another Ask the Model instance is currently updating repository state. Try again after that operation finishes."
+                );
+            }
 
-                if (mutation_lease_fd < 0) {
-                    throw new RepositoryError.STORAGE (
-                        "Repository mutation coordination returned no lease."
-                    );
-                }
+            if (mutation_lease_fd < 0) {
+                throw new RepositoryError.STORAGE (
+                    "Repository mutation coordination returned no lease."
+                );
             }
 
             try {

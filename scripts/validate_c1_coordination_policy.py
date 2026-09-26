@@ -48,7 +48,7 @@ def main() -> int:
     )
     require_equal(
         policy.get("status"),
-        "selected-not-implemented",
+        "implemented-qualified",
         "policy status",
     )
 
@@ -208,19 +208,24 @@ def main() -> int:
 
     implementation = policy.get("implementation_state", {})
     require_equal(
+        policy.get("mixed_mode_qualification_complete"),
+        True,
+        "mixed-mode qualification completion",
+    )
+    require_equal(
         implementation,
         {
-            "writer_b0_always_on": False,
-            "reader_b2_always_on": False,
+            "writer_b0_always_on": True,
+            "reader_b2_always_on": True,
             "destructive_gc_authorized": False,
             "next_required_slice":
-                "IMPLEMENT_AND_QUALIFY_MIXED_MODE_COORDINATION",
+                "QUALIFY_ISOLATE_TO_TRASH_UNDER_AUTHORITY_WIDE_COORDINATION",
         },
         "implementation state",
     )
 
-    # P0 is policy-only. The current runtime must still be the pre-exemption
-    # ON-only implementation until a later implementation/qualification PR.
+    # I3b implements only the selected correctness coordination. Destructive
+    # C1 behavior remains absent and all other Optimizations behavior remains gated.
     download_start = require_marker(
         lifecycle,
         "        public async uint download_or_update (",
@@ -234,18 +239,47 @@ def main() -> int:
         fail("download/update method boundary is unavailable")
     download = lifecycle[download_start:download_end]
 
-    writer_gate = require_marker(
-        download,
-        "            if (optimized_operation) {",
-        "current B0 ON-only gate",
-    )
     writer_acquire = require_marker(
         download,
         "RepositoryNative.try_acquire_mutation_lease (",
-        "current B0 acquisition",
+        "mode-independent B0 acquisition",
     )
-    if writer_gate >= writer_acquire:
-        fail("current B0 acquisition is no longer visibly ON-gated")
+    writer_loop = require_marker(
+        download,
+        "                foreach (RepositoryDescriptor descriptor in selected) {",
+        "repository mutation loop",
+    )
+    if writer_acquire >= writer_loop:
+        fail("B0 mutation lease must be acquired before repository mutation loop")
+
+    before_writer_acquire = download[:writer_acquire]
+    last_opt_gate = before_writer_acquire.rfind("if (optimized_operation)")
+    if last_opt_gate >= 0 and writer_acquire - last_opt_gate < 1200:
+        fail("B0 acquisition still appears Optimizations-gated")
+
+    for marker in (
+        "if (optimized_operation) {\n"
+        "                                require_download_capacity (",
+        "if (optimized_operation &&\n"
+        "                            archive_path != null)",
+    ):
+        require_marker(
+            download,
+            marker,
+            "OFF-preserved optimization gate",
+        )
+
+    prepare_pos = require_marker(
+        download,
+        "yield prepare_snapshot (",
+        "prepare-snapshot optimization routing",
+    )
+    prepare_tail = download[prepare_pos:prepare_pos + 700]
+    if prepare_tail.count("optimized_operation") < 2:
+        fail(
+            "prepare_snapshot must preserve both optimization-gated "
+            "durable-ingest and optimized-index routing flags"
+        )
 
     grounding_start = require_marker(
         lifecycle,
@@ -262,19 +296,28 @@ def main() -> int:
         fail("grounding method boundary is unavailable")
     grounding = lifecycle[grounding_start:grounding_end]
 
-    reader_gate = require_marker(
-        grounding,
-        "            if (optimized_operation) {",
-        "current B2 ON-only gate",
-    )
     reader_acquire = require_marker(
         grounding,
-        "RepositoryGenerationLease.\n"
-        "                            acquire_shared (",
-        "current B2 shared acquisition",
+        "RepositoryGenerationLease lease =\n"
+        "                    RepositoryGenerationLease.\n"
+        "                        acquire_shared (",
+        "mode-independent B2 shared acquisition",
     )
-    if reader_gate >= reader_acquire:
-        fail("current B2 acquisition is no longer visibly ON-gated")
+    reader_load = require_marker(
+        grounding,
+        "ControlStateNative.load_repository_values_at_generation (",
+        "generation authority read",
+    )
+    if reader_acquire >= reader_load:
+        fail("B2 shared lease must be held before generation authority/snapshot use")
+    if "if (optimized_operation)" in grounding[:reader_acquire]:
+        # optimized_operation may be snapshotted, but no gate may wrap B2 acquire.
+        gate_pos = grounding[:reader_acquire].rfind("if (optimized_operation)")
+        snapshot_pos = grounding[:reader_acquire].rfind(
+            "bool optimized_operation ="
+        )
+        if gate_pos > snapshot_pos:
+            fail("B2 shared acquisition still appears Optimizations-gated")
 
     require_marker(
         optimization,
@@ -283,8 +326,8 @@ def main() -> int:
     )
     require_marker(
         generation_validator,
-        '"default-OFF gate + SH lifetime + no-upgrade lock order"',
-        "current generation-lease validator state",
+        '"mode-independent SH lifetime + no-upgrade lock order"',
+        "generation-lease validator state",
     )
 
     # P0 must not smuggle destructive C1 activation into lifecycle.
@@ -300,8 +343,8 @@ def main() -> int:
 
     print(
         "C1 coordination policy validation passed: "
-        "B0/B2 correctness exemption selected, runtime still ON-only, "
-        "destructive GC unauthorized"
+        "B0/B2 correctness exemption implemented for OFF+ON, "
+        "destructive GC still unauthorized"
     )
     return 0
 

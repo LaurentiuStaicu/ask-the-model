@@ -1,7 +1,7 @@
 {
   "schema_version": 1,
   "policy_id": "atm-c1-authority-wide-coordination-v1",
-  "status": "selected-not-implemented",
+  "status": "implemented-qualified",
   "scope": {
     "supported_storage": "qualified local Linux AtM storage only",
     "destructive_gc_authorized": false,
@@ -25,7 +25,10 @@
   },
   "writer_coordination": {
     "lease": "repository-mutation.lock",
-    "required_for_modes": ["OFF", "ON"],
+    "required_for_modes": [
+      "OFF",
+      "ON"
+    ],
     "required_for": [
       "DOWNLOAD_UPDATE_AUTHORITY_MUTATION",
       "SAME_SHA_REPAIR",
@@ -38,7 +41,10 @@
   },
   "reader_coordination": {
     "lease": "repository-generation-leases/<generation>.lock",
-    "required_for_modes": ["OFF", "ON"],
+    "required_for_modes": [
+      "OFF",
+      "ON"
+    ],
     "positive_generation_only": true,
     "mode": "SHARED",
     "acquire_before": "CONTROL_DB_GENERATION_SNAPSHOT_INDEX_USE",
@@ -81,9 +87,10 @@
     "OPTIMIZATIONS_OFF_DOES_NOT_ENABLE_A1_C0_B1_C1_D1"
   ],
   "implementation_state": {
-    "writer_b0_always_on": false,
-    "reader_b2_always_on": false,
+    "writer_b0_always_on": true,
+    "reader_b2_always_on": true,
     "destructive_gc_authorized": false,
-    "next_required_slice": "IMPLEMENT_AND_QUALIFY_MIXED_MODE_COORDINATION"
-  }
+    "next_required_slice": "QUALIFY_ISOLATE_TO_TRASH_UNDER_AUTHORITY_WIDE_COORDINATION"
+  },
+  "mixed_mode_qualification_complete": true
 }

@@ -1536,6 +1536,27 @@ The mixed-mode implementation gate must prove at least:
 
 P0 is policy-only. `qualification/c1-coordination-policy-v1.json` records `writer_b0_always_on=false`, `reader_b2_always_on=false` and `destructive_gc_authorized=false` until a later implementation/qualification slice passes the mixed-mode matrix.
 
+### OPT-C1-I3b mode-independent coordination implementation
+
+I3b implements the P0 correctness exemption without activating destructive GC or any other optimization.
+
+Repository authority writers now acquire B0 regardless of the operation-level Optimizations snapshot. The acquisition remains before the selected-repository mutation loop and its descriptor is held through existing operation cleanup. Contention therefore returns the same `RepositoryError.BUSY` for OFF and ON callers before deterministic download/snapshot mutation begins.
+
+Positive repository-backed grounding now acquires the B2 shared generation lease regardless of Optimizations mode. Generation 0 still returns without creating the lease namespace. The shared lease is attached to `ConversationGrounding` before Control DB generation rows, snapshot contents or retrieval index are used and remains owned for the grounding/session lifetime.
+
+The operation-level Optimizations snapshot remains authoritative for all non-coordination behavior. In particular, durable-ingest A1 barriers, C0 capacity admission and the optimized derived-index path are still selected only when ON. The application switch still starts OFF every process.
+
+The mixed-mode lifecycle regression proves:
+
+- an OFF `download_or_update()` participates in B0 and returns BUSY when the global lease is already held;
+- the same held B0 lease rejects an ON writer as well;
+- an OFF positive-generation grounding holds B2 shared and makes a nonblocking exclusive generation probe contended;
+- after the OFF grounding is released the exclusive probe succeeds;
+- while that exclusive lease is held, a new OFF grounding fails BUSY before repository generation/snapshot use;
+- the existing ON generation-lease lifetime/contention checks remain in place.
+
+This changes coordination metadata behavior while Optimizations is OFF, but does not enable optimization algorithms. `qualification/c1-coordination-policy-v1.json` therefore records both coordination primitives as implemented/qualified while `destructive_gc_authorized=false`. The next C1 slice may qualify isolate-to-trash under the now authority-wide coordination protocol; production GC policy/runtime activation remains later.
+
 ### Recovery fault qualification
 
 The OPT-A0 recovery harness is test-only. Native checkpoint calls compile to no-ops in the production application; only the dedicated recovery helper is built with `ATM_TEST_FAULT_INJECTION`.
