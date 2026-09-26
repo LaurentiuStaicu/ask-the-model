@@ -242,8 +242,7 @@ def main() -> int:
         "conversation persistence entry",
     )
     persist_end = application.find(
-        "
-        private string? immutable_permalink_for_citation",
+        "\n        private string? immutable_permalink_for_citation",
         persist_start,
     )
     if persist_end < 0:
