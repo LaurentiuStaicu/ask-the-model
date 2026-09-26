@@ -262,13 +262,23 @@ def main() -> int:
         "                                require_download_capacity (",
         "if (optimized_operation &&\n"
         "                            archive_path != null)",
-        "optimized_operation,\n"
-        "                                optimized_operation",
     ):
         require_marker(
             download,
             marker,
             "OFF-preserved optimization gate",
+        )
+
+    prepare_pos = require_marker(
+        download,
+        "yield prepare_snapshot (",
+        "prepare-snapshot optimization routing",
+    )
+    prepare_tail = download[prepare_pos:prepare_pos + 700]
+    if prepare_tail.count("optimized_operation") < 2:
+        fail(
+            "prepare_snapshot must preserve both optimization-gated "
+            "durable-ingest and optimized-index routing flags"
         )
 
     grounding_start = require_marker(
