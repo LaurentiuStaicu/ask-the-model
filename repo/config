@@ -1,0 +1,12 @@
+[core]
+repo_version=1
+mode=archive-z2
+indexed-deltas=true
+
+[flatpak]
+title=AtM Development
+comment=Development updates for Ask the Model
+description=Automatically published development builds of Ask the Model from the main branch.
+homepage=https://github.com/LaurentiuStaicu/ask-the-model
+icon=https://raw.githubusercontent.com/LaurentiuStaicu/ask-the-model/main/data/icons/64.png
+default-branch=master
