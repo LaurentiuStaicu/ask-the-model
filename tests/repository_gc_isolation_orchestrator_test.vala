@@ -471,7 +471,8 @@ test_orchestrator_isolates_unrooted_historical_snapshot () {
         );
         assert (result.repository_id == "ewd");
         assert (result.snapshot_sha == OLD_SHA);
-        assert (result.trash_path != null);
+        string trash_path = result.trash_path ?? "";
+        assert (trash_path.length > 0);
         assert (
             !FileUtils.test (
                 snapshot_path_for (
@@ -492,7 +493,7 @@ test_orchestrator_isolates_unrooted_historical_snapshot () {
         );
         assert (
             FileUtils.test (
-                result.trash_path,
+                trash_path,
                 FileTest.IS_DIR
             )
         );
@@ -953,7 +954,8 @@ test_orphan_without_generation_reference_is_isolated () {
         );
         assert (result.repository_id == "ewd");
         assert (result.snapshot_sha == ORPHAN_SHA);
-        assert (result.trash_path != null);
+        string trash_path = trash_path ?? "";
+        assert (trash_path.length > 0);
         assert (
             !FileUtils.test (
                 snapshot_path_for (
