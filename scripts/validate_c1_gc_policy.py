@@ -574,13 +574,12 @@ def main() -> int:
     ]
     previous = -1
     for marker in ordered_action_markers:
-        current = require_marker(
-            app_action,
-            marker,
-            "I7 post-mutation trigger ordering",
-        )
-        if current <= previous:
-            fail(f"I7 trigger ordering drifted at marker: {marker}")
+        current = app_action.find(marker, previous + 1)
+        if current < 0:
+            fail(
+                "I7 post-mutation trigger ordering lost marker after "
+                f"position {previous}: {marker}"
+            )
         previous = current
 
     for forbidden in (
