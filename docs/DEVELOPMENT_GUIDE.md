@@ -1501,6 +1501,41 @@ The native primitive:
 
 Process-crash checkpoints bracket the rename and both post-rename directory barriers so the next qualification step can replay the exact isolation boundaries without enabling production GC.
 
+### OPT-C1-P0 authority-wide coordination prerequisite
+
+C1 candidate discovery remains non-destructive, but post-I3 review exposed a prerequisite that must be closed before any `.trash`/isolation rename can be considered safe.
+
+The current B0 and B2 runtime cooperation is gated by the session-only Optimizations switch:
+
+- `download_or_update()` acquires the global `repository-mutation.lock` only when its operation-level Optimizations snapshot is ON;
+- repository-backed grounding acquires the B2 shared positive-generation lease only when Optimizations is ON.
+
+That is insufficient for an ON destructive GC. A process running with Optimizations OFF can otherwise mutate repository authority without B0 or actively use a historical generation without a B2 shared lease. Because Linux `flock()` is advisory, a GC process cannot infer safety from its own locks when other AtM paths do not participate.
+
+P0 therefore uses G0's already-declared mandatory correctness/security exemption for exactly two coordination mechanisms:
+
+1. **B0 writer coordination becomes mode-independent.** Every OFF or ON repository authority/namespace writer must cooperate with the same global mutation lease. The lease is acquired before deterministic repository staging/namespace mutation and held through guarded authority commit and operation cleanup.
+2. **B2 live-reader coordination becomes mode-independent.** Every repository-backed grounding of a positive generation must hold its generation shared lease for the lifetime of `ConversationGrounding`, whether Optimizations is OFF or ON.
+
+This reclassification does not turn Optimizations ON. The switch still starts OFF every process and continues to gate A1 durability barriers, B1 derived-index single-flight, C0 capacity admission, C1 destructive GC, D1 retrieval/context policy and later optimization behavior unless separately reviewed.
+
+The required destructive-GC lock/reread sequence is now frozen as:
+
+`B0 global exclusive -> fresh durable conversation roots + live-root union -> identify every COMPLETE generation that references the candidate -> acquire the relevant B2 exclusive generation exclusions -> reread durable roots after exclusion -> no-follow dirfd revalidate the exact candidate -> same-filesystem isolation rename`
+
+A reader never acquires B0 after taking a B2 shared lease. A writer does not take a shared generation lease for mutation. Future GC acquires B0 before any B2 exclusive generation exclusions, preventing a lock-order cycle.
+
+The mixed-mode implementation gate must prove at least:
+
+- OFF writer vs OFF writer B0 contention;
+- OFF writer vs ON writer B0 contention;
+- an OFF live reader's B2 shared lease blocks GC exclusive acquisition;
+- a GC-held exclusive generation lease blocks a new OFF reader before snapshot/index use;
+- ON reader behavior remains correct;
+- Optimizations OFF still does not enable A1/C0/B1/C1/D1 behavior.
+
+P0 is policy-only. `qualification/c1-coordination-policy-v1.json` records `writer_b0_always_on=false`, `reader_b2_always_on=false` and `destructive_gc_authorized=false` until a later implementation/qualification slice passes the mixed-mode matrix.
+
 ### Recovery fault qualification
 
 The OPT-A0 recovery harness is test-only. Native checkpoint calls compile to no-ops in the production application; only the dedicated recovery helper is built with `ATM_TEST_FAULT_INJECTION`.

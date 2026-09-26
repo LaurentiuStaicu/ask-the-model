@@ -1,0 +1,89 @@
+{
+  "schema_version": 1,
+  "policy_id": "atm-c1-authority-wide-coordination-v1",
+  "status": "selected-not-implemented",
+  "scope": {
+    "supported_storage": "qualified local Linux AtM storage only",
+    "destructive_gc_authorized": false,
+    "automatic_orphan_recovery_authorized": false
+  },
+  "g0_correctness_exemption": {
+    "selected": true,
+    "reason": "Destructive GC cannot safely isolate repository snapshots unless every cooperative AtM authority writer and every live positive-generation reader participates in the same cross-process coordination protocol, including when the Optimizations switch is OFF.",
+    "always_on_coordination_only": [
+      "B0_REPOSITORY_MUTATION_LEASE",
+      "B2_POSITIVE_GENERATION_SHARED_LEASE"
+    ],
+    "still_optimization_gated": [
+      "A1_DURABILITY_BARRIERS",
+      "B1_DERIVED_INDEX_SINGLE_FLIGHT",
+      "C0_CAPACITY_ADMISSION",
+      "C1_DESTRUCTIVE_GC",
+      "D1_RETRIEVAL_CONTEXT_POLICY"
+    ],
+    "optimization_switch_starts_off": true
+  },
+  "writer_coordination": {
+    "lease": "repository-mutation.lock",
+    "required_for_modes": ["OFF", "ON"],
+    "required_for": [
+      "DOWNLOAD_UPDATE_AUTHORITY_MUTATION",
+      "SAME_SHA_REPAIR",
+      "FUTURE_GC_NAMESPACE_ISOLATION"
+    ],
+    "acquire_before": "DETERMINISTIC_REPOSITORY_STAGING_OR_NAMESPACE_MUTATION",
+    "release_after": "GUARDED_CONTROL_DB_COMMIT_AND_OPERATION_CLEANUP",
+    "contention_behavior": "BUSY_FAIL_CLOSED",
+    "sqlite_expected_generation_guard_retained": true
+  },
+  "reader_coordination": {
+    "lease": "repository-generation-leases/<generation>.lock",
+    "required_for_modes": ["OFF", "ON"],
+    "positive_generation_only": true,
+    "mode": "SHARED",
+    "acquire_before": "CONTROL_DB_GENERATION_SNAPSHOT_INDEX_USE",
+    "hold_until": "CONVERSATION_GROUNDING_RELEASE",
+    "exclusive_gc_contention_behavior": "BUSY_FAIL_CLOSED",
+    "generation_zero_creates_no_lease": true
+  },
+  "future_gc_isolation_preconditions": [
+    "HOLD_GLOBAL_B0_MUTATION_LEASE",
+    "REREAD_DURABLE_CONVERSATION_ROOTS",
+    "REBUILD_B2_LIVE_ROOT_UNION",
+    "IDENTIFY_ALL_COMPLETE_GENERATIONS_REFERENCING_CANDIDATE",
+    "ACQUIRE_RELEVANT_B2_EXCLUSIVE_GENERATION_EXCLUSIONS",
+    "REREAD_DURABLE_ROOTS_AFTER_EXCLUSIVE_EXCLUSION",
+    "REVALIDATE_EXACT_CANDIDATE_OBJECT_WITH_NOFOLLOW_DIRFD",
+    "SAME_FILESYSTEM_ISOLATION_RENAME_ONLY_AFTER_ALL_GATES"
+  ],
+  "lock_order": {
+    "writer_or_gc": [
+      "B0_GLOBAL_MUTATION_EXCLUSIVE",
+      "B2_RELEVANT_GENERATION_EXCLUSIVE_WHEN_GC",
+      "FILESYSTEM_PREPARATION_OR_ISOLATION",
+      "GUARDED_CONTROL_DB_TRANSACTION_IF_ANY"
+    ],
+    "reader": [
+      "B2_GENERATION_SHARED",
+      "GENERATION_SNAPSHOT_INDEX_USE"
+    ],
+    "forbidden": [
+      "B2_SHARED_THEN_B0_GLOBAL",
+      "CONTROL_DB_WRITE_TRANSACTION_THEN_B0_GLOBAL"
+    ]
+  },
+  "mixed_mode_qualification_required": [
+    "OFF_WRITER_VS_OFF_WRITER_B0_CONTENTION",
+    "OFF_WRITER_VS_ON_WRITER_B0_CONTENTION",
+    "OFF_READER_SHARED_B2_BLOCKS_GC_EXCLUSIVE",
+    "GC_EXCLUSIVE_B2_BLOCKS_NEW_OFF_READER",
+    "ON_READER_SHARED_B2_REGRESSION",
+    "OPTIMIZATIONS_OFF_DOES_NOT_ENABLE_A1_C0_B1_C1_D1"
+  ],
+  "implementation_state": {
+    "writer_b0_always_on": false,
+    "reader_b2_always_on": false,
+    "destructive_gc_authorized": false,
+    "next_required_slice": "IMPLEMENT_AND_QUALIFY_MIXED_MODE_COORDINATION"
+  }
+}
