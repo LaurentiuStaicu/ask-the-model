@@ -1557,6 +1557,20 @@ The mixed-mode lifecycle regression proves:
 
 This changes coordination metadata behavior while Optimizations is OFF, but does not enable optimization algorithms. `qualification/c1-coordination-policy-v1.json` therefore records both coordination primitives as implemented/qualified while `destructive_gc_authorized=false`. The next C1 slice may qualify isolate-to-trash under the now authority-wide coordination protocol; production GC policy/runtime activation remains later.
 
+### OPT-C1-I5 isolated-trash purge primitive
+
+I5 is the separate phase-2 primitive for an object that has already been isolated by I4. It is not a candidate selector and cannot operate on ordinary snapshot paths.
+
+The API accepts a fixed-catalog repository ID plus the canonical I4 trash basename. It opens only the chain below `Repositories/.trash/<repository_id>` with directory descriptors and no-follow semantics. The selected trash root must itself be a real directory.
+
+Before the first destructive syscall, I5 recursively validates the entire isolated tree using `fstatat(..., AT_SYMLINK_NOFOLLOW)` and descriptor-based directory opens. Qualified repository snapshots contain only regular files and directories; a symlink or special object found in trash is therefore treated as a repair condition rather than traversed.
+
+The deletion pass revalidates each entry and removes regular files with `unlinkat(..., 0)` and emptied directories with `unlinkat(..., AT_REMOVEDIR)`. Each recursively emptied directory is fsynced, and after the selected trash root is removed the containing trash-repository directory is fsynced. Interruption can therefore leave a complete or partial trash residue, but it cannot recreate repository authority.
+
+Process-interruption qualification uses the same test-only checkpoint mechanism as I4. A fresh verifier accepts only `TRASH_INTACT`, `TRASH_RESIDUAL`, `TRASH_EMPTY_ROOT` or `FULLY_PURGED`. Crashes before/after the first unlink and before root removal must leave a resumable trash object; rerunning the same purge primitive must converge to `FULLY_PURGED`. Crashes after root removal or after the final parent-directory fsync must already classify as fully purged. This is process-restart qualification only; it is not presented as physical power-loss evidence.
+
+I5 remains dormant in `RepositoryLifecycleService`. It does not scan `snapshots`, resolve reachability, remove Control DB history, delete conversations, purge quarantine, or evict retrieval indexes. Automatic purge policy remains a later reviewed slice.
+
 ### Recovery fault qualification
 
 The OPT-A0 recovery harness is test-only. Native checkpoint calls compile to no-ops in the production application; only the dedicated recovery helper is built with `ATM_TEST_FAULT_INJECTION`.
