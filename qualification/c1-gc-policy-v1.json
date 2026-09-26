@@ -93,8 +93,39 @@
     "policy_selected": true,
     "dormant_orchestrator_implemented": true,
     "orchestrator_race_qualification_complete": true,
+    "runtime_trigger_policy_selected": true,
     "runtime_caller_present": false,
     "destructive_gc_authorized": false,
-    "next_required_slice": "SELECT_RUNTIME_ISOLATION_TRIGGER_POLICY"
+    "next_required_slice": "IMPLEMENT_AND_QUALIFY_BOUNDED_POST_MUTATION_ISOLATION_TRIGGER"
+  },
+  "runtime_isolation_trigger_policy": {
+    "selected": "POST_SUCCESSFUL_CHANGED_REPOSITORY_ACTION",
+    "operation_snapshot_required": true,
+    "optimizations_snapshot_must_be_on": true,
+    "repository_action_must_succeed": true,
+    "changed_repository_count_must_be_positive": true,
+    "trigger_after_writer_b0_release": true,
+    "use_same_operation_optimization_snapshot": true,
+    "live_switch_recheck_for_trigger_forbidden": true,
+    "max_isolation_attempts_per_repository_action": 1,
+    "candidate_scope": "GLOBAL_DETERMINISTIC_I6_FIRST_CANDIDATE",
+    "loop_until_empty_forbidden": true,
+    "purge_in_same_trigger_forbidden": true,
+    "ui_trigger_added": false,
+    "background_timer_or_idle_trigger_forbidden": true,
+    "startup_trigger_forbidden": true,
+    "optimization_toggle_trigger_forbidden": true,
+    "conversation_close_delete_archive_trigger_forbidden": true,
+    "enospc_or_capacity_failure_trigger_forbidden": true,
+    "repository_refresh_trigger_forbidden": true,
+    "outcomes": {
+      "NOT_ENABLED": "NOOP",
+      "B0_CONTENDED": "NOOP_SKIP_CLEANUP",
+      "NO_CANDIDATE": "NOOP",
+      "B2_CONTENDED": "NOOP_SKIP_CANDIDATE",
+      "DURABLE_ROOT_APPEARED": "NOOP_SKIP_CANDIDATE",
+      "ISOLATED": "ONE_SNAPSHOT_STAGED_TO_TRASH_NO_PURGE"
+    },
+    "unexpected_failure": "DIAGNOSTIC_ONLY_ALREADY_COMMITTED_REPOSITORY_ACTION_REMAINS_SUCCESS"
   }
 }
