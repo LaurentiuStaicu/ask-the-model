@@ -1,0 +1,99 @@
+{
+  "schema_version": 1,
+  "policy_id": "atm-c1-snapshot-gc-orchestration-v1",
+  "status": "selected-runtime-unwired",
+  "scope": {
+    "supported_storage": "qualified local Linux AtM storage only",
+    "optimizations_required": true,
+    "destructive_gc_authorized": false,
+    "automatic_enospc_gc_authorized": false,
+    "conversation_delete_cascade_authorized": false,
+    "quarantine_purge_authorized": false,
+    "retrieval_index_eviction_authorized": false,
+    "control_db_generation_pruning_authorized": false
+  },
+  "dependencies": {
+    "authority_wide_coordination": "qualification/c1-coordination-policy-v1.json",
+    "protected_root_collector": "OPT-C1-I1/I2",
+    "candidate_discovery": "OPT-C1-I3/I3a",
+    "isolation_primitive": "OPT-C1-I4",
+    "purge_primitive": "OPT-C1-I5",
+    "a1_namespace_durability": "qualification/durability-policy-v1.json"
+  },
+  "candidate_status": {
+    "pre_b0_candidate_list": "ADVISORY_ONLY",
+    "negative_live_probe": "NOT_DELETION_AUTHORITY",
+    "historical_complete_generation_metadata": "NOT_AUTOMATIC_SNAPSHOT_ROOT",
+    "unexpected_object": "REPAIR_FAIL_CLOSED"
+  },
+  "isolation_protocol": [
+    "REQUIRE_OPTIMIZATIONS_ON_OPERATION_SNAPSHOT",
+    "ACQUIRE_B0_GLOBAL_MUTATION_EXCLUSIVE",
+    "COLLECT_FRESH_DURABLE_AND_LIVE_ROOTS",
+    "DISCOVER_OR_REVALIDATE_UNPROTECTED_EXACT_SHA_CANDIDATE",
+    "ENUMERATE_ALL_COMPLETE_GENERATIONS_REFERENCING_CANDIDATE",
+    "SORT_REFERENCING_GENERATION_IDS_ASCENDING",
+    "ACQUIRE_B2_EXCLUSIVE_FOR_EVERY_REFERENCING_POSITIVE_GENERATION",
+    "REREAD_DURABLE_CONVERSATION_ROOTS_AFTER_ALL_B2_EXCLUSIONS",
+    "ABORT_IF_CANDIDATE_IS_NOW_PROTECTED",
+    "REVALIDATE_EXACT_SOURCE_WITH_NOFOLLOW_DIRFD",
+    "I4_SAME_FILESYSTEM_ISOLATE_TO_TRASH",
+    "RELEASE_B2_EXCLUSIONS",
+    "RELEASE_B0_GLOBAL_MUTATION_EXCLUSIVE"
+  ],
+  "generation_reference_resolution": {
+    "authority_source": "STRICT_READONLY_COMPLETE_CONTROL_DB_GENERATIONS",
+    "identity_key": "repository_id+snapshot_sha",
+    "include_all_complete_generations": true,
+    "generation_zero_excluded": true,
+    "empty_reference_set_allowed": true,
+    "exclusive_acquisition_order": "ASCENDING_GENERATION_ID",
+    "partial_exclusive_acquisition_failure": "RELEASE_ALREADY_HELD_AND_SKIP_CANDIDATE",
+    "contended_exclusive": "LIVE_USE_SKIP_CANDIDATE"
+  },
+  "new_durable_root_race_closure": {
+    "required_invariant": "POSITIVE_GENERATION_CONVERSATION_PERSISTENCE_OCCURS_WHILE_MATCHING_B2_SHARED_LEASE_IS_HELD",
+    "existing_reader_blocks_gc_exclusive": true,
+    "gc_exclusive_blocks_new_reader": true,
+    "post_exclusion_durable_root_reread_required": true,
+    "new_positive_generation_root_after_reread_blocked_by_b2_exclusive": true,
+    "conversation_deletion_after_reread_is_overprotection_only": true
+  },
+  "lock_order": {
+    "required": [
+      "B0_GLOBAL_MUTATION_EXCLUSIVE",
+      "B2_EXCLUSIVE_ASCENDING_GENERATION_ID",
+      "FILESYSTEM_EXACT_REVALIDATION_AND_I4_ISOLATION"
+    ],
+    "forbidden": [
+      "B2_SHARED_TO_EXCLUSIVE_UPGRADE",
+      "B2_EXCLUSIVE_THEN_B0_ACQUIRE",
+      "CONTROL_DB_WRITE_TRANSACTION_THEN_B0_ACQUIRE"
+    ]
+  },
+  "two_phase_reclamation": {
+    "isolation_and_purge_same_logical_pass": false,
+    "isolation_result": "TRASH_ONLY_NO_AUTHORITY",
+    "purge_requires_already_isolated_canonical_i4_TRASH_identity": true,
+    "purge_runtime_authorized": false,
+    "age_threshold_selected": false,
+    "automatic_restore_from_trash": false
+  },
+  "failure_contract": {
+    "b0_contention": "BUSY_SKIP_GC",
+    "root_collection_failure": "FAIL_CLOSED_NO_ISOLATION",
+    "candidate_repair_condition": "FAIL_CLOSED_NO_ISOLATION",
+    "b2_exclusive_contention": "RELEASE_EXCLUSIONS_AND_SKIP_CANDIDATE",
+    "post_exclusion_root_appears": "RELEASE_EXCLUSIONS_AND_SKIP_CANDIDATE",
+    "exact_source_revalidation_failure": "FAIL_CLOSED_NO_ISOLATION",
+    "i4_isolation_failure": "REPORT_FAILURE_KEEP_AUTHORITY_UNCHANGED",
+    "no_candidate": "NOOP"
+  },
+  "implementation_state": {
+    "policy_selected": true,
+    "dormant_orchestrator_implemented": false,
+    "runtime_caller_present": false,
+    "destructive_gc_authorized": false,
+    "next_required_slice": "IMPLEMENT_DORMANT_ISOLATION_ORCHESTRATOR_AND_RACE_QUALIFICATION"
+  }
+}

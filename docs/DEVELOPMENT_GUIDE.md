@@ -1571,6 +1571,28 @@ Process-interruption qualification uses the same test-only checkpoint mechanism 
 
 I5 remains dormant in `RepositoryLifecycleService`. It does not scan `snapshots`, resolve reachability, remove Control DB history, delete conversations, purge quarantine, or evict retrieval indexes. Automatic purge policy remains a later reviewed slice.
 
+### OPT-C1-P1 selected isolation orchestration policy
+
+P1 freezes the destructive C1 isolation sequence without implementing or authorizing a runtime GC caller.
+
+An isolation operation may proceed only from an Optimizations-ON operation snapshot and only under the authority-wide coordination selected by C1-P0/I3b. The required order is:
+
+1. acquire B0 repository-mutation exclusive;
+2. rebuild fresh durable and B2-live protected roots;
+3. select or revalidate one exact unprotected repository/SHA candidate;
+4. enumerate every positive COMPLETE Control DB generation whose immutable repository row references that exact repository/SHA;
+5. sort those generation IDs ascending and acquire B2 exclusive for every one;
+6. if any exclusive lease is contended, release already-held exclusions and skip the candidate;
+7. after all exclusions are held, reread durable conversation roots;
+8. if the candidate is now protected, release exclusions and skip it;
+9. keep all B2 exclusions while the exact source object is revalidated through the no-follow dirfd storage path;
+10. invoke the already-qualified I4 same-filesystem isolate-to-trash primitive;
+11. release B2 exclusions, then B0.
+
+The post-exclusion durable-root reread closes the new-conversation-root race because every positive-generation repository-backed session holds the matching B2 shared lease through conversation persistence. An existing reader therefore blocks GC exclusive acquisition; an already-held GC exclusive lease blocks a new reader before it can use/persist that generation.
+
+P1 is policy-only. `destructive_gc_authorized=false`, no `RepositoryLifecycleService` caller is permitted, and I5 purge remains a distinct later phase. No age threshold, automatic ENOSPC GC, conversation-delete cascade, quarantine purge, retrieval-index eviction or Control DB generation pruning is selected here.
+
 ### Recovery fault qualification
 
 The OPT-A0 recovery harness is test-only. Native checkpoint calls compile to no-ops in the production application; only the dedicated recovery helper is built with `ATM_TEST_FAULT_INJECTION`.
