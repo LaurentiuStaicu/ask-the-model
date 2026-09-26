@@ -89,12 +89,13 @@ def main() -> int:
     )
     lease = require(
         operation,
-        "if (optimized_operation) {\n"
-        "                bool contended = false;",
-        "download_or_update",
+        "RepositoryNative.try_acquire_mutation_lease (",
+        "mode-independent authority lease",
     )
     if lease < snapshot:
         fail("authority lease must follow the operation snapshot")
+    if "if (optimized_operation)" in operation[snapshot:lease]:
+        fail("B0 authority lease must be mode-independent after C1-P0")
 
     checkpoint_a = require(
         operation,
@@ -107,8 +108,10 @@ def main() -> int:
         "yield client.download_archive_to_staging (",
         "checkpoint A",
     )
-    if checkpoint_a >= download:
-        fail("checkpoint A must run before archive .part creation/download")
+    if not (lease < checkpoint_a < download):
+        fail(
+            "mode-independent B0 must precede ON-only checkpoint A and archive download"
+        )
 
     checkpoint_b = require(
         operation,
@@ -266,7 +269,7 @@ def main() -> int:
 
     print(
         "capacity runtime wiring validation passed: "
-        "OFF gate + A/B/state ordering + specific NO_SPACE mapping"
+        "mode-independent B0 + OFF-gated A/B/state ordering + specific NO_SPACE mapping"
     )
     return 0
 

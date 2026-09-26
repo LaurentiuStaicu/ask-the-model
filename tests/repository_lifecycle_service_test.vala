@@ -395,18 +395,6 @@ namespace AskTheModel.Tests {
                 yield service.download_or_update (none);
             assert (off_changed == 0);
             assert (
-                !GLib.FileUtils.test (
-                    mutation_lock_path,
-                    GLib.FileTest.EXISTS
-                )
-            );
-
-            optimization_policy.set_enabled_for_session (true);
-
-            uint on_changed =
-                yield service.download_or_update (none);
-            assert (on_changed == 0);
-            assert (
                 GLib.FileUtils.test (
                     mutation_lock_path,
                     GLib.FileTest.IS_REGULAR
@@ -425,18 +413,34 @@ namespace AskTheModel.Tests {
             assert (!lease_contended);
             assert (held_lease_fd >= 0);
 
-            bool busy_rejected = false;
+            bool off_busy_rejected = false;
             try {
                 yield service.download_or_update (one);
             } catch (RepositoryError error) {
-                busy_rejected =
+                off_busy_rejected =
                     error.code == RepositoryError.BUSY;
             }
-            assert (busy_rejected);
+            assert (off_busy_rejected);
+
+            optimization_policy.set_enabled_for_session (true);
+
+            bool on_busy_rejected = false;
+            try {
+                yield service.download_or_update (one);
+            } catch (RepositoryError error) {
+                on_busy_rejected =
+                    error.code == RepositoryError.BUSY;
+            }
+            assert (on_busy_rejected);
 
             RepositoryNative.release_mutation_lease (
                 held_lease_fd
             );
+
+            uint on_changed =
+                yield service.download_or_update (none);
+            assert (on_changed == 0);
+
             optimization_policy.set_enabled_for_session (false);
 
             string guarded_root = new_temp_root ();
@@ -679,6 +683,62 @@ namespace AskTheModel.Tests {
 
             sealed_service.apply_installation_qualification (true);
 
+            {
+                ConversationGrounding off_grounding =
+                    yield sealed_service.prepare_conversation_grounding (
+                        sealed_selection
+                    );
+                assert (off_grounding.has_generation_lease ());
+                assert (
+                    off_grounding.generation_lease_id () == 2
+                );
+
+                int off_generation_exclusive_fd = -1;
+                bool off_generation_exclusive_contended = false;
+                assert (
+                    RepositoryGenerationLeaseNative.
+                        try_acquire_exclusive (
+                            sealed_state_root,
+                            2,
+                            out off_generation_exclusive_fd,
+                            out off_generation_exclusive_contended
+                        )
+                );
+                assert (off_generation_exclusive_contended);
+                assert (off_generation_exclusive_fd == -1);
+            }
+
+            int released_off_generation_fd = -1;
+            bool released_off_generation_contended = false;
+            assert (
+                RepositoryGenerationLeaseNative.
+                    try_acquire_exclusive (
+                        sealed_state_root,
+                        2,
+                        out released_off_generation_fd,
+                        out released_off_generation_contended
+                    )
+            );
+            assert (!released_off_generation_contended);
+            assert (released_off_generation_fd >= 0);
+
+            bool off_reader_busy_rejected = false;
+            try {
+                yield sealed_service.
+                    prepare_conversation_grounding_at_generation (
+                        sealed_selection,
+                        2
+                    );
+            } catch (RepositoryError error) {
+                off_reader_busy_rejected =
+                    error.code == RepositoryError.BUSY;
+            }
+            assert (off_reader_busy_rejected);
+
+            RepositoryGenerationLeaseNative.release (
+                released_off_generation_fd
+            );
+
             int sealed_lease_fd;
             bool sealed_lease_contended;
             assert (
@@ -691,10 +751,11 @@ namespace AskTheModel.Tests {
             assert (!sealed_lease_contended);
             assert (sealed_lease_fd >= 0);
 
-            ConversationGrounding sealed_grounding =
-                yield sealed_service.prepare_conversation_grounding (
-                    sealed_selection
-                );
+            {
+                ConversationGrounding sealed_grounding =
+                    yield sealed_service.prepare_conversation_grounding (
+                        sealed_selection
+                    );
 
             RepositoryNative.release_mutation_lease (
                 sealed_lease_fd
@@ -761,9 +822,10 @@ namespace AskTheModel.Tests {
             assert (
                 sealed_grounding.repository_generation_id () == 2
             );
-            assert (
-                pinned_session.repository_generation_id () == 2
-            );
+                assert (
+                    pinned_session.repository_generation_id () == 2
+                );
+            }
 
             string unavailable_sha =
                 "7777777777777777777777777777777777777777";
@@ -788,11 +850,12 @@ namespace AskTheModel.Tests {
             }
             assert (active_generation_missing_rejected);
 
-            ConversationGrounding restored_historical =
-                yield sealed_service.prepare_conversation_grounding_at_generation (
-                    sealed_selection,
-                    2
-                );
+            {
+                ConversationGrounding restored_historical =
+                    yield sealed_service.prepare_conversation_grounding_at_generation (
+                        sealed_selection,
+                        2
+                    );
             assert (restored_historical.is_frozen ());
             assert (
                 restored_historical.repository_count () == 1
@@ -829,9 +892,10 @@ namespace AskTheModel.Tests {
                 new ControlRepositoryStateStore (
                     sealed_state_root
                 );
-            assert (
-                after_historical_restore.repository_generation_id == 4
-            );
+                assert (
+                    after_historical_restore.repository_generation_id == 4
+                );
+            }
 
             bool missing_generation_rejected = false;
             try {

@@ -141,13 +141,14 @@ def main() -> int:
         method,
         "bool optimized_operation =\n"
         "                optimization_mode_snapshot ();",
-        "optimization gate",
+        "operation-level optimization snapshot",
     )
     acquire = require(
         method,
-        "RepositoryGenerationLease.\n"
-        "                            acquire_shared (",
-        "shared generation lease",
+        "RepositoryGenerationLease lease =\n"
+        "                    RepositoryGenerationLease.\n"
+        "                        acquire_shared (",
+        "mode-independent shared generation lease",
     )
     attach = require(
         method,
@@ -170,9 +171,13 @@ def main() -> int:
         acquire < attach < load < prepare
     ):
         fail(
-            "generation lease must be gated after zero/positive checks "
-            "and held before generation/snapshot/index use"
+            "generation lease must be acquired for every positive generation "
+            "before generation/snapshot/index use"
         )
+
+    between_snapshot_and_acquire = method[snapshot:acquire]
+    if "if (optimized_operation)" in between_snapshot_and_acquire:
+        fail("B2 shared generation lease must not remain Optimizations-gated")
 
     if "try_acquire_mutation_lease" in method:
         fail(
@@ -238,7 +243,7 @@ def main() -> int:
 
     print(
         "generation lease wiring validation passed: "
-        "default-OFF gate + SH lifetime + no-upgrade lock order"
+        "mode-independent SH lifetime + no-upgrade lock order"
     )
     return 0
 
