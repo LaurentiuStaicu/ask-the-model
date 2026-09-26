@@ -845,6 +845,148 @@ test_durable_only_reread_ignores_owned_b2_exclusive () {
     }
 }
 
+private static void
+test_orchestrator_no_candidate_is_noop () {
+    const string ACTIVE_SHA =
+        "dddddddddddddddddddddddddddddddddddddddd";
+
+    string root = new_temp_root ();
+
+    try {
+        publish_generation_one (
+            root,
+            ACTIVE_SHA
+        );
+        create_snapshot_directory (
+            root,
+            ACTIVE_SHA
+        );
+
+        AskTheModel.ConversationPersistenceStore conversations =
+            conversation_store_for (
+                root
+            );
+
+        AskTheModel.RepositoryGcIsolationResult result =
+            AskTheModel.RepositoryGcIsolationOrchestrator.
+                isolate_one (
+                    true,
+                    root,
+                    root,
+                    control_path_for (root),
+                    conversations
+                );
+
+        assert (
+            result.outcome ==
+            AskTheModel.RepositoryGcIsolationOutcome.NO_CANDIDATE
+        );
+        assert (
+            FileUtils.test (
+                snapshot_path_for (
+                    root,
+                    ACTIVE_SHA
+                ),
+                FileTest.IS_DIR
+            )
+        );
+        assert (
+            !FileUtils.test (
+                Path.build_filename (
+                    root,
+                    "Repositories",
+                    ".trash"
+                ),
+                FileTest.EXISTS
+            )
+        );
+    } catch (Error error) {
+        critical ("%s", error.message);
+        assert_not_reached ();
+    } finally {
+        reset_hook ();
+        remove_tree_best_effort (root);
+    }
+}
+
+private static void
+test_orphan_without_generation_reference_is_isolated () {
+    const string ORPHAN_SHA =
+        "1111111111111111111111111111111111111111";
+    const string ACTIVE_SHA =
+        "eeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeee";
+
+    string root = new_temp_root ();
+
+    try {
+        publish_generation_one (
+            root,
+            ACTIVE_SHA
+        );
+        create_snapshot_directory (
+            root,
+            ACTIVE_SHA
+        );
+        create_snapshot_directory (
+            root,
+            ORPHAN_SHA
+        );
+
+        AskTheModel.ConversationPersistenceStore conversations =
+            conversation_store_for (
+                root
+            );
+
+        AskTheModel.RepositoryGcIsolationResult result =
+            AskTheModel.RepositoryGcIsolationOrchestrator.
+                isolate_one (
+                    true,
+                    root,
+                    root,
+                    control_path_for (root),
+                    conversations
+                );
+
+        assert (
+            result.outcome ==
+            AskTheModel.RepositoryGcIsolationOutcome.ISOLATED
+        );
+        assert (result.repository_id == "ewd");
+        assert (result.snapshot_sha == ORPHAN_SHA);
+        assert (result.trash_path != null);
+        assert (
+            !FileUtils.test (
+                snapshot_path_for (
+                    root,
+                    ORPHAN_SHA
+                ),
+                FileTest.EXISTS
+            )
+        );
+        assert (
+            FileUtils.test (
+                snapshot_path_for (
+                    root,
+                    ACTIVE_SHA
+                ),
+                FileTest.IS_DIR
+            )
+        );
+        assert (
+            FileUtils.test (
+                result.trash_path,
+                FileTest.IS_DIR
+            )
+        );
+    } catch (Error error) {
+        critical ("%s", error.message);
+        assert_not_reached ();
+    } finally {
+        reset_hook ();
+        remove_tree_best_effort (root);
+    }
+}
+
 public static int
 main (string[] args) {
     Test.init (ref args);
@@ -856,6 +998,14 @@ main (string[] args) {
     Test.add_func (
         "/repository-gc-i6/b0-contention-noop",
         test_orchestrator_b0_contention_is_noop
+    );
+    Test.add_func (
+        "/repository-gc-i6/no-candidate-noop",
+        test_orchestrator_no_candidate_is_noop
+    );
+    Test.add_func (
+        "/repository-gc-i6/orphan-zero-generation-reference",
+        test_orphan_without_generation_reference_is_isolated
     );
     Test.add_func (
         "/repository-gc-i6/unrooted-historical-isolated",
