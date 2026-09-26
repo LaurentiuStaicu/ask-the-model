@@ -263,7 +263,7 @@ def main() -> int:
         "if (optimized_operation &&\n"
         "                            archive_path != null)",
         "optimized_operation,\n"
-        "                            optimized_operation",
+        "                                optimized_operation",
     ):
         require_marker(
             download,
