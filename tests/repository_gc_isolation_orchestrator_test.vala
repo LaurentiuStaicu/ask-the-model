@@ -10,7 +10,7 @@ private enum GcHookMode {
 private static GcHookMode hook_mode = GcHookMode.NONE;
 private static string? hook_state_root = null;
 private static int64 hook_generation_id = 0;
-private static string hook_repository_version = "0.1.0";
+private static string? hook_repository_version = null;
 private static int hook_shared_fd = -1;
 private static bool hook_shared_blocked = false;
 private static bool hook_action_completed = false;
@@ -288,7 +288,7 @@ orchestrator_test_hook (
             {
                 new AskTheModel.ConversationPersistenceRepository (
                     candidate.repository_id,
-                    hook_repository_version,
+                    hook_repository_version ?? "0.1.0",
                     candidate.snapshot_sha
                 )
             }
