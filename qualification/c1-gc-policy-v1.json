@@ -91,9 +91,10 @@
   },
   "implementation_state": {
     "policy_selected": true,
-    "dormant_orchestrator_implemented": false,
+    "dormant_orchestrator_implemented": true,
+    "orchestrator_race_qualification_complete": true,
     "runtime_caller_present": false,
     "destructive_gc_authorized": false,
-    "next_required_slice": "IMPLEMENT_DORMANT_ISOLATION_ORCHESTRATOR_AND_RACE_QUALIFICATION"
+    "next_required_slice": "SELECT_RUNTIME_ISOLATION_TRIGGER_POLICY"
   }
 }

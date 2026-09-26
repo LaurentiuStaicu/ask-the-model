@@ -1593,6 +1593,38 @@ The post-exclusion durable-root reread closes the new-conversation-root race bec
 
 P1 is policy-only. `destructive_gc_authorized=false`, no `RepositoryLifecycleService` caller is permitted, and I5 purge remains a distinct later phase. No age threshold, automatic ENOSPC GC, conversation-delete cascade, quarantine purge, retrieval-index eviction or Control DB generation pruning is selected here.
 
+### OPT-C1-I6 dormant isolation orchestrator
+
+I6 implements the P1 isolation sequence as a dormant, testable orchestrator without adding any `RepositoryLifecycleService` caller or authorizing destructive runtime GC.
+
+`RepositoryGcIsolationOrchestrator.isolate_one()` accepts the operation-level Optimizations snapshot. OFF returns `NOT_ENABLED` before any lease or filesystem mutation. ON:
+
+1. acquires the authority-wide B0 mutation lease exclusively;
+2. rebuilds fresh durable + live protected roots and discovers the first deterministic unprotected candidate;
+3. enumerates every positive COMPLETE Control DB generation whose immutable repository row references that exact repository/SHA and sorts IDs ascending;
+4. acquires B2 exclusive leases in that order; contention releases already-held exclusions and skips the candidate;
+5. rereads persisted roots only, without running the live B2 probe while GC already owns B2 exclusions;
+6. skips if a durable root appeared;
+7. calls the qualified I4 no-follow same-filesystem isolate-to-trash primitive while B2 exclusions and B0 remain held;
+8. releases B2 exclusions in reverse acquisition order, then B0.
+
+The post-exclusion reread uses `RepositoryGcDurableRootCollector.collect_durable_only()`. This split is required because the ordinary I2 collector also probes B2 exclusive leases; opening another descriptor and probing a lock already held by the same process can report contention under Linux `flock()`, which would make GC misclassify its own exclusion as live use.
+
+The deterministic race suite qualifies:
+
+- Optimizations OFF performs no GC work;
+- B0 contention produces a no-op/busy outcome;
+- an unrooted historical snapshot can be isolated while the active snapshot remains;
+- a shared B2 acquired after candidate selection blocks the later GC exclusive;
+- a durable conversation row that appears after candidate selection is detected by the post-exclusion reread;
+- while GC owns B2 exclusive, a new shared reader is blocked;
+- partial multi-generation exclusions are released after later contention;
+- durable-only reread works while the same process owns the relevant B2 exclusive.
+
+Native-contract inconsistencies remain fail-closed: a contended B0/B2 result must never also return an owned descriptor. Candidate scanning stays deterministic and repair-fail-closed, and I4 performs the final exact no-follow source revalidation immediately before rename.
+
+I6 remains dormant. `destructive_gc_authorized=false`, there is no runtime caller, I5 purge is not invoked, no ENOSPC trigger is selected, and conversation deletion does not trigger synchronous collection. The next reviewed slice is policy for whether/when the dormant isolation pass may be called at runtime; purge remains a separate phase.
+
 ### Recovery fault qualification
 
 The OPT-A0 recovery harness is test-only. Native checkpoint calls compile to no-ops in the production application; only the dedicated recovery helper is built with `ATM_TEST_FAULT_INJECTION`.

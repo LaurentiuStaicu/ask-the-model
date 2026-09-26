@@ -55,6 +55,12 @@ def main() -> int:
     purge = (
         ROOT / "src" / "repository_gc_purge.c"
     ).read_text(encoding="utf-8")
+    orchestrator = (
+        ROOT / "src" / "RepositoryGcIsolationOrchestrator.vala"
+    ).read_text(encoding="utf-8")
+    meson = (
+        ROOT / "meson.build"
+    ).read_text(encoding="utf-8")
 
     require_equal(policy.get("schema_version"), 1, "schema version")
     require_equal(
@@ -187,11 +193,11 @@ def main() -> int:
         implementation,
         {
             "policy_selected": True,
-            "dormant_orchestrator_implemented": False,
+            "dormant_orchestrator_implemented": True,
+            "orchestrator_race_qualification_complete": True,
             "runtime_caller_present": False,
             "destructive_gc_authorized": False,
-            "next_required_slice":
-                "IMPLEMENT_DORMANT_ISOLATION_ORCHESTRATOR_AND_RACE_QUALIFICATION",
+            "next_required_slice": "SELECT_RUNTIME_ISOLATION_TRIGGER_POLICY",
         },
         "implementation state",
     )
@@ -285,20 +291,63 @@ def main() -> int:
     ):
         require_marker(purge, marker, "I5 purge primitive")
 
-    # P1 is policy-only: no destructive lifecycle activation is permitted.
+    # I6 is implemented but remains dormant. Lock and revalidation order are
+    # structural invariants in addition to the native/Valac race tests.
+    ordered_orchestrator_markers = [
+        "try_acquire_mutation_lease (",
+        "RepositoryGcDurableRootCollector.\n                        collect (",
+        "RepositoryGcCandidateDiscovery.\n                        discover (",
+        "referencing_generations (",
+        "try_acquire_generation_lease_exclusive (",
+        "\"after-b2-exclusions\"",
+        "RepositoryGcDurableRootCollector.\n                        collect_durable_only (",
+        "durable_roots.protects_snapshot (",
+        "gc_isolate_snapshot_to_trash (",
+    ]
+    previous = -1
+    for marker in ordered_orchestrator_markers:
+        current = require_marker(
+            orchestrator,
+            marker,
+            "I6 isolation ordering",
+        )
+        if current <= previous:
+            fail(f"I6 isolation ordering drifted at marker: {marker}")
+        previous = current
+
+    for marker in (
+        "sort_generation_ids_ascending (",
+        "release_generation_exclusions (",
+        "RepositoryGcIsolationOutcome.B2_CONTENDED",
+        "Contended B2 exclusion unexpectedly returned an owned file descriptor.",
+        "RepositoryGcIsolationOutcome.DURABLE_ROOT_APPEARED",
+    ):
+        require_marker(orchestrator, marker, "I6 race closure")
+
+    if "gc_purge" in orchestrator or "purge_trash" in orchestrator:
+        fail("I6 orchestrator must not invoke phase-2 purge")
+
+    for marker in (
+        "'src/RepositoryGcIsolationOrchestrator.vala'",
+        "'tests/repository_gc_isolation_orchestrator_test.vala'",
+        "'repository-gc-isolation-orchestrator'",
+    ):
+        require_marker(meson, marker, "I6 Meson qualification wiring")
+
+    # I6 remains dormant: lifecycle activation and phase-2 purge are forbidden.
     for marker in (
         "RepositoryGcCandidateDiscovery",
         "atm_repository_gc_isolate_snapshot_to_trash",
         "atm_repository_gc_purge_trash_entry",
-        "RepositoryGcOrchestrator",
+        "RepositoryGcIsolationOrchestrator",
     ):
         if marker in lifecycle:
             fail(f"P1 introduced destructive lifecycle marker: {marker}")
 
     print(
-        "C1-P1 policy validation passed: B0 -> all relevant B2 EX -> "
-        "post-exclusion durable-root reread -> exact I4 isolation; "
-        "purge separate; runtime still unwired"
+        "C1-I6 policy validation passed: B0 -> all relevant B2 EX -> "
+        "durable-only post-exclusion reread -> exact I4 isolation; "
+        "race qualification complete; purge separate; runtime still unwired"
     )
     return 0
 
