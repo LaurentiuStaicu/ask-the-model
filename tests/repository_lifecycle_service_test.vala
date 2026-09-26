@@ -751,6 +751,8 @@ namespace AskTheModel.Tests {
             assert (!sealed_lease_contended);
             assert (sealed_lease_fd >= 0);
 
+            ControlRepositoryStateStore advancing_writer;
+
             {
                 ConversationGrounding sealed_grounding =
                     yield sealed_service.prepare_conversation_grounding (
@@ -807,7 +809,7 @@ namespace AskTheModel.Tests {
                 session_pin.snapshot_sha == sealed_sha
             );
 
-            var advancing_writer =
+            advancing_writer =
                 new ControlRepositoryStateStore (
                     sealed_state_root
                 );
