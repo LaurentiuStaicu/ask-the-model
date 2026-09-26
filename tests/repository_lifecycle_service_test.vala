@@ -1001,6 +1001,11 @@ namespace AskTheModel.Tests {
                     sealed_state_root,
                     "repository-generation-leases"
                 );
+            string generation_zero_lock =
+                GLib.Path.build_filename (
+                    generation_lock_root,
+                    "0.lock"
+                );
             string generation_five_lock =
                 GLib.Path.build_filename (
                     generation_lock_root,
@@ -1019,7 +1024,7 @@ namespace AskTheModel.Tests {
 
             assert (
                 !GLib.FileUtils.test (
-                    generation_lock_root,
+                    generation_zero_lock,
                     GLib.FileTest.EXISTS
                 )
             );
@@ -1036,7 +1041,7 @@ namespace AskTheModel.Tests {
             );
             assert (
                 !GLib.FileUtils.test (
-                    generation_lock_root,
+                    generation_zero_lock,
                     GLib.FileTest.EXISTS
                 )
             );
