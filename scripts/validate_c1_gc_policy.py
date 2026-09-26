@@ -61,6 +61,9 @@ def main() -> int:
     meson = (
         ROOT / "meson.build"
     ).read_text(encoding="utf-8")
+    orchestrator_tests = (
+        ROOT / "tests" / "repository_gc_isolation_orchestrator_test.vala"
+    ).read_text(encoding="utf-8")
 
     require_equal(policy.get("schema_version"), 1, "schema version")
     require_equal(
@@ -333,6 +336,24 @@ def main() -> int:
         "'repository-gc-isolation-orchestrator'",
     ):
         require_marker(meson, marker, "I6 Meson qualification wiring")
+
+    for marker in (
+        '"/repository-gc-i6/off-noop"',
+        '"/repository-gc-i6/b0-contention-noop"',
+        '"/repository-gc-i6/no-candidate-noop"',
+        '"/repository-gc-i6/orphan-zero-generation-reference"',
+        '"/repository-gc-i6/unrooted-historical-isolated"',
+        '"/repository-gc-i6/late-reader-blocks-exclusive"',
+        '"/repository-gc-i6/late-durable-root-reread"',
+        '"/repository-gc-i6/exclusive-blocks-new-reader"',
+        '"/repository-gc-i6/partial-exclusions-released"',
+        '"/repository-gc-i6/durable-only-under-owned-exclusive"',
+    ):
+        require_marker(
+            orchestrator_tests,
+            marker,
+            "I6 deterministic race coverage",
+        )
 
     # I6 remains dormant: lifecycle activation and phase-2 purge are forbidden.
     for marker in (
