@@ -218,6 +218,7 @@
     "enospc_or_capacity_failure_trigger_forbidden": true,
     "repository_refresh_trigger_forbidden": true,
     "loop_until_empty_forbidden": true,
-    "runtime_implementation_requires_separate_qualification": true
+    "runtime_implementation_requires_separate_qualification": true,
+    "existing_i7_isolation_seam_remains_purge_free": true
   }
 }
