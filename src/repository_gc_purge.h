@@ -11,6 +11,14 @@ typedef struct {
 } AtmRepositoryGcPurgeStats;
 
 /*
+ * Pure canonical identity predicate shared by read-only trash discovery and
+ * the destructive I5 primitive. It performs no filesystem access.
+ */
+gboolean atm_repository_gc_trash_name_is_canonical (
+    const char *trash_name
+);
+
+/*
  * Purges one already-isolated C1 trash object.
  *
  * trash_name must be the canonical basename emitted by the I4 isolation
