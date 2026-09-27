@@ -51,5 +51,6 @@ jobs:
           python3 scripts/validate_c1_closeout.py
           python3 scripts/validate_d0_retrieval_context_evidence.py
           python3 scripts/validate_d1_context_policy.py
+          python3 scripts/validate_pres06_ui.py
           python3 scripts/validate_c1_gc_policy.py
           python3 scripts/validate_presentation_performance_evidence.py

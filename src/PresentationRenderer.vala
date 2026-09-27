@@ -19,7 +19,11 @@ namespace AskTheModel {
         private const string TAG_INLINE_CODE =
             "atm-inline-code";
 
+        private Gtk.TextView view;
         private Gtk.TextBuffer buffer;
+        private Gtk.TextMark? pending_assistant_origin = null;
+        private Gtk.TextMark? pending_assistant_start = null;
+        private Gtk.Spinner? pending_spinner = null;
         private Gtk.TextTag speaker_you;
         private Gtk.TextTag speaker_assistant;
         private Gtk.TextTag heading_1;
@@ -31,9 +35,10 @@ namespace AskTheModel {
         private Gtk.TextTag inline_code;
 
         public PresentationRenderer (
-            Gtk.TextBuffer buffer
+            Gtk.TextView view
         ) {
-            this.buffer = buffer;
+            this.view = view;
+            this.buffer = view.buffer;
 
             speaker_you = ensure_tag (
                 TAG_SPEAKER_YOU
@@ -442,14 +447,9 @@ namespace AskTheModel {
             }
         }
 
-        public void append_assistant (
+        private void render_assistant (
             string text
         ) {
-            if (text.length == 0) {
-                return;
-            }
-
-            append_message_separator ();
             insert_tagged (
                 "Assistant:",
                 TAG_SPEAKER_ASSISTANT
@@ -477,6 +477,186 @@ namespace AskTheModel {
             }
 
             insert_raw (text);
+        }
+
+        private void clear_pending_assistant () {
+            Gtk.TextMark? origin_mark =
+                pending_assistant_origin;
+
+            if (origin_mark == null) {
+                return;
+            }
+
+            Gtk.Spinner? spinner =
+                pending_spinner;
+
+            if (spinner != null &&
+                spinner.get_parent () == view) {
+                view.remove (spinner);
+            }
+            pending_spinner = null;
+
+            Gtk.TextIter start;
+            Gtk.TextIter end;
+            buffer.get_iter_at_mark (
+                out start,
+                origin_mark
+            );
+            buffer.get_end_iter (out end);
+
+            if (start.compare (end) < 0) {
+                buffer.delete (
+                    ref start,
+                    ref end
+                );
+            }
+
+            buffer.delete_mark (
+                origin_mark
+            );
+            pending_assistant_origin = null;
+
+            Gtk.TextMark? start_mark =
+                pending_assistant_start;
+
+            if (start_mark != null) {
+                buffer.delete_mark (
+                    start_mark
+                );
+                pending_assistant_start = null;
+            }
+        }
+
+        public void begin_assistant_generation () {
+            clear_pending_assistant ();
+
+            Gtk.TextIter origin;
+            buffer.get_end_iter (out origin);
+            pending_assistant_origin =
+                buffer.create_mark (
+                    null,
+                    origin,
+                    true
+                );
+
+            append_message_separator ();
+
+            Gtk.TextIter assistant_start;
+            buffer.get_end_iter (
+                out assistant_start
+            );
+            pending_assistant_start =
+                buffer.create_mark (
+                    null,
+                    assistant_start,
+                    true
+                );
+
+            insert_tagged (
+                "Assistant:",
+                TAG_SPEAKER_ASSISTANT
+            );
+            insert_raw (" ");
+
+            Gtk.TextIter end;
+            buffer.get_end_iter (out end);
+            unowned Gtk.TextChildAnchor anchor =
+                buffer.create_child_anchor (
+                    end
+                );
+
+            var spinner = new Gtk.Spinner () {
+                spinning = true,
+                halign = Gtk.Align.START,
+                valign = Gtk.Align.CENTER
+            };
+            spinner.add_css_class (
+                "atm-assistant-spinner"
+            );
+            spinner.update_property (
+                Gtk.AccessibleProperty.LABEL,
+                "Assistant is generating"
+            );
+
+            view.add_child_at_anchor (
+                spinner,
+                anchor
+            );
+            pending_spinner = spinner;
+        }
+
+        public Gtk.TextMark? assistant_generation_start_mark () {
+            return pending_assistant_start;
+        }
+
+        public void append_turn_separator () {
+            Gtk.TextIter end;
+            buffer.get_end_iter (out end);
+            unowned Gtk.TextChildAnchor anchor =
+                buffer.create_child_anchor (
+                    end
+                );
+
+            var separator = new Gtk.Label (
+                "╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌"
+            ) {
+                can_target = false,
+                halign = Gtk.Align.START,
+                single_line_mode = true,
+                width_chars = 40
+            };
+            separator.add_css_class (
+                "atm-turn-separator"
+            );
+            separator.update_property (
+                Gtk.AccessibleProperty.LABEL,
+                "Conversation turn separator"
+            );
+
+            view.add_child_at_anchor (
+                separator,
+                anchor
+            );
+        }
+
+        public bool assistant_generation_pending () {
+            return pending_assistant_origin != null;
+        }
+
+        public void cancel_assistant_generation () {
+            clear_pending_assistant ();
+        }
+
+        public void complete_assistant_generation (
+            string text
+        ) {
+            bool had_pending =
+                pending_assistant_origin != null;
+
+            clear_pending_assistant ();
+
+            if (text.length == 0) {
+                return;
+            }
+
+            if (!had_pending) {
+                append_assistant (text);
+                return;
+            }
+
+            append_message_separator ();
+            render_assistant (text);
+        }
+
+        public void append_assistant (
+            string text
+        ) {
+            if (text.length == 0) {
+                return;
+            }
+
+            append_message_separator ();
+            render_assistant (text);
         }
     }
 }

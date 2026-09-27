@@ -30,9 +30,10 @@ assert_tag_at (
 
 private void
 test_rendering_projection () {
-    var buffer = new Gtk.TextBuffer (null);
+    var view = new Gtk.TextView ();
+    var buffer = view.buffer;
     var renderer =
-        new PresentationRenderer (buffer);
+        new PresentationRenderer (view);
 
     renderer.append_user (
         "Întrebare **literală**"
@@ -135,9 +136,10 @@ test_rendering_projection () {
 
 private void
 test_palette_and_theme_update () {
-    var buffer = new Gtk.TextBuffer (null);
+    var view = new Gtk.TextView ();
+    var buffer = view.buffer;
     var renderer =
-        new PresentationRenderer (buffer);
+        new PresentationRenderer (view);
 
     unowned Gtk.TextTag? you =
         buffer.tag_table.lookup (
@@ -205,6 +207,45 @@ test_palette_and_theme_update () {
     );
 }
 
+private void
+test_pending_assistant_lifecycle () {
+    var view = new Gtk.TextView ();
+    var buffer = view.buffer;
+    var renderer =
+        new PresentationRenderer (view);
+
+    renderer.append_user ("Întrebare");
+    string baseline = buffer.text;
+
+    renderer.begin_assistant_generation ();
+    assert (renderer.assistant_generation_pending ());
+    assert (
+        buffer.text ==
+        baseline + "\n\nAssistant: "
+    );
+
+    renderer.complete_assistant_generation (
+        "Răspuns final"
+    );
+    assert (!renderer.assistant_generation_pending ());
+    assert (
+        buffer.text ==
+        baseline +
+        "\n\nAssistant: Răspuns final"
+    );
+
+    string completed = buffer.text;
+
+    renderer.append_turn_separator ();
+    assert (buffer.text == completed);
+
+    renderer.begin_assistant_generation ();
+    assert (renderer.assistant_generation_pending ());
+    renderer.cancel_assistant_generation ();
+    assert (!renderer.assistant_generation_pending ());
+    assert (buffer.text == completed);
+}
+
 int
 main (string[] args) {
     Gtk.init ();
@@ -217,6 +258,10 @@ main (string[] args) {
     Test.add_func (
         "/presentation-renderer/palette",
         test_palette_and_theme_update
+    );
+    Test.add_func (
+        "/presentation-renderer/pending-assistant",
+        test_pending_assistant_lifecycle
     );
 
     return Test.run ();

@@ -2291,7 +2291,12 @@ presentation_renderer_test = executable(
 
 test(
   'presentation-renderer',
-  presentation_renderer_test
+  presentation_renderer_test,
+  env: {
+    'GTK_A11Y': 'none',
+    'GSK_RENDERER': 'cairo',
+    'LIBGL_ALWAYS_SOFTWARE': '1'
+  }
 )
 
 presentation_normalize_test = executable(

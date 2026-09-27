@@ -269,6 +269,23 @@ window.atm-window notebook.atm-chat-tabs > header.top button.atm-tab-close:hover
     background-color: rgba(27, 27, 24, 0.10);
 }
 
+/* Presentation-only generation indicator beside the pending Assistant label. */
+window.atm-window textview spinner.atm-assistant-spinner {
+    min-width: 12px;
+    min-height: 12px;
+    margin: 0 0 0 2px;
+    color: #5F605C;
+}
+
+window.atm-window textview label.atm-turn-separator {
+    margin-top: 6px;
+    margin-bottom: 4px;
+    color: #A4A5A1;
+    font-family: monospace;
+    font-size: 0.82em;
+    font-weight: 400;
+}
+
 /* Compact source references embedded below grounded answers. */
 window.atm-window textview menubutton.atm-source-ref > button {
     min-width: 0;
@@ -439,6 +456,14 @@ window.atm-window.atm-dark notebook.atm-chat-tabs > header.top button.atm-new-ch
 
 window.atm-window.atm-dark notebook.atm-chat-tabs > header.top button.atm-new-chat-tab:hover {
     background-color: #1B1B18;
+}
+
+window.atm-window.atm-dark textview spinner.atm-assistant-spinner {
+    color: #C9CAC7;
+}
+
+window.atm-window.atm-dark textview label.atm-turn-separator {
+    color: #6F706C;
 }
 
 window.atm-window.atm-dark notebook.atm-chat-tabs > header.top button.atm-tab-close {
