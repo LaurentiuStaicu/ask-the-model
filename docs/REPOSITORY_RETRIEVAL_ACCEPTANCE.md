@@ -940,13 +940,21 @@ retrieval elapsed time and context-assembly elapsed time. Timing remains
 observational because CI runner variance can dominate these local
 millisecond-scale measurements.
 
-An observational promotion flag requires both:
+An observational promotion flag requires:
 
-1. quality preserved relative to the current production control; and
+1. quality preserved relative to the current production control;
 2. a measured reduction in mean source count or mean model-visible evidence
-   bytes.
+   bytes; and
+3. membership on the non-dominated resource frontier among quality-preserving
+   candidates: no other measured candidate may use both no more mean sources
+   and no more mean evidence bytes, with at least one strictly lower.
 
-That flag is not a runtime switch and does not authorize a production policy
+This Pareto rule avoids inventing an arbitrary percentage threshold and prevents
+a negligible byte-cap saving from being treated as equally useful when another
+quality-preserving candidate achieves a strictly better context-cost profile.
+Timing is excluded from the dominance rule because CI latency is observational.
+
+The flag is not a runtime switch and does not authorize a production policy
 change. Any D1 change remains a separate review and must preserve the
 Optimizations-OFF baseline.
 
