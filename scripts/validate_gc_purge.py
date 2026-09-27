@@ -36,7 +36,7 @@ def main() -> int:
 
     for marker in (
         "atm_repository_gc_purge_trash_entry",
-        "trash_name_is_valid",
+        "atm_repository_gc_trash_name_is_canonical",
         "canonical_decimal_segment",
         "G_MAXINT64",
         "G_MAXINT",
@@ -87,6 +87,8 @@ def main() -> int:
         "never scans or deletes ordinary snapshot paths",
         "structurally validated before the first unlink",
         "never traversed",
+        "Pure canonical identity predicate shared by read-only trash discovery",
+        "atm_repository_gc_trash_name_is_canonical",
     ):
         if marker not in header:
             fail(f"public purge contract lost: {marker}")
