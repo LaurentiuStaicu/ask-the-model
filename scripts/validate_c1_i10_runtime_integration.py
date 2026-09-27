@@ -32,6 +32,7 @@ def main() -> int:
     if policy.get("status") not in {
         "selected-runtime-isolation-and-purge-wired",
         "qualified-runtime-isolation-and-purge-reclamation-evidence-complete",
+        "qualified-c1-complete",
     }:
         fail("runtime-wired policy status is not selected or monotonically qualified")
     if policy.get("scope", {}).get("runtime_purge_authorized") is not True:
