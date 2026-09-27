@@ -124,6 +124,7 @@ namespace AskTheModel {
 
         public bool prepare_turn (
             string query,
+            bool optimized_operation,
             out bool needs_clarification,
             out string? system_instructions,
             out string? evidence_text,
@@ -137,6 +138,7 @@ namespace AskTheModel {
 
             return grounding.prepare_turn (
                 query,
+                optimized_operation,
                 out needs_clarification,
                 out system_instructions,
                 out evidence_text,
