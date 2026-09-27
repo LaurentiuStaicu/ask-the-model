@@ -319,7 +319,6 @@ purge_test_hook (
         assert (reader_fd < 0);
         hook_shared_blocked = true;
         hook_action_completed = true;
-    }
         return;
     }
 
