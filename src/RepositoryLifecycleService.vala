@@ -78,6 +78,29 @@ namespace AskTheModel {
     }
 
 
+    public class RepositoryPostMutationMaintenanceResult : Object {
+        public RepositoryGcPurgeResult? purge { get; construct; }
+        public RepositoryGcIsolationResult? isolation { get; construct; }
+        public bool isolation_allowed_after_purge { get; construct; }
+        public bool isolation_attempted { get; construct; }
+
+        public RepositoryPostMutationMaintenanceResult (
+            RepositoryGcPurgeResult? purge,
+            RepositoryGcIsolationResult? isolation,
+            bool isolation_allowed_after_purge,
+            bool isolation_attempted
+        ) {
+            Object (
+                purge: purge,
+                isolation: isolation,
+                isolation_allowed_after_purge:
+                    isolation_allowed_after_purge,
+                isolation_attempted: isolation_attempted
+            );
+        }
+    }
+
+
     private class RepositoryInstallResult : Object {
         public string version { get; construct; }
         public string snapshot_path { get; construct; }
@@ -1103,6 +1126,116 @@ namespace AskTheModel {
                 failure = error.message;
                 return null;
             }
+        }
+
+
+        public RepositoryPostMutationMaintenanceResult?
+        run_post_mutation_maintenance (
+            RepositoryMutationOutcome operation,
+            ConversationPersistenceStore conversation_store,
+            out string? failure
+        ) {
+            failure = null;
+
+            if (!operation.optimized_operation ||
+                operation.changed == 0) {
+                return null;
+            }
+
+            string control_state_path =
+                GLib.Path.build_filename (
+                    state_root,
+                    "control-state.sqlite3"
+                );
+
+            RepositoryGcPurgeResult purge;
+
+            try {
+                purge =
+                    RepositoryGcPurgeOrchestrator.
+                        purge_one (
+                            operation.optimized_operation,
+                            data_root,
+                            state_root,
+                            control_state_path,
+                            conversation_store
+                        );
+            } catch (GLib.Error error) {
+                failure =
+                    "purge phase: " +
+                    error.message;
+
+                return
+                    new RepositoryPostMutationMaintenanceResult (
+                        null,
+                        null,
+                        false,
+                        false
+                    );
+            }
+
+            bool allow_isolation = false;
+
+            switch (purge.outcome) {
+            case RepositoryGcPurgeOutcome.B0_CONTENDED:
+            case RepositoryGcPurgeOutcome.NO_CANDIDATE:
+            case RepositoryGcPurgeOutcome.B2_CONTENDED:
+            case RepositoryGcPurgeOutcome.PURGED:
+                allow_isolation = true;
+                break;
+
+            case RepositoryGcPurgeOutcome.ROOTED_PRESERVED:
+                allow_isolation = false;
+                break;
+
+            case RepositoryGcPurgeOutcome.NOT_ENABLED:
+            default:
+                failure =
+                    "purge phase returned an invalid outcome for an eligible Optimizations-ON repository action";
+
+                return
+                    new RepositoryPostMutationMaintenanceResult (
+                        purge,
+                        null,
+                        false,
+                        false
+                    );
+            }
+
+            if (!allow_isolation) {
+                return
+                    new RepositoryPostMutationMaintenanceResult (
+                        purge,
+                        null,
+                        false,
+                        false
+                    );
+            }
+
+            string? isolation_failure;
+            RepositoryGcIsolationResult? isolation =
+                run_post_mutation_isolation (
+                    operation,
+                    conversation_store,
+                    out isolation_failure
+                );
+
+            if (isolation_failure != null) {
+                failure =
+                    "isolation phase: " +
+                    isolation_failure;
+            } else if (isolation == null) {
+                failure =
+                    "isolation phase returned no result for an eligible Optimizations-ON repository action";
+            }
+
+            return
+                new RepositoryPostMutationMaintenanceResult (
+                    purge,
+                    isolation,
+                    true,
+                    true
+                );
         }
 
 
