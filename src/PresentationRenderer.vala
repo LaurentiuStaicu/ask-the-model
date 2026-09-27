@@ -254,6 +254,24 @@ namespace AskTheModel {
             return text.str;
         }
 
+        public void append_completed_assistant_turn (
+            string text,
+            Gtk.Button[] source_buttons
+        ) {
+            if (text.length == 0) {
+                cancel_assistant_generation ();
+                return;
+            }
+
+            complete_assistant_generation (
+                text
+            );
+            append_sources (
+                source_buttons
+            );
+            append_turn_separator ();
+        }
+
         public void append_sources (
             Gtk.Button[] source_buttons
         ) {
