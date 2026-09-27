@@ -1693,6 +1693,22 @@ P3 keeps all hidden purge triggers forbidden: no startup purge, switch-toggle pu
 
 This slice is policy-only. `runtime_purge_authorized=false`; there is still no Vala binding for `atm_repository_gc_purge_trash_entry()`, no runtime trash discovery, no purge orchestrator and no lifecycle/Application purge caller. The next implementation slice must add read-only canonical trash discovery plus the narrow I5 Vala binding while preserving runtime authorization as false.
 
+### OPT-C1-I8 read-only trash discovery and dormant purge binding
+
+I8 implements only the discovery/binding prerequisite selected by P3. Runtime phase-2 purge remains unauthorized.
+
+The canonical trash identity predicate from I5 is now an exported pure helper used by both discovery and purge, so the two paths share the exact `<sha40>-<positive timestamp>-<positive pid>-<attempt 0..99>` grammar without duplicating it. The helper performs no filesystem access.
+
+`repository_gc_trash_scan.c` opens the qualified data root and then `Repositories/.trash/<repository_id>` component-by-component with directory descriptors and `O_NOFOLLOW`. Only fixed catalog IDs are accepted. A missing `Repositories`, `.trash` or per-repository trash directory is an empty read-only result and is never created. Direct children are inspected with `fstatat(..., AT_SYMLINK_NOFOLLOW)`; only real directories with canonical I4 identities become candidates. Malformed identities, symlinks and non-directories are repair diagnostics. The scanner does not recurse into candidate contents because I5 remains responsible for full pre-unlink tree validation.
+
+The Vala bridge scans every `RepositoryCatalog` descriptor, converts native identities into repository/SHA/trash-name candidates and fails closed on every diagnostic. Candidate selection for the later orchestrator is exposed deterministically by repository ID and then trash basename. No path returned by discovery is deletion authority by itself.
+
+`RepositoryNative.gc_purge_trash_entry()` is now a narrow binding to the already-qualified I5 primitive, but there is intentionally no lifecycle or Application caller. Structural CI requires the scanner, binding and dedicated tests while forbidding both trash discovery and purge calls from runtime surfaces.
+
+The native qualification matrix covers missing-trash read-only behavior, canonical sorted candidates with SHA extraction, malformed names, symlink candidates, a symlinked `.trash` root, exact I4 identity grammar and unknown repository IDs.
+
+After I8, `runtime_purge_authorized=false`, no purge orchestrator exists and I7 remains the only runtime C1 maintenance caller. The next slice must implement and qualify a dormant P3 purge orchestrator before any runtime authorization review.
+
 ### Recovery fault qualification
 
 The OPT-A0 recovery harness is test-only. Native checkpoint calls compile to no-ops in the production application; only the dedicated recovery helper is built with `ATM_TEST_FAULT_INJECTION`.
