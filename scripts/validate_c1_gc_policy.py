@@ -91,7 +91,7 @@ def main() -> int:
     )
     require_equal(
         policy.get("status"),
-        "qualified-runtime-isolation-and-purge-reclamation-evidence-complete",
+        "qualified-c1-complete",
         "policy status",
     )
 
@@ -513,9 +513,10 @@ def main() -> int:
             "runtime_purge_integration_implemented": True,
             "runtime_purge_integration_qualification_complete": True,
             "reclamation_space_accounting_qualification_complete": True,
+            "c1_closeout_complete": True,
             "purge_runtime_authorized": True,
             "next_required_slice": (
-                "REVIEW_C1_CLOSEOUT_AND_RESUME_D0_RETRIEVAL_REBASELINE"
+                "OPT_D0_REBASELINE_RETRIEVAL_CONTEXT_EFFICIENCY"
             ),
         },
         "implementation state",
@@ -1067,9 +1068,9 @@ def main() -> int:
         )
 
     print(
-        "C1-M1 validation passed: P5 no-growth runtime purge is qualified and "
-        "controlled tmpfs/ext4 reclamation evidence is complete; no production "
-        "reclaim threshold or hidden destructive trigger was added"
+        "C1-P6 validation passed: C1 runtime and reclamation qualification "
+        "remain intact, closeout is complete, and the next backend workstream "
+        "is D0 retrieval/context rebaseline"
     )
     return 0
 
