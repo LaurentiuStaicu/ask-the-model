@@ -909,6 +909,47 @@ provenance/traceability and the required evidence visible to the model.
 Retrieval latency is reported but is not initially gated because CI runner
 variance can dominate millisecond-scale local SQLite measurements.
 
+### OPT-D0 post-v0.5.0 rebaseline
+
+D0 is measurement-only and must not change `src/retrieval_policy.h` or
+application runtime behavior.
+
+The D0 workflow first validates the current production control directly from the
+shared production constants. The control is valid only when it remains:
+
+- 6 ranked results per repository;
+- at most 12 model-visible sources;
+- 32 KiB model-visible context budget;
+- green on the existing frozen retrieval/provenance gates.
+
+Candidate execution is fail-fast behind that control validation. The current
+candidate matrix measures:
+
+- 5 ranked results per repository with production source/byte caps;
+- source caps 8, 7, 6, 5, 4 and 3 with production results/byte caps;
+- 16 KiB context bytes with production results/source caps;
+- the historical compact 5-results / 8-sources / 16-KiB combination.
+
+The summary compares each candidate topic-by-topic against the production
+control for exact-ID@1, nDCG@5 and required-evidence context recall. A
+candidate with any unexplained negative topic-level delta is not
+observationally promotion-eligible even when aggregate gates remain green.
+
+The D0 artifact also records model-visible source count, evidence bytes,
+retrieval elapsed time and context-assembly elapsed time. Timing remains
+observational because CI runner variance can dominate these local
+millisecond-scale measurements.
+
+An observational promotion flag requires both:
+
+1. quality preserved relative to the current production control; and
+2. a measured reduction in mean source count or mean model-visible evidence
+   bytes.
+
+That flag is not a runtime switch and does not authorize a production policy
+change. Any D1 change remains a separate review and must preserve the
+Optimizations-OFF baseline.
+
 ### Pass condition
 
 The frozen R5 benchmark remains unchanged and continues to pass its existing
