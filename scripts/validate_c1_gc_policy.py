@@ -61,6 +61,10 @@ def main() -> int:
     trash_scan_tests = (
         ROOT / "tests" / "repository_gc_trash_scan_test.c"
     ).read_text(encoding="utf-8")
+    trash_discovery_workflow = (
+        ROOT / ".github" / "workflows" /
+        "c1-i8-trash-discovery-qualification.yml"
+    ).read_text(encoding="utf-8")
     isolation = (
         ROOT / "src" / "repository_gc_isolation.c"
     ).read_text(encoding="utf-8")
@@ -411,6 +415,7 @@ def main() -> int:
             "runtime_purge_policy_selected": True,
             "runtime_purge_discovery_implemented": True,
             "runtime_purge_binding_implemented": True,
+            "runtime_purge_discovery_qualification_complete": True,
             "runtime_purge_orchestrator_implemented": False,
             "purge_runtime_authorized": False,
             "next_required_slice": (
@@ -816,6 +821,20 @@ def main() -> int:
             meson,
             marker,
             "I8 Meson qualification wiring",
+        )
+
+    for marker in (
+        "name: C1-I8 trash discovery qualification",
+        "Build trash discovery unit test",
+        "Run trash discovery unit test",
+        "src/repository_gc_trash_scan.c",
+        "tests/repository_gc_trash_scan_test.c",
+        "python3 scripts/validate_c1_gc_policy.py",
+    ):
+        require_marker(
+            trash_discovery_workflow,
+            marker,
+            "I8 dedicated qualification workflow",
         )
 
     for marker in (
