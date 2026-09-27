@@ -9,6 +9,10 @@ on:
       - 'src/repository_gc_purge.h'
       - 'tests/c1_reclamation_probe.c'
       - 'meson.build'
+      - 'benchmarks/c1-reclamation-v1/evidence.json'
+      - 'scripts/validate_c1_reclamation_evidence.py'
+      - 'scripts/validate_c1_gc_policy.py'
+      - 'qualification/c1-gc-policy-v1.json'
       - '.github/workflows/c1-m1-reclamation-space-accounting.yml'
   workflow_dispatch:
 
@@ -155,6 +159,13 @@ jobs:
           ' /tmp/c1-m1-evidence.json >/dev/null
 
           cat /tmp/c1-m1-evidence.json
+
+      - name: Validate committed reclamation evidence
+        shell: bash
+        run: |
+          set -euo pipefail
+          python3 scripts/validate_c1_reclamation_evidence.py
+          python3 scripts/validate_c1_gc_policy.py
 
       - name: Upload reclamation evidence
         uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02
