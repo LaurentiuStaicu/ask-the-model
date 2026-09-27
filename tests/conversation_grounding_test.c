@@ -1,6 +1,7 @@
 #include "conversation_grounding.h"
 
 #include "retrieval_index_lifecycle.h"
+#include "retrieval_policy.h"
 
 #include <glib.h>
 #include <glib/gstdio.h>
