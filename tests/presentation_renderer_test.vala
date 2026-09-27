@@ -235,6 +235,9 @@ test_pending_assistant_lifecycle () {
 
     string completed = buffer.text;
 
+    renderer.append_turn_separator ();
+    assert (buffer.text == completed);
+
     renderer.begin_assistant_generation ();
     assert (renderer.assistant_generation_pending ());
     renderer.cancel_assistant_generation ();
