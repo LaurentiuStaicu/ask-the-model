@@ -1,7 +1,7 @@
 {
   "schema_version": 1,
   "policy_id": "atm-c1-snapshot-gc-orchestration-v1",
-  "status": "selected-runtime-isolation-wired-purge-policy-selected-unwired",
+  "status": "selected-runtime-isolation-wired-purge-orchestrator-dormant",
   "scope": {
     "supported_storage": "qualified local Linux AtM storage only",
     "optimizations_required": true,
@@ -20,7 +20,8 @@
     "candidate_discovery": "OPT-C1-I3/I3a",
     "isolation_primitive": "OPT-C1-I4",
     "purge_primitive": "OPT-C1-I5",
-    "a1_namespace_durability": "qualification/durability-policy-v1.json"
+    "a1_namespace_durability": "qualification/durability-policy-v1.json",
+    "purge_orchestrator": "OPT-C1-I9"
   },
   "candidate_status": {
     "pre_b0_candidate_list": "ADVISORY_ONLY",
@@ -104,10 +105,11 @@
     "destructive_gc_authorized": true,
     "runtime_purge_policy_selected": true,
     "runtime_purge_discovery_implemented": true,
-    "runtime_purge_orchestrator_implemented": false,
+    "runtime_purge_orchestrator_implemented": true,
     "purge_runtime_authorized": false,
-    "next_required_slice": "IMPLEMENT_DORMANT_PURGE_ORCHESTRATOR_AND_RACE_QUALIFICATION",
-    "runtime_purge_binding_available": true
+    "next_required_slice": "REVIEW_RUNTIME_PURGE_WIRING_AND_PHASE_ORDER",
+    "runtime_purge_binding_available": true,
+    "runtime_purge_orchestrator_race_qualification_complete": true
   },
   "runtime_isolation_trigger_policy": {
     "selected": "POST_SUCCESSFUL_CHANGED_REPOSITORY_ACTION",
@@ -177,5 +179,33 @@
     "repair_or_internal_failure": "DIAGNOSTIC_BLOCK_SAME_ACTION_ISOLATION_PHASE",
     "repository_action_outcome_remains_success": true,
     "runtime_authorized": false
+  },
+  "dormant_purge_orchestrator_contract": {
+    "optimized_operation_snapshot_required": true,
+    "acquire_b0_before_candidate_selection": true,
+    "deterministic_single_candidate": true,
+    "resolve_all_complete_generations_referencing_candidate": true,
+    "sort_referencing_generation_ids_ascending": true,
+    "acquire_b2_exclusive_for_all_referencing_generations": true,
+    "reread_durable_roots_after_all_b2_exclusions": true,
+    "rooted_candidate_outcome": "ROOTED_PRESERVED",
+    "rooted_candidate_mutation": false,
+    "exact_i5_revalidation_and_purge_after_root_check": true,
+    "max_candidates_per_call": 1,
+    "loop_until_empty_forbidden": true,
+    "partial_b2_failure_releases_held_exclusions": true,
+    "b2_exclusions_held_through_i5_call": true,
+    "b0_held_through_i5_call": true,
+    "runtime_caller_present": false,
+    "runtime_authorized": false,
+    "outcomes": {
+      "NOT_ENABLED": "NOOP",
+      "B0_CONTENDED": "NOOP",
+      "NO_CANDIDATE": "NOOP",
+      "B2_CONTENDED": "NOOP_PRESERVE_TRASH",
+      "ROOTED_PRESERVED": "NOOP_PRESERVE_TRASH",
+      "PURGED": "ONE_CANONICAL_TRASH_ENTRY_REMOVED"
+    },
+    "repair_or_i5_failure": "PROPAGATE_DIAGNOSTIC_FAIL_CLOSED"
   }
 }
