@@ -46,6 +46,9 @@ def main() -> int:
     native_tests = (
         ROOT / "tests" / "presentation_native_test.vala"
     ).read_text(encoding="utf-8")
+    citation_tests = (
+        ROOT / "tests" / "citation_labels_test.c"
+    ).read_text(encoding="utf-8")
     css = (ROOT / "data" / "style.css").read_text(encoding="utf-8")
 
     require_marker(
@@ -58,6 +61,18 @@ def main() -> int:
         "PresentationNative.to_plain_text (",
         "Presentation native bridge qualification",
     )
+
+    for marker in (
+        '"RMD claim [S2]. Repeat [S2]. "',
+        '"EWD claim [S1]. Unknown [S9] [S9]."',
+        'g_assert_cmpstr (first->label, ==, "[S2]");',
+        'g_assert_cmpstr (second->label, ==, "[S1]");',
+    ):
+        require_marker(
+            citation_tests,
+            marker,
+            "native citation first-use ordering qualification",
+        )
 
     for marker in (
         "view.copy_clipboard.connect (() => {",
