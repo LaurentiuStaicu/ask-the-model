@@ -611,8 +611,7 @@ namespace AskTheModel.Tests {
                         );
             assert (cleanup_failure == null);
             if (contended_maintenance == null ||
-                contended_maintenance.purge == null ||
-                contended_maintenance.isolation == null) {
+                contended_maintenance.purge == null) {
                 assert_not_reached ();
             }
             assert (
@@ -620,16 +619,13 @@ namespace AskTheModel.Tests {
                 RepositoryGcPurgeOutcome.B0_CONTENDED
             );
             assert (
-                contended_maintenance.
+                !contended_maintenance.
                     isolation_allowed_after_purge
             );
             assert (
-                contended_maintenance.isolation_attempted
+                !contended_maintenance.isolation_attempted
             );
-            assert (
-                contended_maintenance.isolation.outcome ==
-                RepositoryGcIsolationOutcome.B0_CONTENDED
-            );
+            assert (contended_maintenance.isolation == null);
 
             RepositoryNative.release_mutation_lease (
                 trigger_b0_fd
@@ -832,6 +828,114 @@ namespace AskTheModel.Tests {
 
             remove_tree_best_effort (
                 rooted_root
+            );
+
+            string b2_root = new_temp_root ();
+            string b2_old_sha =
+                "bcbcbcbcbcbcbcbcbcbcbcbcbcbcbcbcbcbcbcbc";
+            string b2_active_sha =
+                "bdbdbdbdbdbdbdbdbdbdbdbdbdbdbdbdbdbdbdbd";
+
+            write_state_v1 (
+                b2_root,
+                catalog[0].id,
+                b2_old_sha,
+                "0.1.0"
+            );
+            publish_control_state (
+                b2_root
+            );
+
+            var b2_state =
+                new ControlRepositoryStateStore (
+                    b2_root
+                );
+            assert (b2_state.repository_generation_id == 1);
+            b2_state.set_current (
+                catalog[0].id,
+                b2_active_sha,
+                "0.2.0"
+            );
+            assert (b2_state.repository_generation_id == 2);
+
+            string b2_trash =
+                create_gc_trash_entry (
+                    b2_root,
+                    catalog[0].id,
+                    b2_old_sha
+                );
+
+            int b2_reader_fd = -1;
+            bool b2_reader_contended = false;
+            assert (
+                RepositoryNative.
+                    try_acquire_generation_lease_shared (
+                        b2_root,
+                        1,
+                        out b2_reader_fd,
+                        out b2_reader_contended
+                    )
+            );
+            assert (!b2_reader_contended);
+            assert (b2_reader_fd >= 0);
+
+            var b2_service =
+                new RepositoryLifecycleService (
+                    b2_root,
+                    b2_root,
+                    b2_root
+                );
+            var b2_store =
+                new ConversationPersistenceStore (
+                    b2_root,
+                    GLib.Path.build_filename (
+                        b2_root,
+                        "Export"
+                    )
+                );
+
+            cleanup_failure = null;
+            RepositoryPostMutationMaintenanceResult?
+                b2_maintenance =
+                    b2_service.
+                        run_post_mutation_maintenance (
+                            new RepositoryMutationOutcome (
+                                1,
+                                true
+                            ),
+                            b2_store,
+                            out cleanup_failure
+                        );
+            if (b2_maintenance == null ||
+                b2_maintenance.purge == null) {
+                assert_not_reached ();
+            }
+            assert (cleanup_failure == null);
+            assert (
+                b2_maintenance.purge.outcome ==
+                RepositoryGcPurgeOutcome.B2_CONTENDED
+            );
+            assert (
+                !b2_maintenance.
+                    isolation_allowed_after_purge
+            );
+            assert (
+                !b2_maintenance.isolation_attempted
+            );
+            assert (b2_maintenance.isolation == null);
+            assert (
+                GLib.FileUtils.test (
+                    b2_trash,
+                    GLib.FileTest.IS_DIR
+                )
+            );
+
+            RepositoryNative.release_generation_lease (
+                b2_reader_fd
+            );
+            b2_reader_fd = -1;
+            remove_tree_best_effort (
+                b2_root
             );
 
             string purged_root = new_temp_root ();
