@@ -2737,41 +2737,36 @@ namespace AskTheModel {
             return button;
         }
 
-        private void append_grounded_answer (
+        private void append_completed_assistant_turn (
             ChatTabState state,
             string visible_answer,
-            CitationResolution resolution
+            CitationResolution? resolution = null
         ) {
-            state.presentation.complete_assistant_generation (
-                visible_answer
-            );
-
-            if (resolution.citation_count () == 0) {
-                return;
-            }
-
             Gtk.Button[] source_buttons = {};
 
-            for (
-                uint i = 0;
-                i < resolution.citation_count ();
-                i++
-            ) {
-                CitationReference? citation =
-                    resolution.citation_at (i);
+            if (resolution != null) {
+                for (
+                    uint i = 0;
+                    i < resolution.citation_count ();
+                    i++
+                ) {
+                    CitationReference? citation =
+                        resolution.citation_at (i);
 
-                if (citation == null) {
-                    continue;
+                    if (citation == null) {
+                        continue;
+                    }
+
+                    source_buttons +=
+                        build_source_reference_button (
+                            citation,
+                            i + 1
+                        );
                 }
-
-                source_buttons +=
-                    build_source_reference_button (
-                        citation,
-                        i + 1
-                    );
             }
 
-            state.presentation.append_sources (
+            state.presentation.append_completed_assistant_turn (
+                visible_answer,
                 source_buttons
             );
         }
@@ -3131,10 +3126,10 @@ namespace AskTheModel {
                     );
 
                 if (needs_clarification) {
-                    state.presentation.complete_assistant_generation (
+                    append_completed_assistant_turn (
+                        state,
                         "Please restate the question with the repository, variable, source, or topic you mean."
                     );
-                    state.presentation.append_turn_separator ();
                 } else {
                     string answer;
                     string title_answer;
@@ -3210,12 +3205,11 @@ namespace AskTheModel {
                         state.grounded_citations +=
                             citation_resolution;
 
-                        append_grounded_answer (
+                        append_completed_assistant_turn (
                             state,
                             visible_answer,
                             citation_resolution
                         );
-                        state.presentation.append_turn_separator ();
                         assistant_stream_started = true;
                         title_answer = visible_answer;
                     } else {
@@ -3243,10 +3237,10 @@ namespace AskTheModel {
                         title_answer = answer;
 
                         if (answer.length > 0) {
-                            state.presentation.complete_assistant_generation (
+                            append_completed_assistant_turn (
+                                state,
                                 answer
                             );
-                            state.presentation.append_turn_separator ();
                             assistant_stream_started = true;
                         } else {
                             state.presentation.cancel_assistant_generation ();
@@ -3631,7 +3625,7 @@ namespace AskTheModel {
                             message
                         );
 
-                    append_grounded_answer (
+                    append_completed_assistant_turn (
                         state,
                         message.display_content,
                         resolution
@@ -3642,7 +3636,8 @@ namespace AskTheModel {
                     state.grounded_citations +=
                         resolution;
                 } else {
-                    state.presentation.append_assistant (
+                    append_completed_assistant_turn (
+                        state,
                         message.display_content
                     );
                 }
