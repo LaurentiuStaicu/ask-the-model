@@ -89,6 +89,12 @@ def main() -> int:
         "policy status",
     )
 
+    require_equal(
+        policy.get("dependencies", {}).get("purge_discovery"),
+        "OPT-C1-I8a",
+        "purge discovery dependency",
+    )
+
     scope = policy.get("scope", {})
     require_equal(scope.get("optimizations_required"), True, "G0 gate")
     require_equal(
