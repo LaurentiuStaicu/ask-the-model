@@ -416,6 +416,7 @@ def main() -> int:
         "enospc_or_capacity_failure_trigger_forbidden",
         "repository_refresh_trigger_forbidden",
         "loop_until_empty_forbidden",
+        "runtime_implementation_requires_separate_qualification",
     ):
         require_equal(integration.get(key), True, f"runtime purge integration {key}")
 
