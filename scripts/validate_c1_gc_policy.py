@@ -91,7 +91,7 @@ def main() -> int:
     )
     require_equal(
         policy.get("status"),
-        "selected-runtime-isolation-wired-purge-integration-selected-unwired",
+        "selected-runtime-isolation-wired-purge-steady-state-policy-selected-unwired",
         "policy status",
     )
 
@@ -368,9 +368,14 @@ def main() -> int:
         "purge rooted-candidate handling",
     )
     require_equal(
-        purge_policy.get("no_candidate_or_contention"),
+        purge_policy.get("no_candidate"),
         "NOOP_ALLOW_EXISTING_I7_ISOLATION_PHASE",
-        "purge no-op behavior",
+        "purge empty-trash behavior",
+    )
+    require_equal(
+        purge_policy.get("contention"),
+        "NOOP_BLOCK_SAME_ACTION_ISOLATION_PHASE",
+        "purge contention behavior",
     )
     require_equal(
         purge_policy.get("repair_or_internal_failure"),
@@ -417,6 +422,9 @@ def main() -> int:
         "repository_refresh_trigger_forbidden",
         "loop_until_empty_forbidden",
         "runtime_implementation_requires_separate_qualification",
+        "existing_i7_isolation_seam_remains_purge_free",
+        "steady_state_no_growth_selected",
+        "only_purge_progress_or_empty_trash_allows_isolation",
     ):
         require_equal(integration.get(key), True, f"runtime purge integration {key}")
 
@@ -434,9 +442,9 @@ def main() -> int:
         integration.get("purge_outcome_policy"),
         {
             "NOT_ENABLED": "CONTRACT_VIOLATION_DIAGNOSTIC_BLOCK_ISOLATION",
-            "B0_CONTENDED": "ALLOW_ISOLATION",
+            "B0_CONTENDED": "NO_PURGE_PROGRESS_BLOCK_ISOLATION",
             "NO_CANDIDATE": "ALLOW_ISOLATION",
-            "B2_CONTENDED": "ALLOW_ISOLATION",
+            "B2_CONTENDED": "LIVE_PROTECTION_NO_PURGE_PROGRESS_BLOCK_ISOLATION",
             "ROOTED_PRESERVED": "PRESERVE_TRASH_BLOCK_ISOLATION",
             "PURGED": "ALLOW_ISOLATION",
         },
@@ -454,8 +462,25 @@ def main() -> int:
     )
     require_equal(
         integration.get("rooted_preserved_rationale"),
-        "DO_NOT_ACCUMULATE_NEW_TRASH_WHILE_DETERMINISTIC_HEAD_CANDIDATE_IS_DURABLY_ROOTED",
-        "rooted-trash accumulation guard",
+        "DO_NOT_ACCUMULATE_NEW_TRASH_WHILE_DETERMINISTIC_HEAD_CANDIDATE_HAS_A_PROTECTION_REASON",
+        "protected-trash accumulation guard",
+    )
+    require_equal(
+        integration.get("steady_state_trash_count_invariant"),
+        "IF_TRASH_COUNT_GT_0_ISOLATION_REQUIRES_SUCCESSFUL_PURGE",
+        "steady-state trash-count invariant",
+    )
+    require_equal(
+        integration.get("steady_state_recurrence"),
+        {
+            "NO_CANDIDATE": "T_PRE=0; T_POST<=1",
+            "PURGED": "T_POST<=T_PRE",
+            "B0_CONTENDED": "T_POST=T_PRE",
+            "B2_CONTENDED": "T_POST=T_PRE",
+            "ROOTED_PRESERVED": "T_POST=T_PRE",
+            "PURGE_ERROR_OR_NOT_ENABLED": "T_POST=T_PRE",
+        },
+        "steady-state trash recurrence",
     )
 
     implementation = policy.get("implementation_state", {})
@@ -475,9 +500,10 @@ def main() -> int:
             "runtime_purge_orchestrator_implemented": True,
             "runtime_purge_orchestrator_race_qualification_complete": True,
             "runtime_purge_integration_policy_selected": True,
+            "runtime_purge_steady_state_policy_selected": True,
             "purge_runtime_authorized": False,
             "next_required_slice": (
-                "IMPLEMENT_BOUNDED_RUNTIME_PURGE_INTEGRATION"
+                "REBASE_AND_QUALIFY_BOUNDED_RUNTIME_PURGE_INTEGRATION_WITH_NO_GROWTH_GATE"
             ),
         },
         "implementation state",
@@ -922,9 +948,9 @@ def main() -> int:
         )
 
     print(
-        "C1-P4 validation passed: bounded purge-then-isolation integration "
-        "policy selected with explicit outcome gating; runtime purge remains "
-        "unauthorized and lifecycle/Application wiring absent"
+        "C1-P5 validation passed: steady-state no-growth gate selected; "
+        "only empty trash or successful purge may permit new isolation; "
+        "runtime purge remains unauthorized pending rebased I10 qualification"
     )
     return 0
 
