@@ -1,0 +1,99 @@
+name: C1-I9 purge orchestrator qualification
+
+on:
+  pull_request:
+    paths:
+      - 'src/RepositoryGcPurgeOrchestrator.vala'
+      - 'src/RepositoryGcTrashDiscovery.vala'
+      - 'src/RepositoryGcDurableRoots.vala'
+      - 'src/RepositoryNative.vala'
+      - 'src/repository_gc_trash_scan.c'
+      - 'src/repository_gc_trash_scan.h'
+      - 'src/repository_gc_purge.c'
+      - 'src/repository_gc_purge.h'
+      - 'tests/repository_gc_purge_orchestrator_test.vala'
+      - 'scripts/validate_gc_purge_orchestrator.py'
+      - 'scripts/validate_c1_gc_policy.py'
+      - 'qualification/c1-gc-policy-v1.json'
+      - 'meson.build'
+      - '.github/workflows/c1-i9-purge-orchestrator-qualification.yml'
+  push:
+    branches:
+      - main
+    paths:
+      - 'src/RepositoryGcPurgeOrchestrator.vala'
+      - 'src/RepositoryGcTrashDiscovery.vala'
+      - 'src/RepositoryGcDurableRoots.vala'
+      - 'src/RepositoryNative.vala'
+      - 'src/repository_gc_trash_scan.c'
+      - 'src/repository_gc_trash_scan.h'
+      - 'src/repository_gc_purge.c'
+      - 'src/repository_gc_purge.h'
+      - 'tests/repository_gc_purge_orchestrator_test.vala'
+      - 'scripts/validate_gc_purge_orchestrator.py'
+      - 'scripts/validate_c1_gc_policy.py'
+      - 'qualification/c1-gc-policy-v1.json'
+      - 'meson.build'
+      - '.github/workflows/c1-i9-purge-orchestrator-qualification.yml'
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: c1-i9-purge-orchestrator-${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  qualify:
+    runs-on: ubuntu-24.04
+    timeout-minutes: 15
+
+    steps:
+      - name: Checkout AtM
+        uses: actions/checkout@v4
+
+      - name: Install build dependencies
+        shell: bash
+        run: |
+          set -euo pipefail
+          sudo apt-get update
+          sudo apt-get install -y --no-install-recommends \
+            meson \
+            ninja-build \
+            valac \
+            libglib2.0-dev \
+            libgee-0.8-dev \
+            libsoup-3.0-dev \
+            libjson-glib-dev \
+            libsqlite3-dev \
+            libyaml-dev \
+            libarchive-dev \
+            libgtk-4-dev \
+            libgranite-7-dev \
+            libmd4c-dev
+
+      - name: Configure test build
+        shell: bash
+        run: |
+          set -euo pipefail
+          meson setup /tmp/atm-c1-i9-build --buildtype=debug
+
+      - name: Compile purge orchestrator target
+        shell: bash
+        run: |
+          set -euo pipefail
+          meson compile -C /tmp/atm-c1-i9-build repository-gc-purge-orchestrator-test
+
+      - name: Run purge orchestrator race matrix
+        shell: bash
+        run: |
+          set -euo pipefail
+          meson test -C /tmp/atm-c1-i9-build repository-gc-purge-orchestrator --print-errorlogs
+
+      - name: Run structural validators
+        shell: bash
+        run: |
+          set -euo pipefail
+          python3 scripts/validate_gc_purge_orchestrator.py
+          python3 scripts/validate_c1_gc_policy.py
