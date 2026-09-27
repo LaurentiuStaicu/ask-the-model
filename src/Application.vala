@@ -1850,7 +1850,7 @@ namespace AskTheModel {
             qualify_restored_conversations.begin ();
         }
 
-        private void run_post_mutation_isolation_best_effort (
+        private void run_post_mutation_maintenance_best_effort (
             RepositoryMutationOutcome operation
         ) {
             if (!operation.optimized_operation ||
@@ -1863,39 +1863,62 @@ namespace AskTheModel {
 
             if (store == null) {
                 stderr.printf (
-                    "AtM: repository isolation maintenance skipped: conversation persistence is unavailable\n"
+                    "AtM: repository maintenance skipped: conversation persistence is unavailable\n"
                 );
                 return;
             }
 
-            string? isolation_failure;
-            RepositoryGcIsolationResult? isolation =
+            string? maintenance_failure;
+            RepositoryPostMutationMaintenanceResult? maintenance =
                 repository_lifecycle.
-                    run_post_mutation_isolation (
+                    run_post_mutation_maintenance (
                         operation,
                         store,
-                        out isolation_failure
+                        out maintenance_failure
                     );
 
-            if (isolation_failure != null) {
-                stderr.printf (
-                    "AtM: repository isolation maintenance failed after committed repository action: %s\n",
-                    isolation_failure
+            if (maintenance == null) {
+                return;
+            }
+
+            if (maintenance.purge != null) {
+                RepositoryGcPurgeResult purge =
+                    maintenance.purge;
+
+                stdout.printf (
+                    "AtM: repository purge maintenance outcome=%d repository=%s sha=%s trash=%s\n",
+                    (int) purge.outcome,
+                    purge.repository_id ?? "-",
+                    purge.snapshot_sha ?? "-",
+                    purge.trash_name ?? "-"
                 );
-                return;
             }
 
-            if (isolation == null) {
-                return;
+            if (!maintenance.isolation_allowed_after_purge) {
+                stdout.printf (
+                    "AtM: repository isolation maintenance skipped by purge outcome policy\n"
+                );
             }
 
-            stdout.printf (
-                "AtM: repository isolation maintenance outcome=%d repository=%s sha=%s trash=%s\n",
-                (int) isolation.outcome,
-                isolation.repository_id ?? "-",
-                isolation.snapshot_sha ?? "-",
-                isolation.trash_path ?? "-"
-            );
+            if (maintenance.isolation != null) {
+                RepositoryGcIsolationResult isolation =
+                    maintenance.isolation;
+
+                stdout.printf (
+                    "AtM: repository isolation maintenance outcome=%d repository=%s sha=%s trash=%s\n",
+                    (int) isolation.outcome,
+                    isolation.repository_id ?? "-",
+                    isolation.snapshot_sha ?? "-",
+                    isolation.trash_path ?? "-"
+                );
+            }
+
+            if (maintenance_failure != null) {
+                stderr.printf (
+                    "AtM: repository maintenance failed after committed repository action: %s\n",
+                    maintenance_failure
+                );
+            }
         }
 
 
@@ -1978,7 +2001,7 @@ namespace AskTheModel {
                     );
                 }
 
-                run_post_mutation_isolation_best_effort (
+                run_post_mutation_maintenance_best_effort (
                     operation
                 );
             } catch (RepositoryError error) {
