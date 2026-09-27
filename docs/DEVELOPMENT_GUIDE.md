@@ -1732,6 +1732,24 @@ The selected outcome gate is explicit:
 
 Purge and isolation retain separate B0 acquisitions. No lock is carried across the two phases; I7 therefore performs its own fresh root/candidate revalidation. All hidden triggers remain forbidden and there is no loop-until-empty or new UI. The next slice may implement exactly this lifecycle-owned composition, but runtime authorization changes only inside that separately qualified implementation.
 
+### OPT-C1-P5 steady-state no-growth gate
+
+The P4 review is tightened before runtime activation by an explicit trash-count recurrence. The key invariant is:
+
+`if trash already exists, new isolation requires a successful purge in the same qualifying action`.
+
+This closes a steady-state accumulation path discovered during the post-P4 review. Under P4, `B0_CONTENDED` or `B2_CONTENDED` allowed I7 even though I9 had reclaimed nothing. Repeated contention could therefore increase `.trash` by one object per repository action.
+
+P5 selects the conservative no-growth gate:
+
+- `NO_CANDIDATE` means the pre-isolation trash set is empty and may allow one I7 isolation, so the resulting trash count is at most one;
+- `PURGED` proves one pre-existing trash object was removed and may allow at most one I7 isolation, so the trash count cannot increase;
+- `B0_CONTENDED`, `B2_CONTENDED`, `ROOTED_PRESERVED`, unexpected `NOT_ENABLED`, and purge repair/internal failure all block same-action isolation because no purge progress occurred;
+- the already-committed repository action remains successful;
+- no new trigger, background sweep, age threshold, loop-until-empty or automatic restore is introduced.
+
+For trash count `T`, the selected recurrence is therefore `T_post <= 1` from an empty state and `T_post <= T_pre` whenever trash already exists. Runtime purge remains unauthorized until I10 is rebased to this stricter gate and requalified.
+
 ### Recovery fault qualification
 
 The OPT-A0 recovery harness is test-only. Native checkpoint calls compile to no-ops in the production application; only the dedicated recovery helper is built with `ATM_TEST_FAULT_INJECTION`.
