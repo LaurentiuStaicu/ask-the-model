@@ -1815,6 +1815,12 @@ The D1 integration test uses one deterministic six-source repository fixture:
 OFF exposes six sources, ON exposes exactly four, and citation resolution in
 both paths verifies repository and exact snapshot-SHA provenance.
 
+The terminal D1 contract is recorded in
+`qualification/d1-context-policy-v1.json`. Runtime readiness requires the
+dedicated OFF/ON integration workflow, frozen R5/D0 replay, Invariant Registry
+and Flatpak to pass together. D1 keeps immediate user rollback: switching
+Optimizations OFF returns subsequent Sends to the unchanged 12-source baseline.
+
 ### Recovery fault qualification
 
 The OPT-A0 recovery harness is test-only. Native checkpoint calls compile to no-ops in the production application; only the dedicated recovery helper is built with `ATM_TEST_FAULT_INJECTION`.
