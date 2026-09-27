@@ -43,6 +43,11 @@ namespace AskTheModel.PresentationNative {
         out Document document
     ) throws GLib.Error;
 
+    [CCode (cname = "atm_presentation_document_to_plain_text")]
+    public static string to_plain_text (
+        Document document
+    );
+
     [CCode (cname = "atm_presentation_document_is_fallback")]
     public static bool is_fallback (
         Document document

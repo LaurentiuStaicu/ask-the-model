@@ -2294,6 +2294,7 @@ test(
   presentation_renderer_test,
   env: {
     'GTK_A11Y': 'none',
+    'GTK_IM_MODULE': 'gtk-im-context-simple',
     'GSK_RENDERER': 'cairo',
     'LIBGL_ALWAYS_SOFTWARE': '1'
   }
