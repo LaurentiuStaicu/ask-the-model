@@ -58,6 +58,12 @@ def main() -> int:
     purge = (
         ROOT / "src" / "repository_gc_purge.c"
     ).read_text(encoding="utf-8")
+    trash_scan = (
+        ROOT / "src" / "repository_gc_trash_scan.c"
+    ).read_text(encoding="utf-8")
+    trash_discovery = (
+        ROOT / "src" / "RepositoryGcTrashDiscovery.vala"
+    ).read_text(encoding="utf-8")
     orchestrator = (
         ROOT / "src" / "RepositoryGcIsolationOrchestrator.vala"
     ).read_text(encoding="utf-8")
@@ -378,11 +384,12 @@ def main() -> int:
             "runtime_caller_present": True,
             "destructive_gc_authorized": True,
             "runtime_purge_policy_selected": True,
-            "runtime_purge_discovery_implemented": False,
+            "runtime_purge_discovery_implemented": True,
+            "runtime_purge_binding_available": True,
             "runtime_purge_orchestrator_implemented": False,
             "purge_runtime_authorized": False,
             "next_required_slice": (
-                "IMPLEMENT_READONLY_CANONICAL_TRASH_DISCOVERY_AND_PURGE_BINDING"
+                "IMPLEMENT_DORMANT_PURGE_ORCHESTRATOR_AND_RACE_QUALIFICATION"
             ),
         },
         "implementation state",
@@ -692,13 +699,55 @@ def main() -> int:
         if forbidden in lifecycle:
             fail(f"P3 policy-only slice must not wire phase-2 purge: {forbidden}")
 
-    for forbidden in (
-        "atm_repository_gc_purge_trash_entry",
-        "gc_purge_trash",
-        "purge_trash",
+    for marker in (
+        'cname = "atm_repository_gc_select_canonical_trash_candidate"',
+        'cheader_filename = "repository_gc_trash_scan.h"',
+        "gc_select_canonical_trash_candidate (",
+        'cname = "atm_repository_gc_purge_trash_entry"',
+        'cheader_filename = "repository_gc_purge.h"',
+        "gc_purge_trash_entry (",
     ):
-        if forbidden in repository_native:
-            fail(f"P3 must leave the I5 Vala purge binding for I8: {forbidden}")
+        require_marker(
+            repository_native,
+            marker,
+            "I8 dormant discovery/purge bridge",
+        )
+
+    for marker in (
+        "atm_repository_gc_select_canonical_trash_candidate",
+        "atm_repository_gc_trash_name_parse",
+        "candidate_precedes (",
+        "validate_trash_root_entries (",
+        "AT_SYMLINK_NOFOLLOW",
+        "O_NOFOLLOW",
+    ):
+        require_marker(
+            trash_scan,
+            marker,
+            "I8 read-only trash discovery",
+        )
+
+    for marker in (
+        "RepositoryGcTrashCandidate",
+        "RepositoryGcTrashDiscovery",
+        "gc_select_canonical_trash_candidate (",
+        "sha40_is_valid (",
+    ):
+        require_marker(
+            trash_discovery,
+            marker,
+            "I8 Vala trash discovery wrapper",
+        )
+
+    for forbidden in (
+        "gc_purge_trash_entry (",
+        "RepositoryGcTrashDiscovery",
+    ):
+        if forbidden in lifecycle:
+            fail(f"I8 discovery/binding must remain lifecycle-unwired: {forbidden}")
+
+    if "gc_purge_trash_entry (" in application:
+        fail("I8 must not add an Application purge caller")
 
     for marker in (
         "RepositoryMutationOutcome off_context =",
@@ -717,9 +766,9 @@ def main() -> int:
         )
 
     print(
-        "C1-P3 validation passed: bounded later-pass purge policy selected; "
-        "only pre-existing canonical I4 trash is eligible; no age threshold; "
-        "I5 Vala binding/orchestrator/runtime purge remain unwired"
+        "C1-I8 validation passed: canonical trash discovery and narrow I5 "
+        "Vala binding are implemented; purge orchestrator/runtime authorization "
+        "remain absent"
     )
     return 0
 
