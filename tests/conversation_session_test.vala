@@ -47,6 +47,7 @@ test_zero_scope_start_prepare_reset ()
     try {
         bool has_grounding = session.prepare_turn (
             "ordinary local chat",
+            false,
             out needs_clarification,
             out system_instructions,
             out evidence_text,
@@ -128,6 +129,7 @@ test_zero_scope_has_no_committable_grounded_turn ()
 
         bool has_grounding = session.prepare_turn (
             "ordinary local chat",
+            false,
             out needs_clarification,
             out system_instructions,
             out evidence_text,

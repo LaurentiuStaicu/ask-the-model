@@ -169,6 +169,7 @@ namespace AskTheModel {
         public static extern bool prepare_turn (
             void* state,
             string query,
+            bool optimized_operation,
             out bool has_grounding,
             out bool needs_clarification,
             out string? system_instructions,
@@ -580,6 +581,7 @@ namespace AskTheModel {
 
         public bool prepare_turn (
             string query,
+            bool optimized_operation,
             out bool needs_clarification,
             out string? system_instructions,
             out string? evidence_text,
@@ -590,6 +592,7 @@ namespace AskTheModel {
             if (!ConversationGroundingNative.prepare_turn (
                     state,
                     query,
+                    optimized_operation,
                     out has_grounding,
                     out needs_clarification,
                     out system_instructions,

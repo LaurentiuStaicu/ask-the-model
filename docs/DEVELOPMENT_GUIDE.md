@@ -1789,6 +1789,38 @@ C1 therefore closes with its original non-goals intact: no Control DB generation
 
 The next Backend Optimization workstream is OPT-D0: a measurement-only rebaseline of retrieval/context efficiency on current `main`. D0 does not change production retrieval policy; any later D1 production change remains separately gated.
 
+### OPT-D0 / D1 retrieval-context optimization
+
+D0 remeasured the frozen EWD/CBD/RMD corpus on current main and preserved the
+stable 6-results / 12-sources / 32-KiB control. Source caps 8 through 4
+preserved the measured quality baseline with zero topic-level regressions;
+source cap 3 crossed the required-evidence context-recall boundary. The
+standalone 16-KiB candidate was Pareto-dominated. Source cap 4 was the sole
+non-dominated quality-preserving frontier point, reducing mean evidence bytes
+by about 40.77% and mean model-visible source count by about 39.05%.
+
+D1 applies only that source-cap-4 choice and only behind the global
+Optimizations gate. Each Send snapshots the gate at entry, before its first
+`yield`. OFF passes the baseline 12-source cap; ON passes the qualified
+4-source cap. Results/repository stays 6 and the context-byte budget stays
+32 KiB in both modes.
+
+The operation snapshot is passed explicitly from `Application` through
+`ConversationSession` and `ConversationGrounding` into the native grounding
+function. It is not persisted, pinned to the conversation or reread from the
+GTK control below Application. A mid-Send toggle therefore affects only a later
+Send.
+
+The D1 integration test uses one deterministic six-source repository fixture:
+OFF exposes six sources, ON exposes exactly four, and citation resolution in
+both paths verifies repository and exact snapshot-SHA provenance.
+
+The terminal D1 contract is recorded in
+`qualification/d1-context-policy-v1.json`. Runtime readiness requires the
+dedicated OFF/ON integration workflow, frozen R5/D0 replay, Invariant Registry
+and Flatpak to pass together. D1 keeps immediate user rollback: switching
+Optimizations OFF returns subsequent Sends to the unchanged 12-source baseline.
+
 ### Recovery fault qualification
 
 The OPT-A0 recovery harness is test-only. Native checkpoint calls compile to no-ops in the production application; only the dedicated recovery helper is built with `ATM_TEST_FAULT_INJECTION`.

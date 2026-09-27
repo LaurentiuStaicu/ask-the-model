@@ -77,6 +77,7 @@ gboolean atm_conversation_grounding_create_retrieval_scopes (
 gboolean atm_conversation_grounding_prepare_turn (
     AtmConversationGroundingState *state,
     const char *query,
+    gboolean optimized_operation,
     gboolean *out_has_grounding,
     gboolean *out_needs_clarification,
     char **out_system_instructions,

@@ -91,6 +91,15 @@ Implemented in the repository lifecycle, index, query, ranking, normalization, s
 
 The backend preserves immutable snapshot identity and returns evidence objects rather than generated scientific conclusions. The scientific repositories remain canonical; AtM does not rewrite their state or convert AI-generated text into canonical project data.
 
+Post-v0.5.0 runtime optimizations remain subordinate to the global session-only
+Optimizations gate. For grounded Send operations, Application snapshots that
+gate before the first asynchronous boundary and passes it explicitly through
+the conversation-session/grounding boundary. The stable OFF retrieval/context
+policy remains 6 results per repository, at most 12 model-visible sources and
+32 KiB context. The qualified D1 ON path changes only the model-visible source
+cap to 4; result count, byte budget, repository scope and provenance semantics
+remain unchanged. The mode is not persisted or pinned to a conversation.
+
 ### G-S0 startup qualification and local snapshot integrity — released in v0.4.0
 
 v0.4.0 adds a non-visual startup qualification layer above the repository-grounded path introduced in v0.3.0.

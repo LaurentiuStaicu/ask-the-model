@@ -1,0 +1,103 @@
+name: D1 context policy qualification
+
+on:
+  pull_request:
+    paths:
+      - 'src/retrieval_policy.h'
+      - 'src/conversation_grounding.c'
+      - 'src/conversation_grounding.h'
+      - 'src/ConversationGrounding.vala'
+      - 'src/ConversationSession.vala'
+      - 'src/Application.vala'
+      - 'tests/conversation_grounding_test.c'
+      - 'tests/conversation_grounding_vala_test.vala'
+      - 'tests/conversation_session_test.vala'
+      - 'qualification/d1-context-policy-v1.json'
+      - 'scripts/validate_d1_context_policy.py'
+      - '.github/workflows/d1-context-policy.yml'
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: d1-context-policy-${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  qualify:
+    runs-on: ubuntu-24.04
+    timeout-minutes: 15
+
+    steps:
+      - name: Checkout AtM
+        uses: actions/checkout@v4
+
+      - name: Install native qualification dependencies
+        shell: bash
+        run: |
+          set -euo pipefail
+          sudo apt-get update
+          sudo apt-get install -y --no-install-recommends \
+            build-essential \
+            pkg-config \
+            libglib2.0-dev \
+            libglib2.0-bin \
+            libjson-glib-dev \
+            libsqlite3-dev \
+            libyaml-dev
+
+      - name: Compile D1 native grounding integration
+        shell: bash
+        run: |
+          set -euo pipefail
+
+          glib-compile-resources \
+            data/io.github.laurentiustaicu.ask_the_model.gresource.xml \
+            --sourcedir=data \
+            --generate-source \
+            --target=/tmp/atm-resources.c
+
+          CFLAGS="$(pkg-config --cflags glib-2.0 gio-2.0 json-glib-1.0 sqlite3 yaml-0.1)"
+          LIBS="$(pkg-config --libs glib-2.0 gio-2.0 json-glib-1.0 sqlite3 yaml-0.1)"
+
+          cc -std=c11 -D_GNU_SOURCE -O2 -Wall -Wextra -Werror -Isrc $CFLAGS \
+            -c tests/conversation_grounding_test.c \
+            -o /tmp/conversation-grounding-test.o
+
+          cc -std=c11 -D_GNU_SOURCE -O2 -Wall -Wextra -Isrc $CFLAGS \
+            src/cff_version.c \
+            src/repository_sources.c \
+            src/markdown_sections.c \
+            src/csv_table.c \
+            src/structured_json.c \
+            src/retrieval_index.c \
+            src/coordination_lease.c \
+            src/retrieval_index_lifecycle.c \
+            src/retrieval_query.c \
+            src/retrieval_rank.c \
+            src/retrieval_scope.c \
+            src/retrieval_normalize.c \
+            src/retrieval_router.c \
+            src/retrieval_conversation.c \
+            src/grounding_context.c \
+            src/citation_labels.c \
+            src/conversation_grounding.c \
+            /tmp/conversation-grounding-test.o \
+            /tmp/atm-resources.c \
+            $LIBS \
+            -o /tmp/conversation-grounding-test
+
+      - name: Run D1 OFF and ON grounding qualification
+        shell: bash
+        run: |
+          set -euo pipefail
+          /tmp/conversation-grounding-test \
+            -p /conversation-grounding/d1-operation-source-cap
+
+      - name: Run D1 structural and D0 evidence validators
+        shell: bash
+        run: |
+          set -euo pipefail
+          python3 scripts/validate_d0_retrieval_context_evidence.py
+          python3 scripts/validate_d1_context_policy.py

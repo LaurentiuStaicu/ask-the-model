@@ -1,6 +1,7 @@
 #include "conversation_grounding.h"
 
 #include "retrieval_index_lifecycle.h"
+#include "retrieval_policy.h"
 
 #include <glib.h>
 #include <glib/gstdio.h>
@@ -99,6 +100,28 @@ write_text (
     g_free (path);
 }
 
+static guint
+count_substring (
+    const char *text,
+    const char *needle
+)
+{
+    guint count = 0;
+    const char *cursor = text;
+    gsize needle_length = strlen (needle);
+
+    g_assert_nonnull (text);
+    g_assert_nonnull (needle);
+    g_assert_cmpuint (needle_length, >, 0);
+
+    while ((cursor = strstr (cursor, needle)) != NULL) {
+        count++;
+        cursor += needle_length;
+    }
+
+    return count;
+}
+
 static char *
 new_snapshot (
     const char *repository_id,
@@ -157,6 +180,77 @@ new_snapshot (
     );
 
     g_free (manifest);
+    return root;
+}
+
+static char *
+new_many_source_snapshot (void)
+{
+    char *root = new_temp_root (
+        "atm-conversation-d1-snapshot-XXXXXX"
+    );
+
+    write_text (
+        root,
+        ".atm/repository.json",
+        "{\n"
+        "  \"schema_version\": 1,\n"
+        "  \"repository_id\": \"ewd\",\n"
+        "  \"acronym\": \"EWD\",\n"
+        "  \"display_name\": \"Empirical World3 Dynamics\",\n"
+        "  \"version_source\": {"
+        "\"type\": \"cff\", \"path\": \"CITATION.cff\"},\n"
+        "  \"status_source\": \"SOURCE1.md\",\n"
+        "  \"required_paths\": ["
+        "\"SOURCE1.md\", \"SOURCE2.md\", \"SOURCE3.md\", "
+        "\"SOURCE4.md\", \"SOURCE5.md\", \"SOURCE6.md\"],\n"
+        "  \"retrieval\": {\n"
+        "    \"canonical\": ["
+        "\"SOURCE1.md\", \"SOURCE2.md\", \"SOURCE3.md\", "
+        "\"SOURCE4.md\", \"SOURCE5.md\", \"SOURCE6.md\"],\n"
+        "    \"structural\": [],\n"
+        "    \"evidence\": [],\n"
+        "    \"tabular\": [],\n"
+        "    \"implementation\": [],\n"
+        "    \"exclude\": []\n"
+        "  }\n"
+        "}\n"
+    );
+
+    write_text (
+        root,
+        "CITATION.cff",
+        "cff-version: 1.2.0\n"
+        "message: Cite this software.\n"
+        "title: D1 Fixture\n"
+        "version: 0.1.0\n"
+        "authors:\n"
+        "  - family-names: Test\n"
+        "    given-names: Fixture\n"
+    );
+
+    for (guint i = 1; i <= 6; i++) {
+        char *relative = g_strdup_printf (
+            "SOURCE%u.md",
+            i
+        );
+        char *contents = g_strdup_printf (
+            "# Optimization frontier source %u\n"
+            "Shared optimization frontier evidence context policy source %u.\n",
+            i,
+            i
+        );
+
+        write_text (
+            root,
+            relative,
+            contents
+        );
+
+        g_free (contents);
+        g_free (relative);
+    }
+
     return root;
 }
 
@@ -260,6 +354,7 @@ test_zero_repository_scope_can_freeze (void)
         atm_conversation_grounding_prepare_turn (
             state,
             "ordinary local chat",
+            FALSE,
             &has_grounding,
             &needs_clarification,
             &system_instructions,
@@ -448,6 +543,7 @@ test_valid_pins_are_canonical_and_frozen (void)
         atm_conversation_grounding_prepare_turn (
             state,
             "What is the current fixture status in EWD?",
+            FALSE,
             &has_grounding,
             &needs_clarification,
             &system_instructions,
@@ -524,6 +620,7 @@ test_valid_pins_are_canonical_and_frozen (void)
         atm_conversation_grounding_prepare_turn (
             state,
             "What is the current fixture status in EWD?",
+            FALSE,
             &has_grounding,
             &needs_clarification,
             &system_instructions,
@@ -597,6 +694,7 @@ test_valid_pins_are_canonical_and_frozen (void)
         atm_conversation_grounding_prepare_turn (
             state,
             "What is the current fixture status in RMD?",
+            FALSE,
             &has_grounding,
             &needs_clarification,
             &system_instructions,
@@ -968,6 +1066,7 @@ test_pinned_snapshot_ignores_newer_snapshot (void)
         atm_conversation_grounding_prepare_turn (
             state,
             "What is the current fixture status in EWD?",
+            FALSE,
             &has_grounding,
             &needs_clarification,
             &system_instructions,
@@ -1026,6 +1125,192 @@ test_pinned_snapshot_ignores_newer_snapshot (void)
     g_free (cache_root);
 }
 
+static void
+test_operation_snapshot_selects_context_source_cap (void)
+{
+    const char *sha =
+        "9999999999999999999999999999999999999999";
+    char *cache_root = new_temp_root (
+        "atm-conversation-d1-cache-XXXXXX"
+    );
+    char *root = new_many_source_snapshot ();
+    char *version = NULL;
+    char *index = ensure_index (
+        cache_root,
+        root,
+        "ewd",
+        sha,
+        &version
+    );
+    AtmConversationGroundingState *state =
+        atm_conversation_grounding_state_new ();
+    GError *error = NULL;
+
+    g_assert_true (
+        atm_conversation_grounding_add_ready_repository (
+            state,
+            "ewd",
+            version,
+            sha,
+            root,
+            index,
+            &error
+        )
+    );
+    g_assert_no_error (error);
+
+    g_assert_true (
+        atm_conversation_grounding_freeze (
+            state,
+            &error
+        )
+    );
+    g_assert_no_error (error);
+
+    gboolean has_grounding = FALSE;
+    gboolean needs_clarification = FALSE;
+    char *system_instructions = NULL;
+    char *evidence_text = NULL;
+    char *post_evidence_reminder = NULL;
+
+    g_assert_true (
+        atm_conversation_grounding_prepare_turn (
+            state,
+            "shared optimization frontier evidence context policy",
+            FALSE,
+            &has_grounding,
+            &needs_clarification,
+            &system_instructions,
+            &evidence_text,
+            &post_evidence_reminder,
+            &error
+        )
+    );
+    g_assert_no_error (error);
+    g_assert_true (has_grounding);
+    g_assert_false (needs_clarification);
+    g_assert_cmpuint (
+        count_substring (
+            evidence_text,
+            "repository_id: ewd"
+        ),
+        ==,
+        6
+    );
+    g_assert_nonnull (
+        g_strstr_len (
+            evidence_text,
+            -1,
+            "[S6]"
+        )
+    );
+
+    AtmCitationResolution *off_resolution = NULL;
+
+    g_assert_true (
+        atm_conversation_grounding_resolve_turn_citations (
+            state,
+            "OFF baseline provenance [S6].",
+            &off_resolution,
+            &error
+        )
+    );
+    g_assert_no_error (error);
+    g_assert_cmpuint (off_resolution->citations->len, ==, 1);
+
+    AtmCitationReference *off_citation =
+        g_ptr_array_index (
+            off_resolution->citations,
+            0
+        );
+
+    g_assert_cmpstr (off_citation->repository_id, ==, "ewd");
+    g_assert_cmpstr (off_citation->snapshot_sha, ==, sha);
+    atm_citation_resolution_free (off_resolution);
+
+    atm_conversation_grounding_abort_turn (state);
+    g_clear_pointer (&post_evidence_reminder, g_free);
+    g_clear_pointer (&evidence_text, g_free);
+    g_clear_pointer (&system_instructions, g_free);
+
+    has_grounding = FALSE;
+    needs_clarification = FALSE;
+
+    g_assert_true (
+        atm_conversation_grounding_prepare_turn (
+            state,
+            "shared optimization frontier evidence context policy",
+            TRUE,
+            &has_grounding,
+            &needs_clarification,
+            &system_instructions,
+            &evidence_text,
+            &post_evidence_reminder,
+            &error
+        )
+    );
+    g_assert_no_error (error);
+    g_assert_true (has_grounding);
+    g_assert_false (needs_clarification);
+    g_assert_cmpuint (
+        count_substring (
+            evidence_text,
+            "repository_id: ewd"
+        ),
+        ==,
+        ATM_OPTIMIZED_GROUNDING_MAX_SOURCES
+    );
+    g_assert_nonnull (
+        g_strstr_len (
+            evidence_text,
+            -1,
+            "[S4]"
+        )
+    );
+    g_assert_null (
+        g_strstr_len (
+            evidence_text,
+            -1,
+            "[S5]"
+        )
+    );
+
+    AtmCitationResolution *on_resolution = NULL;
+
+    g_assert_true (
+        atm_conversation_grounding_resolve_turn_citations (
+            state,
+            "ON optimized provenance [S4].",
+            &on_resolution,
+            &error
+        )
+    );
+    g_assert_no_error (error);
+    g_assert_cmpuint (on_resolution->citations->len, ==, 1);
+
+    AtmCitationReference *on_citation =
+        g_ptr_array_index (
+            on_resolution->citations,
+            0
+        );
+
+    g_assert_cmpstr (on_citation->repository_id, ==, "ewd");
+    g_assert_cmpstr (on_citation->snapshot_sha, ==, sha);
+    atm_citation_resolution_free (on_resolution);
+
+    atm_conversation_grounding_abort_turn (state);
+    g_free (post_evidence_reminder);
+    g_free (evidence_text);
+    g_free (system_instructions);
+    atm_conversation_grounding_state_free (state);
+    g_free (index);
+    g_free (version);
+    remove_tree_best_effort (root);
+    remove_tree_best_effort (cache_root);
+    g_free (root);
+    g_free (cache_root);
+}
+
 int
 main (int argc, char **argv)
 {
@@ -1054,6 +1339,10 @@ main (int argc, char **argv)
     g_test_add_func (
         "/conversation-grounding/pinned-snapshot-survives-update",
         test_pinned_snapshot_ignores_newer_snapshot
+    );
+    g_test_add_func (
+        "/conversation-grounding/d1-operation-source-cap",
+        test_operation_snapshot_selects_context_source_cap
     );
 
     return g_test_run ();

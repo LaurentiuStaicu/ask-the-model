@@ -26,6 +26,7 @@ test_zero_scope_freeze ()
     try {
         bool has_grounding = grounding.prepare_turn (
             "ordinary local chat",
+            false,
             out needs_clarification,
             out system_instructions,
             out evidence_text,
