@@ -91,7 +91,7 @@ def main() -> int:
     )
     require_equal(
         policy.get("status"),
-        "selected-runtime-isolation-wired-purge-steady-state-policy-selected-unwired",
+        "selected-runtime-isolation-and-purge-wired",
         "policy status",
     )
 
@@ -113,9 +113,13 @@ def main() -> int:
         "quarantine_purge_authorized",
         "retrieval_index_eviction_authorized",
         "control_db_generation_pruning_authorized",
-        "runtime_purge_authorized",
     ):
         require_equal(scope.get(key), False, f"scope.{key}")
+    require_equal(
+        scope.get("runtime_purge_authorized"),
+        True,
+        "bounded runtime purge authorization",
+    )
 
     require_equal(
         policy.get("isolation_protocol"),
@@ -211,7 +215,7 @@ def main() -> int:
         require_equal(two_phase.get(key), True, f"two-phase {key}")
     require_equal(
         two_phase.get("purge_runtime_authorized"),
-        False,
+        True,
         "purge runtime authorization",
     )
     require_equal(
@@ -343,9 +347,13 @@ def main() -> int:
     for key in (
         "current_action_new_isolation_eligible_for_purge",
         "age_threshold_selected",
-        "runtime_authorized",
     ):
         require_equal(purge_policy.get(key), False, f"runtime purge policy {key}")
+    require_equal(
+        purge_policy.get("runtime_authorized"),
+        True,
+        "runtime purge policy authorization",
+    )
 
     require_equal(
         purge_policy.get("max_purge_attempts_per_repository_action"),
@@ -396,7 +404,7 @@ def main() -> int:
     )
     require_equal(
         integration.get("runtime_authorized"),
-        False,
+        True,
         "runtime purge integration authorization",
     )
     for key in (
@@ -425,6 +433,7 @@ def main() -> int:
         "existing_i7_isolation_seam_remains_purge_free",
         "steady_state_no_growth_selected",
         "only_purge_progress_or_empty_trash_allows_isolation",
+        "runtime_implementation_qualified",
     ):
         require_equal(integration.get(key), True, f"runtime purge integration {key}")
 
@@ -501,9 +510,11 @@ def main() -> int:
             "runtime_purge_orchestrator_race_qualification_complete": True,
             "runtime_purge_integration_policy_selected": True,
             "runtime_purge_steady_state_policy_selected": True,
-            "purge_runtime_authorized": False,
+            "runtime_purge_integration_implemented": True,
+            "runtime_purge_integration_qualification_complete": True,
+            "purge_runtime_authorized": True,
             "next_required_slice": (
-                "REBASE_AND_QUALIFY_BOUNDED_RUNTIME_PURGE_INTEGRATION_WITH_NO_GROWTH_GATE"
+                "QUALIFY_C1_SPACE_ACCOUNTING_AND_RECLAMATION_EVIDENCE"
             ),
         },
         "implementation state",
