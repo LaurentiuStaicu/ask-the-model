@@ -1673,6 +1673,7 @@ The runtime outcomes retain I6 semantics:
 Structural CI requires the order `download_or_update_with_context -> successful repository status -> one best-effort cleanup call`, forbids a live Optimizations reread in the cleanup path, freezes the single lifecycle orchestrator call site, and forbids phase-2 purge from Application/lifecycle. Lifecycle regression tests additionally prove OFF and zero-change no-op behavior, carried-ON behavior even while the current policy object is OFF, and conversion of an internal I6 failure into diagnostics rather than an exception.
 
 After I7, runtime isolation is authorized only under this bounded trigger. Startup, switch-toggle, refresh, background/idle, conversation close/archive/delete and ENOSPC/capacity-failure triggers remain forbidden. I5 remains dormant; `.trash` retention and any later purge authorization require a separate policy review.
+
 ### OPT-C1-P3 isolated-trash retention and purge policy
 
 P3 selects the retention boundary for phase-2 purge but does not authorize a runtime purge caller. The policy deliberately avoids an arbitrary wall-clock grace period.
