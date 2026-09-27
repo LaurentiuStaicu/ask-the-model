@@ -480,13 +480,19 @@ namespace AskTheModel {
         }
 
         private void clear_pending_assistant () {
-            if (pending_assistant_origin == null) {
+            Gtk.TextMark? origin_mark =
+                pending_assistant_origin;
+
+            if (origin_mark == null) {
                 return;
             }
 
-            if (pending_spinner != null &&
-                pending_spinner.get_parent () == view) {
-                view.remove (pending_spinner);
+            Gtk.Spinner? spinner =
+                pending_spinner;
+
+            if (spinner != null &&
+                spinner.get_parent () == view) {
+                view.remove (spinner);
             }
             pending_spinner = null;
 
@@ -494,7 +500,7 @@ namespace AskTheModel {
             Gtk.TextIter end;
             buffer.get_iter_at_mark (
                 out start,
-                pending_assistant_origin
+                origin_mark
             );
             buffer.get_end_iter (out end);
 
@@ -506,13 +512,16 @@ namespace AskTheModel {
             }
 
             buffer.delete_mark (
-                pending_assistant_origin
+                origin_mark
             );
             pending_assistant_origin = null;
 
-            if (pending_assistant_start != null) {
+            Gtk.TextMark? start_mark =
+                pending_assistant_start;
+
+            if (start_mark != null) {
                 buffer.delete_mark (
-                    pending_assistant_start
+                    start_mark
                 );
                 pending_assistant_start = null;
             }
