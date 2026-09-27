@@ -11,6 +11,25 @@ typedef struct {
 } AtmRepositoryGcPurgeStats;
 
 /*
+ * Selects at most one canonical I4 trash object without mutating storage.
+ *
+ * On a safe empty/absent trash namespace the function returns TRUE and leaves
+ * all three outputs NULL. Otherwise it validates the AtM-owned trash namespace
+ * through dirfd-relative no-follow inspection and chooses deterministically by
+ * repository ID, then canonical trash basename.
+ *
+ * Unknown repository directories, noncanonical trash names, symlinks and
+ * non-directory trash objects are repair conditions and return FALSE.
+ */
+gboolean atm_repository_gc_select_canonical_trash_candidate (
+    const char *data_root,
+    char **out_repository_id,
+    char **out_snapshot_sha,
+    char **out_trash_name,
+    GError **error
+);
+
+/*
  * Purges one already-isolated C1 trash object.
  *
  * trash_name must be the canonical basename emitted by the I4 isolation
