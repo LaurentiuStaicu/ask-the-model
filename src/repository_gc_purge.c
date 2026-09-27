@@ -97,8 +97,8 @@ canonical_decimal_segment (
     return value <= maximum;
 }
 
-static gboolean
-trash_name_is_valid (
+gboolean
+atm_repository_gc_trash_name_is_canonical (
     const char *trash_name
 )
 {
@@ -897,7 +897,7 @@ atm_repository_gc_purge_trash_entry (
         !repository_id_is_known (
             repository_id
         ) ||
-        !trash_name_is_valid (
+        !atm_repository_gc_trash_name_is_canonical (
             trash_name
         )) {
         g_set_error_literal (
