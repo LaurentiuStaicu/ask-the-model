@@ -37,10 +37,19 @@ def main() -> int:
     for key in (
         "runtime_purge_integration_implemented",
         "runtime_purge_integration_qualification_complete",
+        "runtime_purge_steady_state_policy_selected",
         "purge_runtime_authorized",
     ):
         if implementation.get(key) is not True:
             fail(f"implementation state {key} is not true")
+
+    integration_policy = policy.get("runtime_purge_integration_policy", {})
+    if integration_policy.get("steady_state_no_growth_selected") is not True:
+        fail("P5 steady-state no-growth policy is not selected")
+    if integration_policy.get(
+        "only_purge_progress_or_empty_trash_allows_isolation"
+    ) is not True:
+        fail("P5 isolation gate is not selected")
 
     isolation_start = require(
         lifecycle,
@@ -80,10 +89,10 @@ def main() -> int:
     ordered = [
         "RepositoryGcPurgeOrchestrator.\n                        purge_one (",
         "switch (purge.outcome)",
-        "case RepositoryGcPurgeOutcome.B0_CONTENDED:",
         "case RepositoryGcPurgeOutcome.NO_CANDIDATE:",
-        "case RepositoryGcPurgeOutcome.B2_CONTENDED:",
         "case RepositoryGcPurgeOutcome.PURGED:",
+        "case RepositoryGcPurgeOutcome.B0_CONTENDED:",
+        "case RepositoryGcPurgeOutcome.B2_CONTENDED:",
         "case RepositoryGcPurgeOutcome.ROOTED_PRESERVED:",
         "run_post_mutation_isolation (",
     ]
@@ -140,12 +149,18 @@ def main() -> int:
     for marker in (
         "contended_maintenance =",
         "RepositoryGcPurgeOutcome.B0_CONTENDED",
+        "!contended_maintenance.\n                    isolation_allowed_after_purge",
+        "!contended_maintenance.isolation_attempted",
         "no_candidate_maintenance =",
         "RepositoryGcPurgeOutcome.NO_CANDIDATE",
         "malformed_maintenance =",
         "\"purge phase:\"",
         "rooted_maintenance =",
         "RepositoryGcPurgeOutcome.ROOTED_PRESERVED",
+        "b2_maintenance =",
+        "RepositoryGcPurgeOutcome.B2_CONTENDED",
+        "!b2_maintenance.\n                    isolation_allowed_after_purge",
+        "!b2_maintenance.isolation_attempted",
         "purged_maintenance =",
         "RepositoryGcPurgeOutcome.PURGED",
         "RepositoryGcIsolationOutcome.NO_CANDIDATE",
@@ -162,9 +177,9 @@ def main() -> int:
             fail(f"lifecycle build coverage is missing dependency: {marker}")
 
     print(
-        "C1-I10 runtime integration validation passed: purge-first outcome gate, "
+        "C1-I10 runtime integration validation passed: P5 no-growth gate, "
         "purge-free I7 sub-seam, lifecycle ownership, Application indirection, "
-        "and bounded outcome regression coverage are present"
+        "and B0/B2 contention no-growth coverage are present"
     )
     return 0
 
