@@ -70,6 +70,27 @@ namespace AskTheModel {
 
             configure_structural_tags ();
             set_dark (false);
+
+            view.copy_clipboard.connect (() => {
+                bool had_anchor = false;
+                string? semantic =
+                    selected_semantic_text (
+                        out had_anchor
+                    );
+
+                if (!had_anchor ||
+                    semantic == null) {
+                    return;
+                }
+
+                view.get_clipboard ().set_text (
+                    semantic
+                );
+                GLib.Signal.stop_emission_by_name (
+                    view,
+                    "copy-clipboard"
+                );
+            });
         }
 
         private Gtk.TextTag ensure_tag (
@@ -143,6 +164,118 @@ namespace AskTheModel {
                 inline_code.background =
                     "#EFF0ED";
             }
+        }
+
+        private string semantic_anchor_text (
+            Gtk.TextChildAnchor anchor
+        ) {
+            foreach (
+                unowned Gtk.Widget widget
+                in anchor.get_widgets ()
+            ) {
+                if (
+                    widget.has_css_class (
+                        "atm-source-ref"
+                    ) &&
+                    widget is Gtk.Button
+                ) {
+                    unowned Gtk.Button button =
+                        (Gtk.Button) widget;
+                    string? label = button.label;
+
+                    return label ?? "";
+                }
+
+                if (
+                    widget.has_css_class (
+                        "atm-assistant-spinner"
+                    ) ||
+                    widget.has_css_class (
+                        "atm-turn-separator"
+                    )
+                ) {
+                    return "";
+                }
+            }
+
+            /*
+             * Unknown presentation anchors are deliberately omitted rather
+             * than leaking the object-replacement character to clipboard.
+             */
+            return "";
+        }
+
+        internal string? selected_semantic_text (
+            out bool had_anchor
+        ) {
+            had_anchor = false;
+
+            Gtk.TextIter start;
+            Gtk.TextIter end;
+
+            if (!buffer.get_selection_bounds (
+                    out start,
+                    out end
+                )) {
+                return null;
+            }
+
+            var text =
+                new GLib.StringBuilder ();
+            Gtk.TextIter iter = start;
+
+            while (iter.compare (end) < 0) {
+                unowned Gtk.TextChildAnchor? anchor =
+                    iter.get_child_anchor ();
+
+                if (anchor != null) {
+                    had_anchor = true;
+                    text.append (
+                        semantic_anchor_text (
+                            anchor
+                        )
+                    );
+                } else {
+                    unichar character =
+                        iter.get_char ();
+
+                    if (character != 0) {
+                        text.append_unichar (
+                            character
+                        );
+                    }
+                }
+
+                if (!iter.forward_char ()) {
+                    break;
+                }
+            }
+
+            return text.str;
+        }
+
+        public unowned Gtk.TextChildAnchor
+        append_semantic_child (
+            Gtk.Widget child,
+            string css_class
+        ) {
+            child.add_css_class (
+                css_class
+            );
+
+            Gtk.TextIter end;
+            buffer.get_end_iter (out end);
+            unowned Gtk.TextChildAnchor anchor =
+                buffer.create_child_anchor (
+                    end
+                );
+
+            view.add_child_at_anchor (
+                child,
+                anchor
+            );
+
+            return anchor;
         }
 
         private void append_message_separator () {
@@ -558,29 +691,19 @@ namespace AskTheModel {
             );
             insert_raw (" ");
 
-            Gtk.TextIter end;
-            buffer.get_end_iter (out end);
-            unowned Gtk.TextChildAnchor anchor =
-                buffer.create_child_anchor (
-                    end
-                );
-
             var spinner = new Gtk.Spinner () {
                 spinning = true,
                 halign = Gtk.Align.START,
                 valign = Gtk.Align.CENTER
             };
-            spinner.add_css_class (
-                "atm-assistant-spinner"
-            );
             spinner.update_property (
                 Gtk.AccessibleProperty.LABEL,
                 "Assistant is generating"
             );
 
-            view.add_child_at_anchor (
+            append_semantic_child (
                 spinner,
-                anchor
+                "atm-assistant-spinner"
             );
             pending_spinner = spinner;
         }
@@ -590,13 +713,6 @@ namespace AskTheModel {
         }
 
         public void append_turn_separator () {
-            Gtk.TextIter end;
-            buffer.get_end_iter (out end);
-            unowned Gtk.TextChildAnchor anchor =
-                buffer.create_child_anchor (
-                    end
-                );
-
             var separator = new Gtk.Label (
                 "╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌"
             ) {
@@ -605,17 +721,14 @@ namespace AskTheModel {
                 single_line_mode = true,
                 width_chars = 40
             };
-            separator.add_css_class (
-                "atm-turn-separator"
-            );
             separator.update_property (
                 Gtk.AccessibleProperty.LABEL,
                 "Conversation turn separator"
             );
 
-            view.add_child_at_anchor (
+            append_semantic_child (
                 separator,
-                anchor
+                "atm-turn-separator"
             );
         }
 
