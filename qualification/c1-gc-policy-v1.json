@@ -1,7 +1,7 @@
 {
   "schema_version": 1,
   "policy_id": "atm-c1-snapshot-gc-orchestration-v1",
-  "status": "selected-runtime-isolation-wired-purge-steady-state-policy-selected-unwired",
+  "status": "selected-runtime-isolation-and-purge-wired",
   "scope": {
     "supported_storage": "qualified local Linux AtM storage only",
     "optimizations_required": true,
@@ -12,7 +12,7 @@
     "retrieval_index_eviction_authorized": false,
     "control_db_generation_pruning_authorized": false,
     "runtime_isolation_authorized": true,
-    "runtime_purge_authorized": false
+    "runtime_purge_authorized": true
   },
   "dependencies": {
     "authority_wide_coordination": "qualification/c1-coordination-policy-v1.json",
@@ -80,7 +80,7 @@
     "purge_candidate_must_preexist_current_isolation_phase": true,
     "purge_phase_precedes_current_isolation_phase": true,
     "same_repository_action_may_host_distinct_purge_then_isolation_phases": true,
-    "purge_runtime_authorized": false,
+    "purge_runtime_authorized": true,
     "age_threshold_selected": false,
     "automatic_restore_from_trash": false
   },
@@ -105,12 +105,14 @@
     "runtime_purge_policy_selected": true,
     "runtime_purge_discovery_implemented": true,
     "runtime_purge_orchestrator_implemented": true,
-    "purge_runtime_authorized": false,
-    "next_required_slice": "REBASE_AND_QUALIFY_BOUNDED_RUNTIME_PURGE_INTEGRATION_WITH_NO_GROWTH_GATE",
+    "purge_runtime_authorized": true,
+    "next_required_slice": "QUALIFY_C1_SPACE_ACCOUNTING_AND_RECLAMATION_EVIDENCE",
     "runtime_purge_binding_available": true,
     "runtime_purge_orchestrator_race_qualification_complete": true,
     "runtime_purge_integration_policy_selected": true,
-    "runtime_purge_steady_state_policy_selected": true
+    "runtime_purge_steady_state_policy_selected": true,
+    "runtime_purge_integration_implemented": true,
+    "runtime_purge_integration_qualification_complete": true
   },
   "runtime_isolation_trigger_policy": {
     "selected": "POST_SUCCESSFUL_CHANGED_REPOSITORY_ACTION",
@@ -178,14 +180,14 @@
     "repository_refresh_trigger_forbidden": true,
     "repair_or_internal_failure": "DIAGNOSTIC_BLOCK_SAME_ACTION_ISOLATION_PHASE",
     "repository_action_outcome_remains_success": true,
-    "runtime_authorized": false,
+    "runtime_authorized": true,
     "no_candidate": "NOOP_ALLOW_EXISTING_I7_ISOLATION_PHASE",
     "contention": "NOOP_BLOCK_SAME_ACTION_ISOLATION_PHASE"
   },
   "runtime_purge_integration_policy": {
     "selected": "POST_SUCCESSFUL_CHANGED_REPOSITORY_ACTION_PURGE_THEN_ISOLATE",
     "policy_selected": true,
-    "runtime_authorized": false,
+    "runtime_authorized": true,
     "operation_snapshot_required": true,
     "optimizations_snapshot_must_be_on": true,
     "repository_action_must_succeed": true,
@@ -232,6 +234,7 @@
       "ROOTED_PRESERVED": "T_POST=T_PRE",
       "PURGE_ERROR_OR_NOT_ENABLED": "T_POST=T_PRE"
     },
-    "only_purge_progress_or_empty_trash_allows_isolation": true
+    "only_purge_progress_or_empty_trash_allows_isolation": true,
+    "runtime_implementation_qualified": true
   }
 }

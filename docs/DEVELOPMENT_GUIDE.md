@@ -1750,6 +1750,20 @@ P5 selects the conservative no-growth gate:
 
 For trash count `T`, the selected recurrence is therefore `T_post <= 1` from an empty state and `T_post <= T_pre` whenever trash already exists. Runtime purge remains unauthorized until I10 is rebased to this stricter gate and requalified.
 
+### OPT-C1-I10 bounded runtime purge integration
+
+I10 wires the P5-qualified maintenance composition into `RepositoryLifecycleService` and advances bounded runtime purge authorization for Optimizations-ON repository actions only.
+
+After a successful changed Download/Update has committed and released its writer B0 lease, the lifecycle maintenance seam attempts at most one I9 purge. It permits at most one existing I7 isolation only when the purge result is either `NO_CANDIDATE` (trash was empty) or `PURGED` (one pre-existing trash object was removed). `B0_CONTENDED`, `B2_CONTENDED`, `ROOTED_PRESERVED`, unexpected `NOT_ENABLED`, and purge repair/internal failures all block same-action isolation because no purge progress occurred.
+
+This preserves the P5 recurrence: from empty trash, at most one recovery object may be staged; once trash exists, a qualifying action cannot increase the trash count. B0 and B2 contention are explicitly tested at the lifecycle integration boundary, in addition to malformed-trash, rooted-trash, empty-trash and successful-purge scenarios.
+
+The I7 isolation method itself remains purge-free and performs its own fresh B0/root/candidate revalidation. Application calls only the lifecycle maintenance seam and does not invoke I9, I7 or I5 directly. The operation-level Optimizations snapshot is carried from the successful repository action; the live switch is not reread after the action.
+
+Maintenance failures remain diagnostic-only relative to the already-committed repository action. Hidden startup, toggle, background, refresh, conversation lifecycle and ENOSPC triggers remain forbidden, as do loop-until-empty, quarantine purge, retrieval-index eviction and Control DB generation pruning.
+
+I10 does not close C1. The next qualification gate is space-accounting and reclamation evidence: measure logical and allocated bytes for protected/candidate/trash objects and demonstrate the actual storage benefit of successful purge without conflating apparent file size with allocated/reclaimed blocks.
+
 ### Recovery fault qualification
 
 The OPT-A0 recovery harness is test-only. Native checkpoint calls compile to no-ops in the production application; only the dedicated recovery helper is built with `ATM_TEST_FAULT_INJECTION`.
