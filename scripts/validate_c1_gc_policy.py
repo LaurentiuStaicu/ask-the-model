@@ -76,7 +76,7 @@ def main() -> int:
     )
     require_equal(
         policy.get("status"),
-        "selected-runtime-isolation-wired-purge-unwired",
+        "selected-runtime-isolation-wired-purge-policy-selected-unwired",
         "policy status",
     )
 
@@ -202,6 +202,73 @@ def main() -> int:
         False,
         "trash restore policy",
     )
+    require_equal(
+        two_phase.get("retention_boundary_selected"),
+        True,
+        "trash retention boundary selection",
+    )
+    require_equal(
+        two_phase.get("retention_boundary"),
+        "PREEXISTING_AT_REPOSITORY_OPERATION_ENTRY",
+        "trash retention boundary",
+    )
+    for key in (
+        "same_operation_object_purge_forbidden",
+        "purge_candidate_must_be_carried_from_operation_entry",
+        "purge_before_current_operation_isolation",
+    ):
+        require_equal(two_phase.get(key), True, f"two-phase {key}")
+    require_equal(
+        two_phase.get("max_purge_attempts_per_qualifying_repository_action"),
+        1,
+        "bounded purge attempts",
+    )
+
+    purge = policy.get("runtime_purge_policy", {})
+    require_equal(
+        purge.get("selected"),
+        "POST_SUCCESSFUL_CHANGED_REPOSITORY_ACTION_PREEXISTING_TRASH_ONLY",
+        "runtime purge trigger policy",
+    )
+    require_equal(purge.get("policy_selected"), True, "purge policy selected")
+    require_equal(purge.get("runtime_authorized"), False, "purge runtime authorization")
+    for key in (
+        "optimizations_operation_snapshot_must_be_on",
+        "use_same_operation_optimization_snapshot",
+        "live_switch_recheck_for_trigger_forbidden",
+        "repository_action_must_succeed",
+        "changed_repository_count_must_be_positive",
+        "capture_exact_candidate_at_operation_entry",
+        "capture_is_readonly_advisory",
+        "eligibility_uses_pre_operation_membership_not_age",
+        "acquire_b0_before_purge",
+        "exact_i5_revalidation_required",
+        "purge_before_current_operation_isolation",
+        "newly_isolated_object_same_operation_ineligible",
+        "startup_trigger_forbidden",
+        "optimization_toggle_trigger_forbidden",
+        "background_timer_or_idle_trigger_forbidden",
+        "conversation_close_delete_archive_trigger_forbidden",
+        "enospc_or_capacity_failure_trigger_forbidden",
+        "repository_refresh_trigger_forbidden",
+        "loop_until_empty_forbidden",
+    ):
+        require_equal(purge.get(key), True, f"runtime purge policy {key}")
+    require_equal(
+        purge.get("candidate_scope"),
+        "GLOBAL_OLDEST_PRE_OPERATION_CANONICAL_I4_TRASH",
+        "purge candidate scope",
+    )
+    require_equal(
+        purge.get("age_threshold_required"),
+        False,
+        "purge age threshold requirement",
+    )
+    require_equal(
+        purge.get("max_purge_attempts_per_repository_action"),
+        1,
+        "runtime purge bound",
+    )
 
     trigger = policy.get("runtime_isolation_trigger_policy", {})
     require_equal(
@@ -295,9 +362,10 @@ def main() -> int:
             "bounded_runtime_isolation_qualification_complete": True,
             "runtime_caller_present": True,
             "destructive_gc_authorized": True,
+            "purge_policy_selected": True,
             "purge_runtime_authorized": False,
             "next_required_slice": (
-                "REVIEW_ISOLATED_TRASH_RETENTION_AND_PURGE_RUNTIME_POLICY"
+                "IMPLEMENT_AND_QUALIFY_PRE_OPERATION_TRASH_CAPTURE_AND_BOUNDED_PURGE_TRIGGER"
             ),
         },
         "implementation state",
@@ -624,9 +692,9 @@ def main() -> int:
         )
 
     print(
-        "C1-I7 validation passed: one post-successful changed repository "
-        "action isolation attempt is wired under the carried ON snapshot; "
-        "cleanup failure is diagnostic-only; purge remains unwired"
+        "C1-P3 validation passed: I7 isolation remains wired; one-operation "
+        "pre-existing-trash retention/purge policy is selected; purge runtime "
+        "remains unwired pending separate implementation qualification"
     )
     return 0
 
