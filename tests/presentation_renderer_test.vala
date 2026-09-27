@@ -257,16 +257,46 @@ test_semantic_anchor_copy_projection () {
         "Răspuns"
     );
 
-    var source = new Gtk.Button () {
-        label = "[1]",
-        has_frame = false
-    };
-    renderer.append_semantic_child (
-        source,
-        "atm-source-ref"
+    string before_sources =
+        buffer.text;
+    Gtk.Button[] no_sources = {};
+    renderer.append_sources (
+        no_sources
+    );
+    assert (
+        buffer.text ==
+        before_sources
     );
 
+    var source_1 = new Gtk.Button () {
+        label = "[1]",
+        focusable = true
+    };
+    source_1.update_property (
+        Gtk.AccessibleProperty.LABEL,
+        "Source 1"
+    );
+
+    var source_2 = new Gtk.Button () {
+        label = "[2]",
+        focusable = true
+    };
+    source_2.update_property (
+        Gtk.AccessibleProperty.LABEL,
+        "Source 2"
+    );
+
+    Gtk.Button[] sources = {
+        source_1,
+        source_2
+    };
+    renderer.append_sources (
+        sources
+    );
     renderer.append_turn_separator ();
+
+    assert (source_1.focusable);
+    assert (source_2.focusable);
 
     Gtk.TextIter start;
     Gtk.TextIter end;
@@ -287,8 +317,10 @@ test_semantic_anchor_copy_projection () {
 
     assert (had_anchor);
     assert (semantic != null);
-    assert (semantic.contains ("Assistant: Răspuns"));
-    assert (semantic.contains ("[1]"));
+    assert (
+        semantic ==
+        "Assistant: Răspuns\nSources: [1] [2]"
+    );
     assert (!semantic.contains ("\uFFFC"));
     assert (!semantic.contains ("╌"));
 }
