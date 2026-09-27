@@ -11,6 +11,21 @@ typedef struct {
 } AtmRepositoryGcPurgeStats;
 
 /*
+ * Parses the exact canonical I4 trash basename grammar:
+ * <sha40>-<positive timestamp>-<positive pid>-<attempt 0..99>.
+ *
+ * Optional numeric outputs are populated only for a canonical identity.
+ * Read-only discovery and destructive I5 revalidation share this parser so
+ * candidate selection cannot drift to a weaker identity grammar.
+ */
+gboolean atm_repository_gc_trash_name_parse (
+    const char *trash_name,
+    gint64 *out_isolation_time,
+    gint *out_pid,
+    guint *out_attempt
+);
+
+/*
  * Purges one already-isolated C1 trash object.
  *
  * trash_name must be the canonical basename emitted by the I4 isolation
