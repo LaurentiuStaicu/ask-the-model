@@ -1,0 +1,91 @@
+name: C1-I10 runtime purge integration qualification
+
+on:
+  pull_request:
+    paths:
+      - 'src/RepositoryLifecycleService.vala'
+      - 'src/Application.vala'
+      - 'src/RepositoryGcPurgeOrchestrator.vala'
+      - 'src/RepositoryGcIsolationOrchestrator.vala'
+      - 'tests/repository_lifecycle_service_test.vala'
+      - 'scripts/validate_c1_i10_runtime_integration.py'
+      - 'scripts/validate_c1_gc_policy.py'
+      - 'qualification/c1-gc-policy-v1.json'
+      - 'meson.build'
+      - '.github/workflows/c1-i10-runtime-purge-integration-qualification.yml'
+  push:
+    branches:
+      - main
+    paths:
+      - 'src/RepositoryLifecycleService.vala'
+      - 'src/Application.vala'
+      - 'src/RepositoryGcPurgeOrchestrator.vala'
+      - 'src/RepositoryGcIsolationOrchestrator.vala'
+      - 'tests/repository_lifecycle_service_test.vala'
+      - 'scripts/validate_c1_i10_runtime_integration.py'
+      - 'scripts/validate_c1_gc_policy.py'
+      - 'qualification/c1-gc-policy-v1.json'
+      - 'meson.build'
+      - '.github/workflows/c1-i10-runtime-purge-integration-qualification.yml'
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: c1-i10-runtime-purge-${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  qualify:
+    runs-on: ubuntu-24.04
+    timeout-minutes: 15
+
+    steps:
+      - name: Checkout AtM
+        uses: actions/checkout@v4
+
+      - name: Install build dependencies
+        shell: bash
+        run: |
+          set -euo pipefail
+          sudo apt-get update
+          sudo apt-get install -y --no-install-recommends \
+            meson \
+            ninja-build \
+            valac \
+            libglib2.0-dev \
+            libgee-0.8-dev \
+            libsoup-3.0-dev \
+            libjson-glib-dev \
+            libsqlite3-dev \
+            libyaml-dev \
+            libarchive-dev \
+            libgtk-4-dev \
+            libgranite-7-dev \
+            libmd4c-dev
+
+      - name: Configure test build
+        shell: bash
+        run: |
+          set -euo pipefail
+          meson setup /tmp/atm-c1-i10-build --buildtype=debug
+
+      - name: Compile lifecycle integration target
+        shell: bash
+        run: |
+          set -euo pipefail
+          meson compile -C /tmp/atm-c1-i10-build repository-lifecycle-service-test
+
+      - name: Run lifecycle integration matrix
+        shell: bash
+        run: |
+          set -euo pipefail
+          meson test -C /tmp/atm-c1-i10-build repository-lifecycle-service --print-errorlogs
+
+      - name: Run structural validators
+        shell: bash
+        run: |
+          set -euo pipefail
+          python3 scripts/validate_c1_i10_runtime_integration.py
+          python3 scripts/validate_c1_gc_policy.py
