@@ -184,6 +184,29 @@ namespace AskTheModel.RepositoryNative {
 
 
     [CCode (
+        cname = "atm_repository_gc_select_canonical_trash_candidate",
+        cheader_filename = "repository_gc_purge.h"
+    )]
+    public static extern bool gc_select_canonical_trash_candidate (
+        string data_root,
+        out string? repository_id,
+        out string? snapshot_sha,
+        out string? trash_name
+    ) throws GLib.Error;
+
+    [CCode (
+        cname = "atm_repository_gc_purge_trash_entry",
+        cheader_filename = "repository_gc_purge.h"
+    )]
+    public static extern bool gc_purge_trash_entry (
+        string data_root,
+        string repository_id,
+        string trash_name,
+        void* stats
+    ) throws GLib.Error;
+
+
+    [CCode (
         cname = "atm_repository_gc_isolate_snapshot_to_trash",
         cheader_filename = "repository_gc_isolation.h"
     )]
