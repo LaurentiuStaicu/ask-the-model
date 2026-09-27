@@ -64,6 +64,12 @@ def main() -> int:
     trash_discovery = (
         ROOT / "src" / "RepositoryGcTrashDiscovery.vala"
     ).read_text(encoding="utf-8")
+    purge_orchestrator = (
+        ROOT / "src" / "RepositoryGcPurgeOrchestrator.vala"
+    ).read_text(encoding="utf-8")
+    purge_orchestrator_tests = (
+        ROOT / "tests" / "repository_gc_purge_orchestrator_test.vala"
+    ).read_text(encoding="utf-8")
     orchestrator = (
         ROOT / "src" / "RepositoryGcIsolationOrchestrator.vala"
     ).read_text(encoding="utf-8")
@@ -386,10 +392,11 @@ def main() -> int:
             "runtime_purge_policy_selected": True,
             "runtime_purge_discovery_implemented": True,
             "runtime_purge_binding_available": True,
-            "runtime_purge_orchestrator_implemented": False,
+            "runtime_purge_orchestrator_implemented": True,
+            "runtime_purge_orchestrator_race_qualification_complete": True,
             "purge_runtime_authorized": False,
             "next_required_slice": (
-                "IMPLEMENT_DORMANT_PURGE_ORCHESTRATOR_AND_RACE_QUALIFICATION"
+                "REVIEW_RUNTIME_PURGE_INTEGRATION_AUTHORIZATION"
             ),
         },
         "implementation state",
@@ -747,7 +754,75 @@ def main() -> int:
             fail(f"I8 discovery/binding must remain lifecycle-unwired: {forbidden}")
 
     if "gc_purge_trash_entry (" in application:
-        fail("I8 must not add an Application purge caller")
+        fail("I9 must not add an Application purge caller")
+    if "RepositoryGcPurgeOrchestrator" in lifecycle:
+        fail("I9 dormant purge orchestrator must remain lifecycle-unwired")
+    if "RepositoryGcPurgeOrchestrator" in application:
+        fail("I9 dormant purge orchestrator must remain Application-unwired")
+
+    ordered_purge_markers = [
+        "try_acquire_mutation_lease (",
+        "RepositoryGcTrashDiscovery.\n                        select_one (",
+        "int64[] references =\n                    referencing_generations (",
+        "try_acquire_generation_lease_exclusive (",
+        "\"after-b2-exclusions\"",
+        "RepositoryGcDurableRootCollector.\n                        collect_durable_only (",
+        "durable_roots.protects_snapshot (",
+        "\"before-i5-purge\"",
+        "gc_purge_trash_entry (",
+    ]
+    previous = -1
+    for marker in ordered_purge_markers:
+        current = require_marker(
+            purge_orchestrator,
+            marker,
+            "I9 purge ordering",
+        )
+        if current <= previous:
+            fail(f"I9 purge ordering drifted at marker: {marker}")
+        previous = current
+
+    for marker in (
+        "sort_generation_ids_ascending (",
+        "release_generation_exclusions (",
+        "RepositoryGcPurgeOutcome.B0_CONTENDED",
+        "RepositoryGcPurgeOutcome.B2_CONTENDED",
+        "RepositoryGcPurgeOutcome.ROOTED_PRESERVED",
+        "RepositoryGcPurgeOutcome.PURGED",
+    ):
+        require_marker(
+            purge_orchestrator,
+            marker,
+            "I9 purge race closure",
+        )
+
+    for marker in (
+        "'src/RepositoryGcPurgeOrchestrator.vala'",
+        "'tests/repository_gc_purge_orchestrator_test.vala'",
+        "'repository-gc-purge-orchestrator'",
+    ):
+        require_marker(
+            meson,
+            marker,
+            "I9 Meson qualification wiring",
+        )
+
+    for marker in (
+        '"/repository-gc-i9/off-noop"',
+        '"/repository-gc-i9/b0-contention-noop"',
+        '"/repository-gc-i9/no-candidate-noop"',
+        '"/repository-gc-i9/unreferenced-purged"',
+        '"/repository-gc-i9/active-root-preserved"',
+        '"/repository-gc-i9/shared-reader-blocks-exclusive"',
+        '"/repository-gc-i9/late-durable-root-reread"',
+        '"/repository-gc-i9/exclusive-blocks-new-reader"',
+        '"/repository-gc-i9/partial-exclusions-released"',
+    ):
+        require_marker(
+            purge_orchestrator_tests,
+            marker,
+            "I9 deterministic purge race coverage",
+        )
 
     for marker in (
         "RepositoryMutationOutcome off_context =",
@@ -766,9 +841,9 @@ def main() -> int:
         )
 
     print(
-        "C1-I8 validation passed: canonical trash discovery and narrow I5 "
-        "Vala binding are implemented; purge orchestrator/runtime authorization "
-        "remain absent"
+        "C1-I9 validation passed: dormant B0/B2 purge orchestrator and "
+        "deterministic race qualification are present; lifecycle/Application "
+        "runtime purge remains unauthorized"
     )
     return 0
 

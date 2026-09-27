@@ -104,10 +104,11 @@
     "destructive_gc_authorized": true,
     "runtime_purge_policy_selected": true,
     "runtime_purge_discovery_implemented": true,
-    "runtime_purge_orchestrator_implemented": false,
+    "runtime_purge_orchestrator_implemented": true,
     "purge_runtime_authorized": false,
-    "next_required_slice": "IMPLEMENT_DORMANT_PURGE_ORCHESTRATOR_AND_RACE_QUALIFICATION",
-    "runtime_purge_binding_available": true
+    "next_required_slice": "REVIEW_RUNTIME_PURGE_INTEGRATION_AUTHORIZATION",
+    "runtime_purge_binding_available": true,
+    "runtime_purge_orchestrator_race_qualification_complete": true
   },
   "runtime_isolation_trigger_policy": {
     "selected": "POST_SUCCESSFUL_CHANGED_REPOSITORY_ACTION",
