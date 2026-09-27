@@ -194,4 +194,16 @@ namespace AskTheModel.RepositoryNative {
         out string trash_path,
         void* stats
     ) throws GLib.Error;
+
+    [CCode (
+        cname = "atm_repository_gc_select_oldest_trash_candidate",
+        cheader_filename = "repository_gc_trash_scan.h"
+    )]
+    public static extern bool gc_select_oldest_trash_candidate (
+        string data_root,
+        out bool found,
+        out string repository_id,
+        out string trash_name,
+        out int64 isolation_time
+    ) throws GLib.Error;
 }
