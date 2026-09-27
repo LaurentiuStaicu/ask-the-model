@@ -1,7 +1,7 @@
 {
   "schema_version": 1,
   "policy_id": "atm-c1-snapshot-gc-orchestration-v1",
-  "status": "selected-runtime-isolation-wired-purge-policy-selected-unwired",
+  "status": "selected-runtime-isolation-wired-purge-discovery-bound-unwired",
   "scope": {
     "supported_storage": "qualified local Linux AtM storage only",
     "optimizations_required": true,
@@ -20,7 +20,8 @@
     "candidate_discovery": "OPT-C1-I3/I3a",
     "isolation_primitive": "OPT-C1-I4",
     "purge_primitive": "OPT-C1-I5",
-    "a1_namespace_durability": "qualification/durability-policy-v1.json"
+    "a1_namespace_durability": "qualification/durability-policy-v1.json",
+    "trash_discovery": "OPT-C1-I8"
   },
   "candidate_status": {
     "pre_b0_candidate_list": "ADVISORY_ONLY",
@@ -103,10 +104,11 @@
     "runtime_caller_present": true,
     "destructive_gc_authorized": true,
     "runtime_purge_policy_selected": true,
-    "runtime_purge_discovery_implemented": false,
+    "runtime_purge_discovery_implemented": true,
     "runtime_purge_orchestrator_implemented": false,
     "purge_runtime_authorized": false,
-    "next_required_slice": "IMPLEMENT_READONLY_CANONICAL_TRASH_DISCOVERY_AND_PURGE_BINDING"
+    "next_required_slice": "IMPLEMENT_AND_QUALIFY_DORMANT_PURGE_ORCHESTRATOR",
+    "runtime_purge_binding_implemented": true
   },
   "runtime_isolation_trigger_policy": {
     "selected": "POST_SUCCESSFUL_CHANGED_REPOSITORY_ACTION",
@@ -176,5 +178,20 @@
     "repair_or_internal_failure": "DIAGNOSTIC_BLOCK_SAME_ACTION_ISOLATION_PHASE",
     "repository_action_outcome_remains_success": true,
     "runtime_authorized": false
+  },
+  "purge_discovery_contract": {
+    "repository_universe": "FIXED_REPOSITORY_CATALOG_ONLY",
+    "namespace": "Repositories/.trash/<repository_id>",
+    "missing_namespace": "EMPTY_NO_CREATE",
+    "canonical_identity_predicate": "SHARED_WITH_I5_PURGE",
+    "candidate_type": "REAL_DIRECTORY_ONLY",
+    "recursive_candidate_traversal": false,
+    "candidate_listing_order": "TRASH_NAME_ASCENDING_WITHIN_REPOSITORY",
+    "global_candidate_selection": "REPOSITORY_ID_THEN_TRASH_NAME",
+    "malformed_identity": "REPAIR_FAIL_CLOSED",
+    "symlink_or_non_directory": "REPAIR_FAIL_CLOSED",
+    "scanner_filesystem_mutation": false,
+    "i5_vala_binding_present": true,
+    "lifecycle_purge_caller_present": false
   }
 }
