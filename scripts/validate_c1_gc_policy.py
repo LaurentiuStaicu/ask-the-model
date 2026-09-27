@@ -224,14 +224,14 @@ def main() -> int:
         "bounded purge attempts",
     )
 
-    purge = policy.get("runtime_purge_policy", {})
+    purge_policy = policy.get("runtime_purge_policy", {})
     require_equal(
-        purge.get("selected"),
+        purge_policy.get("selected"),
         "POST_SUCCESSFUL_CHANGED_REPOSITORY_ACTION_PREEXISTING_TRASH_ONLY",
         "runtime purge trigger policy",
     )
-    require_equal(purge.get("policy_selected"), True, "purge policy selected")
-    require_equal(purge.get("runtime_authorized"), False, "purge runtime authorization")
+    require_equal(purge_policy.get("policy_selected"), True, "purge policy selected")
+    require_equal(purge_policy.get("runtime_authorized"), False, "purge runtime authorization")
     for key in (
         "optimizations_operation_snapshot_must_be_on",
         "use_same_operation_optimization_snapshot",
@@ -253,19 +253,19 @@ def main() -> int:
         "repository_refresh_trigger_forbidden",
         "loop_until_empty_forbidden",
     ):
-        require_equal(purge.get(key), True, f"runtime purge policy {key}")
+        require_equal(purge_policy.get(key), True, f"runtime purge policy {key}")
     require_equal(
-        purge.get("candidate_scope"),
+        purge_policy.get("candidate_scope"),
         "GLOBAL_OLDEST_PRE_OPERATION_CANONICAL_I4_TRASH",
         "purge candidate scope",
     )
     require_equal(
-        purge.get("age_threshold_required"),
+        purge_policy.get("age_threshold_required"),
         False,
         "purge age threshold requirement",
     )
     require_equal(
-        purge.get("max_purge_attempts_per_repository_action"),
+        purge_policy.get("max_purge_attempts_per_repository_action"),
         1,
         "runtime purge bound",
     )
