@@ -568,6 +568,461 @@ done:
 }
 
 
+
+static gboolean
+open_optional_revalidated_child_directory (
+    int parent_fd,
+    const char *name,
+    int *out_fd,
+    GError **error
+)
+{
+    *out_fd = -1;
+
+    struct stat path_st;
+
+    if (fstatat (
+            parent_fd,
+            name,
+            &path_st,
+            AT_SYMLINK_NOFOLLOW
+        ) != 0) {
+        if (errno == ENOENT) {
+            return TRUE;
+        }
+
+        g_set_error (
+            error,
+            G_FILE_ERROR,
+            g_file_error_from_errno (errno),
+            "Could not inspect optional GC trash directory '%s': %s",
+            name,
+            g_strerror (errno)
+        );
+        return FALSE;
+    }
+
+    if (!S_ISDIR (
+            path_st.st_mode
+        ) ||
+        S_ISLNK (
+            path_st.st_mode
+        )) {
+        g_set_error (
+            error,
+            G_FILE_ERROR,
+            G_FILE_ERROR_INVAL,
+            "GC trash namespace component '%s' is not a real directory.",
+            name
+        );
+        return FALSE;
+    }
+
+    return open_revalidated_child_directory (
+        parent_fd,
+        name,
+        &path_st,
+        out_fd,
+        error
+    );
+}
+
+static gboolean
+validate_trash_repository_namespace (
+    int trash_fd,
+    GError **error
+)
+{
+    GPtrArray *names = NULL;
+
+    if (!collect_directory_entry_names (
+            trash_fd,
+            &names,
+            error
+        )) {
+        return FALSE;
+    }
+
+    for (guint i = 0;
+         i < names->len;
+         i++) {
+        const char *name =
+            g_ptr_array_index (
+                names,
+                i
+            );
+
+        if (!repository_id_is_known (
+                name
+            )) {
+            g_set_error (
+                error,
+                G_FILE_ERROR,
+                G_FILE_ERROR_INVAL,
+                "GC trash contains unknown repository namespace '%s'.",
+                name
+            );
+            g_ptr_array_unref (names);
+            return FALSE;
+        }
+
+        struct stat path_st;
+
+        if (fstatat (
+                trash_fd,
+                name,
+                &path_st,
+                AT_SYMLINK_NOFOLLOW
+            ) != 0) {
+            g_set_error (
+                error,
+                G_FILE_ERROR,
+                g_file_error_from_errno (errno),
+                "Could not inspect GC trash repository namespace '%s': %s",
+                name,
+                g_strerror (errno)
+            );
+            g_ptr_array_unref (names);
+            return FALSE;
+        }
+
+        if (!S_ISDIR (
+                path_st.st_mode
+            ) ||
+            S_ISLNK (
+                path_st.st_mode
+            )) {
+            g_set_error (
+                error,
+                G_FILE_ERROR,
+                G_FILE_ERROR_INVAL,
+                "GC trash repository namespace '%s' is not a real directory.",
+                name
+            );
+            g_ptr_array_unref (names);
+            return FALSE;
+        }
+
+        int repository_fd = -1;
+
+        if (!open_revalidated_child_directory (
+                trash_fd,
+                name,
+                &path_st,
+                &repository_fd,
+                error
+            )) {
+            g_ptr_array_unref (names);
+            return FALSE;
+        }
+
+        close (repository_fd);
+    }
+
+    g_ptr_array_unref (names);
+    return TRUE;
+}
+
+static gboolean
+scan_trash_repository_candidates (
+    int trash_fd,
+    const char *repository_id,
+    char **best_repository_id,
+    char **best_snapshot_sha,
+    char **best_trash_name,
+    GError **error
+)
+{
+    int repository_fd = -1;
+
+    if (!open_optional_revalidated_child_directory (
+            trash_fd,
+            repository_id,
+            &repository_fd,
+            error
+        )) {
+        return FALSE;
+    }
+
+    if (repository_fd < 0) {
+        return TRUE;
+    }
+
+    GPtrArray *names = NULL;
+
+    if (!collect_directory_entry_names (
+            repository_fd,
+            &names,
+            error
+        )) {
+        close (repository_fd);
+        return FALSE;
+    }
+
+    for (guint i = 0;
+         i < names->len;
+         i++) {
+        const char *name =
+            g_ptr_array_index (
+                names,
+                i
+            );
+
+        if (!trash_name_is_valid (
+                name
+            )) {
+            g_set_error (
+                error,
+                G_FILE_ERROR,
+                G_FILE_ERROR_INVAL,
+                "GC trash contains noncanonical entry '%s/%s'.",
+                repository_id,
+                name
+            );
+            g_ptr_array_unref (names);
+            close (repository_fd);
+            return FALSE;
+        }
+
+        struct stat path_st;
+
+        if (fstatat (
+                repository_fd,
+                name,
+                &path_st,
+                AT_SYMLINK_NOFOLLOW
+            ) != 0) {
+            g_set_error (
+                error,
+                G_FILE_ERROR,
+                g_file_error_from_errno (errno),
+                "Could not inspect canonical GC trash entry '%s/%s': %s",
+                repository_id,
+                name,
+                g_strerror (errno)
+            );
+            g_ptr_array_unref (names);
+            close (repository_fd);
+            return FALSE;
+        }
+
+        if (!S_ISDIR (
+                path_st.st_mode
+            ) ||
+            S_ISLNK (
+                path_st.st_mode
+            )) {
+            g_set_error (
+                error,
+                G_FILE_ERROR,
+                G_FILE_ERROR_INVAL,
+                "Canonical GC trash entry '%s/%s' is not a real directory.",
+                repository_id,
+                name
+            );
+            g_ptr_array_unref (names);
+            close (repository_fd);
+            return FALSE;
+        }
+
+        int entry_fd = -1;
+
+        if (!open_revalidated_child_directory (
+                repository_fd,
+                name,
+                &path_st,
+                &entry_fd,
+                error
+            )) {
+            g_ptr_array_unref (names);
+            close (repository_fd);
+            return FALSE;
+        }
+
+        close (entry_fd);
+
+        gboolean better =
+            *best_repository_id == NULL ||
+            strcmp (
+                repository_id,
+                *best_repository_id
+            ) < 0 ||
+            (
+                strcmp (
+                    repository_id,
+                    *best_repository_id
+                ) == 0 &&
+                strcmp (
+                    name,
+                    *best_trash_name
+                ) < 0
+            );
+
+        if (better) {
+            g_free (*best_repository_id);
+            g_free (*best_snapshot_sha);
+            g_free (*best_trash_name);
+
+            *best_repository_id =
+                g_strdup (
+                    repository_id
+                );
+            *best_snapshot_sha =
+                g_strndup (
+                    name,
+                    40
+                );
+            *best_trash_name =
+                g_strdup (
+                    name
+                );
+        }
+    }
+
+    g_ptr_array_unref (names);
+    close (repository_fd);
+    return TRUE;
+}
+
+gboolean
+atm_repository_gc_select_canonical_trash_candidate (
+    const char *data_root,
+    char **out_repository_id,
+    char **out_snapshot_sha,
+    char **out_trash_name,
+    GError **error
+)
+{
+    if (data_root == NULL ||
+        data_root[0] == '\0' ||
+        out_repository_id == NULL ||
+        out_snapshot_sha == NULL ||
+        out_trash_name == NULL) {
+        g_set_error_literal (
+            error,
+            G_FILE_ERROR,
+            G_FILE_ERROR_INVAL,
+            "GC trash discovery received invalid arguments."
+        );
+        return FALSE;
+    }
+
+    *out_repository_id = NULL;
+    *out_snapshot_sha = NULL;
+    *out_trash_name = NULL;
+
+    int data_fd = open (
+        data_root,
+        O_RDONLY |
+        O_DIRECTORY |
+        O_NOFOLLOW |
+        O_CLOEXEC
+    );
+
+    if (data_fd < 0) {
+        g_set_error (
+            error,
+            G_FILE_ERROR,
+            g_file_error_from_errno (errno),
+            "Could not open GC discovery data root without following links: %s",
+            g_strerror (errno)
+        );
+        return FALSE;
+    }
+
+    int repositories_fd = -1;
+    int trash_fd = -1;
+    gboolean ok = FALSE;
+    char *best_repository_id = NULL;
+    char *best_snapshot_sha = NULL;
+    char *best_trash_name = NULL;
+
+    if (!open_optional_revalidated_child_directory (
+            data_fd,
+            "Repositories",
+            &repositories_fd,
+            error
+        )) {
+        goto done;
+    }
+
+    if (repositories_fd < 0) {
+        ok = TRUE;
+        goto done;
+    }
+
+    if (!open_optional_revalidated_child_directory (
+            repositories_fd,
+            ".trash",
+            &trash_fd,
+            error
+        )) {
+        goto done;
+    }
+
+    if (trash_fd < 0) {
+        ok = TRUE;
+        goto done;
+    }
+
+    if (!validate_trash_repository_namespace (
+            trash_fd,
+            error
+        )) {
+        goto done;
+    }
+
+    const char *repository_ids[] = {
+        "cbd",
+        "ewd",
+        "rmd"
+    };
+
+    for (guint i = 0;
+         i < G_N_ELEMENTS (repository_ids);
+         i++) {
+        if (!scan_trash_repository_candidates (
+                trash_fd,
+                repository_ids[i],
+                &best_repository_id,
+                &best_snapshot_sha,
+                &best_trash_name,
+                error
+            )) {
+            goto done;
+        }
+    }
+
+    *out_repository_id =
+        g_steal_pointer (
+            &best_repository_id
+        );
+    *out_snapshot_sha =
+        g_steal_pointer (
+            &best_snapshot_sha
+        );
+    *out_trash_name =
+        g_steal_pointer (
+            &best_trash_name
+        );
+    ok = TRUE;
+
+done:
+    g_free (best_repository_id);
+    g_free (best_snapshot_sha);
+    g_free (best_trash_name);
+
+    if (trash_fd >= 0) {
+        close (trash_fd);
+    }
+    if (repositories_fd >= 0) {
+        close (repositories_fd);
+    }
+    close (data_fd);
+    return ok;
+}
+
+
 static gboolean validate_tree_directory (
     int directory_fd,
     GError **error
