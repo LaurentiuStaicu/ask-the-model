@@ -36,7 +36,7 @@ def main() -> int:
 
     for marker in (
         "atm_repository_gc_purge_trash_entry",
-        "trash_name_is_valid",
+        "atm_repository_gc_trash_name_parse",
         "canonical_decimal_segment",
         "G_MAXINT64",
         "G_MAXINT",
