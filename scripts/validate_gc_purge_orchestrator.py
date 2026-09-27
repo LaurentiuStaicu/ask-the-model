@@ -60,14 +60,23 @@ def main() -> int:
     ):
         require(orchestrator, marker, "purge race contract")
 
-    if "RepositoryGcPurgeOrchestrator" in lifecycle:
-        fail("dormant purge orchestrator is wired into RepositoryLifecycleService")
+    lifecycle_call = (
+        "RepositoryGcPurgeOrchestrator.\n"
+        "                        purge_one ("
+    )
+    require(
+        lifecycle,
+        lifecycle_call,
+        "qualified lifecycle purge orchestrator call",
+    )
+    if lifecycle.count("RepositoryGcPurgeOrchestrator") != 1:
+        fail("lifecycle must contain exactly one purge orchestrator call site")
     if "RepositoryGcPurgeOrchestrator" in application:
-        fail("dormant purge orchestrator is wired into Application")
+        fail("Application must not call the purge orchestrator directly")
     if "gc_purge_trash_entry (" in lifecycle:
-        fail("I5 purge primitive is wired into RepositoryLifecycleService")
+        fail("lifecycle must not bypass I9 and call I5 directly")
     if "gc_purge_trash_entry (" in application:
-        fail("I5 purge primitive is wired into Application")
+        fail("Application must not call I5 directly")
 
     for marker in (
         "'src/RepositoryGcPurgeOrchestrator.vala'",
@@ -92,7 +101,7 @@ def main() -> int:
     print(
         "C1-I9 purge orchestrator validation passed: B0 -> canonical discovery -> "
         "COMPLETE refs -> B2 exclusions -> durable reread -> exact I5; "
-        "runtime caller remains absent"
+        "one qualified lifecycle caller is present; Application/native bypass remains absent"
     )
     return 0
 
