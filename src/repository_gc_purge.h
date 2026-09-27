@@ -8,6 +8,21 @@ typedef struct {
     guint64 regular_files_removed;
     guint64 directories_removed;
     guint64 directory_fsync_calls;
+
+    /*
+     * Populated only after a fully successful purge.
+     *
+     * logical_regular_bytes_removed is the sum of pre-purge st_size for
+     * regular files in the exact validated trash tree.
+     *
+     * allocated_tree_bytes_removed is the sum of Linux st_blocks * 512 for
+     * the validated root directory and every regular-file/directory entry.
+     * It describes allocation attributed to the removed tree; it is not a
+     * promise that filesystem free-space counters increase by exactly this
+     * amount (for example with shared/compressed storage).
+     */
+    guint64 logical_regular_bytes_removed;
+    guint64 allocated_tree_bytes_removed;
 } AtmRepositoryGcPurgeStats;
 
 /*
