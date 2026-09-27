@@ -277,6 +277,15 @@ window.atm-window textview spinner.atm-assistant-spinner {
     color: #5F605C;
 }
 
+window.atm-window textview label.atm-turn-separator {
+    margin-top: 6px;
+    margin-bottom: 4px;
+    color: #A4A5A1;
+    font-family: monospace;
+    font-size: 0.82em;
+    font-weight: 400;
+}
+
 /* Compact source references embedded below grounded answers. */
 window.atm-window textview menubutton.atm-source-ref > button {
     min-width: 0;
@@ -451,6 +460,10 @@ window.atm-window.atm-dark notebook.atm-chat-tabs > header.top button.atm-new-ch
 
 window.atm-window.atm-dark textview spinner.atm-assistant-spinner {
     color: #C9CAC7;
+}
+
+window.atm-window.atm-dark textview label.atm-turn-separator {
+    color: #6F706C;
 }
 
 window.atm-window.atm-dark notebook.atm-chat-tabs > header.top button.atm-tab-close {
