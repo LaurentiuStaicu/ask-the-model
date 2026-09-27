@@ -136,9 +136,10 @@ test_rendering_projection () {
 
 private void
 test_palette_and_theme_update () {
-    var buffer = new Gtk.TextBuffer (null);
+    var view = new Gtk.TextView ();
+    var buffer = view.buffer;
     var renderer =
-        new PresentationRenderer (buffer);
+        new PresentationRenderer (view);
 
     unowned Gtk.TextTag? you =
         buffer.tag_table.lookup (
