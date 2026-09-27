@@ -1,0 +1,113 @@
+{
+  "schema_version": 1,
+  "evidence_id": "atm-d0-retrieval-context-rebaseline-v1",
+  "status": "measurement-complete",
+  "production_policy_changed": false,
+  "d1_evaluation_authorized": true,
+  "d1_runtime_policy_change_authorized": false,
+  "qualified_head": "ea48a988fa56b2d767e249b5e594db61735cb93b",
+  "workflow_run_id": 36301344385,
+  "artifact": {
+    "name": "atm-r5-retrieval-benchmark-36301344385-1",
+    "id": 10926270298,
+    "zip_sha256": "63c76150d0fb1451e125c10565407638bf5d4b714ddee76a547fcd578fbdaac6"
+  },
+  "benchmark": {
+    "benchmark_id": "atm-retrieval-v1-2026-09-20",
+    "corpus": [
+      {
+        "repository_id": "ewd",
+        "repository_version": "0.1.0",
+        "snapshot_sha": "795a6b8e42e2a19497f686a89e7c3a6056e6930c"
+      },
+      {
+        "repository_id": "cbd",
+        "repository_version": "0.1.0",
+        "snapshot_sha": "e6e3b3077b7d78e3f37d963e0734e9084e8a62ab"
+      },
+      {
+        "repository_id": "rmd",
+        "repository_version": "0.1.0",
+        "snapshot_sha": "a8b5ff89a951d3194fdedb59771bc79937fe7bc7"
+      }
+    ]
+  },
+  "production_control": {
+    "max_results_per_repository": 6,
+    "max_context_sources": 12,
+    "max_context_bytes": 32768,
+    "exact_id_success_at_1": 1,
+    "ndcg_at_5": 0.9025687328237045,
+    "canonical_required_recall_at_5": 0.9833333333333333,
+    "context_required_recall": 0.9833333333333333,
+    "evidence_traceability": 1,
+    "context_source_count_mean": 6.363636363636363,
+    "evidence_bytes_mean": 7631.424242424242
+  },
+  "findings": {
+    "results5": {
+      "quality_preserved": false,
+      "ndcg_at_5": 0.8958318212736863,
+      "failing_topic": "structure.cbd.paradigm.ro",
+      "failing_metric": "ndcg_at_5"
+    },
+    "source_caps_quality_preserved": [
+      8,
+      7,
+      6,
+      5,
+      4
+    ],
+    "source_cap_3": {
+      "quality_preserved": false,
+      "context_required_recall": 0.95,
+      "regressions": [
+        "status.rmd.current_boundary.en",
+        "status.rmd.current_boundary.ro"
+      ]
+    },
+    "bytes16k": {
+      "quality_preserved": true,
+      "evidence_bytes_reduction_percent_vs_production": 0.46379205597270784,
+      "source_count_reduction_percent_vs_production": 0.4761904761904758,
+      "pareto_frontier": false,
+      "dominated_by": [
+        "candidate-sources4",
+        "candidate-sources5",
+        "candidate-sources6",
+        "candidate-sources7",
+        "candidate-sources8"
+      ]
+    },
+    "compact": {
+      "quality_preserved": false,
+      "failing_topic": "structure.cbd.paradigm.ro",
+      "failing_metric": "ndcg_at_5"
+    }
+  },
+  "observational_frontier": {
+    "policy": "candidate-sources4",
+    "max_results_per_repository": 6,
+    "max_context_sources": 4,
+    "max_context_bytes": 32768,
+    "exact_id_success_at_1": 1,
+    "ndcg_at_5": 0.9025687328237045,
+    "canonical_required_recall_at_5": 0.9833333333333333,
+    "context_required_recall": 0.9833333333333333,
+    "evidence_traceability": 1,
+    "topic_regression_count": 0,
+    "context_source_count_mean": 3.878787878787879,
+    "evidence_bytes_mean": 4519.787878787879,
+    "source_count_reduction_percent_vs_production": 39.047619047619044,
+    "evidence_bytes_reduction_percent_vs_production": 40.77399270162843,
+    "promotion_eligible_observational": true
+  },
+  "interpretation_rules": [
+    "D0 is measurement-only and does not authorize a runtime policy change.",
+    "Candidate source-cap 4 is the sole non-dominated quality-preserving frontier point on mean source count and mean evidence bytes for this frozen corpus.",
+    "Timing is observational and is not used as a blocking gate or Pareto dimension because CI runner variance is non-negligible.",
+    "Source-cap 3 is the first measured source-cap boundary that reduces required-evidence context recall.",
+    "The 16 KiB byte-cap candidate is not a useful frontier point because its savings are negligible and it is Pareto-dominated by quality-preserving source-cap candidates.",
+    "Any D1 change must remain separate, rerun all blocking retrieval/provenance/invariant gates, and preserve the Optimizations-OFF baseline."
+  ]
+}
