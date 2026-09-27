@@ -34,8 +34,6 @@ jobs:
           set -euo pipefail
           sudo apt-get update
           sudo apt-get install -y --no-install-recommends \
-            meson \
-            ninja-build \
             gcc \
             pkg-config \
             libglib2.0-dev \
@@ -43,12 +41,18 @@ jobs:
             util-linux \
             jq
 
-      - name: Configure and compile reclamation probe
+      - name: Compile reclamation probe
         shell: bash
         run: |
           set -euo pipefail
-          meson setup /tmp/atm-c1-m1-build --buildtype=debug
-          meson compile -C /tmp/atm-c1-m1-build c1-reclamation-probe
+          CFLAGS="$(pkg-config --cflags glib-2.0)"
+          LIBS="$(pkg-config --libs glib-2.0)"
+          cc -std=c11 -O2 -Wall -Wextra -Werror -Isrc $CFLAGS \
+            src/capacity_measurement.c \
+            src/repository_gc_purge.c \
+            tests/c1_reclamation_probe.c \
+            $LIBS \
+            -o /tmp/c1-reclamation-probe
 
       - name: Measure controlled tmpfs reclamation
         shell: bash
@@ -64,7 +68,7 @@ jobs:
           sudo mount -t tmpfs -o size=64m,nr_inodes=4096 tmpfs "$MOUNT"
           sudo chown "$(id -u):$(id -g)" "$MOUNT"
 
-          /tmp/atm-c1-m1-build/c1-reclamation-probe \
+          /tmp/c1-reclamation-probe \
             "$MOUNT" tmpfs | tee /tmp/c1-m1-tmpfs.json
 
           jq -e '
@@ -101,7 +105,7 @@ jobs:
           sudo mount -o loop "$IMAGE" "$MOUNT"
           sudo chown "$(id -u):$(id -g)" "$MOUNT"
 
-          /tmp/atm-c1-m1-build/c1-reclamation-probe \
+          /tmp/c1-reclamation-probe \
             "$MOUNT" ext4 | tee /tmp/c1-m1-ext4.json
 
           jq -e '
