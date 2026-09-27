@@ -1693,6 +1693,19 @@ P3 keeps all hidden purge triggers forbidden: no startup purge, switch-toggle pu
 
 This slice is policy-only. `runtime_purge_authorized=false`; there is still no Vala binding for `atm_repository_gc_purge_trash_entry()`, no runtime trash discovery, no purge orchestrator and no lifecycle/Application purge caller. The next implementation slice must add read-only canonical trash discovery plus the narrow I5 Vala binding while preserving runtime authorization as false.
 
+### OPT-C1-I8 read-only trash discovery and dormant purge binding
+
+I8 implements the next P3 prerequisite without authorizing phase-2 purge. The native discovery path inspects only the fixed catalog repositories below `Repositories/.trash/<repository_id>` using descriptor-relative no-follow operations. A missing `.trash` namespace is an empty result; unexpected repository namespaces, symlink/special objects, malformed canonical identities or namespace replacement races fail closed as repair conditions.
+
+Discovery and I5 now share one canonical I4 trash-name parser. Selection follows the P3 policy exactly: repository ID is the primary ordering key and the canonical trash basename is the secondary key. Isolation timestamps are validated as part of identity but are not an age threshold or selection authority.
+
+The Vala bridge exposes two narrow primitives:
+
+- read-only selection of one canonical trash candidate, returning repository ID, embedded snapshot SHA and exact trash basename;
+- the already-qualified I5 exact-entry purge primitive.
+
+Neither primitive has a `RepositoryLifecycleService` or `Application` purge caller in I8. The existing I7 isolation path is unchanged, the purge orchestrator is still absent, and `runtime_purge_authorized=false` remains enforced structurally. The next slice must implement a dormant purge orchestrator that acquires B0 before authoritative selection, resolves all COMPLETE generations referencing the candidate SHA, acquires B2 exclusions in ascending order, rereads durable roots and only then invokes exact I5 revalidation/purge.
+
 ### Recovery fault qualification
 
 The OPT-A0 recovery harness is test-only. Native checkpoint calls compile to no-ops in the production application; only the dedicated recovery helper is built with `ATM_TEST_FAULT_INJECTION`.
