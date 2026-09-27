@@ -6,6 +6,7 @@ on:
     paths:
       - 'benchmarks/retrieval-v1/**'
       - 'scripts/evaluate_retrieval_benchmark.py'
+      - 'scripts/summarize_retrieval_policy_sweep.py'
       - 'src/cff_version.c'
       - 'src/cff_version.h'
       - 'src/repository_sources.c'
@@ -49,6 +50,7 @@ on:
     paths:
       - 'benchmarks/retrieval-v1/**'
       - 'scripts/evaluate_retrieval_benchmark.py'
+      - 'scripts/summarize_retrieval_policy_sweep.py'
       - 'src/cff_version.c'
       - 'src/repository_sources.c'
       - 'src/markdown_sections.c'
@@ -301,6 +303,103 @@ jobs:
           )
           PY
 
+      - name: Validate D0 production control before candidates
+        shell: bash
+        run: |
+          set -euo pipefail
+
+          python3 - <<'PY'
+          import json
+
+          with open(
+              "/tmp/atm-retrieval-production-policy-run.json",
+              encoding="utf-8",
+          ) as handle:
+              run = json.load(handle)
+
+          with open(
+              "/tmp/atm-retrieval-production-policy-evaluation.json",
+              encoding="utf-8",
+          ) as handle:
+              evaluation = json.load(handle)
+
+          expected = {
+              "name": "production",
+              "max_results_per_repository": 6,
+              "max_context_sources": 12,
+              "max_context_bytes": 32 * 1024,
+          }
+
+          if run.get("policy") != expected:
+              raise SystemExit(
+                  "D0 production control does not match shared 6/12/32-KiB policy."
+              )
+
+          if not evaluation["passes_provisional_targets"]:
+              failed = [
+                  name
+                  for name, passed in evaluation["gates"].items()
+                  if not passed
+              ]
+              raise SystemExit(
+                  "D0 production control failed quality gates: "
+                  + ", ".join(failed)
+              )
+
+          print("PASS: D0 production control is valid; candidate sweep may run.")
+          PY
+
+      - name: Execute D0 candidate policy sweep
+        shell: bash
+        run: |
+          set -euo pipefail
+
+          for policy in \
+            candidate-results5 \
+            candidate-sources8 \
+            candidate-sources7 \
+            candidate-sources6 \
+            candidate-sources5 \
+            candidate-sources4 \
+            candidate-sources3 \
+            candidate-bytes16k \
+            candidate-compact
+          do
+            stem="/tmp/atm-retrieval-${policy}"
+
+            /tmp/atm-retrieval-benchmark-runner \
+              benchmarks/retrieval-v1/benchmark.json \
+              "${stem}-run.json" \
+              "github-${policy}-${GITHUB_RUN_ID}-${GITHUB_RUN_ATTEMPT}" \
+              "${policy}"
+
+            python3 scripts/evaluate_retrieval_benchmark.py \
+              benchmarks/retrieval-v1/benchmark.json \
+              "${stem}-run.json" \
+              --pretty \
+              > "${stem}-evaluation.json"
+          done
+
+      - name: Assemble D0 control-relative sweep artifact
+        shell: bash
+        env:
+          D0_MEASUREMENT_HEAD: ${{ github.event.pull_request.head.sha || github.sha }}
+        run: |
+          set -euo pipefail
+
+          python3 scripts/summarize_retrieval_policy_sweep.py \
+            --root /tmp \
+            --benchmark benchmarks/retrieval-v1/benchmark.json \
+            --output /tmp/atm-retrieval-policy-sweep-summary.json \
+            --measurement-head "$D0_MEASUREMENT_HEAD" \
+            --workflow-commit "$GITHUB_SHA"
+
+          python3 -m json.tool \
+            /tmp/atm-retrieval-policy-sweep-summary.json \
+            >/dev/null
+
+          cat /tmp/atm-retrieval-policy-sweep-summary.json
+
       - name: Enforce provisional R5 gates
         shell: bash
         run: |
@@ -338,5 +437,8 @@ jobs:
             /tmp/atm-retrieval-benchmark-evaluation.json
             /tmp/atm-retrieval-production-policy-run.json
             /tmp/atm-retrieval-production-policy-evaluation.json
+            /tmp/atm-retrieval-candidate-*-run.json
+            /tmp/atm-retrieval-candidate-*-evaluation.json
+            /tmp/atm-retrieval-policy-sweep-summary.json
           if-no-files-found: warn
           retention-days: 14
