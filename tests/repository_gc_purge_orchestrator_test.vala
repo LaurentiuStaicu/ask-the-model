@@ -3,7 +3,8 @@ using GLib;
 private enum PurgeHookMode {
     NONE,
     CREATE_DURABLE_ROOT_AFTER_CANDIDATE,
-    ASSERT_SHARED_BLOCKED_AFTER_EXCLUSIONS
+    ASSERT_SHARED_BLOCKED_AFTER_EXCLUSIONS,
+    REPLACE_CANDIDATE_BEFORE_I5
 }
 
 private static PurgeHookMode hook_mode = PurgeHookMode.NONE;
@@ -317,6 +318,30 @@ purge_test_hook (
         assert (contended);
         assert (reader_fd < 0);
         hook_shared_blocked = true;
+        hook_action_completed = true;
+    }
+        return;
+    }
+
+    if (hook_mode ==
+            PurgeHookMode.REPLACE_CANDIDATE_BEFORE_I5 &&
+        checkpoint == "before-i5-purge") {
+        string candidate_path =
+            Path.build_filename (
+                state_root,
+                "Repositories",
+                ".trash",
+                candidate.repository_id,
+                candidate.trash_name
+            );
+
+        remove_tree_best_effort (
+            candidate_path
+        );
+        FileUtils.set_contents (
+            candidate_path,
+            "replacement-object"
+        );
         hook_action_completed = true;
     }
 }
@@ -758,6 +783,80 @@ test_exclusive_blocks_new_shared_reader () {
 }
 
 private static void
+test_exact_i5_revalidation_rejects_replaced_candidate () {
+    const string ACTIVE_SHA =
+        "cccccccccccccccccccccccccccccccccccccccc";
+    const string TRASH_SHA =
+        "dddddddddddddddddddddddddddddddddddddddd";
+
+    string root = new_temp_root ();
+
+    try {
+        publish_generation_one (
+            root,
+            ACTIVE_SHA
+        );
+
+        string trash_name =
+            create_trash_entry (
+                root,
+                TRASH_SHA
+            );
+
+        install_hook (
+            PurgeHookMode.REPLACE_CANDIDATE_BEFORE_I5,
+            root,
+            0
+        );
+
+        Error? caught = null;
+
+        try {
+            AskTheModel.RepositoryGcPurgeOrchestrator.
+                purge_one (
+                    true,
+                    root,
+                    root,
+                    control_path_for (root),
+                    conversation_store_for (
+                        root
+                    )
+                );
+        } catch (Error error) {
+            caught = error;
+        }
+
+        assert (hook_action_completed);
+        assert (caught != null);
+
+        string replacement_path =
+            trash_path_for (
+                root,
+                trash_name
+            );
+
+        assert (
+            FileUtils.test (
+                replacement_path,
+                FileTest.EXISTS
+            )
+        );
+        assert (
+            !FileUtils.test (
+                replacement_path,
+                FileTest.IS_DIR
+            )
+        );
+    } catch (Error error) {
+        critical ("%s", error.message);
+        assert_not_reached ();
+    } finally {
+        reset_hook ();
+        remove_tree_best_effort (root);
+    }
+}
+
+private static void
 test_partial_exclusions_are_released () {
     const string OLD_SHA =
         "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa";
@@ -888,6 +987,10 @@ main (string[] args) {
     Test.add_func (
         "/repository-gc-i9/exclusive-blocks-new-reader",
         test_exclusive_blocks_new_shared_reader
+    );
+    Test.add_func (
+        "/repository-gc-i9/exact-i5-revalidation",
+        test_exact_i5_revalidation_rejects_replaced_candidate
     );
     Test.add_func (
         "/repository-gc-i9/partial-exclusions-released",
