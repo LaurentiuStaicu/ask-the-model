@@ -2491,115 +2491,6 @@ namespace AskTheModel {
             ).strip ();
         }
 
-        private string markdown_excerpt_to_display_text (
-            string markdown
-        ) {
-            string text = markdown;
-
-            try {
-                var comments = new GLib.Regex (
-                    "<!--.*?-->",
-                    GLib.RegexCompileFlags.DOTALL
-                );
-                text = comments.replace_literal (
-                    text, -1, 0, ""
-                );
-
-                var html_image = new GLib.Regex (
-                    "(?is)<img\\b[^>]*\\balt\\s*=\\s*[\"']([^\"']*)[\"'][^>]*>"
-                );
-                text = html_image.replace (
-                    text, -1, 0, "\\1"
-                );
-
-                var html_break = new GLib.Regex (
-                    "(?i)<br\\s*/?>"
-                );
-                text = html_break.replace_literal (
-                    text, -1, 0, "\n"
-                );
-
-                var html_block = new GLib.Regex (
-                    "(?i)</?(p|div|h[1-6]|li|ul|ol|blockquote|pre|table|tr|section|article|details|summary)[^>]*>"
-                );
-                text = html_block.replace_literal (
-                    text, -1, 0, "\n"
-                );
-
-                var html_tag = new GLib.Regex (
-                    "<[^>]+>"
-                );
-                text = html_tag.replace_literal (
-                    text, -1, 0, ""
-                );
-
-                var md_image = new GLib.Regex (
-                    "!\\[([^\\]]*)\\]\\([^)]*\\)"
-                );
-                text = md_image.replace (
-                    text, -1, 0, "\\1"
-                );
-
-                var md_link = new GLib.Regex (
-                    "\\[([^\\]]+)\\]\\([^)]*\\)"
-                );
-                text = md_link.replace (
-                    text, -1, 0, "\\1"
-                );
-
-                var heading = new GLib.Regex (
-                    "(?m)^\\s{0,3}#{1,6}\\s+"
-                );
-                text = heading.replace_literal (
-                    text, -1, 0, ""
-                );
-
-                var blockquote = new GLib.Regex (
-                    "(?m)^\\s{0,3}>\\s?"
-                );
-                text = blockquote.replace_literal (
-                    text, -1, 0, ""
-                );
-
-                var bullet = new GLib.Regex (
-                    "(?m)^\\s*[-+*]\\s+"
-                );
-                text = bullet.replace_literal (
-                    text, -1, 0, "• "
-                );
-
-                var bold_star = new GLib.Regex (
-                    "\\*\\*([^*\\n]+)\\*\\*"
-                );
-                text = bold_star.replace (
-                    text, -1, 0, "\\1"
-                );
-
-                var bold_underscore = new GLib.Regex (
-                    "__([^_\\n]+)__"
-                );
-                text = bold_underscore.replace (
-                    text, -1, 0, "\\1"
-                );
-
-                var many_blank_lines = new GLib.Regex (
-                    "\\n[ \\t]*\\n(?:[ \\t]*\\n)+"
-                );
-                text = many_blank_lines.replace_literal (
-                    text, -1, 0, "\n\n"
-                );
-            } catch (GLib.RegexError error) {
-                return markdown.strip ();
-            }
-
-            text = text.replace ("&nbsp;", " ");
-            text = text.replace ("&amp;", "&");
-            text = text.replace ("&lt;", "<");
-            text = text.replace ("&gt;", ">");
-
-            return text.strip ();
-        }
-
         private string source_excerpt_display_text (
             CitationReference citation
         ) {
@@ -2607,16 +2498,40 @@ namespace AskTheModel {
                 return "";
             }
 
-            string path = citation.source_path.down ();
+            string excerpt =
+                citation.excerpt;
+            string path =
+                citation.source_path.down ();
 
-            if (path.has_suffix (".md") ||
-                path.has_suffix (".markdown")) {
-                return markdown_excerpt_to_display_text (
-                    citation.excerpt
-                );
+            if (!path.has_suffix (".md") &&
+                !path.has_suffix (".markdown")) {
+                return excerpt;
             }
 
-            return citation.excerpt;
+            try {
+                PresentationNative.Document document;
+
+                if (
+                    PresentationNative.normalize (
+                        excerpt,
+                        (size_t) excerpt.length,
+                        out document
+                    )
+                ) {
+                    return PresentationNative
+                        .to_plain_text (
+                            document
+                        )
+                        .strip ();
+                }
+            } catch (GLib.Error error) {
+                /*
+                 * Source detail is display-only. Preserve the exact excerpt
+                 * when Presentation normalization cannot qualify it.
+                 */
+            }
+
+            return excerpt.strip ();
         }
 
         private Gtk.Widget build_source_detail_content (
@@ -2804,11 +2719,11 @@ namespace AskTheModel {
             var button = new Gtk.Button () {
                 label = "[%u]".printf (display_number),
                 has_frame = false,
+                focusable = true,
                 tooltip_text = "Show source %u".printf (
                     display_number
                 )
             };
-            button.add_css_class ("atm-source-ref");
             button.update_property (
                 Gtk.AccessibleProperty.LABEL,
                 "Source %u".printf (display_number)
@@ -2858,16 +2773,12 @@ namespace AskTheModel {
                     continue;
                 }
 
-                buffer.get_end_iter (out end);
-                unowned Gtk.TextChildAnchor anchor =
-                    buffer.create_child_anchor (end);
-
-                transcript.add_child_at_anchor (
+                state.presentation.append_semantic_child (
                     build_source_reference_button (
                         citation,
                         i + 1
                     ),
-                    anchor
+                    "atm-source-ref"
                 );
 
                 if (i + 1 < resolution.citation_count ()) {
