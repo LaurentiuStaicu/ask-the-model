@@ -560,6 +560,7 @@ namespace AskTheModel.Tests {
             if (cleanup_failure == null) {
                 assert_not_reached ();
             }
+            assert (cleanup_failure != null);
             assert (cleanup_failure.length > 0);
 
             remove_tree_best_effort (
