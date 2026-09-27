@@ -3106,6 +3106,9 @@ namespace AskTheModel {
             ChatTabState state,
             string prompt
         ) {
+            bool optimized_operation =
+                optimization_policy.snapshot_enabled ();
+
             generation_active = true;
             state.generating = true;
             streaming_transcript = null;
@@ -3178,6 +3181,7 @@ namespace AskTheModel {
                 bool has_grounding =
                     state.session.prepare_turn (
                         prompt,
+                        optimized_operation,
                         out needs_clarification,
                         out system_instructions,
                         out evidence_text,
