@@ -223,11 +223,7 @@ def main() -> int:
     persistence = block(
         application,
         "private ConversationPersistenceCitation[]",
-        "private string markdown_excerpt",
-    ) if "private string markdown_excerpt" in application else block(
-        application,
-        "private ConversationPersistenceCitation[]",
-        "private string source_excerpt_display_text (",
+        "private async void update_conversation_title (",
     )
     for marker in (
         "citation.repository_id",
