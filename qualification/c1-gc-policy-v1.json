@@ -1,7 +1,7 @@
 {
   "schema_version": 1,
   "policy_id": "atm-c1-snapshot-gc-orchestration-v1",
-  "status": "selected-runtime-isolation-and-purge-wired",
+  "status": "qualified-runtime-isolation-and-purge-reclamation-evidence-complete",
   "scope": {
     "supported_storage": "qualified local Linux AtM storage only",
     "optimizations_required": true,
@@ -106,13 +106,14 @@
     "runtime_purge_discovery_implemented": true,
     "runtime_purge_orchestrator_implemented": true,
     "purge_runtime_authorized": true,
-    "next_required_slice": "QUALIFY_C1_SPACE_ACCOUNTING_AND_RECLAMATION_EVIDENCE",
+    "next_required_slice": "REVIEW_C1_CLOSEOUT_AND_RESUME_D0_RETRIEVAL_REBASELINE",
     "runtime_purge_binding_available": true,
     "runtime_purge_orchestrator_race_qualification_complete": true,
     "runtime_purge_integration_policy_selected": true,
     "runtime_purge_steady_state_policy_selected": true,
     "runtime_purge_integration_implemented": true,
-    "runtime_purge_integration_qualification_complete": true
+    "runtime_purge_integration_qualification_complete": true,
+    "reclamation_space_accounting_qualification_complete": true
   },
   "runtime_isolation_trigger_policy": {
     "selected": "POST_SUCCESSFUL_CHANGED_REPOSITORY_ACTION",
@@ -236,5 +237,20 @@
     },
     "only_purge_progress_or_empty_trash_allows_isolation": true,
     "runtime_implementation_qualified": true
+  },
+  "reclamation_evidence": {
+    "evidence_id": "atm-c1-reclamation-space-accounting-v1",
+    "path": "benchmarks/c1-reclamation-v1/evidence.json",
+    "qualified_head": "e4f8bd321917115d481b1a78911ac0cb4bb53602",
+    "actions_run_id": 36299959441,
+    "filesystems": [
+      "tmpfs",
+      "ext4"
+    ],
+    "allocated_tree_metric_reused_from_c0": true,
+    "positive_filesystem_reclamation_observed": true,
+    "normal_snapshot_preserved": true,
+    "production_thresholds_selected": false,
+    "runtime_trigger_policy_changed": false
   }
 }
