@@ -1003,21 +1003,34 @@ def main() -> int:
         "assert (!off_context.optimized_operation);",
         "RepositoryMutationOutcome on_context =",
         "assert (on_context.optimized_operation);",
-        "carried_on_cleanup.outcome ==",
-        "RepositoryGcIsolationOutcome.B0_CONTENDED",
-        "assert (failed_cleanup == null);",
-        "assert (cleanup_failure != null);",
+        "contended_maintenance =",
+        "RepositoryGcPurgeOutcome.B0_CONTENDED",
+        "!contended_maintenance.\n                    isolation_allowed_after_purge",
+        "!contended_maintenance.isolation_attempted",
+        "no_candidate_maintenance =",
+        "RepositoryGcPurgeOutcome.NO_CANDIDATE",
+        "malformed_maintenance =",
+        "\"purge phase:\"",
+        "rooted_maintenance =",
+        "RepositoryGcPurgeOutcome.ROOTED_PRESERVED",
+        "b2_maintenance =",
+        "RepositoryGcPurgeOutcome.B2_CONTENDED",
+        "!b2_maintenance.\n                    isolation_allowed_after_purge",
+        "!b2_maintenance.isolation_attempted",
+        "purged_maintenance =",
+        "RepositoryGcPurgeOutcome.PURGED",
+        "RepositoryGcIsolationOutcome.NO_CANDIDATE",
     ):
         require_marker(
             lifecycle_tests,
             marker,
-            "I7 lifecycle trigger qualification",
+            "I10 P5 lifecycle maintenance qualification",
         )
 
     print(
-        "C1-P5 validation passed: steady-state no-growth gate selected; "
-        "only empty trash or successful purge may permit new isolation; "
-        "runtime purge remains unauthorized pending rebased I10 qualification"
+        "C1-I10 validation passed: P5 no-growth runtime purge is lifecycle-owned "
+        "and qualified; only empty trash or successful purge permits I7; "
+        "Application has no direct destructive caller"
     )
     return 0
 
