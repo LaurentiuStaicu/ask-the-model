@@ -91,7 +91,7 @@ def main() -> int:
     )
     require_equal(
         policy.get("status"),
-        "selected-runtime-isolation-and-purge-wired",
+        "qualified-runtime-isolation-and-purge-reclamation-evidence-complete",
         "policy status",
     )
 
@@ -512,13 +512,52 @@ def main() -> int:
             "runtime_purge_steady_state_policy_selected": True,
             "runtime_purge_integration_implemented": True,
             "runtime_purge_integration_qualification_complete": True,
+            "reclamation_space_accounting_qualification_complete": True,
             "purge_runtime_authorized": True,
             "next_required_slice": (
-                "QUALIFY_C1_SPACE_ACCOUNTING_AND_RECLAMATION_EVIDENCE"
+                "REVIEW_C1_CLOSEOUT_AND_RESUME_D0_RETRIEVAL_REBASELINE"
             ),
         },
         "implementation state",
     )
+
+    reclamation = policy.get("reclamation_evidence", {})
+    require_equal(
+        reclamation.get("evidence_id"),
+        "atm-c1-reclamation-space-accounting-v1",
+        "C1 reclamation evidence id",
+    )
+    require_equal(
+        reclamation.get("path"),
+        "benchmarks/c1-reclamation-v1/evidence.json",
+        "C1 reclamation evidence path",
+    )
+    require_equal(
+        reclamation.get("qualified_head"),
+        "e4f8bd321917115d481b1a78911ac0cb4bb53602",
+        "C1 reclamation qualified head",
+    )
+    require_equal(
+        reclamation.get("actions_run_id"),
+        36299959441,
+        "C1 reclamation actions run",
+    )
+    require_equal(
+        reclamation.get("filesystems"),
+        ["tmpfs", "ext4"],
+        "C1 reclamation filesystems",
+    )
+    for key in (
+        "allocated_tree_metric_reused_from_c0",
+        "positive_filesystem_reclamation_observed",
+        "normal_snapshot_preserved",
+    ):
+        require_equal(reclamation.get(key), True, f"C1 reclamation {key}")
+    for key in (
+        "production_thresholds_selected",
+        "runtime_trigger_policy_changed",
+    ):
+        require_equal(reclamation.get(key), False, f"C1 reclamation {key}")
 
     coord_state = coordination.get("implementation_state", {})
     require_equal(
@@ -1028,9 +1067,9 @@ def main() -> int:
         )
 
     print(
-        "C1-I10 validation passed: P5 no-growth runtime purge is lifecycle-owned "
-        "and qualified; only empty trash or successful purge permits I7; "
-        "Application has no direct destructive caller"
+        "C1-M1 validation passed: P5 no-growth runtime purge is qualified and "
+        "controlled tmpfs/ext4 reclamation evidence is complete; no production "
+        "reclaim threshold or hidden destructive trigger was added"
     )
     return 0
 
