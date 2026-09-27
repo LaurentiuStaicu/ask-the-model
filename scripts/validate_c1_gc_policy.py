@@ -713,19 +713,24 @@ def main() -> int:
     if "optimization_mode_snapshot (" in mutation_slice:
         fail("I7 private mutation body rereads live Optimizations state")
 
+    # I7 remains a purge-free isolation sub-seam. I10 composes I9 above
+    # it rather than inserting purge behavior into this method.
     cleanup_start = require_marker(
         lifecycle,
         "run_post_mutation_isolation (",
-        "I7 cleanup seam",
+        "I7 purge-free isolation seam",
     )
-    cleanup_end = lifecycle.find(
-        "\n\n        private async uint download_or_update_for_operation",
-        cleanup_start,
+    maintenance_start = require_marker(
+        lifecycle,
+        "run_post_mutation_maintenance (",
+        "I10 lifecycle maintenance seam",
     )
-    if cleanup_end < 0:
-        fail("I7 cleanup seam boundary is unavailable")
-    cleanup_slice = lifecycle[cleanup_start:cleanup_end]
+    if cleanup_start >= maintenance_start:
+        fail("I7 isolation seam must precede I10 maintenance seam")
 
+    cleanup_slice = lifecycle[
+        cleanup_start:maintenance_start
+    ]
     for marker in (
         "!operation.optimized_operation ||\n                operation.changed == 0",
         "RepositoryGcIsolationOrchestrator.\n                    isolate_one (",
@@ -735,28 +740,88 @@ def main() -> int:
         require_marker(
             cleanup_slice,
             marker,
-            "I7 bounded cleanup seam",
+            "I7 purge-free isolation seam",
+        )
+    for forbidden in (
+        "RepositoryGcPurgeOrchestrator",
+        "gc_purge_trash_entry",
+        "purge_one (",
+    ):
+        if forbidden in cleanup_slice:
+            fail(f"I7 isolation seam gained purge behavior: {forbidden}")
+    if "optimization_mode_snapshot (" in cleanup_slice:
+        fail("I7 isolation seam rereads live Optimizations state")
+
+    maintenance_end = lifecycle.find(
+        "\n\n        private async uint download_or_update_for_operation",
+        maintenance_start,
+    )
+    if maintenance_end < 0:
+        fail("I10 lifecycle maintenance seam boundary is unavailable")
+    maintenance_slice = lifecycle[
+        maintenance_start:maintenance_end
+    ]
+
+    for marker in (
+        "!operation.optimized_operation ||\n                operation.changed == 0",
+        "RepositoryGcPurgeOrchestrator.\n                        purge_one (",
+        "case RepositoryGcPurgeOutcome.NO_CANDIDATE:",
+        "case RepositoryGcPurgeOutcome.PURGED:",
+        "case RepositoryGcPurgeOutcome.B0_CONTENDED:",
+        "case RepositoryGcPurgeOutcome.B2_CONTENDED:",
+        "case RepositoryGcPurgeOutcome.ROOTED_PRESERVED:",
+        "run_post_mutation_isolation (",
+        "\"purge phase: \"",
+        "\"isolation phase: \"",
+    ):
+        require_marker(
+            maintenance_slice,
+            marker,
+            "I10 P5 bounded purge-then-isolation seam",
         )
 
-    if "optimization_mode_snapshot (" in cleanup_slice:
-        fail("I7 cleanup seam rereads live Optimizations state")
-    if "gc_purge" in cleanup_slice or "purge_trash" in cleanup_slice:
-        fail("I7 cleanup seam must not invoke I5 purge")
+    for marker in (
+        "public class RepositoryPostMutationMaintenanceResult",
+        "public bool isolation_allowed_after_purge",
+        "public bool isolation_attempted",
+    ):
+        require_marker(
+            lifecycle,
+            marker,
+            "I10 maintenance result contract",
+        )
+
+    purge_call = require_marker(
+        maintenance_slice,
+        "RepositoryGcPurgeOrchestrator.\n                        purge_one (",
+        "I10 purge call",
+    )
+    isolation_call = maintenance_slice.find(
+        "run_post_mutation_isolation (",
+        purge_call + 1,
+    )
+    if isolation_call < 0 or purge_call >= isolation_call:
+        fail("I10 must attempt purge before optional isolation")
+
+    if "optimization_mode_snapshot (" in maintenance_slice:
+        fail("I10 maintenance seam rereads live Optimizations state")
+    if lifecycle.count("RepositoryGcPurgeOrchestrator") != 1:
+        fail("I10 lifecycle must contain exactly one purge orchestrator call site")
     if lifecycle.count("RepositoryGcIsolationOrchestrator") != 1:
-        fail("I7 lifecycle must contain exactly one orchestrator call site")
+        fail("I10 lifecycle must preserve exactly one isolation orchestrator call site")
 
     app_cleanup_start = require_marker(
         application,
-        "private void run_post_mutation_isolation_best_effort (",
-        "I7 Application cleanup wrapper",
+        "private void run_post_mutation_maintenance_best_effort (",
+        "I10 Application maintenance wrapper",
     )
     app_action_start = require_marker(
         application,
         "private async void download_or_update_selected_repositories ()",
-        "I7 repository action",
+        "I10 repository action",
     )
     if app_cleanup_start >= app_action_start:
-        fail("I7 cleanup wrapper must precede repository action")
+        fail("I10 maintenance wrapper must precede repository action")
 
     app_cleanup = application[
         app_cleanup_start:app_action_start
@@ -764,37 +829,45 @@ def main() -> int:
     for marker in (
         "!operation.optimized_operation ||\n                operation.changed == 0",
         "ConversationPersistenceStore? store =\n                conversation_store;",
-        "run_post_mutation_isolation (",
-        "repository isolation maintenance skipped",
-        "repository isolation maintenance failed after committed repository action",
+        "run_post_mutation_maintenance (",
+        "repository maintenance skipped",
+        "repository purge maintenance outcome=",
+        "repository isolation maintenance skipped by purge outcome policy",
+        "repository maintenance failed after committed repository action",
     ):
         require_marker(
             app_cleanup,
             marker,
-            "I7 best-effort cleanup wrapper",
+            "I10 best-effort Application wrapper",
         )
     if "optimization_policy" in app_cleanup or "snapshot_enabled (" in app_cleanup:
-        fail("I7 Application cleanup wrapper rereads live Optimizations state")
+        fail("I10 Application maintenance wrapper rereads live Optimizations state")
+    if "RepositoryGcPurgeOrchestrator" in application:
+        fail("Application must not call the purge orchestrator directly")
+    if "RepositoryGcIsolationOrchestrator" in application:
+        fail("Application must not call the isolation orchestrator directly")
+    if "gc_purge_trash_entry (" in application:
+        fail("Application must not call I5 directly")
 
     app_action_end = application.find(
         "\n        private Gtk.CheckButton build_repository_check_button",
         app_action_start,
     )
     if app_action_end < 0:
-        fail("I7 repository action boundary is unavailable")
+        fail("I10 repository action boundary is unavailable")
     app_action = application[app_action_start:app_action_end]
 
     ordered_action_markers = [
         "download_or_update_with_context (",
         "finish_repository_operation (\n                    RepositoryOperationOutcome.NORMAL",
-        "run_post_mutation_isolation_best_effort (",
+        "run_post_mutation_maintenance_best_effort (",
     ]
     previous = -1
     for marker in ordered_action_markers:
         current = app_action.find(marker, previous + 1)
         if current < 0:
             fail(
-                "I7 post-mutation trigger ordering lost marker after "
+                "I10 post-mutation ordering lost marker after "
                 f"position {previous}: {marker}"
             )
         previous = current
@@ -802,28 +875,20 @@ def main() -> int:
     for forbidden in (
         "optimization_policy.snapshot_enabled",
         "optimization_mode_snapshot (",
-        "gc_purge",
-        "purge_trash",
+        "RepositoryGcPurgeOrchestrator",
+        "RepositoryGcIsolationOrchestrator",
+        "gc_purge_trash_entry",
     ):
         if forbidden in app_action:
-            fail(f"I7 repository action contains forbidden marker: {forbidden}")
+            fail(f"I10 repository action contains forbidden marker: {forbidden}")
 
     if application.count(
-        "run_post_mutation_isolation_best_effort ("
+        "run_post_mutation_maintenance_best_effort ("
     ) != 2:
-        fail("I7 Application must define and invoke the cleanup wrapper once")
+        fail("I10 Application must define and invoke the maintenance wrapper once")
 
-    if "RepositoryGcIsolationOrchestrator" in application:
-        fail("I7 Application must call GC only through lifecycle seam")
-
-    for forbidden in (
-        "atm_repository_gc_purge_trash_entry",
-        "gc_purge",
-        "purge_trash",
-    ):
-        if forbidden in lifecycle:
-            fail(f"P3 policy-only slice must not wire phase-2 purge: {forbidden}")
-
+    # I8 remains a narrow native/discovery layer. Runtime integration goes
+    # through I9 and never calls these primitives directly from lifecycle.
     for marker in (
         'cname = "atm_repository_gc_select_canonical_trash_candidate"',
         'cheader_filename = "repository_gc_trash_scan.h"',
@@ -835,7 +900,7 @@ def main() -> int:
         require_marker(
             repository_native,
             marker,
-            "I8 dormant discovery/purge bridge",
+            "I8 discovery/purge bridge",
         )
 
     for marker in (
@@ -864,19 +929,10 @@ def main() -> int:
             "I8 Vala trash discovery wrapper",
         )
 
-    for forbidden in (
-        "gc_purge_trash_entry (",
-        "RepositoryGcTrashDiscovery",
-    ):
-        if forbidden in lifecycle:
-            fail(f"I8 discovery/binding must remain lifecycle-unwired: {forbidden}")
-
-    if "gc_purge_trash_entry (" in application:
-        fail("I9 must not add an Application purge caller")
-    if "RepositoryGcPurgeOrchestrator" in lifecycle:
-        fail("I9 dormant purge orchestrator must remain lifecycle-unwired")
-    if "RepositoryGcPurgeOrchestrator" in application:
-        fail("I9 dormant purge orchestrator must remain Application-unwired")
+    if "gc_purge_trash_entry (" in lifecycle:
+        fail("I10 lifecycle must use I9 rather than calling I5 directly")
+    if "RepositoryGcTrashDiscovery" in lifecycle:
+        fail("I10 lifecycle must use I9 rather than calling discovery directly")
 
     ordered_purge_markers = [
         "try_acquire_mutation_lease (",
