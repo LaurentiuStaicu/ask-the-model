@@ -1,7 +1,7 @@
 {
   "schema_version": 1,
   "policy_id": "atm-c1-snapshot-gc-orchestration-v1",
-  "status": "selected-runtime-isolation-wired-purge-integration-selected-unwired",
+  "status": "selected-runtime-isolation-wired-purge-steady-state-policy-selected-unwired",
   "scope": {
     "supported_storage": "qualified local Linux AtM storage only",
     "optimizations_required": true,
@@ -106,10 +106,11 @@
     "runtime_purge_discovery_implemented": true,
     "runtime_purge_orchestrator_implemented": true,
     "purge_runtime_authorized": false,
-    "next_required_slice": "IMPLEMENT_BOUNDED_RUNTIME_PURGE_INTEGRATION",
+    "next_required_slice": "REBASE_AND_QUALIFY_BOUNDED_RUNTIME_PURGE_INTEGRATION_WITH_NO_GROWTH_GATE",
     "runtime_purge_binding_available": true,
     "runtime_purge_orchestrator_race_qualification_complete": true,
-    "runtime_purge_integration_policy_selected": true
+    "runtime_purge_integration_policy_selected": true,
+    "runtime_purge_steady_state_policy_selected": true
   },
   "runtime_isolation_trigger_policy": {
     "selected": "POST_SUCCESSFUL_CHANGED_REPOSITORY_ACTION",
@@ -175,10 +176,11 @@
     "conversation_close_delete_archive_trigger_forbidden": true,
     "enospc_or_capacity_failure_trigger_forbidden": true,
     "repository_refresh_trigger_forbidden": true,
-    "no_candidate_or_contention": "NOOP_ALLOW_EXISTING_I7_ISOLATION_PHASE",
     "repair_or_internal_failure": "DIAGNOSTIC_BLOCK_SAME_ACTION_ISOLATION_PHASE",
     "repository_action_outcome_remains_success": true,
-    "runtime_authorized": false
+    "runtime_authorized": false,
+    "no_candidate": "NOOP_ALLOW_EXISTING_I7_ISOLATION_PHASE",
+    "contention": "NOOP_BLOCK_SAME_ACTION_ISOLATION_PHASE"
   },
   "runtime_purge_integration_policy": {
     "selected": "POST_SUCCESSFUL_CHANGED_REPOSITORY_ACTION_PURGE_THEN_ISOLATE",
@@ -200,16 +202,16 @@
     "purge_phase_precedes_isolation_phase": true,
     "purge_outcome_policy": {
       "NOT_ENABLED": "CONTRACT_VIOLATION_DIAGNOSTIC_BLOCK_ISOLATION",
-      "B0_CONTENDED": "ALLOW_ISOLATION",
+      "B0_CONTENDED": "NO_PURGE_PROGRESS_BLOCK_ISOLATION",
       "NO_CANDIDATE": "ALLOW_ISOLATION",
-      "B2_CONTENDED": "ALLOW_ISOLATION",
+      "B2_CONTENDED": "LIVE_PROTECTION_NO_PURGE_PROGRESS_BLOCK_ISOLATION",
       "ROOTED_PRESERVED": "PRESERVE_TRASH_BLOCK_ISOLATION",
       "PURGED": "ALLOW_ISOLATION"
     },
     "purge_error_policy": "DIAGNOSTIC_BLOCK_ISOLATION",
     "isolation_error_policy": "DIAGNOSTIC_ONLY_REPOSITORY_ACTION_REMAINS_SUCCESS",
     "repository_action_outcome_remains_success": true,
-    "rooted_preserved_rationale": "DO_NOT_ACCUMULATE_NEW_TRASH_WHILE_DETERMINISTIC_HEAD_CANDIDATE_IS_DURABLY_ROOTED",
+    "rooted_preserved_rationale": "DO_NOT_ACCUMULATE_NEW_TRASH_WHILE_DETERMINISTIC_HEAD_CANDIDATE_HAS_A_PROTECTION_REASON",
     "no_runtime_ui_added": true,
     "startup_trigger_forbidden": true,
     "optimization_toggle_trigger_forbidden": true,
@@ -219,6 +221,17 @@
     "repository_refresh_trigger_forbidden": true,
     "loop_until_empty_forbidden": true,
     "runtime_implementation_requires_separate_qualification": true,
-    "existing_i7_isolation_seam_remains_purge_free": true
+    "existing_i7_isolation_seam_remains_purge_free": true,
+    "steady_state_no_growth_selected": true,
+    "steady_state_trash_count_invariant": "IF_TRASH_COUNT_GT_0_ISOLATION_REQUIRES_SUCCESSFUL_PURGE",
+    "steady_state_recurrence": {
+      "NO_CANDIDATE": "T_PRE=0; T_POST<=1",
+      "PURGED": "T_POST<=T_PRE",
+      "B0_CONTENDED": "T_POST=T_PRE",
+      "B2_CONTENDED": "T_POST=T_PRE",
+      "ROOTED_PRESERVED": "T_POST=T_PRE",
+      "PURGE_ERROR_OR_NOT_ENABLED": "T_POST=T_PRE"
+    },
+    "only_purge_progress_or_empty_trash_allows_isolation": true
   }
 }
