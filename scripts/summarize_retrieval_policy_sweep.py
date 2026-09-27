@@ -229,6 +229,18 @@ def main() -> int:
                     ),
                     "delta_source_count_mean_vs_production": source_delta,
                     "delta_evidence_bytes_mean_vs_production": bytes_delta,
+                    "source_count_reduction_percent_vs_production": (
+                        (-source_delta / baseline_sources) * 100.0
+                        if source_delta is not None
+                        and baseline_sources not in (None, 0)
+                        else None
+                    ),
+                    "evidence_bytes_reduction_percent_vs_production": (
+                        (-bytes_delta / baseline_bytes) * 100.0
+                        if bytes_delta is not None
+                        and baseline_bytes not in (None, 0)
+                        else None
+                    ),
                 },
                 "timing_observational": {
                     "retrieval": latency_summary(run, "latency_ms"),
@@ -241,11 +253,57 @@ def main() -> int:
                 "topic_regressions": regressions,
                 "quality_preserved_vs_production": quality_preserved,
                 "resource_benefit_observed": resource_benefit_observed,
-                "promotion_eligible_observational": (
-                    quality_preserved and resource_benefit_observed
-                ),
+                "pareto_dominated_by": [],
+                "pareto_frontier_observational": False,
+                "promotion_eligible_observational": False,
             }
         )
+
+    quality_candidates = [
+        row
+        for row in rows
+        if row["policy"] != "production"
+        and row["quality_preserved_vs_production"]
+        and row["resource_benefit_observed"]
+    ]
+
+    for row in quality_candidates:
+        row_cost = row["context_cost"]
+        dominated_by = []
+
+        for other in quality_candidates:
+            if other is row:
+                continue
+
+            other_cost = other["context_cost"]
+            row_sources = row_cost["source_count_mean"]
+            row_bytes = row_cost["evidence_bytes_mean"]
+            other_sources = other_cost["source_count_mean"]
+            other_bytes = other_cost["evidence_bytes_mean"]
+
+            if None in (
+                row_sources,
+                row_bytes,
+                other_sources,
+                other_bytes,
+            ):
+                continue
+
+            no_worse = (
+                other_sources <= row_sources + epsilon
+                and other_bytes <= row_bytes + epsilon
+            )
+            strictly_better = (
+                other_sources < row_sources - epsilon
+                or other_bytes < row_bytes - epsilon
+            )
+
+            if no_worse and strictly_better:
+                dominated_by.append(other["policy"])
+
+        row["pareto_dominated_by"] = sorted(dominated_by)
+        row["pareto_frontier_observational"] = not dominated_by
+        row["promotion_eligible_observational"] = not dominated_by
 
     output = {
         "schema_version": 3,
@@ -260,8 +318,11 @@ def main() -> int:
             "CI runner variance is not a blocking quality gate"
         ),
         "promotion_interpretation": (
-            "promotion_eligible_observational is only a measured candidate flag; "
-            "D1 remains a separate production-policy decision"
+            "promotion_eligible_observational requires quality preservation, "
+            "measured resource reduction and membership on the non-dominated "
+            "source-count/evidence-byte frontier; timing is excluded from "
+            "dominance because CI variance is observational. D1 remains a "
+            "separate production-policy decision"
         ),
         "policies": rows,
     }
@@ -276,9 +337,12 @@ def main() -> int:
             f"{row['policy']}: "
             f"quality={row['quality_preserved_vs_production']} "
             f"benefit={row['resource_benefit_observed']} "
+            f"pareto={row['pareto_frontier_observational']} "
             f"topic_regressions={row['topic_regression_count']} "
             f"sources_mean={row['context_cost']['source_count_mean']} "
             f"bytes_mean={row['context_cost']['evidence_bytes_mean']} "
+            f"bytes_reduction_pct="
+            f"{row['context_cost']['evidence_bytes_reduction_percent_vs_production']} "
             f"context_ms_mean="
             f"{row['timing_observational']['context_assembly']['mean_ms']}"
         )
