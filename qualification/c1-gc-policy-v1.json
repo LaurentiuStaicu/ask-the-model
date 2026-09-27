@@ -1,7 +1,7 @@
 {
   "schema_version": 1,
   "policy_id": "atm-c1-snapshot-gc-orchestration-v1",
-  "status": "selected-runtime-isolation-wired-purge-unwired",
+  "status": "selected-runtime-isolation-wired-purge-policy-selected-unwired",
   "scope": {
     "supported_storage": "qualified local Linux AtM storage only",
     "optimizations_required": true,
@@ -78,7 +78,13 @@
     "purge_requires_already_isolated_canonical_i4_TRASH_identity": true,
     "purge_runtime_authorized": false,
     "age_threshold_selected": false,
-    "automatic_restore_from_trash": false
+    "automatic_restore_from_trash": false,
+    "retention_boundary_selected": true,
+    "retention_boundary": "PREEXISTING_AT_REPOSITORY_OPERATION_ENTRY",
+    "same_operation_object_purge_forbidden": true,
+    "purge_candidate_must_be_carried_from_operation_entry": true,
+    "purge_before_current_operation_isolation": true,
+    "max_purge_attempts_per_qualifying_repository_action": 1
   },
   "failure_contract": {
     "b0_contention": "BUSY_SKIP_GC",
@@ -99,7 +105,8 @@
     "runtime_caller_present": true,
     "destructive_gc_authorized": true,
     "purge_runtime_authorized": false,
-    "next_required_slice": "REVIEW_ISOLATED_TRASH_RETENTION_AND_PURGE_RUNTIME_POLICY"
+    "next_required_slice": "IMPLEMENT_AND_QUALIFY_PRE_OPERATION_TRASH_CAPTURE_AND_BOUNDED_PURGE_TRIGGER",
+    "purge_policy_selected": true
   },
   "runtime_isolation_trigger_policy": {
     "selected": "POST_SUCCESSFUL_CHANGED_REPOSITORY_ACTION",
@@ -134,5 +141,39 @@
     "conversation_store_unavailable": "NOOP_SKIP_CLEANUP",
     "isolation_failure_does_not_change_repository_action_outcome": true,
     "isolation_does_not_reclaim_trash_bytes": true
+  },
+  "runtime_purge_policy": {
+    "selected": "POST_SUCCESSFUL_CHANGED_REPOSITORY_ACTION_PREEXISTING_TRASH_ONLY",
+    "policy_selected": true,
+    "runtime_authorized": false,
+    "optimizations_operation_snapshot_must_be_on": true,
+    "use_same_operation_optimization_snapshot": true,
+    "live_switch_recheck_for_trigger_forbidden": true,
+    "repository_action_must_succeed": true,
+    "changed_repository_count_must_be_positive": true,
+    "capture_exact_candidate_at_operation_entry": true,
+    "capture_is_readonly_advisory": true,
+    "candidate_scope": "GLOBAL_OLDEST_PRE_OPERATION_CANONICAL_I4_TRASH",
+    "eligibility_uses_pre_operation_membership_not_age": true,
+    "age_threshold_required": false,
+    "acquire_b0_before_purge": true,
+    "exact_i5_revalidation_required": true,
+    "max_purge_attempts_per_repository_action": 1,
+    "purge_before_current_operation_isolation": true,
+    "newly_isolated_object_same_operation_ineligible": true,
+    "first_qualifying_action_with_empty_trash": "NO_PURGE_THEN_EXISTING_I7_ISOLATION_MAY_STAGE_ONE",
+    "later_qualifying_action": "PURGE_AT_MOST_ONE_PREEXISTING_ENTRY_THEN_EXISTING_I7_MAY_ISOLATE_AT_MOST_ONE",
+    "b0_contention": "NOOP_SKIP_PURGE",
+    "missing_carried_candidate": "NOOP",
+    "candidate_disappeared": "NOOP_ALREADY_ABSENT",
+    "repair_condition": "FAIL_CLOSED_NO_PURGE_DIAGNOSTIC_ONLY",
+    "unexpected_failure": "DIAGNOSTIC_ONLY_ALREADY_COMMITTED_REPOSITORY_ACTION_REMAINS_SUCCESS",
+    "startup_trigger_forbidden": true,
+    "optimization_toggle_trigger_forbidden": true,
+    "background_timer_or_idle_trigger_forbidden": true,
+    "conversation_close_delete_archive_trigger_forbidden": true,
+    "enospc_or_capacity_failure_trigger_forbidden": true,
+    "repository_refresh_trigger_forbidden": true,
+    "loop_until_empty_forbidden": true
   }
 }
