@@ -9,7 +9,7 @@ POLICY = ROOT / "qualification" / "c1-gc-policy-v1.json"
 
 
 def fail(message: str) -> None:
-    print(f"C1-P1 policy validation failed: {message}", file=sys.stderr)
+    print(f"C1 policy validation failed: {message}", file=sys.stderr)
     raise SystemExit(1)
 
 
@@ -76,7 +76,7 @@ def main() -> int:
     )
     require_equal(
         policy.get("status"),
-        "selected-runtime-isolation-wired-purge-unwired",
+        "selected-runtime-isolation-wired-purge-policy-selected-unwired",
         "policy status",
     )
 
@@ -91,6 +91,11 @@ def main() -> int:
         scope.get("destructive_gc_authorized"),
         True,
         "bounded isolation authorization",
+    )
+    require_equal(
+        scope.get("runtime_purge_authorized"),
+        False,
+        "runtime purge authorization",
     )
     for key in (
         "automatic_enospc_gc_authorized",
@@ -188,6 +193,11 @@ def main() -> int:
         "two-phase separation",
     )
     require_equal(
+        two_phase.get("purge_runtime_policy_selected"),
+        True,
+        "purge runtime policy selection",
+    )
+    require_equal(
         two_phase.get("purge_runtime_authorized"),
         False,
         "purge runtime authorization",
@@ -196,6 +206,11 @@ def main() -> int:
         two_phase.get("age_threshold_selected"),
         False,
         "purge age threshold",
+    )
+    require_equal(
+        two_phase.get("same_action_new_isolation_eligible_for_purge"),
+        False,
+        "same-action isolation purge exclusion",
     )
     require_equal(
         two_phase.get("automatic_restore_from_trash"),
@@ -284,6 +299,83 @@ def main() -> int:
         "isolation versus purge boundary",
     )
 
+    purge_trigger = policy.get("runtime_purge_trigger_policy", {})
+    require_equal(
+        purge_trigger.get("selected"),
+        "POST_SUCCESSFUL_CHANGED_REPOSITORY_ACTION_PREEXISTING_TRASH_ONLY",
+        "runtime purge trigger",
+    )
+    for key in (
+        "operation_snapshot_required",
+        "optimizations_snapshot_must_be_on",
+        "repository_action_must_succeed",
+        "changed_repository_count_must_be_positive",
+        "candidate_must_preexist_current_repository_mutation",
+        "carry_exact_candidate_through_operation",
+        "live_switch_recheck_for_trigger_forbidden",
+        "trigger_after_writer_b0_release",
+        "reacquire_b0_before_i5",
+        "same_action_i7_isolation_result_ineligible",
+        "purge_before_i7_isolation_cleanup",
+        "loop_until_empty_forbidden",
+        "background_timer_or_idle_trigger_forbidden",
+        "startup_trigger_forbidden",
+        "optimization_toggle_trigger_forbidden",
+        "conversation_close_delete_archive_trigger_forbidden",
+        "enospc_or_capacity_failure_trigger_forbidden",
+        "repository_refresh_trigger_forbidden",
+    ):
+        require_equal(
+            purge_trigger.get(key),
+            True,
+            f"runtime purge policy {key}",
+        )
+    require_equal(
+        purge_trigger.get("candidate_snapshot_phase"),
+        "UNDER_ORIGINAL_WRITER_B0_BEFORE_REPOSITORY_MUTATION",
+        "runtime purge candidate snapshot phase",
+    )
+    require_equal(
+        purge_trigger.get("max_purge_attempts_per_repository_action"),
+        1,
+        "bounded purge attempts",
+    )
+    require_equal(
+        purge_trigger.get("candidate_scope"),
+        "GLOBAL_DETERMINISTIC_OLDEST_CANONICAL_TRASH_ENTRY",
+        "runtime purge candidate scope",
+    )
+    require_equal(
+        purge_trigger.get("age_threshold_required"),
+        False,
+        "runtime purge age threshold",
+    )
+    require_equal(
+        purge_trigger.get("ui_trigger_added"),
+        False,
+        "runtime purge UI boundary",
+    )
+    require_equal(
+        purge_trigger.get("unexpected_or_noncanonical_trash"),
+        "REPAIR_FAIL_CLOSED_SKIP_PURGE",
+        "runtime purge repair boundary",
+    )
+    require_equal(
+        purge_trigger.get("missing_or_changed_candidate_after_reacquire"),
+        "NOOP_SKIP_PURGE",
+        "runtime purge stale-candidate boundary",
+    )
+    require_equal(
+        purge_trigger.get("unexpected_failure"),
+        "DIAGNOSTIC_ONLY_ALREADY_COMMITTED_REPOSITORY_ACTION_REMAINS_SUCCESS",
+        "runtime purge failure boundary",
+    )
+    require_equal(
+        purge_trigger.get("runtime_authorized"),
+        False,
+        "runtime purge remains unwired",
+    )
+
     implementation = policy.get("implementation_state", {})
     require_equal(
         implementation,
@@ -295,9 +387,10 @@ def main() -> int:
             "bounded_runtime_isolation_qualification_complete": True,
             "runtime_caller_present": True,
             "destructive_gc_authorized": True,
+            "purge_runtime_policy_selected": True,
             "purge_runtime_authorized": False,
             "next_required_slice": (
-                "REVIEW_ISOLATED_TRASH_RETENTION_AND_PURGE_RUNTIME_POLICY"
+                "IMPLEMENT_AND_QUALIFY_BOUNDED_PREEXISTING_TRASH_PURGE_TRIGGER"
             ),
         },
         "implementation state",
@@ -624,9 +717,9 @@ def main() -> int:
         )
 
     print(
-        "C1-I7 validation passed: one post-successful changed repository "
-        "action isolation attempt is wired under the carried ON snapshot; "
-        "cleanup failure is diagnostic-only; purge remains unwired"
+        "C1-P3 validation passed: bounded runtime isolation remains wired; "
+        "deferred preexisting-trash purge policy is selected but runtime "
+        "purge remains unwired"
     )
     return 0
 
