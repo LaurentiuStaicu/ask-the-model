@@ -2750,16 +2750,7 @@ namespace AskTheModel {
                 return;
             }
 
-            Gtk.TextView transcript =
-                state.transcript;
-            Gtk.TextBuffer buffer = transcript.buffer;
-            Gtk.TextIter end;
-            buffer.get_end_iter (out end);
-            buffer.insert (
-                ref end,
-                "\nSources: ",
-                -1
-            );
+            Gtk.Button[] source_buttons = {};
 
             for (
                 uint i = 0;
@@ -2773,23 +2764,16 @@ namespace AskTheModel {
                     continue;
                 }
 
-                state.presentation.append_semantic_child (
+                source_buttons +=
                     build_source_reference_button (
                         citation,
                         i + 1
-                    ),
-                    "atm-source-ref"
-                );
-
-                if (i + 1 < resolution.citation_count ()) {
-                    buffer.get_end_iter (out end);
-                    buffer.insert (
-                        ref end,
-                        " ",
-                        -1
                     );
-                }
             }
+
+            state.presentation.append_sources (
+                source_buttons
+            );
         }
 
         private string normalize_conversation_title (
