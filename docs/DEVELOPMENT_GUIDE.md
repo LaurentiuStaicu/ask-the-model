@@ -1706,6 +1706,16 @@ The Vala bridge exposes two narrow primitives:
 
 Neither primitive has a `RepositoryLifecycleService` or `Application` purge caller in I8. The existing I7 isolation path is unchanged, the purge orchestrator is still absent, and `runtime_purge_authorized=false` remains enforced structurally. The next slice must implement a dormant purge orchestrator that acquires B0 before authoritative selection, resolves all COMPLETE generations referencing the candidate SHA, acquires B2 exclusions in ascending order, rereads durable roots and only then invokes exact I5 revalidation/purge.
 
+### OPT-C1-I9 dormant purge orchestrator
+
+I9 implements that purge sequence as a testable dormant component while preserving `runtime_purge_authorized=false` and adding no lifecycle or Application caller.
+
+The orchestrator requires an Optimizations-ON operation context, acquires B0 before authoritative trash discovery, selects one canonical I8 candidate, resolves every COMPLETE Control DB generation referencing the candidate repository/SHA, acquires all corresponding B2 exclusive leases in ascending generation order, and rereads durable roots after those exclusions are held. A rooted candidate remains in trash without automatic restore. Only an unrooted candidate reaches the exact I5 purge primitive.
+
+B0 or B2 contention is a bounded maintenance no-op. All held B2 exclusions are released in reverse order and B0 is released on every path. Tests cover OFF/no-candidate behavior, B0 contention, an unreferenced purge, active-root preservation, shared-reader contention, a durable root appearing after candidate selection, a new shared reader being blocked by the held exclusive lease, and cleanup of partial B2 acquisition.
+
+I9 still does not decide when production should invoke the purge orchestrator. There is no `RepositoryLifecycleService` or `Application` caller, no startup/background/ENOSPC trigger and no loop-until-empty. The next gate is a separate review of runtime purge integration authorization under the already-selected P3 policy.
+
 ### Recovery fault qualification
 
 The OPT-A0 recovery harness is test-only. Native checkpoint calls compile to no-ops in the production application; only the dedicated recovery helper is built with `ATM_TEST_FAULT_INJECTION`.
