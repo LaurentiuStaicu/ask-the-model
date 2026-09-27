@@ -1205,6 +1205,29 @@ test_operation_snapshot_selects_context_source_cap (void)
         )
     );
 
+    AtmCitationResolution *off_resolution = NULL;
+
+    g_assert_true (
+        atm_conversation_grounding_resolve_turn_citations (
+            state,
+            "OFF baseline provenance [S6].",
+            &off_resolution,
+            &error
+        )
+    );
+    g_assert_no_error (error);
+    g_assert_cmpuint (off_resolution->citations->len, ==, 1);
+
+    AtmCitationReference *off_citation =
+        g_ptr_array_index (
+            off_resolution->citations,
+            0
+        );
+
+    g_assert_cmpstr (off_citation->repository_id, ==, "ewd");
+    g_assert_cmpstr (off_citation->snapshot_sha, ==, sha);
+    atm_citation_resolution_free (off_resolution);
+
     atm_conversation_grounding_abort_turn (state);
     g_clear_pointer (&post_evidence_reminder, g_free);
     g_clear_pointer (&evidence_text, g_free);
@@ -1251,6 +1274,29 @@ test_operation_snapshot_selects_context_source_cap (void)
             "[S5]"
         )
     );
+
+    AtmCitationResolution *on_resolution = NULL;
+
+    g_assert_true (
+        atm_conversation_grounding_resolve_turn_citations (
+            state,
+            "ON optimized provenance [S4].",
+            &on_resolution,
+            &error
+        )
+    );
+    g_assert_no_error (error);
+    g_assert_cmpuint (on_resolution->citations->len, ==, 1);
+
+    AtmCitationReference *on_citation =
+        g_ptr_array_index (
+            on_resolution->citations,
+            0
+        );
+
+    g_assert_cmpstr (on_citation->repository_id, ==, "ewd");
+    g_assert_cmpstr (on_citation->snapshot_sha, ==, sha);
+    atm_citation_resolution_free (on_resolution);
 
     atm_conversation_grounding_abort_turn (state);
     g_free (post_evidence_reminder);
