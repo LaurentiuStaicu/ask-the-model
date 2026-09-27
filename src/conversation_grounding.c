@@ -495,6 +495,7 @@ gboolean
 atm_conversation_grounding_prepare_turn (
     AtmConversationGroundingState *state,
     const char *query,
+    gboolean optimized_operation,
     gboolean *out_has_grounding,
     gboolean *out_needs_clarification,
     char **out_system_instructions,
@@ -586,9 +587,14 @@ atm_conversation_grounding_prepare_turn (
         goto out;
     }
 
+    guint max_context_sources =
+        optimized_operation
+            ? ATM_OPTIMIZED_GROUNDING_MAX_SOURCES
+            : ATM_PRODUCTION_GROUNDING_MAX_SOURCES;
+
     if (!atm_grounding_context_build (
             turn->retrieval,
-            ATM_PRODUCTION_GROUNDING_MAX_SOURCES,
+            max_context_sources,
             ATM_PRODUCTION_GROUNDING_MAX_CONTEXT_BYTES,
             &context,
             error
