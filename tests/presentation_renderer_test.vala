@@ -224,6 +224,26 @@ test_pending_assistant_lifecycle () {
         baseline + "\n\nAssistant: "
     );
 
+    Gtk.TextIter pending_start;
+    Gtk.TextIter pending_end;
+    buffer.get_bounds (
+        out pending_start,
+        out pending_end
+    );
+    buffer.select_range (
+        pending_start,
+        pending_end
+    );
+
+    bool pending_had_anchor = false;
+    string? pending_semantic =
+        renderer.selected_semantic_text (
+            out pending_had_anchor
+        );
+    assert (pending_had_anchor);
+    assert (pending_semantic != null);
+    assert (!pending_semantic.contains ("\uFFFC"));
+
     renderer.complete_assistant_generation (
         "Răspuns final"
     );
