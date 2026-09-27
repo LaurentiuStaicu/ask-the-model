@@ -37,6 +37,42 @@ static const BenchmarkPolicy PRODUCTION_POLICY = {
     ATM_PRODUCTION_GROUNDING_MAX_CONTEXT_BYTES
 };
 
+static const BenchmarkPolicy CANDIDATE_RESULTS5_POLICY = {
+    "candidate-results5",
+    5,
+    ATM_PRODUCTION_GROUNDING_MAX_SOURCES,
+    ATM_PRODUCTION_GROUNDING_MAX_CONTEXT_BYTES
+};
+
+#define DEFINE_SOURCE_CAP_POLICY(name, cap) \
+    static const BenchmarkPolicy name = { \
+        "candidate-sources" #cap, \
+        ATM_PRODUCTION_RETRIEVAL_RESULTS_PER_REPOSITORY, \
+        cap, \
+        ATM_PRODUCTION_GROUNDING_MAX_CONTEXT_BYTES \
+    }
+
+DEFINE_SOURCE_CAP_POLICY (CANDIDATE_SOURCES8_POLICY, 8);
+DEFINE_SOURCE_CAP_POLICY (CANDIDATE_SOURCES7_POLICY, 7);
+DEFINE_SOURCE_CAP_POLICY (CANDIDATE_SOURCES6_POLICY, 6);
+DEFINE_SOURCE_CAP_POLICY (CANDIDATE_SOURCES5_POLICY, 5);
+DEFINE_SOURCE_CAP_POLICY (CANDIDATE_SOURCES4_POLICY, 4);
+DEFINE_SOURCE_CAP_POLICY (CANDIDATE_SOURCES3_POLICY, 3);
+
+static const BenchmarkPolicy CANDIDATE_BYTES16K_POLICY = {
+    "candidate-bytes16k",
+    ATM_PRODUCTION_RETRIEVAL_RESULTS_PER_REPOSITORY,
+    ATM_PRODUCTION_GROUNDING_MAX_SOURCES,
+    16 * 1024
+};
+
+static const BenchmarkPolicy CANDIDATE_COMPACT_POLICY = {
+    "candidate-compact",
+    5,
+    8,
+    16 * 1024
+};
+
 typedef struct {
     char *repository_id;
     char *expected_version;
@@ -1035,6 +1071,7 @@ append_topic_run (
     }
 
     AtmGroundingContext *context = NULL;
+    double context_assembly_latency_ms = 0.0;
 
     if (!turn->needs_clarification) {
         if (turn->retrieval == NULL) {
@@ -1053,13 +1090,28 @@ append_topic_run (
             return FALSE;
         }
 
-        if (!atm_grounding_context_build (
+        gint64 context_started =
+            g_get_monotonic_time ();
+
+        gboolean context_built =
+            atm_grounding_context_build (
                 turn->retrieval,
                 policy->max_context_sources,
                 policy->max_context_bytes,
                 &context,
                 error
-            )) {
+            );
+
+        gint64 context_finished =
+            g_get_monotonic_time ();
+
+        context_assembly_latency_ms =
+            (double) (
+                context_finished -
+                context_started
+            ) / 1000.0;
+
+        if (!context_built) {
             atm_retrieval_conversation_turn_free (turn);
             atm_retrieval_conversation_state_free (
                 temporary_state
@@ -1098,6 +1150,15 @@ append_topic_run (
     json_builder_add_double_value (
         builder,
         latency_ms
+    );
+
+    json_builder_set_member_name (
+        builder,
+        "context_assembly_latency_ms"
+    );
+    json_builder_add_double_value (
+        builder,
+        context_assembly_latency_ms
     );
 
     json_builder_set_member_name (
@@ -1150,12 +1211,13 @@ append_topic_run (
     json_builder_end_object (builder);
 
     g_print (
-        "R5 topic: %s outcome=%s latency_ms=%.3f results=%u context=%u bytes=%" G_GSIZE_FORMAT "\n",
+        "R5 topic: %s outcome=%s retrieval_ms=%.3f context_ms=%.3f results=%u context=%u bytes=%" G_GSIZE_FORMAT "\n",
         topic_id,
         turn->needs_clarification
             ? "needs_clarification"
             : "retrieval",
         latency_ms,
+        context_assembly_latency_ms,
         turn->needs_clarification
             ? 0
             : retrieval_result_count (
@@ -1184,7 +1246,11 @@ main (int argc, char **argv)
 {
     if (argc != 4 && argc != 5) {
         g_printerr (
-            "Usage: %s BENCHMARK_JSON OUTPUT_JSON RUN_ID [frozen|production]\n",
+            "Usage: %s BENCHMARK_JSON OUTPUT_JSON RUN_ID "
+            "[frozen|production|candidate-results5|candidate-sources8|"
+            "candidate-sources7|candidate-sources6|candidate-sources5|"
+            "candidate-sources4|candidate-sources3|candidate-bytes16k|"
+            "candidate-compact]\n",
             argv[0]
         );
         return 2;
@@ -1201,9 +1267,27 @@ main (int argc, char **argv)
         policy = &FROZEN_R5_POLICY;
     } else if (g_strcmp0 (policy_name, "production") == 0) {
         policy = &PRODUCTION_POLICY;
+    } else if (g_strcmp0 (policy_name, "candidate-results5") == 0) {
+        policy = &CANDIDATE_RESULTS5_POLICY;
+    } else if (g_strcmp0 (policy_name, "candidate-sources8") == 0) {
+        policy = &CANDIDATE_SOURCES8_POLICY;
+    } else if (g_strcmp0 (policy_name, "candidate-sources7") == 0) {
+        policy = &CANDIDATE_SOURCES7_POLICY;
+    } else if (g_strcmp0 (policy_name, "candidate-sources6") == 0) {
+        policy = &CANDIDATE_SOURCES6_POLICY;
+    } else if (g_strcmp0 (policy_name, "candidate-sources5") == 0) {
+        policy = &CANDIDATE_SOURCES5_POLICY;
+    } else if (g_strcmp0 (policy_name, "candidate-sources4") == 0) {
+        policy = &CANDIDATE_SOURCES4_POLICY;
+    } else if (g_strcmp0 (policy_name, "candidate-sources3") == 0) {
+        policy = &CANDIDATE_SOURCES3_POLICY;
+    } else if (g_strcmp0 (policy_name, "candidate-bytes16k") == 0) {
+        policy = &CANDIDATE_BYTES16K_POLICY;
+    } else if (g_strcmp0 (policy_name, "candidate-compact") == 0) {
+        policy = &CANDIDATE_COMPACT_POLICY;
     } else {
         g_printerr (
-            "Unknown benchmark policy '%s'; expected frozen or production.\n",
+            "Unknown benchmark policy '%s'.\n",
             policy_name
         );
         return 2;
@@ -1338,6 +1422,50 @@ main (int argc, char **argv)
         builder,
         run_id
     );
+
+    json_builder_set_member_name (
+        builder,
+        "policy"
+    );
+    json_builder_begin_object (builder);
+
+    json_builder_set_member_name (
+        builder,
+        "name"
+    );
+    json_builder_add_string_value (
+        builder,
+        policy->name
+    );
+
+    json_builder_set_member_name (
+        builder,
+        "max_results_per_repository"
+    );
+    json_builder_add_int_value (
+        builder,
+        policy->max_results_per_repository
+    );
+
+    json_builder_set_member_name (
+        builder,
+        "max_context_sources"
+    );
+    json_builder_add_int_value (
+        builder,
+        policy->max_context_sources
+    );
+
+    json_builder_set_member_name (
+        builder,
+        "max_context_bytes"
+    );
+    json_builder_add_int_value (
+        builder,
+        (gint64) policy->max_context_bytes
+    );
+
+    json_builder_end_object (builder);
 
     json_builder_set_member_name (
         builder,
