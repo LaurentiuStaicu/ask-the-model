@@ -1,0 +1,66 @@
+{
+  "schema_version": 1,
+  "policy_id": "atm-d1-source-cap4-runtime-v1",
+  "status": "implementation-under-qualification",
+  "dependency_evidence": {
+    "d0": "qualification/d0-retrieval-context-rebaseline-v1.json",
+    "g0_issue": 210
+  },
+  "baseline_policy": {
+    "max_results_per_repository": 6,
+    "max_context_sources": 12,
+    "max_context_bytes": 32768
+  },
+  "optimized_policy": {
+    "gate": "OPTIMIZATIONS_ON_OPERATION_SNAPSHOT",
+    "max_results_per_repository": 6,
+    "max_context_sources": 4,
+    "max_context_bytes": 32768,
+    "d0_frontier_policy": "candidate-sources4"
+  },
+  "operation_snapshot": {
+    "unit": "ONE_SEND",
+    "owner": "Application.send_prompt",
+    "snapshot_expression": "optimization_policy.snapshot_enabled()",
+    "snapshot_before_first_async_boundary": true,
+    "in_flight_toggle_changes_current_send": false,
+    "new_toggle_value_applies_to_later_send": true
+  },
+  "propagation_path": [
+    "Application.send_prompt",
+    "ConversationSession.prepare_turn",
+    "ConversationGrounding.prepare_turn",
+    "atm_conversation_grounding_prepare_turn",
+    "atm_grounding_context_build"
+  ],
+  "state_boundary": {
+    "backend_widget_read_forbidden": true,
+    "environment_override_forbidden": true,
+    "persisted_mode_forbidden": true,
+    "conversation_level_mode_pin_forbidden": true,
+    "restored_conversation_uses_current_send_snapshot": true
+  },
+  "invariant_boundary": {
+    "retrieval_result_count_change_forbidden": true,
+    "context_byte_cap_change_forbidden": true,
+    "semantic_or_vector_retrieval_forbidden": true,
+    "model_provider_change_forbidden": true,
+    "optimization_ui_redesign_forbidden": true
+  },
+  "rollback": {
+    "immediate_runtime": "SET_OPTIMIZATIONS_OFF",
+    "off_path_is_exact_baseline": true
+  },
+  "implementation_state": {
+    "explicit_operation_snapshot_implemented": true,
+    "snapshot_propagation_implemented": true,
+    "off_baseline_source_cap_implemented": true,
+    "on_source_cap4_implemented": true,
+    "deterministic_off_on_grounding_test_added": true,
+    "structural_validator_added": false,
+    "dedicated_d1_workflow_added": false,
+    "frozen_r5_replay_complete": false,
+    "flatpak_qualification_complete": false,
+    "runtime_merge_authorized": false
+  }
+}
