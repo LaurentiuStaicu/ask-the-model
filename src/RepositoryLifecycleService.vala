@@ -1177,13 +1177,13 @@ namespace AskTheModel {
             bool allow_isolation = false;
 
             switch (purge.outcome) {
-            case RepositoryGcPurgeOutcome.B0_CONTENDED:
             case RepositoryGcPurgeOutcome.NO_CANDIDATE:
-            case RepositoryGcPurgeOutcome.B2_CONTENDED:
             case RepositoryGcPurgeOutcome.PURGED:
                 allow_isolation = true;
                 break;
 
+            case RepositoryGcPurgeOutcome.B0_CONTENDED:
+            case RepositoryGcPurgeOutcome.B2_CONTENDED:
             case RepositoryGcPurgeOutcome.ROOTED_PRESERVED:
                 allow_isolation = false;
                 break;
