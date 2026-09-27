@@ -69,8 +69,10 @@ executable(
     'src/RepositoryLifecycleService.vala',
     'src/RepositoryGcDurableRoots.vala',
     'src/RepositoryGcCandidates.vala',
+    'src/RepositoryGcTrashCandidates.vala',
     'src/RepositoryGcIsolationOrchestrator.vala',
     'src/repository_gc_candidate_scan.c',
+    'src/repository_gc_trash_scan.c',
     'src/ConversationGrounding.vala',
     'src/ConversationSession.vala',
     'src/cff_version.c',
@@ -778,6 +780,25 @@ test(
       repository_gc_isolation_fault_helper.full_path()
   },
   timeout: 60
+)
+
+repository_gc_trash_scan_test = executable(
+  'repository-gc-trash-scan-test',
+  [
+    'src/repository_gc_trash_scan.c',
+    'src/repository_gc_purge.c',
+    'tests/repository_gc_trash_scan_test.c'
+  ],
+  include_directories: include_directories('src'),
+  dependencies: [
+    glib_dep
+  ],
+  install: false
+)
+
+test(
+  'repository-gc-trash-scan',
+  repository_gc_trash_scan_test
 )
 
 repository_gc_purge_test = executable(
