@@ -71,6 +71,7 @@ executable(
     'src/RepositoryGcCandidates.vala',
     'src/RepositoryGcIsolationOrchestrator.vala',
     'src/RepositoryGcTrashDiscovery.vala',
+    'src/RepositoryGcPurgeOrchestrator.vala',
     'src/repository_gc_candidate_scan.c',
     'src/ConversationGrounding.vala',
     'src/ConversationSession.vala',
@@ -576,6 +577,56 @@ repository_gc_isolation_orchestrator_test = executable(
 test(
   'repository-gc-isolation-orchestrator',
   repository_gc_isolation_orchestrator_test
+)
+
+repository_gc_purge_orchestrator_test = executable(
+  'repository-gc-purge-orchestrator-test',
+  [
+    'src/RepositoryService.vala',
+    'src/RepositoryNative.vala',
+    'src/RepositoryState.vala',
+    'src/ControlStateNative.vala',
+    'src/ControlRepositoryState.vala',
+    'src/ConversationStoreNative.vapi',
+    'src/ConversationPersistenceStore.vala',
+    'src/ConversationExport.vala',
+    'src/OllamaProvider.vala',
+    'src/ChatRequestBuilder.vala',
+    'src/RepositoryGcDurableRoots.vala',
+    'src/RepositoryGcTrashDiscovery.vala',
+    'src/RepositoryGcPurgeOrchestrator.vala',
+    'src/repository_gc_trash_scan.c',
+    'src/repository_gc_isolation.c',
+    'src/repository_gc_purge.c',
+    'src/control_state.c',
+    'src/conversation_store.c',
+    'src/cff_version.c',
+    'src/coordination_lease.c',
+    'src/repository_generation_lease.c',
+    'src/repository_mutation_lease.c',
+    'tests/repository_gc_purge_orchestrator_test.vala',
+    resources
+  ],
+  include_directories: [
+    include_directories('src'),
+    include_directories('tests')
+  ],
+  dependencies: [
+    glib_dep,
+    gio_dep,
+    soup_dep,
+    json_glib_dep,
+    sqlite_dep
+  ],
+  link_args: [
+    '-lyaml'
+  ],
+  install: false
+)
+
+test(
+  'repository-gc-purge-orchestrator',
+  repository_gc_purge_orchestrator_test
 )
 
 control_repository_state_test = executable(
