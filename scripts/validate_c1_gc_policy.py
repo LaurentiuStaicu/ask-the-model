@@ -9,7 +9,7 @@ POLICY = ROOT / "qualification" / "c1-gc-policy-v1.json"
 
 
 def fail(message: str) -> None:
-    print(f"C1-P1 policy validation failed: {message}", file=sys.stderr)
+    print(f"C1 policy validation failed: {message}", file=sys.stderr)
     raise SystemExit(1)
 
 
@@ -33,6 +33,9 @@ def main() -> int:
     )
     lifecycle = (
         ROOT / "src" / "RepositoryLifecycleService.vala"
+    ).read_text(encoding="utf-8")
+    repository_native = (
+        ROOT / "src" / "RepositoryNative.vala"
     ).read_text(encoding="utf-8")
     application = (
         ROOT / "src" / "Application.vala"
@@ -76,7 +79,7 @@ def main() -> int:
     )
     require_equal(
         policy.get("status"),
-        "selected-runtime-isolation-wired-purge-unwired",
+        "selected-runtime-isolation-wired-purge-policy-selected-unwired",
         "policy status",
     )
 
@@ -98,6 +101,7 @@ def main() -> int:
         "quarantine_purge_authorized",
         "retrieval_index_eviction_authorized",
         "control_db_generation_pruning_authorized",
+        "runtime_purge_authorized",
     ):
         require_equal(scope.get(key), False, f"scope.{key}")
 
@@ -187,6 +191,12 @@ def main() -> int:
         False,
         "two-phase separation",
     )
+    for key in (
+        "purge_candidate_must_preexist_current_isolation_phase",
+        "purge_phase_precedes_current_isolation_phase",
+        "same_repository_action_may_host_distinct_purge_then_isolation_phases",
+    ):
+        require_equal(two_phase.get(key), True, f"two-phase {key}")
     require_equal(
         two_phase.get("purge_runtime_authorized"),
         False,
@@ -284,6 +294,78 @@ def main() -> int:
         "isolation versus purge boundary",
     )
 
+
+    purge_policy = policy.get("runtime_purge_policy", {})
+    require_equal(
+        purge_policy.get("selected"),
+        "NEXT_QUALIFYING_REPOSITORY_ACTION_PRE_ISOLATION_PHASE",
+        "runtime purge trigger",
+    )
+    for key in (
+        "operation_snapshot_required",
+        "optimizations_snapshot_must_be_on",
+        "repository_action_must_succeed",
+        "changed_repository_count_must_be_positive",
+        "trigger_after_writer_b0_release",
+        "use_same_operation_optimization_snapshot",
+        "live_switch_recheck_for_trigger_forbidden",
+        "candidate_must_exist_before_current_isolation_phase",
+        "purge_phase_precedes_current_isolation_phase",
+        "acquire_b0_before_authoritative_selection",
+        "enumerate_and_revalidate_trash_under_b0",
+        "resolve_all_complete_generations_referencing_repository_sha",
+        "acquire_b2_exclusive_for_referencing_generations_ascending",
+        "reread_durable_roots_after_all_b2_exclusions",
+        "exact_i5_revalidation_required",
+        "loop_until_empty_forbidden",
+        "startup_trigger_forbidden",
+        "optimization_toggle_trigger_forbidden",
+        "background_timer_or_idle_trigger_forbidden",
+        "conversation_close_delete_archive_trigger_forbidden",
+        "enospc_or_capacity_failure_trigger_forbidden",
+        "repository_refresh_trigger_forbidden",
+        "repository_action_outcome_remains_success",
+    ):
+        require_equal(purge_policy.get(key), True, f"runtime purge policy {key}")
+
+    for key in (
+        "current_action_new_isolation_eligible_for_purge",
+        "age_threshold_selected",
+        "runtime_authorized",
+    ):
+        require_equal(purge_policy.get(key), False, f"runtime purge policy {key}")
+
+    require_equal(
+        purge_policy.get("max_purge_attempts_per_repository_action"),
+        1,
+        "bounded purge attempts",
+    )
+    require_equal(
+        purge_policy.get("candidate_scope"),
+        "PREEXISTING_CANONICAL_I4_TRASH_ONLY",
+        "purge candidate scope",
+    )
+    require_equal(
+        purge_policy.get("candidate_selection"),
+        "DETERMINISTIC_REPOSITORY_ID_THEN_TRASH_NAME",
+        "purge candidate selection",
+    )
+    require_equal(
+        purge_policy.get("rooted_candidate_handling"),
+        "PRESERVE_TRASH_NO_AUTO_RESTORE",
+        "purge rooted-candidate handling",
+    )
+    require_equal(
+        purge_policy.get("no_candidate_or_contention"),
+        "NOOP_ALLOW_EXISTING_I7_ISOLATION_PHASE",
+        "purge no-op behavior",
+    )
+    require_equal(
+        purge_policy.get("repair_or_internal_failure"),
+        "DIAGNOSTIC_BLOCK_SAME_ACTION_ISOLATION_PHASE",
+        "purge repair failure boundary",
+    )
+
     implementation = policy.get("implementation_state", {})
     require_equal(
         implementation,
@@ -295,9 +377,12 @@ def main() -> int:
             "bounded_runtime_isolation_qualification_complete": True,
             "runtime_caller_present": True,
             "destructive_gc_authorized": True,
+            "runtime_purge_policy_selected": True,
+            "runtime_purge_discovery_implemented": False,
+            "runtime_purge_orchestrator_implemented": False,
             "purge_runtime_authorized": False,
             "next_required_slice": (
-                "REVIEW_ISOLATED_TRASH_RETENTION_AND_PURGE_RUNTIME_POLICY"
+                "IMPLEMENT_READONLY_CANONICAL_TRASH_DISCOVERY_AND_PURGE_BINDING"
             ),
         },
         "implementation state",
@@ -605,7 +690,15 @@ def main() -> int:
         "purge_trash",
     ):
         if forbidden in lifecycle:
-            fail(f"I7 lifecycle must not invoke phase-2 purge: {forbidden}")
+            fail(f"P3 policy-only slice must not wire phase-2 purge: {forbidden}")
+
+    for forbidden in (
+        "atm_repository_gc_purge_trash_entry",
+        "gc_purge_trash",
+        "purge_trash",
+    ):
+        if forbidden in repository_native:
+            fail(f"P3 must leave the I5 Vala purge binding for I8: {forbidden}")
 
     for marker in (
         "RepositoryMutationOutcome off_context =",
@@ -624,9 +717,9 @@ def main() -> int:
         )
 
     print(
-        "C1-I7 validation passed: one post-successful changed repository "
-        "action isolation attempt is wired under the carried ON snapshot; "
-        "cleanup failure is diagnostic-only; purge remains unwired"
+        "C1-P3 validation passed: bounded later-pass purge policy selected; "
+        "only pre-existing canonical I4 trash is eligible; no age threshold; "
+        "I5 Vala binding/orchestrator/runtime purge remain unwired"
     )
     return 0
 
