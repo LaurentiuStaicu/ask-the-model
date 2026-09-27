@@ -213,6 +213,11 @@ def main() -> int:
         "same-action isolation purge exclusion",
     )
     require_equal(
+        two_phase.get("two_phase_boundary_scope"),
+        "PER_TRASH_OBJECT_ACROSS_DISTINCT_REPOSITORY_ACTIONS",
+        "two-phase object boundary",
+    )
+    require_equal(
         two_phase.get("automatic_restore_from_trash"),
         False,
         "trash restore policy",
@@ -312,6 +317,8 @@ def main() -> int:
         "changed_repository_count_must_be_positive",
         "candidate_must_preexist_current_repository_mutation",
         "carry_exact_candidate_through_operation",
+        "candidate_selection_non_destructive",
+        "candidate_selection_failure_does_not_block_repository_action",
         "live_switch_recheck_for_trigger_forbidden",
         "trigger_after_writer_b0_release",
         "reacquire_b0_before_i5",
@@ -342,8 +349,18 @@ def main() -> int:
     )
     require_equal(
         purge_trigger.get("candidate_scope"),
-        "GLOBAL_DETERMINISTIC_OLDEST_CANONICAL_TRASH_ENTRY",
+        "GLOBAL_DETERMINISTIC_CANONICAL_TRASH_ENTRY",
         "runtime purge candidate scope",
+    )
+    require_equal(
+        purge_trigger.get("candidate_sort_key"),
+        "ISOLATION_TIMESTAMP_ASC_REPOSITORY_ID_ASC_TRASH_BASENAME_ASC",
+        "runtime purge candidate ordering",
+    )
+    require_equal(
+        purge_trigger.get("timestamp_used_for_order_only_not_age"),
+        True,
+        "runtime purge timestamp semantics",
     )
     require_equal(
         purge_trigger.get("age_threshold_required"),
