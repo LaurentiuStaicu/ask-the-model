@@ -1,0 +1,176 @@
+name: C1-M1 reclamation space accounting
+
+on:
+  pull_request:
+    paths:
+      - 'src/capacity_measurement.c'
+      - 'src/capacity_measurement.h'
+      - 'src/repository_gc_purge.c'
+      - 'src/repository_gc_purge.h'
+      - 'tests/c1_reclamation_probe.c'
+      - 'meson.build'
+      - 'benchmarks/c1-reclamation-v1/evidence.json'
+      - 'scripts/validate_c1_reclamation_evidence.py'
+      - 'scripts/validate_c1_gc_policy.py'
+      - 'qualification/c1-gc-policy-v1.json'
+      - '.github/workflows/c1-m1-reclamation-space-accounting.yml'
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: c1-m1-reclamation-${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  qualify:
+    runs-on: ubuntu-24.04
+    timeout-minutes: 15
+
+    steps:
+      - name: Checkout AtM
+        uses: actions/checkout@v4
+
+      - name: Install qualification dependencies
+        shell: bash
+        run: |
+          set -euo pipefail
+          sudo apt-get update
+          sudo apt-get install -y --no-install-recommends \
+            gcc \
+            pkg-config \
+            libglib2.0-dev \
+            e2fsprogs \
+            util-linux \
+            jq
+
+      - name: Compile reclamation probe
+        shell: bash
+        run: |
+          set -euo pipefail
+          CFLAGS="$(pkg-config --cflags glib-2.0)"
+          LIBS="$(pkg-config --libs glib-2.0)"
+          cc -std=c11 -D_DEFAULT_SOURCE -O2 -Wall -Wextra -Werror -Isrc $CFLAGS \
+            src/capacity_measurement.c \
+            src/repository_gc_purge.c \
+            tests/c1_reclamation_probe.c \
+            $LIBS \
+            -o /tmp/c1-reclamation-probe
+
+      - name: Measure controlled tmpfs reclamation
+        shell: bash
+        run: |
+          set -euo pipefail
+          MOUNT=/mnt/atm-c1-m1-tmpfs
+          sudo mkdir -p "$MOUNT"
+          cleanup() {
+            sudo umount "$MOUNT" 2>/dev/null || true
+          }
+          trap cleanup EXIT
+
+          sudo mount -t tmpfs -o size=64m,nr_inodes=4096 tmpfs "$MOUNT"
+          sudo chown "$(id -u):$(id -g)" "$MOUNT"
+
+          /tmp/c1-reclamation-probe \
+            "$MOUNT" tmpfs | tee /tmp/c1-m1-tmpfs.json
+
+          jq -e '
+            .schema_version == 1 and
+            .filesystem == "tmpfs" and
+            .trash_logical_regular_bytes_before == 11534336 and
+            .trash_allocated_tree_bytes_before > 0 and
+            .available_bytes_delta > 0 and
+            .purge_regular_files_removed == 2 and
+            .purge_directories_removed >= 2 and
+            .trash_absent_after == true and
+            .normal_snapshot_preserved == true
+          ' /tmp/c1-m1-tmpfs.json >/dev/null
+
+          cleanup
+          trap - EXIT
+
+      - name: Measure controlled ext4 reclamation
+        shell: bash
+        run: |
+          set -euo pipefail
+          IMAGE=/tmp/atm-c1-m1-ext4.img
+          MOUNT=/mnt/atm-c1-m1-ext4
+
+          truncate -s 96M "$IMAGE"
+          /usr/sbin/mkfs.ext4 -F -m 0 -b 4096 "$IMAGE" >/dev/null
+
+          sudo mkdir -p "$MOUNT"
+          cleanup() {
+            sudo umount "$MOUNT" 2>/dev/null || true
+          }
+          trap cleanup EXIT
+
+          sudo mount -o loop "$IMAGE" "$MOUNT"
+          sudo chown "$(id -u):$(id -g)" "$MOUNT"
+
+          /tmp/c1-reclamation-probe \
+            "$MOUNT" ext4 | tee /tmp/c1-m1-ext4.json
+
+          jq -e '
+            .schema_version == 1 and
+            .filesystem == "ext4" and
+            .fragment_size == 4096 and
+            .trash_logical_regular_bytes_before == 11534336 and
+            .trash_allocated_tree_bytes_before > 0 and
+            .available_bytes_delta > 0 and
+            .purge_regular_files_removed == 2 and
+            .purge_directories_removed >= 2 and
+            .trash_absent_after == true and
+            .normal_snapshot_preserved == true
+          ' /tmp/c1-m1-ext4.json >/dev/null
+
+          cleanup
+          trap - EXIT
+
+      - name: Assemble qualification evidence
+        shell: bash
+        run: |
+          set -euo pipefail
+          jq -s \
+            --arg source_commit "$GITHUB_SHA" \
+            '{
+              schema_version: 1,
+              evidence_id: "atm-c1-reclamation-space-accounting-v1",
+              status: "qualification-only",
+              production_thresholds_selected: false,
+              source_commit: $source_commit,
+              interpretation: {
+                allocated_tree_bytes: "AtM-managed allocation observation using existing C0 st_blocks semantics",
+                available_bytes_delta: "environment-specific statvfs observation; not an exact accounting identity or runtime threshold"
+              },
+              observations: .
+            }' \
+            /tmp/c1-m1-tmpfs.json \
+            /tmp/c1-m1-ext4.json \
+            > /tmp/c1-m1-evidence.json
+
+          jq -e '
+            .schema_version == 1 and
+            .status == "qualification-only" and
+            .production_thresholds_selected == false and
+            (.observations | length) == 2 and
+            ([.observations[].filesystem] | sort) == ["ext4", "tmpfs"]
+          ' /tmp/c1-m1-evidence.json >/dev/null
+
+          cat /tmp/c1-m1-evidence.json
+
+      - name: Validate committed reclamation evidence
+        shell: bash
+        run: |
+          set -euo pipefail
+          python3 scripts/validate_c1_reclamation_evidence.py
+          python3 scripts/validate_c1_gc_policy.py
+
+      - name: Upload reclamation evidence
+        uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02
+        with:
+          name: atm-c1-m1-reclamation-${{ github.run_id }}-${{ github.run_attempt }}
+          path: /tmp/c1-m1-evidence.json
+          if-no-files-found: error
+          retention-days: 7

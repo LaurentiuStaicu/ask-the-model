@@ -1764,6 +1764,21 @@ Maintenance failures remain diagnostic-only relative to the already-committed re
 
 I10 does not close C1. The next qualification gate is space-accounting and reclamation evidence: measure logical and allocated bytes for protected/candidate/trash objects and demonstrate the actual storage benefit of successful purge without conflating apparent file size with allocated/reclaimed blocks.
 
+### OPT-C1-M1 reclamation space-accounting evidence
+
+M1 closes that evidence gap without changing runtime GC behavior. The qualification probe reuses the existing C0 capacity measurement implementation and exact I5 purge path against one canonical trash object containing 11,534,336 logical payload bytes, while a separate normal snapshot sentinel must remain untouched.
+
+The same probe was qualified on two controlled Linux filesystems:
+
+- tmpfs, 4 KiB fragment size: measured trash allocation 11,534,336 bytes; observed available-space increase after I5 11,534,336 bytes; four available inodes recovered;
+- ext4, 4 KiB blocks and zero reserved-block percentage: measured trash allocation 11,542,528 bytes; observed available-space increase after I5 11,542,528 bytes; four available inodes recovered.
+
+In both fixtures I5 removed exactly two regular files and two directories, issued three directory-fsync calls, removed the canonical trash object, and preserved the normal snapshot namespace.
+
+The equality between measured allocated-tree bytes and the observed filesystem free-space delta is qualification evidence for these controlled fixtures only. It is not promoted to a filesystem-independent accounting identity, reclaim guarantee, reserve rule, production threshold, or loop-until-empty condition. AtM keeps the two layers distinct: `allocated_tree_bytes` is the AtM-managed allocation observation, while filesystem `available_bytes` is an environment-specific `statvfs` observation.
+
+M1 selects no new runtime trigger and does not change the P5 no-growth policy. Startup, background, Optimizations-toggle, refresh, conversation lifecycle and ENOSPC/capacity-failure purge remain forbidden. The next step is an explicit C1 closeout review; only after that review should the Backend Optimization workstream return to the D0 retrieval/context rebaseline.
+
 ### Recovery fault qualification
 
 The OPT-A0 recovery harness is test-only. Native checkpoint calls compile to no-ops in the production application; only the dedicated recovery helper is built with `ATM_TEST_FAULT_INJECTION`.
