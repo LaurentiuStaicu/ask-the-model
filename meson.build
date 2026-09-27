@@ -929,6 +929,20 @@ test(
   capacity_measurement_test
 )
 
+c1_reclamation_probe = executable(
+  'c1-reclamation-probe',
+  [
+    'src/capacity_measurement.c',
+    'src/repository_gc_purge.c',
+    'tests/c1_reclamation_probe.c'
+  ],
+  include_directories: include_directories('src'),
+  dependencies: [
+    glib_dep
+  ],
+  install: false
+)
+
 capacity_admission_model_test = executable(
   'capacity-admission-model-test',
   [
