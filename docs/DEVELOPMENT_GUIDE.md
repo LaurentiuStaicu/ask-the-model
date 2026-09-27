@@ -98,6 +98,8 @@ The Presentation layer is a display-time projection boundary; it does not modify
 
 The existing provider chunk callback is deliberately not normalized per chunk. Current visible transcript insertion is full-response; if visible streaming is re-enabled later, Presentation must receive a whole-message/finalization boundary because Markdown delimiters may span provider chunks.
 
+PRES-06 adds interaction behavior without changing that semantic boundary. A live Send creates one temporary `Assistant:` row with a native spinner before asynchronous work; the spinner is a TextView child widget rather than transcript text, and completion/cancellation removes the temporary row before the final complete response or error is shown. Application snapshots whether the transcript was already near its bottom before inserting the new user message; only that case performs one `scroll_to_mark()` to the beginning of the pending Assistant row, with no final-answer auto-scroll. A restrained dashed turn separator is also a child widget, so it is neither copied nor persisted as conversation text. Grounded live answers place it after Sources. History intentionally keeps the PRES-05 rendering until PRES-08 unifies live/restore interaction decoration.
+
 Repository excerpts remain untrusted data and are never executed as GTK/Pango markup.
 
 ## Non-negotiable invariants
