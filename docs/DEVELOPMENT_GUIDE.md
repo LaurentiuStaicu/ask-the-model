@@ -1693,6 +1693,20 @@ P3 keeps all hidden purge triggers forbidden: no startup purge, switch-toggle pu
 
 This slice is policy-only. `runtime_purge_authorized=false`; there is still no Vala binding for `atm_repository_gc_purge_trash_entry()`, no runtime trash discovery, no purge orchestrator and no lifecycle/Application purge caller. The next implementation slice must add read-only canonical trash discovery plus the narrow I5 Vala binding while preserving runtime authorization as false.
 
+### OPT-C1-I8a read-only canonical trash discovery and dormant I5 binding
+
+I8a implements only the non-destructive discovery/binding prerequisite selected by P3. It does not create the purge orchestrator and does not authorize runtime purge.
+
+The native discovery entry point opens the qualified data root and resolves `Repositories/.trash` component-by-component with no-follow directory descriptors. An absent `Repositories` or `.trash` namespace is a normal no-candidate result. If trash exists, every top-level repository namespace must be one of the fixed catalog IDs and a real directory. Every candidate below those namespaces must be a canonical I4 trash basename and a real directory; unknown repository namespaces, noncanonical names, symlinks and non-directory objects are repair conditions and fail discovery closed.
+
+Selection is deterministic and deliberately independent of wall-clock age: repository ID ascending, then the full canonical trash basename. Discovery returns the validated repository ID, the 40-hex snapshot SHA encoded by the canonical identity, and the exact trash basename. It performs no rename, unlink, fsync or authority mutation.
+
+`RepositoryGcTrashDiscovery.select_one()` is the narrow Vala wrapper for this read-only primitive. `RepositoryNative` also exposes the already-qualified I5 `atm_repository_gc_purge_trash_entry()` primitive so the next dormant orchestrator can be built without changing native deletion semantics. I8a itself never invokes that purge binding.
+
+Qualification covers an absent namespace, deterministic cross-repository/basename selection, unknown repository namespaces, noncanonical entries, symlink entries and symlink repository namespaces. Structural validation requires the discovery source and I5 binding while continuing to reject every purge call from `RepositoryLifecycleService` and `Application`.
+
+After I8a, `runtime_purge_authorized=false`, no purge orchestrator exists, and I7 remains the only runtime GC behavior. The next slice is a dormant purge orchestrator implementing P3's B0 -> COMPLETE-generation B2 exclusions -> durable-root reread -> exact I5 revalidation sequence before any runtime caller may be considered.
+
 ### Recovery fault qualification
 
 The OPT-A0 recovery harness is test-only. Native checkpoint calls compile to no-ops in the production application; only the dedicated recovery helper is built with `ATM_TEST_FAULT_INJECTION`.
