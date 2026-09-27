@@ -57,8 +57,8 @@
     "off_baseline_source_cap_implemented": true,
     "on_source_cap4_implemented": true,
     "deterministic_off_on_grounding_test_added": true,
-    "structural_validator_added": false,
-    "dedicated_d1_workflow_added": false,
+    "structural_validator_added": true,
+    "dedicated_d1_workflow_added": true,
     "frozen_r5_replay_complete": false,
     "flatpak_qualification_complete": false,
     "runtime_merge_authorized": false
