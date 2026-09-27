@@ -958,6 +958,35 @@ The flag is not a runtime switch and does not authorize a production policy
 change. Any D1 change remains a separate review and must preserve the
 Optimizations-OFF baseline.
 
+### OPT-D1 gated source-cap-4 runtime policy
+
+D1 consumes the D0 frontier without changing the stable OFF policy.
+
+For every Send, `Application` snapshots the session-only Optimizations gate
+before the first asynchronous boundary and passes that immutable operation
+snapshot explicitly through `ConversationSession`, `ConversationGrounding`
+and the native grounding API.
+
+The selected runtime policies are:
+
+- Optimizations OFF: 6 ranked results/repository, 12 model-visible sources,
+  32 KiB context;
+- Optimizations ON: 6 ranked results/repository, 4 model-visible sources,
+  32 KiB context.
+
+No lower backend layer reads the GTK switch or persists the mode. Toggling the
+switch during an in-flight Send cannot change that Send; the new state applies
+to the next Send.
+
+The ON policy is restricted to the D0-selected source-cap-4 candidate. D1 does
+not reduce ranked results, reduce the byte cap, introduce semantic/vector
+retrieval or change citation/provenance semantics.
+
+Dedicated integration qualification must demonstrate both paths on the same
+six-source grounding fixture: OFF can expose all six sources, ON exposes
+exactly four, and citation resolution in both paths preserves repository and
+exact snapshot-SHA provenance.
+
 ### Pass condition
 
 The frozen R5 benchmark remains unchanged and continues to pass its existing
