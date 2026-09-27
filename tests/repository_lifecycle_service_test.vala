@@ -224,6 +224,62 @@ namespace AskTheModel.Tests {
         );
     }
 
+    private static string create_gc_trash_entry (
+        string data_root,
+        string repository_id,
+        string snapshot_sha
+    ) throws GLib.Error {
+        string trash_name =
+            snapshot_sha +
+            "-1-1-0";
+        string trash_path =
+            GLib.Path.build_filename (
+                data_root,
+                "Repositories",
+                ".trash",
+                repository_id,
+                trash_name
+            );
+
+        assert (
+            GLib.DirUtils.create_with_parents (
+                trash_path,
+                0700
+            ) == 0
+        );
+
+        GLib.FileUtils.set_contents (
+            GLib.Path.build_filename (
+                trash_path,
+                "payload.txt"
+            ),
+            "payload"
+        );
+
+        return trash_path;
+    }
+
+    private static void create_empty_snapshot_layout (
+        string data_root
+    ) {
+        foreach (
+            RepositoryDescriptor descriptor
+            in RepositoryCatalog.all ()
+        ) {
+            assert (
+                GLib.DirUtils.create_with_parents (
+                    GLib.Path.build_filename (
+                        data_root,
+                        "Repositories",
+                        descriptor.id,
+                        "snapshots"
+                    ),
+                    0700
+                ) == 0
+            );
+        }
+    }
+
     private static async ConversationSession
     begin_leased_session (
         RepositoryLifecycleService service,
@@ -542,6 +598,39 @@ namespace AskTheModel.Tests {
                 RepositoryGcIsolationOutcome.B0_CONTENDED
             );
 
+            RepositoryPostMutationMaintenanceResult?
+                contended_maintenance =
+                    trigger_service.
+                        run_post_mutation_maintenance (
+                            new RepositoryMutationOutcome (
+                                1,
+                                true
+                            ),
+                            trigger_store,
+                            out cleanup_failure
+                        );
+            assert (cleanup_failure == null);
+            if (contended_maintenance == null ||
+                contended_maintenance.purge == null ||
+                contended_maintenance.isolation == null) {
+                assert_not_reached ();
+            }
+            assert (
+                contended_maintenance.purge.outcome ==
+                RepositoryGcPurgeOutcome.B0_CONTENDED
+            );
+            assert (
+                contended_maintenance.
+                    isolation_allowed_after_purge
+            );
+            assert (
+                contended_maintenance.isolation_attempted
+            );
+            assert (
+                contended_maintenance.isolation.outcome ==
+                RepositoryGcIsolationOutcome.B0_CONTENDED
+            );
+
             RepositoryNative.release_mutation_lease (
                 trigger_b0_fd
             );
@@ -563,8 +652,269 @@ namespace AskTheModel.Tests {
             assert (cleanup_failure != null);
             assert (cleanup_failure.length > 0);
 
+            /*
+             * I9 distinguishes an empty, valid repository namespace from a
+             * missing namespace. The former is NO_CANDIDATE; the latter is
+             * a fail-closed repair condition.
+             */
+            assert (
+                GLib.DirUtils.create_with_parents (
+                    GLib.Path.build_filename (
+                        trigger_root,
+                        "Repositories"
+                    ),
+                    0700
+                ) == 0
+            );
+
+            cleanup_failure = null;
+            RepositoryPostMutationMaintenanceResult?
+                no_candidate_maintenance =
+                    trigger_service.
+                        run_post_mutation_maintenance (
+                            new RepositoryMutationOutcome (
+                                1,
+                                true
+                            ),
+                            trigger_store,
+                            out cleanup_failure
+                        );
+            if (no_candidate_maintenance == null ||
+                no_candidate_maintenance.purge == null) {
+                assert_not_reached ();
+            }
+            assert (
+                no_candidate_maintenance.purge.outcome ==
+                RepositoryGcPurgeOutcome.NO_CANDIDATE
+            );
+            assert (
+                no_candidate_maintenance.
+                    isolation_allowed_after_purge
+            );
+            assert (
+                no_candidate_maintenance.isolation_attempted
+            );
+            assert (
+                no_candidate_maintenance.isolation == null
+            );
+            assert (cleanup_failure != null);
+            assert (
+                cleanup_failure.has_prefix (
+                    "isolation phase:"
+                )
+            );
+
+            string malformed_trash =
+                GLib.Path.build_filename (
+                    trigger_root,
+                    "Repositories",
+                    ".trash",
+                    "ewd",
+                    "malformed"
+                );
+            assert (
+                GLib.DirUtils.create_with_parents (
+                    malformed_trash,
+                    0700
+                ) == 0
+            );
+
+            cleanup_failure = null;
+            RepositoryPostMutationMaintenanceResult?
+                malformed_maintenance =
+                    trigger_service.
+                        run_post_mutation_maintenance (
+                            new RepositoryMutationOutcome (
+                                1,
+                                true
+                            ),
+                            trigger_store,
+                            out cleanup_failure
+                        );
+            if (malformed_maintenance == null) {
+                assert_not_reached ();
+            }
+            assert (
+                malformed_maintenance.purge == null
+            );
+            assert (
+                !malformed_maintenance.
+                    isolation_allowed_after_purge
+            );
+            assert (
+                !malformed_maintenance.isolation_attempted
+            );
+            assert (
+                malformed_maintenance.isolation == null
+            );
+            assert (cleanup_failure != null);
+            assert (
+                cleanup_failure.has_prefix (
+                    "purge phase:"
+                )
+            );
+
             remove_tree_best_effort (
                 trigger_root
+            );
+
+            string rooted_root = new_temp_root ();
+            string rooted_sha =
+                "abababababababababababababababababababab";
+            write_state_v1 (
+                rooted_root,
+                catalog[0].id,
+                rooted_sha,
+                "0.1.0"
+            );
+            publish_control_state (
+                rooted_root
+            );
+            string rooted_trash =
+                create_gc_trash_entry (
+                    rooted_root,
+                    catalog[0].id,
+                    rooted_sha
+                );
+
+            var rooted_service =
+                new RepositoryLifecycleService (
+                    rooted_root,
+                    rooted_root,
+                    rooted_root
+                );
+            var rooted_store =
+                new ConversationPersistenceStore (
+                    rooted_root,
+                    GLib.Path.build_filename (
+                        rooted_root,
+                        "Export"
+                    )
+                );
+
+            cleanup_failure = null;
+            RepositoryPostMutationMaintenanceResult?
+                rooted_maintenance =
+                    rooted_service.
+                        run_post_mutation_maintenance (
+                            new RepositoryMutationOutcome (
+                                1,
+                                true
+                            ),
+                            rooted_store,
+                            out cleanup_failure
+                        );
+            if (rooted_maintenance == null ||
+                rooted_maintenance.purge == null) {
+                assert_not_reached ();
+            }
+            assert (cleanup_failure == null);
+            assert (
+                rooted_maintenance.purge.outcome ==
+                RepositoryGcPurgeOutcome.ROOTED_PRESERVED
+            );
+            assert (
+                !rooted_maintenance.
+                    isolation_allowed_after_purge
+            );
+            assert (
+                !rooted_maintenance.isolation_attempted
+            );
+            assert (
+                rooted_maintenance.isolation == null
+            );
+            assert (
+                GLib.FileUtils.test (
+                    rooted_trash,
+                    GLib.FileTest.IS_DIR
+                )
+            );
+
+            remove_tree_best_effort (
+                rooted_root
+            );
+
+            string purged_root = new_temp_root ();
+            string purged_active_sha =
+                "cdcdcdcdcdcdcdcdcdcdcdcdcdcdcdcdcdcdcdcd";
+            string purged_trash_sha =
+                "dededededededededededededededededededede";
+            write_state_v1 (
+                purged_root,
+                catalog[0].id,
+                purged_active_sha,
+                "0.1.0"
+            );
+            publish_control_state (
+                purged_root
+            );
+            create_empty_snapshot_layout (
+                purged_root
+            );
+            string purged_trash =
+                create_gc_trash_entry (
+                    purged_root,
+                    catalog[0].id,
+                    purged_trash_sha
+                );
+
+            var purged_service =
+                new RepositoryLifecycleService (
+                    purged_root,
+                    purged_root,
+                    purged_root
+                );
+            var purged_store =
+                new ConversationPersistenceStore (
+                    purged_root,
+                    GLib.Path.build_filename (
+                        purged_root,
+                        "Export"
+                    )
+                );
+
+            cleanup_failure = null;
+            RepositoryPostMutationMaintenanceResult?
+                purged_maintenance =
+                    purged_service.
+                        run_post_mutation_maintenance (
+                            new RepositoryMutationOutcome (
+                                1,
+                                true
+                            ),
+                            purged_store,
+                            out cleanup_failure
+                        );
+            if (purged_maintenance == null ||
+                purged_maintenance.purge == null ||
+                purged_maintenance.isolation == null) {
+                assert_not_reached ();
+            }
+            assert (cleanup_failure == null);
+            assert (
+                purged_maintenance.purge.outcome ==
+                RepositoryGcPurgeOutcome.PURGED
+            );
+            assert (
+                purged_maintenance.
+                    isolation_allowed_after_purge
+            );
+            assert (
+                purged_maintenance.isolation_attempted
+            );
+            assert (
+                purged_maintenance.isolation.outcome ==
+                RepositoryGcIsolationOutcome.NO_CANDIDATE
+            );
+            assert (
+                !GLib.FileUtils.test (
+                    purged_trash,
+                    GLib.FileTest.EXISTS
+                )
+            );
+
+            remove_tree_best_effort (
+                purged_root
             );
 
             string guarded_root = new_temp_root ();
