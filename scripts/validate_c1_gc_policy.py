@@ -58,6 +58,12 @@ def main() -> int:
     purge = (
         ROOT / "src" / "repository_gc_purge.c"
     ).read_text(encoding="utf-8")
+    trash_discovery = (
+        ROOT / "src" / "RepositoryGcTrashCandidates.vala"
+    ).read_text(encoding="utf-8")
+    trash_discovery_tests = (
+        ROOT / "tests" / "repository_gc_trash_discovery_test.c"
+    ).read_text(encoding="utf-8")
     orchestrator = (
         ROOT / "src" / "RepositoryGcIsolationOrchestrator.vala"
     ).read_text(encoding="utf-8")
@@ -79,7 +85,7 @@ def main() -> int:
     )
     require_equal(
         policy.get("status"),
-        "selected-runtime-isolation-wired-purge-policy-selected-unwired",
+        "selected-runtime-isolation-wired-purge-discovery-bound-runtime-unwired",
         "policy status",
     )
 
@@ -378,11 +384,13 @@ def main() -> int:
             "runtime_caller_present": True,
             "destructive_gc_authorized": True,
             "runtime_purge_policy_selected": True,
-            "runtime_purge_discovery_implemented": False,
+            "runtime_purge_discovery_implemented": True,
+            "runtime_purge_discovery_qualification_complete": True,
+            "runtime_purge_binding_available": True,
             "runtime_purge_orchestrator_implemented": False,
             "purge_runtime_authorized": False,
             "next_required_slice": (
-                "IMPLEMENT_READONLY_CANONICAL_TRASH_DISCOVERY_AND_PURGE_BINDING"
+                "IMPLEMENT_AND_QUALIFY_DORMANT_TRASH_PURGE_ORCHESTRATOR"
             ),
         },
         "implementation state",
@@ -472,10 +480,13 @@ def main() -> int:
         require_marker(isolation, marker, "I4 isolation primitive")
     for marker in (
         "atm_repository_gc_purge_trash_entry",
+        "atm_repository_gc_select_canonical_trash_candidate",
+        "validate_trash_repository_namespace",
+        "scan_trash_repository_candidates",
         "collect_directory_entry_names",
         "unlinkat (",
     ):
-        require_marker(purge, marker, "I5 purge primitive")
+        require_marker(purge, marker, "I5/I8a trash primitive")
 
     # I6 is implemented but remains dormant. Lock and revalidation order are
     # structural invariants in addition to the native/Valac race tests.
@@ -692,13 +703,57 @@ def main() -> int:
         if forbidden in lifecycle:
             fail(f"P3 policy-only slice must not wire phase-2 purge: {forbidden}")
 
-    for forbidden in (
-        "atm_repository_gc_purge_trash_entry",
-        "gc_purge_trash",
-        "purge_trash",
+    for marker in (
+        'cname = "atm_repository_gc_select_canonical_trash_candidate"',
+        "gc_select_canonical_trash_candidate (",
+        'cname = "atm_repository_gc_purge_trash_entry"',
+        "gc_purge_trash_entry (",
     ):
-        if forbidden in repository_native:
-            fail(f"P3 must leave the I5 Vala purge binding for I8: {forbidden}")
+        require_marker(
+            repository_native,
+            marker,
+            "I8a dormant RepositoryNative binding",
+        )
+
+    for marker in (
+        "public class RepositoryGcTrashCandidate",
+        "public class RepositoryGcTrashDiscovery",
+        "gc_select_canonical_trash_candidate (",
+        "return new RepositoryGcTrashCandidate (",
+    ):
+        require_marker(
+            trash_discovery,
+            marker,
+            "I8a read-only Vala trash discovery",
+        )
+
+    if "gc_purge_trash_entry (" in trash_discovery:
+        fail("I8a read-only discovery must not invoke the purge binding")
+
+    for marker in (
+        "'src/RepositoryGcTrashCandidates.vala'",
+        "'tests/repository_gc_trash_discovery_test.c'",
+        "'repository-gc-trash-discovery'",
+    ):
+        require_marker(
+            meson,
+            marker,
+            "I8a Meson qualification wiring",
+        )
+
+    for marker in (
+        '"/repository-gc-i8a/empty"',
+        '"/repository-gc-i8a/deterministic-selection"',
+        '"/repository-gc-i8a/unknown-repository"',
+        '"/repository-gc-i8a/noncanonical-entry"',
+        '"/repository-gc-i8a/symlink-entry"',
+        '"/repository-gc-i8a/symlink-repository"',
+    ):
+        require_marker(
+            trash_discovery_tests,
+            marker,
+            "I8a trash discovery regression coverage",
+        )
 
     for marker in (
         "RepositoryMutationOutcome off_context =",
@@ -717,9 +772,9 @@ def main() -> int:
         )
 
     print(
-        "C1-P3 validation passed: bounded later-pass purge policy selected; "
-        "only pre-existing canonical I4 trash is eligible; no age threshold; "
-        "I5 Vala binding/orchestrator/runtime purge remain unwired"
+        "C1-I8a validation passed: canonical trash discovery and the dormant "
+        "I5 Vala binding are qualified; purge orchestrator/runtime caller "
+        "remain absent and runtime purge remains unauthorized"
     )
     return 0
 
