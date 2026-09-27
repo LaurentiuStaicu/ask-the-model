@@ -50,8 +50,9 @@ def main() -> int:
         "public void complete_assistant_generation (",
         "public void cancel_assistant_generation ()",
         "public void append_turn_separator ()",
-        'spinner.add_css_class (\n                "atm-assistant-spinner"',
-        'separator.add_css_class (\n                "atm-turn-separator"',
+        '"atm-assistant-spinner"',
+        '"atm-turn-separator"',
+        "public unowned Gtk.TextChildAnchor\n        append_semantic_child (",
         "view.add_child_at_anchor (",
     ):
         require_marker(renderer, marker, "PresentationRenderer PRES-06")
@@ -62,9 +63,20 @@ def main() -> int:
         "public bool assistant_generation_pending ()",
     )
     require(
-        "create_child_anchor" in separator
-        and "add_child_at_anchor" in separator,
-        "turn separator is not a child-anchor widget",
+        "append_semantic_child (" in separator
+        and '"atm-turn-separator"' in separator,
+        "turn separator is not routed through the child-anchor widget seam",
+    )
+
+    semantic_child = block(
+        renderer,
+        "public unowned Gtk.TextChildAnchor\n        append_semantic_child (",
+        "private void append_message_separator ()",
+    )
+    require(
+        "create_child_anchor" in semantic_child
+        and "add_child_at_anchor" in semantic_child,
+        "shared Presentation child seam no longer creates/attaches TextChildAnchor",
     )
     require(
         "insert_raw" not in separator
@@ -86,6 +98,12 @@ def main() -> int:
         begin.find("pending_assistant_start") <
         begin.find('"Assistant:"'),
         "Assistant scroll mark is not captured before Assistant label",
+    )
+
+    require(
+        "append_semantic_child (" in begin
+        and '"atm-assistant-spinner"' in begin,
+        "pending Assistant spinner is not routed through the child-anchor seam",
     )
 
     complete = block(
