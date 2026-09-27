@@ -70,6 +70,7 @@ executable(
     'src/RepositoryGcDurableRoots.vala',
     'src/RepositoryGcCandidates.vala',
     'src/RepositoryGcIsolationOrchestrator.vala',
+    'src/RepositoryGcTrashDiscovery.vala',
     'src/repository_gc_candidate_scan.c',
     'src/ConversationGrounding.vala',
     'src/ConversationSession.vala',
@@ -86,6 +87,7 @@ executable(
     'src/repository_storage.c',
     'src/repository_gc_isolation.c',
     'src/repository_gc_purge.c',
+    'src/repository_gc_trash_scan.c',
     'src/repository_mutation_lease.c',
     'src/snapshot_namespace_durability.c',
     'src/repository_ingest.c',
@@ -797,6 +799,25 @@ repository_gc_purge_test = executable(
 test(
   'repository-gc-purge',
   repository_gc_purge_test
+)
+
+repository_gc_trash_scan_test = executable(
+  'repository-gc-trash-scan-test',
+  [
+    'src/repository_gc_purge.c',
+    'src/repository_gc_trash_scan.c',
+    'tests/repository_gc_trash_scan_test.c'
+  ],
+  include_directories: include_directories('src'),
+  dependencies: [
+    glib_dep
+  ],
+  install: false
+)
+
+test(
+  'repository-gc-trash-discovery',
+  repository_gc_trash_scan_test
 )
 
 repository_gc_purge_fault_helper = executable(

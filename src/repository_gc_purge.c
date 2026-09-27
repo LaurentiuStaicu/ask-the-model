@@ -52,7 +52,8 @@ canonical_decimal_segment (
     const char *start,
     const char *end,
     guint64 maximum,
-    gboolean allow_zero
+    gboolean allow_zero,
+    guint64 *out_value
 )
 {
     if (start == NULL ||
@@ -94,14 +95,35 @@ canonical_decimal_segment (
         return FALSE;
     }
 
-    return value <= maximum;
+    if (value > maximum) {
+        return FALSE;
+    }
+
+    if (out_value != NULL) {
+        *out_value = value;
+    }
+
+    return TRUE;
 }
 
-static gboolean
-trash_name_is_valid (
-    const char *trash_name
+gboolean
+atm_repository_gc_trash_name_parse (
+    const char *trash_name,
+    gint64 *out_isolation_time,
+    gint *out_pid,
+    guint *out_attempt
 )
 {
+    if (out_isolation_time != NULL) {
+        *out_isolation_time = 0;
+    }
+    if (out_pid != NULL) {
+        *out_pid = 0;
+    }
+    if (out_attempt != NULL) {
+        *out_attempt = 0;
+    }
+
     if (!sha40_lower_is_valid_prefix (
             trash_name
         ) ||
@@ -116,13 +138,15 @@ trash_name_is_valid (
             time_start,
             '-'
         );
+    guint64 isolation_time = 0;
 
     if (time_end == NULL ||
         !canonical_decimal_segment (
             time_start,
             time_end,
             G_MAXINT64,
-            FALSE
+            FALSE,
+            &isolation_time
         )) {
         return FALSE;
     }
@@ -134,13 +158,15 @@ trash_name_is_valid (
             pid_start,
             '-'
         );
+    guint64 pid = 0;
 
     if (pid_end == NULL ||
         !canonical_decimal_segment (
             pid_start,
             pid_end,
             G_MAXINT,
-            FALSE
+            FALSE,
+            &pid
         )) {
         return FALSE;
     }
@@ -150,20 +176,36 @@ trash_name_is_valid (
     const char *attempt_end =
         trash_name +
         strlen (trash_name);
+    guint64 attempt = 0;
 
     if (!canonical_decimal_segment (
             attempt_start,
             attempt_end,
             99,
-            TRUE
-        )) {
+            TRUE,
+            &attempt
+        ) ||
+        strchr (
+            attempt_start,
+            '-'
+        ) != NULL) {
         return FALSE;
     }
 
-    return strchr (
-        attempt_start,
-        '-'
-    ) == NULL;
+    if (out_isolation_time != NULL) {
+        *out_isolation_time =
+            (gint64) isolation_time;
+    }
+    if (out_pid != NULL) {
+        *out_pid =
+            (gint) pid;
+    }
+    if (out_attempt != NULL) {
+        *out_attempt =
+            (guint) attempt;
+    }
+
+    return TRUE;
 }
 
 static gboolean
@@ -897,8 +939,11 @@ atm_repository_gc_purge_trash_entry (
         !repository_id_is_known (
             repository_id
         ) ||
-        !trash_name_is_valid (
-            trash_name
+        !atm_repository_gc_trash_name_parse (
+            trash_name,
+            NULL,
+            NULL,
+            NULL
         )) {
         g_set_error_literal (
             error,

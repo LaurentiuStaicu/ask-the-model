@@ -1,0 +1,87 @@
+name: C1-I8 trash discovery qualification
+
+on:
+  pull_request:
+    paths:
+      - 'src/repository_gc_trash_scan.c'
+      - 'src/repository_gc_trash_scan.h'
+      - 'src/repository_gc_purge.c'
+      - 'src/repository_gc_purge.h'
+      - 'src/RepositoryNative.vala'
+      - 'src/RepositoryGcTrashDiscovery.vala'
+      - 'tests/repository_gc_trash_scan_test.c'
+      - 'scripts/validate_gc_trash_discovery.py'
+      - 'scripts/validate_c1_gc_policy.py'
+      - 'qualification/c1-gc-policy-v1.json'
+      - '.github/workflows/c1-i8-trash-discovery-qualification.yml'
+  push:
+    branches:
+      - main
+    paths:
+      - 'src/repository_gc_trash_scan.c'
+      - 'src/repository_gc_trash_scan.h'
+      - 'src/repository_gc_purge.c'
+      - 'src/repository_gc_purge.h'
+      - 'src/RepositoryNative.vala'
+      - 'src/RepositoryGcTrashDiscovery.vala'
+      - 'tests/repository_gc_trash_scan_test.c'
+      - 'scripts/validate_gc_trash_discovery.py'
+      - 'scripts/validate_c1_gc_policy.py'
+      - 'qualification/c1-gc-policy-v1.json'
+      - '.github/workflows/c1-i8-trash-discovery-qualification.yml'
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: c1-i8-trash-discovery-${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  qualify:
+    runs-on: ubuntu-24.04
+    timeout-minutes: 10
+
+    steps:
+      - name: Checkout AtM
+        uses: actions/checkout@v4
+
+      - name: Install native build dependencies
+        shell: bash
+        run: |
+          set -euo pipefail
+          sudo apt-get update
+          sudo apt-get install -y --no-install-recommends \
+            gcc \
+            pkg-config \
+            libglib2.0-dev
+
+      - name: Build trash discovery unit test
+        shell: bash
+        run: |
+          set -euo pipefail
+          CFLAGS="$(pkg-config --cflags glib-2.0)"
+          LIBS="$(pkg-config --libs glib-2.0)"
+          COMMON="-std=c11 -O2 -Wall -Wextra -Werror -Isrc"
+
+          cc $COMMON $CFLAGS \
+            src/repository_gc_purge.c \
+            src/repository_gc_trash_scan.c \
+            tests/repository_gc_trash_scan_test.c \
+            $LIBS \
+            -o /tmp/repository-gc-trash-discovery-test
+
+      - name: Run trash discovery unit test
+        shell: bash
+        run: |
+          set -euo pipefail
+          /tmp/repository-gc-trash-discovery-test
+
+      - name: Run structural contract validators
+        shell: bash
+        run: |
+          set -euo pipefail
+          python3 scripts/validate_gc_purge.py
+          python3 scripts/validate_gc_trash_discovery.py
+          python3 scripts/validate_c1_gc_policy.py
