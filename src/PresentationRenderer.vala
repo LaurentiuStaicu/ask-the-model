@@ -22,6 +22,7 @@ namespace AskTheModel {
         private Gtk.TextView view;
         private Gtk.TextBuffer buffer;
         private Gtk.TextMark? pending_assistant_origin = null;
+        private Gtk.TextMark? pending_assistant_start = null;
         private Gtk.Spinner? pending_spinner = null;
         private Gtk.TextTag speaker_you;
         private Gtk.TextTag speaker_assistant;
@@ -508,6 +509,13 @@ namespace AskTheModel {
                 pending_assistant_origin
             );
             pending_assistant_origin = null;
+
+            if (pending_assistant_start != null) {
+                buffer.delete_mark (
+                    pending_assistant_start
+                );
+                pending_assistant_start = null;
+            }
         }
 
         public void begin_assistant_generation () {
@@ -523,6 +531,18 @@ namespace AskTheModel {
                 );
 
             append_message_separator ();
+
+            Gtk.TextIter assistant_start;
+            buffer.get_end_iter (
+                out assistant_start
+            );
+            pending_assistant_start =
+                buffer.create_mark (
+                    null,
+                    assistant_start,
+                    true
+                );
+
             insert_tagged (
                 "Assistant:",
                 TAG_SPEAKER_ASSISTANT
@@ -554,6 +574,40 @@ namespace AskTheModel {
                 anchor
             );
             pending_spinner = spinner;
+        }
+
+        public Gtk.TextMark? assistant_generation_start_mark () {
+            return pending_assistant_start;
+        }
+
+        public void append_turn_separator () {
+            Gtk.TextIter end;
+            buffer.get_end_iter (out end);
+            unowned Gtk.TextChildAnchor anchor =
+                buffer.create_child_anchor (
+                    end
+                );
+
+            var separator = new Gtk.Label (
+                "╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌"
+            ) {
+                can_target = false,
+                halign = Gtk.Align.START,
+                single_line_mode = true,
+                width_chars = 40
+            };
+            separator.add_css_class (
+                "atm-turn-separator"
+            );
+            separator.update_property (
+                Gtk.AccessibleProperty.LABEL,
+                "Conversation turn separator"
+            );
+
+            view.add_child_at_anchor (
+                separator,
+                anchor
+            );
         }
 
         public bool assistant_generation_pending () {
