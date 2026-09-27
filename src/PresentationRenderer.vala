@@ -254,6 +254,31 @@ namespace AskTheModel {
             return text.str;
         }
 
+        public void append_sources (
+            Gtk.Button[] source_buttons
+        ) {
+            if (source_buttons.length == 0) {
+                return;
+            }
+
+            insert_raw ("\nSources: ");
+
+            for (
+                uint i = 0;
+                i < source_buttons.length;
+                i++
+            ) {
+                append_semantic_child (
+                    source_buttons[i],
+                    "atm-source-ref"
+                );
+
+                if (i + 1 < source_buttons.length) {
+                    insert_raw (" ");
+                }
+            }
+        }
+
         public unowned Gtk.TextChildAnchor
         append_semantic_child (
             Gtk.Widget child,
