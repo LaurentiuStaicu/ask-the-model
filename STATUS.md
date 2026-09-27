@@ -32,11 +32,12 @@ Current AtM Development adds an OFF-by-default, session-only **Optimizations** g
 
 Current Development also adds a qualified display-only **Presentation layer** for chat transcripts. Assistant responses are normalized as complete messages into an AtM-owned semantic document and rendered into the existing GTK text buffer with restrained headings, lists, quotes and code presentation. Markdown emphasis is flattened rather than shown as raw delimiters or reintroduced as bold/italic; bold is reserved for the `You:` and `Assistant:` labels, using neutral light/dark palette colors. User text is preserved literally, grounded Sources buttons remain separate, and provider/persistence/retrieval/scientific content is unchanged by the presentation projection. This capability is post-v0.5.0 development behavior and is not retroactively attributed to the tagged v0.5.0 release.
 
-With Optimizations ON, the currently qualified repository-lifecycle optimizations are:
+With Optimizations ON, the currently qualified runtime optimizations are:
 - one global cross-process repository authority-mutation lease for Download/Update;
 - one per-SHA retrieval-index single-flight for missing/invalid derived indexes;
 - shared read leases for positive repository generations used by repository-backed conversation grounding/History requalification, held for the active session lifetime so future GC can recognize live runtime roots;
-- production local-capacity admission for Download/Update, using pre-download, post-download/pre-mutation and immediate pre-Control-DB-publication checkpoints.
+- production local-capacity admission for Download/Update, using pre-download, post-download/pre-mutation and immediate pre-Control-DB-publication checkpoints;
+- the D1 retrieval/context policy selected from the current-main D0 rebaseline: each Send keeps six ranked results per repository and the 32-KiB context budget, while the model-visible source cap changes from the OFF baseline of 12 to the qualified ON value of 4; frozen R5 quality/provenance gates remain blocking and the operation-level gate snapshot is fixed before the Send's first async boundary.
 
 Capacity admission is deliberately conservative. Exact C0-M1 repository ID + SHA profiles may use their frozen allocated-byte evidence. A new/unknown SHA receives no inherited historical snapshot/index byte prediction because structural stress falsified that predictor as a conservative bound. Structural inode checks and the selected 128 KiB / four-inode Control DB publication headroom remain active. Only proven preflight insufficiency is surfaced as `NO SPACE`; post-admission storage failures retain the established fail-closed path.
 
