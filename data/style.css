@@ -287,7 +287,7 @@ window.atm-window textview label.atm-turn-separator {
 }
 
 /* Compact source references embedded below grounded answers. */
-window.atm-window textview menubutton.atm-source-ref > button {
+window.atm-window textview button.atm-source-ref {
     min-width: 0;
     min-height: 0;
     padding: 0 2px;
@@ -299,8 +299,8 @@ window.atm-window textview menubutton.atm-source-ref > button {
     box-shadow: none;
 }
 
-window.atm-window textview menubutton.atm-source-ref > button:hover,
-window.atm-window textview menubutton.atm-source-ref > button:checked {
+window.atm-window textview button.atm-source-ref:hover,
+window.atm-window textview button.atm-source-ref:checked {
     background-color: rgba(27, 27, 24, 0.08);
     color: #1B1B18;
 }
@@ -475,13 +475,13 @@ window.atm-window.atm-dark notebook.atm-chat-tabs > header.top button.atm-tab-cl
     background-color: rgba(250, 251, 249, 0.12);
 }
 
-window.atm-window.atm-dark textview menubutton.atm-source-ref > button {
+window.atm-window.atm-dark textview button.atm-source-ref {
     background-color: rgba(0, 0, 0, 0);
     color: #C9CAC7;
 }
 
-window.atm-window.atm-dark textview menubutton.atm-source-ref > button:hover,
-window.atm-window.atm-dark textview menubutton.atm-source-ref > button:checked {
+window.atm-window.atm-dark textview button.atm-source-ref:hover,
+window.atm-window.atm-dark textview button.atm-source-ref:checked {
     background-color: rgba(250, 251, 249, 0.10);
     color: #FAFBF9;
 }
