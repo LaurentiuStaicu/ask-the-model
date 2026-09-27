@@ -246,6 +246,53 @@ test_pending_assistant_lifecycle () {
     assert (buffer.text == completed);
 }
 
+private void
+test_semantic_anchor_copy_projection () {
+    var view = new Gtk.TextView ();
+    var buffer = view.buffer;
+    var renderer =
+        new PresentationRenderer (view);
+
+    renderer.append_assistant (
+        "Răspuns"
+    );
+
+    var source = new Gtk.Button () {
+        label = "[1]",
+        has_frame = false
+    };
+    renderer.append_semantic_child (
+        source,
+        "atm-source-ref"
+    );
+
+    renderer.append_turn_separator ();
+
+    Gtk.TextIter start;
+    Gtk.TextIter end;
+    buffer.get_bounds (
+        out start,
+        out end
+    );
+    buffer.select_range (
+        start,
+        end
+    );
+
+    bool had_anchor = false;
+    string? semantic =
+        renderer.selected_semantic_text (
+            out had_anchor
+        );
+
+    assert (had_anchor);
+    assert (semantic != null);
+    assert (semantic.contains ("Assistant: Răspuns"));
+    assert (semantic.contains ("[1]"));
+    assert (!semantic.contains ("\uFFFC"));
+    assert (!semantic.contains ("╌"));
+}
+
 int
 main (string[] args) {
     Gtk.init ();
@@ -262,6 +309,10 @@ main (string[] args) {
     Test.add_func (
         "/presentation-renderer/pending-assistant",
         test_pending_assistant_lifecycle
+    );
+    Test.add_func (
+        "/presentation-renderer/semantic-anchor-copy",
+        test_semantic_anchor_copy_projection
     );
 
     return Test.run ();
