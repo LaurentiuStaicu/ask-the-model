@@ -83,6 +83,15 @@ test_native_bridge () {
             1
         ) == null
     );
+
+    string projected =
+        PresentationNative.to_plain_text (
+            document
+        );
+    assert (
+        projected ==
+        "Heading\n\nParagraph with inline code."
+    );
 }
 
 int
