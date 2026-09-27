@@ -132,13 +132,13 @@ namespace AskTheModel {
                 in candidates_store
             ) {
                 if (best == null ||
-                    GLib.strcmp0 (
+                    GLib.strcmp (
                         candidate.repository_id,
                         best.repository_id
                     ) < 0 ||
                     (candidate.repository_id ==
                         best.repository_id &&
-                     GLib.strcmp0 (
+                     GLib.strcmp (
                         candidate.trash_name,
                         best.trash_name
                      ) < 0)) {
