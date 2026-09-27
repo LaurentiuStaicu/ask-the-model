@@ -1673,6 +1673,26 @@ The runtime outcomes retain I6 semantics:
 Structural CI requires the order `download_or_update_with_context -> successful repository status -> one best-effort cleanup call`, forbids a live Optimizations reread in the cleanup path, freezes the single lifecycle orchestrator call site, and forbids phase-2 purge from Application/lifecycle. Lifecycle regression tests additionally prove OFF and zero-change no-op behavior, carried-ON behavior even while the current policy object is OFF, and conversion of an internal I6 failure into diagnostics rather than an exception.
 
 After I7, runtime isolation is authorized only under this bounded trigger. Startup, switch-toggle, refresh, background/idle, conversation close/archive/delete and ENOSPC/capacity-failure triggers remain forbidden. I5 remains dormant; `.trash` retention and any later purge authorization require a separate policy review.
+### OPT-C1-P3 isolated-trash retention and purge policy
+
+P3 selects the retention boundary for phase-2 purge but does not authorize a runtime purge caller. The policy deliberately avoids an arbitrary wall-clock grace period.
+
+The selected rule is a one-repository-operation recovery boundary. For an Optimizations-ON Download/Update operation, a future implementation may capture at operation entry at most one exact canonical I4 trash identity that already exists. That capture is read-only and advisory. The identity must be carried with the same operation snapshot; it may become purge-eligible only if the repository action later succeeds and changes at least one repository.
+
+After the successful mutation has returned and its writer B0 lease has been released, a future purge implementation must reacquire B0 before touching the carried trash identity, revalidate that exact object through the qualified I5 no-follow path, and attempt at most one purge. Purge must occur before the current operation's I7 isolation attempt. Therefore an object isolated by the current operation cannot be purged by that same operation.
+
+The intended steady-state behavior is bounded and explicit:
+
+- the first qualifying changed ON action with empty trash purges nothing and may isolate at most one I7 candidate;
+- a later qualifying changed ON action may purge at most one object that was already present at its operation entry, then may isolate at most one new I7 candidate;
+- B0 contention, a missing/disappeared carried entry, or no pre-operation candidate is a no-op for purge;
+- malformed or unsafe trash remains a fail-closed repair condition and is never deleted;
+- purge failure is diagnostic-only and cannot retroactively fail an already committed repository update.
+
+Candidate eligibility is based on membership in the exact pre-operation capture, not on elapsed time. A parsed isolation timestamp may later be used only to choose the oldest candidate deterministically; it is not an authorization clock. Startup, switch-toggle, refresh, idle/background, conversation lifecycle and ENOSPC/capacity-failure purge triggers remain forbidden, as does loop-until-empty behavior.
+
+P3 remains policy-only: I5 is still runtime-unwired and `purge_runtime_authorized=false`. The next implementation slice must add and qualify canonical trash discovery/capture, carry the exact pre-operation identity through `RepositoryMutationOutcome`, acquire B0 for the bounded post-success purge, and prove that the current operation's newly isolated object is never purge-eligible.
+
 ### Recovery fault qualification
 
 The OPT-A0 recovery harness is test-only. Native checkpoint calls compile to no-ops in the production application; only the dedicated recovery helper is built with `ATM_TEST_FAULT_INJECTION`.
