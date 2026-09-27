@@ -108,7 +108,8 @@
     "runtime_purge_orchestrator_implemented": false,
     "purge_runtime_authorized": false,
     "next_required_slice": "IMPLEMENT_AND_QUALIFY_DORMANT_PURGE_ORCHESTRATOR",
-    "runtime_purge_binding_implemented": true
+    "runtime_purge_binding_implemented": true,
+    "runtime_purge_discovery_qualification_complete": true
   },
   "runtime_isolation_trigger_policy": {
     "selected": "POST_SUCCESSFUL_CHANGED_REPOSITORY_ACTION",
