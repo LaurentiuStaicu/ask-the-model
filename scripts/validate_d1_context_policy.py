@@ -228,6 +228,12 @@ def main() -> int:
         '"[S6]"',
         '"[S4]"',
         '"[S5]"',
+        '"OFF baseline provenance [S6]."',
+        '"ON optimized provenance [S4]."',
+        "off_citation->repository_id",
+        "off_citation->snapshot_sha",
+        "on_citation->repository_id",
+        "on_citation->snapshot_sha",
     ):
         require_marker(tests, marker, "D1 OFF/ON grounding qualification")
 
