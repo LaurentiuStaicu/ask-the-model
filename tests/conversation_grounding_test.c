@@ -260,6 +260,7 @@ test_zero_repository_scope_can_freeze (void)
         atm_conversation_grounding_prepare_turn (
             state,
             "ordinary local chat",
+            FALSE,
             &has_grounding,
             &needs_clarification,
             &system_instructions,
@@ -448,6 +449,7 @@ test_valid_pins_are_canonical_and_frozen (void)
         atm_conversation_grounding_prepare_turn (
             state,
             "What is the current fixture status in EWD?",
+            FALSE,
             &has_grounding,
             &needs_clarification,
             &system_instructions,
@@ -524,6 +526,7 @@ test_valid_pins_are_canonical_and_frozen (void)
         atm_conversation_grounding_prepare_turn (
             state,
             "What is the current fixture status in EWD?",
+            FALSE,
             &has_grounding,
             &needs_clarification,
             &system_instructions,
@@ -597,6 +600,7 @@ test_valid_pins_are_canonical_and_frozen (void)
         atm_conversation_grounding_prepare_turn (
             state,
             "What is the current fixture status in RMD?",
+            FALSE,
             &has_grounding,
             &needs_clarification,
             &system_instructions,
@@ -968,6 +972,7 @@ test_pinned_snapshot_ignores_newer_snapshot (void)
         atm_conversation_grounding_prepare_turn (
             state,
             "What is the current fixture status in EWD?",
+            FALSE,
             &has_grounding,
             &needs_clarification,
             &system_instructions,
