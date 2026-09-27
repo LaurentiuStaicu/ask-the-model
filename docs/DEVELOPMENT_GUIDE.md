@@ -1716,6 +1716,22 @@ B0 or B2 contention is a bounded maintenance no-op. All held B2 exclusions are r
 
 I9 still does not decide when production should invoke the purge orchestrator. There is no `RepositoryLifecycleService` or `Application` caller, no startup/background/ENOSPC trigger and no loop-until-empty. The next gate is a separate review of runtime purge integration authorization under the already-selected P3 policy.
 
+### OPT-C1-P4 runtime purge integration policy
+
+P4 selects the bounded composition of the already-qualified I9 purge phase and I7 isolation phase, but remains policy-only and keeps `runtime_purge_authorized=false`.
+
+Eligibility remains the existing successful changed Download/Update under the same carried Optimizations-ON operation snapshot after the writer mutation B0 lease has been released. A future lifecycle-owned maintenance seam may attempt at most one I9 purge and, depending on that purge outcome, at most one I7 isolation. Application must not call either orchestrator directly and must not reread the live Optimizations switch after the repository action.
+
+The selected outcome gate is explicit:
+
+- `PURGED`, `NO_CANDIDATE`, `B0_CONTENDED` and `B2_CONTENDED` allow the existing bounded I7 isolation phase;
+- `ROOTED_PRESERVED` preserves trash and blocks new isolation in the same action, avoiding repeated growth while the deterministic first trash candidate has a current durability reason to remain;
+- an unexpected `NOT_ENABLED` result in an otherwise eligible ON maintenance call is a contract violation and blocks isolation;
+- malformed trash, exact-I5 failure or any other purge error is diagnostic and blocks same-action isolation;
+- any later I7 isolation failure remains diagnostic-only and never retroactively changes the already-committed repository action outcome.
+
+Purge and isolation retain separate B0 acquisitions. No lock is carried across the two phases; I7 therefore performs its own fresh root/candidate revalidation. All hidden triggers remain forbidden and there is no loop-until-empty or new UI. The next slice may implement exactly this lifecycle-owned composition, but runtime authorization changes only inside that separately qualified implementation.
+
 ### Recovery fault qualification
 
 The OPT-A0 recovery harness is test-only. Native checkpoint calls compile to no-ops in the production application; only the dedicated recovery helper is built with `ATM_TEST_FAULT_INJECTION`.

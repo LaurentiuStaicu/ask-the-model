@@ -91,7 +91,7 @@ def main() -> int:
     )
     require_equal(
         policy.get("status"),
-        "selected-runtime-isolation-wired-purge-policy-selected-unwired",
+        "selected-runtime-isolation-wired-purge-integration-selected-unwired",
         "policy status",
     )
 
@@ -378,6 +378,86 @@ def main() -> int:
         "purge repair failure boundary",
     )
 
+    integration = policy.get("runtime_purge_integration_policy", {})
+    require_equal(
+        integration.get("selected"),
+        "POST_SUCCESSFUL_CHANGED_REPOSITORY_ACTION_PURGE_THEN_ISOLATE",
+        "runtime purge integration selection",
+    )
+    require_equal(
+        integration.get("policy_selected"),
+        True,
+        "runtime purge integration policy selection",
+    )
+    require_equal(
+        integration.get("runtime_authorized"),
+        False,
+        "runtime purge integration authorization",
+    )
+    for key in (
+        "operation_snapshot_required",
+        "optimizations_snapshot_must_be_on",
+        "repository_action_must_succeed",
+        "changed_repository_count_must_be_positive",
+        "trigger_after_writer_b0_release",
+        "use_same_operation_optimization_snapshot",
+        "live_switch_recheck_forbidden",
+        "conversation_store_required",
+        "application_direct_orchestrator_calls_forbidden",
+        "lifecycle_owns_purge_then_isolation",
+        "purge_and_isolation_use_separate_b0_acquisitions",
+        "purge_phase_precedes_isolation_phase",
+        "repository_action_outcome_remains_success",
+        "no_runtime_ui_added",
+        "startup_trigger_forbidden",
+        "optimization_toggle_trigger_forbidden",
+        "background_timer_or_idle_trigger_forbidden",
+        "conversation_close_delete_archive_trigger_forbidden",
+        "enospc_or_capacity_failure_trigger_forbidden",
+        "repository_refresh_trigger_forbidden",
+        "loop_until_empty_forbidden",
+        "runtime_implementation_requires_separate_qualification",
+    ):
+        require_equal(integration.get(key), True, f"runtime purge integration {key}")
+
+    require_equal(
+        integration.get("max_purge_attempts_per_repository_action"),
+        1,
+        "runtime purge integration purge bound",
+    )
+    require_equal(
+        integration.get("max_isolation_attempts_per_repository_action"),
+        1,
+        "runtime purge integration isolation bound",
+    )
+    require_equal(
+        integration.get("purge_outcome_policy"),
+        {
+            "NOT_ENABLED": "CONTRACT_VIOLATION_DIAGNOSTIC_BLOCK_ISOLATION",
+            "B0_CONTENDED": "ALLOW_ISOLATION",
+            "NO_CANDIDATE": "ALLOW_ISOLATION",
+            "B2_CONTENDED": "ALLOW_ISOLATION",
+            "ROOTED_PRESERVED": "PRESERVE_TRASH_BLOCK_ISOLATION",
+            "PURGED": "ALLOW_ISOLATION",
+        },
+        "runtime purge outcome policy",
+    )
+    require_equal(
+        integration.get("purge_error_policy"),
+        "DIAGNOSTIC_BLOCK_ISOLATION",
+        "runtime purge error policy",
+    )
+    require_equal(
+        integration.get("isolation_error_policy"),
+        "DIAGNOSTIC_ONLY_REPOSITORY_ACTION_REMAINS_SUCCESS",
+        "runtime isolation error policy",
+    )
+    require_equal(
+        integration.get("rooted_preserved_rationale"),
+        "DO_NOT_ACCUMULATE_NEW_TRASH_WHILE_DETERMINISTIC_HEAD_CANDIDATE_IS_DURABLY_ROOTED",
+        "rooted-trash accumulation guard",
+    )
+
     implementation = policy.get("implementation_state", {})
     require_equal(
         implementation,
@@ -394,9 +474,10 @@ def main() -> int:
             "runtime_purge_binding_available": True,
             "runtime_purge_orchestrator_implemented": True,
             "runtime_purge_orchestrator_race_qualification_complete": True,
+            "runtime_purge_integration_policy_selected": True,
             "purge_runtime_authorized": False,
             "next_required_slice": (
-                "REVIEW_RUNTIME_PURGE_INTEGRATION_AUTHORIZATION"
+                "IMPLEMENT_BOUNDED_RUNTIME_PURGE_INTEGRATION"
             ),
         },
         "implementation state",
@@ -841,9 +922,9 @@ def main() -> int:
         )
 
     print(
-        "C1-I9 validation passed: dormant B0/B2 purge orchestrator and "
-        "deterministic race qualification are present; lifecycle/Application "
-        "runtime purge remains unauthorized"
+        "C1-P4 validation passed: bounded purge-then-isolation integration "
+        "policy selected with explicit outcome gating; runtime purge remains "
+        "unauthorized and lifecycle/Application wiring absent"
     )
     return 0
 

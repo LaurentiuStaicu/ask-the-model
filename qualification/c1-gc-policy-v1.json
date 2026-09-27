@@ -1,7 +1,7 @@
 {
   "schema_version": 1,
   "policy_id": "atm-c1-snapshot-gc-orchestration-v1",
-  "status": "selected-runtime-isolation-wired-purge-policy-selected-unwired",
+  "status": "selected-runtime-isolation-wired-purge-integration-selected-unwired",
   "scope": {
     "supported_storage": "qualified local Linux AtM storage only",
     "optimizations_required": true,
@@ -106,9 +106,10 @@
     "runtime_purge_discovery_implemented": true,
     "runtime_purge_orchestrator_implemented": true,
     "purge_runtime_authorized": false,
-    "next_required_slice": "REVIEW_RUNTIME_PURGE_INTEGRATION_AUTHORIZATION",
+    "next_required_slice": "IMPLEMENT_BOUNDED_RUNTIME_PURGE_INTEGRATION",
     "runtime_purge_binding_available": true,
-    "runtime_purge_orchestrator_race_qualification_complete": true
+    "runtime_purge_orchestrator_race_qualification_complete": true,
+    "runtime_purge_integration_policy_selected": true
   },
   "runtime_isolation_trigger_policy": {
     "selected": "POST_SUCCESSFUL_CHANGED_REPOSITORY_ACTION",
@@ -178,5 +179,46 @@
     "repair_or_internal_failure": "DIAGNOSTIC_BLOCK_SAME_ACTION_ISOLATION_PHASE",
     "repository_action_outcome_remains_success": true,
     "runtime_authorized": false
+  },
+  "runtime_purge_integration_policy": {
+    "selected": "POST_SUCCESSFUL_CHANGED_REPOSITORY_ACTION_PURGE_THEN_ISOLATE",
+    "policy_selected": true,
+    "runtime_authorized": false,
+    "operation_snapshot_required": true,
+    "optimizations_snapshot_must_be_on": true,
+    "repository_action_must_succeed": true,
+    "changed_repository_count_must_be_positive": true,
+    "trigger_after_writer_b0_release": true,
+    "use_same_operation_optimization_snapshot": true,
+    "live_switch_recheck_forbidden": true,
+    "conversation_store_required": true,
+    "application_direct_orchestrator_calls_forbidden": true,
+    "lifecycle_owns_purge_then_isolation": true,
+    "max_purge_attempts_per_repository_action": 1,
+    "max_isolation_attempts_per_repository_action": 1,
+    "purge_and_isolation_use_separate_b0_acquisitions": true,
+    "purge_phase_precedes_isolation_phase": true,
+    "purge_outcome_policy": {
+      "NOT_ENABLED": "CONTRACT_VIOLATION_DIAGNOSTIC_BLOCK_ISOLATION",
+      "B0_CONTENDED": "ALLOW_ISOLATION",
+      "NO_CANDIDATE": "ALLOW_ISOLATION",
+      "B2_CONTENDED": "ALLOW_ISOLATION",
+      "ROOTED_PRESERVED": "PRESERVE_TRASH_BLOCK_ISOLATION",
+      "PURGED": "ALLOW_ISOLATION"
+    },
+    "purge_error_policy": "DIAGNOSTIC_BLOCK_ISOLATION",
+    "isolation_error_policy": "DIAGNOSTIC_ONLY_REPOSITORY_ACTION_REMAINS_SUCCESS",
+    "repository_action_outcome_remains_success": true,
+    "rooted_preserved_rationale": "DO_NOT_ACCUMULATE_NEW_TRASH_WHILE_DETERMINISTIC_HEAD_CANDIDATE_IS_DURABLY_ROOTED",
+    "no_runtime_ui_added": true,
+    "startup_trigger_forbidden": true,
+    "optimization_toggle_trigger_forbidden": true,
+    "background_timer_or_idle_trigger_forbidden": true,
+    "conversation_close_delete_archive_trigger_forbidden": true,
+    "enospc_or_capacity_failure_trigger_forbidden": true,
+    "repository_refresh_trigger_forbidden": true,
+    "loop_until_empty_forbidden": true,
+    "runtime_implementation_requires_separate_qualification": true,
+    "existing_i7_isolation_seam_remains_purge_free": true
   }
 }
