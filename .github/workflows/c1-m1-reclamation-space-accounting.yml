@@ -47,7 +47,7 @@ jobs:
           set -euo pipefail
           CFLAGS="$(pkg-config --cflags glib-2.0)"
           LIBS="$(pkg-config --libs glib-2.0)"
-          cc -std=c11 -O2 -Wall -Wextra -Werror -Isrc $CFLAGS \
+          cc -std=c11 -D_DEFAULT_SOURCE -O2 -Wall -Wextra -Werror -Isrc $CFLAGS \
             src/capacity_measurement.c \
             src/repository_gc_purge.c \
             tests/c1_reclamation_probe.c \
