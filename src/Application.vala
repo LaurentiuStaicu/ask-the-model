@@ -51,7 +51,7 @@ namespace AskTheModel {
             this.transcript = transcript;
             this.presentation =
                 new PresentationRenderer (
-                    transcript.buffer
+                    transcript
                 );
             this.prompt = prompt;
             this.send_button = send_button;
