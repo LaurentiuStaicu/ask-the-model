@@ -9,6 +9,7 @@ namespace AskTheModel {
     private class ChatTabState : Object {
         public Gtk.Box page;
         public Gtk.TextView transcript;
+        public Gtk.ScrolledWindow transcript_scroll;
         public PresentationRenderer presentation;
         public Gtk.TextView prompt;
         public Gtk.Button send_button;
@@ -33,10 +34,12 @@ namespace AskTheModel {
         public bool restored_view_only = false;
         public string? restored_read_only_reason = null;
         public bool archived = false;
+        public bool follow_next_assistant = false;
 
         public ChatTabState (
             Gtk.Box page,
             Gtk.TextView transcript,
+            Gtk.ScrolledWindow transcript_scroll,
             Gtk.TextView prompt,
             Gtk.Button send_button,
             Gtk.Label placeholder,
@@ -49,6 +52,7 @@ namespace AskTheModel {
             Object ();
             this.page = page;
             this.transcript = transcript;
+            this.transcript_scroll = transcript_scroll;
             this.presentation =
                 new PresentationRenderer (
                     transcript
@@ -2823,7 +2827,7 @@ namespace AskTheModel {
             string visible_answer,
             CitationResolution resolution
         ) {
-            state.presentation.append_assistant (
+            state.presentation.complete_assistant_generation (
                 visible_answer
             );
 
@@ -3102,6 +3106,46 @@ namespace AskTheModel {
             }
         }
 
+        private bool transcript_is_near_bottom (
+            ChatTabState state
+        ) {
+            Gtk.Adjustment adjustment =
+                state.transcript_scroll.vadjustment;
+
+            double remaining =
+                adjustment.upper -
+                adjustment.page_size -
+                adjustment.value;
+
+            return remaining <= 32.0;
+        }
+
+        private void reveal_pending_assistant (
+            ChatTabState state
+        ) {
+            if (!state.follow_next_assistant) {
+                return;
+            }
+
+            state.follow_next_assistant = false;
+
+            Gtk.TextMark? mark =
+                state.presentation
+                    .assistant_generation_start_mark ();
+
+            if (mark == null) {
+                return;
+            }
+
+            state.transcript.scroll_to_mark (
+                mark,
+                0.0,
+                true,
+                0.0,
+                0.0
+            );
+        }
+
         private async void send_prompt (
             ChatTabState state,
             string prompt
@@ -3114,6 +3158,9 @@ namespace AskTheModel {
             streaming_transcript = null;
             assistant_stream_started = false;
             update_conversation_ui_state ();
+
+            state.presentation.begin_assistant_generation ();
+            reveal_pending_assistant (state);
 
             uint serial = state.serial;
             bool should_generate_title =
@@ -3189,9 +3236,10 @@ namespace AskTheModel {
                     );
 
                 if (needs_clarification) {
-                    state.presentation.append_assistant (
+                    state.presentation.complete_assistant_generation (
                         "Please restate the question with the repository, variable, source, or topic you mean."
                     );
+                    state.presentation.append_turn_separator ();
                 } else {
                     string answer;
                     string title_answer;
@@ -3272,6 +3320,7 @@ namespace AskTheModel {
                             visible_answer,
                             citation_resolution
                         );
+                        state.presentation.append_turn_separator ();
                         assistant_stream_started = true;
                         title_answer = visible_answer;
                     } else {
@@ -3299,10 +3348,13 @@ namespace AskTheModel {
                         title_answer = answer;
 
                         if (answer.length > 0) {
-                            state.presentation.append_assistant (
+                            state.presentation.complete_assistant_generation (
                                 answer
                             );
+                            state.presentation.append_turn_separator ();
                             assistant_stream_started = true;
+                        } else {
+                            state.presentation.cancel_assistant_generation ();
                         }
                     }
 
@@ -3317,6 +3369,8 @@ namespace AskTheModel {
                     }
                 }
             } catch (GLib.Error error) {
+                state.presentation.cancel_assistant_generation ();
+
                 if (grounded_turn_prepared) {
                     state.session.abort_turn ();
                 }
@@ -3500,6 +3554,7 @@ namespace AskTheModel {
             var state = new ChatTabState (
                 chat_page,
                 transcript,
+                transcript_scroll,
                 prompt_view,
                 send_button,
                 prompt_placeholder,
@@ -3554,6 +3609,11 @@ namespace AskTheModel {
                     state.locked = true;
                     update_conversation_ui_state ();
                 }
+
+                state.follow_next_assistant =
+                    transcript_is_near_bottom (
+                        state
+                    );
 
                 state.presentation.append_user (
                     prompt
