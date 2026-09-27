@@ -1,7 +1,7 @@
 {
   "schema_version": 1,
   "policy_id": "atm-d1-source-cap4-runtime-v1",
-  "status": "implementation-under-qualification",
+  "status": "qualified-runtime-ready",
   "dependency_evidence": {
     "d0": "qualification/d0-retrieval-context-rebaseline-v1.json",
     "g0_issue": 210
@@ -59,8 +59,40 @@
     "deterministic_off_on_grounding_test_added": true,
     "structural_validator_added": true,
     "dedicated_d1_workflow_added": true,
-    "frozen_r5_replay_complete": false,
-    "flatpak_qualification_complete": false,
-    "runtime_merge_authorized": false
+    "frozen_r5_replay_complete": true,
+    "flatpak_qualification_complete": true,
+    "runtime_merge_authorized": true
+  },
+  "qualification_evidence": {
+    "qualified_head": "9fe02f683212fbd466d1e516508485dc46b77c35",
+    "dedicated_d1_workflow": {
+      "run_id": 36302535414,
+      "result": "success"
+    },
+    "frozen_r5_replay": {
+      "run_id": 36302535251,
+      "result": "success",
+      "production_exact_id_success_at_1": 1,
+      "production_ndcg_at_5": 0.9025687328237045,
+      "production_context_required_recall": 0.9833333333333333,
+      "source_cap4_quality_preserved": true,
+      "source_cap4_pareto_frontier": true,
+      "source_cap4_topic_regression_count": 0,
+      "source_cap4_mean_sources": 3.878787878787879,
+      "source_cap4_mean_evidence_bytes": 4519.787878787879,
+      "source_cap4_evidence_bytes_reduction_percent_vs_production": 40.77399270162843
+    },
+    "invariant_registry": {
+      "run_id": 36302535264,
+      "result": "success"
+    },
+    "flatpak": {
+      "run_id": 36302535223,
+      "result": "success"
+    },
+    "c1_i10_regression": {
+      "run_id": 36302535409,
+      "result": "success"
+    }
   }
 }
