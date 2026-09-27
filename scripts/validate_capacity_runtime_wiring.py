@@ -74,28 +74,51 @@ def main() -> int:
     if gate.get("operation_snapshot_required") is not True:
         fail("capacity runtime must use one operation snapshot")
 
+    context = block_between(
+        lifecycle,
+        "        public async RepositoryMutationOutcome\n"
+        "        download_or_update_with_context (",
+        "\n        public async uint download_or_update (",
+        "download_or_update_with_context",
+    )
     operation = block_between(
         lifecycle,
-        "        public async uint download_or_update (",
+        "        private async uint download_or_update_for_operation (",
         "\n    }\n}",
-        "download_or_update",
+        "download_or_update_for_operation",
     )
 
     snapshot = require(
-        operation,
+        context,
         "bool optimized_operation =\n"
         "                optimization_mode_snapshot ();",
-        "download_or_update",
+        "download_or_update_with_context",
     )
+    operation_call = require(
+        context,
+        "yield download_or_update_for_operation (",
+        "download_or_update_with_context",
+    )
+    if snapshot >= operation_call:
+        fail("operation snapshot must be captured before mutation dispatch")
+    require(
+        context,
+        "new RepositoryMutationOutcome (\n"
+        "                changed,\n"
+        "                optimized_operation",
+        "operation snapshot result",
+    )
+    if "optimization_mode_snapshot (" in operation:
+        fail("private mutation body must not reread Optimizations")
+
     lease = require(
         operation,
         "RepositoryNative.try_acquire_mutation_lease (",
         "mode-independent authority lease",
     )
-    if lease < snapshot:
-        fail("authority lease must follow the operation snapshot")
-    if "if (optimized_operation)" in operation[snapshot:lease]:
-        fail("B0 authority lease must be mode-independent after C1-P0")
+    prefix = operation[:lease]
+    if "if (optimized_operation)" in prefix:
+        fail("B0 authority lease must remain mode-independent after C1-P0")
 
     checkpoint_a = require(
         operation,
@@ -268,7 +291,7 @@ def main() -> int:
         fail("runtime operation classification helper is missing")
 
     print(
-        "capacity runtime wiring validation passed: "
+        "capacity runtime wiring validation passed: carried operation snapshot + "
         "mode-independent B0 + OFF-gated A/B/state ordering + specific NO_SPACE mapping"
     )
     return 0

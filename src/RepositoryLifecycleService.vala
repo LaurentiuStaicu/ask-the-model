@@ -62,6 +62,22 @@ namespace AskTheModel {
         }
     }
 
+    public class RepositoryMutationOutcome : Object {
+        public uint changed { get; construct; }
+        public bool optimized_operation { get; construct; }
+
+        public RepositoryMutationOutcome (
+            uint changed,
+            bool optimized_operation
+        ) {
+            Object (
+                changed: changed,
+                optimized_operation: optimized_operation
+            );
+        }
+    }
+
+
     private class RepositoryInstallResult : Object {
         public string version { get; construct; }
         public string snapshot_path { get; construct; }
@@ -1021,8 +1037,78 @@ namespace AskTheModel {
                 );
         }
 
+        public async RepositoryMutationOutcome
+        download_or_update_with_context (
+            RepositoryDescriptor[] selected,
+            GLib.Cancellable? cancellable = null
+        ) throws GLib.Error {
+            bool optimized_operation =
+                optimization_mode_snapshot ();
+
+            uint changed =
+                yield download_or_update_for_operation (
+                    selected,
+                    optimized_operation,
+                    cancellable
+                );
+
+            return new RepositoryMutationOutcome (
+                changed,
+                optimized_operation
+            );
+        }
+
         public async uint download_or_update (
             RepositoryDescriptor[] selected,
+            GLib.Cancellable? cancellable = null
+        ) throws GLib.Error {
+            RepositoryMutationOutcome outcome =
+                yield download_or_update_with_context (
+                    selected,
+                    cancellable
+                );
+
+            return outcome.changed;
+        }
+
+        public RepositoryGcIsolationResult?
+        run_post_mutation_isolation (
+            RepositoryMutationOutcome operation,
+            ConversationPersistenceStore conversation_store,
+            out string? failure
+        ) {
+            failure = null;
+
+            if (!operation.optimized_operation ||
+                operation.changed == 0) {
+                return null;
+            }
+
+            string control_state_path =
+                GLib.Path.build_filename (
+                    state_root,
+                    "control-state.sqlite3"
+                );
+
+            try {
+                return RepositoryGcIsolationOrchestrator.
+                    isolate_one (
+                        true,
+                        data_root,
+                        state_root,
+                        control_state_path,
+                        conversation_store
+                    );
+            } catch (GLib.Error error) {
+                failure = error.message;
+                return null;
+            }
+        }
+
+
+        private async uint download_or_update_for_operation (
+            RepositoryDescriptor[] selected,
+            bool optimized_operation,
             GLib.Cancellable? cancellable = null
         ) throws GLib.Error {
             if (!repository_operations_allowed ()) {
@@ -1031,8 +1117,6 @@ namespace AskTheModel {
                 );
             }
 
-            bool optimized_operation =
-                optimization_mode_snapshot ();
             int mutation_lease_fd = -1;
 
             bool mutation_contended = false;

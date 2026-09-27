@@ -64,6 +64,9 @@ def main() -> int:
     orchestrator_tests = (
         ROOT / "tests" / "repository_gc_isolation_orchestrator_test.vala"
     ).read_text(encoding="utf-8")
+    lifecycle_tests = (
+        ROOT / "tests" / "repository_lifecycle_service_test.vala"
+    ).read_text(encoding="utf-8")
 
     require_equal(policy.get("schema_version"), 1, "schema version")
     require_equal(
@@ -73,14 +76,23 @@ def main() -> int:
     )
     require_equal(
         policy.get("status"),
-        "selected-runtime-unwired",
+        "selected-runtime-isolation-wired-purge-unwired",
         "policy status",
     )
 
     scope = policy.get("scope", {})
     require_equal(scope.get("optimizations_required"), True, "G0 gate")
+    require_equal(
+        scope.get("runtime_isolation_authorized"),
+        True,
+        "runtime isolation authorization",
+    )
+    require_equal(
+        scope.get("destructive_gc_authorized"),
+        True,
+        "bounded isolation authorization",
+    )
     for key in (
-        "destructive_gc_authorized",
         "automatic_enospc_gc_authorized",
         "conversation_delete_cascade_authorized",
         "quarantine_purge_authorized",
@@ -251,6 +263,27 @@ def main() -> int:
         "runtime trigger failure boundary",
     )
 
+    require_equal(
+        trigger.get("runtime_authorized"),
+        True,
+        "runtime trigger authorization",
+    )
+    require_equal(
+        trigger.get("conversation_store_unavailable"),
+        "NOOP_SKIP_CLEANUP",
+        "conversation-store unavailable handling",
+    )
+    require_equal(
+        trigger.get("isolation_failure_does_not_change_repository_action_outcome"),
+        True,
+        "post-commit cleanup failure semantics",
+    )
+    require_equal(
+        trigger.get("isolation_does_not_reclaim_trash_bytes"),
+        True,
+        "isolation versus purge boundary",
+    )
+
     implementation = policy.get("implementation_state", {})
     require_equal(
         implementation,
@@ -259,10 +292,12 @@ def main() -> int:
             "dormant_orchestrator_implemented": True,
             "orchestrator_race_qualification_complete": True,
             "runtime_trigger_policy_selected": True,
-            "runtime_caller_present": False,
-            "destructive_gc_authorized": False,
+            "bounded_runtime_isolation_qualification_complete": True,
+            "runtime_caller_present": True,
+            "destructive_gc_authorized": True,
+            "purge_runtime_authorized": False,
             "next_required_slice": (
-                "IMPLEMENT_AND_QUALIFY_BOUNDED_POST_MUTATION_ISOLATION_TRIGGER"
+                "REVIEW_ISOLATED_TRASH_RETENTION_AND_PURGE_RUNTIME_POLICY"
             ),
         },
         "implementation state",
@@ -418,23 +453,180 @@ def main() -> int:
             "I6 deterministic race coverage",
         )
 
-    # I6 remains dormant: lifecycle activation and phase-2 purge are forbidden.
+    # I7 wires exactly one bounded post-successful-mutation isolation
+    # trigger. The operation snapshot must be returned by the lifecycle
+    # mutation itself rather than reread from the live switch after await.
+    lifecycle_context_start = require_marker(
+        lifecycle,
+        "download_or_update_with_context (",
+        "I7 operation context API",
+    )
+    lifecycle_private_start = require_marker(
+        lifecycle,
+        "private async uint download_or_update_for_operation (",
+        "I7 operation implementation",
+    )
+    if lifecycle_context_start >= lifecycle_private_start:
+        fail("I7 operation context wrapper must precede private mutation body")
+
+    context_slice = lifecycle[
+        lifecycle_context_start:lifecycle_private_start
+    ]
     for marker in (
-        "RepositoryGcCandidateDiscovery",
-        "atm_repository_gc_isolate_snapshot_to_trash",
-        "atm_repository_gc_purge_trash_entry",
-        "RepositoryGcIsolationOrchestrator",
+        "bool optimized_operation =\n                optimization_mode_snapshot ();",
+        "yield download_or_update_for_operation (",
+        "new RepositoryMutationOutcome (",
+        "changed,\n                optimized_operation",
     ):
-        if marker in lifecycle:
-            fail(f"P1 introduced destructive lifecycle marker: {marker}")
+        require_marker(
+            context_slice,
+            marker,
+            "I7 operation snapshot carry",
+        )
+
+    private_end = lifecycle.find(
+        "\n        }\n\n    }",
+        lifecycle_private_start,
+    )
+    if private_end < 0:
+        private_end = len(lifecycle)
+    mutation_slice = lifecycle[
+        lifecycle_private_start:private_end
+    ]
+    if "optimization_mode_snapshot (" in mutation_slice:
+        fail("I7 private mutation body rereads live Optimizations state")
+
+    cleanup_start = require_marker(
+        lifecycle,
+        "run_post_mutation_isolation (",
+        "I7 cleanup seam",
+    )
+    cleanup_end = lifecycle.find(
+        "\n\n        private async uint download_or_update_for_operation",
+        cleanup_start,
+    )
+    if cleanup_end < 0:
+        fail("I7 cleanup seam boundary is unavailable")
+    cleanup_slice = lifecycle[cleanup_start:cleanup_end]
+
+    for marker in (
+        "!operation.optimized_operation ||\n                operation.changed == 0",
+        "RepositoryGcIsolationOrchestrator.\n                    isolate_one (",
+        "failure = error.message;",
+        "return null;",
+    ):
+        require_marker(
+            cleanup_slice,
+            marker,
+            "I7 bounded cleanup seam",
+        )
+
+    if "optimization_mode_snapshot (" in cleanup_slice:
+        fail("I7 cleanup seam rereads live Optimizations state")
+    if "gc_purge" in cleanup_slice or "purge_trash" in cleanup_slice:
+        fail("I7 cleanup seam must not invoke I5 purge")
+    if lifecycle.count("RepositoryGcIsolationOrchestrator") != 1:
+        fail("I7 lifecycle must contain exactly one orchestrator call site")
+
+    app_cleanup_start = require_marker(
+        application,
+        "private void run_post_mutation_isolation_best_effort (",
+        "I7 Application cleanup wrapper",
+    )
+    app_action_start = require_marker(
+        application,
+        "private async void download_or_update_selected_repositories ()",
+        "I7 repository action",
+    )
+    if app_cleanup_start >= app_action_start:
+        fail("I7 cleanup wrapper must precede repository action")
+
+    app_cleanup = application[
+        app_cleanup_start:app_action_start
+    ]
+    for marker in (
+        "!operation.optimized_operation ||\n                operation.changed == 0",
+        "ConversationPersistenceStore? store =\n                conversation_store;",
+        "run_post_mutation_isolation (",
+        "repository isolation maintenance skipped",
+        "repository isolation maintenance failed after committed repository action",
+    ):
+        require_marker(
+            app_cleanup,
+            marker,
+            "I7 best-effort cleanup wrapper",
+        )
+    if "optimization_policy" in app_cleanup or "snapshot_enabled (" in app_cleanup:
+        fail("I7 Application cleanup wrapper rereads live Optimizations state")
+
+    app_action_end = application.find(
+        "\n        private Gtk.CheckButton build_repository_check_button",
+        app_action_start,
+    )
+    if app_action_end < 0:
+        fail("I7 repository action boundary is unavailable")
+    app_action = application[app_action_start:app_action_end]
+
+    ordered_action_markers = [
+        "download_or_update_with_context (",
+        "finish_repository_operation (\n                    RepositoryOperationOutcome.NORMAL",
+        "run_post_mutation_isolation_best_effort (",
+    ]
+    previous = -1
+    for marker in ordered_action_markers:
+        current = app_action.find(marker, previous + 1)
+        if current < 0:
+            fail(
+                "I7 post-mutation trigger ordering lost marker after "
+                f"position {previous}: {marker}"
+            )
+        previous = current
+
+    for forbidden in (
+        "optimization_policy.snapshot_enabled",
+        "optimization_mode_snapshot (",
+        "gc_purge",
+        "purge_trash",
+    ):
+        if forbidden in app_action:
+            fail(f"I7 repository action contains forbidden marker: {forbidden}")
+
+    if application.count(
+        "run_post_mutation_isolation_best_effort ("
+    ) != 2:
+        fail("I7 Application must define and invoke the cleanup wrapper once")
 
     if "RepositoryGcIsolationOrchestrator" in application:
-        fail("I6 introduced a direct Application runtime caller")
+        fail("I7 Application must call GC only through lifecycle seam")
+
+    for forbidden in (
+        "atm_repository_gc_purge_trash_entry",
+        "gc_purge",
+        "purge_trash",
+    ):
+        if forbidden in lifecycle:
+            fail(f"I7 lifecycle must not invoke phase-2 purge: {forbidden}")
+
+    for marker in (
+        "RepositoryMutationOutcome off_context =",
+        "assert (!off_context.optimized_operation);",
+        "RepositoryMutationOutcome on_context =",
+        "assert (on_context.optimized_operation);",
+        "carried_on_cleanup.outcome ==",
+        "RepositoryGcIsolationOutcome.B0_CONTENDED",
+        "assert (failed_cleanup == null);",
+        "assert (cleanup_failure != null);",
+    ):
+        require_marker(
+            lifecycle_tests,
+            marker,
+            "I7 lifecycle trigger qualification",
+        )
 
     print(
-        "C1-P2 policy validation passed: I6 race qualification complete; "
-        "one post-successful changed repository action isolation attempt "
-        "selected; purge separate; runtime caller still absent"
+        "C1-I7 validation passed: one post-successful changed repository "
+        "action isolation attempt is wired under the carried ON snapshot; "
+        "cleanup failure is diagnostic-only; purge remains unwired"
     )
     return 0
 
