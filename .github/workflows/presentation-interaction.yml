@@ -4,10 +4,13 @@ on:
   pull_request:
     paths:
       - 'src/PresentationRenderer.vala'
+      - 'src/PresentationNative.vapi'
       - 'src/Application.vala'
       - 'tests/presentation_renderer_test.vala'
+      - 'tests/presentation_native_test.vala'
       - 'data/style.css'
       - 'scripts/validate_pres06_ui.py'
+      - 'scripts/validate_pres07_sources.py'
       - '.github/workflows/presentation-interaction.yml'
   workflow_dispatch:
 
@@ -51,11 +54,13 @@ jobs:
           set -euo pipefail
           meson setup build
 
-      - name: Build Presentation renderer qualification
+      - name: Build Presentation interaction qualification
         shell: bash
         run: |
           set -euo pipefail
-          ninja -C build presentation-renderer-test
+          ninja -C build \
+            presentation-native-test \
+            presentation-renderer-test
 
       - name: Run Presentation renderer qualification
         shell: bash
@@ -67,8 +72,20 @@ jobs:
           set -euo pipefail
           xvfb-run -a ./build/presentation-renderer-test
 
+      - name: Run Presentation native bridge qualification
+        shell: bash
+        run: |
+          set -euo pipefail
+          ./build/presentation-native-test
+
       - name: Validate PRES-06 interaction contract
         shell: bash
         run: |
           set -euo pipefail
           python3 scripts/validate_pres06_ui.py
+
+      - name: Validate PRES-07 Sources contract
+        shell: bash
+        run: |
+          set -euo pipefail
+          python3 scripts/validate_pres07_sources.py
