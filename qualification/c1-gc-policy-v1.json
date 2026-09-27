@@ -1,7 +1,7 @@
 {
   "schema_version": 1,
   "policy_id": "atm-c1-snapshot-gc-orchestration-v1",
-  "status": "qualified-runtime-isolation-and-purge-reclamation-evidence-complete",
+  "status": "qualified-c1-complete",
   "scope": {
     "supported_storage": "qualified local Linux AtM storage only",
     "optimizations_required": true,
@@ -106,14 +106,15 @@
     "runtime_purge_discovery_implemented": true,
     "runtime_purge_orchestrator_implemented": true,
     "purge_runtime_authorized": true,
-    "next_required_slice": "REVIEW_C1_CLOSEOUT_AND_RESUME_D0_RETRIEVAL_REBASELINE",
+    "next_required_slice": "OPT_D0_REBASELINE_RETRIEVAL_CONTEXT_EFFICIENCY",
     "runtime_purge_binding_available": true,
     "runtime_purge_orchestrator_race_qualification_complete": true,
     "runtime_purge_integration_policy_selected": true,
     "runtime_purge_steady_state_policy_selected": true,
     "runtime_purge_integration_implemented": true,
     "runtime_purge_integration_qualification_complete": true,
-    "reclamation_space_accounting_qualification_complete": true
+    "reclamation_space_accounting_qualification_complete": true,
+    "c1_closeout_complete": true
   },
   "runtime_isolation_trigger_policy": {
     "selected": "POST_SUCCESSFUL_CHANGED_REPOSITORY_ACTION",
@@ -252,5 +253,14 @@
     "normal_snapshot_preserved": true,
     "production_thresholds_selected": false,
     "runtime_trigger_policy_changed": false
+  },
+  "closeout": {
+    "closeout_id": "atm-c1-snapshot-gc-closeout-v1",
+    "path": "qualification/c1-closeout-v1.json",
+    "c1_complete": true,
+    "destructive_scope_expansion_required": false,
+    "runtime_recursive_byte_measurement_selected": false,
+    "next_backend_workstream": "OPT-D0",
+    "d1_production_policy_change_authorized": false
   }
 }

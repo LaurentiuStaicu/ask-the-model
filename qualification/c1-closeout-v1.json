@@ -1,0 +1,94 @@
+{
+  "schema_version": 1,
+  "closeout_id": "atm-c1-snapshot-gc-closeout-v1",
+  "status": "complete",
+  "scope": "OPT-C1 protected-root two-phase repository snapshot GC",
+  "runtime_policy": {
+    "optimizations_required": true,
+    "bounded_post_repository_action_only": true,
+    "max_purge_attempts_per_action": 1,
+    "max_isolation_attempts_per_action": 1,
+    "steady_state_no_growth": true,
+    "background_gc": false,
+    "startup_gc": false,
+    "toggle_gc": false,
+    "enospc_triggered_gc": false,
+    "conversation_delete_cascade": false,
+    "quarantine_purge": false,
+    "retrieval_index_eviction": false,
+    "control_db_generation_pruning": false
+  },
+  "original_test_matrix": {
+    "C1-T1_active_generation_protected": {
+      "status": "qualified",
+      "coverage": ["OPT-C1-I1/I2", "RepositoryGcDurableRoots"]
+    },
+    "C1-T2_saved_history_conversation_protected": {
+      "status": "qualified",
+      "coverage": ["OPT-C1-I1/I2", "conversation durable-root collection"]
+    },
+    "C1-T3_live_lease_protected": {
+      "status": "qualified",
+      "coverage": ["OPT-C1-I3b", "OPT-C1-I6 B2 race qualification"]
+    },
+    "C1-T4_unrooted_historical_snapshot_isolated": {
+      "status": "qualified",
+      "coverage": ["OPT-C1-I4", "OPT-C1-I6", "OPT-C1-I7"]
+    },
+    "C1-T5_crash_after_trash_rename": {
+      "status": "qualified",
+      "coverage": ["OPT-C1-I4 process-interruption replay", "A1 namespace barriers"]
+    },
+    "C1-T6_purge_interruption": {
+      "status": "qualified",
+      "coverage": ["OPT-C1-I5 process-restart replay"]
+    },
+    "C1-T7_root_appears_before_isolation": {
+      "status": "qualified",
+      "coverage": ["OPT-C1-I6 post-B2 durable-root reread"]
+    },
+    "C1-T8_malformed_or_symlink_candidate": {
+      "status": "qualified",
+      "coverage": ["OPT-C1-I3/I3a", "OPT-C1-I4", "OPT-C1-I5", "OPT-C1-I8"]
+    },
+    "C1-T9_conversation_permanently_deleted_no_sync_cascade": {
+      "status": "qualified",
+      "coverage": ["P1/P2/P3/P4/P5 hidden-trigger prohibitions", "Invariant Registry"]
+    }
+  },
+  "reclamation": {
+    "space_benefit_qualification_complete": true,
+    "evidence": "benchmarks/c1-reclamation-v1/evidence.json",
+    "controlled_filesystems": ["tmpfs", "ext4"],
+    "allocated_tree_metric_reused_from_c0": true,
+    "positive_free_space_delta_observed": true,
+    "normal_snapshot_preserved": true,
+    "production_reclaim_threshold_selected": false
+  },
+  "space_accounting_closeout": {
+    "candidate_identity_reported_runtime": true,
+    "isolated_trash_identity_reported_runtime": true,
+    "purge_identity_and_outcome_reported_runtime": true,
+    "runtime_recursive_byte_measurement_selected": false,
+    "protected_bytes_by_root_class_selected": false,
+    "decision": "DEFER_OPTIONAL_OBSERVABILITY_NOT_REQUIRED_FOR_C1_CORRECTNESS",
+    "rationale": "Adding recursive tree measurement to every bounded maintenance action would add I/O cost solely for observability. C0/M1 already provide qualified allocation/reclamation measurement. Any future runtime byte telemetry must be a separate non-destructive optimization/observability slice and must not widen GC authority.",
+    "future_observability_must_not_change_reachability_or_trigger_policy": true
+  },
+  "non_goals_preserved": {
+    "no_control_db_generation_pruning": true,
+    "no_automatic_gc_on_enospc": true,
+    "no_saved_conversation_deletion": true,
+    "no_quarantine_purge": true,
+    "no_general_retrieval_index_cache_eviction": true,
+    "no_background_daemon": true,
+    "no_automatic_trash_restore": true
+  },
+  "closeout_decision": {
+    "c1_complete": true,
+    "destructive_scope_expansion_required": false,
+    "next_backend_workstream": "OPT-D0",
+    "next_backend_action": "REBASELINE_RETRIEVAL_CONTEXT_EFFICIENCY_MEASUREMENT_ONLY",
+    "d1_production_policy_change_authorized": false
+  }
+}

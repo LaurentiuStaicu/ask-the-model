@@ -48,5 +48,6 @@ jobs:
           python3 scripts/validate_gc_purge_orchestrator.py
           python3 scripts/validate_c1_i10_runtime_integration.py
           python3 scripts/validate_c1_reclamation_evidence.py
+          python3 scripts/validate_c1_closeout.py
           python3 scripts/validate_c1_gc_policy.py
           python3 scripts/validate_presentation_performance_evidence.py

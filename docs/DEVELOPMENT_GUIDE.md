@@ -1777,7 +1777,17 @@ In both fixtures I5 removed exactly two regular files and two directories, issue
 
 The equality between measured allocated-tree bytes and the observed filesystem free-space delta is qualification evidence for these controlled fixtures only. It is not promoted to a filesystem-independent accounting identity, reclaim guarantee, reserve rule, production threshold, or loop-until-empty condition. AtM keeps the two layers distinct: `allocated_tree_bytes` is the AtM-managed allocation observation, while filesystem `available_bytes` is an environment-specific `statvfs` observation.
 
-M1 selects no new runtime trigger and does not change the P5 no-growth policy. Startup, background, Optimizations-toggle, refresh, conversation lifecycle and ENOSPC/capacity-failure purge remain forbidden. The next step is an explicit C1 closeout review; only after that review should the Backend Optimization workstream return to the D0 retrieval/context rebaseline.
+M1 selects no new runtime trigger and does not change the P5 no-growth policy. Startup, background, Optimizations-toggle, refresh, conversation lifecycle and ENOSPC/capacity-failure purge remain forbidden.
+
+### OPT-C1-P6 closeout
+
+P6 closes C1 after checking the original C1-T1 through C1-T9 matrix against the implemented I1-I10/fault/replay qualification chain. Active authority, saved-conversation roots, live B2 readers, late durable roots, malformed objects, process interruption and no-synchronous-conversation-delete cascade all have explicit qualification coverage. P5 remains the production steady-state rule: once trash exists, a repository action cannot increase its count unless one pre-existing canonical object was first purged.
+
+The M1 allocation/reclamation measurements satisfy the storage-benefit evidence gate without introducing a production reclaim threshold. C1 does not add recursive byte scans to every runtime maintenance action solely for observability. Runtime already reports candidate/purge identity and outcomes; detailed candidate/protected byte telemetry is deferred as an optional non-destructive observability improvement because continuously walking snapshot trees would add I/O to the bounded maintenance path. Any later telemetry must not widen reachability authority, triggers, or deletion scope.
+
+C1 therefore closes with its original non-goals intact: no Control DB generation pruning, automatic ENOSPC recovery, conversation-delete cascade, quarantine purge, general retrieval-index eviction, background daemon or automatic trash restore.
+
+The next Backend Optimization workstream is OPT-D0: a measurement-only rebaseline of retrieval/context efficiency on current `main`. D0 does not change production retrieval policy; any later D1 production change remains separately gated.
 
 ### Recovery fault qualification
 
