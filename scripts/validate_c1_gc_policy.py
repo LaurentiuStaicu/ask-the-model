@@ -796,7 +796,7 @@ def main() -> int:
         '"malformed-trash-name"',
         '"not-real-directory"',
         "deterministic_first ()",
-        "GLib.strcmp0 (",
+        "GLib.strcmp (",
         '"Repositories",',
         '".trash",',
     ):
