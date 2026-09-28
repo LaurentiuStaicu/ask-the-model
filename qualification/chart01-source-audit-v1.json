@@ -1,0 +1,36 @@
+{
+  "schema": "atm-chart01-source-audit/1",
+  "status": "PINNED_PROCESSED_SOURCE_AUDITED",
+  "repository": "LaurentiuStaicu/empirical-world3-dynamics",
+  "snapshot_sha": "d9e249339663015f6d1c05752338a955bf64ad0b",
+  "source_sha256": {
+    "science/data/input_manifest.json": "887bfec97515472e22084a6e28655b1d644d86949dc59b5a506801346a1fce8e",
+    "science/data/processed/nasa_gistemp_global_2026.csv": "c03e15198201c491cfbd665ad655f72c54f2df19db9c93614b5a2fb4ee5590fb",
+    "science/data/processed/nasa_gistemp_global_2026.provenance.json": "2ac56f0f060fbba0b15f483a2510b293fe5cfbebb2a8e39816f3b73270496ed9",
+    "science/data/registry.csv": "0637a1842706d2303750d6591851830987f3899de681e432c32b2be7b71adf4d"
+  },
+  "series_id": "nasa_gistemp_global",
+  "subject": "global_surface_temperature",
+  "attribute": "annual_temperature_anomaly",
+  "x_semantics": "calendar_year",
+  "frequency": "annual",
+  "y_unit": "degree_Celsius_anomaly",
+  "reference_period": "1951-1980",
+  "epistemic_status": "empirical",
+  "scenario": "not_applicable",
+  "point_count": 146,
+  "start_year": 1880,
+  "end_year": 2025,
+  "missing_count": 0,
+  "gap_count": 0,
+  "numeric_encoding": "source_decimal_text_4_places",
+  "scientific_boundary": "Observed climate state for extension audits; not interchangeable with World3 persistent pollution and not yet a central feedback",
+  "raw_reproduction_verified": false,
+  "native_verified_series_available": false,
+  "runtime_adapter_enabled": false,
+  "limitations": [
+    "Checks pinned processed data and metadata, not raw NASA reconstruction.",
+    "No current AtM semantic profile admits this dataset as a numeric series.",
+    "This report is not a VerifiedSeries or authority to render a chart."
+  ]
+}

@@ -54,5 +54,7 @@ jobs:
           python3 scripts/validate_pres06_ui.py
           python3 scripts/validate_pres07_sources.py
           python3 scripts/validate_pres08_parity.py
+          python3 scripts/validate_chart01_source.py --check
+          python3 tests/chart01_source_audit_test.py
           python3 scripts/validate_c1_gc_policy.py
           python3 scripts/validate_presentation_performance_evidence.py
