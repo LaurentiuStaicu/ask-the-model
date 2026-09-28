@@ -97,3 +97,41 @@ applicable, immutable ownership, malformed inputs and the exact pinned source.
 M1b must bind the parsed candidate to qualified data and metadata through an
 explicit profile admission. Only that later layer may construct VerifiedSeries.
 The candidate API has no qualified-series ID, unit setter or rendering authority.
+
+## M1b pinned source admission
+
+`gistemp_admission.h/.c` introduces the independent policy
+`atm-gistemp-pinned-admission/1`. It does not modify the existing EWD evidence
+profile or create an `AtmScientificArtifact`, SRA result or VerifiedSeries.
+It admits only the exact repository, snapshot and four byte-pinned files above.
+The source order is fixed: CSV, provenance, input manifest, registry. A changed,
+missing, swapped or oversized file fails closed; matching caller identity
+strings cannot admit different bytes. New vintages need explicit policy review.
+
+The builder owns deep copies, verifies their SHA-256 against compiled policy,
+then parses the owned CSV and checks its 146-point, 1880–2025 coverage. All four
+source sizes are checked before copying; each is bounded to 64 KiB, for at most
+256 KiB of retained bundle bytes plus the candidate's bounded copy/points.
+Returned candidate and metadata are borrowed read-only data. Failed admission
+leaves output unchanged. This is an in-memory API with no network or file I/O.
+
+The metadata mapping is a reviewed interpretation of the *exact* provenance
+and registry bytes retained by M0: global annual empirical surface-temperature
+anomaly, calendar years, Celsius anomaly, reference period 1951–1980 and source
+access vintage 2026-08-31. There are no caller metadata setters. File paths and
+hashes expose the complete supporting bundle; candidate row locators identify
+numeric observations. The `ppol` registry alias never becomes the subject.
+The access vintage is not a claim that measurements were made on that date.
+
+This policy is a local trust anchor for one reviewed processed source. It does
+not independently authenticate upstream Git membership, reconstruct raw NASA
+data, generalize scientific admission to other files, or mint qualified support
+IDs. Hash matching is used to bind reviewed metadata to reviewed bytes, not as
+a substitute for scientific interpretation. M1c still needs canonical series
+identities, qualified support/artifact integration, revalidation and a full
+VerifiedSeries contract before any chart can be authorized.
+
+Native tests compare all compiled pins with the M0 lock, reject mutation of each
+source, missing/swapped sources, wrong repository/snapshot and byte ceiling
+violations, and check caller-memory independence. Both native targets run under
+ASan/UBSan and in Meson/Flatpak. This layer remains linked only into tests.
