@@ -1,0 +1,40 @@
+name: CHART-01 native candidate
+
+on:
+  pull_request:
+    paths:
+      - 'src/annual_series_candidate.*'
+      - 'src/scientific_canonical.*'
+      - 'tests/annual_series_candidate_test.c'
+      - 'tests/fixtures/chart01/**'
+      - 'meson.build'
+      - '.github/workflows/chart01-native.yml'
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  qualify:
+    runs-on: ubuntu-24.04
+    timeout-minutes: 10
+    steps:
+      - uses: actions/checkout@v4
+      - name: Install native dependencies
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y --no-install-recommends gcc pkg-config libglib2.0-dev libjson-glib-dev
+      - name: Compile and test under ASan and UBSan
+        env:
+          ATM_CHART01_CSV: tests/fixtures/chart01/ewd/science/data/processed/nasa_gistemp_global_2026.csv
+          ASAN_OPTIONS: detect_leaks=1:halt_on_error=1
+          UBSAN_OPTIONS: halt_on_error=1:print_stacktrace=1
+        run: |
+          set -euo pipefail
+          cc -std=c11 -Wall -Wextra -Werror -g -O1 \
+            -fsanitize=address,undefined -fno-omit-frame-pointer -Isrc \
+            src/annual_series_candidate.c src/scientific_canonical.c \
+            tests/annual_series_candidate_test.c \
+            $(pkg-config --cflags --libs glib-2.0 json-glib-1.0) -lm \
+            -o /tmp/annual-series-candidate-test
+          /tmp/annual-series-candidate-test

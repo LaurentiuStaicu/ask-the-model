@@ -69,3 +69,31 @@ CHART-02 consumes qualified series and owns compatible axes and GAP policy;
 CHART-03 adds Cairo and the `atm-retro-mono/1` visual prototype; CHART-04 owns
 M4/resize/cache; CHART-05 owns exact History persistence. No persistence or
 Presentation behavior changes in this source-audit slice.
+
+## M1a native candidate boundary
+
+`annual_series_candidate.h/.c` supplies an opaque, immutable parsed candidate,
+not a VerifiedSeries. It is linked only into its Meson test. The parser performs
+no file/network access, accepts source bytes rather than caller-supplied point
+arrays, deep-copies those bytes, and preserves each decimal token and original
+one-based CSV row. It also exposes the existing exact-decimal canonical
+coefficient/exponent and a raw source SHA-256; that digest is not qualification.
+Borrowed accessors remain valid until candidate destruction. Failure leaves a
+NULL output unchanged; pre-populated output pointers are rejected.
+
+The complete annual source dialect rejects gaps, duplicates, year zero, CRLF,
+quoted/extra columns, embedded NUL, missing and nonfinite values. This narrow
+parser does not implement general MISSING/event/categorical series. Exact
+source `-0.0000` is retained; its canonical mathematical value is `0 × 10^0`,
+matching Scientific Plane conventions. No conversion to binary64 occurs.
+
+Resource ceilings are defensive allocation policy: 64 KiB source bytes (matching
+M0's file ceiling), 256 points (above the pinned 146 annual observations), and
+64 bytes per decimal token. Limits are checked before copying source bytes,
+allocating each point or canonicalizing a token. These are not performance
+benchmarks or a scientific time horizon. Tests exercise limit and limit+1 where
+applicable, immutable ownership, malformed inputs and the exact pinned source.
+
+M1b must bind the parsed candidate to qualified data and metadata through an
+explicit profile admission. Only that later layer may construct VerifiedSeries.
+The candidate API has no qualified-series ID, unit setter or rendering authority.
