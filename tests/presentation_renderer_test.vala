@@ -445,9 +445,122 @@ test_completed_turn_parity () {
     }
 }
 
+private void
+settle_visual_frame () {
+    var loop = new MainLoop ();
+    Timeout.add (400, () => {
+        loop.quit ();
+        return Source.REMOVE;
+    });
+    loop.run ();
+}
+
+/* Opt-in CI smoke fixture. Uses production CSS and the actual renderer;
+ * ImageMagick captures only the isolated Xvfb display. */
+private int
+visual_smoke (string output_dir) {
+    var css = new Gtk.CssProvider ();
+    css.load_from_path ("data/style.css");
+    Gtk.StyleContext.add_provider_for_display (
+        Gdk.Display.get_default (), css,
+        Gtk.STYLE_PROVIDER_PRIORITY_APPLICATION
+    );
+    DirUtils.create_with_parents (output_dir, 0755);
+    for (int theme = 0; theme < 2; theme++) {
+        var window = new Gtk.Window () {
+            default_width = 1320,
+            default_height = 820
+        };
+        window.add_css_class ("atm-window");
+        if (theme == 1) {
+            window.add_css_class ("atm-dark");
+        }
+        var columns = new Gtk.Box (Gtk.Orientation.HORIZONTAL, 16) {
+            homogeneous = true,
+            margin_top = 12, margin_bottom = 12,
+            margin_start = 12, margin_end = 12
+        };
+        window.child = columns;
+        Gtk.ScrolledWindow[] scrolls = {};
+        string? previous_signature = null;
+        for (int mode = 0; mode < 2; mode++) {
+            var column = new Gtk.Box (Gtk.Orientation.VERTICAL, 8);
+            column.append (new Gtk.Label (mode == 0 ? "Live" : "History"));
+            var view = new Gtk.TextView () {
+                editable = false, cursor_visible = false,
+                wrap_mode = Gtk.WrapMode.WORD_CHAR,
+                left_margin = 10, right_margin = 10
+            };
+            var scroll = new Gtk.ScrolledWindow () {
+                vexpand = true, hexpand = true, child = view
+            };
+            scrolls += scroll;
+            column.append (scroll);
+            columns.append (column);
+            var renderer = new PresentationRenderer (view);
+            renderer.set_dark (theme == 1);
+            for (int turn = 0; turn < 4; turn++) {
+                renderer.append_user ("Întrebare **literală** — %d".printf (turn + 1));
+                if (mode == 0) {
+                    renderer.begin_assistant_generation ();
+                }
+                Gtk.Button[] sources = {
+                    new Gtk.Button.with_label ("[1]"),
+                    new Gtk.Button.with_label ("[2]")
+                };
+                renderer.append_completed_turn (
+                    "## Rezultat și limite\n\n" +
+                    "Text **important**, șțâîă, cu `cod` și conținut suficient de lung pentru a verifica împachetarea pe mai multe rânduri în aceeași fereastră.\n\n" +
+                    "- Prima observație\n- A doua observație\n\n" +
+                    "> Interpretarea păstrează limitele dovezilor.\n\n" +
+                    "```txt\nx = 1\ny = 2\n```\n\n" +
+                    "Text final <span>istoric incomplet **lizibil",
+                    sources
+                );
+            }
+            string signature = projection_signature (view.buffer);
+            if (previous_signature != null) {
+                assert (signature == previous_signature);
+            }
+            previous_signature = signature;
+        }
+        window.present ();
+        settle_visual_frame ();
+        for (int position = 0; position < 2; position++) {
+            if (position == 1) {
+                foreach (Gtk.ScrolledWindow scroll in scrolls) {
+                    scroll.vadjustment.value = scroll.vadjustment.upper -
+                        scroll.vadjustment.page_size;
+                }
+                settle_visual_frame ();
+            }
+            string file = Path.build_filename (output_dir,
+                "%s-%s.png".printf (theme == 0 ? "light" : "dark",
+                                    position == 0 ? "top" : "bottom"));
+            try {
+                int status;
+                Process.spawn_command_line_sync (
+                    "import -window root " + Shell.quote (file),
+                    null, null, out status
+                );
+                assert (status == 0);
+            } catch (Error error) {
+                GLib.error ("Visual smoke capture failed: %s", error.message);
+            }
+        }
+        window.destroy ();
+        settle_visual_frame ();
+    }
+    return 0;
+}
+
 int
 main (string[] args) {
     Gtk.init ();
+    string? smoke_dir = Environment.get_variable ("ATM_PRESENTATION_SMOKE_DIR");
+    if (smoke_dir != null) {
+        return visual_smoke (smoke_dir);
+    }
     Test.init (ref args);
 
     Test.add_func (
