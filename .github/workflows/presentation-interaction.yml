@@ -11,6 +11,7 @@ on:
       - 'data/style.css'
       - 'scripts/validate_pres06_ui.py'
       - 'scripts/validate_pres07_sources.py'
+      - 'scripts/validate_pres08_parity.py'
       - '.github/workflows/presentation-interaction.yml'
   workflow_dispatch:
 
@@ -90,3 +91,9 @@ jobs:
         run: |
           set -euo pipefail
           python3 scripts/validate_pres07_sources.py
+
+      - name: Validate PRES-08 live/History parity
+        shell: bash
+        run: |
+          set -euo pipefail
+          python3 scripts/validate_pres08_parity.py

@@ -345,6 +345,106 @@ test_semantic_anchor_copy_projection () {
     assert (!semantic.contains ("╌"));
 }
 
+/* Include actual child widgets and applied tags, not just TextBuffer.text:
+ * TextBuffer.text intentionally omits source/separator anchors. */
+private string
+projection_signature (Gtk.TextBuffer buffer) {
+    var signature = new GLib.StringBuilder ();
+    Gtk.TextIter iter;
+    buffer.get_start_iter (out iter);
+    while (!iter.is_end ()) {
+        unowned Gtk.TextChildAnchor? anchor = iter.get_child_anchor ();
+        if (anchor != null) {
+            foreach (unowned Gtk.Widget widget in anchor.get_widgets ()) {
+                if (widget is Gtk.Button) {
+                    signature.append (((Gtk.Button) widget).label ?? "");
+                    assert (widget.focusable);
+                    assert (widget.has_css_class ("atm-source-ref"));
+                } else {
+                    assert (widget.has_css_class ("atm-turn-separator"));
+                    signature.append ("<separator>");
+                }
+            }
+        } else {
+            signature.append_unichar (iter.get_char ());
+            foreach (unowned Gtk.TextTag tag in iter.get_tags ()) {
+                signature.append ("<" + (tag.name ?? "") + ">");
+            }
+        }
+        iter.forward_char ();
+    }
+    return signature.str;
+}
+
+private string
+copy_projection (PresentationRenderer renderer, Gtk.TextBuffer buffer) {
+    Gtk.TextIter start;
+    Gtk.TextIter end;
+    buffer.get_bounds (out start, out end);
+    buffer.select_range (start, end);
+    bool had_anchor;
+    string? text = renderer.selected_semantic_text (out had_anchor);
+    assert (had_anchor);
+    assert (text != null);
+    assert (!text.contains ("\uFFFC"));
+    return text;
+}
+
+private void
+test_completed_turn_parity () {
+    string[] answers = {
+        "Răspuns **important** cu șțâîă și 日本語.",
+        "## Titlu\n\n- unu\n- doi\n\n> Citat\n\n```txt\nx = 1\n```",
+        "**incomplet <span>text &amp; final",
+        "```vala\nvar x = \"neterminat\";",
+        "Please restate the question with the repository, variable, source, or topic you mean."
+    };
+    for (int theme = 0; theme < 2; theme++) {
+        for (int source_count = 0; source_count <= 2; source_count += 2) {
+            var live_view = new Gtk.TextView ();
+            var history_view = new Gtk.TextView ();
+            var live = new PresentationRenderer (live_view);
+            var history = new PresentationRenderer (history_view);
+            live.set_dark (theme == 1);
+            history.set_dark (theme == 1);
+            foreach (string answer in answers) {
+                live.append_user ("Întrebare **literală**");
+                history.append_user ("Întrebare **literală**");
+                live.begin_assistant_generation ();
+                assert (!history.assistant_generation_pending ());
+                Gtk.Button[] live_sources = {};
+                Gtk.Button[] history_sources = {};
+                for (int i = 1; i <= source_count; i++) {
+                    live_sources += new Gtk.Button.with_label ("[%d]".printf (i));
+                    history_sources += new Gtk.Button.with_label ("[%d]".printf (i));
+                }
+                live.append_completed_turn (answer, live_sources);
+                history.append_completed_turn (answer, history_sources);
+                assert (!live.assistant_generation_pending ());
+                assert (!history.assistant_generation_pending ());
+                assert (projection_signature (live_view.buffer) ==
+                        projection_signature (history_view.buffer));
+                string copied = copy_projection (live, live_view.buffer);
+                assert (copied == copy_projection (history, history_view.buffer));
+                assert (copied.contains ("Întrebare **literală**"));
+                if (source_count > 0) {
+                    assert (copied.contains ("Sources: [1] [2]"));
+                } else {
+                    assert (!copied.contains ("Sources:"));
+                }
+            }
+            string completed = projection_signature (live_view.buffer);
+            assert (completed.split ("<separator>").length == answers.length + 1);
+            live.begin_assistant_generation ();
+            live.append_completed_turn ("", {});
+            history.append_completed_turn ("", {});
+            assert (!live.assistant_generation_pending ());
+            assert (projection_signature (live_view.buffer) == completed);
+            assert (projection_signature (history_view.buffer) == completed);
+        }
+    }
+}
+
 int
 main (string[] args) {
     Gtk.init ();
@@ -365,6 +465,11 @@ main (string[] args) {
     Test.add_func (
         "/presentation-renderer/semantic-anchor-copy",
         test_semantic_anchor_copy_projection
+    );
+
+    Test.add_func (
+        "/presentation-renderer/completed-turn-parity",
+        test_completed_turn_parity
     );
 
     return Test.run ();

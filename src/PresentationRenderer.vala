@@ -768,22 +768,26 @@ namespace AskTheModel {
         public void complete_assistant_generation (
             string text
         ) {
-            bool had_pending =
-                pending_assistant_origin != null;
-
             clear_pending_assistant ();
+            append_assistant (text);
+        }
 
-            if (text.length == 0) {
+        /* Shared display-time projection for live completion and History.
+         * Only live turns have a pending row to remove. Source buttons carry
+         * already-resolved citations; this layer never changes their authority.
+         */
+        public void append_completed_turn (
+            string text,
+            Gtk.Button[] source_buttons
+        ) {
+            complete_assistant_generation (text);
+
+            if (text.length == 0 && source_buttons.length == 0) {
                 return;
             }
 
-            if (!had_pending) {
-                append_assistant (text);
-                return;
-            }
-
-            append_message_separator ();
-            render_assistant (text);
+            append_sources (source_buttons);
+            append_turn_separator ();
         }
 
         public void append_assistant (
