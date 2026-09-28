@@ -113,8 +113,7 @@ def main() -> int:
     )
     require(
         "clear_pending_assistant ();" in complete
-        and "append_message_separator ();" in complete
-        and "render_assistant (text);" in complete,
+        and "append_assistant (text);" in complete,
         "completion no longer replaces pending row with one final Assistant message",
     )
 
@@ -190,8 +189,8 @@ def main() -> int:
         "error cleanup",
     )
     require(
-        send.count("state.presentation.append_turn_separator ();") == 3,
-        "live flow must append exactly three completion-path separators",
+        send.count("append_completed_answer (") == 3,
+        "live flow must route all three completion paths through the shared seam",
     )
 
     reveal = block(
@@ -218,16 +217,16 @@ def main() -> int:
 
     grounded = block(
         application,
-        "private void append_grounded_answer (",
+        "private void append_completed_answer (",
         "private string normalize_conversation_title (",
     )
     require(
-        "complete_assistant_generation" in grounded,
+        "append_completed_turn" in grounded,
         "grounded live answer no longer uses pending-aware completion",
     )
     require(
         "append_turn_separator" not in grounded,
-        "shared grounded renderer would add PRES-06 separator during History restore",
+        "Application must delegate decoration to the shared completed-turn renderer",
     )
 
     for marker in (
@@ -242,7 +241,7 @@ def main() -> int:
         "PRES-06 validation passed: pending Assistant is non-streaming and "
         "replaceable, near-bottom is snapshotted before user insertion, "
         "scroll occurs once to the Assistant start, and the turn separator "
-        "is a non-text child widget kept out of History until PRES-08"
+        "is a non-text child widget shared with History by PRES-08"
     )
     return 0
 

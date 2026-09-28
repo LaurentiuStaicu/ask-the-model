@@ -345,9 +345,222 @@ test_semantic_anchor_copy_projection () {
     assert (!semantic.contains ("╌"));
 }
 
+/* Include actual child widgets and applied tags, not just TextBuffer.text:
+ * TextBuffer.text intentionally omits source/separator anchors. */
+private string
+projection_signature (Gtk.TextBuffer buffer) {
+    var signature = new GLib.StringBuilder ();
+    Gtk.TextIter iter;
+    buffer.get_start_iter (out iter);
+    while (!iter.is_end ()) {
+        unowned Gtk.TextChildAnchor? anchor = iter.get_child_anchor ();
+        if (anchor != null) {
+            foreach (unowned Gtk.Widget widget in anchor.get_widgets ()) {
+                if (widget is Gtk.Button) {
+                    signature.append (((Gtk.Button) widget).label ?? "");
+                    assert (widget.focusable);
+                    assert (widget.has_css_class ("atm-source-ref"));
+                } else {
+                    assert (widget.has_css_class ("atm-turn-separator"));
+                    signature.append ("<separator>");
+                }
+            }
+        } else {
+            signature.append_unichar (iter.get_char ());
+            foreach (unowned Gtk.TextTag tag in iter.get_tags ()) {
+                signature.append ("<" + (tag.name ?? "") + ">");
+            }
+        }
+        iter.forward_char ();
+    }
+    return signature.str;
+}
+
+private string
+copy_projection (PresentationRenderer renderer, Gtk.TextBuffer buffer) {
+    Gtk.TextIter start;
+    Gtk.TextIter end;
+    buffer.get_bounds (out start, out end);
+    buffer.select_range (start, end);
+    bool had_anchor;
+    string? text = renderer.selected_semantic_text (out had_anchor);
+    assert (had_anchor);
+    assert (text != null);
+    assert (!text.contains ("\uFFFC"));
+    return text;
+}
+
+private void
+test_completed_turn_parity () {
+    string[] answers = {
+        "Răspuns **important** cu șțâîă și 日本語.",
+        "## Titlu\n\n- unu\n- doi\n\n> Citat\n\n```txt\nx = 1\n```",
+        "**incomplet <span>text &amp; final",
+        "```vala\nvar x = \"neterminat\";",
+        "Please restate the question with the repository, variable, source, or topic you mean."
+    };
+    for (int theme = 0; theme < 2; theme++) {
+        for (int source_count = 0; source_count <= 2; source_count += 2) {
+            var live_view = new Gtk.TextView ();
+            var history_view = new Gtk.TextView ();
+            var live = new PresentationRenderer (live_view);
+            var history = new PresentationRenderer (history_view);
+            live.set_dark (theme == 1);
+            history.set_dark (theme == 1);
+            foreach (string answer in answers) {
+                live.append_user ("Întrebare **literală**");
+                history.append_user ("Întrebare **literală**");
+                live.begin_assistant_generation ();
+                assert (!history.assistant_generation_pending ());
+                Gtk.Button[] live_sources = {};
+                Gtk.Button[] history_sources = {};
+                for (int i = 1; i <= source_count; i++) {
+                    live_sources += new Gtk.Button.with_label ("[%d]".printf (i));
+                    history_sources += new Gtk.Button.with_label ("[%d]".printf (i));
+                }
+                live.append_completed_turn (answer, live_sources);
+                history.append_completed_turn (answer, history_sources);
+                assert (!live.assistant_generation_pending ());
+                assert (!history.assistant_generation_pending ());
+                assert (projection_signature (live_view.buffer) ==
+                        projection_signature (history_view.buffer));
+                string copied = copy_projection (live, live_view.buffer);
+                assert (copied == copy_projection (history, history_view.buffer));
+                assert (copied.contains ("Întrebare **literală**"));
+                if (source_count > 0) {
+                    assert (copied.contains ("Sources: [1] [2]"));
+                } else {
+                    assert (!copied.contains ("Sources:"));
+                }
+            }
+            string completed = projection_signature (live_view.buffer);
+            assert (completed.split ("<separator>").length == answers.length + 1);
+            live.begin_assistant_generation ();
+            live.append_completed_turn ("", {});
+            history.append_completed_turn ("", {});
+            assert (!live.assistant_generation_pending ());
+            assert (projection_signature (live_view.buffer) == completed);
+            assert (projection_signature (history_view.buffer) == completed);
+        }
+    }
+}
+
+private void
+settle_visual_frame () {
+    var loop = new MainLoop ();
+    Timeout.add (400, () => {
+        loop.quit ();
+        return Source.REMOVE;
+    });
+    loop.run ();
+}
+
+/* Opt-in CI smoke fixture. Uses production CSS and the actual renderer;
+ * ImageMagick captures only the isolated Xvfb display. */
+private int
+visual_smoke (string output_dir) {
+    var css = new Gtk.CssProvider ();
+    css.load_from_path ("data/style.css");
+    Gtk.StyleContext.add_provider_for_display (
+        Gdk.Display.get_default (), css,
+        Gtk.STYLE_PROVIDER_PRIORITY_APPLICATION
+    );
+    DirUtils.create_with_parents (output_dir, 0755);
+    for (int theme = 0; theme < 2; theme++) {
+        var window = new Gtk.Window () {
+            default_width = 1320,
+            default_height = 820
+        };
+        window.add_css_class ("atm-window");
+        if (theme == 1) {
+            window.add_css_class ("atm-dark");
+        }
+        var columns = new Gtk.Box (Gtk.Orientation.HORIZONTAL, 16) {
+            homogeneous = true,
+            margin_top = 12, margin_bottom = 12,
+            margin_start = 12, margin_end = 12
+        };
+        window.child = columns;
+        Gtk.ScrolledWindow[] scrolls = {};
+        string? previous_signature = null;
+        for (int mode = 0; mode < 2; mode++) {
+            var column = new Gtk.Box (Gtk.Orientation.VERTICAL, 8);
+            column.append (new Gtk.Label (mode == 0 ? "Live" : "History"));
+            var view = new Gtk.TextView () {
+                editable = false, cursor_visible = false,
+                wrap_mode = Gtk.WrapMode.WORD_CHAR,
+                left_margin = 10, right_margin = 10
+            };
+            var scroll = new Gtk.ScrolledWindow () {
+                vexpand = true, hexpand = true, child = view
+            };
+            scrolls += scroll;
+            column.append (scroll);
+            columns.append (column);
+            var renderer = new PresentationRenderer (view);
+            renderer.set_dark (theme == 1);
+            for (int turn = 0; turn < 4; turn++) {
+                renderer.append_user ("Întrebare **literală** — %d".printf (turn + 1));
+                if (mode == 0) {
+                    renderer.begin_assistant_generation ();
+                }
+                Gtk.Button[] sources = {
+                    new Gtk.Button.with_label ("[1]"),
+                    new Gtk.Button.with_label ("[2]")
+                };
+                renderer.append_completed_turn (
+                    "## Rezultat și limite\n\n" +
+                    "Text **important**, șțâîă, cu `cod` și conținut suficient de lung pentru a verifica împachetarea pe mai multe rânduri în aceeași fereastră.\n\n" +
+                    "- Prima observație\n- A doua observație\n\n" +
+                    "> Interpretarea păstrează limitele dovezilor.\n\n" +
+                    "```txt\nx = 1\ny = 2\n```\n\n" +
+                    "Text final <span>istoric incomplet **lizibil",
+                    sources
+                );
+            }
+            string signature = projection_signature (view.buffer);
+            if (previous_signature != null) {
+                assert (signature == previous_signature);
+            }
+            previous_signature = signature;
+        }
+        window.present ();
+        settle_visual_frame ();
+        for (int position = 0; position < 2; position++) {
+            if (position == 1) {
+                foreach (Gtk.ScrolledWindow scroll in scrolls) {
+                    scroll.vadjustment.value = scroll.vadjustment.upper -
+                        scroll.vadjustment.page_size;
+                }
+                settle_visual_frame ();
+            }
+            string file = Path.build_filename (output_dir,
+                "%s-%s.png".printf (theme == 0 ? "light" : "dark",
+                                    position == 0 ? "top" : "bottom"));
+            try {
+                int status;
+                Process.spawn_command_line_sync (
+                    "import -window root " + Shell.quote (file),
+                    null, null, out status
+                );
+                assert (status == 0);
+            } catch (Error error) {
+                GLib.error ("Visual smoke capture failed: %s", error.message);
+            }
+        }
+        window.destroy ();
+        settle_visual_frame ();
+    }
+    return 0;
+}
+
 int
 main (string[] args) {
     Gtk.init ();
+    string? smoke_dir = Environment.get_variable ("ATM_PRESENTATION_SMOKE_DIR");
+    if (smoke_dir != null) {
+        return visual_smoke (smoke_dir);
+    }
     Test.init (ref args);
 
     Test.add_func (
@@ -365,6 +578,11 @@ main (string[] args) {
     Test.add_func (
         "/presentation-renderer/semantic-anchor-copy",
         test_semantic_anchor_copy_projection
+    );
+
+    Test.add_func (
+        "/presentation-renderer/completed-turn-parity",
+        test_completed_turn_parity
     );
 
     return Test.run ();

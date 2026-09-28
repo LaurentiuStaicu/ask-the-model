@@ -156,7 +156,7 @@ def main() -> int:
     button = block(
         application,
         "private Gtk.Button build_source_reference_button (",
-        "private void append_grounded_answer (",
+        "private void append_completed_answer (",
     )
     for marker in (
         "new Gtk.Button ()",
@@ -174,12 +174,12 @@ def main() -> int:
 
     grounded = block(
         application,
-        "private void append_grounded_answer (",
+        "private void append_completed_answer (",
         "private string normalize_conversation_title (",
     )
     zero = require_marker(
         grounded,
-        "if (resolution.citation_count () == 0)",
+        "resolution != null && i < resolution.citation_count ()",
         "zero-citation path",
     )
     loop = require_marker(
@@ -189,7 +189,7 @@ def main() -> int:
     )
     append = require_marker(
         grounded,
-        "state.presentation.append_sources (",
+        "state.presentation.append_completed_turn (",
         "shared Sources projection",
     )
     require(
@@ -208,7 +208,7 @@ def main() -> int:
         "private ConversationPersistenceRepository[]",
     )
     require(
-        "append_grounded_answer (" in restore,
+        "append_completed_answer (" in restore,
         "History no longer shares grounded Sources projection with live rendering",
     )
 

@@ -11,6 +11,7 @@ on:
       - 'data/style.css'
       - 'scripts/validate_pres06_ui.py'
       - 'scripts/validate_pres07_sources.py'
+      - 'scripts/validate_pres08_parity.py'
       - '.github/workflows/presentation-interaction.yml'
   workflow_dispatch:
 
@@ -40,6 +41,7 @@ jobs:
             ninja-build \
             valac \
             xvfb \
+            imagemagick \
             libgtk-4-dev \
             libgranite-7-dev \
             libsoup-3.0-dev \
@@ -90,3 +92,28 @@ jobs:
         run: |
           set -euo pipefail
           python3 scripts/validate_pres07_sources.py
+
+      - name: Validate PRES-08 live/History parity
+        shell: bash
+        run: |
+          set -euo pipefail
+          python3 scripts/validate_pres08_parity.py
+
+      - name: Capture PRES-08 visual smoke matrix
+        shell: bash
+        env:
+          GTK_A11Y: none
+          GTK_IM_MODULE: gtk-im-context-simple
+          GSK_RENDERER: cairo
+          LIBGL_ALWAYS_SOFTWARE: '1'
+          ATM_PRESENTATION_SMOKE_DIR: visual-smoke
+        run: |
+          set -euo pipefail
+          xvfb-run -a -s '-screen 0 1360x900x24' ./build/presentation-renderer-test
+
+      - name: Retain PRES-08 visual smoke matrix
+        uses: actions/upload-artifact@v4
+        with:
+          name: pres08-visual-smoke-${{ github.sha }}
+          path: visual-smoke/*.png
+          if-no-files-found: error
