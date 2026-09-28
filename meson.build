@@ -2450,3 +2450,16 @@ foreach size : icon_sizes
     rename: meson.project_name() + '.png'
   )
 endforeach
+
+# CHART-01 M1a: dormant parser; deliberately not linked into the application.
+annual_series_candidate_test = executable(
+  'annual-series-candidate-test',
+  ['src/annual_series_candidate.c', 'src/scientific_canonical.c',
+   'tests/annual_series_candidate_test.c'],
+  include_directories: include_directories('src'),
+  dependencies: [glib_dep, json_glib_dep],
+  install: false
+)
+test('annual-series-candidate', annual_series_candidate_test,
+  env: {'ATM_CHART01_CSV': meson.current_source_dir() /
+    'tests/fixtures/chart01/ewd/science/data/processed/nasa_gistemp_global_2026.csv'})
