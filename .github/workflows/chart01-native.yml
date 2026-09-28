@@ -4,6 +4,8 @@ on:
   pull_request:
     paths:
       - 'src/annual_series_candidate.*'
+      - 'src/gistemp_admission.*'
+      - 'tests/gistemp_admission_test.c'
       - 'src/scientific_canonical.*'
       - 'tests/annual_series_candidate_test.c'
       - 'tests/fixtures/chart01/**'
@@ -26,6 +28,7 @@ jobs:
           sudo apt-get install -y --no-install-recommends gcc pkg-config libglib2.0-dev libjson-glib-dev
       - name: Compile and test under ASan and UBSan
         env:
+          ATM_CHART01_FIXTURE: tests/fixtures/chart01
           ATM_CHART01_CSV: tests/fixtures/chart01/ewd/science/data/processed/nasa_gistemp_global_2026.csv
           ASAN_OPTIONS: detect_leaks=1:halt_on_error=1
           UBSAN_OPTIONS: halt_on_error=1:print_stacktrace=1
@@ -38,3 +41,10 @@ jobs:
             $(pkg-config --cflags --libs glib-2.0 json-glib-1.0) -lm \
             -o /tmp/annual-series-candidate-test
           /tmp/annual-series-candidate-test
+          cc -std=c11 -Wall -Wextra -Werror -g -O1 \
+            -fsanitize=address,undefined -fno-omit-frame-pointer -Isrc \
+            src/gistemp_admission.c src/annual_series_candidate.c \
+            src/scientific_canonical.c tests/gistemp_admission_test.c \
+            $(pkg-config --cflags --libs glib-2.0 json-glib-1.0) -lm \
+            -o /tmp/gistemp-admission-test
+          /tmp/gistemp-admission-test
