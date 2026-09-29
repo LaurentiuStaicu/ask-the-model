@@ -75,7 +75,7 @@ static gboolean layout_fits (cairo_t *cr, const AtmChartProjection *p, guint wid
         const AtmChartTick *t = atm_chart_projection_x_tick (p, i);
         cairo_text_extents_t e; cairo_text_extents (cr, t->label, &e);
         double center = 84 + t->position, left = center - e.width / 2, right = center + e.width / 2;
-        if (left < 16 || right > width - 16 || left < previous_right + 8) return FALSE;
+        if (left < 12 || right > width - 12 || left < previous_right + 8) return FALSE;
         previous_right = right;
     }
     double previous_top = 1e9;

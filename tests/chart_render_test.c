@@ -152,6 +152,9 @@ static void test_fallback_arguments (void)
     AtmChartSpec *spec = specification (ATM_CHART_LINE);
     AtmChartRender *small = render (spec, 240, 140, 1), *large = render (spec, 860, 500, 1);
     g_assert_true (atm_chart_render_is_fallback (small));
+    AtmChartRender *minimum = render (spec, 432, 348, 1);
+    g_assert_false (atm_chart_render_is_fallback (minimum));
+    monochrome (minimum); atm_chart_render_free (minimum);
     g_assert_cmpstr (atm_chart_render_data (small), ==, atm_chart_render_data (large));
     monochrome (small); save_preview (small, "atm-chart-small.png", FALSE);
     const guint invalid[][3] = {{239,500,1},{860,139,1},{2049,500,1},{860,2049,1},{860,500,0},{860,500,3},{G_MAXUINT,500,2}};
