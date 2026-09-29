@@ -75,3 +75,48 @@ exact source extrema, input lifetime, duplicates, cardinality, unsupported kinds
 corrupted input, changed bounds/identity and changed owned series. Degenerate and
 multi-source synthetic fixtures are not represented as qualified source data.
 The module remains test-only, with no application caller or enabled chart UI.
+
+## Bounded display projection
+
+`chart_projection.h/.c` adds `atm-display/gistemp-linear/1`, a transient display
+policy for the closed complete annual GISTEMP adapter. It validates the supplied
+ChartSpec before reconstructing an owned copy. It does not admit arbitrary data,
+change the ChartSpec identity or modify scientific extents. Coordinates are
+binary64 display approximations; exact source decimals remain accessible through
+the owned specification for the later Data view.
+
+The policy selects 25-year X ticks, including both exact domain endpoints, and
+quarter-degree Y ticks. Y display bounds are the enclosing multiples of 0.25 °C;
+for the retained source this yields [-0.50, 1.50], while scientific bounds remain
+[-0.49, 1.28]. These ticks are scale labels, not additional observations. Positive
+Y goes upward; the returned plot coordinates have origin at the upper left.
+
+Conversion first forms exact signed integers in units of 1e-4 °C, with bounded
+coefficient/exponent arithmetic (exponent -4 through 0, absolute scaled integer
+at most 100,000,000). Integer differences are then divided to obtain display
+coordinates. No locale-sensitive decimal parsing, nonfinite result, clamping,
+interpolation or resampling is allowed. This narrow conversion policy is not a
+generic arbitrary-precision projection claim; future adapters require new gates.
+
+The factory accepts finite plot-area dimensions from 320×160 through 8192×8192
+logical units, at most 17 ticks per axis, and a bounded point array. Dimensions
+exclude text margins. Quarter-degree coverage exceeding 17 ticks is rejected;
+there is no implicit change of scale. Tick labels use exact integer formatting,
+an ASCII decimal point and no negative zero. Small-window fallback, font metrics,
+label collision management, clipping and physical pixel scaling belong to the
+renderer, which is not enabled here. The minimum size is a resource/API policy,
+not visual layout qualification. General missing and event series remain rejected
+upstream; LINE and SCATTER preserve every admitted point and its source index.
+
+The reference fixture `projection-reference.json` was independently computed
+from every retained CSV observation using Python Decimal at plot size 580×160:
+`x=(year-1880)*4`, `y=(1.50-source_decimal)*80`. Native tests compare all 146
+coordinates within 1e-10 logical units, all tick labels/positions, normalized
+geometry across minimum/fractional/maximum dimensions, exact identity preservation,
+input lifetime, invalid dimensions, altered specifications and tampered derived
+geometry. Validation reconstructs domains, labels and coordinates from the owned
+specification. No cached display data is scientific authority.
+
+Next: CHART-03 headless Cairo prototype and Data view, then visual review before
+application activation. CHART-04 caching/resampling and CHART-05 persistence remain
+separate work; this module has no application caller.

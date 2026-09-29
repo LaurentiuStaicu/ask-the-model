@@ -152,3 +152,12 @@ guint atm_chart_spec_x_min (const AtmChartSpec *s) { return s ? s->x_min : 0; }
 guint atm_chart_spec_x_max (const AtmChartSpec *s) { return s ? s->x_max : 0; }
 const AtmScientificDecimal *atm_chart_spec_y_min (const AtmChartSpec *s) { return s ? &s->y_min : NULL; }
 const AtmScientificDecimal *atm_chart_spec_y_max (const AtmChartSpec *s) { return s ? &s->y_max : NULL; }
+
+gboolean atm_chart_spec_rebuild (const AtmChartSpec *s, AtmChartSpec **out, GError **error)
+{
+    if (out == NULL || *out != NULL) return reject (error, "Invalid ChartSpec rebuild output.");
+    if (!atm_chart_spec_validate (s, error)) return FALSE;
+    const AtmVerifiedSeries *inputs[ATM_CHART_SPEC_MAX_SERIES];
+    for (guint i = 0; i < s->count; i++) inputs[i] = s->series[i];
+    return atm_chart_spec_new (s->kind, inputs, s->count, out, error);
+}
