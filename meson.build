@@ -2514,6 +2514,7 @@ verified_series_test = executable(
    'src/scientific_derivation.c', 'tests/verified_series_test.c'],
   include_directories: include_directories('src'),
   dependencies: [glib_dep, json_glib_dep],
+  c_args: ['-DATM_VERIFIED_SERIES_TESTING'],
   install: false
 )
 test('verified-series', verified_series_test,

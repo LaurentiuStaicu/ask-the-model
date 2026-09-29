@@ -279,3 +279,35 @@ identities, lifetime independence, corrupted order/year/row/value/exponent,
 MISSING/break fields, changed source spelling, support/identity corruption and
 invalid API arguments. General missing/discontinuity qualification and downstream
 chart gates are not claimed by this complete-source implementation.
+
+## Complete-annual qualification closeout
+
+This is a scoped gate for the one admitted complete annual profile. It does not
+close the broader #343 requirements or qualify other repositories, vintages,
+events, missing observations or derived numeric series. ChartSpec work may use
+this profile once the closeout CI passes; the following exclusions remain gates.
+
+| Requirement | Evidence and scope |
+| --- | --- |
+| Source identity and meaning | Four byte-pinned files, M0 audit, native admission, exact snapshot and reviewed metadata |
+| Exact numeric values and order | All 146 observations, exact decimal coefficients/exponents, consecutive years, row/column locators |
+| Qualified facts and support | Reconstructed evidence, finalized source-bound SRA, five supports per point, 150-artifact aggregate |
+| Stable series identities | Retained reference IDs in `tests/fixtures/chart01/verified-series-identity.json`, checked by native test |
+| Source agreement beyond hashes | Rehashed artifact, re-finalized SRA and rehashed series forgeries must be rejected |
+| Scientific/provenance separation | Changed mathematical value changes both IDs; equal-value source spelling or support changes qualification only |
+| Ownership and limits | Owned source bytes and data, fixed complete-source counts, checked byte/token/support ceilings |
+| Missing/discontinuity boundary | First, last and all-MISSING cases reject; no zero filling, interpolation or joined gaps |
+| Generic missing/event/derived data | Not qualified; remains open in #343 and cannot enter this profile |
+| Runtime chart display | Not enabled; requires ChartSpec and renderer qualification |
+
+The closeout fault-injection helper is compiled only with
+`ATM_VERIFIED_SERIES_TESTING`, only in the VerifiedSeries test target, and has no
+public header/API declaration. It recomputes internally consistent identities
+for deliberately altered materialized points, allowing the test to prove that
+fresh source reconstruction still rejects them. It is not an alternate factory
+or an application feature. The native CI also checks a compilation without that
+define to ensure the helper is absent from the production object.
+
+The identity reference records values observed from merged PR #350's qualified
+native run, not values generated afresh by the test being checked. Updating the
+reference requires review of the canonical-contract compatibility consequences.
