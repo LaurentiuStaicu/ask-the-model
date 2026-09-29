@@ -2503,3 +2503,18 @@ gistemp_sra_test = executable(
 )
 test('gistemp-sra', gistemp_sra_test,
   env: {'ATM_CHART01_FIXTURE': meson.current_source_dir() / 'tests/fixtures/chart01'})
+
+# CHART-01 M1c3: dormant VerifiedSeries for the complete pinned annual adapter.
+verified_series_test = executable(
+  'verified-series-test',
+  ['src/verified_series.c', 'src/gistemp_sra.c', 'src/gistemp_evidence.c',
+   'src/gistemp_admission.c', 'src/annual_series_candidate.c',
+   'src/scientific_canonical.c', 'src/scientific_artifact.c',
+   'src/scientific_result.c', 'src/scientific_operation.c',
+   'src/scientific_derivation.c', 'tests/verified_series_test.c'],
+  include_directories: include_directories('src'),
+  dependencies: [glib_dep, json_glib_dep],
+  install: false
+)
+test('verified-series', verified_series_test,
+  env: {'ATM_CHART01_FIXTURE': meson.current_source_dir() / 'tests/fixtures/chart01'})

@@ -1,6 +1,6 @@
 # CHART-01: source audit and VerifiedSeries boundary
 
-Status: measurement/contract work; no chart runtime. Tracks #343 after PRES-08.
+Status: native complete-source qualification; no chart runtime. Tracks #343 after PRES-08.
 
 ## First pinned source
 
@@ -40,9 +40,9 @@ python3 tests/chart01_source_audit_test.py
 - Hash, coverage, source-set or metadata disagreement rejects the audit.
 - This audit emits no scientific/qualified series ID and cannot authorize drawing.
 
-## Native contract still to implement
+## Qualification requirements established at M0
 
-`atm-verified-series/1` needs a bounded native builder that consumes qualified
+The `atm-verified-series/1` target requires a bounded native builder that consumes qualified
 facts through an explicitly admitted adapter. It must validate the complete SRA
 and source artifacts, not accept identity strings as proof. Existing seams:
 
@@ -227,3 +227,55 @@ of unfinalized results. This target is linked only into native/Flatpak tests.
 Series-level identity, explicit point ordering/missing/break contract and
 VerifiedSeries remain subsequent work; an SRA identity is not silently reused
 as a chart-series identity.
+
+## M1c3 first native VerifiedSeries
+
+`verified_series.h/.c` implements `atm-verified-series/1` under the narrow
+`atm-series/gistemp-complete-annual/1` profile. Its only factory accepts the
+reviewed GISTEMP admission. It rebuilds that admission, constructs and validates
+the source-bound SRA, and explicitly checks each year/value mapping before
+materializing points. No arbitrary point-array or model-text constructor exists.
+It remains linked only into tests; ChartSpec, rendering and persistence are not
+enabled by the existence of this type.
+
+The supported contract is deliberately complete annual observations only:
+
+- Exactly 146 ordered points, 1880–2025, zero-based order and one-based CSV rows.
+- X is a calendar-year coordinate (time dimension), not elapsed seconds or an
+  assumption that every calendar year has an identical duration.
+- Each Y is NUMERIC with exact canonical decimal coefficient/exponent and the
+  separate original source token. No binary64 conversion or interpolation.
+- `break_before=false`, `missing_reason=null`, `break_reason=null` for every
+  point, including the first (which has no predecessor to disconnect).
+- MISSING has an explicit enum value but is rejected by this profile. Gaps,
+  events, categorical coordinates and all-missing series are unsupported, not
+  converted into zero, interpolated or joined. Broader semantics require an
+  independently specified and qualified adapter/profile.
+- Each point owns five sorted qualified support IDs. Their union equals the
+  sorted 150-artifact SRA evidence set; row and both column locators remain bound.
+
+Identity uses the existing canonical JSON hashing primitive with separate
+`atm.verified-series.v1` and `atm.verified-series.qualification.v1` domains.
+Scientific identity includes ordered points, exact numeric encoding, point
+status/break fields and meaning-changing subject/attribute/axis/context metadata.
+Qualified identity binds that scientific identity to the exact snapshot,
+admission and series profiles, finalized SRA qualification, aggregate and
+per-point support, source path/columns/rows and original decimal spelling.
+It is neither the SRA identity nor the source-file SHA-256. Changing original
+spelling without changing mathematical value is still a qualification change.
+Changes to this canonical contract require explicit version/compatibility review.
+
+Validation checks complete-source shape and bounded tokens/support IDs, validates
+the owned source-bound SRA, recomputes both series IDs from materialized points,
+and builds a fresh series from owned source bytes to compare both IDs again.
+This checks both internal identity consistency and source agreement. Limits
+remain the reviewed four-file admission ceilings, fixed 146 points, five support
+IDs per point and 150 aggregate support IDs; there is no external JSON importer.
+The retained M0 source-audit report describes that earlier audit's output scope;
+it is not a capability flag for this new native API.
+
+Tests exercise all source values and support membership, deterministic distinct
+identities, lifetime independence, corrupted order/year/row/value/exponent,
+MISSING/break fields, changed source spelling, support/identity corruption and
+invalid API arguments. General missing/discontinuity qualification and downstream
+chart gates are not claimed by this complete-source implementation.
