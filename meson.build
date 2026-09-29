@@ -2564,3 +2564,32 @@ chart_render_test = executable(
 )
 test('chart-render', chart_render_test,
   env: {'ATM_CHART01_FIXTURE': meson.current_source_dir() / 'tests/fixtures/chart01'})
+
+# CHART-03: reusable GTK component and Vala ABI; deliberately test-only.
+chart_view_test = executable(
+  'chart-view-test',
+  ['src/chart_view.c', 'tests/chart_fixture.c', 'src/chart_render.c', 'src/chart_projection.c', 'src/chart_spec.c', 'src/verified_series.c', 'src/gistemp_sra.c', 'src/gistemp_evidence.c',
+   'src/gistemp_admission.c', 'src/annual_series_candidate.c',
+   'src/scientific_canonical.c', 'src/scientific_artifact.c',
+   'src/scientific_result.c', 'src/scientific_operation.c',
+   'src/scientific_derivation.c', 'tests/chart_view_test.c'],
+  include_directories: include_directories('src', 'tests'),
+  dependencies: [gtk_dep, glib_dep, json_glib_dep, dependency('cairo')],
+  install: false
+)
+test('chart-view', chart_view_test,
+  env: {'GTK_A11Y': 'none', 'GSK_RENDERER': 'cairo', 'ATM_CHART01_FIXTURE': meson.current_source_dir() / 'tests/fixtures/chart01'})
+
+chart_view_vala_test = executable(
+  'chart-view-vala-test',
+  ['src/ChartNative.vapi', 'src/chart_view.c', 'tests/chart_fixture.c', 'src/chart_render.c', 'src/chart_projection.c', 'src/chart_spec.c', 'src/verified_series.c', 'src/gistemp_sra.c', 'src/gistemp_evidence.c',
+   'src/gistemp_admission.c', 'src/annual_series_candidate.c',
+   'src/scientific_canonical.c', 'src/scientific_artifact.c',
+   'src/scientific_result.c', 'src/scientific_operation.c',
+   'src/scientific_derivation.c', 'tests/chart_view_vala_test.vala'],
+  include_directories: include_directories('src', 'tests'),
+  dependencies: [gtk_dep, glib_dep, json_glib_dep, dependency('cairo')],
+  install: false
+)
+test('chart-view-vala', chart_view_vala_test,
+  env: {'GTK_A11Y': 'none', 'GSK_RENDERER': 'cairo', 'ATM_CHART01_FIXTURE': meson.current_source_dir() / 'tests/fixtures/chart01'})

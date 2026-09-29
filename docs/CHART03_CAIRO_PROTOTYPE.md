@@ -71,3 +71,48 @@ Primary implementation references:
 - https://www.cairographics.org/manual/cairo-Image-Surfaces.html
 - https://www.cairographics.org/manual/cairo-text.html
 - https://www.cairographics.org/manual/cairo-Error-handling.html
+
+## Dormant GTK component
+
+`chart_view.h/.c` adds a reusable GTK4 Box subclass with Chart/Data stack pages,
+a native ColumnView in source order (year, exact anomaly, source row), and a
+read-only selectable provenance expander for the selected observation. Its
+metadata includes the exact canonical decimal, pinned source path/snapshot,
+qualified series identity and support IDs. All cells use plain text, never markup.
+`ChartNative.vapi` exposes the owned component to Vala; an independent Vala test
+checks ownership, errors, page switching, selected row and exact data access.
+
+The component revalidates and owns its scientific input. Strings in the table
+model are owned copies; freeing the factory input or replacing the rendered
+surface cannot alter Data. Render output is replaced on size/device-scale changes;
+a draw callback only paints the prepared surface. One current surface is retained
+for ordinary redraws. Unsupported sizes/scales produce an explicit status with
+Data still available. Synchronous source reconstruction on resize is intentionally
+not a performance qualification; CHART-04 must address interactive resize cost
+before general runtime activation. No shared cache or downsampling is introduced.
+
+Chart/Data switcher buttons use GTK keyboard behavior. Alt+1 and Alt+2 switch
+pages and move focus. The Data table supports native arrow-key row selection;
+selection updates provenance. The component, chart, table and provenance have
+accessible names/descriptions and GTK table roles. This is a semantic/keyboard
+baseline, not an end-to-end screen-reader or localization qualification.
+
+`CHART-03 GTK component` CI uses a real X11 GTK window under Xvfb and XTest keys
+(xdotool) to check Alt+2, Down and Alt+1, including selected-row provenance and
+Data preservation after resize. GTK warnings are fatal; the C component runs
+with UBSan. Both C and Vala paths also run in the Elementary Flatpak suite. The
+XTest case is explicitly skipped there because the dedicated workflow owns that
+external-keyboard qualification. The existing headless renderer/source suite
+retains its separate ASan/UBSan and leak checks.
+
+CI captures actual GTK Chart/Data/small-canvas PNGs through the widget snapshot
+and GSK renderer for visual inspection. No fake rows, synthesized observations,
+user conversation writes or Application caller are introduced. Live/History
+runtime binding, persisted chart reconstruction, clipboard/export controls,
+translation and screen-reader testing remain pending in the chart program.
+
+GTK references:
+- https://docs.gtk.org/gtk4/class.ColumnView.html
+- https://docs.gtk.org/gtk4/class.StackSwitcher.html
+- https://docs.gtk.org/gtk4/method.DrawingArea.set_draw_func.html
+- https://docs.gtk.org/gtk4/ctor.SingleSelection.new.html
