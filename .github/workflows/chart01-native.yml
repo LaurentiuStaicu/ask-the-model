@@ -78,6 +78,7 @@ jobs:
           /tmp/gistemp-sra-test
           cc -std=c11 -Wall -Wextra -Werror -g -O1 \
             -fsanitize=address,undefined -fno-omit-frame-pointer -Isrc \
+            -DATM_VERIFIED_SERIES_TESTING \
             src/verified_series.c src/gistemp_sra.c src/gistemp_evidence.c \
             src/gistemp_admission.c src/annual_series_candidate.c \
             src/scientific_canonical.c src/scientific_artifact.c \
@@ -86,3 +87,8 @@ jobs:
             $(pkg-config --cflags --libs glib-2.0 json-glib-1.0) -lm \
             -o /tmp/verified-series-test
           /tmp/verified-series-test
+          cc -std=c11 -Wall -Wextra -Werror -Isrc \
+            $(pkg-config --cflags glib-2.0 json-glib-1.0) \
+            -c src/verified_series.c -o /tmp/verified-series-production.o
+          nm -g /tmp/verified-series-production.o | python3 -c \
+            'import sys; assert "atm_verified_series_test_rehash" not in sys.stdin.read()'

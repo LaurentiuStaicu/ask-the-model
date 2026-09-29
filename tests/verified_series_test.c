@@ -1,4 +1,9 @@
 #include "verified_series.h"
+#include <json-glib/json-glib.h>
+#ifndef ATM_VERIFIED_SERIES_TESTING
+#error VerifiedSeries qualification tests require the test-only fault injection seam.
+#endif
+gboolean atm_verified_series_test_rehash (AtmVerifiedSeries *s, GError **error);
 
 static AtmGistempAdmission *admit (void)
 {
@@ -39,6 +44,17 @@ static void test_complete_series (void)
     g_assert_true (atm_verified_series_validate (s, NULL));
     g_test_message ("scientific_id=%s", atm_verified_series_scientific_id (s));
     g_test_message ("qualified_id=%s", atm_verified_series_qualified_id (s));
+    char *reference_path = g_build_filename (g_getenv ("ATM_CHART01_FIXTURE"),
+                                              "verified-series-identity.json", NULL);
+    JsonParser *reference = json_parser_new ();
+    g_assert_true (json_parser_load_from_file (reference, reference_path, NULL));
+    JsonObject *ids = json_node_get_object (json_parser_get_root (reference));
+    g_assert_cmpstr (json_object_get_string_member (ids, "series_profile"), ==, ATM_VERIFIED_SERIES_PROFILE);
+    g_assert_cmpstr (atm_verified_series_scientific_id (s), ==,
+                    json_object_get_string_member (ids, "scientific_id"));
+    g_assert_cmpstr (atm_verified_series_qualified_id (s), ==,
+                    json_object_get_string_member (ids, "qualified_id"));
+    g_object_unref (reference); g_free (reference_path);
     g_assert_cmpuint (atm_verified_series_count (s), ==, 146);
     g_assert_cmpuint (atm_verified_series_support_count (s), ==, 150);
     g_assert_cmpstr (atm_verified_series_scientific_id (s), ==, atm_verified_series_scientific_id (again));
@@ -134,6 +150,56 @@ static void test_support_and_identity_corruption (void)
     g_assert_true (atm_verified_series_validate (s, NULL));
     atm_verified_series_free (s);
 }
+static void test_rehashed_series (void)
+{
+    for (guint mode = 0; mode < 3; mode++) {
+        AtmVerifiedSeries *s = build ();
+        char *scientific = g_strdup (atm_verified_series_scientific_id (s));
+        char *qualified = g_strdup (atm_verified_series_qualified_id (s));
+        AtmVerifiedPoint *p = (AtmVerifiedPoint *) atm_verified_series_point (s, 0);
+        if (mode == 0) {
+            g_free (p->source_decimal); p->source_decimal = g_strdup ("-0.17000");
+        } else if (mode == 1) {
+            p->coefficient[2] = '8';
+        } else {
+            g_free (g_ptr_array_index (p->support, 0));
+            g_ptr_array_index (p->support, 0) = g_strdup (
+                "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa");
+        }
+        /* Materialized shape and both new hashes are self-consistent. */
+        g_assert_true (atm_verified_series_test_rehash (s, NULL));
+        if (mode == 1)
+            g_assert_cmpstr (atm_verified_series_scientific_id (s), !=, scientific);
+        else
+            g_assert_cmpstr (atm_verified_series_scientific_id (s), ==, scientific);
+        g_assert_cmpstr (atm_verified_series_qualified_id (s), !=, qualified);
+        GError *error = NULL;
+        g_assert_false (atm_verified_series_validate (s, &error));
+        g_assert_error (error, ATM_SRA_ERROR, ATM_SRA_ERROR_IDENTITY);
+        /* Ensures the source-reconstruction guard, not a stale-hash guard, fired. */
+        g_assert_cmpstr (error->message, ==, "Verified series disagrees with reconstructed source.");
+        g_clear_error (&error);
+        g_free (scientific); g_free (qualified);
+        atm_verified_series_free (s);
+    }
+}
+static void test_missing_boundaries (void)
+{
+    AtmVerifiedSeries *s = build ();
+    for (guint mode = 0; mode < 3; mode++) {
+        for (guint i = 0; i < 146; i++) {
+            AtmVerifiedPoint *p = (AtmVerifiedPoint *) atm_verified_series_point (s, i);
+            if (mode == 2 || (mode == 0 && i == 0) || (mode == 1 && i == 145))
+                p->y_status = ATM_VERIFIED_Y_MISSING;
+        }
+        g_assert_false (atm_verified_series_test_rehash (s, NULL));
+        g_assert_false (atm_verified_series_validate (s, NULL));
+        for (guint i = 0; i < 146; i++)
+            ((AtmVerifiedPoint *) atm_verified_series_point (s, i))->y_status = ATM_VERIFIED_Y_NUMERIC;
+    }
+    g_assert_true (atm_verified_series_validate (s, NULL));
+    atm_verified_series_free (s);
+}
 static void test_arguments (void)
 {
     AtmVerifiedSeries *s = NULL;
@@ -161,5 +227,7 @@ int main (int argc, char **argv)
     g_test_add_func ("/verified-series/point-corruption", test_point_corruption);
     g_test_add_func ("/verified-series/support-identity", test_support_and_identity_corruption);
     g_test_add_func ("/verified-series/arguments", test_arguments);
+    g_test_add_func ("/verified-series/rehashed-series", test_rehashed_series);
+    g_test_add_func ("/verified-series/missing-boundaries", test_missing_boundaries);
     return g_test_run ();
 }

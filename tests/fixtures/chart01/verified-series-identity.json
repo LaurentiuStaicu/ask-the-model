@@ -1,0 +1,8 @@
+{
+  "schema": "atm-chart01-series-identity-reference/1",
+  "series_profile": "atm-series/gistemp-complete-annual/1",
+  "source_snapshot": "d9e249339663015f6d1c05752338a955bf64ad0b",
+  "recorded_from_commit": "9bdf94ee2980227f08df4340bc75067a16fa85a5",
+  "scientific_id": "4cfff6bb991c2d771228c09e81ca860a5b3e195e4f2390d059a3c8aacc65c48c",
+  "qualified_id": "29827400d3e250f6c935eefa33d2a8c4f99c4198721676231e777d16ee1f6b24"
+}

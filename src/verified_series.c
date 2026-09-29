@@ -261,3 +261,15 @@ const char *atm_verified_series_support (const AtmVerifiedSeries *s, guint i)
     const GPtrArray *ids = atm_gistemp_sra_result (s->sra)->qualification->evidence_atom_ids;
     return i < ids->len ? g_ptr_array_index (ids, i) : NULL;
 }
+
+#ifdef ATM_VERIFIED_SERIES_TESTING
+/* Fault-injection seam, compiled exclusively into the qualification test.
+ * Rehashing is intentionally not source qualification. Never expose in app API. */
+gboolean atm_verified_series_test_rehash (AtmVerifiedSeries *s, GError **error)
+{
+    if (!shape_valid (s, error)) return FALSE;
+    g_clear_pointer (&s->scientific_id, g_free);
+    g_clear_pointer (&s->qualified_id, g_free);
+    return identities (s, &s->scientific_id, &s->qualified_id, error);
+}
+#endif
