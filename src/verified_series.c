@@ -273,3 +273,10 @@ gboolean atm_verified_series_test_rehash (AtmVerifiedSeries *s, GError **error)
     return identities (s, &s->scientific_id, &s->qualified_id, error);
 }
 #endif
+
+gboolean atm_verified_series_rebuild (const AtmVerifiedSeries *s, AtmVerifiedSeries **out, GError **error)
+{
+    if (out == NULL || *out != NULL) return reject (error, "Invalid rebuild output.");
+    if (!atm_verified_series_validate (s, error)) return FALSE;
+    return atm_verified_series_from_gistemp (s->admission, out, error);
+}

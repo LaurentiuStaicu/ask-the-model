@@ -25,6 +25,9 @@ typedef struct AtmVerifiedSeries AtmVerifiedSeries;
 gboolean atm_verified_series_from_gistemp (const AtmGistempAdmission *admission,
     AtmVerifiedSeries **out, GError **error);
 gboolean atm_verified_series_validate (const AtmVerifiedSeries *series, GError **error);
+/* Validate the supplied materialization before rebuilding from owned source. */
+gboolean atm_verified_series_rebuild (const AtmVerifiedSeries *series,
+    AtmVerifiedSeries **out, GError **error);
 void atm_verified_series_free (AtmVerifiedSeries *series);
 guint atm_verified_series_count (const AtmVerifiedSeries *series);
 /* Every returned pointer is borrowed read-only until series destruction.

@@ -7,6 +7,8 @@ on:
       - 'src/gistemp_admission.*'
       - 'src/gistemp_evidence.*'
       - 'src/gistemp_sra.*'
+      - 'src/chart_spec.*'
+      - 'tests/chart_spec_test.c'
       - 'src/verified_series.*'
       - 'tests/verified_series_test.c'
       - 'src/scientific_result.*'
@@ -87,6 +89,16 @@ jobs:
             $(pkg-config --cflags --libs glib-2.0 json-glib-1.0) -lm \
             -o /tmp/verified-series-test
           /tmp/verified-series-test
+          cc -std=c11 -Wall -Wextra -Werror -g -O1 \
+            -fsanitize=address,undefined -fno-omit-frame-pointer -Isrc \
+            src/chart_spec.c src/verified_series.c src/gistemp_sra.c src/gistemp_evidence.c \
+            src/gistemp_admission.c src/annual_series_candidate.c \
+            src/scientific_canonical.c src/scientific_artifact.c \
+            src/scientific_result.c src/scientific_operation.c \
+            src/scientific_derivation.c tests/chart_spec_test.c \
+            $(pkg-config --cflags --libs glib-2.0 json-glib-1.0) -lm \
+            -o /tmp/chart-spec-test
+          /tmp/chart-spec-test
           cc -std=c11 -Wall -Wextra -Werror -Isrc \
             $(pkg-config --cflags glib-2.0 json-glib-1.0) \
             -c src/verified_series.c -o /tmp/verified-series-production.o
