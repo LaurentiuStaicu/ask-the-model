@@ -13,6 +13,8 @@ typedef struct AtmChartSpec AtmChartSpec;
 gboolean atm_chart_spec_new (AtmChartKind kind, const AtmVerifiedSeries *const *series,
     gsize count, AtmChartSpec **out, GError **error);
 gboolean atm_chart_spec_validate (const AtmChartSpec *spec, GError **error);
+/* Reject altered materializations before reconstructing owned inputs. */
+gboolean atm_chart_spec_rebuild (const AtmChartSpec *spec, AtmChartSpec **out, GError **error);
 void atm_chart_spec_free (AtmChartSpec *spec);
 /* All returned pointers are borrowed read-only, valid until destruction. */
 const char *atm_chart_spec_id (const AtmChartSpec *spec);

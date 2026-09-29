@@ -2534,3 +2534,18 @@ chart_spec_test = executable(
 )
 test('chart-spec', chart_spec_test,
   env: {'ATM_CHART01_FIXTURE': meson.current_source_dir() / 'tests/fixtures/chart01'})
+
+# CHART-02: bounded display projection; still no application caller.
+chart_projection_test = executable(
+  'chart-projection-test',
+  ['src/chart_projection.c', 'src/chart_spec.c', 'src/verified_series.c', 'src/gistemp_sra.c', 'src/gistemp_evidence.c',
+   'src/gistemp_admission.c', 'src/annual_series_candidate.c',
+   'src/scientific_canonical.c', 'src/scientific_artifact.c',
+   'src/scientific_result.c', 'src/scientific_operation.c',
+   'src/scientific_derivation.c', 'tests/chart_projection_test.c'],
+  include_directories: include_directories('src'),
+  dependencies: [glib_dep, json_glib_dep],
+  install: false
+)
+test('chart-projection', chart_projection_test,
+  env: {'ATM_CHART01_FIXTURE': meson.current_source_dir() / 'tests/fixtures/chart01'})
