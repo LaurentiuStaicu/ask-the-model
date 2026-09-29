@@ -6,6 +6,11 @@ on:
       - 'src/annual_series_candidate.*'
       - 'src/gistemp_admission.*'
       - 'src/gistemp_evidence.*'
+      - 'src/gistemp_sra.*'
+      - 'src/scientific_result.*'
+      - 'src/scientific_operation.*'
+      - 'src/scientific_derivation.*'
+      - 'tests/gistemp_sra_test.c'
       - 'src/scientific_artifact.*'
       - 'tests/gistemp_evidence_test.c'
       - 'tests/gistemp_admission_test.c'
@@ -59,3 +64,13 @@ jobs:
             $(pkg-config --cflags --libs glib-2.0 json-glib-1.0) -lm \
             -o /tmp/gistemp-evidence-test
           /tmp/gistemp-evidence-test
+          cc -std=c11 -Wall -Wextra -Werror -g -O1 \
+            -fsanitize=address,undefined -fno-omit-frame-pointer -Isrc \
+            src/gistemp_sra.c src/gistemp_evidence.c src/gistemp_admission.c \
+            src/annual_series_candidate.c src/scientific_canonical.c \
+            src/scientific_artifact.c src/scientific_result.c \
+            src/scientific_operation.c src/scientific_derivation.c \
+            tests/gistemp_sra_test.c \
+            $(pkg-config --cflags --libs glib-2.0 json-glib-1.0) -lm \
+            -o /tmp/gistemp-sra-test
+          /tmp/gistemp-sra-test

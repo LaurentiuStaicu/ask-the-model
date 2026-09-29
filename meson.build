@@ -2488,3 +2488,18 @@ gistemp_evidence_test = executable(
 )
 test('gistemp-evidence', gistemp_evidence_test,
   env: {'ATM_CHART01_FIXTURE': meson.current_source_dir() / 'tests/fixtures/chart01'})
+
+# CHART-01 M1c2: dormant source-bound finalized SRA.
+gistemp_sra_test = executable(
+  'gistemp-sra-test',
+  ['src/gistemp_sra.c', 'src/gistemp_evidence.c', 'src/gistemp_admission.c',
+   'src/annual_series_candidate.c', 'src/scientific_canonical.c',
+   'src/scientific_artifact.c', 'src/scientific_result.c',
+   'src/scientific_operation.c', 'src/scientific_derivation.c',
+   'tests/gistemp_sra_test.c'],
+  include_directories: include_directories('src'),
+  dependencies: [glib_dep, json_glib_dep],
+  install: false
+)
+test('gistemp-sra', gistemp_sra_test,
+  env: {'ATM_CHART01_FIXTURE': meson.current_source_dir() / 'tests/fixtures/chart01'})

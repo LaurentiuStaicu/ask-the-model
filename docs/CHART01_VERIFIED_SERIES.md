@@ -188,3 +188,42 @@ M1c1 does not create an SRA result, series-level scientific/qualified identity,
 VerifiedSeries, general MISSING/discontinuity representation or chart authority.
 Those remain M1c follow-up work. It only establishes the source-bound artifact
 and per-point support foundation, linked exclusively into tests.
+
+## M1c2 finalized source-bound SRA
+
+`gistemp_sra.h/.c` builds an opaque owned SRA wrapper from an admitted bundle.
+It owns reconstructed evidence and a finalized `AtmSraResult`; it accepts no
+caller-authored facts or pre-finalized results. Its result has exactly 146
+established facts and 150 qualified supporting artifacts, with no derived facts
+or operations. The ANSWERED state means the narrow extraction is complete; it
+is not an answerability claim for arbitrary user questions.
+
+A fact is identified by its calendar year. Its exact value is the existing
+canonical decimal coefficient followed by `e` and the integer exponent (for
+example `-17e-2`), never a binary64 projection. Unit, dimension, subject and
+attribute come from the reconstructed observation artifact. Its qualifiers
+retain the complete observation payload, including year, baseline, empirical
+status and vintage. This deliberate redundancy keeps the value and full context
+together; source-bound validation checks both against reconstructed evidence.
+Each fact retains the four source-binding support IDs plus its observation ID.
+SRA finalization applies the existing canonical ordering and support de-duplication.
+
+The qualification envelope binds `atm-sra/1`, the dedicated source reconstruction
+obligation, exact repository snapshot, dedicated semantic profile and exact-
+decimal numeric profile. Limitations explicitly retain the processed-data/raw-
+reproduction boundary, distinguish temperature anomalies from World3 pollution,
+and state that this is not VerifiedSeries or rendering authority.
+
+Validation first verifies the finalized SRA's generic identities, then validates
+and reconstructs its owned evidence and builds a fresh SRA. Both scientific and
+qualified result identities must match. A changed value, unit, support set,
+limitation or numeric profile is therefore rejected even after successful
+re-finalization with the generic SRA API. The collection retains the bounded
+M1c1 source adapter; this API does not deserialize arbitrary external SRA data.
+
+Tests cover deterministic identities, complete fact/support counts, exact values,
+caller-admission lifetime, re-finalized forgeries, output ownership and refusal
+of unfinalized results. This target is linked only into native/Flatpak tests.
+Series-level identity, explicit point ordering/missing/break contract and
+VerifiedSeries remain subsequent work; an SRA identity is not silently reused
+as a chart-series identity.
