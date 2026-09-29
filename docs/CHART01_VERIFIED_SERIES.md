@@ -135,3 +135,56 @@ Native tests compare all compiled pins with the M0 lock, reject mutation of each
 source, missing/swapped sources, wrong repository/snapshot and byte ceiling
 violations, and check caller-memory independence. Both native targets run under
 ASan/UBSan and in Meson/Flatpak. This layer remains linked only into tests.
+
+## M1c1 reconstructed scientific evidence
+
+`gistemp_evidence.h/.c` defines the dormant source-specific adapter
+`atm-profile/ewd-gistemp-pinned/v1`. Its only input is an admitted bundle; it
+re-admits the owned source bytes and re-extracts points, rather than trusting
+cached candidate fields. It does not accept arbitrary evidence atoms, X/Y
+arrays, profile names, metadata or identity strings from callers. The existing
+EWD v1 profile and runtime dispatch remain unchanged.
+
+The adapter builds exactly 150 canonical scientific artifacts using existing
+Scientific Plane identity functions: four whole-file bindings and 146 annual
+observations. Each point exposes five qualified support IDs, in fixed order:
+CSV, provenance, manifest, registry, then its own observation artifact. The
+aggregate support set is all 150 artifacts. The file bindings attest to matching
+the reviewed local policy; they do not independently authenticate upstream Git
+membership or reproduce raw NASA processing.
+
+Observation scientific payloads contain calendar year, NUMERIC status, exact
+canonical decimal coefficient/exponent, subject, attribute, temperature-
+difference dimension, unit, reference period, selection, access vintage,
+empirical status, annual frequency and not-applicable scenario. The numeric
+profile label describes the existing decimal primitive, not a new floating-point
+operation. Source spelling remains preserved by the admitted CSV and its digest;
+it is not substituted for canonical numeric identity. No binary64 conversion
+occurs. Calendar years are labels here, not a declaration of fixed-length seconds.
+
+Qualified artifact identity additionally binds the exact source path, row and
+both column names, snapshot, logical observation ID and dedicated adapter
+version. Repository version is `snapshot:<sha>` rather than an inferred mutable
+release label. The canonical repository identifier is `ewd`; its mapping to the
+full upstream repository name is fixed by the admission policy. Whole-file
+bindings use `file:complete` and the appropriate source path.
+
+Validation creates a fresh admitted bundle and fresh artifacts from owned bytes,
+validates each stored artifact's identities, then compares its complete storage
+digest with the corresponding reconstructed artifact. This rejects reordered
+artifacts and even altered values, units, baselines, years, locators or source
+receipts whose generic artifact hashes have been correctly recomputed. Generic
+artifact validity alone is therefore insufficient for this adapter.
+
+Construction and validation are bounded by the admitted four-file policy and
+fixed 150-artifact count; payloads are generated only from bounded parsed tokens
+and fixed metadata. The collection owns its sources and artifacts, including
+after destruction of the original admission. Borrowed artifacts must not be
+modified or freed by callers; corruption tests deliberately violate that
+read-only contract to verify rejection. This is not a deserializer for arbitrary
+pointers or JSON documents.
+
+M1c1 does not create an SRA result, series-level scientific/qualified identity,
+VerifiedSeries, general MISSING/discontinuity representation or chart authority.
+Those remain M1c follow-up work. It only establishes the source-bound artifact
+and per-point support foundation, linked exclusively into tests.

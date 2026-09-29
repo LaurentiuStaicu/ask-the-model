@@ -5,6 +5,9 @@ on:
     paths:
       - 'src/annual_series_candidate.*'
       - 'src/gistemp_admission.*'
+      - 'src/gistemp_evidence.*'
+      - 'src/scientific_artifact.*'
+      - 'tests/gistemp_evidence_test.c'
       - 'tests/gistemp_admission_test.c'
       - 'src/scientific_canonical.*'
       - 'tests/annual_series_candidate_test.c'
@@ -48,3 +51,11 @@ jobs:
             $(pkg-config --cflags --libs glib-2.0 json-glib-1.0) -lm \
             -o /tmp/gistemp-admission-test
           /tmp/gistemp-admission-test
+          cc -std=c11 -Wall -Wextra -Werror -g -O1 \
+            -fsanitize=address,undefined -fno-omit-frame-pointer -Isrc \
+            src/gistemp_evidence.c src/gistemp_admission.c \
+            src/annual_series_candidate.c src/scientific_canonical.c \
+            src/scientific_artifact.c tests/gistemp_evidence_test.c \
+            $(pkg-config --cflags --libs glib-2.0 json-glib-1.0) -lm \
+            -o /tmp/gistemp-evidence-test
+          /tmp/gistemp-evidence-test

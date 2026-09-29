@@ -2475,3 +2475,16 @@ gistemp_admission_test = executable(
 )
 test('gistemp-admission', gistemp_admission_test,
   env: {'ATM_CHART01_FIXTURE': meson.current_source_dir() / 'tests/fixtures/chart01'})
+
+# CHART-01 M1c1: source-bound artifacts; still no application caller.
+gistemp_evidence_test = executable(
+  'gistemp-evidence-test',
+  ['src/gistemp_evidence.c', 'src/gistemp_admission.c',
+   'src/annual_series_candidate.c', 'src/scientific_canonical.c',
+   'src/scientific_artifact.c', 'tests/gistemp_evidence_test.c'],
+  include_directories: include_directories('src'),
+  dependencies: [glib_dep, json_glib_dep],
+  install: false
+)
+test('gistemp-evidence', gistemp_evidence_test,
+  env: {'ATM_CHART01_FIXTURE': meson.current_source_dir() / 'tests/fixtures/chart01'})

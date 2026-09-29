@@ -96,3 +96,11 @@ const char *atm_gistemp_admission_epistemic_status (const AtmGistempAdmission *a
 { return a != NULL ? "empirical" : NULL; }
 const char *atm_gistemp_admission_x_semantics (const AtmGistempAdmission *a)
 { return a != NULL ? "calendar_year" : NULL; }
+
+gboolean atm_gistemp_admission_rebuild (const AtmGistempAdmission *source,
+    AtmGistempAdmission **out, GError **error)
+{
+    if (source == NULL)
+        return reject (error, ATM_ANNUAL_SERIES_ERROR_ARGUMENT, "Missing admitted source.");
+    return atm_gistemp_admission_new (repository_id, snapshot_id, source->sources, out, error);
+}
