@@ -7,6 +7,9 @@ on:
       - 'src/gistemp_admission.*'
       - 'src/gistemp_evidence.*'
       - 'src/gistemp_sra.*'
+      - 'src/chart_render.*'
+      - 'tests/chart_render_test.c'
+      - 'scripts/chart03_preview_log.py'
       - 'src/chart_projection.*'
       - 'tests/chart_projection_test.c'
       - 'src/chart_spec.*'
@@ -39,9 +42,10 @@ jobs:
       - name: Install native dependencies
         run: |
           sudo apt-get update
-          sudo apt-get install -y --no-install-recommends gcc pkg-config libglib2.0-dev libjson-glib-dev
+          sudo apt-get install -y --no-install-recommends gcc pkg-config libglib2.0-dev libjson-glib-dev libcairo2-dev libfontconfig-dev fonts-dejavu-core
       - name: Compile and test under ASan and UBSan
         env:
+          ATM_CHART03_OUTPUT: /tmp/chart03-preview
           ATM_CHART01_FIXTURE: tests/fixtures/chart01
           ATM_CHART01_CSV: tests/fixtures/chart01/ewd/science/data/processed/nasa_gistemp_global_2026.csv
           ASAN_OPTIONS: detect_leaks=1:halt_on_error=1
@@ -111,8 +115,25 @@ jobs:
             $(pkg-config --cflags --libs glib-2.0 json-glib-1.0) -lm \
             -o /tmp/chart-projection-test
           /tmp/chart-projection-test
+          cc -std=c11 -Wall -Wextra -Werror -g -O1 \
+            -fsanitize=address,undefined -fno-omit-frame-pointer -Isrc \
+            src/chart_render.c src/chart_projection.c src/chart_spec.c src/verified_series.c src/gistemp_sra.c src/gistemp_evidence.c \
+            src/gistemp_admission.c src/annual_series_candidate.c \
+            src/scientific_canonical.c src/scientific_artifact.c \
+            src/scientific_result.c src/scientific_operation.c \
+            src/scientific_derivation.c tests/chart_render_test.c \
+            $(pkg-config --cflags --libs glib-2.0 json-glib-1.0 cairo fontconfig) -lm \
+            -o /tmp/chart-render-test
+          /tmp/chart-render-test
           cc -std=c11 -Wall -Wextra -Werror -Isrc \
             $(pkg-config --cflags glib-2.0 json-glib-1.0) \
             -c src/verified_series.c -o /tmp/verified-series-production.o
           nm -g /tmp/verified-series-production.o | python3 -c \
             'import sys; assert "atm_verified_series_test_rehash" not in sys.stdin.read()'
+      - name: Publish bounded headless preview diagnostics
+        run: python3 scripts/chart03_preview_log.py /tmp/chart03-preview
+      - uses: actions/upload-artifact@v4
+        with:
+          name: chart03-headless-preview
+          path: /tmp/chart03-preview/
+          if-no-files-found: error

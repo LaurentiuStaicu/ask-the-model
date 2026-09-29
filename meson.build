@@ -2549,3 +2549,18 @@ chart_projection_test = executable(
 )
 test('chart-projection', chart_projection_test,
   env: {'ATM_CHART01_FIXTURE': meson.current_source_dir() / 'tests/fixtures/chart01'})
+
+# CHART-03: dormant headless Cairo prototype; no application caller.
+chart_render_test = executable(
+  'chart-render-test',
+  ['src/chart_render.c', 'src/chart_projection.c', 'src/chart_spec.c', 'src/verified_series.c', 'src/gistemp_sra.c', 'src/gistemp_evidence.c',
+   'src/gistemp_admission.c', 'src/annual_series_candidate.c',
+   'src/scientific_canonical.c', 'src/scientific_artifact.c',
+   'src/scientific_result.c', 'src/scientific_operation.c',
+   'src/scientific_derivation.c', 'tests/chart_render_test.c'],
+  include_directories: include_directories('src'),
+  dependencies: [glib_dep, json_glib_dep, dependency('cairo'), dependency('fontconfig')],
+  install: false
+)
+test('chart-render', chart_render_test,
+  env: {'ATM_CHART01_FIXTURE': meson.current_source_dir() / 'tests/fixtures/chart01'})
