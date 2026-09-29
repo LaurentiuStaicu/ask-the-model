@@ -2519,3 +2519,18 @@ verified_series_test = executable(
 )
 test('verified-series', verified_series_test,
   env: {'ATM_CHART01_FIXTURE': meson.current_source_dir() / 'tests/fixtures/chart01'})
+
+# CHART-02: dormant specification, no renderer or application caller.
+chart_spec_test = executable(
+  'chart-spec-test',
+  ['src/chart_spec.c', 'src/verified_series.c', 'src/gistemp_sra.c', 'src/gistemp_evidence.c',
+   'src/gistemp_admission.c', 'src/annual_series_candidate.c',
+   'src/scientific_canonical.c', 'src/scientific_artifact.c',
+   'src/scientific_result.c', 'src/scientific_operation.c',
+   'src/scientific_derivation.c', 'tests/chart_spec_test.c'],
+  include_directories: include_directories('src'),
+  dependencies: [glib_dep, json_glib_dep],
+  install: false
+)
+test('chart-spec', chart_spec_test,
+  env: {'ATM_CHART01_FIXTURE': meson.current_source_dir() / 'tests/fixtures/chart01'})

@@ -51,3 +51,27 @@ visual padding and layout belong to separately tested display policy. The
 future renderer uses `atm-retro-mono/1`; exact colors, widths and spacing remain
 subject to visual prototype review. CHART-04 performance and CHART-05 History
 persistence remain separate stages.
+
+## First native implementation
+
+`chart_spec.h/.c` provides an owned, source-revalidated specification for LINE
+and SCATTER only. It accepts one to four inputs, rejects duplicate qualified
+identities, and currently admits only the closed complete GISTEMP profile.
+There is still only one unique qualified series; successful multi-series
+compatibility is not claimed. STEP, BAR, missing/event data and other adapters
+remain unsupported.
+
+Exact coefficient/exponent comparisons derive the data extents without floating
+point conversion. The retained source gives x=[1880,2025], y=[-49e-2,128e-2].
+Empty or constant domains are rejected; ticks, display padding and binary64
+projection are deferred to rendering. Linear axes and GAP policy are fixed in
+the canonical ChartSpec identity alongside ordered qualified series IDs.
+Validation reconstructs the specification and compares both domains and identity.
+Input mutation cannot alter the owned series; corrupted materializations are
+rejected before source rebuilding. Public pointers are borrowed read-only.
+
+The native sanitizer and Meson tests cover deterministic identity, distinct kinds,
+exact source extrema, input lifetime, duplicates, cardinality, unsupported kinds,
+corrupted input, changed bounds/identity and changed owned series. Degenerate and
+multi-source synthetic fixtures are not represented as qualified source data.
+The module remains test-only, with no application caller or enabled chart UI.
