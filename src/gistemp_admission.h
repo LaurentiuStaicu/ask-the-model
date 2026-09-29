@@ -14,6 +14,9 @@ typedef struct AtmGistempAdmission AtmGistempAdmission;
 gboolean atm_gistemp_admission_new (const char *repository, const char *snapshot,
     GBytes *const sources[ATM_GISTEMP_SOURCE_COUNT], AtmGistempAdmission **out,
     GError **error);
+/* Re-admit the owned bytes and re-extract points; no cached candidate copying. */
+gboolean atm_gistemp_admission_rebuild (const AtmGistempAdmission *source,
+    AtmGistempAdmission **out, GError **error);
 void atm_gistemp_admission_free (AtmGistempAdmission *admission);
 /* Borrowed immutable values, valid until destruction. Invalid index -> NULL. */
 const AtmAnnualSeriesCandidate *atm_gistemp_admission_candidate (const AtmGistempAdmission *a);
