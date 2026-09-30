@@ -47,6 +47,21 @@ test_dense_roles_and_order (void)
 }
 
 static void
+test_dense_without_effective_reduction (void)
+{
+    const AtmChartM4Point input[] = {
+        {0, 0.1, 2.0}, {1, 0.2, 1.0}, {2, 2.0, 3.0}
+    };
+    AtmChartM4Plan *plan = NULL;
+    g_assert_true (atm_chart_m4_plan_new (input, G_N_ELEMENTS (input), 2, &plan, NULL));
+    g_assert_false (atm_chart_m4_plan_is_reduced (plan));
+    g_assert_cmpuint (atm_chart_m4_plan_count (plan), ==, G_N_ELEMENTS (input));
+    for (guint i = 0; i < G_N_ELEMENTS (input); i++)
+        assert_point (plan, i, input[i].source_index, input[i].x, input[i].y);
+    atm_chart_m4_plan_free (plan);
+}
+
+static void
 test_role_collision_dedup (void)
 {
     const AtmChartM4Point input[] = {
@@ -192,6 +207,7 @@ main (int argc, char **argv)
     g_test_init (&argc, &argv, NULL);
     g_test_add_func ("/chart-m4/non-dense-identity", test_non_dense_identity);
     g_test_add_func ("/chart-m4/dense-roles-order", test_dense_roles_and_order);
+    g_test_add_func ("/chart-m4/dense-no-effective-reduction", test_dense_without_effective_reduction);
     g_test_add_func ("/chart-m4/role-collision-dedup", test_role_collision_dedup);
     g_test_add_func ("/chart-m4/spike-endpoints", test_spike_and_endpoints_survive);
     g_test_add_func ("/chart-m4/irregular-x", test_irregular_x_uses_projected_columns);
