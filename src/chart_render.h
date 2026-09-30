@@ -12,6 +12,11 @@ typedef struct AtmChartRender AtmChartRender;
  * *out must be NULL. Failure leaves it unchanged. */
 gboolean atm_chart_render_new (const AtmChartSpec *spec, guint width, guint height,
     guint device_scale, AtmChartRender **out, GError **error);
+/* Viewport-only update over this renderer's already reconstructed/owned
+ * ChartSpec. Prepares projection+surface before replacing current viewport
+ * state. Failure leaves spec, Data and the previous viewport unchanged. */
+gboolean atm_chart_render_resize (AtmChartRender *render, guint width, guint height,
+    guint device_scale, GError **error);
 void atm_chart_render_free (AtmChartRender *render);
 /* Borrowed read-only; never modify or destroy the surface or strings. */
 cairo_surface_t *atm_chart_render_surface (const AtmChartRender *render);
