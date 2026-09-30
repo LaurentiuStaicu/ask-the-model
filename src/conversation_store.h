@@ -45,6 +45,27 @@ typedef struct {
     const char *immutable_permalink;
 } AtmConversationCitationInput;
 
+typedef struct {
+    const char *series_profile;
+    const char *admission_profile;
+    const char *scientific_id;
+    const char *qualified_id;
+    const char *repository_id;
+    const char *repository_version;
+    const char *snapshot_sha;
+    const char *source_path;
+} AtmConversationChartSeriesInput;
+
+typedef struct {
+    guint ordinal;
+    const char *chart_schema;
+    const char *chart_spec_id;
+    const char *chart_kind;
+    const char *reconstruction_profile;
+    const AtmConversationChartSeriesInput *series;
+    gsize series_count;
+} AtmConversationChartInput;
+
 GQuark atm_conversation_store_error_quark (void);
 
 gboolean atm_conversation_store_open (
@@ -98,6 +119,18 @@ gboolean atm_conversation_store_commit_turn (
     const AtmConversationCitationInput *citations,
     gsize citation_count,
     gint64 *out_turn_no,
+    GError **error
+);
+
+/* Attaches a qualified reconstruction recipe to an already committed grounded
+ * assistant turn. Current v3 profile accepts exactly one pinned GISTEMP series.
+ * The recipe contains identities/provenance only; never numeric point/raster
+ * state. The mutation is transactional. */
+gboolean atm_conversation_store_attach_chart (
+    AtmConversationStore *store,
+    const char *conversation_id,
+    gint64 turn_no,
+    const AtmConversationChartInput *chart,
     GError **error
 );
 
@@ -332,6 +365,103 @@ gint64 atm_conversation_snapshot_message_created_at_us_at (
 guint atm_conversation_snapshot_message_citation_count_at (
     const AtmConversationSnapshot *snapshot,
     guint message_index
+);
+
+guint atm_conversation_snapshot_message_chart_count_at (
+    const AtmConversationSnapshot *snapshot,
+    guint message_index
+);
+
+gint64 atm_conversation_snapshot_chart_ordinal_at (
+    const AtmConversationSnapshot *snapshot,
+    guint message_index,
+    guint chart_index
+);
+
+const char *atm_conversation_snapshot_chart_schema_at (
+    const AtmConversationSnapshot *snapshot,
+    guint message_index,
+    guint chart_index
+);
+
+const char *atm_conversation_snapshot_chart_spec_id_at (
+    const AtmConversationSnapshot *snapshot,
+    guint message_index,
+    guint chart_index
+);
+
+const char *atm_conversation_snapshot_chart_kind_at (
+    const AtmConversationSnapshot *snapshot,
+    guint message_index,
+    guint chart_index
+);
+
+const char *atm_conversation_snapshot_chart_reconstruction_profile_at (
+    const AtmConversationSnapshot *snapshot,
+    guint message_index,
+    guint chart_index
+);
+
+guint atm_conversation_snapshot_chart_series_count_at (
+    const AtmConversationSnapshot *snapshot,
+    guint message_index,
+    guint chart_index
+);
+
+const char *atm_conversation_snapshot_chart_series_profile_at (
+    const AtmConversationSnapshot *snapshot,
+    guint message_index,
+    guint chart_index,
+    guint series_index
+);
+
+const char *atm_conversation_snapshot_chart_series_admission_profile_at (
+    const AtmConversationSnapshot *snapshot,
+    guint message_index,
+    guint chart_index,
+    guint series_index
+);
+
+const char *atm_conversation_snapshot_chart_series_scientific_id_at (
+    const AtmConversationSnapshot *snapshot,
+    guint message_index,
+    guint chart_index,
+    guint series_index
+);
+
+const char *atm_conversation_snapshot_chart_series_qualified_id_at (
+    const AtmConversationSnapshot *snapshot,
+    guint message_index,
+    guint chart_index,
+    guint series_index
+);
+
+const char *atm_conversation_snapshot_chart_series_repository_id_at (
+    const AtmConversationSnapshot *snapshot,
+    guint message_index,
+    guint chart_index,
+    guint series_index
+);
+
+const char *atm_conversation_snapshot_chart_series_repository_version_at (
+    const AtmConversationSnapshot *snapshot,
+    guint message_index,
+    guint chart_index,
+    guint series_index
+);
+
+const char *atm_conversation_snapshot_chart_series_snapshot_sha_at (
+    const AtmConversationSnapshot *snapshot,
+    guint message_index,
+    guint chart_index,
+    guint series_index
+);
+
+const char *atm_conversation_snapshot_chart_series_source_path_at (
+    const AtmConversationSnapshot *snapshot,
+    guint message_index,
+    guint chart_index,
+    guint series_index
 );
 
 const char *atm_conversation_snapshot_citation_label_at (
