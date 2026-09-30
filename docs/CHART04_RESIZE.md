@@ -79,6 +79,34 @@ The characterization workflow now retains both the repeated-new-render sequence
 and a true 24-step atm_chart_render_resize() sequence. This provides direct
 before/after evidence without turning timing into a correctness threshold.
 
+## Post-refactor characterization
+
+On the same Ubuntu 24.04 / AMD EPYC 7763 runner class, the qualified head
+`f3f7b1b371a6e3b90784af92543f26cf1924baa0` reported:
+
+- ChartSpec rebuild: median 283114 us;
+- public projection construction: median 281610 us;
+- fallback 240x140 render: median 283449 us;
+- normal 860x500 render: median 284607 us;
+- 2x 860x500 render: median 285817 us;
+- 24-step repeated-new-render sequence: median 6881032 us,
+  approximately 286710 us per step;
+- 24-step viewport-only resize sequence: median 12742 us,
+  approximately 531 us per step.
+
+Relative to the pre-refactor 24-step baseline (~570861 us/step), the qualified
+viewport-only path is approximately 1075x faster on this runner. A normal fresh
+render also drops from ~567 ms to ~285 ms because only one scientific/spec
+reconstruction remains instead of two.
+
+These ratios are characterization evidence, not runtime promises or acceptance
+thresholds. Correctness remains established by the sanitizer, GTK, Flatpak and
+scientific/invariant gates.
+
+The three real GTK preview PNGs on the qualified head are byte-for-byte identical
+to the pre-refactor CHART-03 baseline, confirming that the ownership/resize
+optimization changes no qualified presentation pixels.
+
 ## Boundaries
 
 M4 remains dormant under its separate Cairo equality qualification. No shared or
