@@ -162,6 +162,11 @@ test_invalid (void)
     g_assert_error (error, ATM_CHART_M4_ERROR, ATM_CHART_M4_ERROR_LIMIT);
     g_clear_error (&error);
 
+    g_assert_false (atm_chart_m4_plan_new (
+        valid, 2, ATM_CHART_M4_MAX_COLUMNS + 1, &plan, &error));
+    g_assert_error (error, ATM_CHART_M4_ERROR, ATM_CHART_M4_ERROR_LIMIT);
+    g_clear_error (&error);
+
     AtmChartM4Point bad_column_order[] = {{0, 1, 0.0}, {1, 0, 1.0}};
     g_assert_false (atm_chart_m4_plan_new (bad_column_order, 2, 2, &plan, &error));
     g_assert_error (error, ATM_CHART_M4_ERROR, ATM_CHART_M4_ERROR_ORDER);
