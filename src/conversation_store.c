@@ -3609,6 +3609,39 @@ snapshot_citation_free (
 }
 
 static void
+snapshot_chart_series_free (
+    gpointer data
+)
+{
+    AtmConversationSnapshotChartSeries *series = data;
+    if (series == NULL) return;
+    g_free (series->series_profile);
+    g_free (series->admission_profile);
+    g_free (series->scientific_id);
+    g_free (series->qualified_id);
+    g_free (series->repository_id);
+    g_free (series->repository_version);
+    g_free (series->snapshot_sha);
+    g_free (series->source_path);
+    g_free (series);
+}
+
+static void
+snapshot_chart_free (
+    gpointer data
+)
+{
+    AtmConversationSnapshotChart *chart = data;
+    if (chart == NULL) return;
+    g_free (chart->chart_schema);
+    g_free (chart->chart_spec_id);
+    g_free (chart->chart_kind);
+    g_free (chart->reconstruction_profile);
+    g_clear_pointer (&chart->series, g_ptr_array_unref);
+    g_free (chart);
+}
+
+static void
 snapshot_message_free (
     gpointer data
 )
@@ -3626,6 +3659,10 @@ snapshot_message_free (
     g_free (message->display_content);
     g_clear_pointer (
         &message->citations,
+        g_ptr_array_unref
+    );
+    g_clear_pointer (
+        &message->charts,
         g_ptr_array_unref
     );
     g_free (message);
@@ -3732,6 +3769,54 @@ snapshot_citation_at (
         message->citations,
         citation_index
     );
+}
+
+static AtmConversationSnapshotChart *
+snapshot_chart_at (
+    const AtmConversationSnapshot *snapshot,
+    guint message_index,
+    guint chart_index
+)
+{
+    AtmConversationSnapshotMessage *message =
+        snapshot_message_at (snapshot, message_index);
+    if (message == NULL || message->charts == NULL ||
+        chart_index >= message->charts->len) {
+        return NULL;
+    }
+    return g_ptr_array_index (message->charts, chart_index);
+}
+
+static AtmConversationSnapshotChartSeries *
+snapshot_chart_series_at (
+    const AtmConversationSnapshot *snapshot,
+    guint message_index,
+    guint chart_index,
+    guint series_index
+)
+{
+    AtmConversationSnapshotChart *chart =
+        snapshot_chart_at (snapshot, message_index, chart_index);
+    if (chart == NULL || chart->series == NULL ||
+        series_index >= chart->series->len) {
+        return NULL;
+    }
+    return g_ptr_array_index (chart->series, series_index);
+}
+
+static AtmConversationSnapshotChart *
+snapshot_chart_for_ordinal (
+    AtmConversationSnapshotMessage *message,
+    gint64 ordinal
+)
+{
+    if (message == NULL || message->charts == NULL) return NULL;
+    for (guint i = 0; i < message->charts->len; i++) {
+        AtmConversationSnapshotChart *chart =
+            g_ptr_array_index (message->charts, i);
+        if (chart->ordinal == ordinal) return chart;
+    }
+    return NULL;
 }
 
 gboolean
