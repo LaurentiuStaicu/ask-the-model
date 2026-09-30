@@ -2550,6 +2550,16 @@ chart_projection_test = executable(
 test('chart-projection', chart_projection_test,
   env: {'ATM_CHART01_FIXTURE': meson.current_source_dir() / 'tests/fixtures/chart01'})
 
+# CHART-04: dormant M4 projected-geometry selector; no renderer caller.
+chart_m4_test = executable(
+  'chart-m4-test',
+  ['src/chart_m4.c', 'tests/chart_m4_test.c'],
+  include_directories: include_directories('src'),
+  dependencies: [glib_dep],
+  install: false
+)
+test('chart-m4', chart_m4_test)
+
 # CHART-03: dormant headless Cairo prototype; no application caller.
 chart_render_test = executable(
   'chart-render-test',
