@@ -22,14 +22,6 @@ reject (GError **error, AtmChartM4Error code, const char *message)
     return FALSE;
 }
 
-static guint
-pixel_column (double x, guint width)
-{
-    if (x >= (double) width)
-        return width - 1;
-    return (guint) x;
-}
-
 static void
 append_index (AtmChartM4Plan *plan, const AtmChartM4Point *input, guint index)
 {
@@ -57,29 +49,29 @@ gboolean
 atm_chart_m4_plan_new (
     const AtmChartM4Point *points,
     gsize count,
-    guint plot_width,
+    guint column_count,
     AtmChartM4Plan **out,
     GError **error)
 {
     if (out == NULL || *out != NULL || points == NULL || count == 0)
         return reject (error, ATM_CHART_M4_ERROR_ARGUMENT, "Invalid M4 arguments or output.");
-    if (count > ATM_CHART_M4_MAX_POINTS || plot_width == 0 || plot_width > ATM_CHART_M4_MAX_WIDTH)
+    if (count > ATM_CHART_M4_MAX_POINTS || column_count == 0 ||
+        column_count > ATM_CHART_M4_MAX_COLUMNS)
         return reject (error, ATM_CHART_M4_ERROR_LIMIT, "M4 input exceeds display limits.");
 
     for (gsize i = 0; i < count; i++) {
-        if (!isfinite (points[i].x) || !isfinite (points[i].y) ||
-            points[i].x < 0.0 || points[i].x > (double) plot_width)
-            return reject (error, ATM_CHART_M4_ERROR_SHAPE, "M4 point is outside finite projected geometry.");
+        if (!isfinite (points[i].y) || points[i].pixel_column >= column_count)
+            return reject (error, ATM_CHART_M4_ERROR_SHAPE, "M4 point is outside qualified pixel columns.");
         if (i > 0 && points[i].source_index <= points[i - 1].source_index)
             return reject (error, ATM_CHART_M4_ERROR_ORDER, "M4 source order is not strictly increasing.");
-        if (i > 0 && points[i].x < points[i - 1].x)
-            return reject (error, ATM_CHART_M4_ERROR_ORDER, "M4 projected X is not nondecreasing.");
+        if (i > 0 && points[i].pixel_column < points[i - 1].pixel_column)
+            return reject (error, ATM_CHART_M4_ERROR_ORDER, "M4 pixel columns are not nondecreasing.");
     }
 
     AtmChartM4Plan *plan = g_new0 (AtmChartM4Plan, 1);
     plan->points = g_new (AtmChartM4Point, count);
 
-    if (count <= plot_width) {
+    if (count <= column_count) {
         memcpy (plan->points, points, sizeof *points * count);
         plan->count = (guint) count;
         plan->reduced = FALSE;
@@ -89,9 +81,9 @@ atm_chart_m4_plan_new (
 
     guint start = 0;
     while (start < count) {
-        guint bucket = pixel_column (points[start].x, plot_width);
+        guint column = points[start].pixel_column;
         guint end = start + 1;
-        while (end < count && pixel_column (points[end].x, plot_width) == bucket)
+        while (end < count && points[end].pixel_column == column)
             end++;
 
         guint first = start, last = end - 1, min_y = start, max_y = start;
