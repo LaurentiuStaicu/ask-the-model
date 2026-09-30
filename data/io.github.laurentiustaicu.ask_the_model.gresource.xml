@@ -9,6 +9,8 @@
     <file alias="schemas/control-state-v1-to-v2.sql">schemas/control-state-v1-to-v2.sql</file>
     <file alias="schemas/conversation-store-v1.sql">schemas/conversation-store-v1.sql</file>
     <file alias="schemas/conversation-store-v2.sql">schemas/conversation-store-v2.sql</file>
+    <file alias="schemas/conversation-store-v3.sql">schemas/conversation-store-v3.sql</file>
     <file alias="schemas/conversation-store-v1-to-v2.sql">schemas/conversation-store-v1-to-v2.sql</file>
+    <file alias="schemas/conversation-store-v2-to-v3.sql">schemas/conversation-store-v2-to-v3.sql</file>
   </gresource>
 </gresources>
