@@ -480,6 +480,221 @@ test_snapshot_restore_provider_history ()
 }
 
 private static void
+test_chart_binding_domain_export_bridge ()
+{
+    string root = new_temp_root ();
+
+    try {
+        var store =
+            new AskTheModel.ConversationPersistenceStore (
+                root
+            );
+
+        var repository =
+            new AskTheModel.ConversationPersistenceRepository (
+                "ewd",
+                "0.1.0",
+                "0123456789abcdef0123456789abcdef01234567"
+            );
+
+        string conversation_id =
+            store.create_conversation (
+                "Chart bridge",
+                100,
+                "model-chart",
+                null,
+                7,
+                { repository }
+            );
+
+        var citation =
+            new AskTheModel.ConversationPersistenceCitation (
+                "S1",
+                "ewd",
+                "0.1.0",
+                "0123456789abcdef0123456789abcdef01234567",
+                "gistemp-global-annual",
+                "science/data/processed/nasa_gistemp_global_2026.csv",
+                "rows 1-146",
+                "GISTEMP global annual",
+                null,
+                null
+            );
+
+        int64 turn_no =
+            store.commit_turn (
+                conversation_id,
+                "show the series",
+                "answer [S1]",
+                "answer",
+                true,
+                101,
+                { citation }
+            );
+
+        assert (turn_no == 0);
+
+        var series =
+            new AskTheModel.ConversationPersistenceChartSeries (
+                "atm-series/gistemp-complete-annual/1",
+                "atm-gistemp-pinned-admission/1",
+                "bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb",
+                "cccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccc",
+                "ewd",
+                "0.1.0",
+                "0123456789abcdef0123456789abcdef01234567",
+                "science/data/processed/nasa_gistemp_global_2026.csv"
+            );
+        var chart =
+            new AskTheModel.ConversationPersistenceChart (
+                1,
+                "atm-chart-spec/1",
+                "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+                "line",
+                "atm-chart-reconstruct/gistemp-complete-annual/1",
+                { series }
+            );
+
+        store.attach_chart (
+            conversation_id,
+            turn_no,
+            chart
+        );
+
+        bool duplicate_rejected = false;
+
+        try {
+            store.attach_chart (
+                conversation_id,
+                turn_no,
+                chart
+            );
+        } catch (Error error) {
+            duplicate_rejected = true;
+        }
+
+        assert (duplicate_rejected);
+
+        var snapshot =
+            store.load_snapshot (
+                conversation_id
+            );
+
+        assert (snapshot.messages.length == 2);
+        assert (snapshot.messages[0].charts.length == 0);
+        assert (snapshot.messages[1].charts.length == 1);
+
+        var loaded_chart =
+            snapshot.messages[1].charts[0];
+        assert (loaded_chart.ordinal == 1);
+        assert (loaded_chart.chart_schema == "atm-chart-spec/1");
+        assert (
+            loaded_chart.chart_spec_id ==
+            "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa"
+        );
+        assert (loaded_chart.chart_kind == "line");
+        assert (
+            loaded_chart.reconstruction_profile ==
+            "atm-chart-reconstruct/gistemp-complete-annual/1"
+        );
+        assert (loaded_chart.series.length == 1);
+        assert (
+            loaded_chart.series[0].scientific_id ==
+            "bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb"
+        );
+        assert (
+            loaded_chart.series[0].qualified_id ==
+            "cccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccc"
+        );
+
+        string first =
+            store.export_conversation_json (
+                conversation_id
+            );
+        string second =
+            store.export_conversation_json (
+                conversation_id
+            );
+
+        assert (first == second);
+
+        var parser = new Json.Parser ();
+        parser.load_from_data (first, -1);
+
+        Json.Object envelope =
+            parser.get_root ().get_object ();
+        assert (
+            envelope.get_int_member ("schema_version") ==
+            2
+        );
+
+        Json.Array messages =
+            envelope.get_object_member ("conversation")
+                .get_array_member ("messages");
+        assert (
+            messages.get_object_element (0)
+                .get_array_member ("charts")
+                .get_length () == 0
+        );
+
+        Json.Array charts =
+            messages.get_object_element (1)
+                .get_array_member ("charts");
+        assert (charts.get_length () == 1);
+
+        Json.Object exported_chart =
+            charts.get_object_element (0);
+        assert (
+            exported_chart.get_string_member ("chart_spec_id") ==
+            loaded_chart.chart_spec_id
+        );
+        assert (
+            exported_chart.get_string_member ("reconstruction_profile") ==
+            loaded_chart.reconstruction_profile
+        );
+
+        Json.Array exported_series =
+            exported_chart.get_array_member ("series");
+        assert (exported_series.get_length () == 1);
+        assert (
+            exported_series.get_object_element (0)
+                .get_string_member ("qualified_id") ==
+            loaded_chart.series[0].qualified_id
+        );
+
+        store.set_archived (
+            conversation_id,
+            true,
+            102
+        );
+
+        string automatic_path =
+            GLib.Path.build_filename (
+                store.export_root,
+                "%s.json".printf (
+                    conversation_id
+                )
+            );
+        string automatic_export;
+        assert (
+            GLib.FileUtils.get_contents (
+                automatic_path,
+                out automatic_export
+            )
+        );
+        assert (
+            automatic_export ==
+            store.export_conversation_json (
+                conversation_id
+            )
+        );
+    } catch (Error error) {
+        critical ("%s", error.message);
+        assert_not_reached ();
+    }
+}
+
+private static void
 test_archive_delete_domain_lifecycle ()
 {
     string root = new_temp_root ();
@@ -1064,6 +1279,10 @@ main (string[] args)
     Test.add_func (
         "/conversation-persistence/snapshot-restore-provider-history",
         test_snapshot_restore_provider_history
+    );
+    Test.add_func (
+        "/conversation-persistence/chart-binding-domain-export",
+        test_chart_binding_domain_export_bridge
     );
     Test.add_func (
         "/conversation-persistence/archive-delete-lifecycle",
