@@ -58,6 +58,27 @@ typedef struct {
 } AtmConversationSnapshotCitation;
 
 typedef struct {
+    guint series_ordinal;
+    char *series_profile;
+    char *admission_profile;
+    char *scientific_id;
+    char *qualified_id;
+    char *repository_id;
+    char *repository_version;
+    char *snapshot_sha;
+    char *source_path;
+} AtmConversationSnapshotChartSeries;
+
+typedef struct {
+    gint64 ordinal;
+    char *chart_schema;
+    char *chart_spec_id;
+    char *chart_kind;
+    char *reconstruction_profile;
+    GPtrArray *series;
+} AtmConversationSnapshotChart;
+
+typedef struct {
     char *message_id;
     gint64 sequence_no;
     gint64 turn_no;
@@ -67,6 +88,7 @@ typedef struct {
     gboolean grounded;
     gint64 created_at_us;
     GPtrArray *citations;
+    GPtrArray *charts;
 } AtmConversationSnapshotMessage;
 
 struct AtmConversationSnapshot {
