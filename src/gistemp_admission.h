@@ -4,6 +4,11 @@ G_BEGIN_DECLS
 
 /* Independent admission policy; not the EWD evidence profile or VerifiedSeries. */
 #define ATM_GISTEMP_ADMISSION_PROFILE "atm-gistemp-pinned-admission/1"
+#define ATM_GISTEMP_ADMITTED_REPOSITORY "LaurentiuStaicu/empirical-world3-dynamics"
+#define ATM_GISTEMP_ADMITTED_REPOSITORY_ID "ewd"
+#define ATM_GISTEMP_ADMITTED_VERSION "0.1.0"
+#define ATM_GISTEMP_ADMITTED_SNAPSHOT "d9e249339663015f6d1c05752338a955bf64ad0b"
+#define ATM_GISTEMP_PRIMARY_SOURCE_PATH "science/data/processed/nasa_gistemp_global_2026.csv"
 #define ATM_GISTEMP_SOURCE_COUNT 4u
 #define ATM_GISTEMP_SOURCE_MAX_BYTES ((gsize) 65536)
 
