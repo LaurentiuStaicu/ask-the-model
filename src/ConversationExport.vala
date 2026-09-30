@@ -156,18 +156,6 @@ namespace AskTheModel {
             }
 
             builder.end_array ();
-
-            builder.set_member_name ("charts");
-            builder.begin_array ();
-
-            foreach (
-                ConversationPersistenceChart chart
-                in message.charts
-            ) {
-                add_chart (builder, chart);
-            }
-
-            builder.end_array ();
             builder.end_object ();
         }
 
@@ -210,6 +198,18 @@ namespace AskTheModel {
                 in message.citations
             ) {
                 add_citation (builder, citation);
+            }
+
+            builder.end_array ();
+
+            builder.set_member_name ("charts");
+            builder.begin_array ();
+
+            foreach (
+                ConversationPersistenceChart chart
+                in message.charts
+            ) {
+                add_chart (builder, chart);
             }
 
             builder.end_array ();
