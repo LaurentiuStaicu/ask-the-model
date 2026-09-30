@@ -35,7 +35,9 @@ typedef struct AtmChartM4Plan AtmChartM4Plan;
  * finite, nondecreasing in projected X and bounded to the current projection
  * width. If count <= plot_width, the plan is an exact full copy. Dense input
  * retains first/min-Y/max-Y/last in each projected X-pixel column, deduplicated
- * and emitted in original source order. *out must be NULL. */
+ * and emitted in original source order. One source-ordered LINE series is planned
+ * per call. is_reduced is true only when the output count actually shrinks.
+ * *out must be NULL. */
 gboolean atm_chart_m4_plan_new (
     const AtmChartM4Point *points,
     gsize count,
