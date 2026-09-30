@@ -11,6 +11,7 @@ on:
       - 'tests/chart_render_test.c'
       - 'src/chart_m4.*'
       - 'tests/chart_m4_test.c'
+      - 'tests/chart_m4_cairo_test.c'
       - 'scripts/chart03_preview_log.py'
       - 'src/chart_projection.*'
       - 'tests/chart_projection_test.c'
@@ -123,6 +124,12 @@ jobs:
             $(pkg-config --cflags --libs glib-2.0) -lm \
             -o /tmp/chart-m4-test
           /tmp/chart-m4-test
+          cc -std=c11 -Wall -Wextra -Werror -g -O1 \
+            -fsanitize=address,undefined -fno-omit-frame-pointer -Isrc \
+            src/chart_m4.c tests/chart_m4_cairo_test.c \
+            $(pkg-config --cflags --libs glib-2.0 cairo) -lm \
+            -o /tmp/chart-m4-cairo-test
+          /tmp/chart-m4-cairo-test
           cc -std=c11 -Wall -Wextra -Werror -g -O1 \
             -fsanitize=address,undefined -fno-omit-frame-pointer -Isrc \
             src/chart_render.c src/chart_projection.c src/chart_spec.c src/verified_series.c src/gistemp_sra.c src/gistemp_evidence.c \
