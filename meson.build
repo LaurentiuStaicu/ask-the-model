@@ -2560,6 +2560,16 @@ chart_m4_test = executable(
 )
 test('chart-m4', chart_m4_test)
 
+# CHART-04: test-only Cairo equivalence characterization for M4.
+chart_m4_cairo_test = executable(
+  'chart-m4-cairo-test',
+  ['src/chart_m4.c', 'tests/chart_m4_cairo_test.c'],
+  include_directories: include_directories('src'),
+  dependencies: [glib_dep, dependency('cairo')],
+  install: false
+)
+test('chart-m4-cairo', chart_m4_cairo_test)
+
 # CHART-03: dormant headless Cairo prototype; no application caller.
 chart_render_test = executable(
   'chart-render-test',
