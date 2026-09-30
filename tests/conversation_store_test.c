@@ -532,6 +532,56 @@ test_v1_to_v3_migration (void)
 }
 
 static void
+test_v1_to_v3_migration_rollback (void)
+{
+    char *root = new_temp_root ("atm-conversation-v1-v3-rollback-XXXXXX");
+    char *path = store_path (root);
+    create_v1_store (path);
+
+    raw_exec (
+        path,
+        "CREATE TABLE message_charts(dummy INTEGER) STRICT;"
+    );
+
+    AtmConversationStore *store = NULL;
+    GError *error = NULL;
+    g_assert_false (atm_conversation_store_open (path, &store, &error));
+    g_assert_nonnull (error);
+    g_assert_null (store);
+    g_clear_error (&error);
+
+    g_assert_cmpint (raw_int64 (path, "PRAGMA user_version;"), ==, 1);
+    char *schema_id = raw_text (
+        path,
+        "SELECT schema_id FROM installation WHERE singleton_id=1;"
+    );
+    g_assert_cmpstr (schema_id, ==, "atm-conversation-store/1");
+    g_free (schema_id);
+    g_assert_cmpint (
+        raw_int64 (
+            path,
+            "SELECT count(*) FROM pragma_table_info('conversations') "
+            "WHERE name='open_on_startup';"
+        ),
+        ==,
+        0
+    );
+    g_assert_cmpint (
+        raw_int64 (
+            path,
+            "SELECT count(*) FROM sqlite_master "
+            "WHERE type='table' AND name='chart_series';"
+        ),
+        ==,
+        0
+    );
+
+    g_free (path);
+    remove_tree_best_effort (root);
+    g_free (root);
+}
+
+static void
 test_v2_to_v3_migration (void)
 {
     char *root = new_temp_root ("atm-conversation-v2-v3-XXXXXX");
@@ -2444,6 +2494,10 @@ main (int argc, char **argv)
     g_test_add_func (
         "/conversation-store/v1-to-v3-migration",
         test_v1_to_v3_migration
+    );
+    g_test_add_func (
+        "/conversation-store/v1-to-v3-rollback",
+        test_v1_to_v3_migration_rollback
     );
     g_test_add_func (
         "/conversation-store/v2-to-v3-migration",
