@@ -120,7 +120,7 @@ jobs:
           cc -std=c11 -Wall -Wextra -Werror -g -O1 \
             -fsanitize=address,undefined -fno-omit-frame-pointer -Isrc \
             src/chart_m4.c tests/chart_m4_test.c \
-            $(pkg-config --cflags --libs glib-2.0 json-glib-1.0) -lm \
+            $(pkg-config --cflags --libs glib-2.0) -lm \
             -o /tmp/chart-m4-test
           /tmp/chart-m4-test
           cc -std=c11 -Wall -Wextra -Werror -g -O1 \
