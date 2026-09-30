@@ -129,7 +129,9 @@ void atm_chart_view_show_chart (AtmChartView *self)
 void atm_chart_view_show_data (AtmChartView *self)
 {
     if (!self || !self->stack) return;
-    gtk_stack_set_visible_child_name (self->stack, "data"); gtk_widget_grab_focus (GTK_WIDGET (self->table));
+    gtk_stack_set_visible_child_name (self->stack, "data");
+    gtk_column_view_scroll_to (self->table, gtk_single_selection_get_selected (self->selection),
+        NULL, GTK_LIST_SCROLL_FOCUS, NULL);
 }
 static gboolean key_pressed (GtkEventControllerKey *controller, guint key, guint code, GdkModifierType state, gpointer data)
 {
@@ -168,7 +170,7 @@ gboolean atm_chart_view_new (const AtmChartSpec *spec, AtmChartView **out, GErro
     GtkWidget *chart = gtk_box_new (GTK_ORIENTATION_VERTICAL, 0);
     self->status = GTK_LABEL (gtk_label_new ("")); gtk_label_set_wrap (self->status, TRUE);
     gtk_box_append (GTK_BOX (chart), GTK_WIDGET (self->status));
-    self->area = GTK_DRAWING_AREA (gtk_drawing_area_new ()); gtk_drawing_area_set_content_height (self->area, 500);
+    self->area = GTK_DRAWING_AREA (gtk_drawing_area_new ()); gtk_drawing_area_set_content_height (self->area, 140);
     gtk_widget_set_hexpand (GTK_WIDGET (self->area), TRUE); gtk_widget_set_vexpand (GTK_WIDGET (self->area), TRUE);
     gtk_widget_set_focusable (GTK_WIDGET (self->area), TRUE);
     accessible (GTK_WIDGET (self->area), "Global annual temperature anomaly chart", "Exact observations and provenance are in Data.");

@@ -1,7 +1,7 @@
 # CHART-03: headless monochrome prototype
 
-Status: dormant native prototype, linked only into tests. No application caller,
-GTK Data view widget, persistence or chart prompt is enabled by this slice.
+Status: dormant native renderer and GTK component, linked only into tests. No
+application caller, persistence or chart prompt is enabled by these slices.
 
 ## Contract and scientific boundary
 
@@ -92,7 +92,8 @@ not a performance qualification; CHART-04 must address interactive resize cost
 before general runtime activation. No shared cache or downsampling is introduced.
 
 Chart/Data switcher buttons use GTK keyboard behavior. Alt+1 and Alt+2 switch
-pages and move focus. The Data table supports native arrow-key row selection;
+pages and move focus. GTK 4.12's `gtk_column_view_scroll_to` focuses the selected
+Data row explicitly. The Data table supports native arrow-key row selection;
 selection updates provenance. The component, chart, table and provenance have
 accessible names/descriptions and GTK table roles. This is a semantic/keyboard
 baseline, not an end-to-end screen-reader or localization qualification.
