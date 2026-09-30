@@ -3,7 +3,6 @@
 
 struct _AtmChartView {
     GtkBox parent_instance;
-    AtmChartSpec *spec;
     AtmChartRender *render;
     char *data;
     GtkStack *stack;
@@ -45,7 +44,7 @@ static void dispose (GObject *object)
 static void finalize (GObject *object)
 {
     AtmChartView *self = ATM_CHART_VIEW (object);
-    atm_chart_spec_free (self->spec); atm_chart_render_free (self->render); g_free (self->data);
+    atm_chart_render_free (self->render); g_free (self->data);
     G_OBJECT_CLASS (atm_chart_view_parent_class)->finalize (object);
 }
 static void atm_chart_view_class_init (AtmChartViewClass *klass)
@@ -182,12 +181,10 @@ static gboolean key_pressed (GtkEventControllerKey *controller, guint key, guint
 gboolean atm_chart_view_new (const AtmChartSpec *spec, AtmChartView **out, GError **error)
 {
     if (!out || *out) return reject (error, "Invalid chart widget output.");
-    AtmChartSpec *owned = NULL;
-    if (!atm_chart_spec_rebuild (spec, &owned, error)) return FALSE;
     AtmChartRender *initial = NULL;
-    if (!atm_chart_render_new (owned, 860, 500, 1, &initial, error)) { atm_chart_spec_free (owned); return FALSE; }
+    if (!atm_chart_render_new (spec, 860, 500, 1, &initial, error)) return FALSE;
     AtmChartView *self = g_object_ref_sink (g_object_new (ATM_TYPE_CHART_VIEW, "accessible-role", GTK_ACCESSIBLE_ROLE_GROUP, NULL));
-    self->spec = owned; self->render = initial;
+    self->render = initial;
     self->requested_width = self->render_width = 860;
     self->requested_height = self->render_height = 500;
     self->requested_scale = self->render_scale = 1;
