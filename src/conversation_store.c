@@ -4537,6 +4537,10 @@ atm_conversation_store_load_snapshot (
             g_ptr_array_new_with_free_func (
                 snapshot_citation_free
             );
+        message->charts =
+            g_ptr_array_new_with_free_func (
+                snapshot_chart_free
+            );
 
         g_ptr_array_add (
             snapshot->messages,
