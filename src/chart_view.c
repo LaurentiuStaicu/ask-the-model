@@ -13,7 +13,12 @@ struct _AtmChartView {
     GtkSingleSelection *selection;
     GtkTextBuffer *provenance;
     GtkLabel *status;
-    int width, height, scale;
+    GSource *resize_source;
+    int requested_width, requested_height, requested_scale;
+    int render_width, render_height, render_scale;
+#ifdef ATM_CHART_VIEW_TESTING
+    guint test_resize_apply_count;
+#endif
 };
 G_DEFINE_TYPE (AtmChartView, atm_chart_view, GTK_TYPE_BOX)
 static gboolean reject (GError **error, const char *message)
@@ -23,6 +28,11 @@ static gboolean reject (GError **error, const char *message)
 static void dispose (GObject *object)
 {
     AtmChartView *self = ATM_CHART_VIEW (object);
+    if (self->resize_source) {
+        g_source_destroy (self->resize_source);
+        g_source_unref (self->resize_source);
+        self->resize_source = NULL;
+    }
     if (self->area) {
         g_signal_handlers_disconnect_by_data (self->area, self);
         gtk_drawing_area_set_draw_func (self->area, NULL, NULL, NULL); self->area = NULL;
@@ -62,29 +72,56 @@ static void draw (GtkDrawingArea *area, cairo_t *cr, int width, int height, gpoi
         cairo_set_source_surface (cr, atm_chart_render_surface (self->render), 0, 0); cairo_paint (cr);
     }
 }
+static gboolean apply_pending_resize (gpointer data)
+{
+    AtmChartView *self = data;
+    GSource *source = self->resize_source;
+    self->resize_source = NULL;
+    if (source) g_source_unref (source);
+#ifdef ATM_CHART_VIEW_TESTING
+    self->test_resize_apply_count++;
+#endif
+    int width = self->requested_width, height = self->requested_height, scale = self->requested_scale;
+    GError *error = NULL;
+    gboolean ok = width >= 240 && height >= 140 && scale >= 1 && scale <= 2 &&
+        atm_chart_render_resize (self->render, (guint) width, (guint) height, (guint) scale, &error);
+    if (ok) {
+        self->render_width = width; self->render_height = height; self->render_scale = scale;
+    }
+    gtk_widget_set_visible (GTK_WIDGET (self->status), !ok);
+    gtk_label_set_text (self->status, !ok ? "Chart unavailable at this size or scale. Exact values are in Data." : "");
+    accessible (GTK_WIDGET (self->area), "Global annual temperature anomaly chart",
+        !ok || atm_chart_render_is_fallback (self->render) ? "Chart unavailable. Switch to Data for all 146 exact observations." :
+        "146 empirical observations from 1880 to 2025. Degrees Celsius relative to 1951-1980. Exact values are in Data.");
+    g_clear_error (&error);
+    gtk_widget_queue_draw (GTK_WIDGET (self->area));
+    return G_SOURCE_REMOVE;
+}
+static void request_resize (AtmChartView *self, int width, int height, int scale)
+{
+    if (width == self->requested_width && height == self->requested_height && scale == self->requested_scale) {
+        if (self->resize_source ||
+            (width == self->render_width && height == self->render_height && scale == self->render_scale))
+            return;
+    }
+    self->requested_width = width; self->requested_height = height; self->requested_scale = scale;
+    if (self->resize_source) return;
+    self->resize_source = g_idle_source_new ();
+    g_source_set_priority (self->resize_source, G_PRIORITY_DEFAULT_IDLE);
+    g_source_set_callback (self->resize_source, apply_pending_resize, self, NULL);
+    g_source_attach (self->resize_source, NULL);
+}
 static void resize (GtkDrawingArea *area, int width, int height, gpointer data)
 {
     AtmChartView *self = data;
-    int scale = gtk_widget_get_scale_factor (GTK_WIDGET (area));
-    if (width == self->width && height == self->height && scale == self->scale) return;
-    self->width = width; self->height = height; self->scale = scale;
-    AtmChartRender *next = NULL; GError *error = NULL;
-    gboolean ok = width >= 240 && height >= 140 &&
-        atm_chart_render_new (self->spec, (guint) width, (guint) height, (guint) scale, &next, &error);
-    atm_chart_render_free (self->render); self->render = next;
-    gtk_widget_set_visible (GTK_WIDGET (self->status), !ok);
-    gtk_label_set_text (self->status, !ok ? "Chart unavailable at this size or scale. Exact values are in Data." : "");
-    accessible (GTK_WIDGET (area), "Global annual temperature anomaly chart",
-        !ok || atm_chart_render_is_fallback (next) ? "Chart unavailable. Switch to Data for all 146 exact observations." :
-        "146 empirical observations from 1880 to 2025. Degrees Celsius relative to 1951-1980. Exact values are in Data.");
-    g_clear_error (&error);
-    gtk_widget_queue_draw (GTK_WIDGET (area));
+    request_resize (self, width, height, gtk_widget_get_scale_factor (GTK_WIDGET (area)));
 }
 static void scale_changed (GObject *object, GParamSpec *pspec, gpointer data)
 {
     (void) pspec;
     GtkWidget *area = GTK_WIDGET (object);
-    resize (GTK_DRAWING_AREA (area), gtk_widget_get_width (area), gtk_widget_get_height (area), data);
+    request_resize (data, gtk_widget_get_width (area), gtk_widget_get_height (area),
+        gtk_widget_get_scale_factor (area));
 }
 static void cell_setup (GtkSignalListItemFactory *factory, GtkListItem *item, gpointer data)
 {
@@ -150,7 +187,10 @@ gboolean atm_chart_view_new (const AtmChartSpec *spec, AtmChartView **out, GErro
     AtmChartRender *initial = NULL;
     if (!atm_chart_render_new (owned, 860, 500, 1, &initial, error)) { atm_chart_spec_free (owned); return FALSE; }
     AtmChartView *self = g_object_ref_sink (g_object_new (ATM_TYPE_CHART_VIEW, "accessible-role", GTK_ACCESSIBLE_ROLE_GROUP, NULL));
-    self->spec = owned; self->render = initial; self->width = 860; self->height = 500; self->scale = 1;
+    self->spec = owned; self->render = initial;
+    self->requested_width = self->render_width = 860;
+    self->requested_height = self->render_height = 500;
+    self->requested_scale = self->render_scale = 1;
     self->data = g_strdup (atm_chart_render_data (initial));
     self->rows = gtk_string_list_new (NULL);
     char **lines = g_strsplit (self->data, "\n", -1);
@@ -231,3 +271,21 @@ char *atm_chart_view_provenance (AtmChartView *self)
     GtkTextIter start, end; gtk_text_buffer_get_bounds (self->provenance, &start, &end);
     return gtk_text_buffer_get_text (self->provenance, &start, &end, FALSE);
 }
+
+#ifdef ATM_CHART_VIEW_TESTING
+void atm_chart_view_test_request_resize (AtmChartView *self, int width, int height, int scale)
+{
+    if (self) request_resize (self, width, height, scale);
+}
+guint atm_chart_view_test_resize_apply_count (AtmChartView *self)
+{
+    return self ? self->test_resize_apply_count : 0;
+}
+void atm_chart_view_test_render_size (AtmChartView *self, int *width, int *height, int *scale)
+{
+    if (!self) return;
+    if (width) *width = self->render_width;
+    if (height) *height = self->render_height;
+    if (scale) *scale = self->render_scale;
+}
+#endif
