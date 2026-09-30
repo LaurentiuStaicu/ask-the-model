@@ -2555,7 +2555,7 @@ chart_m4_test = executable(
   'chart-m4-test',
   ['src/chart_m4.c', 'tests/chart_m4_test.c'],
   include_directories: include_directories('src'),
-  dependencies: [glib_dep, json_glib_dep],
+  dependencies: [glib_dep],
   install: false
 )
 test('chart-m4', chart_m4_test)
