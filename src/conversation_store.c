@@ -3383,6 +3383,201 @@ out:
 }
 
 gboolean
+atm_conversation_store_attach_chart (
+    AtmConversationStore *store,
+    const char *conversation_id,
+    gint64 turn_no,
+    const AtmConversationChartInput *chart,
+    GError **error
+)
+{
+    if (store == NULL || store->db == NULL ||
+        !nonempty (conversation_id) || turn_no < 0 ||
+        !chart_input_is_valid (chart)) {
+        g_set_error_literal (
+            error,
+            ATM_CONVERSATION_STORE_ERROR,
+            ATM_CONVERSATION_STORE_ERROR_ARGUMENT,
+            "Conversation chart attachment received an invalid reconstruction recipe."
+        );
+        return FALSE;
+    }
+
+    if (!exec_sql (store->db, "BEGIN IMMEDIATE;", error)) {
+        return FALSE;
+    }
+
+    gboolean ok = FALSE;
+    sqlite3_stmt *statement = NULL;
+    char *message_id = NULL;
+
+    if (!prepare_statement (
+            store->db,
+            "SELECT message_id,grounded "
+            "FROM messages "
+            "WHERE conversation_id=?1 AND turn_no=?2 AND role='assistant';",
+            &statement,
+            error
+        )) {
+        goto out;
+    }
+
+    sqlite3_bind_text (statement, 1, conversation_id, -1, SQLITE_TRANSIENT);
+    sqlite3_bind_int64 (statement, 2, turn_no);
+
+    int rc = sqlite3_step (statement);
+    if (rc == SQLITE_DONE) {
+        g_set_error_literal (
+            error,
+            ATM_CONVERSATION_STORE_ERROR,
+            ATM_CONVERSATION_STORE_ERROR_NOT_FOUND,
+            "Grounded assistant turn for chart attachment was not found."
+        );
+        goto out;
+    }
+    if (rc != SQLITE_ROW) {
+        set_sqlite_error (
+            store->db,
+            error,
+            ATM_CONVERSATION_STORE_ERROR_SQLITE,
+            "Could not resolve chart attachment message"
+        );
+        goto out;
+    }
+
+    message_id = column_text_dup (statement, 0);
+    gboolean grounded = sqlite3_column_int (statement, 1) != 0;
+    if (sqlite3_step (statement) != SQLITE_DONE) {
+        g_set_error_literal (
+            error,
+            ATM_CONVERSATION_STORE_ERROR,
+            ATM_CONVERSATION_STORE_ERROR_INTEGRITY,
+            "Chart attachment target query returned multiple assistant messages."
+        );
+        goto out;
+    }
+    sqlite3_finalize (statement);
+    statement = NULL;
+
+    if (!grounded) {
+        g_set_error_literal (
+            error,
+            ATM_CONVERSATION_STORE_ERROR,
+            ATM_CONVERSATION_STORE_ERROR_INTEGRITY,
+            "Charts may only be attached to grounded assistant messages."
+        );
+        goto out;
+    }
+
+    const AtmConversationChartSeriesInput *series = &chart->series[0];
+    if (!prepare_statement (
+            store->db,
+            "SELECT count(*) "
+            "FROM conversation_repositories "
+            "WHERE conversation_id=?1 "
+            "AND repository_id=?2 "
+            "AND repository_version=?3 "
+            "AND snapshot_sha=?4;",
+            &statement,
+            error
+        )) {
+        goto out;
+    }
+    sqlite3_bind_text (statement, 1, conversation_id, -1, SQLITE_TRANSIENT);
+    sqlite3_bind_text (statement, 2, series->repository_id, -1, SQLITE_TRANSIENT);
+    sqlite3_bind_text (statement, 3, series->repository_version, -1, SQLITE_TRANSIENT);
+    sqlite3_bind_text (statement, 4, series->snapshot_sha, -1, SQLITE_TRANSIENT);
+
+    rc = sqlite3_step (statement);
+    if (rc != SQLITE_ROW || sqlite3_column_int64 (statement, 0) != 1 ||
+        sqlite3_step (statement) != SQLITE_DONE) {
+        sqlite3_finalize (statement);
+        statement = NULL;
+        g_set_error_literal (
+            error,
+            ATM_CONVERSATION_STORE_ERROR,
+            ATM_CONVERSATION_STORE_ERROR_INTEGRITY,
+            "Chart reconstruction source is outside the conversation's pinned repository scope."
+        );
+        goto out;
+    }
+    sqlite3_finalize (statement);
+    statement = NULL;
+
+    if (!prepare_statement (
+            store->db,
+            "INSERT INTO message_charts("
+            "message_id,ordinal,chart_schema,chart_spec_id,chart_kind,reconstruction_profile"
+            ") VALUES(?1,?2,?3,?4,?5,?6);",
+            &statement,
+            error
+        )) {
+        goto out;
+    }
+    sqlite3_bind_text (statement, 1, message_id, -1, SQLITE_TRANSIENT);
+    sqlite3_bind_int (statement, 2, (int) chart->ordinal);
+    sqlite3_bind_text (statement, 3, chart->chart_schema, -1, SQLITE_TRANSIENT);
+    sqlite3_bind_text (statement, 4, chart->chart_spec_id, -1, SQLITE_TRANSIENT);
+    sqlite3_bind_text (statement, 5, chart->chart_kind, -1, SQLITE_TRANSIENT);
+    sqlite3_bind_text (statement, 6, chart->reconstruction_profile, -1, SQLITE_TRANSIENT);
+    if (!step_done (
+            store->db,
+            statement,
+            "Could not persist conversation chart binding",
+            error
+        )) {
+        goto out;
+    }
+    sqlite3_finalize (statement);
+    statement = NULL;
+
+    if (!prepare_statement (
+            store->db,
+            "INSERT INTO chart_series("
+            "message_id,chart_ordinal,series_ordinal,series_profile,admission_profile,"
+            "scientific_id,qualified_id,repository_id,repository_version,snapshot_sha,source_path"
+            ") VALUES(?1,?2,0,?3,?4,?5,?6,?7,?8,?9,?10);",
+            &statement,
+            error
+        )) {
+        goto out;
+    }
+    sqlite3_bind_text (statement, 1, message_id, -1, SQLITE_TRANSIENT);
+    sqlite3_bind_int (statement, 2, (int) chart->ordinal);
+    sqlite3_bind_text (statement, 3, series->series_profile, -1, SQLITE_TRANSIENT);
+    sqlite3_bind_text (statement, 4, series->admission_profile, -1, SQLITE_TRANSIENT);
+    sqlite3_bind_text (statement, 5, series->scientific_id, -1, SQLITE_TRANSIENT);
+    sqlite3_bind_text (statement, 6, series->qualified_id, -1, SQLITE_TRANSIENT);
+    sqlite3_bind_text (statement, 7, series->repository_id, -1, SQLITE_TRANSIENT);
+    sqlite3_bind_text (statement, 8, series->repository_version, -1, SQLITE_TRANSIENT);
+    sqlite3_bind_text (statement, 9, series->snapshot_sha, -1, SQLITE_TRANSIENT);
+    sqlite3_bind_text (statement, 10, series->source_path, -1, SQLITE_TRANSIENT);
+    if (!step_done (
+            store->db,
+            statement,
+            "Could not persist conversation chart series binding",
+            error
+        )) {
+        goto out;
+    }
+    sqlite3_finalize (statement);
+    statement = NULL;
+
+    if (!validate_chart_semantics (store->db, error) ||
+        !exec_sql (store->db, "COMMIT;", error)) {
+        goto out;
+    }
+
+    ok = TRUE;
+
+out:
+    if (statement != NULL) sqlite3_finalize (statement);
+    if (!ok) rollback_best_effort (store->db);
+    g_free (message_id);
+    return ok;
+}
+
+gboolean
 atm_conversation_store_create_conversation_values (
     AtmConversationStore *store,
     const char *title,
