@@ -18,9 +18,11 @@ series.
 
 ## Selector
 
-Reduction is admitted only when point count is greater than logical plot width.
-Each point is assigned to its projected X pixel column. The right plot endpoint is
-clamped to the final column. For every occupied column the plan retains:
+Reduction is admitted only when point count is greater than the supplied raster
+column count. The caller supplies each point's pixel column using the exact
+renderer mapping that has been separately qualified. The M4 core deliberately
+does not choose floor/round/clamp semantics for continuous projected X. For every
+occupied column the plan retains:
 
 1. first source observation;
 2. minimum projected Y;
@@ -43,11 +45,13 @@ owns copied display geometry only.
 Synthetic projected-geometry fixtures are contract tests, not scientific evidence.
 They verify the non-dense identity path, first/min/max/last selection, role
 deduplication, source order, global endpoints, positive/negative spikes, irregular
-X spacing, determinism and fail-closed arguments/order/finite/limit checks. The
-test runs under ASan/UBSan and in the Flatpak Meson suite.
+sparse pixel-column occupancy, determinism and fail-closed
+arguments/order/finite/limit checks. The test runs under ASan/UBSan and in the
+Flatpak Meson suite.
 
 The selector is deliberately not connected to rendering yet. The next CHART-04
-slice must bind it to qualified LINE projections, version the render-plan key and
+slice must bind it to qualified LINE projections, qualify the exact projected-X
+to raster-column mapping against Cairo output, version the render-plan key and
 compare full versus reduced Cairo output before M4 can affect pixels. Resize/cache
 work follows only after that renderer gate.
 
