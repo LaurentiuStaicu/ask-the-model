@@ -72,8 +72,8 @@ static void resize (GtkDrawingArea *area, int width, int height, gpointer data)
     gboolean ok = width >= 240 && height >= 140 &&
         atm_chart_render_new (self->spec, (guint) width, (guint) height, (guint) scale, &next, &error);
     atm_chart_render_free (self->render); self->render = next;
-    gtk_label_set_text (self->status, !ok ? "Chart unavailable at this size or scale. Exact values are in Data." :
-        (atm_chart_render_is_fallback (next) ? "More space is needed for the chart. Exact values are in Data." : ""));
+    gtk_widget_set_visible (GTK_WIDGET (self->status), !ok);
+    gtk_label_set_text (self->status, !ok ? "Chart unavailable at this size or scale. Exact values are in Data." : "");
     accessible (GTK_WIDGET (area), "Global annual temperature anomaly chart",
         !ok || atm_chart_render_is_fallback (next) ? "Chart unavailable. Switch to Data for all 146 exact observations." :
         "146 empirical observations from 1880 to 2025. Degrees Celsius relative to 1951-1980. Exact values are in Data.");
@@ -170,6 +170,7 @@ gboolean atm_chart_view_new (const AtmChartSpec *spec, AtmChartView **out, GErro
     gtk_widget_set_tooltip_text (switcher, "Chart: Alt+1. Data: Alt+2.");
     GtkWidget *chart = gtk_box_new (GTK_ORIENTATION_VERTICAL, 0);
     self->status = GTK_LABEL (gtk_label_new ("")); gtk_label_set_wrap (self->status, TRUE);
+    gtk_label_set_xalign (self->status, 0); gtk_widget_set_visible (GTK_WIDGET (self->status), FALSE);
     gtk_box_append (GTK_BOX (chart), GTK_WIDGET (self->status));
     self->area = GTK_DRAWING_AREA (gtk_drawing_area_new ()); gtk_drawing_area_set_content_height (self->area, 140);
     gtk_widget_set_hexpand (GTK_WIDGET (self->area), TRUE); gtk_widget_set_vexpand (GTK_WIDGET (self->area), TRUE);
