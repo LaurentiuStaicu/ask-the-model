@@ -2254,6 +2254,249 @@ test_archive_delete_lifecycle (void)
 }
 
 static void
+test_chart_binding_write_load (void)
+{
+    char *root = new_temp_root ("atm-conversation-chart-binding-XXXXXX");
+    char *path = store_path (root);
+    AtmConversationStore *store = NULL;
+    GError *error = NULL;
+
+    g_assert_true (atm_conversation_store_open (path, &store, &error));
+    g_assert_no_error (error);
+
+    AtmConversationRepositoryInput repository = {
+        .repository_id = "ewd",
+        .repository_version = "0.1.0",
+        .snapshot_sha = "0123456789abcdef0123456789abcdef01234567"
+    };
+    char *conversation_id = NULL;
+    g_assert_true (
+        atm_conversation_store_create_conversation (
+            store, "Chart binding", 1, "model-a", NULL, 7,
+            &repository, 1, &conversation_id, &error
+        )
+    );
+    g_assert_no_error (error);
+
+    AtmConversationCitationInput citation = {
+        .label = "S1",
+        .repository_id = "ewd",
+        .repository_version = "0.1.0",
+        .snapshot_sha = "0123456789abcdef0123456789abcdef01234567",
+        .logical_source_id = "gistemp-global-annual",
+        .source_path = "science/data/processed/nasa_gistemp_global_2026.csv",
+        .locator = "rows 1-146",
+        .title = "GISTEMP global annual",
+        .excerpt = "Qualified annual observations",
+        .immutable_permalink = NULL
+    };
+    gint64 grounded_turn = -1;
+    g_assert_true (
+        atm_conversation_store_commit_turn (
+            store, conversation_id, "show the series", "answer [S1]", "answer",
+            TRUE, 2, &citation, 1, &grounded_turn, &error
+        )
+    );
+    g_assert_no_error (error);
+    g_assert_cmpint (grounded_turn, ==, 0);
+
+    AtmConversationChartSeriesInput series = {
+        .series_profile = "atm-series/gistemp-complete-annual/1",
+        .admission_profile = "atm-gistemp-pinned-admission/1",
+        .scientific_id =
+            "bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb",
+        .qualified_id =
+            "cccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccc",
+        .repository_id = "ewd",
+        .repository_version = "0.1.0",
+        .snapshot_sha = "0123456789abcdef0123456789abcdef01234567",
+        .source_path = "science/data/processed/nasa_gistemp_global_2026.csv"
+    };
+    AtmConversationChartInput chart = {
+        .ordinal = 1,
+        .chart_schema = "atm-chart-spec/1",
+        .chart_spec_id =
+            "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+        .chart_kind = "line",
+        .reconstruction_profile =
+            "atm-chart-reconstruct/gistemp-complete-annual/1",
+        .series = &series,
+        .series_count = 1
+    };
+
+    g_assert_true (
+        atm_conversation_store_attach_chart (
+            store, conversation_id, grounded_turn, &chart, &error
+        )
+    );
+    g_assert_no_error (error);
+
+    g_assert_false (
+        atm_conversation_store_attach_chart (
+            store, conversation_id, grounded_turn, &chart, &error
+        )
+    );
+    g_assert_nonnull (error);
+    g_clear_error (&error);
+
+    AtmConversationChartInput invalid_chart = chart;
+    invalid_chart.chart_spec_id = "not-a-qualified-id";
+    g_assert_false (
+        atm_conversation_store_attach_chart (
+            store, conversation_id, grounded_turn, &invalid_chart, &error
+        )
+    );
+    g_assert_error (
+        error,
+        ATM_CONVERSATION_STORE_ERROR,
+        ATM_CONVERSATION_STORE_ERROR_ARGUMENT
+    );
+    g_clear_error (&error);
+
+    AtmConversationChartSeriesInput wrong_scope = series;
+    wrong_scope.snapshot_sha = "1111111111111111111111111111111111111111";
+    AtmConversationChartInput wrong_scope_chart = chart;
+    wrong_scope_chart.ordinal = 2;
+    wrong_scope_chart.series = &wrong_scope;
+    g_assert_false (
+        atm_conversation_store_attach_chart (
+            store, conversation_id, grounded_turn, &wrong_scope_chart, &error
+        )
+    );
+    g_assert_error (
+        error,
+        ATM_CONVERSATION_STORE_ERROR,
+        ATM_CONVERSATION_STORE_ERROR_INTEGRITY
+    );
+    g_clear_error (&error);
+
+    gint64 ungrounded_turn = -1;
+    g_assert_true (
+        atm_conversation_store_commit_turn (
+            store, conversation_id, "plain turn", "plain answer", "plain answer",
+            FALSE, 3, NULL, 0, &ungrounded_turn, &error
+        )
+    );
+    g_assert_no_error (error);
+    g_assert_cmpint (ungrounded_turn, ==, 1);
+    g_assert_false (
+        atm_conversation_store_attach_chart (
+            store, conversation_id, ungrounded_turn, &chart, &error
+        )
+    );
+    g_assert_error (
+        error,
+        ATM_CONVERSATION_STORE_ERROR,
+        ATM_CONVERSATION_STORE_ERROR_INTEGRITY
+    );
+    g_clear_error (&error);
+
+    atm_conversation_store_close (store);
+    store = NULL;
+    g_assert_true (atm_conversation_store_open (path, &store, &error));
+    g_assert_no_error (error);
+
+    AtmConversationSnapshot *snapshot = NULL;
+    g_assert_true (
+        atm_conversation_store_load_snapshot (
+            store, conversation_id, &snapshot, &error
+        )
+    );
+    g_assert_no_error (error);
+    g_assert_cmpuint (atm_conversation_snapshot_message_count (snapshot), ==, 4);
+    g_assert_cmpuint (
+        atm_conversation_snapshot_message_chart_count_at (snapshot, 0), ==, 0
+    );
+    g_assert_cmpuint (
+        atm_conversation_snapshot_message_chart_count_at (snapshot, 1), ==, 1
+    );
+    g_assert_cmpuint (
+        atm_conversation_snapshot_message_chart_count_at (snapshot, 3), ==, 0
+    );
+    g_assert_cmpint (
+        atm_conversation_snapshot_chart_ordinal_at (snapshot, 1, 0), ==, 1
+    );
+    g_assert_cmpstr (
+        atm_conversation_snapshot_chart_schema_at (snapshot, 1, 0),
+        ==, chart.chart_schema
+    );
+    g_assert_cmpstr (
+        atm_conversation_snapshot_chart_spec_id_at (snapshot, 1, 0),
+        ==, chart.chart_spec_id
+    );
+    g_assert_cmpstr (
+        atm_conversation_snapshot_chart_kind_at (snapshot, 1, 0),
+        ==, chart.chart_kind
+    );
+    g_assert_cmpstr (
+        atm_conversation_snapshot_chart_reconstruction_profile_at (snapshot, 1, 0),
+        ==, chart.reconstruction_profile
+    );
+    g_assert_cmpuint (
+        atm_conversation_snapshot_chart_series_count_at (snapshot, 1, 0), ==, 1
+    );
+    g_assert_cmpstr (
+        atm_conversation_snapshot_chart_series_profile_at (snapshot, 1, 0, 0),
+        ==, series.series_profile
+    );
+    g_assert_cmpstr (
+        atm_conversation_snapshot_chart_series_admission_profile_at (snapshot, 1, 0, 0),
+        ==, series.admission_profile
+    );
+    g_assert_cmpstr (
+        atm_conversation_snapshot_chart_series_scientific_id_at (snapshot, 1, 0, 0),
+        ==, series.scientific_id
+    );
+    g_assert_cmpstr (
+        atm_conversation_snapshot_chart_series_qualified_id_at (snapshot, 1, 0, 0),
+        ==, series.qualified_id
+    );
+    g_assert_cmpstr (
+        atm_conversation_snapshot_chart_series_repository_id_at (snapshot, 1, 0, 0),
+        ==, series.repository_id
+    );
+    g_assert_cmpstr (
+        atm_conversation_snapshot_chart_series_repository_version_at (snapshot, 1, 0, 0),
+        ==, series.repository_version
+    );
+    g_assert_cmpstr (
+        atm_conversation_snapshot_chart_series_snapshot_sha_at (snapshot, 1, 0, 0),
+        ==, series.snapshot_sha
+    );
+    g_assert_cmpstr (
+        atm_conversation_snapshot_chart_series_source_path_at (snapshot, 1, 0, 0),
+        ==, series.source_path
+    );
+
+    g_assert_cmpint (
+        atm_conversation_snapshot_chart_ordinal_at (snapshot, 1, 1), ==, -1
+    );
+    g_assert_null (
+        atm_conversation_snapshot_chart_spec_id_at (snapshot, 1, 1)
+    );
+    g_assert_null (
+        atm_conversation_snapshot_chart_series_qualified_id_at (snapshot, 1, 0, 1)
+    );
+
+    atm_conversation_snapshot_free (snapshot);
+
+    g_assert_true (
+        atm_conversation_store_delete_conversation (
+            store, conversation_id, &error
+        )
+    );
+    g_assert_no_error (error);
+    g_assert_cmpint (raw_int64 (path, "SELECT count(*) FROM message_charts;"), ==, 0);
+    g_assert_cmpint (raw_int64 (path, "SELECT count(*) FROM chart_series;"), ==, 0);
+
+    atm_conversation_store_close (store);
+    g_free (conversation_id);
+    g_free (path);
+    remove_tree_best_effort (root);
+    g_free (root);
+}
+
+static void
 test_readonly_repository_generation_roots (void)
 {
     char *root = new_temp_root (
@@ -2542,6 +2785,10 @@ main (int argc, char **argv)
     g_test_add_func (
         "/conversation-store/archive-delete-lifecycle",
         test_archive_delete_lifecycle
+    );
+    g_test_add_func (
+        "/conversation-store/chart-binding-write-load",
+        test_chart_binding_write_load
     );
     g_test_add_func (
         "/conversation-store/readonly-repository-generation-roots",
