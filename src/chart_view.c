@@ -132,6 +132,7 @@ void atm_chart_view_show_data (AtmChartView *self)
     gtk_stack_set_visible_child_name (self->stack, "data");
     gtk_column_view_scroll_to (self->table, gtk_single_selection_get_selected (self->selection),
         NULL, GTK_LIST_SCROLL_FOCUS, NULL);
+    gtk_widget_grab_focus (GTK_WIDGET (self->table));
 }
 static gboolean key_pressed (GtkEventControllerKey *controller, guint key, guint code, GdkModifierType state, gpointer data)
 {
