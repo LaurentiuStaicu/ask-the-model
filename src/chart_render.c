@@ -1,4 +1,5 @@
 #include "chart_render.h"
+#include "chart_projection_internal.h"
 #include <string.h>
 
 struct AtmChartRender {
@@ -16,7 +17,8 @@ static gboolean reject (GError **error, const char *message)
 void atm_chart_render_free (AtmChartRender *r)
 {
     if (r == NULL) return;
-    atm_chart_spec_free (r->spec); atm_chart_projection_free (r->projection);
+    atm_chart_projection_free (r->projection);
+    atm_chart_spec_free (r->spec);
     if (r->surface != NULL) cairo_surface_destroy (r->surface);
     g_free (r->data); g_free (r);
 }
@@ -89,15 +91,15 @@ static gboolean layout_fits (cairo_t *cr, const AtmChartProjection *p, guint wid
     return fits (cr, "Anomaly relative to 1951-1980 (deg C)", width - 32) &&
         fits (cr, "Source: EWD pinned GISTEMP | vintage 2026-08-31", width - 32);
 }
-static void chart (cairo_t *cr, AtmChartRender *r, guint width, guint height)
+static void chart (cairo_t *cr, const AtmChartSpec *spec, const AtmChartProjection *p,
+    guint width, guint height)
 {
     double left = 84, top = 108, pw = width - 112, ph = height - 188;
-    AtmChartProjection *p = r->projection;
     font (cr, 14, TRUE);
     label (cr, "GISTEMP / GLOBAL ANNUAL TEMPERATURE", 16, 26, 0);
     font (cr, 12, FALSE);
     label (cr, "Anomaly relative to 1951-1980 (deg C)", 16, 47, 0);
-    const char *kind = atm_chart_spec_kind (r->spec) == ATM_CHART_LINE ? "LINE" : "SCATTER";
+    const char *kind = atm_chart_spec_kind (spec) == ATM_CHART_LINE ? "LINE" : "SCATTER";
     char *summary = g_strdup_printf ("1880-2025 | 146 observations | empirical | %s", kind);
     label (cr, summary, 16, 68, 0); g_free (summary);
     label (cr, "deg C", left, 96, 0);
@@ -118,69 +120,128 @@ static void chart (cairo_t *cr, AtmChartRender *r, guint width, guint height)
         label (cr, t->label, x, top + ph + 22, 0.5);
     }
     cairo_save (cr);
-    /* Keep endpoint markers visible while bounding plot ink away from labels. */
     cairo_rectangle (cr, left - 3, top - 3, pw + 6, ph + 6); cairo_clip (cr);
     cairo_set_line_width (cr, 1.5);
     for (guint i = 0; i < atm_chart_projection_count (p); i++) {
         const AtmChartProjectedPoint *point = atm_chart_projection_point (p, i);
         double x = left + point->x, y = top + point->y;
-        if (atm_chart_spec_kind (r->spec) == ATM_CHART_SCATTER) {
+        if (atm_chart_spec_kind (spec) == ATM_CHART_SCATTER) {
             cairo_rectangle (cr, x - 1.5, y - 1.5, 3, 3); cairo_fill (cr);
         } else if (i == 0 || point->point_index == 0) {
             if (i > 0) cairo_stroke (cr);
             cairo_move_to (cr, x, y);
         } else cairo_line_to (cr, x, y);
     }
-    if (atm_chart_spec_kind (r->spec) == ATM_CHART_LINE) cairo_stroke (cr);
+    if (atm_chart_spec_kind (spec) == ATM_CHART_LINE) cairo_stroke (cr);
     cairo_restore (cr);
     font (cr, 12, FALSE);
     label (cr, "Source: EWD pinned GISTEMP | vintage 2026-08-31", 16, height - 36, 0);
     label (cr, "Exact values and provenance: Data view", 16, height - 16, 0);
 }
-gboolean atm_chart_render_new (const AtmChartSpec *spec, guint width, guint height,
-    guint scale, AtmChartRender **out, GError **error)
+static gboolean prepare_viewport (const AtmChartSpec *spec, guint width, guint height, guint scale,
+    AtmChartProjection **projection_out, cairo_surface_t **surface_out,
+    gboolean *fallback_out, GError **error)
 {
-    if (out == NULL || *out != NULL || width < 240 || height < 140 ||
-        width > ATM_CHART_RENDER_MAX_SIZE || height > ATM_CHART_RENDER_MAX_SIZE || scale < 1 || scale > 2)
-        return reject (error, "Invalid chart canvas dimensions or output.");
-    AtmChartRender *r = g_new0 (AtmChartRender, 1);
-    if (!atm_chart_spec_rebuild (spec, &r->spec, error)) goto invalid;
-    r->data = data_view (r->spec);
-    r->surface = cairo_image_surface_create (CAIRO_FORMAT_ARGB32, width * scale, height * scale);
-    if (cairo_surface_status (r->surface) != CAIRO_STATUS_SUCCESS) {
-        reject (error, "Cannot allocate chart surface."); goto invalid;
+    if (spec == NULL || projection_out == NULL || *projection_out != NULL ||
+        surface_out == NULL || *surface_out != NULL || fallback_out == NULL ||
+        width < 240 || height < 140 || width > ATM_CHART_RENDER_MAX_SIZE ||
+        height > ATM_CHART_RENDER_MAX_SIZE || scale < 1 || scale > 2)
+        return reject (error, "Invalid chart viewport arguments.");
+
+    cairo_surface_t *surface = cairo_image_surface_create (
+        CAIRO_FORMAT_ARGB32, width * scale, height * scale);
+    if (cairo_surface_status (surface) != CAIRO_STATUS_SUCCESS) {
+        cairo_surface_destroy (surface);
+        return reject (error, "Cannot allocate chart surface.");
     }
-    cairo_surface_set_device_scale (r->surface, scale, scale);
-    cairo_t *cr = cairo_create (r->surface);
+    cairo_surface_set_device_scale (surface, scale, scale);
+    cairo_t *cr = cairo_create (surface);
     cairo_set_source_rgb (cr, 1, 1, 1); cairo_paint (cr);
     cairo_set_source_rgb (cr, 0, 0, 0); cairo_set_antialias (cr, CAIRO_ANTIALIAS_NONE);
     cairo_font_options_t *options = cairo_font_options_create ();
     cairo_font_options_set_antialias (options, CAIRO_ANTIALIAS_NONE);
     cairo_set_font_options (cr, options); cairo_font_options_destroy (options);
-    r->fallback = width < 432 || height < 348;
-    if (!r->fallback) {
-        if (!atm_chart_projection_new (r->spec, width - 112, height - 188, &r->projection, error)) {
-            cairo_destroy (cr); goto invalid;
-        }
+
+    gboolean fallback = width < 432 || height < 348;
+    AtmChartProjection *projection = NULL;
+    if (!fallback) {
+        if (!_atm_chart_projection_new_trusted (
+                spec, width - 112, height - 188, &projection, error))
+            goto invalid;
         font (cr, 14, TRUE);
-        r->fallback = !fits (cr, "GISTEMP / GLOBAL ANNUAL TEMPERATURE", width - 32);
+        fallback = !fits (cr, "GISTEMP / GLOBAL ANNUAL TEMPERATURE", width - 32);
         font (cr, 12, FALSE);
-        r->fallback = r->fallback || !fits (cr, "1880-2025 | 146 observations | empirical | SCATTER", width - 32) ||
-                      !layout_fits (cr, r->projection, width);
+        fallback = fallback ||
+            !fits (cr, "1880-2025 | 146 observations | empirical | SCATTER", width - 32) ||
+            !layout_fits (cr, projection, width);
     }
-    if (r->fallback) {
+    if (fallback) {
         font (cr, 14, TRUE); label (cr, "GISTEMP", 16, 30, 0);
         font (cr, 12, FALSE); label (cr, "Chart needs more space.", 16, 60, 0);
         label (cr, "Exact values remain", 16, 86, 0);
         label (cr, "available in Data view.", 16, 104, 0);
-    } else chart (cr, r, width, height);
-    cairo_status_t status = cairo_status (cr); cairo_destroy (cr); cairo_surface_flush (r->surface);
-    if (status != CAIRO_STATUS_SUCCESS || cairo_surface_status (r->surface) != CAIRO_STATUS_SUCCESS) {
-        reject (error, "Cairo chart rendering failed."); goto invalid;
+    } else {
+        chart (cr, spec, projection, width, height);
     }
-    *out = r; return TRUE;
+
+    cairo_status_t status = cairo_status (cr);
+    cairo_destroy (cr);
+    cr = NULL;
+    cairo_surface_flush (surface);
+    if (status != CAIRO_STATUS_SUCCESS || cairo_surface_status (surface) != CAIRO_STATUS_SUCCESS) {
+        reject (error, "Cairo chart rendering failed.");
+        goto invalid;
+    }
+    *projection_out = projection;
+    *surface_out = surface;
+    *fallback_out = fallback;
+    return TRUE;
+
 invalid:
-    atm_chart_render_free (r); return FALSE;
+    if (cr != NULL) cairo_destroy (cr);
+    atm_chart_projection_free (projection);
+    cairo_surface_destroy (surface);
+    return FALSE;
+}
+gboolean atm_chart_render_new (const AtmChartSpec *spec, guint width, guint height,
+    guint scale, AtmChartRender **out, GError **error)
+{
+    if (spec == NULL || out == NULL || *out != NULL || width < 240 || height < 140 ||
+        width > ATM_CHART_RENDER_MAX_SIZE || height > ATM_CHART_RENDER_MAX_SIZE ||
+        scale < 1 || scale > 2)
+        return reject (error, "Invalid chart canvas dimensions or output.");
+    AtmChartRender *r = g_new0 (AtmChartRender, 1);
+    if (!atm_chart_spec_rebuild (spec, &r->spec, error)) goto invalid;
+    r->data = data_view (r->spec);
+    if (!prepare_viewport (r->spec, width, height, scale,
+            &r->projection, &r->surface, &r->fallback, error))
+        goto invalid;
+    *out = r;
+    return TRUE;
+invalid:
+    atm_chart_render_free (r);
+    return FALSE;
+}
+gboolean atm_chart_render_resize (AtmChartRender *r, guint width, guint height,
+    guint scale, GError **error)
+{
+    if (r == NULL || r->spec == NULL)
+        return reject (error, "Invalid chart renderer.");
+    AtmChartProjection *projection = NULL;
+    cairo_surface_t *surface = NULL;
+    gboolean fallback = FALSE;
+    if (!prepare_viewport (r->spec, width, height, scale,
+            &projection, &surface, &fallback, error))
+        return FALSE;
+
+    AtmChartProjection *old_projection = r->projection;
+    cairo_surface_t *old_surface = r->surface;
+    r->projection = projection;
+    r->surface = surface;
+    r->fallback = fallback;
+    atm_chart_projection_free (old_projection);
+    if (old_surface != NULL) cairo_surface_destroy (old_surface);
+    return TRUE;
 }
 cairo_surface_t *atm_chart_render_surface (const AtmChartRender *r) { return r ? r->surface : NULL; }
 const char *atm_chart_render_data (const AtmChartRender *r) { return r ? r->data : NULL; }

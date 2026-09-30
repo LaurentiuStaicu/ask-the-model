@@ -81,7 +81,7 @@ measure (const char *name, Operation op, AtmChartSpec *spec)
 }
 
 static gboolean
-measure_resize_sequence (AtmChartSpec *spec)
+measure_new_render_sequence (AtmChartSpec *spec)
 {
     static const guint widths[RESIZE_STEPS] = {
         432, 480, 540, 620, 700, 780, 860, 940,
@@ -109,7 +109,58 @@ measure_resize_sequence (AtmChartSpec *spec)
 
     qsort (samples, RESIZE_SAMPLES, sizeof samples[0], compare_i64);
     guint p90_index = RESIZE_SAMPLES - 1;
-    g_print ("CHART04-RESIZE operation=24-step-sequence samples=%u median_us=%" G_GINT64_FORMAT
+    g_print ("CHART04-RESIZE operation=24-step-new-render-sequence samples=%u median_us=%" G_GINT64_FORMAT
+             " p90_us=%" G_GINT64_FORMAT " per_step_median_us=%.1f\n",
+             RESIZE_SAMPLES, samples[RESIZE_SAMPLES / 2], samples[p90_index],
+             (double) samples[RESIZE_SAMPLES / 2] / RESIZE_STEPS);
+    return TRUE;
+}
+
+static gboolean
+measure_viewport_resize_sequence (AtmChartSpec *spec)
+{
+    static const guint widths[RESIZE_STEPS] = {
+        432, 480, 540, 620, 700, 780, 860, 940,
+        1020, 1100, 1180, 1260, 1340, 1420, 1500, 1420,
+        1340, 1260, 1180, 1100, 1020, 940, 860, 780
+    };
+    AtmChartRender *render = NULL;
+    GError *error = NULL;
+    if (!atm_chart_render_new (spec, 860, 500, 1, &render, &error)) {
+        g_printerr ("viewport resize setup failed: %s\n",
+                    error ? error->message : "unknown error");
+        g_clear_error (&error);
+        return FALSE;
+    }
+    const AtmChartSpec *owned_spec = atm_chart_render_spec (render);
+    const char *data = atm_chart_render_data (render);
+    gint64 samples[RESIZE_SAMPLES];
+
+    for (guint sample = 0; sample < RESIZE_SAMPLES; sample++) {
+        gint64 start = g_get_monotonic_time ();
+        for (guint i = 0; i < RESIZE_STEPS; i++) {
+            guint height = 348 + (widths[i] - 432) / 2;
+            if (!atm_chart_render_resize (render, widths[i], height, 1, &error)) {
+                g_printerr ("viewport resize sequence failed: %s\n",
+                            error ? error->message : "unknown error");
+                g_clear_error (&error);
+                atm_chart_render_free (render);
+                return FALSE;
+            }
+            if (atm_chart_render_spec (render) != owned_spec ||
+                atm_chart_render_data (render) != data) {
+                g_printerr ("viewport resize replaced invariant scientific/Data ownership\n");
+                atm_chart_render_free (render);
+                return FALSE;
+            }
+        }
+        samples[sample] = g_get_monotonic_time () - start;
+    }
+
+    atm_chart_render_free (render);
+    qsort (samples, RESIZE_SAMPLES, sizeof samples[0], compare_i64);
+    guint p90_index = RESIZE_SAMPLES - 1;
+    g_print ("CHART04-RESIZE operation=24-step-viewport-resize samples=%u median_us=%" G_GINT64_FORMAT
              " p90_us=%" G_GINT64_FORMAT " per_step_median_us=%.1f\n",
              RESIZE_SAMPLES, samples[RESIZE_SAMPLES / 2], samples[p90_index],
              (double) samples[RESIZE_SAMPLES / 2] / RESIZE_STEPS);
@@ -129,7 +180,8 @@ main (void)
         measure ("render-fallback-240x140", OP_RENDER_FALLBACK, spec) &&
         measure ("render-normal-860x500", OP_RENDER_NORMAL, spec) &&
         measure ("render-scale2-860x500", OP_RENDER_SCALE2, spec) &&
-        measure_resize_sequence (spec);
+        measure_new_render_sequence (spec) &&
+        measure_viewport_resize_sequence (spec);
 
     atm_chart_spec_free (spec);
     cairo_debug_reset_static_data ();

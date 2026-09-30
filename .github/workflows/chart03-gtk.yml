@@ -43,10 +43,16 @@ jobs:
             src/verified_series.c src/gistemp_sra.c src/gistemp_evidence.c src/gistemp_admission.c
             src/annual_series_candidate.c src/scientific_canonical.c src/scientific_artifact.c
             src/scientific_result.c src/scientific_operation.c src/scientific_derivation.c tests/chart_fixture.c)
-          cc -std=c11 -Wall -Wextra -Werror -g -O1 -fsanitize=undefined -Isrc -Itests \
+          cc -std=c11 -Wall -Wextra -Werror -g -O1 -fsanitize=undefined \
+            -DATM_CHART_VIEW_TESTING -Isrc -Itests \
             "${sources[@]}" tests/chart_view_test.c \
             $(pkg-config --cflags --libs gtk4 json-glib-1.0) -lm -o /tmp/chart-view-test
           xvfb-run -a -s '-screen 0 1200x900x24' dbus-run-session -- /tmp/chart-view-test
+          cc -std=c11 -Wall -Wextra -Werror -Isrc \
+            $(pkg-config --cflags gtk4 json-glib-1.0) \
+            -c src/chart_view.c -o /tmp/chart-view-production.o
+          nm -g /tmp/chart-view-production.o | python3 -c \
+            'import sys; assert "atm_chart_view_test_" not in sys.stdin.read()'
           valac --pkg gtk4 --pkg json-glib-1.0 --pkg cairo --pkg gio-2.0 \
             -X -Isrc -X -Itests -X -lm \
             src/ChartNative.vapi tests/chart_view_vala_test.vala "${sources[@]}" \

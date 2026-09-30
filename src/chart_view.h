@@ -17,4 +17,10 @@ gboolean atm_chart_view_select_row (AtmChartView *view, guint row);
 guint atm_chart_view_selected_row (AtmChartView *view);
 /* Caller owns returned plain-text provenance. */
 char *atm_chart_view_provenance (AtmChartView *view);
+#ifdef ATM_CHART_VIEW_TESTING
+/* Test-only resize qualification hooks; excluded from normal compilation. */
+void atm_chart_view_test_request_resize (AtmChartView *view, int width, int height, int scale);
+guint atm_chart_view_test_resize_apply_count (AtmChartView *view);
+void atm_chart_view_test_render_size (AtmChartView *view, int *width, int *height, int *scale);
+#endif
 G_END_DECLS

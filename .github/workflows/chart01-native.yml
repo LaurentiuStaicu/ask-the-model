@@ -14,6 +14,7 @@ on:
       - 'tests/chart_m4_cairo_test.c'
       - 'scripts/chart03_preview_log.py'
       - 'src/chart_projection.*'
+      - 'src/chart_projection_internal.h'
       - 'tests/chart_projection_test.c'
       - 'src/chart_spec.*'
       - 'tests/chart_spec_test.c'

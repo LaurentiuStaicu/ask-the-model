@@ -147,6 +147,56 @@ static void test_scatter_scale (void)
     save_preview (a, "atm-chart-scatter.png", FALSE);
     atm_chart_render_free (a); atm_chart_render_free (b); atm_chart_spec_free (spec);
 }
+static void test_resize_transactional (void)
+{
+    AtmChartSpec *spec = specification (ATM_CHART_LINE);
+    AtmChartRender *r = render (spec, 860, 500, 1);
+    atm_chart_spec_free (spec);
+
+    const AtmChartSpec *owned = atm_chart_render_spec (r);
+    char *owned_id = g_strdup (atm_chart_spec_id (owned));
+    char *data = g_strdup (atm_chart_render_data (r));
+    char *before = pixel_digest (r);
+
+    GError *error = NULL;
+    g_assert_true (atm_chart_render_resize (r, 600, 360, 2, &error));
+    g_assert_no_error (error);
+    g_assert_true (atm_chart_render_spec (r) == owned);
+    g_assert_cmpstr (atm_chart_spec_id (atm_chart_render_spec (r)), ==, owned_id);
+    g_assert_cmpstr (atm_chart_render_data (r), ==, data);
+    g_assert_false (atm_chart_render_is_fallback (r));
+    cairo_surface_t *surface = atm_chart_render_surface (r);
+    g_assert_cmpint (cairo_image_surface_get_width (surface), ==, 1200);
+    g_assert_cmpint (cairo_image_surface_get_height (surface), ==, 720);
+    double dx = 0, dy = 0; cairo_surface_get_device_scale (surface, &dx, &dy);
+    g_assert_cmpfloat (dx, ==, 2); g_assert_cmpfloat (dy, ==, 2);
+
+    char *resized = pixel_digest (r);
+    g_assert_cmpstr (before, !=, resized);
+    g_free (before);
+
+    g_assert_false (atm_chart_render_resize (r, 239, 360, 2, &error));
+    g_assert_error (error, ATM_SRA_ERROR, ATM_SRA_ERROR_IDENTITY);
+    g_clear_error (&error);
+    char *after_invalid = pixel_digest (r);
+    g_assert_cmpstr (after_invalid, ==, resized);
+    g_assert_true (atm_chart_render_spec (r) == owned);
+    g_assert_cmpstr (atm_chart_render_data (r), ==, data);
+    g_free (after_invalid); g_free (resized);
+
+    g_assert_true (atm_chart_render_resize (r, 240, 140, 1, &error));
+    g_assert_no_error (error);
+    g_assert_true (atm_chart_render_is_fallback (r));
+    g_assert_true (atm_chart_render_spec (r) == owned);
+    g_assert_cmpstr (atm_chart_render_data (r), ==, data);
+
+    g_assert_false (atm_chart_render_resize (NULL, 860, 500, 1, &error));
+    g_assert_error (error, ATM_SRA_ERROR, ATM_SRA_ERROR_IDENTITY);
+    g_clear_error (&error);
+
+    g_free (owned_id); g_free (data); atm_chart_render_free (r);
+}
+
 static void test_fallback_arguments (void)
 {
     AtmChartSpec *spec = specification (ATM_CHART_LINE);
@@ -178,6 +228,7 @@ int main (int argc, char **argv)
     g_test_init (&argc, &argv, NULL);
     g_test_add_func ("/chart-render/line-data-ownership", test_line_data_ownership);
     g_test_add_func ("/chart-render/scatter-scale", test_scatter_scale);
+    g_test_add_func ("/chart-render/resize-transactional", test_resize_transactional);
     g_test_add_func ("/chart-render/fallback-arguments", test_fallback_arguments);
     int result = g_test_run ();
     /* Release process-wide Cairo/Fontconfig test caches after every object is

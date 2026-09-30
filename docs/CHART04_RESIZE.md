@@ -1,47 +1,120 @@
-# CHART-04: resize characterization
+# CHART-04: resize characterization and qualified viewport state
 
-Status: measurement harness only. No production behavior is changed by this
-slice, and no performance threshold is used as a correctness gate.
+Status: dormant chart/GTK optimization. No Application, Conversations, History or
+persistence caller is enabled by this slice.
 
-## Question
+## Baseline characterization
 
-The dormant GTK chart component currently rebuilds a complete renderer
-synchronously from the DrawingArea resize callback. Source inspection shows that
-a normal non-fallback render rebuilds ChartSpec once in `atm_chart_render_new`
-and again inside `atm_chart_projection_new`. It also regenerates the exact Data
-buffer although source data and provenance are invariant across viewport sizes.
+PR #361 recorded the current optimized (-O2) GISTEMP LINE path on an Ubuntu
+24.04 GitHub runner (Linux 6.17 Azure, 4 vCPU AMD EPYC 7763). The retained
+artifact reported:
 
-Before changing ownership or adding caching, this harness measures the current
-optimized native path on the same pinned GISTEMP fixture.
+- ChartSpec rebuild: median 285511 us, p90 291299 us;
+- public projection construction: median 283878 us, p90 284828 us;
+- fallback 240x140 render: median 285738 us;
+- normal 860x500 render: median 567233 us;
+- 2x 860x500 render: median 568501 us;
+- 24-step repeated-new-render resize sequence: median 13700663 us,
+  approximately 570861 us per step.
 
-## Measurements
+These are characterization measurements, not portable performance promises. They
+show that the dominant resize cost is repeated scientific/source reconstruction:
+the renderer rebuilt ChartSpec, and public projection construction rebuilt it
+again. Exact Data was also regenerated despite being invariant across viewport
+sizes.
 
-The dedicated `CHART-04 resize characterization` workflow compiles an `-O2`
-binary and records median/p90 timing for:
+## Selected ownership boundary
 
-- ChartSpec rebuild;
-- projection construction at the current 860x500 chart plot size;
-- small fallback render;
-- normal 860x500 render at device scale 1;
-- the same render at device scale 2;
-- a deterministic 24-step resize sequence spanning admitted chart sizes.
+The public trust boundary remains unchanged. atm_chart_projection_new() still
+rebuilds and validates its supplied ChartSpec before owning a projection.
 
-The workflow uploads both timing output and runner CPU/kernel context. Timings are
-characterization evidence, not portable performance promises. ASan/UBSan and
-Flatpak remain separate correctness gates.
+A separate hidden/internal projection entry may borrow only a ChartSpec already
+reconstructed and owned by AtmChartRender. That borrowed specification must
+outlive the projection and is never exposed as an Application-facing bypass.
 
-## Decision rule
+atm_chart_render_new() reconstructs the supplied ChartSpec once, builds exact
+Data once, and then prepares viewport state from that owned qualified spec.
 
-Use the measurements together with the static ownership path to choose the
-smallest safe refactor. The target invariants are already fixed:
+atm_chart_render_resize() is viewport-only. It prepares a new projection and
+Cairo surface in temporary state, using the renderer-owned qualified spec. Only
+after successful preparation are the old projection/surface replaced. Failure
+leaves scientific identity, Data and the previous valid viewport untouched.
 
-- scientific/source qualification happens at component/session creation, not for
-  every viewport size;
-- resize invalidates only viewport-dependent projection/surface state;
-- the exact Data buffer and qualified scientific identity do not change on resize;
-- draw remains paint-only;
-- at most the current prepared surface plus bounded pending state is retained;
-- no persistent pixel/M4 cache is introduced.
+This is not a scientific cache: there is one renderer-owned qualified
+specification and one current viewport projection/surface.
 
-Measured values and the selected implementation will be recorded after the first
-qualified workflow run.
+## GTK resize policy
+
+GtkDrawingArea resize/device-scale notifications record only the latest requested
+width/height/scale. At most one default-idle GSource is pending. A burst of resize
+events therefore performs one viewport update for the latest request.
+
+The widget stores the GSource object itself, not only a numeric source ID. Dispose
+destroys and unreferences pending work before disconnecting the DrawingArea. The
+draw callback remains paint-only.
+
+Unsupported transient dimensions/scales keep the last valid render and exact Data.
+A later valid request replaces viewport state once. The existing real X11/Xvfb
+test continues to exercise actual window resize, keyboard navigation and visual
+snapshot generation.
+
+## Qualification
+
+Native tests require:
+
+- public projection validation/reconstruction behavior remains intact;
+- renderer resize preserves the same owned ChartSpec and exact Data;
+- valid viewport resize updates dimensions/device scale;
+- invalid resize leaves the previous surface byte-identical;
+- fallback resize remains available without regenerating Data;
+- three queued GTK resize requests coalesce into one apply operation and the
+  latest request wins;
+- unsupported GTK requests retain the last valid viewport;
+- a pending GSource is cancelled when the widget is destroyed;
+- test-only GTK resize hooks are absent from normal compilation;
+- all existing chart, Scientific Plane, GTK, Flatpak and invariant gates stay
+  green.
+
+The characterization workflow now retains both the repeated-new-render sequence
+and a true 24-step atm_chart_render_resize() sequence. This provides direct
+before/after evidence without turning timing into a correctness threshold.
+
+## Post-refactor characterization
+
+On the same Ubuntu 24.04 / AMD EPYC 7763 runner class, the qualified head
+`f3f7b1b371a6e3b90784af92543f26cf1924baa0` reported:
+
+- ChartSpec rebuild: median 283114 us;
+- public projection construction: median 281610 us;
+- fallback 240x140 render: median 283449 us;
+- normal 860x500 render: median 284607 us;
+- 2x 860x500 render: median 285817 us;
+- 24-step repeated-new-render sequence: median 6881032 us,
+  approximately 286710 us per step;
+- 24-step viewport-only resize sequence: median 12742 us,
+  approximately 531 us per step.
+
+Relative to the pre-refactor 24-step baseline (~570861 us/step), the qualified
+viewport-only path is approximately 1075x faster on this runner. A normal fresh
+render also drops from ~567 ms to ~285 ms because only one scientific/spec
+reconstruction remains instead of two.
+
+These ratios are characterization evidence, not runtime promises or acceptance
+thresholds. Correctness remains established by the sanitizer, GTK, Flatpak and
+scientific/invariant gates.
+
+The three real GTK preview PNGs on the qualified head are byte-for-byte identical
+to the pre-refactor CHART-03 baseline, confirming that the ownership/resize
+optimization changes no qualified presentation pixels.
+
+## Boundaries
+
+M4 remains dormant under its separate Cairo equality qualification. No shared or
+unbounded pixel cache is added. No viewport/M4 state is persisted. CHART-05 must
+persist/reconstruct complete qualified scientific state and derive current
+viewport state again.
+
+References:
+- https://docs.gtk.org/gtk4/signal.DrawingArea.resize.html
+- https://docs.gtk.org/gtk4/method.DrawingArea.set_draw_func.html
+- https://docs.gtk.org/glib/func.idle_add_full.html

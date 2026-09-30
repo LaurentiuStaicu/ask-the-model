@@ -1,4 +1,4 @@
-#include "chart_projection.h"
+#include "chart_projection_internal.h"
 #include <errno.h>
 #include <math.h>
 #include <string.h>
@@ -9,7 +9,8 @@
 #define QUARTER 2500
 #define MAX_POINTS (ATM_CHART_SPEC_MAX_SERIES * ATM_ANNUAL_SERIES_MAX_POINTS)
 struct AtmChartProjection {
-    AtmChartSpec *spec;
+    const AtmChartSpec *spec;
+    AtmChartSpec *owned_spec;
     double width, height;
     AtmChartDisplayDomain domain;
     guint count, nx, ny;
@@ -42,7 +43,7 @@ static gboolean fixed (const char *coefficient, gint64 exponent, gint64 *out, GE
 void atm_chart_projection_free (AtmChartProjection *p)
 {
     if (p == NULL) return;
-    atm_chart_spec_free (p->spec); g_free (p);
+    atm_chart_spec_free (p->owned_spec); g_free (p);
 }
 static gboolean x_tick (AtmChartProjection *p, guint year, GError **error)
 {
@@ -53,15 +54,20 @@ static gboolean x_tick (AtmChartProjection *p, guint year, GError **error)
     g_snprintf (t->label, sizeof t->label, "%u", year);
     return TRUE;
 }
-gboolean atm_chart_projection_new (const AtmChartSpec *spec, double width, double height,
-    AtmChartProjection **out, GError **error)
+static gboolean projection_new (const AtmChartSpec *spec, gboolean rebuild,
+    double width, double height, AtmChartProjection **out, GError **error)
 {
-    if (out == NULL || *out != NULL || !isfinite (width) || !isfinite (height) ||
+    if (spec == NULL || out == NULL || *out != NULL || !isfinite (width) || !isfinite (height) ||
         width < ATM_CHART_PROJECTION_MIN_WIDTH || height < ATM_CHART_PROJECTION_MIN_HEIGHT ||
         width > ATM_CHART_PROJECTION_MAX_SIZE || height > ATM_CHART_PROJECTION_MAX_SIZE)
-        return reject (error, "Invalid plot dimensions or projection output.");
+        return reject (error, "Invalid plot dimensions, specification, or projection output.");
     AtmChartProjection *p = g_new0 (AtmChartProjection, 1);
-    if (!atm_chart_spec_rebuild (spec, &p->spec, error)) goto invalid;
+    if (rebuild) {
+        if (!atm_chart_spec_rebuild (spec, &p->owned_spec, error)) goto invalid;
+        p->spec = p->owned_spec;
+    } else {
+        p->spec = spec;
+    }
     p->width = width; p->height = height;
     const AtmScientificDecimal *low = atm_chart_spec_y_min (p->spec), *high = atm_chart_spec_y_max (p->spec);
     gint64 lo, hi;
@@ -112,6 +118,16 @@ gboolean atm_chart_projection_new (const AtmChartSpec *spec, double width, doubl
     *out = p; return TRUE;
 invalid:
     atm_chart_projection_free (p); return FALSE;
+}
+gboolean atm_chart_projection_new (const AtmChartSpec *spec, double width, double height,
+    AtmChartProjection **out, GError **error)
+{
+    return projection_new (spec, TRUE, width, height, out, error);
+}
+G_GNUC_INTERNAL gboolean _atm_chart_projection_new_trusted (const AtmChartSpec *spec,
+    double width, double height, AtmChartProjection **out, GError **error)
+{
+    return projection_new (spec, FALSE, width, height, out, error);
 }
 static gboolean ticks_equal (const AtmChartTick *a, const AtmChartTick *b, guint count)
 {
