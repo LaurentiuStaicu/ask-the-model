@@ -83,6 +83,67 @@ namespace AskTheModel {
         }
     }
 
+    public class ConversationPersistenceChartSeries : Object {
+        public string series_profile { get; construct; }
+        public string admission_profile { get; construct; }
+        public string scientific_id { get; construct; }
+        public string qualified_id { get; construct; }
+        public string repository_id { get; construct; }
+        public string repository_version { get; construct; }
+        public string snapshot_sha { get; construct; }
+        public string source_path { get; construct; }
+
+        public ConversationPersistenceChartSeries (
+            string series_profile,
+            string admission_profile,
+            string scientific_id,
+            string qualified_id,
+            string repository_id,
+            string repository_version,
+            string snapshot_sha,
+            string source_path
+        ) {
+            Object (
+                series_profile: series_profile,
+                admission_profile: admission_profile,
+                scientific_id: scientific_id,
+                qualified_id: qualified_id,
+                repository_id: repository_id,
+                repository_version: repository_version,
+                snapshot_sha: snapshot_sha,
+                source_path: source_path
+            );
+        }
+    }
+
+    public class ConversationPersistenceChart : Object {
+        public int64 ordinal { get; construct; }
+        public string chart_schema { get; construct; }
+        public string chart_spec_id { get; construct; }
+        public string chart_kind { get; construct; }
+        public string reconstruction_profile { get; construct; }
+        public ConversationPersistenceChartSeries[] series;
+
+        public ConversationPersistenceChart (
+            int64 ordinal,
+            string chart_schema,
+            string chart_spec_id,
+            string chart_kind,
+            string reconstruction_profile,
+            ConversationPersistenceChartSeries[] series
+        ) {
+            Object (
+                ordinal: ordinal,
+                chart_schema: chart_schema,
+                chart_spec_id: chart_spec_id,
+                chart_kind: chart_kind,
+                reconstruction_profile: reconstruction_profile
+            );
+
+            this.series = series;
+        }
+    }
+
     public class ConversationPersistenceMessage : Object {
         public int64 sequence_no { get; construct; }
         public int64 turn_no { get; construct; }
@@ -92,6 +153,7 @@ namespace AskTheModel {
         public bool grounded { get; construct; }
         public int64 created_at_us { get; construct; }
         public ConversationPersistenceCitation[] citations;
+        public ConversationPersistenceChart[] charts;
 
         public ConversationPersistenceMessage (
             int64 sequence_no,
@@ -101,7 +163,8 @@ namespace AskTheModel {
             string display_content,
             bool grounded,
             int64 created_at_us,
-            ConversationPersistenceCitation[] citations
+            ConversationPersistenceCitation[] citations,
+            ConversationPersistenceChart[] charts
         ) {
             Object (
                 sequence_no: sequence_no,
@@ -114,6 +177,7 @@ namespace AskTheModel {
             );
 
             this.citations = citations;
+            this.charts = charts;
         }
     }
 
