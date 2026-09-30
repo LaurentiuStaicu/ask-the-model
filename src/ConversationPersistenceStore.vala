@@ -1239,6 +1239,48 @@ namespace AskTheModel {
             return turn_no;
         }
 
+        public void attach_chart (
+            string conversation_id,
+            int64 turn_no,
+            ConversationPersistenceChart chart
+        ) throws GLib.Error {
+            if (chart.series.length != 1) {
+                throw new GLib.IOError.INVALID_DATA (
+                    "The current durable chart profile requires exactly one qualified series."
+                );
+            }
+
+            ConversationPersistenceChartSeries series =
+                chart.series[0];
+
+            if (!ConversationStoreNative.attach_chart_values (
+                    native_store,
+                    conversation_id,
+                    turn_no,
+                    (uint) chart.ordinal,
+                    chart.chart_schema,
+                    chart.chart_spec_id,
+                    chart.chart_kind,
+                    chart.reconstruction_profile,
+                    series.series_profile,
+                    series.admission_profile,
+                    series.scientific_id,
+                    series.qualified_id,
+                    series.repository_id,
+                    series.repository_version,
+                    series.snapshot_sha,
+                    series.source_path
+                )) {
+                throw new GLib.IOError.FAILED (
+                    "Conversation chart reconstruction recipe could not be persisted."
+                );
+            }
+
+            sync_automatic_export_best_effort (
+                conversation_id
+            );
+        }
+
         public void update_title (
             string conversation_id,
             string title,
