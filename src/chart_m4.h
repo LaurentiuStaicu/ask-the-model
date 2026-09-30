@@ -1,12 +1,15 @@
 #pragma once
 
-#include "chart_projection.h"
+#include <glib.h>
 
 G_BEGIN_DECLS
 
 #define ATM_CHART_M4_ALGORITHM "atm-m4-line/1"
-#define ATM_CHART_M4_MAX_POINTS (ATM_CHART_SPEC_MAX_SERIES * ATM_ANNUAL_SERIES_MAX_POINTS)
-#define ATM_CHART_M4_MAX_WIDTH ATM_CHART_PROJECTION_MAX_SIZE
+/* Display-layer allocation ceilings aligned with the current projection envelope.
+ * They are not scientific coverage claims and deliberately avoid depending on
+ * VerifiedSeries/ChartSpec headers. */
+#define ATM_CHART_M4_MAX_POINTS 1024u
+#define ATM_CHART_M4_MAX_WIDTH 8192u
 
 typedef enum {
     ATM_CHART_M4_ERROR_ARGUMENT,
