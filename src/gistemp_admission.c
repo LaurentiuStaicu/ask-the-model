@@ -1,9 +1,9 @@
 #include "gistemp_admission.h"
 
-static const char repository_id[] = "LaurentiuStaicu/empirical-world3-dynamics";
-static const char snapshot_id[] = "d9e249339663015f6d1c05752338a955bf64ad0b";
+static const char repository_id[] = ATM_GISTEMP_ADMITTED_REPOSITORY;
+static const char snapshot_id[] = ATM_GISTEMP_ADMITTED_SNAPSHOT;
 static const struct { const char *path; const char *digest; } policy[] = {
-    {"science/data/processed/nasa_gistemp_global_2026.csv", "c03e15198201c491cfbd665ad655f72c54f2df19db9c93614b5a2fb4ee5590fb"},
+    {ATM_GISTEMP_PRIMARY_SOURCE_PATH, "c03e15198201c491cfbd665ad655f72c54f2df19db9c93614b5a2fb4ee5590fb"},
     {"science/data/processed/nasa_gistemp_global_2026.provenance.json", "2ac56f0f060fbba0b15f483a2510b293fe5cfbebb2a8e39816f3b73270496ed9"},
     {"science/data/input_manifest.json", "887bfec97515472e22084a6e28655b1d644d86949dc59b5a506801346a1fce8e"},
     {"science/data/registry.csv", "0637a1842706d2303750d6591851830987f3899de681e432c32b2be7b71adf4d"},
