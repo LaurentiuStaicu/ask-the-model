@@ -206,8 +206,10 @@ invalid:
 gboolean atm_chart_render_new (const AtmChartSpec *spec, guint width, guint height,
     guint scale, AtmChartRender **out, GError **error)
 {
-    if (out == NULL || *out != NULL)
-        return reject (error, "Invalid chart output.");
+    if (spec == NULL || out == NULL || *out != NULL || width < 240 || height < 140 ||
+        width > ATM_CHART_RENDER_MAX_SIZE || height > ATM_CHART_RENDER_MAX_SIZE ||
+        scale < 1 || scale > 2)
+        return reject (error, "Invalid chart canvas dimensions or output.");
     AtmChartRender *r = g_new0 (AtmChartRender, 1);
     if (!atm_chart_spec_rebuild (spec, &r->spec, error)) goto invalid;
     r->data = data_view (r->spec);
