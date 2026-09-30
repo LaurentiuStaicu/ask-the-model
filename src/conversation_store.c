@@ -1283,6 +1283,62 @@ citation_input_is_valid (
         nonempty (citation->locator);
 }
 
+static gboolean
+is_hex64 (
+    const char *value
+)
+{
+    if (value == NULL || strlen (value) != 64) return FALSE;
+    for (const char *cursor = value; *cursor != '\0'; cursor++) {
+        if (!((*cursor >= '0' && *cursor <= '9') ||
+              (*cursor >= 'a' && *cursor <= 'f'))) {
+            return FALSE;
+        }
+    }
+    return TRUE;
+}
+
+static gboolean
+chart_series_input_is_valid (
+    const AtmConversationChartSeriesInput *series
+)
+{
+    return series != NULL &&
+        g_strcmp0 (series->series_profile,
+            "atm-series/gistemp-complete-annual/1") == 0 &&
+        g_strcmp0 (series->admission_profile,
+            "atm-gistemp-pinned-admission/1") == 0 &&
+        is_hex64 (series->scientific_id) &&
+        is_hex64 (series->qualified_id) &&
+        g_strcmp0 (series->repository_id, "ewd") == 0 &&
+        nonempty (series->repository_version) &&
+        is_sha40 (series->snapshot_sha) &&
+        g_strcmp0 (
+            series->source_path,
+            "science/data/processed/nasa_gistemp_global_2026.csv"
+        ) == 0;
+}
+
+static gboolean
+chart_input_is_valid (
+    const AtmConversationChartInput *chart
+)
+{
+    return chart != NULL &&
+        chart->ordinal >= 1 && chart->ordinal <= 4 &&
+        g_strcmp0 (chart->chart_schema, "atm-chart-spec/1") == 0 &&
+        is_hex64 (chart->chart_spec_id) &&
+        (g_strcmp0 (chart->chart_kind, "line") == 0 ||
+         g_strcmp0 (chart->chart_kind, "scatter") == 0) &&
+        g_strcmp0 (
+            chart->reconstruction_profile,
+            "atm-chart-reconstruct/gistemp-complete-annual/1"
+        ) == 0 &&
+        chart->series != NULL &&
+        chart->series_count == 1 &&
+        chart_series_input_is_valid (&chart->series[0]);
+}
+
 gboolean
 atm_conversation_store_create_conversation (
     AtmConversationStore *store,
