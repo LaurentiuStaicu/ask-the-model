@@ -32,10 +32,11 @@ original source order. Equal extrema retain the earlier observation. Empty colum
 create no values. Projected X must be nondecreasing and source indexes strictly
 increasing.
 
-The plan is bounded by the existing projection ceilings: at most
-`ATM_CHART_SPEC_MAX_SERIES * ATM_ANNUAL_SERIES_MAX_POINTS` points and plot width
-at most `ATM_CHART_PROJECTION_MAX_SIZE`. It is deterministic and owns copied
-display geometry only.
+The plan has independent display-layer allocation ceilings of 1024 points and
+8192 logical pixels, aligned with the current projection envelope. These are
+resource bounds, not scientific coverage claims, and the primitive deliberately
+does not depend on VerifiedSeries/ChartSpec headers. It is deterministic and
+owns copied display geometry only.
 
 ## Qualification in this slice
 
