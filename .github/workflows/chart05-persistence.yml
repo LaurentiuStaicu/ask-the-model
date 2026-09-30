@@ -29,7 +29,7 @@ jobs:
         run: |
           set -euo pipefail
           glib-compile-resources             data/io.github.laurentiustaicu.ask_the_model.gresource.xml             --sourcedir=data             --generate-source             --target=/tmp/atm-resources.c
-          cc -std=c11 -Wall -Wextra -Werror -g -O1             -fsanitize=address,undefined -fno-omit-frame-pointer             -Isrc             src/conversation_store.c             tests/conversation_store_test.c             /tmp/atm-resources.c             $(pkg-config --cflags --libs glib-2.0 gio-2.0 sqlite3)             -o /tmp/conversation-store-test
+          cc -std=c11 -Wall -Wextra -Werror -g -O1             -D_POSIX_C_SOURCE=200809L             -fsanitize=address,undefined -fno-omit-frame-pointer             -Isrc             src/conversation_store.c             tests/conversation_store_test.c             /tmp/atm-resources.c             $(pkg-config --cflags --libs glib-2.0 gio-2.0 sqlite3)             -o /tmp/conversation-store-test
 
       - name: Qualify schema migration and native chart bindings
         env:
