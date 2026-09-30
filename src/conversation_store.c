@@ -58,6 +58,27 @@ typedef struct {
 } AtmConversationSnapshotCitation;
 
 typedef struct {
+    guint series_ordinal;
+    char *series_profile;
+    char *admission_profile;
+    char *scientific_id;
+    char *qualified_id;
+    char *repository_id;
+    char *repository_version;
+    char *snapshot_sha;
+    char *source_path;
+} AtmConversationSnapshotChartSeries;
+
+typedef struct {
+    gint64 ordinal;
+    char *chart_schema;
+    char *chart_spec_id;
+    char *chart_kind;
+    char *reconstruction_profile;
+    GPtrArray *series;
+} AtmConversationSnapshotChart;
+
+typedef struct {
     char *message_id;
     gint64 sequence_no;
     gint64 turn_no;
@@ -67,6 +88,7 @@ typedef struct {
     gboolean grounded;
     gint64 created_at_us;
     GPtrArray *citations;
+    GPtrArray *charts;
 } AtmConversationSnapshotMessage;
 
 struct AtmConversationSnapshot {
@@ -1259,6 +1281,62 @@ citation_input_is_valid (
         nonempty (citation->logical_source_id) &&
         nonempty (citation->source_path) &&
         nonempty (citation->locator);
+}
+
+static gboolean
+is_hex64 (
+    const char *value
+)
+{
+    if (value == NULL || strlen (value) != 64) return FALSE;
+    for (const char *cursor = value; *cursor != '\0'; cursor++) {
+        if (!((*cursor >= '0' && *cursor <= '9') ||
+              (*cursor >= 'a' && *cursor <= 'f'))) {
+            return FALSE;
+        }
+    }
+    return TRUE;
+}
+
+static gboolean
+chart_series_input_is_valid (
+    const AtmConversationChartSeriesInput *series
+)
+{
+    return series != NULL &&
+        g_strcmp0 (series->series_profile,
+            "atm-series/gistemp-complete-annual/1") == 0 &&
+        g_strcmp0 (series->admission_profile,
+            "atm-gistemp-pinned-admission/1") == 0 &&
+        is_hex64 (series->scientific_id) &&
+        is_hex64 (series->qualified_id) &&
+        g_strcmp0 (series->repository_id, "ewd") == 0 &&
+        nonempty (series->repository_version) &&
+        is_sha40 (series->snapshot_sha) &&
+        g_strcmp0 (
+            series->source_path,
+            "science/data/processed/nasa_gistemp_global_2026.csv"
+        ) == 0;
+}
+
+static gboolean
+chart_input_is_valid (
+    const AtmConversationChartInput *chart
+)
+{
+    return chart != NULL &&
+        chart->ordinal >= 1 && chart->ordinal <= 4 &&
+        g_strcmp0 (chart->chart_schema, "atm-chart-spec/1") == 0 &&
+        is_hex64 (chart->chart_spec_id) &&
+        (g_strcmp0 (chart->chart_kind, "line") == 0 ||
+         g_strcmp0 (chart->chart_kind, "scatter") == 0) &&
+        g_strcmp0 (
+            chart->reconstruction_profile,
+            "atm-chart-reconstruct/gistemp-complete-annual/1"
+        ) == 0 &&
+        chart->series != NULL &&
+        chart->series_count == 1 &&
+        chart_series_input_is_valid (&chart->series[0]);
 }
 
 gboolean
@@ -3305,6 +3383,212 @@ out:
 }
 
 gboolean
+atm_conversation_store_attach_chart (
+    AtmConversationStore *store,
+    const char *conversation_id,
+    gint64 turn_no,
+    const AtmConversationChartInput *chart,
+    GError **error
+)
+{
+    if (store == NULL || store->db == NULL ||
+        !nonempty (conversation_id) || turn_no < 0 ||
+        !chart_input_is_valid (chart)) {
+        g_set_error_literal (
+            error,
+            ATM_CONVERSATION_STORE_ERROR,
+            ATM_CONVERSATION_STORE_ERROR_ARGUMENT,
+            "Conversation chart attachment received an invalid reconstruction recipe."
+        );
+        return FALSE;
+    }
+
+    if (!exec_sql (store->db, "BEGIN IMMEDIATE;", error)) {
+        return FALSE;
+    }
+
+    gboolean ok = FALSE;
+    sqlite3_stmt *statement = NULL;
+    char *message_id = NULL;
+
+    if (!prepare_statement (
+            store->db,
+            "SELECT message_id,grounded "
+            "FROM messages "
+            "WHERE conversation_id=?1 AND turn_no=?2 AND role='assistant';",
+            &statement,
+            error
+        )) {
+        goto out;
+    }
+
+    sqlite3_bind_text (statement, 1, conversation_id, -1, SQLITE_TRANSIENT);
+    sqlite3_bind_int64 (statement, 2, turn_no);
+
+    int rc = sqlite3_step (statement);
+    if (rc == SQLITE_DONE) {
+        g_set_error_literal (
+            error,
+            ATM_CONVERSATION_STORE_ERROR,
+            ATM_CONVERSATION_STORE_ERROR_NOT_FOUND,
+            "Grounded assistant turn for chart attachment was not found."
+        );
+        goto out;
+    }
+    if (rc != SQLITE_ROW) {
+        set_sqlite_error (
+            store->db,
+            error,
+            ATM_CONVERSATION_STORE_ERROR_SQLITE,
+            "Could not resolve chart attachment message"
+        );
+        goto out;
+    }
+
+    const unsigned char *message_value =
+        sqlite3_column_text (statement, 0);
+    if (message_value == NULL) {
+        g_set_error_literal (
+            error,
+            ATM_CONVERSATION_STORE_ERROR,
+            ATM_CONVERSATION_STORE_ERROR_INTEGRITY,
+            "Chart attachment target message has no identity."
+        );
+        goto out;
+    }
+    message_id = g_strdup ((const char *) message_value);
+    gboolean grounded = sqlite3_column_int (statement, 1) != 0;
+    if (sqlite3_step (statement) != SQLITE_DONE) {
+        g_set_error_literal (
+            error,
+            ATM_CONVERSATION_STORE_ERROR,
+            ATM_CONVERSATION_STORE_ERROR_INTEGRITY,
+            "Chart attachment target query returned multiple assistant messages."
+        );
+        goto out;
+    }
+    sqlite3_finalize (statement);
+    statement = NULL;
+
+    if (!grounded) {
+        g_set_error_literal (
+            error,
+            ATM_CONVERSATION_STORE_ERROR,
+            ATM_CONVERSATION_STORE_ERROR_INTEGRITY,
+            "Charts may only be attached to grounded assistant messages."
+        );
+        goto out;
+    }
+
+    const AtmConversationChartSeriesInput *series = &chart->series[0];
+    if (!prepare_statement (
+            store->db,
+            "SELECT count(*) "
+            "FROM conversation_repositories "
+            "WHERE conversation_id=?1 "
+            "AND repository_id=?2 "
+            "AND repository_version=?3 "
+            "AND snapshot_sha=?4;",
+            &statement,
+            error
+        )) {
+        goto out;
+    }
+    sqlite3_bind_text (statement, 1, conversation_id, -1, SQLITE_TRANSIENT);
+    sqlite3_bind_text (statement, 2, series->repository_id, -1, SQLITE_TRANSIENT);
+    sqlite3_bind_text (statement, 3, series->repository_version, -1, SQLITE_TRANSIENT);
+    sqlite3_bind_text (statement, 4, series->snapshot_sha, -1, SQLITE_TRANSIENT);
+
+    rc = sqlite3_step (statement);
+    if (rc != SQLITE_ROW || sqlite3_column_int64 (statement, 0) != 1 ||
+        sqlite3_step (statement) != SQLITE_DONE) {
+        sqlite3_finalize (statement);
+        statement = NULL;
+        g_set_error_literal (
+            error,
+            ATM_CONVERSATION_STORE_ERROR,
+            ATM_CONVERSATION_STORE_ERROR_INTEGRITY,
+            "Chart reconstruction source is outside the conversation's pinned repository scope."
+        );
+        goto out;
+    }
+    sqlite3_finalize (statement);
+    statement = NULL;
+
+    if (!prepare_statement (
+            store->db,
+            "INSERT INTO message_charts("
+            "message_id,ordinal,chart_schema,chart_spec_id,chart_kind,reconstruction_profile"
+            ") VALUES(?1,?2,?3,?4,?5,?6);",
+            &statement,
+            error
+        )) {
+        goto out;
+    }
+    sqlite3_bind_text (statement, 1, message_id, -1, SQLITE_TRANSIENT);
+    sqlite3_bind_int (statement, 2, (int) chart->ordinal);
+    sqlite3_bind_text (statement, 3, chart->chart_schema, -1, SQLITE_TRANSIENT);
+    sqlite3_bind_text (statement, 4, chart->chart_spec_id, -1, SQLITE_TRANSIENT);
+    sqlite3_bind_text (statement, 5, chart->chart_kind, -1, SQLITE_TRANSIENT);
+    sqlite3_bind_text (statement, 6, chart->reconstruction_profile, -1, SQLITE_TRANSIENT);
+    if (!step_done (
+            store->db,
+            statement,
+            "Could not persist conversation chart binding",
+            error
+        )) {
+        goto out;
+    }
+    sqlite3_finalize (statement);
+    statement = NULL;
+
+    if (!prepare_statement (
+            store->db,
+            "INSERT INTO chart_series("
+            "message_id,chart_ordinal,series_ordinal,series_profile,admission_profile,"
+            "scientific_id,qualified_id,repository_id,repository_version,snapshot_sha,source_path"
+            ") VALUES(?1,?2,0,?3,?4,?5,?6,?7,?8,?9,?10);",
+            &statement,
+            error
+        )) {
+        goto out;
+    }
+    sqlite3_bind_text (statement, 1, message_id, -1, SQLITE_TRANSIENT);
+    sqlite3_bind_int (statement, 2, (int) chart->ordinal);
+    sqlite3_bind_text (statement, 3, series->series_profile, -1, SQLITE_TRANSIENT);
+    sqlite3_bind_text (statement, 4, series->admission_profile, -1, SQLITE_TRANSIENT);
+    sqlite3_bind_text (statement, 5, series->scientific_id, -1, SQLITE_TRANSIENT);
+    sqlite3_bind_text (statement, 6, series->qualified_id, -1, SQLITE_TRANSIENT);
+    sqlite3_bind_text (statement, 7, series->repository_id, -1, SQLITE_TRANSIENT);
+    sqlite3_bind_text (statement, 8, series->repository_version, -1, SQLITE_TRANSIENT);
+    sqlite3_bind_text (statement, 9, series->snapshot_sha, -1, SQLITE_TRANSIENT);
+    sqlite3_bind_text (statement, 10, series->source_path, -1, SQLITE_TRANSIENT);
+    if (!step_done (
+            store->db,
+            statement,
+            "Could not persist conversation chart series binding",
+            error
+        )) {
+        goto out;
+    }
+    sqlite3_finalize (statement);
+    statement = NULL;
+
+    if (!validate_chart_semantics (store->db, error) ||
+        !exec_sql (store->db, "COMMIT;", error)) {
+        goto out;
+    }
+
+    ok = TRUE;
+
+out:
+    if (statement != NULL) sqlite3_finalize (statement);
+    if (!ok) rollback_best_effort (store->db);
+    g_free (message_id);
+    return ok;
+}
+
+gboolean
 atm_conversation_store_create_conversation_values (
     AtmConversationStore *store,
     const char *title,
@@ -3587,6 +3871,39 @@ snapshot_citation_free (
 }
 
 static void
+snapshot_chart_series_free (
+    gpointer data
+)
+{
+    AtmConversationSnapshotChartSeries *series = data;
+    if (series == NULL) return;
+    g_free (series->series_profile);
+    g_free (series->admission_profile);
+    g_free (series->scientific_id);
+    g_free (series->qualified_id);
+    g_free (series->repository_id);
+    g_free (series->repository_version);
+    g_free (series->snapshot_sha);
+    g_free (series->source_path);
+    g_free (series);
+}
+
+static void
+snapshot_chart_free (
+    gpointer data
+)
+{
+    AtmConversationSnapshotChart *chart = data;
+    if (chart == NULL) return;
+    g_free (chart->chart_schema);
+    g_free (chart->chart_spec_id);
+    g_free (chart->chart_kind);
+    g_free (chart->reconstruction_profile);
+    g_clear_pointer (&chart->series, g_ptr_array_unref);
+    g_free (chart);
+}
+
+static void
 snapshot_message_free (
     gpointer data
 )
@@ -3604,6 +3921,10 @@ snapshot_message_free (
     g_free (message->display_content);
     g_clear_pointer (
         &message->citations,
+        g_ptr_array_unref
+    );
+    g_clear_pointer (
+        &message->charts,
         g_ptr_array_unref
     );
     g_free (message);
@@ -3710,6 +4031,54 @@ snapshot_citation_at (
         message->citations,
         citation_index
     );
+}
+
+static AtmConversationSnapshotChart *
+snapshot_chart_at (
+    const AtmConversationSnapshot *snapshot,
+    guint message_index,
+    guint chart_index
+)
+{
+    AtmConversationSnapshotMessage *message =
+        snapshot_message_at (snapshot, message_index);
+    if (message == NULL || message->charts == NULL ||
+        chart_index >= message->charts->len) {
+        return NULL;
+    }
+    return g_ptr_array_index (message->charts, chart_index);
+}
+
+static AtmConversationSnapshotChartSeries *
+snapshot_chart_series_at (
+    const AtmConversationSnapshot *snapshot,
+    guint message_index,
+    guint chart_index,
+    guint series_index
+)
+{
+    AtmConversationSnapshotChart *chart =
+        snapshot_chart_at (snapshot, message_index, chart_index);
+    if (chart == NULL || chart->series == NULL ||
+        series_index >= chart->series->len) {
+        return NULL;
+    }
+    return g_ptr_array_index (chart->series, series_index);
+}
+
+static AtmConversationSnapshotChart *
+snapshot_chart_for_ordinal (
+    AtmConversationSnapshotMessage *message,
+    gint64 ordinal
+)
+{
+    if (message == NULL || message->charts == NULL) return NULL;
+    for (guint i = 0; i < message->charts->len; i++) {
+        AtmConversationSnapshotChart *chart =
+            g_ptr_array_index (message->charts, i);
+        if (chart->ordinal == ordinal) return chart;
+    }
+    return NULL;
 }
 
 gboolean
@@ -4179,6 +4548,10 @@ atm_conversation_store_load_snapshot (
             g_ptr_array_new_with_free_func (
                 snapshot_citation_free
             );
+        message->charts =
+            g_ptr_array_new_with_free_func (
+                snapshot_chart_free
+            );
 
         g_ptr_array_add (
             snapshot->messages,
@@ -4330,6 +4703,118 @@ atm_conversation_store_load_snapshot (
     sqlite3_finalize (
         statement
     );
+    statement = NULL;
+
+    if (!prepare_statement (
+            store->db,
+            "SELECT m.sequence_no,c.ordinal,c.chart_schema,c.chart_spec_id,"
+            "c.chart_kind,c.reconstruction_profile "
+            "FROM message_charts c "
+            "JOIN messages m ON m.message_id=c.message_id "
+            "WHERE m.conversation_id=?1 "
+            "ORDER BY m.sequence_no ASC,c.ordinal ASC;",
+            &statement,
+            error
+        )) {
+        goto out;
+    }
+    sqlite3_bind_text (statement, 1, conversation_id, -1, SQLITE_TRANSIENT);
+
+    while ((rc = sqlite3_step (statement)) == SQLITE_ROW) {
+        gint64 sequence_no = sqlite3_column_int64 (statement, 0);
+        AtmConversationSnapshotMessage *message =
+            snapshot_message_for_sequence (snapshot, sequence_no);
+        if (message == NULL) {
+            g_set_error_literal (
+                error,
+                ATM_CONVERSATION_STORE_ERROR,
+                ATM_CONVERSATION_STORE_ERROR_INTEGRITY,
+                "Conversation chart refers to an unavailable snapshot message."
+            );
+            goto out;
+        }
+
+        AtmConversationSnapshotChart *chart =
+            g_new0 (AtmConversationSnapshotChart, 1);
+        chart->ordinal = sqlite3_column_int64 (statement, 1);
+        chart->chart_schema = column_text_dup (statement, 2);
+        chart->chart_spec_id = column_text_dup (statement, 3);
+        chart->chart_kind = column_text_dup (statement, 4);
+        chart->reconstruction_profile = column_text_dup (statement, 5);
+        chart->series =
+            g_ptr_array_new_with_free_func (snapshot_chart_series_free);
+        g_ptr_array_add (message->charts, chart);
+    }
+    if (rc != SQLITE_DONE) {
+        set_sqlite_error (
+            store->db,
+            error,
+            ATM_CONVERSATION_STORE_ERROR_SQLITE,
+            "Could not read durable conversation chart bindings"
+        );
+        goto out;
+    }
+    sqlite3_finalize (statement);
+    statement = NULL;
+
+    if (!prepare_statement (
+            store->db,
+            "SELECT m.sequence_no,s.chart_ordinal,s.series_ordinal,"
+            "s.series_profile,s.admission_profile,s.scientific_id,s.qualified_id,"
+            "s.repository_id,s.repository_version,s.snapshot_sha,s.source_path "
+            "FROM chart_series s "
+            "JOIN messages m ON m.message_id=s.message_id "
+            "WHERE m.conversation_id=?1 "
+            "ORDER BY m.sequence_no ASC,s.chart_ordinal ASC,s.series_ordinal ASC;",
+            &statement,
+            error
+        )) {
+        goto out;
+    }
+    sqlite3_bind_text (statement, 1, conversation_id, -1, SQLITE_TRANSIENT);
+
+    while ((rc = sqlite3_step (statement)) == SQLITE_ROW) {
+        gint64 sequence_no = sqlite3_column_int64 (statement, 0);
+        gint64 chart_ordinal = sqlite3_column_int64 (statement, 1);
+        gint64 series_ordinal = sqlite3_column_int64 (statement, 2);
+        AtmConversationSnapshotMessage *message =
+            snapshot_message_for_sequence (snapshot, sequence_no);
+        AtmConversationSnapshotChart *chart =
+            snapshot_chart_for_ordinal (message, chart_ordinal);
+        if (chart == NULL || series_ordinal < 0 ||
+            (guint) series_ordinal != chart->series->len) {
+            g_set_error_literal (
+                error,
+                ATM_CONVERSATION_STORE_ERROR,
+                ATM_CONVERSATION_STORE_ERROR_INTEGRITY,
+                "Conversation chart series order is unavailable or non-contiguous."
+            );
+            goto out;
+        }
+
+        AtmConversationSnapshotChartSeries *series =
+            g_new0 (AtmConversationSnapshotChartSeries, 1);
+        series->series_ordinal = (guint) series_ordinal;
+        series->series_profile = column_text_dup (statement, 3);
+        series->admission_profile = column_text_dup (statement, 4);
+        series->scientific_id = column_text_dup (statement, 5);
+        series->qualified_id = column_text_dup (statement, 6);
+        series->repository_id = column_text_dup (statement, 7);
+        series->repository_version = column_text_dup (statement, 8);
+        series->snapshot_sha = column_text_dup (statement, 9);
+        series->source_path = column_text_dup (statement, 10);
+        g_ptr_array_add (chart->series, series);
+    }
+    if (rc != SQLITE_DONE) {
+        set_sqlite_error (
+            store->db,
+            error,
+            ATM_CONVERSATION_STORE_ERROR_SQLITE,
+            "Could not read durable conversation chart series bindings"
+        );
+        goto out;
+    }
+    sqlite3_finalize (statement);
     statement = NULL;
 
     if (!exec_sql (
@@ -4763,6 +5248,126 @@ atm_conversation_snapshot_message_citation_count_at (
             ? message->citations->len
             : 0;
 }
+
+guint
+atm_conversation_snapshot_message_chart_count_at (
+    const AtmConversationSnapshot *snapshot,
+    guint message_index
+)
+{
+    AtmConversationSnapshotMessage *message =
+        snapshot_message_at (snapshot, message_index);
+    return message != NULL && message->charts != NULL
+        ? message->charts->len : 0;
+}
+
+gint64
+atm_conversation_snapshot_chart_ordinal_at (
+    const AtmConversationSnapshot *snapshot,
+    guint message_index,
+    guint chart_index
+)
+{
+    AtmConversationSnapshotChart *chart =
+        snapshot_chart_at (snapshot, message_index, chart_index);
+    return chart != NULL ? chart->ordinal : -1;
+}
+
+#define SNAPSHOT_CHART_TEXT_ACCESSOR(name, field) \
+const char * \
+name ( \
+    const AtmConversationSnapshot *snapshot, \
+    guint message_index, \
+    guint chart_index \
+) \
+{ \
+    AtmConversationSnapshotChart *chart = \
+        snapshot_chart_at (snapshot, message_index, chart_index); \
+    return chart != NULL ? chart->field : NULL; \
+}
+
+SNAPSHOT_CHART_TEXT_ACCESSOR (
+    atm_conversation_snapshot_chart_schema_at,
+    chart_schema
+)
+SNAPSHOT_CHART_TEXT_ACCESSOR (
+    atm_conversation_snapshot_chart_spec_id_at,
+    chart_spec_id
+)
+SNAPSHOT_CHART_TEXT_ACCESSOR (
+    atm_conversation_snapshot_chart_kind_at,
+    chart_kind
+)
+SNAPSHOT_CHART_TEXT_ACCESSOR (
+    atm_conversation_snapshot_chart_reconstruction_profile_at,
+    reconstruction_profile
+)
+
+#undef SNAPSHOT_CHART_TEXT_ACCESSOR
+
+guint
+atm_conversation_snapshot_chart_series_count_at (
+    const AtmConversationSnapshot *snapshot,
+    guint message_index,
+    guint chart_index
+)
+{
+    AtmConversationSnapshotChart *chart =
+        snapshot_chart_at (snapshot, message_index, chart_index);
+    return chart != NULL && chart->series != NULL
+        ? chart->series->len : 0;
+}
+
+#define SNAPSHOT_CHART_SERIES_TEXT_ACCESSOR(name, field) \
+const char * \
+name ( \
+    const AtmConversationSnapshot *snapshot, \
+    guint message_index, \
+    guint chart_index, \
+    guint series_index \
+) \
+{ \
+    AtmConversationSnapshotChartSeries *series = \
+        snapshot_chart_series_at ( \
+            snapshot, message_index, chart_index, series_index \
+        ); \
+    return series != NULL ? series->field : NULL; \
+}
+
+SNAPSHOT_CHART_SERIES_TEXT_ACCESSOR (
+    atm_conversation_snapshot_chart_series_profile_at,
+    series_profile
+)
+SNAPSHOT_CHART_SERIES_TEXT_ACCESSOR (
+    atm_conversation_snapshot_chart_series_admission_profile_at,
+    admission_profile
+)
+SNAPSHOT_CHART_SERIES_TEXT_ACCESSOR (
+    atm_conversation_snapshot_chart_series_scientific_id_at,
+    scientific_id
+)
+SNAPSHOT_CHART_SERIES_TEXT_ACCESSOR (
+    atm_conversation_snapshot_chart_series_qualified_id_at,
+    qualified_id
+)
+SNAPSHOT_CHART_SERIES_TEXT_ACCESSOR (
+    atm_conversation_snapshot_chart_series_repository_id_at,
+    repository_id
+)
+SNAPSHOT_CHART_SERIES_TEXT_ACCESSOR (
+    atm_conversation_snapshot_chart_series_repository_version_at,
+    repository_version
+)
+SNAPSHOT_CHART_SERIES_TEXT_ACCESSOR (
+    atm_conversation_snapshot_chart_series_snapshot_sha_at,
+    snapshot_sha
+)
+SNAPSHOT_CHART_SERIES_TEXT_ACCESSOR (
+    atm_conversation_snapshot_chart_series_source_path_at,
+    source_path
+)
+
+#undef SNAPSHOT_CHART_SERIES_TEXT_ACCESSOR
 
 #define SNAPSHOT_CITATION_TEXT_ACCESSOR(name, field) \
 const char * \

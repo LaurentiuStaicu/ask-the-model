@@ -1,0 +1,38 @@
+name: CHART-05 conversation persistence
+
+on:
+  pull_request:
+    paths:
+      - 'src/conversation_store.*'
+      - 'tests/conversation_store_test.c'
+      - 'data/schemas/conversation-store-*.sql'
+      - 'data/io.github.laurentiustaicu.ask_the_model.gresource.xml'
+      - '.github/workflows/chart05-persistence.yml'
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  qualify:
+    runs-on: ubuntu-24.04
+    timeout-minutes: 10
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Install native dependencies
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y --no-install-recommends             gcc pkg-config libglib2.0-dev libglib2.0-bin libsqlite3-dev
+
+      - name: Compile conversation store with embedded schema resources
+        run: |
+          set -euo pipefail
+          glib-compile-resources             data/io.github.laurentiustaicu.ask_the_model.gresource.xml             --sourcedir=data             --generate-source             --target=/tmp/atm-resources.c
+          cc -std=c11 -Wall -Wextra -Werror -g -O1             -D_POSIX_C_SOURCE=200809L             -fsanitize=address,undefined -fno-omit-frame-pointer             -Isrc             src/conversation_store.c             tests/conversation_store_test.c             /tmp/atm-resources.c             $(pkg-config --cflags --libs glib-2.0 gio-2.0 sqlite3)             -o /tmp/conversation-store-test
+
+      - name: Qualify schema migration and native chart bindings
+        env:
+          ASAN_OPTIONS: halt_on_error=1:abort_on_error=1:detect_leaks=1
+          UBSAN_OPTIONS: halt_on_error=1:abort_on_error=1:print_stacktrace=1
+        run: /tmp/conversation-store-test
