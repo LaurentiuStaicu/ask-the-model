@@ -2393,13 +2393,12 @@ validate_v2_for_migration (
 }
 
 static gboolean
-migrate_v1_to_v2 (
+migrate_v1_to_v3 (
     AtmConversationStore *store,
     GError **error
 )
 {
-    if (store == NULL ||
-        store->db == NULL) {
+    if (store == NULL || store->db == NULL) {
         g_set_error_literal (
             error,
             ATM_CONVERSATION_STORE_ERROR,
@@ -2409,68 +2408,46 @@ migrate_v1_to_v2 (
         return FALSE;
     }
 
-    if (!validate_v1_for_migration (
-            store->db,
-            error
-        )) {
+    if (!validate_v1_for_migration (store->db, error)) {
         return FALSE;
     }
 
-    char *migration_sql = NULL;
+    char *migration_v1_v2_sql = NULL;
+    char *migration_v2_v3_sql = NULL;
 
-    if (!load_migration_v1_v2_sql (
-            &migration_sql,
-            error
-        )) {
+    if (!load_migration_v1_v2_sql (&migration_v1_v2_sql, error) ||
+        !load_migration_v2_v3_sql (&migration_v2_v3_sql, error)) {
+        g_free (migration_v1_v2_sql);
+        g_free (migration_v2_v3_sql);
         return FALSE;
     }
 
-    if (!exec_sql (
-            store->db,
-            "BEGIN IMMEDIATE;",
-            error
-        )) {
-        g_free (migration_sql);
+    if (!exec_sql (store->db, "BEGIN IMMEDIATE;", error)) {
+        g_free (migration_v1_v2_sql);
+        g_free (migration_v2_v3_sql);
         return FALSE;
     }
 
     gboolean ok = FALSE;
 
-    if (!exec_sql (
-            store->db,
-            migration_sql,
-            error
-        )) {
+    if (!exec_sql (store->db, migration_v1_v2_sql, error) ||
+        !validate_v2_for_migration (store->db, error) ||
+        !exec_sql (store->db, migration_v2_v3_sql, error)) {
         goto rollback;
     }
 
     char *version_sql = g_strdup_printf (
         "PRAGMA user_version=%d;",
-        ATM_CONVERSATION_STORE_SCHEMA_V2_VERSION
+        ATM_CONVERSATION_STORE_SCHEMA_VERSION
     );
-
-    if (!exec_sql (
-            store->db,
-            version_sql,
-            error
-        )) {
+    if (!exec_sql (store->db, version_sql, error)) {
         g_free (version_sql);
         goto rollback;
     }
     g_free (version_sql);
 
-    if (!validate_v2_for_migration (
-            store->db,
-            error
-        )) {
-        goto rollback;
-    }
-
-    if (!exec_sql (
-            store->db,
-            "COMMIT;",
-            error
-        )) {
+    if (!atm_conversation_store_validate (store, error) ||
+        !exec_sql (store->db, "COMMIT;", error)) {
         goto rollback;
     }
 
@@ -2478,16 +2455,10 @@ migrate_v1_to_v2 (
 
 rollback:
     if (!ok) {
-        sqlite3_exec (
-            store->db,
-            "ROLLBACK;",
-            NULL,
-            NULL,
-            NULL
-        );
+        sqlite3_exec (store->db, "ROLLBACK;", NULL, NULL, NULL);
     }
-
-    g_free (migration_sql);
+    g_free (migration_v1_v2_sql);
+    g_free (migration_v2_v3_sql);
     return ok;
 }
 
@@ -2702,8 +2673,7 @@ atm_conversation_store_open (
         user_version ==
             ATM_CONVERSATION_STORE_SCHEMA_V1_VERSION
     ) {
-        if (!migrate_v1_to_v2 (store, error) ||
-            !migrate_v2_to_v3 (store, error)) {
+        if (!migrate_v1_to_v3 (store, error)) {
             atm_conversation_store_close (store);
             return FALSE;
         }
