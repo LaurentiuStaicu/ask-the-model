@@ -7,11 +7,15 @@
 #include <string.h>
 
 #define ATM_CONVERSATION_STORE_SCHEMA_RESOURCE \
-    "/io/github/laurentiustaicu/ask_the_model/schemas/conversation-store-v2.sql"
+    "/io/github/laurentiustaicu/ask_the_model/schemas/conversation-store-v3.sql"
 #define ATM_CONVERSATION_STORE_MIGRATION_V1_V2_RESOURCE \
     "/io/github/laurentiustaicu/ask_the_model/schemas/conversation-store-v1-to-v2.sql"
+#define ATM_CONVERSATION_STORE_MIGRATION_V2_V3_RESOURCE \
+    "/io/github/laurentiustaicu/ask_the_model/schemas/conversation-store-v2-to-v3.sql"
 #define ATM_CONVERSATION_STORE_SCHEMA_V1_ID "atm-conversation-store/1"
 #define ATM_CONVERSATION_STORE_SCHEMA_V1_VERSION 1
+#define ATM_CONVERSATION_STORE_SCHEMA_V2_ID "atm-conversation-store/2"
+#define ATM_CONVERSATION_STORE_SCHEMA_V2_VERSION 2
 
 struct AtmConversationStore {
     sqlite3 *db;
@@ -373,6 +377,20 @@ load_migration_v1_v2_sql (
     return load_sql_resource (
         ATM_CONVERSATION_STORE_MIGRATION_V1_V2_RESOURCE,
         "v1-to-v2 migration",
+        out_sql,
+        error
+    );
+}
+
+static gboolean
+load_migration_v2_v3_sql (
+    char **out_sql,
+    GError **error
+)
+{
+    return load_sql_resource (
+        ATM_CONVERSATION_STORE_MIGRATION_V2_V3_RESOURCE,
+        "v2-to-v3 migration",
         out_sql,
         error
     );
@@ -952,7 +970,7 @@ validate_integrity (
 }
 
 static gboolean
-validate_semantics (
+validate_base_semantics (
     sqlite3 *db,
     GError **error
 )
@@ -1069,6 +1087,84 @@ is_sha40 (
               (*cursor >= 'a' && *cursor <= 'f'))) {
             return FALSE;
         }
+    }
+
+    return TRUE;
+}
+
+static gboolean
+validate_chart_semantics (
+    sqlite3 *db,
+    GError **error
+)
+{
+    gint64 invalid_chart_message = 0;
+    gint64 invalid_chart_series_shape = 0;
+    gint64 invalid_chart_provenance = 0;
+
+    if (!query_single_int64 (
+            db,
+            "SELECT count(*) "
+            "FROM message_charts c "
+            "JOIN messages m ON m.message_id=c.message_id "
+            "WHERE m.role!='assistant' OR m.grounded!=1;",
+            &invalid_chart_message,
+            error
+        ) ||
+        !query_single_int64 (
+            db,
+            "SELECT count(*) FROM ("
+            "SELECT c.message_id, c.ordinal, "
+            "count(s.series_ordinal) AS series_count, "
+            "min(s.series_ordinal) AS first_ordinal, "
+            "max(s.series_ordinal) AS last_ordinal "
+            "FROM message_charts c "
+            "LEFT JOIN chart_series s "
+            "ON s.message_id=c.message_id "
+            "AND s.chart_ordinal=c.ordinal "
+            "GROUP BY c.message_id, c.ordinal "
+            "HAVING series_count!=1 "
+            "OR first_ordinal!=0 OR last_ordinal!=0"
+            ");",
+            &invalid_chart_series_shape,
+            error
+        ) ||
+        !query_single_int64 (
+            db,
+            "SELECT count(*) "
+            "FROM chart_series s "
+            "JOIN messages m ON m.message_id=s.message_id "
+            "LEFT JOIN conversation_repositories r "
+            "ON r.conversation_id=m.conversation_id "
+            "AND r.repository_id=s.repository_id "
+            "AND r.repository_version=s.repository_version "
+            "AND r.snapshot_sha=s.snapshot_sha "
+            "WHERE r.repository_id IS NULL "
+            "OR s.repository_id!='ewd' "
+            "OR s.source_path!="
+            "'science/data/processed/nasa_gistemp_global_2026.csv';",
+            &invalid_chart_provenance,
+            error
+        )) {
+        return FALSE;
+    }
+
+    if (invalid_chart_message != 0 ||
+        invalid_chart_series_shape != 0 ||
+        invalid_chart_provenance != 0) {
+        g_set_error (
+            error,
+            ATM_CONVERSATION_STORE_ERROR,
+            ATM_CONVERSATION_STORE_ERROR_INTEGRITY,
+            "Conversation-store chart semantic validation failed "
+            "(message=%" G_GINT64_FORMAT
+            ", series=%" G_GINT64_FORMAT
+            ", provenance=%" G_GINT64_FORMAT ").",
+            invalid_chart_message,
+            invalid_chart_series_shape,
+            invalid_chart_provenance
+        );
+        return FALSE;
     }
 
     return TRUE;
@@ -2036,7 +2132,9 @@ atm_conversation_store_validate (
         "conversations",
         "conversation_repositories",
         "messages",
-        "citations"
+        "citations",
+        "message_charts",
+        "chart_series"
     };
 
     if (store == NULL ||
@@ -2102,7 +2200,11 @@ atm_conversation_store_validate (
             store->db,
             error
         ) &&
-        validate_semantics (
+        validate_base_semantics (
+            store->db,
+            error
+        ) &&
+        validate_chart_semantics (
             store->db,
             error
         );
@@ -2236,7 +2338,7 @@ validate_v1_for_migration (
             db,
             error
         ) &&
-        validate_semantics (
+        validate_base_semantics (
             db,
             error
         );
