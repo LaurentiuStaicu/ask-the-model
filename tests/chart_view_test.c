@@ -48,6 +48,48 @@ static void test_data_lifetime (void)
     g_assert_cmpstr (atm_chart_view_data (view), ==, data); g_free (data);
     gpointer weak = view; g_object_add_weak_pointer (G_OBJECT (view), &weak); g_object_unref (view); g_assert_null (weak);
 }
+static void test_resize_coalescing (void)
+{
+    AtmChartView *view = build_view ();
+    char *data = g_strdup (atm_chart_view_data (view));
+    guint baseline = atm_chart_view_test_resize_apply_count (view);
+
+    atm_chart_view_test_request_resize (view, 700, 400, 1);
+    atm_chart_view_test_request_resize (view, 760, 440, 1);
+    atm_chart_view_test_request_resize (view, 820, 480, 1);
+    g_assert_cmpuint (atm_chart_view_test_resize_apply_count (view), ==, baseline);
+    settle ();
+    g_assert_cmpuint (atm_chart_view_test_resize_apply_count (view), ==, baseline + 1);
+    int width = 0, height = 0, scale = 0;
+    atm_chart_view_test_render_size (view, &width, &height, &scale);
+    g_assert_cmpint (width, ==, 820); g_assert_cmpint (height, ==, 480); g_assert_cmpint (scale, ==, 1);
+    g_assert_cmpstr (atm_chart_view_data (view), ==, data);
+
+    atm_chart_view_test_request_resize (view, 120, 100, 1);
+    settle ();
+    g_assert_cmpuint (atm_chart_view_test_resize_apply_count (view), ==, baseline + 2);
+    atm_chart_view_test_render_size (view, &width, &height, &scale);
+    g_assert_cmpint (width, ==, 820); g_assert_cmpint (height, ==, 480); g_assert_cmpint (scale, ==, 1);
+    g_assert_cmpstr (atm_chart_view_data (view), ==, data);
+
+    atm_chart_view_test_request_resize (view, 600, 360, 2);
+    settle ();
+    g_assert_cmpuint (atm_chart_view_test_resize_apply_count (view), ==, baseline + 3);
+    atm_chart_view_test_render_size (view, &width, &height, &scale);
+    g_assert_cmpint (width, ==, 600); g_assert_cmpint (height, ==, 360); g_assert_cmpint (scale, ==, 2);
+    g_assert_cmpstr (atm_chart_view_data (view), ==, data);
+    g_free (data);
+    g_object_unref (view);
+
+    AtmChartView *pending = build_view ();
+    atm_chart_view_test_request_resize (pending, 740, 420, 1);
+    gpointer weak = pending;
+    g_object_add_weak_pointer (G_OBJECT (pending), &weak);
+    g_object_unref (pending);
+    g_assert_null (weak);
+    while (g_main_context_iteration (NULL, FALSE));
+}
+
 static void test_keyboard_window (void)
 {
     if (!g_getenv ("ATM_CHART03_KEYBOARD")) { g_test_skip ("Real XTest keyboard exercised by dedicated GTK workflow."); return; }
@@ -93,6 +135,7 @@ int main (int argc, char **argv)
 {
     gtk_init (); g_test_init (&argc,&argv,NULL);
     g_test_add_func ("/chart-view/data-lifetime",test_data_lifetime);
+    g_test_add_func ("/chart-view/resize-coalescing",test_resize_coalescing);
     g_test_add_func ("/chart-view/keyboard-window",test_keyboard_window);
     g_test_add_func ("/chart-view/invalid",test_invalid);
     return g_test_run ();
