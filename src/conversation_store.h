@@ -134,6 +134,28 @@ gboolean atm_conversation_store_attach_chart (
     GError **error
 );
 
+/* Value-wrapper for Vala/FFI callers. This does not broaden the admitted
+ * persistence profile: v3 still accepts one qualified GISTEMP series only. */
+gboolean atm_conversation_store_attach_chart_values (
+    AtmConversationStore *store,
+    const char *conversation_id,
+    gint64 turn_no,
+    guint ordinal,
+    const char *chart_schema,
+    const char *chart_spec_id,
+    const char *chart_kind,
+    const char *reconstruction_profile,
+    const char *series_profile,
+    const char *admission_profile,
+    const char *scientific_id,
+    const char *qualified_id,
+    const char *repository_id,
+    const char *repository_version,
+    const char *snapshot_sha,
+    const char *source_path,
+    GError **error
+);
+
 gboolean atm_conversation_store_update_title (
     AtmConversationStore *store,
     const char *conversation_id,

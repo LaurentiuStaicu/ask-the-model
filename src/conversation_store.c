@@ -3589,6 +3589,56 @@ out:
 }
 
 gboolean
+atm_conversation_store_attach_chart_values (
+    AtmConversationStore *store,
+    const char *conversation_id,
+    gint64 turn_no,
+    guint ordinal,
+    const char *chart_schema,
+    const char *chart_spec_id,
+    const char *chart_kind,
+    const char *reconstruction_profile,
+    const char *series_profile,
+    const char *admission_profile,
+    const char *scientific_id,
+    const char *qualified_id,
+    const char *repository_id,
+    const char *repository_version,
+    const char *snapshot_sha,
+    const char *source_path,
+    GError **error
+)
+{
+    AtmConversationChartSeriesInput series = {
+        .series_profile = series_profile,
+        .admission_profile = admission_profile,
+        .scientific_id = scientific_id,
+        .qualified_id = qualified_id,
+        .repository_id = repository_id,
+        .repository_version = repository_version,
+        .snapshot_sha = snapshot_sha,
+        .source_path = source_path
+    };
+    AtmConversationChartInput chart = {
+        .ordinal = ordinal,
+        .chart_schema = chart_schema,
+        .chart_spec_id = chart_spec_id,
+        .chart_kind = chart_kind,
+        .reconstruction_profile = reconstruction_profile,
+        .series = &series,
+        .series_count = 1
+    };
+
+    return atm_conversation_store_attach_chart (
+        store,
+        conversation_id,
+        turn_no,
+        &chart,
+        error
+    );
+}
+
+gboolean
 atm_conversation_store_create_conversation_values (
     AtmConversationStore *store,
     const char *title,

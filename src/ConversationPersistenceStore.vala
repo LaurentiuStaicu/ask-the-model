@@ -83,6 +83,67 @@ namespace AskTheModel {
         }
     }
 
+    public class ConversationPersistenceChartSeries : Object {
+        public string series_profile { get; construct; }
+        public string admission_profile { get; construct; }
+        public string scientific_id { get; construct; }
+        public string qualified_id { get; construct; }
+        public string repository_id { get; construct; }
+        public string repository_version { get; construct; }
+        public string snapshot_sha { get; construct; }
+        public string source_path { get; construct; }
+
+        public ConversationPersistenceChartSeries (
+            string series_profile,
+            string admission_profile,
+            string scientific_id,
+            string qualified_id,
+            string repository_id,
+            string repository_version,
+            string snapshot_sha,
+            string source_path
+        ) {
+            Object (
+                series_profile: series_profile,
+                admission_profile: admission_profile,
+                scientific_id: scientific_id,
+                qualified_id: qualified_id,
+                repository_id: repository_id,
+                repository_version: repository_version,
+                snapshot_sha: snapshot_sha,
+                source_path: source_path
+            );
+        }
+    }
+
+    public class ConversationPersistenceChart : Object {
+        public int64 ordinal { get; construct; }
+        public string chart_schema { get; construct; }
+        public string chart_spec_id { get; construct; }
+        public string chart_kind { get; construct; }
+        public string reconstruction_profile { get; construct; }
+        public ConversationPersistenceChartSeries[] series;
+
+        public ConversationPersistenceChart (
+            int64 ordinal,
+            string chart_schema,
+            string chart_spec_id,
+            string chart_kind,
+            string reconstruction_profile,
+            ConversationPersistenceChartSeries[] series
+        ) {
+            Object (
+                ordinal: ordinal,
+                chart_schema: chart_schema,
+                chart_spec_id: chart_spec_id,
+                chart_kind: chart_kind,
+                reconstruction_profile: reconstruction_profile
+            );
+
+            this.series = series;
+        }
+    }
+
     public class ConversationPersistenceMessage : Object {
         public int64 sequence_no { get; construct; }
         public int64 turn_no { get; construct; }
@@ -92,6 +153,7 @@ namespace AskTheModel {
         public bool grounded { get; construct; }
         public int64 created_at_us { get; construct; }
         public ConversationPersistenceCitation[] citations;
+        public ConversationPersistenceChart[] charts;
 
         public ConversationPersistenceMessage (
             int64 sequence_no,
@@ -101,7 +163,8 @@ namespace AskTheModel {
             string display_content,
             bool grounded,
             int64 created_at_us,
-            ConversationPersistenceCitation[] citations
+            ConversationPersistenceCitation[] citations,
+            ConversationPersistenceChart[] charts
         ) {
             Object (
                 sequence_no: sequence_no,
@@ -114,6 +177,7 @@ namespace AskTheModel {
             );
 
             this.citations = citations;
+            this.charts = charts;
         }
     }
 
@@ -834,6 +898,149 @@ namespace AskTheModel {
                         );
                 }
 
+                ConversationPersistenceChart[] charts = {};
+
+                for (
+                    uint chart_index = 0;
+                    chart_index <
+                        ConversationStoreNative.snapshot_message_chart_count_at (
+                            native_snapshot,
+                            message_index
+                        );
+                    chart_index++
+                ) {
+                    ConversationPersistenceChartSeries[] series = {};
+
+                    for (
+                        uint series_index = 0;
+                        series_index <
+                            ConversationStoreNative.snapshot_chart_series_count_at (
+                                native_snapshot,
+                                message_index,
+                                chart_index
+                            );
+                        series_index++
+                    ) {
+                        series +=
+                            new ConversationPersistenceChartSeries (
+                                require_native_text (
+                                    ConversationStoreNative.snapshot_chart_series_profile_at (
+                                        native_snapshot,
+                                        message_index,
+                                        chart_index,
+                                        series_index
+                                    ),
+                                    "chart series profile"
+                                ),
+                                require_native_text (
+                                    ConversationStoreNative.snapshot_chart_series_admission_profile_at (
+                                        native_snapshot,
+                                        message_index,
+                                        chart_index,
+                                        series_index
+                                    ),
+                                    "chart admission profile"
+                                ),
+                                require_native_text (
+                                    ConversationStoreNative.snapshot_chart_series_scientific_id_at (
+                                        native_snapshot,
+                                        message_index,
+                                        chart_index,
+                                        series_index
+                                    ),
+                                    "chart scientific id"
+                                ),
+                                require_native_text (
+                                    ConversationStoreNative.snapshot_chart_series_qualified_id_at (
+                                        native_snapshot,
+                                        message_index,
+                                        chart_index,
+                                        series_index
+                                    ),
+                                    "chart qualified id"
+                                ),
+                                require_native_text (
+                                    ConversationStoreNative.snapshot_chart_series_repository_id_at (
+                                        native_snapshot,
+                                        message_index,
+                                        chart_index,
+                                        series_index
+                                    ),
+                                    "chart repository id"
+                                ),
+                                require_native_text (
+                                    ConversationStoreNative.snapshot_chart_series_repository_version_at (
+                                        native_snapshot,
+                                        message_index,
+                                        chart_index,
+                                        series_index
+                                    ),
+                                    "chart repository version"
+                                ),
+                                require_native_text (
+                                    ConversationStoreNative.snapshot_chart_series_snapshot_sha_at (
+                                        native_snapshot,
+                                        message_index,
+                                        chart_index,
+                                        series_index
+                                    ),
+                                    "chart snapshot SHA"
+                                ),
+                                require_native_text (
+                                    ConversationStoreNative.snapshot_chart_series_source_path_at (
+                                        native_snapshot,
+                                        message_index,
+                                        chart_index,
+                                        series_index
+                                    ),
+                                    "chart source path"
+                                )
+                            );
+                    }
+
+                    charts +=
+                        new ConversationPersistenceChart (
+                            ConversationStoreNative.snapshot_chart_ordinal_at (
+                                native_snapshot,
+                                message_index,
+                                chart_index
+                            ),
+                            require_native_text (
+                                ConversationStoreNative.snapshot_chart_schema_at (
+                                    native_snapshot,
+                                    message_index,
+                                    chart_index
+                                ),
+                                "chart schema"
+                            ),
+                            require_native_text (
+                                ConversationStoreNative.snapshot_chart_spec_id_at (
+                                    native_snapshot,
+                                    message_index,
+                                    chart_index
+                                ),
+                                "chart spec id"
+                            ),
+                            require_native_text (
+                                ConversationStoreNative.snapshot_chart_kind_at (
+                                    native_snapshot,
+                                    message_index,
+                                    chart_index
+                                ),
+                                "chart kind"
+                            ),
+                            require_native_text (
+                                ConversationStoreNative.snapshot_chart_reconstruction_profile_at (
+                                    native_snapshot,
+                                    message_index,
+                                    chart_index
+                                ),
+                                "chart reconstruction profile"
+                            ),
+                            series
+                        );
+                }
+
                 messages +=
                     new ConversationPersistenceMessage (
                         ConversationStoreNative.snapshot_message_sequence_no_at (
@@ -873,7 +1080,8 @@ namespace AskTheModel {
                             native_snapshot,
                             message_index
                         ),
-                        citations
+                        citations,
+                        charts
                     );
             }
 
@@ -1029,6 +1237,48 @@ namespace AskTheModel {
             );
 
             return turn_no;
+        }
+
+        public void attach_chart (
+            string conversation_id,
+            int64 turn_no,
+            ConversationPersistenceChart chart
+        ) throws GLib.Error {
+            if (chart.series.length != 1) {
+                throw new GLib.IOError.INVALID_DATA (
+                    "The current durable chart profile requires exactly one qualified series."
+                );
+            }
+
+            ConversationPersistenceChartSeries series =
+                chart.series[0];
+
+            if (!ConversationStoreNative.attach_chart_values (
+                    native_store,
+                    conversation_id,
+                    turn_no,
+                    (uint) chart.ordinal,
+                    chart.chart_schema,
+                    chart.chart_spec_id,
+                    chart.chart_kind,
+                    chart.reconstruction_profile,
+                    series.series_profile,
+                    series.admission_profile,
+                    series.scientific_id,
+                    series.qualified_id,
+                    series.repository_id,
+                    series.repository_version,
+                    series.snapshot_sha,
+                    series.source_path
+                )) {
+                throw new GLib.IOError.FAILED (
+                    "Conversation chart reconstruction recipe could not be persisted."
+                );
+            }
+
+            sync_automatic_export_best_effort (
+                conversation_id
+            );
         }
 
         public void update_title (
