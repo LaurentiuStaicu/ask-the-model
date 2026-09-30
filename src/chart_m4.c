@@ -87,7 +87,6 @@ atm_chart_m4_plan_new (
         return TRUE;
     }
 
-    plan->reduced = TRUE;
     guint start = 0;
     while (start < count) {
         guint bucket = pixel_column (points[start].x, plot_width);
@@ -112,6 +111,7 @@ atm_chart_m4_plan_new (
         start = end;
     }
 
+    plan->reduced = plan->count < count;
     *out = plan;
     return TRUE;
 }
