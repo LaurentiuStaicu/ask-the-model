@@ -3445,7 +3445,18 @@ atm_conversation_store_attach_chart (
         goto out;
     }
 
-    message_id = column_text_dup (statement, 0);
+    const unsigned char *message_value =
+        sqlite3_column_text (statement, 0);
+    if (message_value == NULL) {
+        g_set_error_literal (
+            error,
+            ATM_CONVERSATION_STORE_ERROR,
+            ATM_CONVERSATION_STORE_ERROR_INTEGRITY,
+            "Chart attachment target message has no identity."
+        );
+        goto out;
+    }
+    message_id = g_strdup ((const char *) message_value);
     gboolean grounded = sqlite3_column_int (statement, 1) != 0;
     if (sqlite3_step (statement) != SQLITE_DONE) {
         g_set_error_literal (
