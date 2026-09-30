@@ -2578,7 +2578,7 @@ chart_view_test = executable(
   install: false
 )
 test('chart-view', chart_view_test,
-  env: {'GTK_A11Y': 'none', 'GSK_RENDERER': 'cairo', 'ATM_CHART01_FIXTURE': meson.current_source_dir() / 'tests/fixtures/chart01'})
+  env: {'GTK_A11Y': 'none', 'GTK_IM_MODULE': 'gtk-im-context-simple', 'GSK_RENDERER': 'cairo', 'ATM_CHART01_FIXTURE': meson.current_source_dir() / 'tests/fixtures/chart01'})
 
 chart_view_vala_test = executable(
   'chart-view-vala-test',
@@ -2592,4 +2592,4 @@ chart_view_vala_test = executable(
   install: false
 )
 test('chart-view-vala', chart_view_vala_test,
-  env: {'GTK_A11Y': 'none', 'GSK_RENDERER': 'cairo', 'ATM_CHART01_FIXTURE': meson.current_source_dir() / 'tests/fixtures/chart01'})
+  env: {'GTK_A11Y': 'none', 'GTK_IM_MODULE': 'gtk-im-context-simple', 'GSK_RENDERER': 'cairo', 'ATM_CHART01_FIXTURE': meson.current_source_dir() / 'tests/fixtures/chart01'})

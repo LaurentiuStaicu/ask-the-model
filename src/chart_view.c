@@ -146,7 +146,7 @@ gboolean atm_chart_view_new (const AtmChartSpec *spec, AtmChartView **out, GErro
     if (!atm_chart_spec_rebuild (spec, &owned, error)) return FALSE;
     AtmChartRender *initial = NULL;
     if (!atm_chart_render_new (owned, 860, 500, 1, &initial, error)) { atm_chart_spec_free (owned); return FALSE; }
-    AtmChartView *self = g_object_ref_sink (g_object_new (ATM_TYPE_CHART_VIEW, NULL));
+    AtmChartView *self = g_object_ref_sink (g_object_new (ATM_TYPE_CHART_VIEW, "accessible-role", GTK_ACCESSIBLE_ROLE_GROUP, NULL));
     self->spec = owned; self->render = initial; self->width = 860; self->height = 500; self->scale = 1;
     self->data = g_strdup (atm_chart_render_data (initial));
     self->rows = gtk_string_list_new (NULL);
