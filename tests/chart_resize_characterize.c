@@ -107,12 +107,12 @@ measure_resize_sequence (AtmChartSpec *spec)
         samples[sample] = g_get_monotonic_time () - start;
     }
 
-    qsort (samples, SAMPLES, sizeof samples[0], compare_i64);
-    guint p90_index = (SAMPLES * 9 + 9) / 10 - 1;
+    qsort (samples, RESIZE_SAMPLES, sizeof samples[0], compare_i64);
+    guint p90_index = RESIZE_SAMPLES - 1;
     g_print ("CHART04-RESIZE operation=24-step-sequence samples=%u median_us=%" G_GINT64_FORMAT
              " p90_us=%" G_GINT64_FORMAT " per_step_median_us=%.1f\n",
-             SAMPLES, samples[SAMPLES / 2], samples[p90_index],
-             (double) samples[SAMPLES / 2] / RESIZE_STEPS);
+             RESIZE_SAMPLES, samples[RESIZE_SAMPLES / 2], samples[p90_index],
+             (double) samples[RESIZE_SAMPLES / 2] / RESIZE_STEPS);
     return TRUE;
 }
 
