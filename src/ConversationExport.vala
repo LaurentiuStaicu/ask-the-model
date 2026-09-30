@@ -2,7 +2,7 @@ namespace AskTheModel {
     public class ConversationExport : Object {
         public const string FORMAT =
             "ask-the-model-conversation-export";
-        public const int64 SCHEMA_VERSION = 1;
+        public const int64 SCHEMA_VERSION = 2;
 
         private static void add_nullable_string (
             Json.Builder builder,
@@ -86,6 +86,88 @@ namespace AskTheModel {
                 citation.immutable_permalink
             );
 
+            builder.end_object ();
+        }
+
+        private static void add_chart_series (
+            Json.Builder builder,
+            ConversationPersistenceChartSeries series
+        ) {
+            builder.begin_object ();
+
+            builder.set_member_name ("series_profile");
+            builder.add_string_value (series.series_profile);
+
+            builder.set_member_name ("admission_profile");
+            builder.add_string_value (series.admission_profile);
+
+            builder.set_member_name ("scientific_id");
+            builder.add_string_value (series.scientific_id);
+
+            builder.set_member_name ("qualified_id");
+            builder.add_string_value (series.qualified_id);
+
+            builder.set_member_name ("repository_id");
+            builder.add_string_value (series.repository_id);
+
+            builder.set_member_name ("repository_version");
+            builder.add_string_value (series.repository_version);
+
+            builder.set_member_name ("snapshot_sha");
+            builder.add_string_value (series.snapshot_sha);
+
+            builder.set_member_name ("source_path");
+            builder.add_string_value (series.source_path);
+
+            builder.end_object ();
+        }
+
+        private static void add_chart (
+            Json.Builder builder,
+            ConversationPersistenceChart chart
+        ) {
+            builder.begin_object ();
+
+            builder.set_member_name ("ordinal");
+            builder.add_int_value (chart.ordinal);
+
+            builder.set_member_name ("chart_schema");
+            builder.add_string_value (chart.chart_schema);
+
+            builder.set_member_name ("chart_spec_id");
+            builder.add_string_value (chart.chart_spec_id);
+
+            builder.set_member_name ("chart_kind");
+            builder.add_string_value (chart.chart_kind);
+
+            builder.set_member_name ("reconstruction_profile");
+            builder.add_string_value (
+                chart.reconstruction_profile
+            );
+
+            builder.set_member_name ("series");
+            builder.begin_array ();
+
+            foreach (
+                ConversationPersistenceChartSeries series
+                in chart.series
+            ) {
+                add_chart_series (builder, series);
+            }
+
+            builder.end_array ();
+
+            builder.set_member_name ("charts");
+            builder.begin_array ();
+
+            foreach (
+                ConversationPersistenceChart chart
+                in message.charts
+            ) {
+                add_chart (builder, chart);
+            }
+
+            builder.end_array ();
             builder.end_object ();
         }
 
