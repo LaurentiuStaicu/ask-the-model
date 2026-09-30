@@ -898,6 +898,149 @@ namespace AskTheModel {
                         );
                 }
 
+                ConversationPersistenceChart[] charts = {};
+
+                for (
+                    uint chart_index = 0;
+                    chart_index <
+                        ConversationStoreNative.snapshot_message_chart_count_at (
+                            native_snapshot,
+                            message_index
+                        );
+                    chart_index++
+                ) {
+                    ConversationPersistenceChartSeries[] series = {};
+
+                    for (
+                        uint series_index = 0;
+                        series_index <
+                            ConversationStoreNative.snapshot_chart_series_count_at (
+                                native_snapshot,
+                                message_index,
+                                chart_index
+                            );
+                        series_index++
+                    ) {
+                        series +=
+                            new ConversationPersistenceChartSeries (
+                                require_native_text (
+                                    ConversationStoreNative.snapshot_chart_series_profile_at (
+                                        native_snapshot,
+                                        message_index,
+                                        chart_index,
+                                        series_index
+                                    ),
+                                    "chart series profile"
+                                ),
+                                require_native_text (
+                                    ConversationStoreNative.snapshot_chart_series_admission_profile_at (
+                                        native_snapshot,
+                                        message_index,
+                                        chart_index,
+                                        series_index
+                                    ),
+                                    "chart admission profile"
+                                ),
+                                require_native_text (
+                                    ConversationStoreNative.snapshot_chart_series_scientific_id_at (
+                                        native_snapshot,
+                                        message_index,
+                                        chart_index,
+                                        series_index
+                                    ),
+                                    "chart scientific id"
+                                ),
+                                require_native_text (
+                                    ConversationStoreNative.snapshot_chart_series_qualified_id_at (
+                                        native_snapshot,
+                                        message_index,
+                                        chart_index,
+                                        series_index
+                                    ),
+                                    "chart qualified id"
+                                ),
+                                require_native_text (
+                                    ConversationStoreNative.snapshot_chart_series_repository_id_at (
+                                        native_snapshot,
+                                        message_index,
+                                        chart_index,
+                                        series_index
+                                    ),
+                                    "chart repository id"
+                                ),
+                                require_native_text (
+                                    ConversationStoreNative.snapshot_chart_series_repository_version_at (
+                                        native_snapshot,
+                                        message_index,
+                                        chart_index,
+                                        series_index
+                                    ),
+                                    "chart repository version"
+                                ),
+                                require_native_text (
+                                    ConversationStoreNative.snapshot_chart_series_snapshot_sha_at (
+                                        native_snapshot,
+                                        message_index,
+                                        chart_index,
+                                        series_index
+                                    ),
+                                    "chart snapshot SHA"
+                                ),
+                                require_native_text (
+                                    ConversationStoreNative.snapshot_chart_series_source_path_at (
+                                        native_snapshot,
+                                        message_index,
+                                        chart_index,
+                                        series_index
+                                    ),
+                                    "chart source path"
+                                )
+                            );
+                    }
+
+                    charts +=
+                        new ConversationPersistenceChart (
+                            ConversationStoreNative.snapshot_chart_ordinal_at (
+                                native_snapshot,
+                                message_index,
+                                chart_index
+                            ),
+                            require_native_text (
+                                ConversationStoreNative.snapshot_chart_schema_at (
+                                    native_snapshot,
+                                    message_index,
+                                    chart_index
+                                ),
+                                "chart schema"
+                            ),
+                            require_native_text (
+                                ConversationStoreNative.snapshot_chart_spec_id_at (
+                                    native_snapshot,
+                                    message_index,
+                                    chart_index
+                                ),
+                                "chart spec id"
+                            ),
+                            require_native_text (
+                                ConversationStoreNative.snapshot_chart_kind_at (
+                                    native_snapshot,
+                                    message_index,
+                                    chart_index
+                                ),
+                                "chart kind"
+                            ),
+                            require_native_text (
+                                ConversationStoreNative.snapshot_chart_reconstruction_profile_at (
+                                    native_snapshot,
+                                    message_index,
+                                    chart_index
+                                ),
+                                "chart reconstruction profile"
+                            ),
+                            series
+                        );
+                }
+
                 messages +=
                     new ConversationPersistenceMessage (
                         ConversationStoreNative.snapshot_message_sequence_no_at (
@@ -937,7 +1080,8 @@ namespace AskTheModel {
                             native_snapshot,
                             message_index
                         ),
-                        citations
+                        citations,
+                        charts
                     );
             }
 
