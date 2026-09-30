@@ -5238,6 +5238,126 @@ atm_conversation_snapshot_message_citation_count_at (
             : 0;
 }
 
+guint
+atm_conversation_snapshot_message_chart_count_at (
+    const AtmConversationSnapshot *snapshot,
+    guint message_index
+)
+{
+    AtmConversationSnapshotMessage *message =
+        snapshot_message_at (snapshot, message_index);
+    return message != NULL && message->charts != NULL
+        ? message->charts->len : 0;
+}
+
+gint64
+atm_conversation_snapshot_chart_ordinal_at (
+    const AtmConversationSnapshot *snapshot,
+    guint message_index,
+    guint chart_index
+)
+{
+    AtmConversationSnapshotChart *chart =
+        snapshot_chart_at (snapshot, message_index, chart_index);
+    return chart != NULL ? chart->ordinal : -1;
+}
+
+#define SNAPSHOT_CHART_TEXT_ACCESSOR(name, field) \
+const char * \
+name ( \
+    const AtmConversationSnapshot *snapshot, \
+    guint message_index, \
+    guint chart_index \
+) \
+{ \
+    AtmConversationSnapshotChart *chart = \
+        snapshot_chart_at (snapshot, message_index, chart_index); \
+    return chart != NULL ? chart->field : NULL; \
+}
+
+SNAPSHOT_CHART_TEXT_ACCESSOR (
+    atm_conversation_snapshot_chart_schema_at,
+    chart_schema
+)
+SNAPSHOT_CHART_TEXT_ACCESSOR (
+    atm_conversation_snapshot_chart_spec_id_at,
+    chart_spec_id
+)
+SNAPSHOT_CHART_TEXT_ACCESSOR (
+    atm_conversation_snapshot_chart_kind_at,
+    chart_kind
+)
+SNAPSHOT_CHART_TEXT_ACCESSOR (
+    atm_conversation_snapshot_chart_reconstruction_profile_at,
+    reconstruction_profile
+)
+
+#undef SNAPSHOT_CHART_TEXT_ACCESSOR
+
+guint
+atm_conversation_snapshot_chart_series_count_at (
+    const AtmConversationSnapshot *snapshot,
+    guint message_index,
+    guint chart_index
+)
+{
+    AtmConversationSnapshotChart *chart =
+        snapshot_chart_at (snapshot, message_index, chart_index);
+    return chart != NULL && chart->series != NULL
+        ? chart->series->len : 0;
+}
+
+#define SNAPSHOT_CHART_SERIES_TEXT_ACCESSOR(name, field) \
+const char * \
+name ( \
+    const AtmConversationSnapshot *snapshot, \
+    guint message_index, \
+    guint chart_index, \
+    guint series_index \
+) \
+{ \
+    AtmConversationSnapshotChartSeries *series = \
+        snapshot_chart_series_at ( \
+            snapshot, message_index, chart_index, series_index \
+        ); \
+    return series != NULL ? series->field : NULL; \
+}
+
+SNAPSHOT_CHART_SERIES_TEXT_ACCESSOR (
+    atm_conversation_snapshot_chart_series_profile_at,
+    series_profile
+)
+SNAPSHOT_CHART_SERIES_TEXT_ACCESSOR (
+    atm_conversation_snapshot_chart_series_admission_profile_at,
+    admission_profile
+)
+SNAPSHOT_CHART_SERIES_TEXT_ACCESSOR (
+    atm_conversation_snapshot_chart_series_scientific_id_at,
+    scientific_id
+)
+SNAPSHOT_CHART_SERIES_TEXT_ACCESSOR (
+    atm_conversation_snapshot_chart_series_qualified_id_at,
+    qualified_id
+)
+SNAPSHOT_CHART_SERIES_TEXT_ACCESSOR (
+    atm_conversation_snapshot_chart_series_repository_id_at,
+    repository_id
+)
+SNAPSHOT_CHART_SERIES_TEXT_ACCESSOR (
+    atm_conversation_snapshot_chart_series_repository_version_at,
+    repository_version
+)
+SNAPSHOT_CHART_SERIES_TEXT_ACCESSOR (
+    atm_conversation_snapshot_chart_series_snapshot_sha_at,
+    snapshot_sha
+)
+SNAPSHOT_CHART_SERIES_TEXT_ACCESSOR (
+    atm_conversation_snapshot_chart_series_source_path_at,
+    source_path
+)
+
+#undef SNAPSHOT_CHART_SERIES_TEXT_ACCESSOR
+
 #define SNAPSHOT_CITATION_TEXT_ACCESSOR(name, field) \
 const char * \
 name ( \
