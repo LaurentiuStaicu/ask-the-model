@@ -53,6 +53,26 @@ namespace AskTheModel.ConversationStoreNative {
         out int64 turn_no
     ) throws GLib.Error;
 
+    [CCode (cname = "atm_conversation_store_attach_chart_values")]
+    public static bool attach_chart_values (
+        Store store,
+        string conversation_id,
+        int64 turn_no,
+        uint ordinal,
+        string chart_schema,
+        string chart_spec_id,
+        string chart_kind,
+        string reconstruction_profile,
+        string series_profile,
+        string admission_profile,
+        string scientific_id,
+        string qualified_id,
+        string repository_id,
+        string repository_version,
+        string snapshot_sha,
+        string source_path
+    ) throws GLib.Error;
+
     [CCode (cname = "atm_conversation_store_update_title")]
     public static bool update_title (
         Store store,
@@ -267,6 +287,118 @@ namespace AskTheModel.ConversationStoreNative {
     public static uint snapshot_message_citation_count_at (
         ConversationSnapshot snapshot,
         uint message_index
+    );
+
+    [CCode (cname = "atm_conversation_snapshot_message_chart_count_at")]
+    public static uint snapshot_message_chart_count_at (
+        ConversationSnapshot snapshot,
+        uint message_index
+    );
+
+    [CCode (cname = "atm_conversation_snapshot_chart_ordinal_at")]
+    public static int64 snapshot_chart_ordinal_at (
+        ConversationSnapshot snapshot,
+        uint message_index,
+        uint chart_index
+    );
+
+    [CCode (cname = "atm_conversation_snapshot_chart_schema_at")]
+    public static unowned string? snapshot_chart_schema_at (
+        ConversationSnapshot snapshot,
+        uint message_index,
+        uint chart_index
+    );
+
+    [CCode (cname = "atm_conversation_snapshot_chart_spec_id_at")]
+    public static unowned string? snapshot_chart_spec_id_at (
+        ConversationSnapshot snapshot,
+        uint message_index,
+        uint chart_index
+    );
+
+    [CCode (cname = "atm_conversation_snapshot_chart_kind_at")]
+    public static unowned string? snapshot_chart_kind_at (
+        ConversationSnapshot snapshot,
+        uint message_index,
+        uint chart_index
+    );
+
+    [CCode (cname = "atm_conversation_snapshot_chart_reconstruction_profile_at")]
+    public static unowned string? snapshot_chart_reconstruction_profile_at (
+        ConversationSnapshot snapshot,
+        uint message_index,
+        uint chart_index
+    );
+
+    [CCode (cname = "atm_conversation_snapshot_chart_series_count_at")]
+    public static uint snapshot_chart_series_count_at (
+        ConversationSnapshot snapshot,
+        uint message_index,
+        uint chart_index
+    );
+
+    [CCode (cname = "atm_conversation_snapshot_chart_series_profile_at")]
+    public static unowned string? snapshot_chart_series_profile_at (
+        ConversationSnapshot snapshot,
+        uint message_index,
+        uint chart_index,
+        uint series_index
+    );
+
+    [CCode (cname = "atm_conversation_snapshot_chart_series_admission_profile_at")]
+    public static unowned string? snapshot_chart_series_admission_profile_at (
+        ConversationSnapshot snapshot,
+        uint message_index,
+        uint chart_index,
+        uint series_index
+    );
+
+    [CCode (cname = "atm_conversation_snapshot_chart_series_scientific_id_at")]
+    public static unowned string? snapshot_chart_series_scientific_id_at (
+        ConversationSnapshot snapshot,
+        uint message_index,
+        uint chart_index,
+        uint series_index
+    );
+
+    [CCode (cname = "atm_conversation_snapshot_chart_series_qualified_id_at")]
+    public static unowned string? snapshot_chart_series_qualified_id_at (
+        ConversationSnapshot snapshot,
+        uint message_index,
+        uint chart_index,
+        uint series_index
+    );
+
+    [CCode (cname = "atm_conversation_snapshot_chart_series_repository_id_at")]
+    public static unowned string? snapshot_chart_series_repository_id_at (
+        ConversationSnapshot snapshot,
+        uint message_index,
+        uint chart_index,
+        uint series_index
+    );
+
+    [CCode (cname = "atm_conversation_snapshot_chart_series_repository_version_at")]
+    public static unowned string? snapshot_chart_series_repository_version_at (
+        ConversationSnapshot snapshot,
+        uint message_index,
+        uint chart_index,
+        uint series_index
+    );
+
+    [CCode (cname = "atm_conversation_snapshot_chart_series_snapshot_sha_at")]
+    public static unowned string? snapshot_chart_series_snapshot_sha_at (
+        ConversationSnapshot snapshot,
+        uint message_index,
+        uint chart_index,
+        uint series_index
+    );
+
+    [CCode (cname = "atm_conversation_snapshot_chart_series_source_path_at")]
+    public static unowned string? snapshot_chart_series_source_path_at (
+        ConversationSnapshot snapshot,
+        uint message_index,
+        uint chart_index,
+        uint series_index
     );
 
     [CCode (cname = "atm_conversation_snapshot_citation_label_at")]
