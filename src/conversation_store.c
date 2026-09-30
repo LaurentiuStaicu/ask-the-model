@@ -4694,6 +4694,118 @@ atm_conversation_store_load_snapshot (
     );
     statement = NULL;
 
+    if (!prepare_statement (
+            store->db,
+            "SELECT m.sequence_no,c.ordinal,c.chart_schema,c.chart_spec_id,"
+            "c.chart_kind,c.reconstruction_profile "
+            "FROM message_charts c "
+            "JOIN messages m ON m.message_id=c.message_id "
+            "WHERE m.conversation_id=?1 "
+            "ORDER BY m.sequence_no ASC,c.ordinal ASC;",
+            &statement,
+            error
+        )) {
+        goto out;
+    }
+    sqlite3_bind_text (statement, 1, conversation_id, -1, SQLITE_TRANSIENT);
+
+    while ((rc = sqlite3_step (statement)) == SQLITE_ROW) {
+        gint64 sequence_no = sqlite3_column_int64 (statement, 0);
+        AtmConversationSnapshotMessage *message =
+            snapshot_message_for_sequence (snapshot, sequence_no);
+        if (message == NULL) {
+            g_set_error_literal (
+                error,
+                ATM_CONVERSATION_STORE_ERROR,
+                ATM_CONVERSATION_STORE_ERROR_INTEGRITY,
+                "Conversation chart refers to an unavailable snapshot message."
+            );
+            goto out;
+        }
+
+        AtmConversationSnapshotChart *chart =
+            g_new0 (AtmConversationSnapshotChart, 1);
+        chart->ordinal = sqlite3_column_int64 (statement, 1);
+        chart->chart_schema = column_text_dup (statement, 2);
+        chart->chart_spec_id = column_text_dup (statement, 3);
+        chart->chart_kind = column_text_dup (statement, 4);
+        chart->reconstruction_profile = column_text_dup (statement, 5);
+        chart->series =
+            g_ptr_array_new_with_free_func (snapshot_chart_series_free);
+        g_ptr_array_add (message->charts, chart);
+    }
+    if (rc != SQLITE_DONE) {
+        set_sqlite_error (
+            store->db,
+            error,
+            ATM_CONVERSATION_STORE_ERROR_SQLITE,
+            "Could not read durable conversation chart bindings"
+        );
+        goto out;
+    }
+    sqlite3_finalize (statement);
+    statement = NULL;
+
+    if (!prepare_statement (
+            store->db,
+            "SELECT m.sequence_no,s.chart_ordinal,s.series_ordinal,"
+            "s.series_profile,s.admission_profile,s.scientific_id,s.qualified_id,"
+            "s.repository_id,s.repository_version,s.snapshot_sha,s.source_path "
+            "FROM chart_series s "
+            "JOIN messages m ON m.message_id=s.message_id "
+            "WHERE m.conversation_id=?1 "
+            "ORDER BY m.sequence_no ASC,s.chart_ordinal ASC,s.series_ordinal ASC;",
+            &statement,
+            error
+        )) {
+        goto out;
+    }
+    sqlite3_bind_text (statement, 1, conversation_id, -1, SQLITE_TRANSIENT);
+
+    while ((rc = sqlite3_step (statement)) == SQLITE_ROW) {
+        gint64 sequence_no = sqlite3_column_int64 (statement, 0);
+        gint64 chart_ordinal = sqlite3_column_int64 (statement, 1);
+        gint64 series_ordinal = sqlite3_column_int64 (statement, 2);
+        AtmConversationSnapshotMessage *message =
+            snapshot_message_for_sequence (snapshot, sequence_no);
+        AtmConversationSnapshotChart *chart =
+            snapshot_chart_for_ordinal (message, chart_ordinal);
+        if (chart == NULL || series_ordinal < 0 ||
+            (guint) series_ordinal != chart->series->len) {
+            g_set_error_literal (
+                error,
+                ATM_CONVERSATION_STORE_ERROR,
+                ATM_CONVERSATION_STORE_ERROR_INTEGRITY,
+                "Conversation chart series order is unavailable or non-contiguous."
+            );
+            goto out;
+        }
+
+        AtmConversationSnapshotChartSeries *series =
+            g_new0 (AtmConversationSnapshotChartSeries, 1);
+        series->series_ordinal = (guint) series_ordinal;
+        series->series_profile = column_text_dup (statement, 3);
+        series->admission_profile = column_text_dup (statement, 4);
+        series->scientific_id = column_text_dup (statement, 5);
+        series->qualified_id = column_text_dup (statement, 6);
+        series->repository_id = column_text_dup (statement, 7);
+        series->repository_version = column_text_dup (statement, 8);
+        series->snapshot_sha = column_text_dup (statement, 9);
+        series->source_path = column_text_dup (statement, 10);
+        g_ptr_array_add (chart->series, series);
+    }
+    if (rc != SQLITE_DONE) {
+        set_sqlite_error (
+            store->db,
+            error,
+            ATM_CONVERSATION_STORE_ERROR_SQLITE,
+            "Could not read durable conversation chart series bindings"
+        );
+        goto out;
+    }
+    sqlite3_finalize (statement);
+    statement = NULL;
+
     if (!exec_sql (
             store->db,
             "COMMIT;",
