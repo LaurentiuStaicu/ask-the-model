@@ -1,0 +1,58 @@
+name: CHART-04 resize characterization
+
+on:
+  pull_request:
+    paths:
+      - 'src/chart_*'
+      - 'src/verified_series.*'
+      - 'src/gistemp_*'
+      - 'src/annual_series_candidate.*'
+      - 'src/scientific_*'
+      - 'tests/chart_fixture.*'
+      - 'tests/chart_resize_characterize.c'
+      - 'tests/fixtures/chart01/**'
+      - '.github/workflows/chart04-resize-characterize.yml'
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  characterize:
+    runs-on: ubuntu-24.04
+    timeout-minutes: 15
+    steps:
+      - uses: actions/checkout@v4
+      - name: Install native dependencies
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y --no-install-recommends gcc pkg-config libglib2.0-dev libjson-glib-dev libcairo2-dev libfontconfig-dev fonts-dejavu-core
+      - name: Build optimized characterization binary
+        run: |
+          set -euo pipefail
+          sources=(src/chart_render.c src/chart_projection.c src/chart_spec.c src/verified_series.c
+            src/gistemp_sra.c src/gistemp_evidence.c src/gistemp_admission.c
+            src/annual_series_candidate.c src/scientific_canonical.c src/scientific_artifact.c
+            src/scientific_result.c src/scientific_operation.c src/scientific_derivation.c
+            tests/chart_fixture.c)
+          cc -std=c11 -Wall -Wextra -Werror -O2 -Isrc -Itests \
+            "${sources[@]}" tests/chart_resize_characterize.c \
+            $(pkg-config --cflags --libs glib-2.0 json-glib-1.0 cairo fontconfig) -lm \
+            -o /tmp/chart-resize-characterize
+      - name: Record environment
+        run: |
+          {
+            echo "kernel=$(uname -srmo)"
+            lscpu | grep -E '^(Architecture|CPU\(s\)|Model name|Thread|Core|Socket):' || true
+          } | tee /tmp/chart04-resize-environment.txt
+      - name: Characterize resize path
+        env:
+          ATM_CHART01_FIXTURE: tests/fixtures/chart01
+        run: /tmp/chart-resize-characterize | tee /tmp/chart04-resize-characterization.txt
+      - uses: actions/upload-artifact@v4
+        with:
+          name: chart04-resize-characterization
+          path: |
+            /tmp/chart04-resize-characterization.txt
+            /tmp/chart04-resize-environment.txt
+          if-no-files-found: error
