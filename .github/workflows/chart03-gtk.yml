@@ -1,0 +1,61 @@
+name: CHART-03 GTK component
+on:
+  pull_request:
+    paths:
+      - 'src/chart_*'
+      - 'src/ChartNative.vapi'
+      - 'src/verified_series.*'
+      - 'src/gistemp_*'
+      - 'src/annual_series_candidate.*'
+      - 'src/scientific_*'
+      - 'tests/chart_*'
+      - 'tests/fixtures/chart01/**'
+      - 'scripts/chart03_gtk_preview_log.py'
+      - 'meson.build'
+      - '.github/workflows/chart03-gtk.yml'
+  workflow_dispatch:
+permissions:
+  contents: read
+jobs:
+  qualify:
+    runs-on: ubuntu-24.04
+    timeout-minutes: 15
+    steps:
+      - uses: actions/checkout@v4
+      - name: Install GTK test dependencies
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y --no-install-recommends gcc pkg-config valac libgtk-4-dev libjson-glib-dev fonts-dejavu-core xvfb xauth xdotool dbus-x11
+      - name: Compile and exercise native and Vala component
+        env:
+          GTK_A11Y: none
+          GTK_IM_MODULE: gtk-im-context-simple
+          GDK_BACKEND: x11
+          GSK_RENDERER: cairo
+          G_DEBUG: fatal-warnings
+          ATM_CHART01_FIXTURE: tests/fixtures/chart01
+          ATM_CHART03_KEYBOARD: '1'
+          ATM_CHART03_GTK_OUTPUT: /tmp/chart03-gtk-preview
+          UBSAN_OPTIONS: halt_on_error=1:print_stacktrace=1
+        run: |
+          set -euo pipefail
+          sources=(src/chart_view.c src/chart_render.c src/chart_projection.c src/chart_spec.c
+            src/verified_series.c src/gistemp_sra.c src/gistemp_evidence.c src/gistemp_admission.c
+            src/annual_series_candidate.c src/scientific_canonical.c src/scientific_artifact.c
+            src/scientific_result.c src/scientific_operation.c src/scientific_derivation.c tests/chart_fixture.c)
+          cc -std=c11 -Wall -Wextra -Werror -g -O1 -fsanitize=undefined -Isrc -Itests \
+            "${sources[@]}" tests/chart_view_test.c \
+            $(pkg-config --cflags --libs gtk4 json-glib-1.0) -lm -o /tmp/chart-view-test
+          xvfb-run -a -s '-screen 0 1200x900x24' dbus-run-session -- /tmp/chart-view-test
+          valac --pkg gtk4 --pkg json-glib-1.0 --pkg cairo --pkg gio-2.0 \
+            -X -Isrc -X -Itests -X -lm \
+            src/ChartNative.vapi tests/chart_view_vala_test.vala "${sources[@]}" \
+            -o /tmp/chart-view-vala-test
+          xvfb-run -a dbus-run-session -- /tmp/chart-view-vala-test
+      - name: Publish GTK preview diagnostics
+        run: python3 scripts/chart03_gtk_preview_log.py /tmp/chart03-gtk-preview
+      - uses: actions/upload-artifact@v4
+        with:
+          name: chart03-gtk-preview
+          path: /tmp/chart03-gtk-preview/
+          if-no-files-found: error
