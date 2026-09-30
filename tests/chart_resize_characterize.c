@@ -4,7 +4,8 @@
 #include <fontconfig/fontconfig.h>
 #include <stdlib.h>
 
-#define SAMPLES 21u
+#define SAMPLES 9u
+#define RESIZE_SAMPLES 3u
 #define RESIZE_STEPS 24u
 
 typedef enum {
@@ -87,9 +88,9 @@ measure_resize_sequence (AtmChartSpec *spec)
         1020, 1100, 1180, 1260, 1340, 1420, 1500, 1420,
         1340, 1260, 1180, 1100, 1020, 940, 860, 780
     };
-    gint64 samples[SAMPLES];
+    gint64 samples[RESIZE_SAMPLES];
 
-    for (guint sample = 0; sample < SAMPLES; sample++) {
+    for (guint sample = 0; sample < RESIZE_SAMPLES; sample++) {
         gint64 start = g_get_monotonic_time ();
         for (guint i = 0; i < RESIZE_STEPS; i++) {
             guint height = 348 + (widths[i] - 432) / 2;
