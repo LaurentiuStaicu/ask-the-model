@@ -2595,6 +2595,7 @@ chart_view_test = executable(
    'src/scientific_derivation.c', 'tests/chart_view_test.c'],
   include_directories: include_directories('src', 'tests'),
   dependencies: [gtk_dep, glib_dep, json_glib_dep, dependency('cairo')],
+  c_args: ['-DATM_CHART_VIEW_TESTING'],
   install: false
 )
 test('chart-view', chart_view_test,
