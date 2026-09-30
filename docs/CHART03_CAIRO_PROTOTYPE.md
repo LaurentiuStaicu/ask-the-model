@@ -85,11 +85,12 @@ checks ownership, errors, page switching, selected row and exact data access.
 The component revalidates and owns its scientific input. Strings in the table
 model are owned copies; freeing the factory input or replacing the rendered
 surface cannot alter Data. Render output is replaced on size/device-scale changes;
-a draw callback only paints the prepared surface. One current surface is retained
-for ordinary redraws. Unsupported sizes/scales produce an explicit status with
-Data still available. Synchronous source reconstruction on resize is intentionally
-not a performance qualification; CHART-04 must address interactive resize cost
-before general runtime activation. No shared cache or downsampling is introduced.
+a draw callback only paints the prepared surface. CHART-04 qualifies the renderer
+once at construction, then rebuilds only viewport-dependent projection/surface
+state from that owned specification. GTK resize/device-scale bursts are coalesced
+to one idle viewport update for the latest request; unsupported transient requests
+retain the last valid surface and exact Data. No shared cache or production
+downsampling caller is introduced.
 
 Chart/Data switcher buttons use GTK keyboard behavior. Alt+1 and Alt+2 switch
 pages and move focus. GTK 4.12's `gtk_column_view_scroll_to` focuses the selected
