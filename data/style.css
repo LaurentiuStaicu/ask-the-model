@@ -526,3 +526,30 @@ window.atm-window.atm-dark textview.atm-prompt-input text {
     background-color: #2D2D2A;
     color: #FAFBF9;
 }
+
+tooltip,
+tooltip.background,
+tooltip.csd {
+    margin: 0;
+    padding: 0;
+    background-image: none;
+    background-color: #2D2D2A;
+    color: #FAFBF9;
+    border: 1px solid #6F706C;
+    border-radius: 0;
+    box-shadow: none;
+}
+
+tooltip > box {
+    margin: 0;
+    padding: 4px 8px;
+    background-image: none;
+    background-color: transparent;
+    border: none;
+    border-radius: 0;
+    box-shadow: none;
+}
+
+tooltip label {
+    color: #FAFBF9;
+}

@@ -608,12 +608,30 @@ namespace AskTheModel {
                     optimization_summary
                 );
 
-            status_lcd.tooltip_text = summary;
             status_lcd.update_property (
                 Gtk.AccessibleProperty.LABEL,
                 "Application status",
                 Gtk.AccessibleProperty.DESCRIPTION,
                 summary
+            );
+        }
+
+        private string repository_annunciator_tooltip (
+            string repository_id
+        ) {
+            RepositoryRuntimeInfo info =
+                repository_lifecycle.info_for (
+                    repository_id
+                );
+            string version =
+                info.local.version ??
+                info.remote_version ??
+                info.descriptor.supported_version;
+
+            return "%s (%s) v%s".printf (
+                info.descriptor.display_name,
+                info.descriptor.acronym,
+                version
             );
         }
 
@@ -728,6 +746,21 @@ namespace AskTheModel {
                 repository_error ||
                 startup_qualification_failed
             );
+
+            if (repo_ewd_annunciator != null) {
+                repo_ewd_annunciator.tooltip_text =
+                    repository_annunciator_tooltip ("ewd");
+            }
+
+            if (repo_cbd_annunciator != null) {
+                repo_cbd_annunciator.tooltip_text =
+                    repository_annunciator_tooltip ("cbd");
+            }
+
+            if (repo_rmd_annunciator != null) {
+                repo_rmd_annunciator.tooltip_text =
+                    repository_annunciator_tooltip ("rmd");
+            }
 
             if (repo_error_annunciator != null) {
                 repo_error_annunciator.label =
@@ -2235,6 +2268,10 @@ namespace AskTheModel {
             if (optimization_lcd_annunciator != null) {
                 optimization_lcd_annunciator.label =
                     enabled ? "OPT ON" : "OPT OFF";
+                optimization_lcd_annunciator.tooltip_text =
+                    enabled
+                        ? "Optimizations ON — experimental optimized runtime behavior"
+                        : "Optimizations OFF — baseline runtime behavior";
                 set_annunciator (
                     optimization_lcd_annunciator,
                     true
@@ -4000,11 +4037,11 @@ namespace AskTheModel {
             no_repos_annunciator.tooltip_text =
                 "No selected repository snapshot ready";
             repo_ewd_annunciator.tooltip_text =
-                "Empirical World3 Dynamics (EWD) v0.1.0";
+                repository_annunciator_tooltip ("ewd");
             repo_cbd_annunciator.tooltip_text =
-                "Cognitive Belief Dynamics (CBD) v0.1.0";
+                repository_annunciator_tooltip ("cbd");
             repo_rmd_annunciator.tooltip_text =
-                "Romanian Monetary Dynamics (RMD) v0.1.0";
+                repository_annunciator_tooltip ("rmd");
             ai_scan_annunciator.tooltip_text =
                 "Scan local AI models";
             repo_check_annunciator.tooltip_text =
@@ -4022,7 +4059,9 @@ namespace AskTheModel {
             repo_error_annunciator.tooltip_text =
                 "Repository operation failed";
             optimization_lcd_annunciator.tooltip_text =
-                "Optimization mode";
+                optimization_policy.enabled
+                    ? "Optimizations ON — experimental optimized runtime behavior"
+                    : "Optimizations OFF — baseline runtime behavior";
 
             var lcd_row = new Gtk.Box (
                 Gtk.Orientation.HORIZONTAL,
