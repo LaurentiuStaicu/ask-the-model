@@ -1,0 +1,7 @@
+[Flatpak Repo]
+Title=AtM Development
+Url=https://raw.githubusercontent.com/LaurentiuStaicu/ask-the-model/flatpak-repo/repo/
+Homepage=https://github.com/LaurentiuStaicu/ask-the-model
+Comment=Development updates for Ask the Model
+Description=Automatically published development builds of Ask the Model.
+Icon=https://raw.githubusercontent.com/LaurentiuStaicu/ask-the-model/main/data/icons/64.png
