@@ -836,8 +836,9 @@ atm_archive_extract_snapshot_cancellable (
 
             if (declared_size < 0 ||
                 (guint64) declared_size > limits->max_file_bytes ||
-                total_bytes + (guint64) declared_size >
-                    limits->max_total_bytes) {
+                total_bytes >
+                    limits->max_total_bytes -
+                    (guint64) declared_size) {
                 g_set_error_literal (
                     error,
                     ATM_ARCHIVE_ERROR,

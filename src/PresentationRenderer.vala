@@ -230,11 +230,30 @@ namespace AskTheModel {
 
                 if (anchor != null) {
                     had_anchor = true;
-                    text.append (
+                    string anchor_text =
                         semantic_anchor_text (
                             anchor
-                        )
-                    );
+                        );
+                    if (anchor_text.length == 0 &&
+                        text.len > 0 &&
+                        text.str[text.len - 1] == '\n') {
+                        foreach (
+                            unowned Gtk.Widget widget
+                            in anchor.get_widgets ()
+                        ) {
+                            if (
+                                widget.has_css_class (
+                                    "atm-turn-separator"
+                                )
+                            ) {
+                                text.truncate (
+                                    text.len - 1
+                                );
+                                break;
+                            }
+                        }
+                    }
+                    text.append (anchor_text);
                 } else {
                     unichar character =
                         iter.get_char ();
@@ -738,6 +757,16 @@ namespace AskTheModel {
         }
 
         public void append_turn_separator () {
+            if (buffer.get_char_count () > 0) {
+                Gtk.TextIter end;
+                buffer.get_end_iter (out end);
+                Gtk.TextIter prev = end;
+                if (!prev.backward_char () ||
+                    prev.get_char () != '\n') {
+                    insert_raw ("\n");
+                }
+            }
+
             var separator = new Gtk.Label (
                 "╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌"
             ) {

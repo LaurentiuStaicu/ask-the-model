@@ -1265,6 +1265,9 @@ namespace AskTheModel {
                 default_height = 420
             };
             history_window.add_css_class ("atm-window");
+            if (system_prefers_dark ()) {
+                history_window.add_css_class ("atm-dark");
+            }
 
             var list = new Gtk.ListBox () {
                 selection_mode = Gtk.SelectionMode.NONE,
@@ -2196,7 +2199,10 @@ namespace AskTheModel {
                     main_window.add_css_class ("atm-dark");
                 }
 
-                update_model_selector ();
+                if (!startup_qualification_running &&
+                    !ai_scanning) {
+                    update_model_selector ();
+                }
             }
 
             main_window.present ();
@@ -2709,6 +2715,10 @@ namespace AskTheModel {
                 default_height = 360,
                 child = scroller
             };
+            source_window.add_css_class ("atm-window");
+            if (system_prefers_dark ()) {
+                source_window.add_css_class ("atm-dark");
+            }
             source_window.present ();
         }
 
@@ -3989,6 +3999,12 @@ namespace AskTheModel {
                 "No usable local AI available";
             no_repos_annunciator.tooltip_text =
                 "No selected repository snapshot ready";
+            repo_ewd_annunciator.tooltip_text =
+                "Empirical World3 Dynamics (EWD) v0.1.0";
+            repo_cbd_annunciator.tooltip_text =
+                "Cognitive Belief Dynamics (CBD) v0.1.0";
+            repo_rmd_annunciator.tooltip_text =
+                "Romanian Monetary Dynamics (RMD) v0.1.0";
             ai_scan_annunciator.tooltip_text =
                 "Scan local AI models";
             repo_check_annunciator.tooltip_text =

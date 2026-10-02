@@ -127,9 +127,18 @@ namespace AskTheModel {
                 }
 
                 var parser = new Json.Parser ();
-                parser.load_from_data ((string) body.get_data (), -1);
+                parser.load_from_data (
+                    (string) body.get_data (),
+                    (ssize_t) body.get_size ()
+                );
 
-                Json.Object root = parser.get_root ().get_object ();
+                unowned Json.Node? root_node = parser.get_root ();
+                if (root_node == null ||
+                    root_node.get_node_type () != Json.NodeType.OBJECT) {
+                    return false;
+                }
+
+                Json.Object root = root_node.get_object ();
                 if (!root.has_member ("capabilities")) {
                     return false;
                 }
@@ -174,9 +183,18 @@ namespace AskTheModel {
                     }
 
                     var parser = new Json.Parser ();
-                    parser.load_from_data ((string) body.get_data (), -1);
+                    parser.load_from_data (
+                        (string) body.get_data (),
+                        (ssize_t) body.get_size ()
+                    );
 
-                    Json.Object root = parser.get_root ().get_object ();
+                    unowned Json.Node? root_node = parser.get_root ();
+                    if (root_node == null ||
+                        root_node.get_node_type () != Json.NodeType.OBJECT) {
+                        continue;
+                    }
+
+                    Json.Object root = root_node.get_object ();
                     if (!root.has_member ("models")) {
                         continue;
                     }

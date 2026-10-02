@@ -122,7 +122,8 @@ window.atm-window menubutton.atm-triangle-selector > button:hover {
 }
 
 window.atm-window dropdown.atm-triangle-selector > popover > contents,
-window.atm-window dropdown.atm-triangle-selector > popover listview {
+window.atm-window dropdown.atm-triangle-selector > popover listview,
+window.atm-window menubutton.atm-triangle-selector > popover > contents {
     background-color: #EFF0ED;
     color: #1B1B18;
 }
@@ -391,7 +392,8 @@ window.atm-window.atm-dark menubutton.atm-triangle-selector > button:hover {
 }
 
 window.atm-window.atm-dark dropdown.atm-triangle-selector > popover > contents,
-window.atm-window.atm-dark dropdown.atm-triangle-selector > popover listview {
+window.atm-window.atm-dark dropdown.atm-triangle-selector > popover listview,
+window.atm-window.atm-dark menubutton.atm-triangle-selector > popover > contents {
     background-color: #2D2D2A;
     color: #FAFBF9;
 }
@@ -505,4 +507,22 @@ window.atm-window.atm-dark frame.atm-input-frame textview text {
 
 window.atm-window.atm-dark frame.atm-input-frame:focus-within {
     border-color: #C9CAC7;
+}
+
+window.atm-window.atm-dark label.atm-header-title,
+window.atm-window.atm-dark label.atm-optimization-title,
+window.atm-window.atm-dark label.atm-tab-title {
+    color: #FAFBF9;
+}
+
+window.atm-window.atm-dark textview.atm-chat-log,
+window.atm-window.atm-dark textview.atm-chat-log text {
+    background-color: #1B1B18;
+    color: #FAFBF9;
+}
+
+window.atm-window.atm-dark textview.atm-prompt-input,
+window.atm-window.atm-dark textview.atm-prompt-input text {
+    background-color: #2D2D2A;
+    color: #FAFBF9;
 }

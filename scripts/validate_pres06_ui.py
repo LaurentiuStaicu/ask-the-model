@@ -79,9 +79,9 @@ def main() -> int:
         "shared Presentation child seam no longer creates/attaches TextChildAnchor",
     )
     require(
-        "insert_raw" not in separator
+        'insert_raw ("\\n")' in separator
         and "buffer.insert" not in separator,
-        "turn separator writes transcript text",
+        "turn separator must place child anchor on a dedicated line without writing separator glyphs to buffer",
     )
 
     begin = block(
@@ -127,7 +127,7 @@ def main() -> int:
         "renderer.complete_assistant_generation (",
         "renderer.cancel_assistant_generation ();",
         "renderer.append_turn_separator ();",
-        "assert (buffer.text == completed);",
+        'assert (buffer.text == completed + "\\n");',
     ):
         require_marker(tests, marker, "renderer PRES-06 test")
 

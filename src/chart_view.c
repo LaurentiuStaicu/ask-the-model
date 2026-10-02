@@ -136,7 +136,11 @@ static void cell_bind (GtkSignalListItemFactory *factory, GtkListItem *item, gpo
     (void) factory;
     const char *line = gtk_string_object_get_string (GTK_STRING_OBJECT (gtk_list_item_get_item (item)));
     char **cells = g_strsplit (line, "\t", -1);
-    gtk_label_set_text (GTK_LABEL (gtk_list_item_get_child (item)), cells[GPOINTER_TO_UINT (data)]);
+    guint col = GPOINTER_TO_UINT (data);
+    gtk_label_set_text (
+        GTK_LABEL (gtk_list_item_get_child (item)),
+        col < g_strv_length (cells) ? cells[col] : ""
+    );
     g_strfreev (cells);
 }
 static void selection_changed (GObject *object, GParamSpec *pspec, gpointer data)
@@ -146,6 +150,11 @@ static void selection_changed (GObject *object, GParamSpec *pspec, gpointer data
     GtkStringObject *row = GTK_STRING_OBJECT (gtk_single_selection_get_selected_item (self->selection));
     if (!row) { gtk_text_buffer_set_text (self->provenance, "Select an observation to inspect its source.", -1); return; }
     char **c = g_strsplit (gtk_string_object_get_string (row), "\t", -1);
+    if (g_strv_length (c) < 8) {
+        g_strfreev (c);
+        gtk_text_buffer_set_text (self->provenance, "Select an observation to inspect its source.", -1);
+        return;
+    }
     GString *text = g_string_new (NULL);
     g_string_append_printf (text, "Year: %s\nExact anomaly: %s deg C (1951-1980)\nCanonical decimal: %se%s\n"
         "Source row: %s\nRepository: LaurentiuStaicu/empirical-world3-dynamics\n"
