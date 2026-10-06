@@ -2643,3 +2643,21 @@ chart_history_reconstruct_test = executable(
 )
 test('chart-history-reconstruct', chart_history_reconstruct_test,
   env: {'ATM_CHART01_FIXTURE': meson.current_source_dir() / 'tests/fixtures/chart01'})
+
+# PRES-09: durable chart recipe survives close/reopen and is re-qualified from the pinned source.
+pres09_chart_history_e2e_test = executable(
+  'pres09-chart-history-e2e-test',
+  ['src/conversation_store.c', 'src/chart_history_reconstruct.c',
+   'src/chart_spec.c', 'src/verified_series.c',
+   'src/gistemp_sra.c', 'src/gistemp_evidence.c',
+   'src/gistemp_admission.c', 'src/annual_series_candidate.c',
+   'src/scientific_canonical.c', 'src/scientific_artifact.c',
+   'src/scientific_result.c', 'src/scientific_operation.c',
+   'src/scientific_derivation.c',
+   'tests/pres09_chart_history_e2e_test.c', resources],
+  include_directories: include_directories('src'),
+  dependencies: [glib_dep, gio_dep, json_glib_dep, sqlite_dep],
+  install: false
+)
+test('pres09-chart-history-e2e', pres09_chart_history_e2e_test,
+  env: {'ATM_CHART01_FIXTURE': meson.current_source_dir() / 'tests/fixtures/chart01'})
