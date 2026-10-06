@@ -206,3 +206,103 @@ cleanup:
         g_clear_pointer (&sources[i], g_bytes_unref);
     return ok;
 }
+
+
+gboolean
+atm_chart_live_reconstruct_gistemp (
+    const char *snapshot_path,
+    const char *repository_id,
+    const char *repository_version,
+    const char *snapshot_sha,
+    AtmChartSpec **out,
+    GError **error
+)
+{
+    static const char *expected_repository =
+        "LaurentiuStaicu/empirical-world3-dynamics";
+    static const char *expected_repository_key = "ewd";
+    static const char *expected_snapshot =
+        "d9e249339663015f6d1c05752338a955bf64ad0b";
+    static const char *source_paths[ATM_GISTEMP_SOURCE_COUNT] = {
+        "science/data/processed/nasa_gistemp_global_2026.csv",
+        "science/data/processed/nasa_gistemp_global_2026.provenance.json",
+        "science/data/input_manifest.json",
+        "science/data/registry.csv"
+    };
+    GBytes *sources[ATM_GISTEMP_SOURCE_COUNT] = { NULL, NULL, NULL, NULL };
+    AtmGistempAdmission *admission = NULL;
+    AtmVerifiedSeries *series = NULL;
+    AtmChartSpec *spec = NULL;
+    const char *admission_repository =
+        NULL;
+    gboolean ok = FALSE;
+
+    g_return_val_if_fail (out != NULL && *out == NULL, FALSE);
+
+    if (snapshot_path == NULL ||
+        repository_id == NULL ||
+        repository_version == NULL ||
+        snapshot_sha == NULL ||
+        repository_version[0] == '\0') {
+        return reject (error, "Incomplete live chart reconstruction identity.");
+    }
+
+    if ((g_strcmp0 (repository_id, expected_repository_key) != 0 &&
+         g_strcmp0 (repository_id, expected_repository) != 0) ||
+        g_strcmp0 (snapshot_sha, expected_snapshot) != 0) {
+        return reject (error, "Live chart repository identity is not admitted.");
+    }
+
+    admission_repository =
+        g_strcmp0 (repository_id, expected_repository_key) == 0
+            ? expected_repository
+            : repository_id;
+
+    for (guint i = 0; i < ATM_GISTEMP_SOURCE_COUNT; i++) {
+        if (!read_source (
+                snapshot_path,
+                source_paths[i],
+                &sources[i],
+                error)) {
+            goto cleanup;
+        }
+    }
+
+    if (!atm_gistemp_admission_new (
+            admission_repository,
+            snapshot_sha,
+            sources,
+            &admission,
+            error)) {
+        goto cleanup;
+    }
+
+    if (!atm_verified_series_from_gistemp (
+            admission,
+            &series,
+            error)) {
+        goto cleanup;
+    }
+
+    const AtmVerifiedSeries *inputs[1] = { series };
+    if (!atm_chart_spec_new (
+            ATM_CHART_LINE,
+            inputs,
+            1,
+            &spec,
+            error)) {
+        goto cleanup;
+    }
+
+    *out = spec;
+    spec = NULL;
+    ok = TRUE;
+
+cleanup:
+    atm_chart_spec_free (spec);
+    atm_verified_series_free (series);
+    atm_gistemp_admission_free (admission);
+    for (guint i = 0; i < ATM_GISTEMP_SOURCE_COUNT; i++)
+        g_clear_pointer (&sources[i], g_bytes_unref);
+    return ok;
+}
