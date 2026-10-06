@@ -47,6 +47,7 @@ executable(
     'src/PresentationNative.vapi',
     'src/PresentationRenderer.vala',
     'src/ChartNative.vapi',
+    'src/ChartIntent.vala',
     'src/chart_view.c',
     'src/chart_render.c',
     'src/chart_projection.c',
