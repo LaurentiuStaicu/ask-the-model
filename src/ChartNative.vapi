@@ -6,6 +6,7 @@ namespace AskTheModel.ChartNative {
 
     [CCode (cname = "AtmChartView", lower_case_cprefix = "atm_chart_view_", type_id = "atm_chart_view_get_type ()")]
     public class View : Gtk.Box {
+        public string? series_scientific_id (); public string? series_qualified_id ();
         public uint row_count ();
         public unowned string? data ();
         public unowned string? visible_page ();
@@ -17,6 +18,14 @@ namespace AskTheModel.ChartNative {
     }
     [CCode (cname = "atm_chart_view_new")]
     public static bool create (Spec? spec, out View view) throws GLib.Error;
+    [CCode (cname = "atm_chart_live_reconstruct_gistemp")]
+    public static bool reconstruct_live_gistemp (
+        string snapshot_path,
+        string repository_id,
+        string repository_version,
+        string snapshot_sha,
+        out Spec spec
+    ) throws GLib.Error;
     [CCode (cname = "atm_chart_history_reconstruct_gistemp")]
     public static bool reconstruct_history_gistemp (
         string snapshot_path,
