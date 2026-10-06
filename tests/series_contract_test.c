@@ -14,7 +14,7 @@ static AtmScientificArtifact *support_artifact (void)
     e.profile_id = "atm-profile/ewd/v1";
     e.profile_version = "1";
     e.repository_id = "ewd";
-    e.repository_version = "1";
+    e.repository_version = "0.1.0";
     e.snapshot_sha = (char *) SHA;
     e.logical_source_id = "ewd:entity:variable:fixture";
     e.source_path = "science/configs/fixture.json";
@@ -47,7 +47,7 @@ static AtmSraResult *qualified_with_artifact (AtmScientificArtifact *a)
     g_assert_no_error (error);
     g_assert_true (atm_sra_qualification_add_canonical_obligation (q, "atm-sra/1", &error));
     g_assert_no_error (error);
-    char *snapshot = g_strdup_printf ("fixture@1#%s", SHA);
+    char *snapshot = g_strdup_printf ("ewd@0.1.0#%s", SHA);
     g_assert_true (atm_sra_qualification_add_repository_snapshot (q, snapshot, &error));
     g_free (snapshot);
     g_assert_no_error (error);
