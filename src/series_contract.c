@@ -2,6 +2,7 @@
 #include "scientific_canonical.h"
 #include <json-glib/json-glib.h>
 
+#include <errno.h>
 #include <string.h>
 
 static gboolean fail (GError **error, AtmSeriesContractError code, const char *message)
@@ -145,20 +146,29 @@ x_valid (AtmSeriesXKind kind, const char *x)
 {
     if (!bounded (x, ATM_SERIES_CONTRACT_MAX_X)) return FALSE;
     if (kind == ATM_SERIES_X_UTC_INSTANT) {
-        /* Canonical UTC instant: YYYY-MM-DDTHH:MM:SSZ. */
+        /* Canonical UTC instant: YYYY-MM-DDTHH:MM:SSZ, with real calendar/time fields. */
         if (strlen (x) != 20 || x[4] != '-' || x[7] != '-' ||
             x[10] != 'T' || x[13] != ':' || x[16] != ':' || x[19] != 'Z')
             return FALSE;
         for (guint i = 0; i < 20; i++)
             if (i != 4 && i != 7 && i != 10 && i != 13 && i != 16 && i != 19 &&
                 !g_ascii_isdigit (x[i])) return FALSE;
-        return TRUE;
+        GDateTime *dt = g_date_time_new_from_iso8601 (x);
+        if (dt == NULL) return FALSE;
+        char *canonical = g_date_time_format (dt, "%Y-%m-%dT%H:%M:%SZ");
+        gboolean matches = g_strcmp0 (canonical, x) == 0;
+        g_free (canonical);
+        g_date_time_unref (dt);
+        return matches;
     }
     if (kind == ATM_SERIES_X_EVENT_ORDINAL) {
         if (x[0] == '0' && x[1] != '\0') return FALSE;
         for (const char *p = x; *p != '\0'; p++)
             if (!g_ascii_isdigit (*p)) return FALSE;
-        return x[0] != '\0';
+        errno = 0;
+        char *end = NULL;
+        (void) g_ascii_strtoull (x, &end, 10);
+        return x[0] != '\0' && end != NULL && *end == '\0' && errno != ERANGE;
     }
     if (kind == ATM_SERIES_X_CALENDAR_YEAR) {
         gsize n = strlen (x);
@@ -345,9 +355,14 @@ support_is_qualified (const AtmSraResult *q, const char *id)
 static gint
 compare_x (AtmSeriesXKind kind, const char *a, const char *b)
 {
-    if (kind == ATM_SERIES_X_CALENDAR_YEAR || kind == ATM_SERIES_X_EVENT_ORDINAL) {
+    if (kind == ATM_SERIES_X_CALENDAR_YEAR) {
         gint64 ai = g_ascii_strtoll (a, NULL, 10);
         gint64 bi = g_ascii_strtoll (b, NULL, 10);
+        return ai < bi ? -1 : ai > bi ? 1 : 0;
+    }
+    if (kind == ATM_SERIES_X_EVENT_ORDINAL) {
+        guint64 ai = g_ascii_strtoull (a, NULL, 10);
+        guint64 bi = g_ascii_strtoull (b, NULL, 10);
         return ai < bi ? -1 : ai > bi ? 1 : 0;
     }
     return strcmp (a, b);
