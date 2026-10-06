@@ -273,6 +273,40 @@ namespace AskTheModel {
             return text.str;
         }
 
+        public void append_chart_widget (
+            Gtk.Widget chart
+        ) {
+            if (chart == null) {
+                return;
+            }
+
+            insert_raw ("\\n");
+            append_semantic_child (
+                chart,
+                "atm-chart-attachment"
+            );
+            insert_raw ("\\n");
+        }
+
+        public void append_chart_status (
+            string text
+        ) {
+            var label = new Gtk.Label (text) {
+                halign = Gtk.Align.START,
+                xalign = 0.0f,
+                wrap = true
+            };
+            label.update_property (
+                Gtk.AccessibleProperty.LABEL,
+                text
+            );
+            append_semantic_child (
+                label,
+                "atm-chart-status"
+            );
+            insert_raw ("\\n");
+        }
+
         public void append_sources (
             Gtk.Button[] source_buttons
         ) {
@@ -807,12 +841,21 @@ namespace AskTheModel {
          */
         public void append_completed_turn (
             string text,
-            Gtk.Button[] source_buttons
+            Gtk.Button[] source_buttons,
+            Gtk.Widget[]? chart_widgets = null
         ) {
             complete_assistant_generation (text);
 
-            if (text.length == 0 && source_buttons.length == 0) {
+            if (text.length == 0 &&
+                source_buttons.length == 0 &&
+                (chart_widgets == null || chart_widgets.length == 0)) {
                 return;
+            }
+
+            if (chart_widgets != null) {
+                foreach (Gtk.Widget chart in chart_widgets) {
+                    append_chart_widget (chart);
+                }
             }
 
             append_sources (source_buttons);

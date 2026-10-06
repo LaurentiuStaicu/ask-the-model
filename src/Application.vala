@@ -2784,10 +2784,120 @@ namespace AskTheModel {
             return button;
         }
 
+        private Gtk.Widget[] build_history_chart_widgets (
+            ConversationPersistenceSnapshot snapshot,
+            ConversationPersistenceMessage message
+        ) throws GLib.Error {
+            Gtk.Widget[] widgets = {};
+
+            if (message.role != "assistant") {
+                throw new GLib.IOError.INVALID_DATA (
+                    "Persisted chart attachment belongs to a non-assistant message."
+                );
+            }
+
+            if (!message.grounded && message.charts.length > 0) {
+                throw new GLib.IOError.INVALID_DATA (
+                    "Persisted chart attachment belongs to an ungrounded assistant message."
+                );
+            }
+
+            for (uint i = 0; i < message.charts.length; i++) {
+                ConversationPersistenceChart chart = message.charts[i];
+
+                if (chart.ordinal != (int64) i ||
+                    chart.series.length != 1) {
+                    throw new GLib.IOError.INVALID_DATA (
+                        "Persisted chart attachment has invalid ordering or series cardinality."
+                    );
+                }
+
+                ConversationPersistenceChartSeries series =
+                    chart.series[0];
+                bool pin_matches = false;
+
+                foreach (ConversationPersistenceRepository pin
+                         in snapshot.repositories) {
+                    if (pin.repository_id == series.repository_id &&
+                        pin.repository_version == series.repository_version &&
+                        pin.snapshot_sha == series.snapshot_sha) {
+                        pin_matches = true;
+                        break;
+                    }
+                }
+
+                if (!pin_matches) {
+                    throw new GLib.IOError.INVALID_DATA (
+                        "Persisted chart repository binding is outside the conversation pin."
+                    );
+                }
+
+                RepositoryDescriptor[] descriptors =
+                    repository_descriptors_for_ids (
+                        { series.repository_id }
+                    );
+                if (descriptors.length != 1) {
+                    throw new GLib.IOError.NOT_FOUND (
+                        "Persisted chart repository is unavailable."
+                    );
+                }
+
+                string snapshot_path =
+                    RepositoryLifecycleService.snapshot_path (
+                        descriptors[0],
+                        series.snapshot_sha
+                    );
+
+                if (!GLib.FileUtils.test (
+                        snapshot_path,
+                        GLib.FileTest.IS_DIR
+                    )) {
+                    throw new GLib.IOError.NOT_FOUND (
+                        "Pinned chart repository snapshot is unavailable."
+                    );
+                }
+
+                ChartNative.Spec? spec = null;
+                if (!ChartNative.reconstruct_history_gistemp (
+                        snapshot_path,
+                        series.repository_id,
+                        series.repository_version,
+                        series.snapshot_sha,
+                        chart.chart_schema,
+                        chart.chart_spec_id,
+                        chart.chart_kind,
+                        chart.reconstruction_profile,
+                        series.series_profile,
+                        series.admission_profile,
+                        series.scientific_id,
+                        series.qualified_id,
+                        series.source_path,
+                        out spec
+                    ) || spec == null) {
+                    throw new GLib.IOError.INVALID_DATA (
+                        "Pinned chart source could not be re-qualified."
+                    );
+                }
+
+                ChartNative.View view;
+                if (!ChartNative.create (spec, out view)) {
+                    throw new GLib.IOError.FAILED (
+                        "Qualified chart could not be rendered."
+                    );
+                }
+
+                view.add_css_class ("atm-history-chart");
+                widgets += view;
+            }
+
+            return widgets;
+        }
+
         private void append_completed_answer (
             ChatTabState state,
             string visible_answer,
-            CitationResolution? resolution = null
+            CitationResolution? resolution = null,
+            Gtk.Widget[]? chart_widgets = null
         ) {
             Gtk.Button[] source_buttons = {};
 
@@ -2812,7 +2922,8 @@ namespace AskTheModel {
 
             state.presentation.append_completed_turn (
                 visible_answer,
-                source_buttons
+                source_buttons,
+                chart_widgets
             );
         }
 
@@ -3670,10 +3781,35 @@ namespace AskTheModel {
                             message
                         );
 
+                    Gtk.Widget[] chart_widgets = {};
+                    try {
+                        chart_widgets = build_history_chart_widgets (
+                            snapshot,
+                            message
+                        );
+                    } catch (GLib.Error chart_error) {
+                        var status = new Gtk.Label (
+                            "Chart unavailable: %s".printf (
+                                chart_error.message
+                            )
+                        ) {
+                            halign = Gtk.Align.START,
+                            xalign = 0.0f,
+                            wrap = true
+                        };
+                        status.add_css_class ("atm-chart-status");
+                        status.update_property (
+                            Gtk.AccessibleProperty.LABEL,
+                            "Chart unavailable. The persisted chart source could not be re-qualified."
+                        );
+                        chart_widgets += status;
+                    }
+
                     append_completed_answer (
                         state,
                         message.display_content,
-                        resolution
+                        resolution,
+                        chart_widgets
                     );
 
                     state.grounded_answers +=

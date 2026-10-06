@@ -46,6 +46,17 @@ executable(
     'src/presentation_normalize.c',
     'src/PresentationNative.vapi',
     'src/PresentationRenderer.vala',
+    'src/ChartNative.vapi',
+    'src/chart_view.c',
+    'src/chart_render.c',
+    'src/chart_projection.c',
+    'src/chart_spec.c',
+    'src/verified_series.c',
+    'src/gistemp_sra.c',
+    'src/gistemp_evidence.c',
+    'src/gistemp_admission.c',
+    'src/annual_series_candidate.c',
+    'src/chart_history_reconstruct.c',
     'src/ActivityRing.vala',
     'src/SelectorTriangle.vala',
     'src/ChatRequestBuilder.vala',
@@ -139,7 +150,8 @@ executable(
   link_args: [
     '-larchive',
     '-lyaml',
-    '-lsqlite3'
+    '-lsqlite3',
+    '-lm'
   ],
   install: true
 )
@@ -2614,3 +2626,20 @@ chart_view_vala_test = executable(
 )
 test('chart-view-vala', chart_view_vala_test,
   env: {'GTK_A11Y': 'none', 'GTK_IM_MODULE': 'gtk-im-context-simple', 'GSK_RENDERER': 'cairo', 'ATM_CHART01_FIXTURE': meson.current_source_dir() / 'tests/fixtures/chart01'})
+
+
+# CHART-05: reconstruct persisted chart recipes from the pinned History snapshot.
+chart_history_reconstruct_test = executable(
+  'chart-history-reconstruct-test',
+  ['src/chart_history_reconstruct.c', 'src/chart_spec.c', 'src/verified_series.c',
+   'src/gistemp_sra.c', 'src/gistemp_evidence.c', 'src/gistemp_admission.c',
+   'src/annual_series_candidate.c', 'src/scientific_canonical.c',
+   'src/scientific_artifact.c', 'src/scientific_result.c',
+   'src/scientific_operation.c', 'src/scientific_derivation.c',
+   'tests/chart_history_reconstruct_test.c'],
+  include_directories: include_directories('src'),
+  dependencies: [glib_dep, gio_dep, json_glib_dep],
+  install: false
+)
+test('chart-history-reconstruct', chart_history_reconstruct_test,
+  env: {'ATM_CHART01_FIXTURE': meson.current_source_dir() / 'tests/fixtures/chart01'})

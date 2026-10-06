@@ -553,3 +553,21 @@ tooltip > box {
 tooltip label {
     color: #FAFBF9;
 }
+
+
+/* CHART-05 History attachments: keep the qualified native component visually
+ * separate from transcript text without changing the semantic transcript. */
+.atm-chart-attachment {
+    margin-top: 8px;
+    margin-bottom: 8px;
+}
+
+.atm-history-chart {
+    min-width: 0;
+}
+
+.atm-chart-status {
+    margin-top: 8px;
+    margin-bottom: 8px;
+    font-size: 0.9em;
+}
