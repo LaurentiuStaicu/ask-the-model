@@ -2629,6 +2629,19 @@ test('chart-view-vala', chart_view_vala_test,
   env: {'GTK_A11Y': 'none', 'GTK_IM_MODULE': 'gtk-im-context-simple', 'GSK_RENDERER': 'cairo', 'ATM_CHART01_FIXTURE': meson.current_source_dir() / 'tests/fixtures/chart01'})
 
 
+# CHART-01: dormant general VerifiedSeries semantic contract.
+series_contract_test = executable(
+  'series-contract-test',
+  ['src/series_contract.c', 'src/scientific_canonical.c',
+   'src/scientific_artifact.c', 'src/scientific_result.c',
+   'src/scientific_operation.c', 'src/scientific_derivation.c',
+   'tests/series_contract_test.c'],
+  include_directories: include_directories('src'),
+  dependencies: [glib_dep],
+  install: false
+)
+test('series-contract', series_contract_test)
+
 # CHART-05: reconstruct persisted chart recipes from the pinned History snapshot.
 chart_history_reconstruct_test = executable(
   'chart-history-reconstruct-test',
