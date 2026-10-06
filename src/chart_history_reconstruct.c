@@ -78,6 +78,7 @@ atm_chart_history_reconstruct_gistemp (
         "science/data/processed/nasa_gistemp_global_2026.csv";
     static const char *expected_repository =
         "LaurentiuStaicu/empirical-world3-dynamics";
+    static const char *expected_repository_key = "ewd";
     static const char *expected_snapshot =
         "d9e249339663015f6d1c05752338a955bf64ad0b";
     static const char *expected_schema = ATM_CHART_SPEC_SCHEMA;
@@ -95,6 +96,7 @@ atm_chart_history_reconstruct_gistemp (
     AtmVerifiedSeries *series = NULL;
     AtmChartSpec *spec = NULL;
     AtmChartKind kind;
+    const char *admission_repository = NULL;
     gboolean ok = FALSE;
 
     g_return_val_if_fail (out != NULL && *out == NULL, FALSE);
@@ -115,10 +117,20 @@ atm_chart_history_reconstruct_gistemp (
         return reject (error, "Incomplete persisted chart reconstruction recipe.");
     }
 
-    if (g_strcmp0 (repository_id, expected_repository) != 0 ||
+    if ((g_strcmp0 (repository_id, expected_repository_key) != 0 &&
+         g_strcmp0 (repository_id, expected_repository) != 0) ||
         g_strcmp0 (snapshot_sha, expected_snapshot) != 0) {
         return reject (error, "Persisted chart repository identity is not admitted.");
     }
+
+    /* The durable conversation schema stores the canonical repository key
+     * (ewd); the scientific admission contract uses the immutable repository
+     * identity. Accept the historical full identity as an internal/native
+     * caller form, but always qualify against the immutable identity. */
+    admission_repository =
+        g_strcmp0 (repository_id, expected_repository_key) == 0
+            ? expected_repository
+            : repository_id;
 
     if (repository_version[0] == '\0' ||
         g_strcmp0 (chart_schema, expected_schema) != 0 ||
@@ -140,7 +152,7 @@ atm_chart_history_reconstruct_gistemp (
     }
 
     if (!atm_gistemp_admission_new (
-            repository_id,
+            admission_repository,
             snapshot_sha,
             sources,
             &admission,
