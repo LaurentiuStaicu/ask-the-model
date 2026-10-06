@@ -3470,6 +3470,9 @@ namespace AskTheModel {
 
                         grounded_turn_prepared = false;
 
+                        Gtk.Widget[] live_chart_widgets = {};
+                        ConversationPersistenceChart[] live_charts = {};
+
                         try {
                             ConversationPersistenceCitation[] citations =
                                 persistence_citations (
@@ -3489,10 +3492,7 @@ namespace AskTheModel {
                                 citations
                             );
 
-                        Gtk.Widget[] live_chart_widgets = {};
-                        ConversationPersistenceChart[] live_charts = {};
-
-                        if (chart_intent.gistemp_requested) {
+                            if (chart_intent.gistemp_requested) {
                             try {
                                 live_chart_widgets =
                                     build_live_chart_widgets (
@@ -3541,7 +3541,7 @@ namespace AskTheModel {
                         title_answer = visible_answer;
                     } else {
                         answer = yield ollama_provider.chat (
-                            prompt,
+                            effective_prompt,
                             state.conversation,
                             false
                         );
