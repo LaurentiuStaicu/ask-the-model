@@ -153,7 +153,7 @@ x_valid (AtmSeriesXKind kind, const char *x)
         for (guint i = 0; i < 20; i++)
             if (i != 4 && i != 7 && i != 10 && i != 13 && i != 16 && i != 19 &&
                 !g_ascii_isdigit (x[i])) return FALSE;
-        GDateTime *dt = g_date_time_new_from_iso8601 (x);
+        GDateTime *dt = g_date_time_new_from_iso8601 (x, NULL);
         if (dt == NULL) return FALSE;
         char *canonical = g_date_time_format (dt, "%Y-%m-%dT%H:%M:%SZ");
         gboolean matches = g_strcmp0 (canonical, x) == 0;
