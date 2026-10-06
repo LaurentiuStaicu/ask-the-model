@@ -376,7 +376,7 @@ atm_series_contract_validate (AtmSeriesContract *s, const AtmSraResult *q, GErro
             if (!support_is_qualified (q, g_ptr_array_index (p->support, k)))
                 return fail (error, ATM_SERIES_CONTRACT_ERROR_SUPPORT, "Point support is not in finalized qualification.");
         if (p->y_status == ATM_SERIES_Y_NUMERIC) {
-            if (p->missing_reason != NULL || p->break_before && p->break_reason == NULL)
+            if (p->missing_reason != NULL || (p->break_before && p->break_reason == NULL))
                 return fail (error, ATM_SERIES_CONTRACT_ERROR_SHAPE, "Numeric point has invalid missing/break semantics.");
             if (!point_numeric_valid (p, error)) return FALSE;
             numeric++;
