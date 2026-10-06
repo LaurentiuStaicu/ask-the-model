@@ -5,7 +5,7 @@ static const char snapshot_id[] = "d9e249339663015f6d1c05752338a955bf64ad0b";
 static const struct { const char *path; const char *digest; } policy[] = {
     {"science/data/processed/energy_institute_global_2026.csv", "46b30240372b392f7e7aabb7b63a0521afd9a9af2574ff044867ea84d0a1074c"},
     {"science/data/processed/energy_institute_global_2026.provenance.json", "1eca3a26375f7d56a0c4540eabccd8ea0d10c984dc1381757b2f4464f34e6a57"},
-    {"science/data/input_manifest.json", "0637a1842706d2303750d6591851830987f3899de681e432c32b2be7b71adf4d"},
+    {"science/data/input_manifest.json", "887bfec97515472e22084a6e28655b1d644d86949dc59b5a506801346a1fce8e"},
     {"science/data/registry.csv", "0637a1842706d2303750d6591851830987f3899de681e432c32b2be7b71adf4d"},
 };
 
