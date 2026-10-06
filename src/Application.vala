@@ -2784,6 +2784,125 @@ namespace AskTheModel {
             return button;
         }
 
+        private Gtk.Widget[] build_live_chart_widgets (
+            CitationResolution resolution,
+            out ConversationPersistenceChart[] charts
+        ) throws GLib.Error {
+            Gtk.Widget[] widgets = {};
+            charts = {};
+            CitationReference? chart_citation = null;
+
+            for (uint i = 0; i < resolution.citation_count (); i++) {
+                CitationReference? citation = resolution.citation_at (i);
+                if (citation == null) {
+                    continue;
+                }
+
+                if (citation.source_path !=
+                    "science/data/processed/nasa_gistemp_global_2026.csv") {
+                    continue;
+                }
+
+                if (citation.repository_id != "ewd" &&
+                    citation.repository_id !=
+                        "LaurentiuStaicu/empirical-world3-dynamics") {
+                    continue;
+                }
+
+                if (chart_citation != null &&
+                    (chart_citation.repository_id != citation.repository_id ||
+                     chart_citation.repository_version != citation.repository_version ||
+                     chart_citation.snapshot_sha != citation.snapshot_sha ||
+                     chart_citation.source_path != citation.source_path)) {
+                    throw new GLib.IOError.INVALID_DATA (
+                        "Multiple distinct GISTEMP chart sources are not admitted by the current one-series profile."
+                    );
+                }
+
+                chart_citation = citation;
+            }
+
+            if (chart_citation == null) {
+                return widgets;
+            }
+
+            RepositoryDescriptor? descriptor =
+                repository_descriptor_for_id (chart_citation.repository_id);
+            if (descriptor == null) {
+                throw new GLib.IOError.NOT_FOUND (
+                    "Qualified chart repository is unavailable."
+                );
+            }
+
+            string snapshot_path = RepositoryLifecycleService.snapshot_path (
+                descriptor,
+                chart_citation.snapshot_sha
+            );
+
+            if (!GLib.FileUtils.test (
+                    snapshot_path,
+                    GLib.FileTest.IS_DIR
+                )) {
+                throw new GLib.IOError.NOT_FOUND (
+                    "Qualified chart repository snapshot is unavailable."
+                );
+            }
+
+            ChartNative.Spec spec;
+            if (!ChartNative.reconstruct_live_gistemp (
+                    snapshot_path,
+                    chart_citation.repository_id,
+                    chart_citation.repository_version,
+                    chart_citation.snapshot_sha,
+                    out spec
+                ) || spec == null) {
+                throw new GLib.IOError.INVALID_DATA (
+                    "Pinned GISTEMP source could not be re-qualified for chart presentation."
+                );
+            }
+
+            string? scientific_id = spec.series_scientific_id (0);
+            string? qualified_id = spec.series_qualified_id (0);
+            string? chart_spec_id = spec.id ();
+
+            if (scientific_id == null || qualified_id == null ||
+                chart_spec_id == null) {
+                throw new GLib.IOError.INVALID_DATA (
+                    "Qualified chart identities are unavailable."
+                );
+            }
+
+            var series = new ConversationPersistenceChartSeries (
+                "atm-series/gistemp-complete-annual/1",
+                "atm-gistemp-pinned-admission/1",
+                scientific_id,
+                qualified_id,
+                chart_citation.repository_id,
+                chart_citation.repository_version,
+                chart_citation.snapshot_sha,
+                chart_citation.source_path
+            );
+            charts += new ConversationPersistenceChart (
+                1,
+                "atm-chart-spec/1",
+                chart_spec_id,
+                "LINE",
+                "atm-chart-reconstruct/gistemp-complete-annual/1",
+                { series }
+            );
+
+            ChartNative.View view;
+            if (!ChartNative.create (spec, out view)) {
+                throw new GLib.IOError.FAILED (
+                    "Qualified live chart could not be rendered."
+                );
+            }
+
+            view.add_css_class ("atm-history-chart");
+            widgets += view;
+            return widgets;
+        }
+
         private Gtk.Widget[] build_history_chart_widgets (
             ConversationPersistenceSnapshot snapshot,
             ConversationPersistenceMessage message
