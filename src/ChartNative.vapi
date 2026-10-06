@@ -17,4 +17,21 @@ namespace AskTheModel.ChartNative {
     }
     [CCode (cname = "atm_chart_view_new")]
     public static bool create (Spec? spec, out View view) throws GLib.Error;
+    [CCode (cname = "atm_chart_history_reconstruct_gistemp")]
+    public static bool reconstruct_history_gistemp (
+        string snapshot_path,
+        string repository_id,
+        string repository_version,
+        string snapshot_sha,
+        string chart_schema,
+        string chart_spec_id,
+        string chart_kind,
+        string reconstruction_profile,
+        string series_profile,
+        string admission_profile,
+        string scientific_id,
+        string qualified_id,
+        string source_path,
+        out Spec spec
+    ) throws GLib.Error;
 }
