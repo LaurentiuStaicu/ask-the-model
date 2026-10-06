@@ -2784,6 +2784,127 @@ namespace AskTheModel {
             return button;
         }
 
+        private Gtk.Widget[] build_live_chart_widgets (
+            CitationResolution resolution,
+            out ConversationPersistenceChart[] charts
+        ) throws GLib.Error {
+            Gtk.Widget[] widgets = {};
+            charts = {};
+            CitationReference? chart_citation = null;
+
+            for (uint i = 0; i < resolution.citation_count (); i++) {
+                CitationReference? citation = resolution.citation_at (i);
+                if (citation == null) {
+                    continue;
+                }
+
+                if (citation.source_path !=
+                    "science/data/processed/nasa_gistemp_global_2026.csv") {
+                    continue;
+                }
+
+                if (citation.repository_id != "ewd" &&
+                    citation.repository_id !=
+                        "LaurentiuStaicu/empirical-world3-dynamics") {
+                    continue;
+                }
+
+                if (chart_citation != null &&
+                    (chart_citation.repository_id != citation.repository_id ||
+                     chart_citation.repository_version != citation.repository_version ||
+                     chart_citation.snapshot_sha != citation.snapshot_sha ||
+                     chart_citation.source_path != citation.source_path)) {
+                    throw new GLib.IOError.INVALID_DATA (
+                        "Multiple distinct GISTEMP chart sources are not admitted by the current one-series profile."
+                    );
+                }
+
+                chart_citation = citation;
+            }
+
+            if (chart_citation == null) {
+                return widgets;
+            }
+
+            RepositoryDescriptor? descriptor =
+                repository_descriptor_for_id (chart_citation.repository_id);
+            if (descriptor == null) {
+                throw new GLib.IOError.NOT_FOUND (
+                    "Qualified chart repository is unavailable."
+                );
+            }
+
+            string snapshot_path = RepositoryLifecycleService.snapshot_path (
+                descriptor,
+                chart_citation.snapshot_sha
+            );
+
+            if (!GLib.FileUtils.test (
+                    snapshot_path,
+                    GLib.FileTest.IS_DIR
+                )) {
+                throw new GLib.IOError.NOT_FOUND (
+                    "Qualified chart repository snapshot is unavailable."
+                );
+            }
+
+            ChartNative.Spec spec;
+            if (!ChartNative.reconstruct_live_gistemp (
+                    snapshot_path,
+                    chart_citation.repository_id,
+                    chart_citation.repository_version,
+                    chart_citation.snapshot_sha,
+                    out spec
+                ) || spec == null) {
+                throw new GLib.IOError.INVALID_DATA (
+                    "Pinned GISTEMP source could not be re-qualified for chart presentation."
+                );
+            }
+
+            string? scientific_id = spec.series_scientific_id (0);
+            string? qualified_id = spec.series_qualified_id (0);
+            string? chart_spec_id = spec.id ();
+
+            if (scientific_id == null || qualified_id == null ||
+                chart_spec_id == null) {
+                throw new GLib.IOError.INVALID_DATA (
+                    "Qualified chart identities are unavailable."
+                );
+            }
+
+            var series = new ConversationPersistenceChartSeries (
+                "atm-series/gistemp-complete-annual/1",
+                "atm-gistemp-pinned-admission/1",
+                scientific_id,
+                qualified_id,
+                chart_citation.repository_id,
+                chart_citation.repository_version,
+                chart_citation.snapshot_sha,
+                chart_citation.source_path
+            );
+            charts = {
+                new ConversationPersistenceChart (
+                    1,
+                    "atm-chart-spec/1",
+                    chart_spec_id,
+                    "LINE",
+                    "atm-chart-reconstruct/gistemp-complete-annual/1",
+                    { series }
+                )
+            };
+
+            ChartNative.View view;
+            if (!ChartNative.create (spec, out view)) {
+                throw new GLib.IOError.FAILED (
+                    "Qualified live chart could not be rendered."
+                );
+            }
+
+            view.add_css_class ("atm-history-chart");
+            widgets += view;
+            return widgets;
+        }
+
         private Gtk.Widget[] build_history_chart_widgets (
             ConversationPersistenceSnapshot snapshot,
             ConversationPersistenceMessage message
@@ -3196,6 +3317,22 @@ namespace AskTheModel {
             ChatTabState state,
             string prompt
         ) {
+            ChartIntent chart_intent =
+                ChartIntent.parse (prompt);
+            string effective_prompt =
+                chart_intent.gistemp_requested
+                    ? chart_intent.query
+                    : prompt;
+
+            if (chart_intent.gistemp_requested &&
+                effective_prompt.length == 0) {
+                append_transcript (
+                    state.transcript,
+                    "Assistant: Use /chart gistemp followed by the grounded question you want to visualize."
+                );
+                return;
+            }
+
             bool optimized_operation =
                 optimization_policy.snapshot_enabled ();
 
@@ -3273,7 +3410,7 @@ namespace AskTheModel {
 
                 bool has_grounding =
                     state.session.prepare_turn (
-                        prompt,
+                        effective_prompt,
                         optimized_operation,
                         out needs_clarification,
                         out system_instructions,
@@ -3293,7 +3430,7 @@ namespace AskTheModel {
                     if (has_grounding) {
                         grounded_turn_prepared = true;
                         answer = yield ollama_provider.chat_grounded (
-                            prompt,
+                            effective_prompt,
                             system_instructions ?? "",
                             evidence_text ?? "",
                             post_evidence_reminder ?? "",
@@ -3335,23 +3472,58 @@ namespace AskTheModel {
 
                         grounded_turn_prepared = false;
 
+                        Gtk.Widget[] live_chart_widgets = {};
+                        ConversationPersistenceChart[] live_charts = {};
+
                         try {
                             ConversationPersistenceCitation[] citations =
                                 persistence_citations (
                                     citation_resolution
                                 );
 
+                            int64 committed_turn_no =
                             ConversationTurnCommitter.commit (
                                 conversation_store,
                                 state.persistent_id,
                                 state.conversation,
-                                prompt,
+                                effective_prompt,
                                 answer,
                                 visible_answer,
                                 true,
                                 GLib.get_real_time (),
                                 citations
                             );
+
+                            if (chart_intent.gistemp_requested) {
+                            try {
+                                live_chart_widgets =
+                                    build_live_chart_widgets (
+                                        citation_resolution,
+                                        out live_charts
+                                    );
+
+                                if (live_charts.length > 0 &&
+                                    conversation_store != null &&
+                                    state.persistent_id != null) {
+                                    foreach (
+                                        ConversationPersistenceChart chart
+                                        in live_charts
+                                    ) {
+                                        conversation_store.attach_chart (
+                                            state.persistent_id,
+                                            committed_turn_no,
+                                            chart
+                                        );
+                                    }
+                                }
+                            } catch (GLib.Error chart_error) {
+                                live_chart_widgets = {};
+                                stderr.printf (
+                                    "AtM: qualified live chart unavailable: %s\n",
+                                    chart_error.message
+                                );
+                            }
+                        }
                         } catch (GLib.Error error) {
                             state.persistence_failed = true;
                             throw error;
@@ -3364,13 +3536,14 @@ namespace AskTheModel {
                         append_completed_answer (
                             state,
                             visible_answer,
-                            citation_resolution
+                            citation_resolution,
+                            live_chart_widgets
                         );
                         assistant_stream_started = true;
                         title_answer = visible_answer;
                     } else {
                         answer = yield ollama_provider.chat (
-                            prompt,
+                            effective_prompt,
                             state.conversation,
                             false
                         );
@@ -3383,7 +3556,7 @@ namespace AskTheModel {
                             conversation_store,
                             state.persistent_id,
                             state.conversation,
-                            prompt,
+                            effective_prompt,
                             answer,
                             answer,
                             false,
@@ -3407,7 +3580,7 @@ namespace AskTheModel {
                         title_answer.length > 0) {
                         update_conversation_title.begin (
                             state,
-                            prompt,
+                            effective_prompt,
                             title_answer,
                             serial
                         );

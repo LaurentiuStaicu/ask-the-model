@@ -108,6 +108,22 @@ test_reconstruct_and_identity (void)
         atm_chart_spec_id (spec), ==, atm_chart_spec_id (reference)
     );
 
+    AtmChartSpec *live = NULL;
+    g_assert_true (atm_chart_live_reconstruct_gistemp (
+        snapshot,
+        "ewd",
+        "2026-08-31",
+        "d9e249339663015f6d1c05752338a955bf64ad0b",
+        &live,
+        &error
+    ));
+    g_assert_no_error (error);
+    g_assert_nonnull (live);
+    g_assert_cmpstr (
+        atm_chart_spec_id (live), ==, atm_chart_spec_id (reference)
+    );
+
+    atm_chart_spec_free (live);
     atm_chart_spec_free (spec);
     atm_chart_spec_free (reference);
     atm_verified_series_free (series);

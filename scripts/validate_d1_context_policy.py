@@ -135,7 +135,7 @@ def main() -> int:
     require_marker(
         send,
         "state.session.prepare_turn (\n"
-        "                        prompt,\n"
+        "                        effective_prompt,\n"
         "                        optimized_operation,",
         "Send explicit snapshot propagation",
     )

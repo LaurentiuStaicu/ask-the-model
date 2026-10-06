@@ -148,6 +148,10 @@ AtmChartKind atm_chart_spec_kind (const AtmChartSpec *s) { return s ? s->kind : 
 guint atm_chart_spec_count (const AtmChartSpec *s) { return s ? s->count : 0; }
 const AtmVerifiedSeries *atm_chart_spec_series (const AtmChartSpec *s, guint i)
 { return s && i < s->count ? s->series[i] : NULL; }
+const char *atm_chart_spec_series_scientific_id (const AtmChartSpec *s, guint i)
+{ return s && i < s->count ? atm_verified_series_scientific_id (s->series[i]) : NULL; }
+const char *atm_chart_spec_series_qualified_id (const AtmChartSpec *s, guint i)
+{ return s && i < s->count ? atm_verified_series_qualified_id (s->series[i]) : NULL; }
 guint atm_chart_spec_x_min (const AtmChartSpec *s) { return s ? s->x_min : 0; }
 guint atm_chart_spec_x_max (const AtmChartSpec *s) { return s ? s->x_max : 0; }
 const AtmScientificDecimal *atm_chart_spec_y_min (const AtmChartSpec *s) { return s ? &s->y_min : NULL; }
