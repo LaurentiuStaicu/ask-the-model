@@ -41,11 +41,13 @@ read_source (
 static gboolean
 chart_kind_from_text (const char *text, AtmChartKind *out, GError **error)
 {
-    if (g_strcmp0 (text, "LINE") == 0 ||\n        g_strcmp0 (text, "line") == 0) {
+    if (g_strcmp0 (text, "LINE") == 0 ||
+        g_strcmp0 (text, "line") == 0) {
         *out = ATM_CHART_LINE;
         return TRUE;
     }
-    if (g_strcmp0 (text, "SCATTER") == 0 ||\n        g_strcmp0 (text, "scatter") == 0) {
+    if (g_strcmp0 (text, "SCATTER") == 0 ||
+        g_strcmp0 (text, "scatter") == 0) {
         *out = ATM_CHART_SCATTER;
         return TRUE;
     }
