@@ -228,6 +228,17 @@ Series-level identity, explicit point ordering/missing/break contract and
 VerifiedSeries remain subsequent work; an SRA identity is not silently reused
 as a chart-series identity.
 
+
+## M1c4 general VerifiedSeries contract
+
+The dormant native contract `atm-verified-series/1` is now pinned separately from the GISTEMP adapter. It is a semantic container/validator, not a source adapter and not chart authority. It supports exactly three X kinds: integer calendar year, canonical UTC instant (`YYYY-MM-DDTHH:MM:SSZ` with real calendar/time fields), and non-negative event ordinal representable as an unsigned 64-bit integer. X values are strictly increasing; duplicate X values reject and no automatic sorting occurs.
+
+Y is explicitly `NUMERIC` or `MISSING`. Numeric values retain the source decimal token plus canonical coefficient/exponent; signed zero is preserved only as the exact `-0` representation. MISSING never carries a numeric value and requires an explicit bounded reason. A discontinuity is represented only by `break_before=true` with a bounded reason. A first-point break is rejected; a final break and an all-MISSING series are valid contract states because neither invents a value or silently joins observations.
+
+The general contract is bounded at 10,000 points, 32 support IDs per point and 256-byte metadata/reason fields, with bounded X and numeric encodings. Support must be a lowercase SHA-256 identity present in a finalized and independently validated SRA qualification; matching a caller-provided identity string is insufficient. Scientific and qualified series identities are recomputed from canonical contract material and provenance.
+
+This general contract deliberately remains dormant. It does not create an adapter, widen the admitted GISTEMP profile, change Application behavior, enable charts, or reinterpret model output. Source-specific adapters must establish their own semantics and qualification before constructing a VerifiedSeries.
+
 ## M1c3 first native VerifiedSeries
 
 `verified_series.h/.c` implements `atm-verified-series/1` under the narrow

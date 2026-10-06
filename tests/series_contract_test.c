@@ -196,6 +196,104 @@ static void test_caller_identity_not_authoritative (void)
     atm_scientific_artifact_free (a);
 }
 
+static AtmSeriesContract *base_kind (AtmSeriesXKind kind);
+
+static void test_last_break_and_all_missing_are_supported (void)
+{
+    AtmScientificArtifact *a = support_artifact ();
+    AtmSraResult *q = qualified_with_artifact (a);
+    const char *support[] = { a->qualified_artifact_id };
+    GError *error = NULL;
+
+    AtmSeriesContract *broken = base_kind (ATM_SERIES_X_CALENDAR_YEAR);
+    g_assert_true (atm_series_contract_add_point (
+        broken, "1880", ATM_SERIES_Y_NUMERIC, "1.0000", "1", 0,
+        FALSE, FALSE, NULL, NULL, support, 1, &error));
+    g_assert_no_error (error);
+    g_assert_true (atm_series_contract_add_point (
+        broken, "1881", ATM_SERIES_Y_MISSING, NULL, NULL, 0,
+        FALSE, TRUE, "source_missing", "measurement_gap", support, 1, &error));
+    g_assert_no_error (error);
+    g_assert_true (atm_series_contract_validate (broken, q, &error));
+    g_assert_no_error (error);
+    atm_series_contract_free (broken);
+
+    AtmSeriesContract *missing = base_kind (ATM_SERIES_X_CALENDAR_YEAR);
+    g_assert_true (atm_series_contract_add_point (
+        missing, "1880", ATM_SERIES_Y_MISSING, NULL, NULL, 0,
+        FALSE, FALSE, "source_missing", NULL, support, 1, &error));
+    g_assert_no_error (error);
+    g_assert_true (atm_series_contract_add_point (
+        missing, "1881", ATM_SERIES_Y_MISSING, NULL, NULL, 0,
+        FALSE, FALSE, "source_missing", NULL, support, 1, &error));
+    g_assert_no_error (error);
+    g_assert_true (atm_series_contract_validate (missing, q, &error));
+    g_assert_no_error (error);
+    atm_series_contract_free (missing);
+
+    atm_sra_result_free (q);
+    atm_scientific_artifact_free (a);
+}
+
+static AtmSeriesContract *base_kind (AtmSeriesXKind kind)
+{
+    GError *error = NULL;
+    AtmSeriesContract *s = atm_series_contract_new (
+        kind, "subject", "attribute",
+        kind == ATM_SERIES_X_UTC_INSTANT ? "UTC" :
+            kind == ATM_SERIES_X_EVENT_ORDINAL ? "event" : "calendar_year",
+        "time", "unit", "dimension",
+        "empirical_observations", "baseline", "scope", "observed",
+        "ewd", "0.1.0", SHA, "data/series.csv", "fixture-series", "1", &error);
+    g_assert_no_error (error);
+    g_assert_nonnull (s);
+    return s;
+}
+
+static void test_invalid_utc_calendar_rejected (void)
+{
+    AtmScientificArtifact *a = support_artifact ();
+    AtmSraResult *q = qualified_with_artifact (a);
+    AtmSeriesContract *s = base_kind (ATM_SERIES_X_UTC_INSTANT);
+    const char *support[] = { a->qualified_artifact_id };
+    GError *error = NULL;
+
+    g_assert_false (atm_series_contract_add_point (
+        s, "2026-02-30T12:00:00Z", ATM_SERIES_Y_MISSING, NULL, NULL, 0,
+        FALSE, FALSE, "source_missing", NULL, support, 1, &error));
+    g_assert_error (error, ATM_SERIES_CONTRACT_ERROR,
+                    ATM_SERIES_CONTRACT_ERROR_ARGUMENT);
+    g_clear_error (&error);
+
+    atm_series_contract_free (s);
+    atm_sra_result_free (q);
+    atm_scientific_artifact_free (a);
+}
+
+static void test_event_ordinal_overflow_rejected (void)
+{
+    AtmScientificArtifact *a = support_artifact ();
+    AtmSraResult *q = qualified_with_artifact (a);
+    AtmSeriesContract *s = base_kind (ATM_SERIES_X_EVENT_ORDINAL);
+    const char *support[] = { a->qualified_artifact_id };
+    GError *error = NULL;
+
+    g_assert_true (atm_series_contract_add_point (
+        s, "18446744073709551615", ATM_SERIES_Y_MISSING, NULL, NULL, 0,
+        FALSE, FALSE, "source_missing", NULL, support, 1, &error));
+    g_assert_no_error (error);
+    g_assert_false (atm_series_contract_add_point (
+        s, "18446744073709551616", ATM_SERIES_Y_MISSING, NULL, NULL, 0,
+        FALSE, FALSE, "source_missing", NULL, support, 1, &error));
+    g_assert_error (error, ATM_SERIES_CONTRACT_ERROR,
+                    ATM_SERIES_CONTRACT_ERROR_ARGUMENT);
+    g_clear_error (&error);
+
+    atm_series_contract_free (s);
+    atm_sra_result_free (q);
+    atm_scientific_artifact_free (a);
+}
+
 int main (int argc, char **argv)
 {
     g_test_init (&argc, &argv, NULL);
@@ -204,5 +302,8 @@ int main (int argc, char **argv)
     g_test_add_func ("/series-contract/support", test_unqualified_support_rejected);
     g_test_add_func ("/series-contract/first-break", test_first_break_rejected);
     g_test_add_func ("/series-contract/identity", test_caller_identity_not_authoritative);
+    g_test_add_func ("/series-contract/utc-calendar", test_invalid_utc_calendar_rejected);
+    g_test_add_func ("/series-contract/event-overflow", test_event_ordinal_overflow_rejected);
+    g_test_add_func ("/series-contract/missing-boundaries", test_last_break_and_all_missing_are_supported);
     return g_test_run ();
 }
