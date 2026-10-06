@@ -2805,7 +2805,7 @@ namespace AskTheModel {
             for (uint i = 0; i < message.charts.length; i++) {
                 ConversationPersistenceChart chart = message.charts[i];
 
-                if (chart.ordinal != (int64) i ||
+                if (chart.ordinal != (int64) (i + 1) ||
                     chart.series.length != 1) {
                     throw new GLib.IOError.INVALID_DATA (
                         "Persisted chart attachment has invalid ordering or series cardinality."
