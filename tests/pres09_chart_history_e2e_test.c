@@ -112,7 +112,7 @@ test_persist_close_reopen_reconstruct (void)
     g_assert_no_error (error);
 
     AtmConversationRepositoryInput repository = {
-        "LaurentiuStaicu/empirical-world3-dynamics",
+        "ewd",
         "2026-08-31",
         "d9e249339663015f6d1c05752338a955bf64ad0b"
     };
@@ -158,7 +158,7 @@ test_persist_close_reopen_reconstruct (void)
         "atm-gistemp-pinned-admission/1",
         atm_verified_series_scientific_id (reference_series),
         atm_verified_series_qualified_id (reference_series),
-        "LaurentiuStaicu/empirical-world3-dynamics",
+        "ewd",
         "2026-08-31",
         "d9e249339663015f6d1c05752338a955bf64ad0b",
         "science/data/processed/nasa_gistemp_global_2026.csv"
