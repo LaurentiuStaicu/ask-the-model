@@ -2882,14 +2882,16 @@ namespace AskTheModel {
                 chart_citation.snapshot_sha,
                 chart_citation.source_path
             );
-            charts += new ConversationPersistenceChart (
-                1,
-                "atm-chart-spec/1",
-                chart_spec_id,
-                "LINE",
-                "atm-chart-reconstruct/gistemp-complete-annual/1",
-                { series }
-            );
+            charts = {
+                new ConversationPersistenceChart (
+                    1,
+                    "atm-chart-spec/1",
+                    chart_spec_id,
+                    "LINE",
+                    "atm-chart-reconstruct/gistemp-complete-annual/1",
+                    { series }
+                )
+            };
 
             ChartNative.View view;
             if (!ChartNative.create (spec, out view)) {
