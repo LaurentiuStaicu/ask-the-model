@@ -97,7 +97,10 @@ static void test_missing_and_break_are_explicit (void)
         s, "1882", ATM_SERIES_Y_NUMERIC, "-0.0000", "0", 0, TRUE,
         FALSE, NULL, NULL, support, 1, &error));
     g_assert_no_error (error);
-    g_assert_true (atm_series_contract_validate (s, q, &error));
+    gboolean valid = atm_series_contract_validate (s, q, &error);
+    if (!valid && error != NULL)
+        g_test_message ("contract validation error: %s", error->message);
+    g_assert_true (valid);
     g_assert_no_error (error);
     g_assert_nonnull (atm_series_contract_scientific_id (s));
     g_assert_nonnull (atm_series_contract_qualified_id (s));
