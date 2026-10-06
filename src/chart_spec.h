@@ -21,6 +21,8 @@ const char *atm_chart_spec_id (const AtmChartSpec *spec);
 AtmChartKind atm_chart_spec_kind (const AtmChartSpec *spec);
 guint atm_chart_spec_count (const AtmChartSpec *spec);
 const AtmVerifiedSeries *atm_chart_spec_series (const AtmChartSpec *spec, guint index);
+const char *atm_chart_spec_series_scientific_id (const AtmChartSpec *spec, guint index);
+const char *atm_chart_spec_series_qualified_id (const AtmChartSpec *spec, guint index);
 guint atm_chart_spec_x_min (const AtmChartSpec *spec);
 guint atm_chart_spec_x_max (const AtmChartSpec *spec);
 const AtmScientificDecimal *atm_chart_spec_y_min (const AtmChartSpec *spec);
