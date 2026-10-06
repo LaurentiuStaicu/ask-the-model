@@ -43,6 +43,11 @@ Capacity admission is deliberately conservative. Exact C0-M1 repository ID + SHA
 
 With Optimizations OFF, these post-v0.5.0 optimization paths are not activated and the baseline repository behavior is retained.
 
+
+### Qualified chart presentation development
+
+Post-v0.5.0 Development now includes a narrowly qualified GISTEMP chart presentation path. The reviewed GTK Chart/Data component is used by both live and History rendering. A chart is requested explicitly with `/chart gistemp <grounded question>`; the command is not model-derived and supplies no scientific values or chart configuration. The live path re-qualifies the pinned EWD snapshot through Admission → VerifiedSeries → ChartSpec before rendering and persists only the existing CHART-05 reconstruction recipe. The current admission remains limited to the complete annual global GISTEMP source, 1880–2025, and unsupported or unavailable data fails closed. No generic chart intent, arbitrary model-authored series, STEP/BAR, missing/event series or additional scientific source has been enabled.
+
 ## Canonical application role
 
 **Ask the Model (AtM) is a local conversational interface and retrieval/provenance layer for locally managed AI models and repositories of scientific dynamical models. It is not itself a scientific model and does not replace the canonical models maintained in those repositories.**
