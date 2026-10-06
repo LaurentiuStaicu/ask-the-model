@@ -46,6 +46,17 @@ executable(
     'src/presentation_normalize.c',
     'src/PresentationNative.vapi',
     'src/PresentationRenderer.vala',
+    'src/ChartNative.vapi',
+    'src/chart_view.c',
+    'src/chart_render.c',
+    'src/chart_projection.c',
+    'src/chart_spec.c',
+    'src/verified_series.c',
+    'src/gistemp_sra.c',
+    'src/gistemp_evidence.c',
+    'src/gistemp_admission.c',
+    'src/annual_series_candidate.c',
+    'src/chart_history_reconstruct.c',
     'src/ActivityRing.vala',
     'src/SelectorTriangle.vala',
     'src/ChatRequestBuilder.vala',
@@ -139,7 +150,8 @@ executable(
   link_args: [
     '-larchive',
     '-lyaml',
-    '-lsqlite3'
+    '-lsqlite3',
+    '-lm'
   ],
   install: true
 )
