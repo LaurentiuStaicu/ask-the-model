@@ -11,19 +11,19 @@ static AtmScientificArtifact *support_artifact (void)
     GError *error = NULL;
     e.status = ATM_SCIENTIFIC_EVIDENCE_TYPED_VALIDATED;
     e.reason_code = "typed_validated";
-    e.profile_id = "atm-profile/fixture/v1";
+    e.profile_id = "atm-profile/ewd/v1";
     e.profile_version = "1";
-    e.repository_id = "fixture";
+    e.repository_id = "ewd";
     e.repository_version = "1";
     e.snapshot_sha = (char *) SHA;
-    e.logical_source_id = "fixture:series";
-    e.source_path = "data/series.csv";
-    e.locator = "row:1";
-    e.evidence_kind = "observation";
-    e.semantic_type = "fixture.series";
-    e.entity_type = "series";
-    e.native_id = "series";
-    e.raw_payload = "fixture";
+    e.logical_source_id = "ewd:entity:variable:fixture";
+    e.source_path = "science/configs/fixture.json";
+    e.locator = "json:/fixture/fixture";
+    e.evidence_kind = "entity";
+    e.semantic_type = "ewd.variable_record";
+    e.entity_type = "variable";
+    e.native_id = "fixture";
+    e.raw_payload = "{\"id\":\"fixture\",\"value\":1}";
     g_assert_true (atm_scientific_artifact_from_evidence (&e, &a, &error));
     g_assert_no_error (error);
     return a;
@@ -54,7 +54,7 @@ static AtmSraResult *qualified_with_artifact (AtmScientificArtifact *a)
     g_assert_true (atm_sra_qualification_add_evidence_artifact (q, a, &error));
     g_assert_no_error (error);
     g_assert_true (atm_sra_qualification_add_semantic_profile (
-        q, "atm-profile/fixture/v1@1", &error));
+        q, "atm-profile/ewd/v1@1", &error));
     g_assert_no_error (error);
     g_assert_true (atm_sra_qualification_set_numeric_profile (
         q, ATM_SERIES_CONTRACT_NUMERIC_PROFILE, &error));
