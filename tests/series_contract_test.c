@@ -139,7 +139,7 @@ static void test_unqualified_support_rejected (void)
     AtmScientificArtifact *a = support_artifact ();
     AtmSraResult *q = qualified_with_artifact (a);
     AtmSeriesContract *s = base ();
-    const char *forged[] = { SHA };
+    const char *forged[] = { "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa" };
     GError *error = NULL;
     g_assert_true (atm_series_contract_add_point (
         s, "1880", ATM_SERIES_Y_MISSING, NULL, NULL, 0, FALSE,
