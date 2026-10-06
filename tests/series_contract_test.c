@@ -29,40 +29,6 @@ static AtmScientificArtifact *support_artifact (void)
     return a;
 }
 
-static AtmSraResult *qualification (const char *support)
-{
-    AtmSraResult *q = atm_sra_result_new (ATM_SRA_ANSWERED);
-    AtmSraEstablishedFact *a = atm_sra_established_fact_new (
-        "fact-1", "observation", "subject", "attribute", "1", "u", "d", NULL);
-    AtmSraEstablishedFact *b = atm_sra_established_fact_new (
-        "fact-2", "observation", "subject", "attribute", "2", "u", "d", NULL);
-    GError *error = NULL;
-
-    g_assert_true (atm_sra_fact_add_support (a, support, &error));
-    g_assert_no_error (error);
-    g_assert_true (atm_sra_fact_add_support (b, support, &error));
-    g_assert_no_error (error);
-    g_assert_true (atm_sra_result_add_fact (q, a, &error));
-    g_assert_no_error (error);
-    g_assert_true (atm_sra_result_add_fact (q, b, &error));
-    g_assert_no_error (error);
-    g_assert_true (atm_sra_qualification_add_canonical_obligation (q, "atm-sra/1", &error));
-    g_assert_no_error (error);
-    g_assert_true (atm_sra_qualification_add_repository_snapshot (
-        q, "fixture@1#" SHA, &error));
-    g_assert_no_error (error);
-    g_assert_true (atm_sra_qualification_add_semantic_profile (
-        q, "atm-profile/fixture/v1@1", &error));
-    g_assert_no_error (error);
-    g_assert_true (atm_sra_qualification_set_numeric_profile (
-        q, ATM_SERIES_CONTRACT_NUMERIC_PROFILE, &error));
-    g_assert_no_error (error);
-    g_assert_true (atm_sra_qualification_add_evidence_artifact (
-        q, NULL, &error) == FALSE);
-    g_clear_error (&error);
-    return q;
-}
-
 static AtmSraResult *qualified_with_artifact (AtmScientificArtifact *a)
 {
     AtmSraResult *q = atm_sra_result_new (ATM_SRA_ANSWERED);
