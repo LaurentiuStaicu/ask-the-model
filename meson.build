@@ -2637,7 +2637,7 @@ series_contract_test = executable(
    'src/scientific_operation.c', 'src/scientific_derivation.c',
    'tests/series_contract_test.c'],
   include_directories: include_directories('src'),
-  dependencies: [glib_dep],
+  dependencies: [glib_dep, json_glib_dep],
   install: false
 )
 test('series-contract', series_contract_test)
