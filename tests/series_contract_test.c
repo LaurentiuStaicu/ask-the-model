@@ -2,7 +2,7 @@
 #include "series_contract.h"
 #include "scientific_artifact.h"
 
-static const char *SHA = "0123456789abcdef0123456789abcdef0123456789abcdef0123456789abcdef";
+static const char *SHA = "0123456789abcdef0123456789abcdef01234567";
 
 static AtmScientificArtifact *support_artifact (void)
 {
