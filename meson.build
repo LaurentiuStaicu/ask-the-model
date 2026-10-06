@@ -2514,6 +2514,19 @@ gistemp_evidence_test = executable(
 test('gistemp-evidence', gistemp_evidence_test,
   env: {'ATM_CHART01_FIXTURE': meson.current_source_dir() / 'tests/fixtures/chart01'})
 
+# CHART-01 Energy Institute M1c1: source-bound artifacts; still no application caller.
+energy_institute_evidence_test = executable(
+  'energy-institute-evidence-test',
+  ['src/energy_institute_evidence.c', 'src/energy_institute_admission.c',
+   'src/energy_institute_candidate.c', 'src/scientific_canonical.c',
+   'src/scientific_artifact.c', 'tests/energy_institute_evidence_test.c'],
+  include_directories: include_directories('src'),
+  dependencies: [glib_dep, json_glib_dep],
+  install: false
+)
+test('energy-institute-evidence', energy_institute_evidence_test,
+  env: {'ATM_CHART01_FIXTURE': meson.current_source_dir() / 'tests/fixtures/chart01'})
+
 # CHART-01 M1c2: dormant source-bound finalized SRA.
 gistemp_sra_test = executable(
   'gistemp-sra-test',
