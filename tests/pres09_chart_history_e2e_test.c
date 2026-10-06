@@ -4,6 +4,7 @@
 #include "gistemp_admission.h"
 #include "verified_series.h"
 #include <glib.h>
+#include <glib/gstdio.h>
 
 static char *
 fixture_snapshot (void)
@@ -165,7 +166,7 @@ test_persist_close_reopen_reconstruct (void)
     };
 
     AtmConversationChartInput chart_input = {
-        0,
+        1,
         "atm-chart-spec/1",
         atm_chart_spec_id (reference),
         "line",
