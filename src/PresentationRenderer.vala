@@ -842,18 +842,20 @@ namespace AskTheModel {
         public void append_completed_turn (
             string text,
             Gtk.Button[] source_buttons,
-            Gtk.Widget[] chart_widgets = {}
+            Gtk.Widget[]? chart_widgets = null
         ) {
             complete_assistant_generation (text);
 
             if (text.length == 0 &&
                 source_buttons.length == 0 &&
-                chart_widgets.length == 0) {
+                (chart_widgets == null || chart_widgets.length == 0)) {
                 return;
             }
 
-            foreach (Gtk.Widget chart in chart_widgets) {
-                append_chart_widget (chart);
+            if (chart_widgets != null) {
+                foreach (Gtk.Widget chart in chart_widgets) {
+                    append_chart_widget (chart);
+                }
             }
 
             append_sources (source_buttons);
