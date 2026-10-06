@@ -2897,7 +2897,7 @@ namespace AskTheModel {
             ChatTabState state,
             string visible_answer,
             CitationResolution? resolution = null,
-            Gtk.Widget[] chart_widgets = {}
+            Gtk.Widget[]? chart_widgets = null
         ) {
             Gtk.Button[] source_buttons = {};
 
