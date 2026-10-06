@@ -1,5 +1,6 @@
 #include "series_contract.h"
 #include "scientific_canonical.h"
+#include <json-glib/json-glib.h>
 
 #include <string.h>
 
@@ -242,86 +243,93 @@ atm_series_contract_add_point (
     return TRUE;
 }
 
-static gboolean
-json_text_member (GString *json, const char *key, const char *value)
+static void text_member (JsonBuilder *b, const char *key, const char *value)
 {
-    if (!bounded (key, ATM_SERIES_CONTRACT_MAX_TEXT) || !bounded (value, ATM_SERIES_CONTRACT_MAX_TEXT))
-        return FALSE;
-    char *escaped = g_strescape (value, NULL);
-    g_string_append_printf (json, "\"%s\":\"%s\",", key, escaped);
-    g_free (escaped);
-    return TRUE;
+    json_builder_set_member_name (b, key);
+    if (value != NULL) json_builder_add_string_value (b, value);
+    else json_builder_add_null_value (b);
+}
+
+static void strings_member (JsonBuilder *b, const char *key, const GPtrArray *values)
+{
+    json_builder_set_member_name (b, key);
+    json_builder_begin_array (b);
+    for (guint i = 0; i < values->len; i++)
+        json_builder_add_string_value (b, g_ptr_array_index (values, i));
+    json_builder_end_array (b);
 }
 
 static gboolean
 build_scientific_json (const AtmSeriesContract *s, char **out, GError **error)
 {
-    GString *j = g_string_new ("{");
-    if (!json_text_member (j, "schema", ATM_SERIES_CONTRACT_SCHEMA) ||
-        !json_text_member (j, "x_kind",
-            s->x_kind == ATM_SERIES_X_CALENDAR_YEAR ? "calendar_year" :
-            s->x_kind == ATM_SERIES_X_UTC_INSTANT ? "utc_instant" : "event_ordinal") ||
-        !json_text_member (j, "subject", s->subject) ||
-        !json_text_member (j, "attribute", s->attribute) ||
-        !json_text_member (j, "x_unit", s->x_unit) ||
-        !json_text_member (j, "x_dimension", s->x_dimension) ||
-        !json_text_member (j, "y_unit", s->y_unit) ||
-        !json_text_member (j, "y_dimension", s->y_dimension) ||
-        !json_text_member (j, "series_semantics", s->series_semantics) ||
-        !json_text_member (j, "scenario", s->scenario) ||
-        !json_text_member (j, "time_scope", s->time_scope) ||
-        !json_text_member (j, "epistemic_status", s->epistemic_status))
-        { g_string_free (j, TRUE); return fail (error, ATM_SERIES_CONTRACT_ERROR_SHAPE, "Invalid identity metadata."); }
-
-    g_string_append (j, "\"points\":[");
+    JsonBuilder *b = json_builder_new ();
+    json_builder_begin_object (b);
+    text_member (b, "schema", ATM_SERIES_CONTRACT_SCHEMA);
+    text_member (b, "x_kind",
+        s->x_kind == ATM_SERIES_X_CALENDAR_YEAR ? "calendar_year" :
+        s->x_kind == ATM_SERIES_X_UTC_INSTANT ? "utc_instant" : "event_ordinal");
+    text_member (b, "subject", s->subject);
+    text_member (b, "attribute", s->attribute);
+    text_member (b, "x_unit", s->x_unit);
+    text_member (b, "x_dimension", s->x_dimension);
+    text_member (b, "y_unit", s->y_unit);
+    text_member (b, "y_dimension", s->y_dimension);
+    text_member (b, "series_semantics", s->series_semantics);
+    text_member (b, "scenario", s->scenario);
+    text_member (b, "time_scope", s->time_scope);
+    text_member (b, "epistemic_status", s->epistemic_status);
+    json_builder_set_member_name (b, "points");
+    json_builder_begin_array (b);
     for (guint i = 0; i < s->points->len; i++) {
         const AtmSeriesContractPoint *p = g_ptr_array_index (s->points, i);
-        if (i > 0) g_string_append_c (j, ',');
-        g_string_append_printf (j, "{\"order\":%u,", p->order);
-        char *xe = g_strescape (p->x, NULL);
-        char *de = p->source_decimal != NULL ? g_strescape (p->source_decimal, NULL) : NULL;
-        char *ce = p->coefficient != NULL ? g_strescape (p->coefficient, NULL) : NULL;
-        char *mr = p->missing_reason != NULL ? g_strescape (p->missing_reason, NULL) : NULL;
-        char *br = p->break_reason != NULL ? g_strescape (p->break_reason, NULL) : NULL;
-        g_string_append_printf (j, "\"x\":\"%s\",\"y_status\":%u,\"source_decimal\":%s,\"coefficient\":%s,\"exponent\":%lld,\"negative_zero\":%s,\"break_before\":%s,\"missing_reason\":%s,\"break_reason\":%s,\"support\":[",
-            xe, p->y_status, de ? "\"" : "null", ce ? "\"" : "null",
-            (long long) p->exponent, p->negative_zero ? "true" : "false",
-            p->break_before ? "true" : "false", mr ? "\"" : "null", br ? "\"" : "null");
-        /* Replace the deliberately simple quoted fields with escaped values. */
-        if (de) { g_string_truncate (j, j->len - 1); g_string_append_printf (j, "\"%s\",", de); }
-        if (ce) { g_string_truncate (j, j->len - 1); g_string_append_printf (j, "\"%s\",", ce); }
-        if (mr) { g_string_truncate (j, j->len - 1); g_string_append_printf (j, "\"%s\",", mr); }
-        if (br) { g_string_truncate (j, j->len - 1); g_string_append_printf (j, "\"%s\",", br); }
-        g_free (xe); g_free (de); g_free (ce); g_free (mr); g_free (br);
-        for (guint k = 0; k < p->support->len; k++) {
-            if (k > 0) g_string_append_c (j, ',');
-            char *se = g_strescape (g_ptr_array_index (p->support, k), NULL);
-            g_string_append_printf (j, "\"%s\"", se);
-            g_free (se);
-        }
-        g_string_append (j, "]},");
+        json_builder_begin_object (b);
+        json_builder_set_member_name (b, "order");
+        json_builder_add_int_value (b, p->order);
+        text_member (b, "x", p->x);
+        json_builder_set_member_name (b, "y_status");
+        json_builder_add_int_value (b, p->y_status);
+        text_member (b, "source_decimal", p->source_decimal);
+        text_member (b, "coefficient", p->coefficient);
+        json_builder_set_member_name (b, "exponent");
+        json_builder_add_int_value (b, p->exponent);
+        json_builder_set_member_name (b, "negative_zero");
+        json_builder_add_boolean_value (b, p->negative_zero);
+        json_builder_set_member_name (b, "break_before");
+        json_builder_add_boolean_value (b, p->break_before);
+        text_member (b, "missing_reason", p->missing_reason);
+        text_member (b, "break_reason", p->break_reason);
+        strings_member (b, "support", p->support);
+        json_builder_end_object (b);
     }
-    if (s->points->len > 0) g_string_truncate (j, j->len - 1);
-    g_string_append (j, "]}");
-    *out = g_string_free (j, FALSE);
+    json_builder_end_array (b);
+    json_builder_end_object (b);
+    JsonNode *root = json_builder_get_root (b);
+    *out = json_to_string (root, FALSE);
+    json_node_free (root);
+    g_object_unref (b);
+    if (*out == NULL) return fail (error, ATM_SERIES_CONTRACT_ERROR_IDENTITY, "Could not serialize scientific series identity.");
     return TRUE;
 }
 
 static gboolean
 build_qualified_json (const AtmSeriesContract *s, const char *scientific_id, char **out, GError **error)
 {
-    GString *j = g_string_new ("{");
-    json_text_member (j, "schema", "atm-verified-series-qualification/1");
-    json_text_member (j, "scientific_content_id", scientific_id);
-    json_text_member (j, "repository_id", s->repository_id);
-    json_text_member (j, "repository_version", s->repository_version);
-    json_text_member (j, "snapshot_sha", s->snapshot_sha);
-    json_text_member (j, "source_path", s->source_path);
-    json_text_member (j, "profile_id", s->profile_id);
-    json_text_member (j, "profile_version", s->profile_version);
-    if (j->len > 0 && j->str[j->len - 1] == ',') g_string_truncate (j, j->len - 1);
-    g_string_append_c (j, '}');
-    *out = g_string_free (j, FALSE);
+    JsonBuilder *b = json_builder_new ();
+    json_builder_begin_object (b);
+    text_member (b, "schema", "atm-verified-series-qualification/1");
+    text_member (b, "scientific_content_id", scientific_id);
+    text_member (b, "repository_id", s->repository_id);
+    text_member (b, "repository_version", s->repository_version);
+    text_member (b, "snapshot_sha", s->snapshot_sha);
+    text_member (b, "source_path", s->source_path);
+    text_member (b, "profile_id", s->profile_id);
+    text_member (b, "profile_version", s->profile_version);
+    json_builder_end_object (b);
+    JsonNode *root = json_builder_get_root (b);
+    *out = json_to_string (root, FALSE);
+    json_node_free (root);
+    g_object_unref (b);
+    if (*out == NULL) return fail (error, ATM_SERIES_CONTRACT_ERROR_IDENTITY, "Could not serialize qualified series identity.");
     return TRUE;
 }
 
