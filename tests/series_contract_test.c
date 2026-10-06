@@ -196,6 +196,8 @@ static void test_caller_identity_not_authoritative (void)
     atm_scientific_artifact_free (a);
 }
 
+static AtmSeriesContract *base_kind (AtmSeriesXKind kind);
+
 static void test_last_break_and_all_missing_are_supported (void)
 {
     AtmScientificArtifact *a = support_artifact ();
