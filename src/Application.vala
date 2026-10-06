@@ -3324,9 +3324,9 @@ namespace AskTheModel {
 
             if (chart_intent.gistemp_requested &&
                 effective_prompt.length == 0) {
-                append_completed_answer (
-                    state,
-                    "Use /chart gistemp followed by the grounded question you want to visualize."
+                append_transcript (
+                    state.transcript,
+                    "Assistant: Use /chart gistemp followed by the grounded question you want to visualize."
                 );
                 return;
             }
