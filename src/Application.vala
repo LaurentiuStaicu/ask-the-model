@@ -3315,6 +3315,22 @@ namespace AskTheModel {
             ChatTabState state,
             string prompt
         ) {
+            ChartIntent chart_intent =
+                ChartIntent.parse (prompt);
+            string effective_prompt =
+                chart_intent.gistemp_requested
+                    ? chart_intent.query
+                    : prompt;
+
+            if (chart_intent.gistemp_requested &&
+                effective_prompt.length == 0) {
+                append_completed_answer (
+                    state,
+                    "Use /chart gistemp followed by the grounded question you want to visualize."
+                );
+                return;
+            }
+
             bool optimized_operation =
                 optimization_policy.snapshot_enabled ();
 
@@ -3392,7 +3408,7 @@ namespace AskTheModel {
 
                 bool has_grounding =
                     state.session.prepare_turn (
-                        prompt,
+                        effective_prompt,
                         optimized_operation,
                         out needs_clarification,
                         out system_instructions,
@@ -3412,7 +3428,7 @@ namespace AskTheModel {
                     if (has_grounding) {
                         grounded_turn_prepared = true;
                         answer = yield ollama_provider.chat_grounded (
-                            prompt,
+                            effective_prompt,
                             system_instructions ?? "",
                             evidence_text ?? "",
                             post_evidence_reminder ?? "",
@@ -3460,17 +3476,52 @@ namespace AskTheModel {
                                     citation_resolution
                                 );
 
+                            int64 committed_turn_no =
                             ConversationTurnCommitter.commit (
                                 conversation_store,
                                 state.persistent_id,
                                 state.conversation,
-                                prompt,
+                                effective_prompt,
                                 answer,
                                 visible_answer,
                                 true,
                                 GLib.get_real_time (),
                                 citations
                             );
+
+                        Gtk.Widget[] live_chart_widgets = {};
+                        ConversationPersistenceChart[] live_charts = {};
+
+                        if (chart_intent.gistemp_requested) {
+                            try {
+                                live_chart_widgets =
+                                    build_live_chart_widgets (
+                                        citation_resolution,
+                                        out live_charts
+                                    );
+
+                                if (live_charts.length > 0 &&
+                                    conversation_store != null &&
+                                    state.persistent_id != null) {
+                                    foreach (
+                                        ConversationPersistenceChart chart
+                                        in live_charts
+                                    ) {
+                                        conversation_store.attach_chart (
+                                            state.persistent_id,
+                                            committed_turn_no,
+                                            chart
+                                        );
+                                    }
+                                }
+                            } catch (GLib.Error chart_error) {
+                                live_chart_widgets = {};
+                                stderr.printf (
+                                    "AtM: qualified live chart unavailable: %s\n",
+                                    chart_error.message
+                                );
+                            }
+                        }
                         } catch (GLib.Error error) {
                             state.persistence_failed = true;
                             throw error;
@@ -3483,7 +3534,8 @@ namespace AskTheModel {
                         append_completed_answer (
                             state,
                             visible_answer,
-                            citation_resolution
+                            citation_resolution,
+                            live_chart_widgets
                         );
                         assistant_stream_started = true;
                         title_answer = visible_answer;
@@ -3502,7 +3554,7 @@ namespace AskTheModel {
                             conversation_store,
                             state.persistent_id,
                             state.conversation,
-                            prompt,
+                            effective_prompt,
                             answer,
                             answer,
                             false,
@@ -3526,7 +3578,7 @@ namespace AskTheModel {
                         title_answer.length > 0) {
                         update_conversation_title.begin (
                             state,
-                            prompt,
+                            effective_prompt,
                             title_answer,
                             serial
                         );
