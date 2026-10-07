@@ -610,11 +610,22 @@ namespace AskTheModel {
                 }
             }
 
-            if (!turn_guard.commit (
+            bool turn_committed = false;
+            try {
+                turn_committed = turn_guard.commit (
                     current_generation_id,
                     model_name,
                     model_digest
-                )) {
+                );
+            } catch (GLib.Error error) {
+                throw new ProviderError.STALE_IDENTITY (
+                    "The response could not be committed because its identity is stale: %s".printf (
+                        error.message
+                    )
+                );
+            }
+
+            if (!turn_committed) {
                 throw new ProviderError.STALE_IDENTITY (
                     "The response was produced against a model identity that has since changed."
                 );
