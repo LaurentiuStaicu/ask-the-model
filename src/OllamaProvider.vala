@@ -509,8 +509,8 @@ namespace AskTheModel {
                     input_stream,
                     message.get_status ()
                 );
-                throw new ProviderError.HTTP (error_message);
                 turn_guard.abort ();
+                throw new ProviderError.HTTP (error_message);
             }
 
             var data_stream = new GLib.DataInputStream (input_stream);
@@ -538,10 +538,10 @@ namespace AskTheModel {
                 saw_response = true;
 
                 if (root.has_member ("error")) {
+                    turn_guard.abort ();
                     throw new ProviderError.HTTP (
                         root.get_string_member ("error")
                     );
-                    turn_guard.abort ();
                 }
 
                 if (root.has_member ("message")) {
@@ -566,11 +566,11 @@ namespace AskTheModel {
             }
 
             if (!saw_response) {
+                turn_guard.abort ();
                 throw new ProviderError.INVALID_RESPONSE (
                     "Local provider returned an empty response stream."
                 );
             }
-                turn_guard.abort ();
 
             if (!turn_guard.commit (
                     0,
