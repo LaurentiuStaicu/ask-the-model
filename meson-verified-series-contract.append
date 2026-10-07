@@ -1,0 +1,30 @@
+
+# ---------------------------------------------------------------------------
+# CHART-M1c: option C bridge, pinned VerifiedSeries -> general contract.
+#
+# Isolated target. This is the one place in the build where both families are
+# linked together on purpose: verified_series_contract.c reads the pinned
+# GISTEMP chain (verified_series -> gistemp_sra -> gistemp_evidence) and the
+# shared chain (series_adapter -> series_sra -> series_evidence) to produce the
+# general contract.
+#
+# Nothing above this point is modified, so the build stays valid whether or not
+# this block is used.
+# ---------------------------------------------------------------------------
+
+verified_series_contract_test = executable(
+  'verified-series-contract-test',
+  ['src/verified_series_contract.c', 'src/verified_series.c',
+   'src/gistemp_sra.c', 'src/gistemp_evidence.c', 'src/gistemp_admission.c',
+   'src/series_adapter.c', 'src/series_sra.c', 'src/series_evidence.c',
+   'src/series_evidence_adapters.c', 'src/series_contract.c',
+   'src/annual_series_candidate.c', 'src/scientific_canonical.c',
+   'src/scientific_artifact.c', 'src/scientific_result.c',
+   'src/scientific_operation.c', 'src/scientific_derivation.c',
+   'tests/verified_series_contract_test.c'],
+  include_directories: include_directories('src'),
+  dependencies: [glib_dep, json_glib_dep],
+  install: false
+)
+test('verified-series-contract', verified_series_contract_test,
+  env: {'ATM_CHART01_FIXTURE': meson.current_source_dir() / 'tests/fixtures/chart01'})
