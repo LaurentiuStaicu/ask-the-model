@@ -202,9 +202,9 @@ run_checks (
 
         string answer = yield provider.chat_grounded (
             "hello",
-            "",
-            "",
-            "",
+            "Follow the grounding rules.",
+            "evidence",
+            "Use only the supplied evidence.",
             valid_conversation,
             true,
             41,
