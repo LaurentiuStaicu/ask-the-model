@@ -76,7 +76,10 @@ run_checks (
         assert (uris != null);
         assert (uris.data != null);
 
-        string base_url = uris.data.to_string ();
+        string base_url = "http://%s:%d".printf (
+            uris.data.get_host (),
+            uris.data.get_port ()
+        );
         Environment.set_variable (
             "ATM_M12_TEST_BASE_URL",
             base_url,
