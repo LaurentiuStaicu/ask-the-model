@@ -2724,3 +2724,13 @@ conversation_turn_guard_test = executable(
   install: false
 )
 test('conversation-turn-guard', conversation_turn_guard_test)
+conversation_turn_guard_callsite_test = executable(
+  'conversation-turn-guard-callsite-test',
+  ['src/conversation_turn_guard.c',
+   'tests/conversation_turn_guard_callsite_test.c'],
+  include_directories: include_directories('src'),
+  dependencies: [glib_dep],
+  install: false
+)
+test('conversation-turn-guard-callsite', conversation_turn_guard_callsite_test)
+
