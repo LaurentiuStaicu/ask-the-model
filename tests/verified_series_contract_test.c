@@ -139,11 +139,10 @@ test_pinned_identity_survives_alongside (void)
     g_assert_true (atm_verified_series_contract (admission, &contract, &error));
     g_assert_no_error (error);
 
-    g_assert_cmpstr (atm_series_contract_scientific_id (contract), !=
-                     ATM_PINNED_SCIENTIFIC_ID ?
-                     atm_series_contract_scientific_id (contract) : "", ==, "");
-    g_assert_nonnull (atm_series_contract_scientific_id (contract));
-    g_assert_nonnull (atm_series_contract_qualified_id (contract));
+    g_assert_cmpstr (atm_series_contract_scientific_id (contract), !=,
+                     ATM_PINNED_SCIENTIFIC_ID);
+    g_assert_cmpstr (atm_series_contract_qualified_id (contract), !=,
+                     ATM_PINNED_QUALIFIED_ID);
 
     /* The pinned series is still valid after the contract was built: the
      * bridge must not mutate the admission or the identity. */
