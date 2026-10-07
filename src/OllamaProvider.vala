@@ -50,12 +50,15 @@ namespace AskTheModel {
         STALE_IDENTITY
     }
 
+    public delegate int64 CurrentRepositoryGenerationReader () throws GLib.Error;
+
     public class OllamaProvider : Object {
         private Soup.Session session;
         private OllamaConversation default_conversation =
             new OllamaConversation ();
         private string[] completion_models = {};
         private string[] completion_model_digests = {};
+        private CurrentRepositoryGenerationReader? current_generation_reader = null;
 
         public signal void response_chunk (string chunk);
         public signal void discovery_progress (uint percent);
@@ -68,6 +71,12 @@ namespace AskTheModel {
         public OllamaProvider () {
             session = new Soup.Session ();
             session.timeout = 300;
+        }
+
+        public void set_current_generation_reader (
+            CurrentRepositoryGenerationReader? reader
+        ) {
+            current_generation_reader = reader;
         }
 
         public string[] get_completion_models () {
@@ -583,8 +592,17 @@ namespace AskTheModel {
                 );
             }
 
+            int64 current_generation_id =
+                expected_generation_id;
+
+            if (expected_generation_id > 0 &&
+                current_generation_reader != null) {
+                current_generation_id =
+                    current_generation_reader ();
+            }
+
             if (!turn_guard.commit (
-                    expected_generation_id,
+                    current_generation_id,
                     model_name,
                     model_digest
                 )) {
