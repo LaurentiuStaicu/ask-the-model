@@ -67,6 +67,8 @@ run_checks (
     server.add_handler ("/api/chat", chat_handler);
 
     try {
+        int64 live_generation = 41;
+
         server.listen_local (
             0,
             Soup.ServerListenOptions.IPV4_ONLY
@@ -87,6 +89,9 @@ run_checks (
         );
 
         var provider = new AskTheModel.OllamaProvider ();
+        provider.set_current_generation_reader (() => {
+            return 41;
+        });
         assert (yield provider.discover ());
         assert (provider.is_ready ());
         assert (provider.model_name == MODEL);
@@ -118,6 +123,9 @@ run_checks (
 
         var stale_provider =
             new AskTheModel.OllamaProvider ();
+        stale_provider.set_current_generation_reader (() => {
+            return live_generation;
+        });
 
         assert (yield stale_provider.discover ());
         assert (stale_provider.select_model (MODEL));
@@ -128,6 +136,7 @@ run_checks (
         bool stale_commit_rejected = false;
 
         stale_provider.response_chunk.connect ((chunk) => {
+            live_generation = 42;
             assert (stale_provider.select_model ("replacement-model"));
         });
 
