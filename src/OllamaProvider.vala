@@ -597,8 +597,17 @@ namespace AskTheModel {
 
             if (expected_generation_id > 0 &&
                 current_generation_reader != null) {
-                current_generation_id =
-                    current_generation_reader ();
+                try {
+                    current_generation_id =
+                        current_generation_reader ();
+                } catch (GLib.Error error) {
+                    turn_guard.abort ();
+                    throw new ProviderError.STALE_IDENTITY (
+                        "The repository generation could not be revalidated before turn commit: %s".printf (
+                            error.message
+                        )
+                    );
+                }
             }
 
             if (!turn_guard.commit (
