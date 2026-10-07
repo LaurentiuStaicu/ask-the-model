@@ -487,7 +487,7 @@
         "data/schemas/control-state-v2.sql"
       ],
       "tested_by": [
-        "meson:control-state"
+        "mesoon:control-state"
       ]
     },
     {
@@ -668,6 +668,21 @@
         "src/ConversationPersistenceStore.vala",
         "src/ConversationExport.vala",
         "src/Application.vala"
+      ],
+      "tested_by": [
+        "meson:conversation-persistence-store"
+      ]
+    },
+    {
+      "id": "LIFECYCLE-S1-001",
+      "category": "LIFECYCLE",
+      "severity": "S1",
+      "lifecycle": "enforced",
+      "statement": "An unarchived conversation row may be discarded only when its most recent export publish attempt succeeded. A conversation whose export failed, or that the barrier has never observed, must be retained: the row is the only remaining record of a conversation whose export never landed. The publish attempt must precede any discard pass.",
+      "enforced_by": [
+        "src/ConversationPersistenceStore.vala",
+        "src/PublicationBarrier.vala",
+        "src/publication_barrier.c"
       ],
       "tested_by": [
         "meson:conversation-persistence-store"
