@@ -237,23 +237,40 @@ atm_series_adapter_admit (const AtmSeriesEvidenceDescriptor *descriptor,
 }
 
 gboolean
-atm_series_adapter_validate (const AtmSeriesContract *contract,
-                             const AtmSeriesEvidenceDescriptor *descriptor,
-                             const AtmSeriesAdapterMetadata *metadata,
-                             const AtmSeriesEvidence *evidence,
-                             GError **error)
+atm_series_adapter_revalidate (const AtmSeriesContract *contract,
+                               const AtmSeriesEvidenceDescriptor *descriptor,
+                               const AtmSeriesAdapterMetadata *metadata,
+                               gconstpointer admission,
+                               GError **error)
 {
     if (contract == NULL || descriptor == NULL || metadata == NULL ||
-        evidence == NULL)
+        admission == NULL)
         return reject (error, "Invalid series-adapter arguments.");
 
-    AtmSeriesContract *rebuilt = NULL;
-    if (!atm_series_adapter_from_evidence (descriptor, metadata, evidence,
-                                           &rebuilt, error))
+    /* Rebuild the entire chain from the same admission. The contract mints its
+     * identities only when validated against a finalized SRA, so the SRA must
+     * be part of the reconstruction - an evidence-only rebuild has no identity
+     * to compare and would always read as disagreement. */
+    AtmSeriesSra *sra = NULL;
+    if (!atm_series_sra_new (descriptor, admission, &sra, error))
         return FALSE;
 
-    /* Compare the reconstructed identities. A materialised contract whose
-     * identity disagrees with its own reconstruction is rejected, which is the
+    AtmSeriesContract *rebuilt = NULL;
+    gboolean built = atm_series_adapter_from_evidence (descriptor, metadata,
+        atm_series_sra_evidence (sra), &rebuilt, error);
+
+    if (built)
+        built = atm_series_contract_validate (rebuilt,
+            atm_series_sra_result (sra), error);
+
+    if (!built) {
+        if (rebuilt != NULL) atm_series_contract_free (rebuilt);
+        atm_series_sra_free (sra);
+        return FALSE;
+    }
+
+    /* Compare both identities. A contract whose identity disagrees with a
+     * reconstruction from the same admitted bytes is rejected, which is the
      * guarantee the source-specific module provided. */
     gboolean matches =
         g_strcmp0 (atm_series_contract_scientific_id (contract),
@@ -262,6 +279,7 @@ atm_series_adapter_validate (const AtmSeriesContract *contract,
                    atm_series_contract_qualified_id (rebuilt)) == 0;
 
     atm_series_contract_free (rebuilt);
+    atm_series_sra_free (sra);
 
     if (!matches)
         return reject (error, "Series contract disagrees with reconstructed source.");

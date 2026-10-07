@@ -55,13 +55,18 @@ gboolean atm_series_adapter_admit (
     AtmSeriesContract **out_contract,
     GError **error);
 
-/* Rebuild the contract from the owned evidence and compare both identities.
- * FALSE when the materialised contract disagrees with its own reconstruction. */
-gboolean atm_series_adapter_validate (
+/* Rebuild the whole chain from the same admission - evidence, finalized SRA,
+ * contract - and compare both identities against the supplied contract.
+ *
+ * Taking the admission rather than an evidence collection is what makes this
+ * check possible: the contract mints its identities only when validated against
+ * a finalized SRA, so a reconstruction that skips the SRA has no identity to
+ * compare and would always appear to disagree. */
+gboolean atm_series_adapter_revalidate (
     const AtmSeriesContract *contract,
     const AtmSeriesEvidenceDescriptor *descriptor,
     const AtmSeriesAdapterMetadata *metadata,
-    const AtmSeriesEvidence *evidence,
+    gconstpointer admission,
     GError **error);
 
 G_END_DECLS
