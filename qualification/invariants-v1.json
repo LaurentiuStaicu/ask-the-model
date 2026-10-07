@@ -487,7 +487,7 @@
         "data/schemas/control-state-v2.sql"
       ],
       "tested_by": [
-        "mesoon:control-state"
+        "meson:control-state"
       ]
     },
     {
