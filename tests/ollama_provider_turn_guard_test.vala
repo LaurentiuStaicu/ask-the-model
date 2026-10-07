@@ -197,6 +197,43 @@ run_checks (
         assert (stale_generation_rejected);
         assert (stale_generation_conversation.message_count () == 0);
 
+        var cancelled_provider =
+            new AskTheModel.OllamaProvider ();
+        cancelled_provider.set_current_generation_reader (() => {
+            return live_generation;
+        });
+        assert (yield cancelled_provider.discover ());
+        assert (cancelled_provider.select_model (MODEL));
+
+        var cancelled_conversation =
+            new AskTheModel.OllamaConversation ();
+        var cancellable = new GLib.Cancellable ();
+        bool cancellation_rejected = false;
+
+        cancelled_provider.response_chunk.connect ((chunk) => {
+            cancellable.cancel ();
+        });
+
+        try {
+            yield cancelled_provider.chat_grounded (
+                "hello",
+                "Follow the grounding rules.",
+                "evidence",
+                "Use only the supplied evidence.",
+                cancelled_conversation,
+                true,
+                41,
+                MODEL,
+                DIGEST,
+                cancellable
+            );
+        } catch (GLib.IOError.CANCELLED error) {
+            cancellation_rejected = true;
+        }
+
+        assert (cancellation_rejected);
+        assert (cancelled_conversation.message_count () == 0);
+
         var valid_conversation =
             new AskTheModel.OllamaConversation ();
 

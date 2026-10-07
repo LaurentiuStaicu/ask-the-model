@@ -333,15 +333,16 @@ namespace AskTheModel {
 
         private async string read_http_error (
             GLib.InputStream input_stream,
-            uint status
-        ) {
+            uint status,
+            GLib.Cancellable? cancellable
+        ) throws GLib.Error {
             string detail = "";
 
             try {
                 var data_stream = new GLib.DataInputStream (input_stream);
                 string? line = yield data_stream.read_line_utf8_async (
                     GLib.Priority.DEFAULT,
-                    null
+                    cancellable
                 );
 
                 if (line != null && line.strip ().length > 0) {
@@ -354,6 +355,10 @@ namespace AskTheModel {
                     }
                 }
             } catch (GLib.Error error) {
+                if (cancellable != null &&
+                    cancellable.is_cancelled ()) {
+                    throw error;
+                }
                 detail = "";
             }
 
@@ -433,7 +438,8 @@ namespace AskTheModel {
         public async string chat (
             string prompt,
             OllamaConversation? conversation = null,
-            bool persist_history = true
+            bool persist_history = true,
+            GLib.Cancellable? cancellable = null
         ) throws GLib.Error {
             return yield chat_internal (
                 prompt,
@@ -444,7 +450,8 @@ namespace AskTheModel {
                 persist_history,
                 0,
                 null,
-                null
+                null,
+                cancellable
             );
         }
 
@@ -457,7 +464,8 @@ namespace AskTheModel {
             bool persist_history = true,
             int64 expected_generation_id = 0,
             string? expected_model = null,
-            string? expected_model_digest = null
+            string? expected_model_digest = null,
+            GLib.Cancellable? cancellable = null
         ) throws GLib.Error {
             return yield chat_internal (
                 prompt,
@@ -468,7 +476,8 @@ namespace AskTheModel {
                 persist_history,
                 expected_generation_id,
                 expected_model,
-                expected_model_digest
+                expected_model_digest,
+                cancellable
             );
         }
 
@@ -481,7 +490,8 @@ namespace AskTheModel {
             bool persist_history,
             int64 expected_generation_id,
             string? expected_model,
-            string? expected_model_digest
+            string? expected_model_digest,
+            GLib.Cancellable? cancellable
         ) throws GLib.Error {
             yield ensure_ready ();
 
@@ -518,17 +528,30 @@ namespace AskTheModel {
                 new GLib.Bytes (request_body.data)
             );
 
-            GLib.InputStream input_stream = yield session.send_async (
-                message,
-                GLib.Priority.DEFAULT,
-                null
-            );
+            GLib.InputStream input_stream;
+            try {
+                input_stream = yield session.send_async (
+                    message,
+                    GLib.Priority.DEFAULT,
+                    cancellable
+                );
+            } catch (GLib.Error error) {
+                turn_guard.abort ();
+                throw error;
+            }
 
             if (message.get_status () != Soup.Status.OK) {
-                string error_message = yield read_http_error (
-                    input_stream,
-                    message.get_status ()
-                );
+                string error_message;
+                try {
+                    error_message = yield read_http_error (
+                        input_stream,
+                        message.get_status (),
+                        cancellable
+                    );
+                } catch (GLib.Error error) {
+                    turn_guard.abort ();
+                    throw error;
+                }
                 turn_guard.abort ();
                 throw new ProviderError.HTTP (error_message);
             }
@@ -538,10 +561,16 @@ namespace AskTheModel {
             bool saw_response = false;
 
             while (true) {
-                string? line = yield data_stream.read_line_utf8_async (
-                    GLib.Priority.DEFAULT,
-                    null
-                );
+                string? line;
+                try {
+                    line = yield data_stream.read_line_utf8_async (
+                        GLib.Priority.DEFAULT,
+                        cancellable
+                    );
+                } catch (GLib.Error error) {
+                    turn_guard.abort ();
+                    throw error;
+                }
 
                 if (line == null) {
                     break;
@@ -589,6 +618,14 @@ namespace AskTheModel {
                 turn_guard.abort ();
                 throw new ProviderError.INVALID_RESPONSE (
                     "Local provider returned an empty response stream."
+                );
+            }
+
+            if (cancellable != null &&
+                cancellable.is_cancelled ()) {
+                turn_guard.abort ();
+                throw new GLib.IOError.CANCELLED (
+                    "The turn was stopped before commit."
                 );
             }
 

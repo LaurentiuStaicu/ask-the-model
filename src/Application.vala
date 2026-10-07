@@ -23,6 +23,7 @@ namespace AskTheModel {
         public uint serial;
         public bool locked = false;
         public bool generating = false;
+        public GLib.Cancellable? generation_cancellable = null;
         public string? model_name = null;
         public string? model_digest = null;
         public string[] repository_ids = {};
@@ -1503,11 +1504,14 @@ namespace AskTheModel {
                     !generation_active &&
                     !state.persistence_failed &&
                     !state.restored_view_only;
+                state.send_button.label =
+                    state.generating ? "Stop" : "Send";
                 state.send_button.sensitive =
-                    !generation_active &&
-                    !state.persistence_failed &&
-                    !state.restored_view_only &&
-                    state.prompt.buffer.text.strip ().length > 0;
+                    state.generating ||
+                    (!generation_active &&
+                     !state.persistence_failed &&
+                     !state.restored_view_only &&
+                     state.prompt.buffer.text.strip ().length > 0);
                 state.lifecycle_button.sensitive =
                     !state.generating &&
                     !state.persistence_failed &&
@@ -3342,6 +3346,8 @@ namespace AskTheModel {
 
             generation_active = true;
             state.generating = true;
+            var cancellable = new GLib.Cancellable ();
+            state.generation_cancellable = cancellable;
             streaming_transcript = null;
             assistant_stream_started = false;
             update_conversation_ui_state ();
@@ -3421,6 +3427,13 @@ namespace AskTheModel {
                         out evidence_text,
                         out post_evidence_reminder
                     );
+                grounded_turn_prepared = has_grounding;
+
+                if (cancellable.is_cancelled ()) {
+                    throw new GLib.IOError.CANCELLED (
+                        "Generation was stopped."
+                    );
+                }
 
                 if (needs_clarification) {
                     append_completed_answer (
@@ -3432,7 +3445,6 @@ namespace AskTheModel {
                     string title_answer;
 
                     if (has_grounding) {
-                        grounded_turn_prepared = true;
                         answer = yield ollama_provider.chat_grounded (
                             effective_prompt,
                             system_instructions ?? "",
@@ -3442,7 +3454,8 @@ namespace AskTheModel {
                             false,
                             state.session.repository_generation_id (),
                             state.session.model_name (),
-                            state.session.model_digest ()
+                            state.session.model_digest (),
+                            cancellable
                         );
 
                         CitationResolution citation_resolution =
@@ -3552,7 +3565,8 @@ namespace AskTheModel {
                         answer = yield ollama_provider.chat (
                             effective_prompt,
                             state.conversation,
-                            false
+                            false,
+                            cancellable
                         );
 
                         ensure_persistent_conversation (
@@ -3606,9 +3620,13 @@ namespace AskTheModel {
 
                 append_transcript (
                     state.transcript,
-                    "System: " + error.message
+                    cancellable.is_cancelled ()
+                        ? "System: Generation stopped."
+                        : "System: " + error.message
                 );
             }
+
+            state.generation_cancellable = null;
 
             if (streaming_transcript == state.transcript) {
                 streaming_transcript = null;
@@ -3805,14 +3823,24 @@ namespace AskTheModel {
                 prompt_placeholder.visible =
                     prompt_view.buffer.get_char_count () == 0;
 
+                send_button.label =
+                    state.generating ? "Stop" : "Send";
                 send_button.sensitive =
-                    !generation_active &&
-                    !state.persistence_failed &&
-                    prompt_view.sensitive &&
-                    prompt_view.buffer.text.strip ().length > 0;
+                    state.generating ||
+                    (!generation_active &&
+                     !state.persistence_failed &&
+                     prompt_view.sensitive &&
+                     prompt_view.buffer.text.strip ().length > 0);
             });
 
             send_button.clicked.connect (() => {
+                if (state.generating) {
+                    if (state.generation_cancellable != null) {
+                        state.generation_cancellable.cancel ();
+                    }
+                    return;
+                }
+
                 if (generation_active ||
                     state.persistence_failed) {
                     return;
