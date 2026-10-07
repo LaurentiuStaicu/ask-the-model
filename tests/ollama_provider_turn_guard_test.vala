@@ -105,9 +105,9 @@ run_checks (
         try {
             yield provider.chat_grounded (
                 "hello",
-                "",
-                "",
-                "",
+                "Follow the grounding rules.",
+                "evidence",
+                "Use only the supplied evidence.",
                 stale_begin_conversation,
                 true,
                 41,
@@ -142,9 +142,9 @@ run_checks (
         try {
             yield stale_model_provider.chat_grounded (
                 "hello",
-                "",
-                "",
-                "",
+                "Follow the grounding rules.",
+                "evidence",
+                "Use only the supplied evidence.",
                 stale_model_conversation,
                 true,
                 41,
@@ -181,9 +181,9 @@ run_checks (
         try {
             yield stale_generation_provider.chat_grounded (
                 "hello",
-                "",
-                "",
-                "",
+                "Follow the grounding rules.",
+                "evidence",
+                "Use only the supplied evidence.",
                 stale_generation_conversation,
                 true,
                 41,
