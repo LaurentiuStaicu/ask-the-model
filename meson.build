@@ -2734,3 +2734,21 @@ conversation_turn_guard_callsite_test = executable(
 )
 test('conversation-turn-guard-callsite', conversation_turn_guard_callsite_test)
 
+ollama_provider_turn_guard_test = executable(
+  'ollama-provider-turn-guard-test',
+  ['src/OllamaProvider.vala',
+   'src/ChatRequestBuilder.vala',
+   'src/TurnGuardNative.vapi',
+   'src/conversation_turn_guard.c',
+   'tests/ollama_provider_turn_guard_test.vala'],
+  include_directories: include_directories('src'),
+  dependencies: [glib_dep, gio_dep, soup_dep, json_glib_dep],
+  vala_args: ['--define=ATM_M12_TEST'],
+  install: false
+)
+test(
+  'ollama-provider-turn-guard',
+  ollama_provider_turn_guard_test,
+  env: {'ATM_M12_TEST_BASE_URL': 'http://127.0.0.1:0'}
+)
+
