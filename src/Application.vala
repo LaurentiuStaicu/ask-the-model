@@ -182,6 +182,10 @@ namespace AskTheModel {
             apply_system_style ();
 
             ollama_provider = new OllamaProvider ();
+            ollama_provider.set_current_generation_reader (() => {
+                return repository_lifecycle
+                    .current_repository_generation_id ();
+            });
 
             new_chat_action = new GLib.SimpleAction (
                 "new-chat",
