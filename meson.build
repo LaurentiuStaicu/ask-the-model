@@ -2700,3 +2700,22 @@ pres09_chart_history_e2e_test = executable(
 )
 test('pres09-chart-history-e2e', pres09_chart_history_e2e_test,
   env: {'ATM_CHART01_FIXTURE': meson.current_source_dir() / 'tests/fixtures/chart01'})
+
+# ---------------------------------------------------------------------------
+# M11: publication barrier.
+#
+# Isolated target: the barrier has no dependency beyond glib, and nothing in
+# the application links it yet. Wiring it into ConversationPersistenceStore -
+# which also means moving the automatic export ahead of
+# discard_unarchived_conversations_best_effort - is a separate change.
+# ---------------------------------------------------------------------------
+
+publication_barrier_test = executable(
+  'publication-barrier-test',
+  ['src/publication_barrier.c',
+   'tests/publication_barrier_test.c'],
+  include_directories: include_directories('src'),
+  dependencies: [glib_dep],
+  install: false
+)
+test('publication-barrier', publication_barrier_test)

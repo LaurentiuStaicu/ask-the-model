@@ -370,6 +370,8 @@ namespace AskTheModel {
 
     public class ConversationPersistenceStore : Object {
         private ConversationStoreNative.Store native_store;
+        private PublicationBarrier publication_barrier =
+            new PublicationBarrier ();
         public string path { get; private set; }
         public string export_root { get; private set; }
 
@@ -413,11 +415,16 @@ namespace AskTheModel {
 
             native_store = (owned) opened;
 
-            discard_unarchived_conversations_best_effort ();
-
+            /* Publishing must be attempted before anything is discarded. The
+             * barrier records each conversation's export outcome and the
+             * cleanup below consults it; running the cleanup first would delete
+             * a row whose export had not yet been attempted, which is the fault
+             * this ordering exists to prevent. */
             if (automatic_export_directory_ready ()) {
                 sync_all_automatic_exports_best_effort ();
             }
+
+            discard_unarchived_conversations_best_effort ();
         }
 
         private void discard_unarchived_conversations_best_effort () {
@@ -427,6 +434,20 @@ namespace AskTheModel {
                     in list_conversations ()
                 ) {
                     if (summary.archived) {
+                        continue;
+                    }
+
+                    /* A conversation is discardable only when its last publish
+                     * attempt succeeded. A row whose export failed, or that the
+                     * barrier has never seen, is left in place: losing it
+                     * silently is exactly what this gate prevents. */
+                    if (!publication_barrier.may_discard (
+                            summary.conversation_id
+                        )) {
+                        warning (
+                            "AtM: keeping unarchived conversation %s; its export is not published",
+                            summary.conversation_id
+                        );
                         continue;
                     }
 
@@ -457,19 +478,32 @@ namespace AskTheModel {
         }
 
         private void sync_all_automatic_exports_best_effort () {
-            try {
-                foreach (
-                    ConversationPersistenceSummary summary
-                    in list_conversations ()
-                ) {
+            foreach (
+                ConversationPersistenceSummary summary
+                in list_conversations ()
+            ) {
+                /* Each conversation's export is attempted and its outcome
+                 * recorded independently. Previously one failure abandoned the
+                 * whole batch, which also meant the barrier could only ever
+                 * learn about conversations before the first failure. */
+                bool published = false;
+
+                try {
                     sync_automatic_export_best_effort (
                         summary.conversation_id
                     );
+                    published = true;
+                } catch (GLib.Error error) {
+                    warning (
+                        "AtM: automatic conversation export could not be synchronized for %s: %s",
+                        summary.conversation_id,
+                        error.message
+                    );
                 }
-            } catch (GLib.Error error) {
-                warning (
-                    "AtM: existing automatic conversation exports could not be synchronized: %s",
-                    error.message
+
+                publication_barrier.record (
+                    summary.conversation_id,
+                    published
                 );
             }
         }
