@@ -63,6 +63,8 @@ executable(
     'src/ChatRequestBuilder.vala',
     'src/OptimizationPolicy.vala',
     'src/OllamaProvider.vala',
+    'src/TurnGuardNative.vapi',
+    'src/conversation_turn_guard.c',
     'src/RepositoryService.vala',
     'src/RepositoryNative.vala',
     'src/RepositorySelection.vala',
@@ -453,6 +455,8 @@ conversation_persistence_store_test = executable(
     'src/ConversationPersistenceStore.vala',
     'src/ConversationExport.vala',
     'src/OllamaProvider.vala',
+    'src/TurnGuardNative.vapi',
+    'src/conversation_turn_guard.c',
     'src/ChatRequestBuilder.vala',
     'src/conversation_store.c',
     'tests/conversation_persistence_store_test.vala',
@@ -508,6 +512,8 @@ repository_gc_durable_roots_test = executable(
     'src/ConversationPersistenceStore.vala',
     'src/ConversationExport.vala',
     'src/OllamaProvider.vala',
+    'src/TurnGuardNative.vapi',
+    'src/conversation_turn_guard.c',
     'src/ChatRequestBuilder.vala',
     'src/RepositoryGcDurableRoots.vala',
     'src/RepositoryGcCandidates.vala',
@@ -555,6 +561,8 @@ repository_gc_isolation_orchestrator_test = executable(
     'src/ConversationPersistenceStore.vala',
     'src/ConversationExport.vala',
     'src/OllamaProvider.vala',
+    'src/TurnGuardNative.vapi',
+    'src/conversation_turn_guard.c',
     'src/ChatRequestBuilder.vala',
     'src/RepositoryGcDurableRoots.vala',
     'src/RepositoryGcCandidates.vala',
@@ -604,6 +612,8 @@ repository_gc_purge_orchestrator_test = executable(
     'src/ConversationPersistenceStore.vala',
     'src/ConversationExport.vala',
     'src/OllamaProvider.vala',
+    'src/TurnGuardNative.vapi',
+    'src/conversation_turn_guard.c',
     'src/ChatRequestBuilder.vala',
     'src/RepositoryGcDurableRoots.vala',
     'src/RepositoryGcTrashDiscovery.vala',
@@ -2020,6 +2030,8 @@ repository_lifecycle_service_test = executable(
     'src/ConversationPersistenceStore.vala',
     'src/ConversationExport.vala',
     'src/OllamaProvider.vala',
+    'src/TurnGuardNative.vapi',
+    'src/conversation_turn_guard.c',
     'src/ChatRequestBuilder.vala',
     'src/OptimizationPolicy.vala',
     'src/RepositoryLifecycleService.vala',
@@ -2105,6 +2117,8 @@ repository_lifecycle_durability_fault_test = executable(
     'src/ConversationPersistenceStore.vala',
     'src/ConversationExport.vala',
     'src/OllamaProvider.vala',
+    'src/TurnGuardNative.vapi',
+    'src/conversation_turn_guard.c',
     'src/ChatRequestBuilder.vala',
     'src/OptimizationPolicy.vala',
     'src/RepositoryLifecycleService.vala',
@@ -2700,3 +2714,13 @@ pres09_chart_history_e2e_test = executable(
 )
 test('pres09-chart-history-e2e', pres09_chart_history_e2e_test,
   env: {'ATM_CHART01_FIXTURE': meson.current_source_dir() / 'tests/fixtures/chart01'})
+
+conversation_turn_guard_test = executable(
+  'conversation-turn-guard-test',
+  ['src/conversation_turn_guard.c',
+   'tests/conversation_turn_guard_test.c'],
+  include_directories: include_directories('src'),
+  dependencies: [glib_dep],
+  install: false
+)
+test('conversation-turn-guard', conversation_turn_guard_test)

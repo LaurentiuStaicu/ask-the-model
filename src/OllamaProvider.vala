@@ -46,7 +46,8 @@ namespace AskTheModel {
     public errordomain ProviderError {
         NOT_READY,
         HTTP,
-        INVALID_RESPONSE
+        INVALID_RESPONSE,
+        STALE_IDENTITY
     }
 
     public class OllamaProvider : Object {
@@ -452,6 +453,13 @@ namespace AskTheModel {
         ) throws GLib.Error {
             yield ensure_ready ();
 
+            var turn_guard = new TurnGuardNative.Guard ();
+            if (!turn_guard.begin (0, model_name, model_digest)) {
+                throw new ProviderError.STALE_IDENTITY (
+                    "The local model changed before the turn could start."
+                );
+            }
+
             OllamaConversation target =
                 conversation ?? default_conversation;
 
@@ -486,6 +494,7 @@ namespace AskTheModel {
                     message.get_status ()
                 );
                 throw new ProviderError.HTTP (error_message);
+                turn_guard.abort ();
             }
 
             var data_stream = new GLib.DataInputStream (input_stream);
@@ -516,6 +525,7 @@ namespace AskTheModel {
                     throw new ProviderError.HTTP (
                         root.get_string_member ("error")
                     );
+                    turn_guard.abort ();
                 }
 
                 if (root.has_member ("message")) {
@@ -542,6 +552,13 @@ namespace AskTheModel {
             if (!saw_response) {
                 throw new ProviderError.INVALID_RESPONSE (
                     "Local provider returned an empty response stream."
+                );
+            }
+                turn_guard.abort ();
+
+            if (!turn_guard.commit (0, model_name, model_digest)) {
+                throw new ProviderError.STALE_IDENTITY (
+                    "The response was produced against a model identity that has since changed."
                 );
             }
 
