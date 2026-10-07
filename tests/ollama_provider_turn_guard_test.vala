@@ -121,43 +121,81 @@ run_checks (
         assert (stale_begin_rejected);
         assert (stale_begin_conversation.message_count () == 0);
 
-        var stale_provider =
+        var stale_model_provider =
             new AskTheModel.OllamaProvider ();
-        stale_provider.set_current_generation_reader (() => {
+        stale_model_provider.set_current_generation_reader (() => {
             return live_generation;
         });
 
-        assert (yield stale_provider.discover ());
-        assert (stale_provider.select_model (MODEL));
+        assert (yield stale_model_provider.discover ());
+        assert (stale_model_provider.select_model (MODEL));
 
-        var stale_commit_conversation =
+        var stale_model_conversation =
             new AskTheModel.OllamaConversation ();
 
-        bool stale_commit_rejected = false;
+        bool stale_model_rejected = false;
 
-        stale_provider.response_chunk.connect ((chunk) => {
-            live_generation = 42;
-            assert (stale_provider.select_model ("replacement-model"));
+        stale_model_provider.response_chunk.connect ((chunk) => {
+            assert (stale_model_provider.select_model ("replacement-model"));
         });
 
         try {
-            yield stale_provider.chat_grounded (
+            yield stale_model_provider.chat_grounded (
                 "hello",
                 "",
                 "",
                 "",
-                stale_commit_conversation,
+                stale_model_conversation,
                 true,
                 41,
                 MODEL,
                 DIGEST
             );
         } catch (AskTheModel.ProviderError.STALE_IDENTITY error) {
-            stale_commit_rejected = true;
+            stale_model_rejected = true;
         }
 
-        assert (stale_commit_rejected);
-        assert (stale_commit_conversation.message_count () == 0);
+        assert (stale_model_rejected);
+        assert (stale_model_conversation.message_count () == 0);
+
+        live_generation = 41;
+
+        var stale_generation_provider =
+            new AskTheModel.OllamaProvider ();
+        stale_generation_provider.set_current_generation_reader (() => {
+            return live_generation;
+        });
+
+        assert (yield stale_generation_provider.discover ());
+        assert (stale_generation_provider.select_model (MODEL));
+
+        var stale_generation_conversation =
+            new AskTheModel.OllamaConversation ();
+
+        bool stale_generation_rejected = false;
+
+        stale_generation_provider.response_chunk.connect ((chunk) => {
+            live_generation = 42;
+        });
+
+        try {
+            yield stale_generation_provider.chat_grounded (
+                "hello",
+                "",
+                "",
+                "",
+                stale_generation_conversation,
+                true,
+                41,
+                MODEL,
+                DIGEST
+            );
+        } catch (AskTheModel.ProviderError.STALE_IDENTITY error) {
+            stale_generation_rejected = true;
+        }
+
+        assert (stale_generation_rejected);
+        assert (stale_generation_conversation.message_count () == 0);
 
         var valid_conversation =
             new AskTheModel.OllamaConversation ();
