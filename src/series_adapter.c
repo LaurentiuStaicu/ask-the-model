@@ -100,8 +100,8 @@ atm_series_adapter_from_evidence (const AtmSeriesEvidenceDescriptor *descriptor,
         return FALSE;
     }
 
-    /* Repository and snapshot come from the artifact the identity was minted
-     * over, never from a caller argument. */
+    /* Repository, version and snapshot come from the artifact the identity was
+     * minted over, never from a caller argument. */
     AtmSeriesContract *series = atm_series_contract_new (
         ATM_SERIES_X_CALENDAR_YEAR,
         subject,
@@ -252,9 +252,9 @@ atm_series_adapter_validate (const AtmSeriesContract *contract,
                                            &rebuilt, error))
         return FALSE;
 
-    /* A materialised contract whose identity disagrees with its own
-     * reconstruction is rejected, which is the guarantee the source-specific
-     * module provided. */
+    /* Compare the reconstructed identities. A materialised contract whose
+     * identity disagrees with its own reconstruction is rejected, which is the
+     * guarantee the source-specific module provided. */
     gboolean matches =
         g_strcmp0 (atm_series_contract_scientific_id (contract),
                    atm_series_contract_scientific_id (rebuilt)) == 0 &&
@@ -263,7 +263,8 @@ atm_series_adapter_validate (const AtmSeriesContract *contract,
 
     atm_series_contract_free (rebuilt);
 
-    return matches || g_set_error_literal (error, ATM_SERIES_CONTRACT_ERROR,
-        ATM_SERIES_CONTRACT_ERROR_IDENTITY,
-        "Series contract disagrees with reconstructed source.");
+    if (!matches)
+        return reject (error, "Series contract disagrees with reconstructed source.");
+
+    return TRUE;
 }
