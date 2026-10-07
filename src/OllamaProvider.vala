@@ -421,7 +421,10 @@ namespace AskTheModel {
                 null,
                 null,
                 conversation,
-                persist_history
+                persist_history,
+                0,
+                null,
+                null
             );
         }
 
@@ -431,7 +434,10 @@ namespace AskTheModel {
             string evidence_text,
             string post_evidence_reminder,
             OllamaConversation? conversation = null,
-            bool persist_history = true
+            bool persist_history = true,
+            int64 expected_generation_id = 0,
+            string? expected_model = null,
+            string? expected_model_digest = null
         ) throws GLib.Error {
             return yield chat_internal (
                 prompt,
@@ -439,7 +445,10 @@ namespace AskTheModel {
                 evidence_text,
                 post_evidence_reminder,
                 conversation,
-                persist_history
+                persist_history,
+                expected_generation_id,
+                expected_model,
+                expected_model_digest
             );
         }
 
@@ -449,12 +458,19 @@ namespace AskTheModel {
             string? evidence_text,
             string? post_evidence_reminder,
             OllamaConversation? conversation,
-            bool persist_history
+            bool persist_history,
+            int64 expected_generation_id,
+            string? expected_model,
+            string? expected_model_digest
         ) throws GLib.Error {
             yield ensure_ready ();
 
             var turn_guard = new TurnGuardNative.Guard ();
-            if (!turn_guard.begin (0, model_name, model_digest)) {
+            if (!turn_guard.begin (
+                    expected_generation_id,
+                    expected_model ?? model_name,
+                    expected_model_digest ?? model_digest
+                )) {
                 throw new ProviderError.STALE_IDENTITY (
                     "The local model changed before the turn could start."
                 );
@@ -556,7 +572,11 @@ namespace AskTheModel {
             }
                 turn_guard.abort ();
 
-            if (!turn_guard.commit (0, model_name, model_digest)) {
+            if (!turn_guard.commit (
+                    0,
+                    model_name,
+                    model_digest
+                )) {
                 throw new ProviderError.STALE_IDENTITY (
                     "The response was produced against a model identity that has since changed."
                 );

@@ -3435,7 +3435,10 @@ namespace AskTheModel {
                             evidence_text ?? "",
                             post_evidence_reminder ?? "",
                             state.conversation,
-                            false
+                            false,
+                            state.session.repository_generation_id (),
+                            state.session.model_name (),
+                            state.session.model_digest ()
                         );
 
                         CitationResolution citation_resolution =
