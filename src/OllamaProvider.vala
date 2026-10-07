@@ -161,10 +161,21 @@ namespace AskTheModel {
 
         public async bool discover () {
             string? previous_model = model_name;
-            string[] candidates = {
+#if ATM_M12_TEST
+            string? test_base_url =
+                Environment.get_variable ("ATM_M12_TEST_BASE_URL");
+            string[] candidates = test_base_url != null
+                ? new string[] { test_base_url }
+                : new string[] {
+                    "http://127.0.0.1:11434",
+                    "http://127.0.0.1:11435"
+                };
+#else
+            string[] candidates = new string[] {
                 "http://127.0.0.1:11434",
                 "http://127.0.0.1:11435"
             };
+#endif
 
             foreach (string candidate in candidates) {
                 try {
