@@ -92,9 +92,12 @@ append_artifact (AtmSeriesEvidence *e,
      * No caller-supplied evidence atom, metadata or point payload is accepted. */
     AtmScientificEvidenceAtom atom = {0};
     atom.status = ATM_SCIENTIFIC_EVIDENCE_TYPED_VALIDATED;
-    atom.profile_id = d->profile_id;
-    atom.profile_version = d->profile_version;
-    atom.repository_id = d->repository_id;
+    /* The atom declares these as non-const char *, matching the existing
+     * source-specific modules. The descriptor's strings outlive the atom and
+     * the constructor does not take ownership, so the cast is honest here. */
+    atom.profile_id = (char *) d->profile_id;
+    atom.profile_version = (char *) d->profile_version;
+    atom.repository_id = (char *) d->repository_id;
 
     const char *snapshot = d->admission_snapshot (e->admission);
     char *version = g_strconcat ("snapshot:", snapshot, NULL);

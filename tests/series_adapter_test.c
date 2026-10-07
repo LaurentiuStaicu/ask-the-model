@@ -8,7 +8,8 @@
  *   1. admission produces a contract that validates against the finalized SRA;
  *   2. the contract carries the reviewed source metadata and admitted years;
  *   3. the reviewed metadata is bound into the identity, not decorative;
- *   4. argument guards hold and the output is left untouched on failure.
+ *   4. a reconstruction from the same admission agrees, and the check can fail;
+ *   5. argument guards hold and the output is left untouched on failure.
  *
  * Fixtures resolve as ATM_CHART01_FIXTURE plus the nested ewd/ paths, and the
  * four files are asserted against tests/fixtures/chart01/source-lock.json.
@@ -197,38 +198,31 @@ test_contract_points_carry_admitted_years (void)
     atm_gistemp_admission_free (admission);
 }
 
-/* The reconstruction guard: a contract rebuilt from the same evidence agrees. */
+/* Rebuilding the whole chain from the same admission must reproduce both
+ * identities. This is the shape the check must have: the contract mints its
+ * identities only when validated against a finalized SRA. */
 static void
-test_adapter_validate_accepts_reconstruction (void)
+test_adapter_revalidate_accepts_reconstruction (void)
 {
     AtmGistempAdmission *admission = build_gistemp_admission ();
-
-    AtmSeriesSra *sra = NULL;
-    GError *error = NULL;
-    g_assert_true (atm_series_sra_new (&ATM_GISTEMP_EVIDENCE_DESCRIPTOR,
-                                       admission, &sra, &error));
-    g_assert_no_error (error);
-
     AtmSeriesContract *contract = NULL;
-    g_assert_true (atm_series_adapter_from_evidence (&ATM_GISTEMP_EVIDENCE_DESCRIPTOR,
-        &GISTEMP_METADATA, atm_series_sra_evidence (sra), &contract, &error));
-    g_assert_no_error (error);
-    g_assert_true (atm_series_contract_validate (contract,
-        atm_series_sra_result (sra), &error));
+    GError *error = NULL;
+
+    g_assert_true (atm_series_adapter_admit (&ATM_GISTEMP_EVIDENCE_DESCRIPTOR,
+        &GISTEMP_METADATA, admission, &contract, &error));
     g_assert_no_error (error);
 
-    g_assert_true (atm_series_adapter_validate (contract,
+    g_assert_true (atm_series_adapter_revalidate (contract,
         &ATM_GISTEMP_EVIDENCE_DESCRIPTOR, &GISTEMP_METADATA,
-        atm_series_sra_evidence (sra), &error));
+        admission, &error));
     g_assert_no_error (error);
 
     atm_series_contract_free (contract);
-    atm_series_sra_free (sra);
     atm_gistemp_admission_free (admission);
 }
 
-/* Different reviewed metadata must produce a different identity. If it did not,
- * the metadata would not be bound into the contract at all. */
+/* A different reviewed metadata set must produce a different identity. If it did
+ * not, the metadata would not be bound into the contract at all. */
 static void
 test_metadata_is_bound_into_identity (void)
 {
@@ -314,7 +308,7 @@ main (int argc, char **argv)
 
     g_test_add_func ("/adapter/admit-valid", test_admit_produces_valid_contract);
     g_test_add_func ("/adapter/points-carry-years", test_contract_points_carry_admitted_years);
-    g_test_add_func ("/adapter/validate-reconstruction", test_adapter_validate_accepts_reconstruction);
+    g_test_add_func ("/adapter/revalidate", test_adapter_revalidate_accepts_reconstruction);
     g_test_add_func ("/adapter/metadata-bound-into-identity", test_metadata_is_bound_into_identity);
     g_test_add_func ("/adapter/argument-guards", test_argument_guards);
 
