@@ -584,7 +584,7 @@ namespace AskTheModel {
             }
 
             if (!turn_guard.commit (
-                    0,
+                    expected_generation_id,
                     model_name,
                     model_digest
                 )) {
