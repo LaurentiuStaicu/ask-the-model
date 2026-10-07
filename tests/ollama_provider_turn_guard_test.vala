@@ -25,7 +25,7 @@ tags_handler (
 ) {
     write_json_response (
         message,
-        "{\"models\":[{\"name\":\"test-model\",\"digest\":\"test-digest\"}]}"
+        "{\"models\":[{\"name\":\"test-model\",\"digest\":\"test-digest\"},{\"name\":\"replacement-model\",\"digest\":\"replacement-digest\"}]}"
     );
 }
 
@@ -89,10 +89,10 @@ run_checks (
         assert (provider.model_name == MODEL);
         assert (provider.model_digest == DIGEST);
 
-        var stale_model_conversation =
+        var stale_begin_conversation =
             new AskTheModel.OllamaConversation ();
 
-        bool stale_model_rejected = false;
+        bool stale_begin_rejected = false;
 
         try {
             yield provider.chat_grounded (
@@ -100,66 +100,52 @@ run_checks (
                 "",
                 "",
                 "",
-                stale_model_conversation,
+                stale_begin_conversation,
                 true,
-                0,
+                41,
                 "wrong-model",
                 DIGEST
             );
         } catch (AskTheModel.ProviderError.STALE_IDENTITY error) {
-            stale_model_rejected = true;
+            stale_begin_rejected = true;
         }
 
-        assert (stale_model_rejected);
-        assert (stale_model_conversation.message_count () == 0);
+        assert (stale_begin_rejected);
+        assert (stale_begin_conversation.message_count () == 0);
 
-        var stale_digest_conversation =
+        var stale_provider =
+            new AskTheModel.OllamaProvider ();
+
+        assert (yield stale_provider.discover ());
+        assert (stale_provider.select_model (MODEL));
+
+        var stale_commit_conversation =
             new AskTheModel.OllamaConversation ();
 
-        bool stale_digest_rejected = false;
+        bool stale_commit_rejected = false;
+
+        stale_provider.response_chunk.connect ((chunk) => {
+            assert (stale_provider.select_model ("replacement-model"));
+        });
 
         try {
-            yield provider.chat_grounded (
+            yield stale_provider.chat_grounded (
                 "hello",
                 "",
                 "",
                 "",
-                stale_digest_conversation,
+                stale_commit_conversation,
                 true,
-                0,
-                MODEL,
-                "wrong-digest"
-            );
-        } catch (AskTheModel.ProviderError.STALE_IDENTITY error) {
-            stale_digest_rejected = true;
-        }
-
-        assert (stale_digest_rejected);
-        assert (stale_digest_conversation.message_count () == 0);
-
-        var stale_generation_conversation =
-            new AskTheModel.OllamaConversation ();
-
-        bool stale_generation_rejected = false;
-
-        try {
-            yield provider.chat_grounded (
-                "hello",
-                "",
-                "",
-                "",
-                stale_generation_conversation,
-                true,
-                1,
+                41,
                 MODEL,
                 DIGEST
             );
         } catch (AskTheModel.ProviderError.STALE_IDENTITY error) {
-            stale_generation_rejected = true;
+            stale_commit_rejected = true;
         }
 
-        assert (stale_generation_rejected);
-        assert (stale_generation_conversation.message_count () == 0);
+        assert (stale_commit_rejected);
+        assert (stale_commit_conversation.message_count () == 0);
 
         var valid_conversation =
             new AskTheModel.OllamaConversation ();
@@ -171,7 +157,7 @@ run_checks (
             "",
             valid_conversation,
             true,
-            0,
+            41,
             MODEL,
             DIGEST
         );
