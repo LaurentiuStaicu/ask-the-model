@@ -9,10 +9,10 @@
     "policy": "Release version changes are deliberate. A minor release is appropriate when substantial backward-compatible user-facing functionality is added; patch releases are reserved for compatible corrections."
   },
   "current_public_release": {
-    "version": "0.6.0",
+    "version": "0.6.1",
     "date": "2026-10-08",
     "version_bump_required_now": false,
-    "reason": "v0.6.0 promotes qualified semantic transcript and source presentation, explicit source-revalidated GISTEMP chart rendering with History reconstruction, and default-OFF session-only repository optimizations, while preserving the v0.5.0 saved-History, exact-context and hardened state boundaries."
+    "reason": "v0.6.1 is the published compatible GISTEMP chart correction; it is immutable and remains the current public release while post-release grounded-turn durability work stays unreleased on main."
   },
   "canonical_sources": {
     "version": "meson.build project() version",
@@ -69,12 +69,12 @@
     "saved_conversation_history": "v0.5.0 makes explicit Save to History the only user-visible conversation save transition; later lifecycle changes must preserve exact-context restore and fail-closed permanent deletion semantics unless deliberately redesigned and documented.",
     "presentation": "v0.6.0 qualifies semantic transcript presentation and accessible grounded Sources; future presentation changes must preserve provider/persistence content and citation provenance boundaries.",
     "optimizations": "v0.6.0 exposes the session-only Optimizations gate defaulting OFF; qualified ON policies remain bounded and individually evidenced, while OFF retains the established baseline.",
-    "charting": "v0.6.0 supports only explicit GISTEMP chart intent from the exact pinned EWD source. The planned v0.6.1 correction also recognizes clear natural-language requests and renders from the complete pinned source independently of retrieved evidence excerpts; no generic/model-authored chart values or arbitrary source adapters are implied."
+    "charting": "v0.6.1 supports the qualified GISTEMP chart intent from the exact pinned EWD source, recognizes clear natural-language requests, and renders from the complete pinned source independently of retrieved evidence excerpts; no generic/model-authored chart values or arbitrary source adapters are implied."
   },
   "release_candidate": {
-    "version": "0.6.1",
-    "date": "2026-10-08",
-    "status": "planned",
-    "scope": "Correct live rendering of the qualified pinned GISTEMP series and natural-language request recognition; no generic charts or model-authored numeric values."
+    "version": "0.6.2",
+    "date": null,
+    "status": "unreleased",
+    "scope": "Post-v0.6.1 grounded-turn durability correction: durable SQLite commit ordering, final identity/cancellation gates, fail-closed pre-boundary persistence and regression qualification; release date remains deliberately unset until a release candidate is qualified."
   }
 }
