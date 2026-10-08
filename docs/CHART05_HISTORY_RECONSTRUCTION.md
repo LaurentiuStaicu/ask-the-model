@@ -1,6 +1,6 @@
 # CHART-05: qualified History chart reconstruction
 
-Status: slice 4 integrated on the chart-05-history-reconstruction branch; chart runtime remains disabled for new/live turns.
+Status: chart recipes are attached to eligible live grounded turns and reconstructed in History from the exact pinned repository snapshot. This is a narrow GISTEMP path; arbitrary chart data and model-authored chart recipes are not admitted.
 
 ## Reconstruction authority
 
@@ -41,11 +41,11 @@ The existing Chart/Data component remains authoritative for exact displayed sour
 
 ## Qualification
 
-chart-history-reconstruct proves:
+The `chart-history-reconstruct` test proves:
 
 - successful source re-admission and identity reconstruction;
 - persisted scientific/qualified/spec identity equality;
 - wrong snapshot rejection;
 - missing snapshot rejection.
 
-The existing ChartSpec, VerifiedSeries, GTK, Flatpak and Invariant Registry gates remain non-regression requirements.
+The PRES-09 test exercises recipe attachment, archive, close/reopen, and reconstruction. The Flatpak suite builds the application and runs the Meson tests. CHART-03 qualifies the GTK component separately. There is no dedicated end-to-end GTK Application test that drives a live chart request through restored History presentation, so that integrated UI path should not be described as having its own end-to-end gate.
