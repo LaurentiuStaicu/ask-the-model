@@ -3429,6 +3429,18 @@ namespace AskTheModel {
                     );
                 grounded_turn_prepared = has_grounding;
 
+                string grounded_system_instructions =
+                    system_instructions ?? "";
+                if (chart_intent.gistemp_requested) {
+                    grounded_system_instructions +=
+                        "\nThe application handles the requested qualified " +
+                        "GISTEMP chart. Do not claim that you cannot render " +
+                        "charts. Answer the user's grounded question briefly " +
+                        "and cite the GISTEMP source when it is present in " +
+                        "the supplied evidence. Never invent data or chart " +
+                        "configuration.";
+                }
+
                 if (cancellable.is_cancelled ()) {
                     throw new GLib.IOError.CANCELLED (
                         "Generation was stopped."
@@ -3447,7 +3459,7 @@ namespace AskTheModel {
                     if (has_grounding) {
                         answer = yield ollama_provider.chat_grounded (
                             effective_prompt,
-                            system_instructions ?? "",
+                            grounded_system_instructions,
                             evidence_text ?? "",
                             post_evidence_reminder ?? "",
                             state.conversation,
