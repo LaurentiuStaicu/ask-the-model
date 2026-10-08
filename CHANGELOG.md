@@ -4,7 +4,13 @@ All notable public releases of Ask the Model are recorded here.
 
 ## Unreleased
 
-### Grounded-turn durability
+No unreleased public changes are currently recorded.
+
+## 0.6.2 - 2026-10-08
+
+Harden grounded-turn durable commit ordering and fail-closed persistence.
+
+### Reliability correction
 
 - Fixed the grounded-turn durable commit boundary so `ConversationSession` grounding state advances only after the corresponding SQLite turn has committed successfully.
 - Added final cancellation, model-identity and repository-generation checks immediately before the synchronous durable commit; pre-boundary persistence failures abort the prepared turn, while post-durable chart/presentation failures cannot roll back committed grounding.
