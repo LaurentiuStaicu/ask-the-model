@@ -6,6 +6,13 @@ namespace AskTheModel {
         NO_SPACE
     }
 
+    private errordomain GistempChartQualificationError {
+        EWD_NOT_SELECTED,
+        SNAPSHOT_UNAVAILABLE,
+        SOURCE_INVALID,
+        IDENTITIES_UNAVAILABLE
+    }
+
     private class ChatTabState : Object {
         public Gtk.Box page;
         public Gtk.TextView transcript;
@@ -2792,6 +2799,88 @@ namespace AskTheModel {
             return button;
         }
 
+        private void qualify_live_gistemp_request (
+            ConversationSession session
+        ) throws GLib.Error {
+            ConversationRepositoryPin? chart_pin = null;
+
+            for (uint i = 0; i < session.repository_count (); i++) {
+                ConversationRepositoryPin? pin =
+                    session.repository_pin_at (i);
+
+                if (pin == null) {
+                    continue;
+                }
+
+                if (pin.repository_id == "ewd" ||
+                    pin.repository_id ==
+                        "LaurentiuStaicu/empirical-world3-dynamics") {
+                    chart_pin = pin;
+                    break;
+                }
+            }
+
+            if (chart_pin == null) {
+                throw new GistempChartQualificationError.EWD_NOT_SELECTED (
+                    "GISTEMP charts require EWD to be selected for this conversation. " +
+                    "Select EWD in Repository Scope and retry."
+                );
+            }
+
+            const string source_path =
+                "science/data/processed/nasa_gistemp_global_2026.csv";
+
+            RepositoryDescriptor? descriptor =
+                repository_descriptor_for_id (
+                    chart_pin.repository_id
+                );
+
+            if (descriptor == null) {
+                throw new GistempChartQualificationError.SOURCE_INVALID (
+                    "The pinned EWD repository required for the GISTEMP chart is unavailable."
+                );
+            }
+
+            string snapshot_path =
+                RepositoryLifecycleService.snapshot_path (
+                    descriptor,
+                    chart_pin.snapshot_sha
+                );
+
+            if (!GLib.FileUtils.test (
+                    snapshot_path,
+                    GLib.FileTest.IS_DIR
+                )) {
+                throw new GistempChartQualificationError.SNAPSHOT_UNAVAILABLE (
+                    "The pinned EWD snapshot required for the GISTEMP chart is unavailable."
+                );
+            }
+
+            ChartNative.Spec spec;
+            if (!ChartNative.reconstruct_live_gistemp (
+                    snapshot_path,
+                    chart_pin.repository_id,
+                    chart_pin.repository_version,
+                    chart_pin.snapshot_sha,
+                    out spec
+                ) || spec == null) {
+                throw new GistempChartQualificationError.SOURCE_INVALID (
+                    "The pinned GISTEMP source could not be re-qualified."
+                );
+            }
+
+            string? scientific_id = spec.series_scientific_id (0);
+            string? qualified_id = spec.series_qualified_id (0);
+            string? chart_spec_id = spec.id ();
+
+            if (scientific_id == null || qualified_id == null ||
+                chart_spec_id == null) {
+                throw new GistempChartQualificationError.IDENTITIES_UNAVAILABLE (
+                    "The qualified GISTEMP chart identities are unavailable."
+                );
+            }
+        }
+
         private Gtk.Widget[] build_live_chart_widgets (
             ConversationSession session,
             out ConversationPersistenceChart[] charts
@@ -3348,6 +3437,7 @@ namespace AskTheModel {
             bool should_generate_title =
                 state.title_label.label == "New";
             bool grounded_turn_prepared = false;
+            bool session_started_for_request = false;
 
             try {
                 if (state.persistence_failed) {
@@ -3387,6 +3477,7 @@ namespace AskTheModel {
                         state.model_name,
                         state.model_digest
                     );
+                    session_started_for_request = true;
                 }
 
                 if (!ollama_provider.select_model (
@@ -3401,6 +3492,12 @@ namespace AskTheModel {
                     state.model_name,
                     ollama_provider.model_digest
                 );
+
+                if (chart_intent.gistemp_requested) {
+                    qualify_live_gistemp_request (
+                        state.session
+                    );
+                }
 
                 bool needs_clarification;
                 string? system_instructions;
@@ -3616,6 +3713,22 @@ namespace AskTheModel {
                         );
                     }
                 }
+            } catch (GistempChartQualificationError error) {
+                state.presentation.cancel_assistant_generation ();
+
+                if (session_started_for_request &&
+                    !grounded_turn_prepared) {
+                    state.session.reset ();
+                    state.locked = false;
+                    state.model_name = null;
+                    state.model_digest = null;
+                    state.repository_ids = {};
+                }
+
+                append_transcript (
+                    state.transcript,
+                    "System: " + error.message
+                );
             } catch (GLib.Error error) {
                 state.presentation.cancel_assistant_generation ();
 
