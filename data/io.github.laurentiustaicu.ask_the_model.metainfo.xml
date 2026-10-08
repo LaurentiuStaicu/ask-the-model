@@ -20,11 +20,11 @@
       chat tabs and lets users explicitly save selected conversations to local History.
     </p>
     <p>
-      Version 0.6.0 retains repository-grounded exploration, exact-context saved History,
-      hardened SQLite state authority and upstream Git SHA provenance. It adds semantic
-      transcript presentation, accessible grounded Sources, an explicitly requested
-      GISTEMP chart reconstructed from its pinned source, and qualified session-only
-      repository optimizations that default to OFF.
+      Version 0.6.1 corrects live GISTEMP chart rendering to use the complete pinned,
+      revalidated source independently of retrieval excerpts, and recognizes clear
+      natural-language chart requests alongside the explicit command. The chart remains
+      limited to the qualified GISTEMP profile; no generic charts or model-authored data
+      are enabled.
     </p>
     <p>
       AtM remains an interface and retrieval layer. The external provider owns
@@ -45,6 +45,14 @@
   <content_rating type="oars-1.1"/>
 
   <releases>
+    <release version="0.6.1" date="2026-10-08">
+      <description>
+        <p>
+          Corrected complete-pinned-source GISTEMP chart rendering and natural-language
+          request recognition, retaining the qualified GISTEMP-only chart boundary.
+        </p>
+      </description>
+    </release>
     <release version="0.6.0" date="2026-10-08">
       <description>
         <p>
