@@ -3481,8 +3481,11 @@ namespace AskTheModel {
                 try {
                     Gtk.Widget chart =
                         build_active_chart_widget (state);
-                    state.presentation.append_chart_widget (chart);
-                    state.presentation.append_turn_separator ();
+                    state.presentation.append_completed_turn (
+                        "",
+                        {},
+                        { chart }
+                    );
                 } catch (GLib.Error error) {
                     state.presentation.append_chart_status (
                         "AtM could not regenerate the qualified GISTEMP chart: " +
