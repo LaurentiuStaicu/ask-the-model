@@ -113,6 +113,7 @@ atm_grounded_turn_fixture_create (
         "message: Cite this software.\n"
         "title: Fixture\n"
         "version: 0.1.0\n"
+        "type: software\n"
         "authors:\n"
         "  - family-names: Test\n"
         "    given-names: Fixture\n",
@@ -129,7 +130,21 @@ atm_grounded_turn_fixture_create (
         snapshot_root,
         "STATUS.md",
         "# Scientific status\n"
+        "## Release status\n"
         "Current fixture status.\n",
+        error
+    );
+    if (*error != NULL) {
+        atm_grounded_turn_fixture_destroy (
+            cache_root, snapshot_root, NULL, NULL, NULL
+        );
+        return FALSE;
+    }
+
+    write_text (
+        snapshot_root,
+        "model/core.json",
+        "{\"variables\":[{\"id\":\"fixture_status\",\"label\":{\"en\":\"Fixture status\"}}]}\n",
         error
     );
     if (*error != NULL) {
