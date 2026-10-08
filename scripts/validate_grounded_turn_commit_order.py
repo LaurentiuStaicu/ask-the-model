@@ -59,6 +59,12 @@ def main() -> int:
     ):
         marker(send, declaration, "send_prompt durable state")
 
+    marker(
+        send,
+        "state.session.prepare_turn (",
+        "grounded preparation",
+    )
+
     required = [
         "yield ollama_provider.chat_grounded (",
         "state.session.resolve_turn_citations (",
@@ -84,7 +90,6 @@ def main() -> int:
     }
 
     order = [
-        "state.session.prepare_turn (",
         "yield ollama_provider.chat_grounded (",
         "state.session.resolve_turn_citations (",
         "ensure_persistent_conversation (",
@@ -101,6 +106,16 @@ def main() -> int:
         "build_live_chart_widgets (",
         "append_completed_answer (",
     ]
+    prepare_position = send.find("state.session.prepare_turn (")
+    require(
+        prepare_position >= 0,
+        "grounded prepare_turn call missing",
+    )
+    require(
+        prepare_position < grounded_start,
+        "prepare_turn must precede the grounded provider branch",
+    )
+
     for left, right in zip(order, order[1:]):
         require(
             positions[left] < positions[right],
