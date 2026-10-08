@@ -2,19 +2,23 @@
 
 ## Release status
 
-**Current release: Ask the Model (AtM) v0.6.1 release candidate — GISTEMP chart rendering correction, planned release date: 2026-10-08.**
+**Current release: Ask the Model (AtM) v0.6.1 — GISTEMP chart rendering correction, released 2026-10-08.**
 
-**Latest published release: v0.6.0 (2026-10-08).** The `0.6.1` candidate is not published; its scope is limited to reliable rendering of the already qualified GISTEMP chart and natural-language recognition of requests for that chart.
+**Latest published release: v0.6.1 (2026-10-08).** Tag `v0.6.1` and the immutable GitHub Release point to merge commit `2d6ac8bc38efc657689f19e2c7904e6c81097468`. The release was published automatically by the Flatpak release workflow after the post-merge release gates passed.
 
 v0.6.0 retains the v0.5.0 repository-grounding, exact-context saved History, hardened SQLite state and startup-integrity boundaries. It adds complete-message semantic transcript presentation, accessible grounded Sources and semantic copy; a user-requested GISTEMP chart path with exact pinned-source revalidation and History reconstruction; and session-only repository optimizations that default to OFF.
 
 The project remains in the `0.x` initial-development series. The public API and repository-management surface are not yet considered stable enough for v1.0.
 
-## v0.6.1 release candidate
+## v0.6.1 release
 
 - Natural-language requests for the qualified GISTEMP chart are recognized alongside `/chart gistemp`.
 - The chart reads the complete pinned, revalidated EWD GISTEMP series directly, rather than depending on sparse retrieval excerpts.
 - Scope remains limited to the existing GISTEMP chart; no generic chart support or model-authored values are added.
+
+## v0.6.1 verification
+
+The post-merge release gate for commit `2d6ac8bc38efc657689f19e2c7904e6c81097468` passed all six workflows: C1-I9 purge orchestrator qualification, C1-I10 runtime purge integration qualification, A1-M12 runtime authority replay, A1-M12b lifecycle fsync EIO qualification, Invariant Registry and Flatpak. The published release contains `AskTheModel.flatpak` (480,440 bytes; SHA-256 `ca197f469f337ccf17b65623fa2a64410f7ee4d7d9574250e2620da650759512`).
 
 ## v0.6.0 release highlights
 
@@ -22,7 +26,7 @@ The project remains in the `0.x` initial-development series. The public API and 
 - The explicit `/chart gistemp <grounded question>` request renders only the qualified complete annual global GISTEMP series from the exact pinned EWD snapshot. History stores a reconstruction recipe and rebuilds the chart from pinned source data; it does not persist numeric points or pixel state.
 - The session-only **Optimizations** switch starts OFF. ON enables individually qualified repository coordination, capacity admission, D1 source-cap policy, selected S1 local durability and bounded C1 reclamation. OFF preserves the established baseline. Reclamation is limited to the qualified post-action path; background, startup and ENOSPC-triggered GC remain disabled.
 - Grounded provider turns revalidate model and repository-generation identity before commit. Mismatch or cancellation fails closed before conversation history advances.
-- CHART-01/03, PRES-09, D1, C1-I10, A1-M12/M12b, Presentation Interaction, Invariant Registry and Flatpak qualifications passed together on the audited candidate before the release metadata update. The final release candidate must pass CI again after this metadata commit.
+- CHART-01/03, PRES-09, D1, C1-I10, A1-M12/M12b, Presentation Interaction, Invariant Registry and Flatpak qualifications passed together on the audited candidate before the release metadata update. The final metadata-bearing head passed the required post-merge release CI gate; Flatpak then published `v0.6.1`.
 
 The release does not claim scientific certification, arbitrary chart support, model-authored scientific values, remote-filesystem durability, or generic automatic cleanup. The scientific repositories remain authoritative for their own models, data and validation.
 
