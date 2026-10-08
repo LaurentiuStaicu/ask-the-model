@@ -232,7 +232,7 @@ Any such work should preserve the invariants documented in `docs/DEVELOPMENT_GUI
 - `docs/ARCHITECTURE.md` — application architecture;
 - `docs/REPOSITORY_RETRIEVAL_ARCHITECTURE.md` — repository/retrieval architecture;
 - `docs/REPOSITORY_RETRIEVAL_ACCEPTANCE.md` — acceptance gates;
-- `releases/v0.6.0.md` — current release description;
+- `releases/v0.6.1.md` — current release description;
 - `releases/v0.5.0.md` — previous release description;
 - `releases/v0.4.0.md` — previous startup-integrity release description;
 - `CHANGELOG.md` — release history.

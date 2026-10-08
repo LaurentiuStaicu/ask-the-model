@@ -1,10 +1,10 @@
 # Application architecture boundary
 
-## Released state — v0.6.0
+## Released state — v0.6.1
 
-AtM v0.6.0 provides a functional GTK 4 / Granite local-chat application, desktop integration, AppStream metadata, elementary OS 8 Flatpak packaging, repository-grounded EWD/CBD/RMD conversation paths, startup qualification/snapshot integrity, hardened SQLite repository authority, explicit saved-conversation History, semantic transcript presentation, accessible grounded Sources, a source-revalidated GISTEMP chart path and qualified session-only repository optimizations defaulting to OFF.
+AtM v0.6.1 provides the functional GTK 4 / Granite local-chat application, desktop integration, AppStream metadata, elementary OS 8 Flatpak packaging, repository-grounded EWD/CBD/RMD conversation paths, startup qualification/snapshot integrity, hardened SQLite repository authority, explicit saved-conversation History, semantic transcript presentation, accessible grounded Sources, the source-revalidated GISTEMP chart path and qualified session-only repository optimizations defaulting to OFF.
 
-Repository selection, validated exact-SHA snapshots, deterministic retrieval, per-chat repository/model pinning, grounded citations and on-demand provenance inspection remain part of the released capability boundary. v0.6.0 retains application-owned SQLite Control State, explicit Save to History conversation archiving, exact-context restore and managed archived-conversation JSON mirrors from v0.5.0, and adds the qualified presentation, chart and optimization behaviors above.
+Repository selection, validated exact-SHA snapshots, deterministic retrieval, per-chat repository/model pinning, grounded citations and on-demand provenance inspection remain part of the released capability boundary. v0.6.1 retains the v0.6.0 presentation, chart and optimization behaviors while adding the qualified natural-language GISTEMP correction. Post-v0.6.1 grounded-turn durability work on main is intentionally unreleased and documented separately in STATUS.md and CHANGELOG.md.
 
 ## Repository-aware implementation — released in v0.3.0
 
