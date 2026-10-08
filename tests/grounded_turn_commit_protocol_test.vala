@@ -364,6 +364,110 @@ test_persistence_failure_is_aborted_and_retryable () {
     }
 }
 
+private static void
+test_abort_before_durable_commit_leaves_no_turn () {
+    string cache_root;
+    string snapshot_root;
+    string index_path;
+    string version;
+    string snapshot_sha;
+
+    try {
+        var session = new_session (
+            out cache_root,
+            out snapshot_root,
+            out index_path,
+            out version,
+            out snapshot_sha
+        );
+
+        var store =
+            new AskTheModel.ConversationPersistenceStore (
+                cache_root
+            );
+
+        string conversation_id =
+            store.create_conversation (
+                "Grounded",
+                1,
+                "model-a",
+                "digest-a",
+                7,
+                {
+                    new AskTheModel.ConversationPersistenceRepository (
+                        "ewd",
+                        version,
+                        snapshot_sha
+                    )
+                }
+            );
+
+        bool needs_clarification;
+        string? system_instructions;
+        string? evidence_text;
+        string? post_evidence_reminder;
+
+        assert (
+            session.prepare_turn (
+                "What is the current fixture status?",
+                false,
+                out needs_clarification,
+                out system_instructions,
+                out evidence_text,
+                out post_evidence_reminder
+            )
+        );
+
+        var resolution =
+            session.resolve_turn_citations (
+                "The fixture status is current [S1]."
+            );
+        assert (resolution.citation_count () == 1);
+
+        session.abort_turn ();
+
+        var conversation =
+            new AskTheModel.OllamaConversation ();
+        assert (conversation.message_count () == 0);
+        assert (
+            store.load_snapshot (conversation_id).messages.length == 0
+        );
+
+        bool retry_needs_clarification;
+        string? retry_system_instructions;
+        string? retry_evidence_text;
+        string? retry_post_evidence_reminder;
+
+        assert (
+            session.prepare_turn (
+                "What is the current fixture status?",
+                false,
+                out retry_needs_clarification,
+                out retry_system_instructions,
+                out retry_evidence_text,
+                out retry_post_evidence_reminder
+            )
+        );
+
+        var retry_resolution =
+            session.resolve_turn_citations (
+                "The fixture status is current [S1]."
+            );
+        assert (retry_resolution.citation_count () == 1);
+
+        GroundedTurnFixtureNative.destroy (
+            cache_root,
+            snapshot_root,
+            index_path,
+            version,
+            snapshot_sha
+        );
+    } catch (GLib.Error error) {
+        critical ("%s", error.message);
+        assert_not_reached ();
+    }
+}
+
 int
 main (string[] args) {
     Test.init (ref args);
@@ -375,6 +479,10 @@ main (string[] args) {
     Test.add_func (
         "/grounded-turn-commit-protocol/persistence-failure-abort-retry",
         test_persistence_failure_is_aborted_and_retryable
+    );
+    Test.add_func (
+        "/grounded-turn-commit-protocol/abort-before-durable",
+        test_abort_before_durable_commit_leaves_no_turn
     );
 
     return Test.run ();
