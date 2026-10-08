@@ -53,10 +53,13 @@ def main() -> int:
     require(grounded_end >= 0, "grounded branch boundary missing")
     grounded = send[grounded_start:grounded_end]
 
-    required = [
+    for declaration in (
         "bool grounded_turn_prepared = false;",
         "bool turn_durably_committed = false;",
-        "state.session.prepare_turn (",
+    ):
+        marker(send, declaration, "send_prompt durable state")
+
+    required = [
         "yield ollama_provider.chat_grounded (",
         "state.session.resolve_turn_citations (",
         "ensure_persistent_conversation (",
