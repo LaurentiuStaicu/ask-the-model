@@ -4,8 +4,17 @@ All notable public releases of Ask the Model are recorded here.
 
 ## Unreleased
 
-- Accept clear natural-language requests for the qualified GISTEMP chart in addition to the explicit `/chart gistemp` command. Chart intent remains application-detected and restricted to the pinned, revalidated GISTEMP series.
+No unreleased changes yet.
 
+## 0.6.1 - 2026-10-08
+
+Correct live GISTEMP chart rendering and recognize clear natural-language chart requests.
+
+### User-facing corrections
+
+- Natural-language requests such as “Arată-mi un grafic GISTEMP cu evoluția temperaturii globale în timp” and “Show me a GISTEMP chart of global temperature over time” now enter the qualified chart flow; the explicit `/chart gistemp` command remains supported.
+- Build the chart directly from the complete, pinned and revalidated EWD GISTEMP source. Rendering no longer depends on whether retrieval excerpts happen to cite the CSV path or include a sparse subset of its rows.
+- Keep chart values and configuration application-controlled and the chart restricted to the qualified GISTEMP profile. Generic charts, arbitrary sources and model-authored numeric values remain outside scope.
 
 ## 0.6.0 - 2026-10-08
 
