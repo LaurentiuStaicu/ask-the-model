@@ -4,6 +4,29 @@ All notable public releases of Ask the Model are recorded here.
 
 ## Unreleased
 
+No unreleased changes yet.
+
+## 0.6.0 - 2026-10-08
+
+Qualified semantic presentation, session-only repository optimizations and a narrowly scoped GISTEMP chart path.
+
+### User-facing capabilities
+
+- Added semantic rendering for complete assistant responses, accessible grounded Sources buttons and semantic clipboard serialization. Live and History turns use the same completed-turn projection.
+- Added an explicit `/chart gistemp <grounded question>` request. AtM revalidates the exact pinned EWD source, renders the qualified annual global GISTEMP series and persists a reconstruction recipe for History; numeric chart data and pixel state are never persisted.
+- Added a session-only **Optimizations** switch that defaults to OFF. Qualified ON behavior includes coordinated repository updates, source-cap-4 context, conservative capacity admission, selected local durability and bounded post-action reclamation. OFF preserves the established baseline.
+- Grounded provider turns now revalidate exact model and repository-generation identity at commit. Identity drift and cancellation fail closed before provider history advances.
+
+### Boundaries and qualification
+
+- Charts remain restricted to the audited GISTEMP profile and explicit user intent. Generic charts, model-authored numeric data, arbitrary sources, STEP/BAR and missing/event series are not enabled.
+- Optimizations remain opt-in and session-only. Background, startup, toggle-triggered and ENOSPC-triggered reclamation remain disabled; no broad snapshot or database pruning is added.
+- Qualification retains the frozen R5 retrieval gate and scientific boundary. The final metadata-bearing release candidate must pass the complete Flatpak and invariant/workflow set before merge and tagging.
+
+### Detailed development and qualification record
+
+The entries below preserve the post-v0.5.0 implementation and measurement trail. Earlier entries record the state at their original change point; later entries in this section close or refine those qualifications.
+
 ### Presentation layer
 
 - unified live and History completed Assistant turns through PRES-08: ordinary, grounded and clarification responses share the same body/Sources/separator projection; old saved display content is normalized at render time without rewriting durable messages, provider history or citations; live pending-row cleanup and one-shot scroll behavior are preserved;
