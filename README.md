@@ -32,7 +32,7 @@
 
 <small><strong>Ask the Model</strong> provides the interface and retrieval/provenance layer. A <strong>local provider</strong>, such as Ollama, loads and runs AI models. The <strong>AI model</strong> remains a separate artifact that must currently be downloaded and managed through the provider rather than AtM.</small>
 
-<small>Version 0.6.2 hardens the qualified grounded-turn persistence boundary after the v0.6.1 GISTEMP chart release: clear natural-language requests work alongside `/chart gistemp`, and AtM builds the chart from the complete, pinned and revalidated source rather than sparse retrieval excerpts. The release preserves v0.6.0 semantic presentation, accessible Sources, exact-context saved History and default-OFF repository optimizations. EWD, CBD and RMD remain authoritative for their code, data, assumptions, provenance and validation.</small>
+<small>Version 0.6.2 hardens the grounded-turn persistence boundary after the v0.6.1 GISTEMP chart release. A grounded turn now advances session state only after its corresponding durable SQLite turn commits successfully, with final cancellation/model/repository-generation gates and fail-closed pre-boundary persistence. The release preserves the qualified v0.6.1 chart behavior, v0.6.0 semantic presentation, accessible Sources, exact-context saved History and default-OFF repository optimizations. EWD, CBD and RMD remain authoritative for their code, data, assumptions, provenance and validation.</small>
 
 ### Repository-grounded scientific-model chat
 
