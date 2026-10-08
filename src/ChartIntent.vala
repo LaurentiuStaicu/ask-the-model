@@ -1,4 +1,9 @@
 namespace AskTheModel {
+    public enum ChartKind {
+        NONE,
+        GISTEMP
+    }
+
     /*
      * Chart intent is resolved locally. The model never supplies chart intent,
      * values, axes, units, or domains. GISTEMP requests may use the explicit
@@ -29,6 +34,28 @@ namespace AskTheModel {
             }
 
             return false;
+        }
+
+        public static bool is_chart_follow_up (string prompt) {
+            string normalized = prompt.strip ().down ();
+            return normalized == "generate the chart" ||
+                normalized == "show the chart" ||
+                normalized == "display the chart" ||
+                normalized == "create the chart" ||
+                normalized == "draw the chart" ||
+                normalized == "plot the chart" ||
+                normalized == "generează graficul" ||
+                normalized == "genereaza graficul" ||
+                normalized == "arată graficul" ||
+                normalized == "arata graficul" ||
+                normalized == "afișează graficul" ||
+                normalized == "afiseaza graficul" ||
+                normalized == "creează graficul" ||
+                normalized == "creeaza graficul" ||
+                normalized == "desenează graficul" ||
+                normalized == "deseneaza graficul" ||
+                normalized == "vizualizează graficul" ||
+                normalized == "vizualizeaza graficul";
         }
 
         public static ChartIntent parse (string prompt) {
