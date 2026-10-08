@@ -3348,6 +3348,7 @@ namespace AskTheModel {
             bool should_generate_title =
                 state.title_label.label == "New";
             bool grounded_turn_prepared = false;
+            bool turn_durably_committed = false;
 
             try {
                 if (state.persistence_failed) {
@@ -3482,28 +3483,55 @@ namespace AskTheModel {
                                 answer
                             );
 
-                        ensure_persistent_conversation (
-                            state
-                        );
+                        bool persistence_ready = false;
+                        try {
+                            persistence_ready =
+                                ensure_persistent_conversation (
+                                    state
+                                );
+                        } catch (GLib.Error error) {
+                            state.persistence_failed = true;
+                            throw error;
+                        }
 
-                        if (!state.session.commit_turn ()) {
-                            throw new ConversationSessionError.INVALID_GROUNDING (
-                                "Grounded conversation turn could not be committed."
+                        if (!persistence_ready) {
+                            state.persistence_failed = true;
+                            throw new GLib.IOError.FAILED (
+                                "Grounded conversation persistence is unavailable."
                             );
                         }
 
-                        grounded_turn_prepared = false;
+                        if (cancellable.is_cancelled ()) {
+                            throw new GLib.IOError.CANCELLED (
+                                "Generation was stopped."
+                            );
+                        }
 
-                        Gtk.Widget[] live_chart_widgets = {};
-                        ConversationPersistenceChart[] live_charts = {};
+                        state.session.require_model (
+                            state.model_name,
+                            ollama_provider.model_digest
+                        );
 
-                        try {
-                            ConversationPersistenceCitation[] citations =
-                                persistence_citations (
-                                    citation_resolution
+                        int64 pinned_generation =
+                            state.session.repository_generation_id ();
+
+                        if (pinned_generation > 0) {
+                            int64 current_generation =
+                                repository_lifecycle.current_repository_generation_id ();
+
+                            if (current_generation != pinned_generation) {
+                                throw new ConversationSessionError.INVALID_GROUNDING (
+                                    "The repository generation changed before durable turn commit."
                                 );
+                            }
+                        }
 
-                            int64 committed_turn_no =
+                        ConversationPersistenceCitation[] citations =
+                            persistence_citations (
+                                citation_resolution
+                            );
+
+                        int64 committed_turn_no =
                             ConversationTurnCommitter.commit (
                                 conversation_store,
                                 state.persistent_id,
@@ -3516,7 +3544,27 @@ namespace AskTheModel {
                                 citations
                             );
 
-                            if (chart_intent.gistemp_requested) {
+                        if (committed_turn_no < 0) {
+                            state.persistence_failed = true;
+                            throw new GLib.IOError.FAILED (
+                                "Grounded conversation turn did not receive a durable turn number."
+                            );
+                        }
+
+                        turn_durably_committed = true;
+
+                        if (!state.session.commit_turn ()) {
+                            throw new ConversationSessionError.INVALID_GROUNDING (
+                                "Grounded turn was durably persisted but could not be committed in the conversation session."
+                            );
+                        }
+
+                        grounded_turn_prepared = false;
+
+                        Gtk.Widget[] live_chart_widgets = {};
+                        ConversationPersistenceChart[] live_charts = {};
+
+                        if (chart_intent.gistemp_requested) {
                             try {
                                 live_chart_widgets =
                                     build_live_chart_widgets (
@@ -3541,14 +3589,10 @@ namespace AskTheModel {
                             } catch (GLib.Error chart_error) {
                                 live_chart_widgets = {};
                                 stderr.printf (
-                                    "AtM: qualified live chart unavailable: %s\n",
+                                    "AtM: qualified live chart unavailable: %s\\n",
                                     chart_error.message
                                 );
                             }
-                        }
-                        } catch (GLib.Error error) {
-                            state.persistence_failed = true;
-                            throw error;
                         }
 
                         state.grounded_answers += answer;
@@ -3619,7 +3663,8 @@ namespace AskTheModel {
             } catch (GLib.Error error) {
                 state.presentation.cancel_assistant_generation ();
 
-                if (grounded_turn_prepared) {
+                if (grounded_turn_prepared &&
+                    !turn_durably_committed) {
                     state.session.abort_turn ();
                 }
 
