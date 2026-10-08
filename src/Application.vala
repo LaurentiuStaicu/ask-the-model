@@ -3589,7 +3589,7 @@ namespace AskTheModel {
                             } catch (GLib.Error chart_error) {
                                 live_chart_widgets = {};
                                 stderr.printf (
-                                    "AtM: qualified live chart unavailable: %s\\n",
+                                    "AtM: qualified live chart unavailable: %s\n",
                                     chart_error.message
                                 );
                             }
