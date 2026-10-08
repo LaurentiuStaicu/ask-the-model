@@ -3,6 +3,7 @@
 #include "retrieval_index_lifecycle.h"
 
 #include <glib/gstdio.h>
+#include <errno.h>
 #include <string.h>
 
 static void
@@ -168,6 +169,33 @@ atm_grounded_turn_fixture_create (
     return TRUE;
 }
 
+static void
+remove_tree_best_effort (
+    const char *path
+)
+{
+    if (path == NULL) {
+        return;
+    }
+
+    GDir *directory = g_dir_open (path, 0, NULL);
+    if (directory != NULL) {
+        const char *name = NULL;
+        while ((name = g_dir_read_name (directory)) != NULL) {
+            char *child = g_build_filename (path, name, NULL);
+            remove_tree_best_effort (child);
+            g_free (child);
+        }
+        g_dir_close (directory);
+    }
+
+    if (g_file_test (path, G_FILE_TEST_IS_DIR)) {
+        g_rmdir (path);
+    } else {
+        g_remove (path);
+    }
+}
+
 void
 atm_grounded_turn_fixture_destroy (
     char *cache_root,
@@ -177,40 +205,10 @@ atm_grounded_turn_fixture_destroy (
     char *snapshot_sha
 )
 {
-    if (index_path != NULL) {
-        g_remove (index_path);
-    }
-    g_free (index_path);
+    (void) index_path;
     g_free (version);
     g_free (snapshot_sha);
 
-    if (snapshot_root != NULL) {
-        char *command = g_strdup_printf (
-            "rm -rf -- %s",
-            snapshot_root
-        );
-        g_spawn_command_line_sync (
-            command,
-            NULL,
-            NULL,
-            NULL,
-            NULL
-        );
-        g_free (command);
-    }
-
-    if (cache_root != NULL) {
-        char *command = g_strdup_printf (
-            "rm -rf -- %s",
-            cache_root
-        );
-        g_spawn_command_line_sync (
-            command,
-            NULL,
-            NULL,
-            NULL,
-            NULL
-        );
-        g_free (command);
-    }
+    remove_tree_best_effort (snapshot_root);
+    remove_tree_best_effort (cache_root);
 }
