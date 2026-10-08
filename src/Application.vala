@@ -3400,6 +3400,7 @@ namespace AskTheModel {
             bool should_generate_title =
                 state.title_label.label == "New";
             bool grounded_turn_prepared = false;
+            bool session_started_for_request = false;
 
             try {
                 if (state.persistence_failed) {
@@ -3451,6 +3452,7 @@ namespace AskTheModel {
                         state.model_name,
                         state.model_digest
                     );
+                    session_started_for_request = true;
                 }
 
                 if (!ollama_provider.select_model (
@@ -3693,6 +3695,8 @@ namespace AskTheModel {
 
                 if (grounded_turn_prepared) {
                     state.session.abort_turn ();
+                } else if (session_started_for_request) {
+                    state.session.reset ();
                 }
 
                 if (!state.session.is_active ()) {
