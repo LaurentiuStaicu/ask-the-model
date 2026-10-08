@@ -32,7 +32,7 @@
 
 <small><strong>Ask the Model</strong> provides the interface and retrieval/provenance layer. A <strong>local provider</strong>, such as Ollama, loads and runs AI models. The <strong>AI model</strong> remains a separate artifact that must currently be downloaded and managed through the provider rather than AtM.</small>
 
-<small>Version 0.6.1 fixes live rendering of the qualified GISTEMP chart by reading the complete pinned source independently of retrieval excerpts, and recognizes clear natural-language chart requests alongside the explicit command. It retains the v0.6.0 presentation, History and default-OFF optimization boundaries. It retains exact-context saved History, hardened SQLite state, startup qualification, deterministic local snapshot-integrity seals and exact-SHA provenance. EWD, CBD and RMD remain authoritative for their own code, data, assumptions, provenance and validation.</small>
+<small>Version 0.6.1 fixes the qualified GISTEMP chart path: clear natural-language requests work alongside `/chart gistemp`, and AtM builds the chart from the complete, pinned and revalidated source rather than sparse retrieval excerpts. The release preserves v0.6.0 semantic presentation, accessible Sources, exact-context saved History and default-OFF repository optimizations. EWD, CBD and RMD remain authoritative for their code, data, assumptions, provenance and validation.</small>
 
 ### Repository-grounded scientific-model chat
 
