@@ -42,7 +42,7 @@
 
 ### Qualified chart view
 
-<small>After selecting EWD and preparing a grounded chat, enter <code>/chart gistemp &lt;grounded question&gt;</code> to request a chart for the eligible global annual GISTEMP series. AtM re-reads and revalidates the exact pinned repository snapshot; the model does not supply chart values or configuration. Saved chart views are reconstructed from their pinned source in History. This path does not enable generic charts, arbitrary series or model-authored data.</small>
+<small>After selecting EWD and preparing a grounded chat, ask in natural language for a chart of GISTEMP/global temperature (for example, “Show me a GISTEMP chart of global temperature over time”), or use <code>/chart gistemp &lt;grounded question&gt;</code>. AtM supports only the eligible global annual GISTEMP series. AtM re-reads and revalidates the exact pinned repository snapshot; the model does not supply chart values or configuration. Saved chart views are reconstructed from their pinned source in History. This path does not enable generic charts, arbitrary series or model-authored data.</small>
 
 ### Save conversations for later
 
