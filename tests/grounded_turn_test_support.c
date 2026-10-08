@@ -221,8 +221,8 @@ atm_grounded_turn_fixture_destroy (
 )
 {
     (void) index_path;
-    g_free (version);
-    g_free (snapshot_sha);
+    (void) version;
+    (void) snapshot_sha;
 
     remove_tree_best_effort (snapshot_root);
     remove_tree_best_effort (cache_root);
