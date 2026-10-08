@@ -1,10 +1,10 @@
 # Application architecture boundary
 
-## Released state — v0.5.0
+## Released state — v0.6.0
 
-AtM v0.5.0 provides a functional GTK 4 / Granite local-chat application, desktop integration, AppStream metadata, elementary OS 8 Flatpak packaging, an implemented local AI-provider layer, repository-grounded EWD/CBD/RMD conversation paths, startup qualification/snapshot integrity, hardened SQLite repository authority and explicit saved-conversation History.
+AtM v0.6.0 provides a functional GTK 4 / Granite local-chat application, desktop integration, AppStream metadata, elementary OS 8 Flatpak packaging, repository-grounded EWD/CBD/RMD conversation paths, startup qualification/snapshot integrity, hardened SQLite repository authority, explicit saved-conversation History, semantic transcript presentation, accessible grounded Sources, a source-revalidated GISTEMP chart path and qualified session-only repository optimizations defaulting to OFF.
 
-Repository selection, validated exact-SHA snapshots, deterministic retrieval, per-chat repository/model pinning, grounded citations and on-demand provenance inspection remain part of the released capability boundary. v0.5.0 additionally releases application-owned SQLite Control State plus explicit Save to History conversation archiving, exact-context restore and managed archived-conversation JSON mirrors.
+Repository selection, validated exact-SHA snapshots, deterministic retrieval, per-chat repository/model pinning, grounded citations and on-demand provenance inspection remain part of the released capability boundary. v0.6.0 retains application-owned SQLite Control State, explicit Save to History conversation archiving, exact-context restore and managed archived-conversation JSON mirrors from v0.5.0, and adds the qualified presentation, chart and optimization behaviors above.
 
 ## Repository-aware implementation — released in v0.3.0
 
@@ -67,7 +67,7 @@ Working conversation state is not saved implicitly. Only conversations explicitl
 
 ### User interface
 
-The v0.5.0 UI provides:
+The v0.6.0 UI provides:
 
 - elementary-style GTK/Granite shell and system color-scheme following;
 - separate AI-model and multi-repository selectors with explicit refresh/download/update lifecycle controls;
@@ -91,7 +91,7 @@ Implemented in the repository lifecycle, index, query, ranking, normalization, s
 
 The backend preserves immutable snapshot identity and returns evidence objects rather than generated scientific conclusions. The scientific repositories remain canonical; AtM does not rewrite their state or convert AI-generated text into canonical project data.
 
-Post-v0.5.0 runtime optimizations remain subordinate to the global session-only
+v0.6.0 runtime optimizations remain subordinate to the global session-only
 Optimizations gate. For grounded Send operations, Application snapshots that
 gate before the first asynchronous boundary and passes it explicitly through
 the conversation-session/grounding boundary. The stable OFF retrieval/context
@@ -186,7 +186,7 @@ Import, retention policy and bulk History management remain future work.
 
 Responsible for future provider endpoint configuration, preferred AI model and application-level preferences. Repository source snapshots use the fixed visible location `~/Ask the Model/Repositories`; derived indexes and application state remain in AtM's private XDG cache/state locations. Arbitrary repository storage locations are not a v1 setting.
 
-## Explicitly outside the v0.5.0 boundary
+## Explicitly outside the v0.6.0 boundary
 
 - import of saved-conversation archives plus retention-policy/bulk History management;
 - arbitrary unreviewed repository origins beyond the fixed EWD/CBD/RMD catalog;

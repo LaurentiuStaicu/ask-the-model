@@ -46,8 +46,11 @@ namespace AskTheModel {
     public errordomain ProviderError {
         NOT_READY,
         HTTP,
-        INVALID_RESPONSE
+        INVALID_RESPONSE,
+        STALE_IDENTITY
     }
+
+    public delegate int64 CurrentRepositoryGenerationReader () throws GLib.Error;
 
     public class OllamaProvider : Object {
         private Soup.Session session;
@@ -55,6 +58,7 @@ namespace AskTheModel {
             new OllamaConversation ();
         private string[] completion_models = {};
         private string[] completion_model_digests = {};
+        private CurrentRepositoryGenerationReader? current_generation_reader = null;
 
         public signal void response_chunk (string chunk);
         public signal void discovery_progress (uint percent);
@@ -67,6 +71,12 @@ namespace AskTheModel {
         public OllamaProvider () {
             session = new Soup.Session ();
             session.timeout = 300;
+        }
+
+        public void set_current_generation_reader (
+            CurrentRepositoryGenerationReader? reader
+        ) {
+            current_generation_reader = reader;
         }
 
         public string[] get_completion_models () {
@@ -160,10 +170,21 @@ namespace AskTheModel {
 
         public async bool discover () {
             string? previous_model = model_name;
-            string[] candidates = {
+#if ATM_M12_TEST
+            string? test_base_url =
+                Environment.get_variable ("ATM_M12_TEST_BASE_URL");
+            string[] candidates = test_base_url != null
+                ? new string[] { test_base_url }
+                : new string[] {
+                    "http://127.0.0.1:11434",
+                    "http://127.0.0.1:11435"
+                };
+#else
+            string[] candidates = new string[] {
                 "http://127.0.0.1:11434",
                 "http://127.0.0.1:11435"
             };
+#endif
 
             foreach (string candidate in candidates) {
                 try {
@@ -312,15 +333,16 @@ namespace AskTheModel {
 
         private async string read_http_error (
             GLib.InputStream input_stream,
-            uint status
-        ) {
+            uint status,
+            GLib.Cancellable? cancellable
+        ) throws GLib.Error {
             string detail = "";
 
             try {
                 var data_stream = new GLib.DataInputStream (input_stream);
                 string? line = yield data_stream.read_line_utf8_async (
                     GLib.Priority.DEFAULT,
-                    null
+                    cancellable
                 );
 
                 if (line != null && line.strip ().length > 0) {
@@ -333,6 +355,10 @@ namespace AskTheModel {
                     }
                 }
             } catch (GLib.Error error) {
+                if (cancellable != null &&
+                    cancellable.is_cancelled ()) {
+                    throw error;
+                }
                 detail = "";
             }
 
@@ -412,7 +438,8 @@ namespace AskTheModel {
         public async string chat (
             string prompt,
             OllamaConversation? conversation = null,
-            bool persist_history = true
+            bool persist_history = true,
+            GLib.Cancellable? cancellable = null
         ) throws GLib.Error {
             return yield chat_internal (
                 prompt,
@@ -420,7 +447,11 @@ namespace AskTheModel {
                 null,
                 null,
                 conversation,
-                persist_history
+                persist_history,
+                0,
+                null,
+                null,
+                cancellable
             );
         }
 
@@ -430,7 +461,11 @@ namespace AskTheModel {
             string evidence_text,
             string post_evidence_reminder,
             OllamaConversation? conversation = null,
-            bool persist_history = true
+            bool persist_history = true,
+            int64 expected_generation_id = 0,
+            string? expected_model = null,
+            string? expected_model_digest = null,
+            GLib.Cancellable? cancellable = null
         ) throws GLib.Error {
             return yield chat_internal (
                 prompt,
@@ -438,7 +473,11 @@ namespace AskTheModel {
                 evidence_text,
                 post_evidence_reminder,
                 conversation,
-                persist_history
+                persist_history,
+                expected_generation_id,
+                expected_model,
+                expected_model_digest,
+                cancellable
             );
         }
 
@@ -448,9 +487,24 @@ namespace AskTheModel {
             string? evidence_text,
             string? post_evidence_reminder,
             OllamaConversation? conversation,
-            bool persist_history
+            bool persist_history,
+            int64 expected_generation_id,
+            string? expected_model,
+            string? expected_model_digest,
+            GLib.Cancellable? cancellable
         ) throws GLib.Error {
             yield ensure_ready ();
+
+            var turn_guard = new TurnGuardNative.Guard ();
+            if (!turn_guard.begin (
+                    expected_generation_id,
+                    expected_model ?? model_name,
+                    expected_model_digest ?? model_digest
+                )) {
+                throw new ProviderError.STALE_IDENTITY (
+                    "The local model changed before the turn could start."
+                );
+            }
 
             OllamaConversation target =
                 conversation ?? default_conversation;
@@ -474,17 +528,31 @@ namespace AskTheModel {
                 new GLib.Bytes (request_body.data)
             );
 
-            GLib.InputStream input_stream = yield session.send_async (
-                message,
-                GLib.Priority.DEFAULT,
-                null
-            );
+            GLib.InputStream input_stream;
+            try {
+                input_stream = yield session.send_async (
+                    message,
+                    GLib.Priority.DEFAULT,
+                    cancellable
+                );
+            } catch (GLib.Error error) {
+                turn_guard.abort ();
+                throw error;
+            }
 
             if (message.get_status () != Soup.Status.OK) {
-                string error_message = yield read_http_error (
-                    input_stream,
-                    message.get_status ()
-                );
+                string error_message;
+                try {
+                    error_message = yield read_http_error (
+                        input_stream,
+                        message.get_status (),
+                        cancellable
+                    );
+                } catch (GLib.Error error) {
+                    turn_guard.abort ();
+                    throw error;
+                }
+                turn_guard.abort ();
                 throw new ProviderError.HTTP (error_message);
             }
 
@@ -493,10 +561,16 @@ namespace AskTheModel {
             bool saw_response = false;
 
             while (true) {
-                string? line = yield data_stream.read_line_utf8_async (
-                    GLib.Priority.DEFAULT,
-                    null
-                );
+                string? line;
+                try {
+                    line = yield data_stream.read_line_utf8_async (
+                        GLib.Priority.DEFAULT,
+                        cancellable
+                    );
+                } catch (GLib.Error error) {
+                    turn_guard.abort ();
+                    throw error;
+                }
 
                 if (line == null) {
                     break;
@@ -513,6 +587,7 @@ namespace AskTheModel {
                 saw_response = true;
 
                 if (root.has_member ("error")) {
+                    turn_guard.abort ();
                     throw new ProviderError.HTTP (
                         root.get_string_member ("error")
                     );
@@ -540,8 +615,56 @@ namespace AskTheModel {
             }
 
             if (!saw_response) {
+                turn_guard.abort ();
                 throw new ProviderError.INVALID_RESPONSE (
                     "Local provider returned an empty response stream."
+                );
+            }
+
+            if (cancellable != null &&
+                cancellable.is_cancelled ()) {
+                turn_guard.abort ();
+                throw new GLib.IOError.CANCELLED (
+                    "The turn was stopped before commit."
+                );
+            }
+
+            int64 current_generation_id =
+                expected_generation_id;
+
+            if (expected_generation_id > 0 &&
+                current_generation_reader != null) {
+                try {
+                    current_generation_id =
+                        current_generation_reader ();
+                } catch (GLib.Error error) {
+                    turn_guard.abort ();
+                    throw new ProviderError.STALE_IDENTITY (
+                        "The repository generation could not be revalidated before turn commit: %s".printf (
+                            error.message
+                        )
+                    );
+                }
+            }
+
+            bool turn_committed = false;
+            try {
+                turn_committed = turn_guard.commit (
+                    current_generation_id,
+                    model_name,
+                    model_digest
+                );
+            } catch (GLib.Error error) {
+                throw new ProviderError.STALE_IDENTITY (
+                    "The response could not be committed because its identity is stale: %s".printf (
+                        error.message
+                    )
+                );
+            }
+
+            if (!turn_committed) {
+                throw new ProviderError.STALE_IDENTITY (
+                    "The response was produced against a model identity that has since changed."
                 );
             }
 

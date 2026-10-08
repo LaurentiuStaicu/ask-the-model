@@ -58,7 +58,7 @@ require_regex CITATION.cff "^[[:space:]]*date-released:[[:space:]]*\"?${release_
 
 require_text README.md "img alt=\"Version: $version\""
 require_text STATUS.md "Current release: Ask the Model (AtM) v$version"
-require_text STATUS.md "released $release_date."
+require_text STATUS.md "planned release date: $release_date."
 require_text CHANGELOG.md "## $version - $release_date"
 
 release_file="releases/v$version.md"

@@ -672,6 +672,22 @@
       "tested_by": [
         "meson:conversation-persistence-store"
       ]
+    },
+    {
+      "id": "SESSION-S1-002",
+      "category": "SESSION",
+      "severity": "S1",
+      "lifecycle": "enforced",
+      "statement": "A grounded provider turn must bind its begin identity to the conversation session's expected repository generation and exact model identity, and its commit must re-read the provider's current identity. A generation, model-name, or model-digest mismatch must fail closed with STALE_IDENTITY before provider conversation history is persisted.",
+      "enforced_by": [
+        "src/Application.vala",
+        "src/RepositoryLifecycleService.vala",
+        "src/OllamaProvider.vala",
+        "src/conversation_turn_guard.c"
+      ],
+      "tested_by": [
+        "meson:ollama-provider-turn-guard"
+      ]
     }
   ]
 }

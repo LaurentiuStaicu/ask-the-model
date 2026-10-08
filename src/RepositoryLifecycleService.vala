@@ -170,6 +170,28 @@ namespace AskTheModel {
             return optimization_policy.snapshot_enabled ();
         }
 
+        public int64 current_repository_generation_id () throws GLib.Error {
+            var current_state =
+                new ControlRepositoryStateStore (
+                    state_root
+                );
+
+            if (current_state.load_status !=
+                    RepositoryStateLoadStatus.VALID) {
+                throw new RepositoryError.NOT_READY (
+                    "The active Control DB generation is not currently valid."
+                );
+            }
+
+            if (current_state.repository_generation_id < 0) {
+                throw new RepositoryError.INVALID_RESPONSE (
+                    "The active repository generation identifier is invalid."
+                );
+            }
+
+            return current_state.repository_generation_id;
+        }
+
 #if ATM_M12_TEST
         internal void set_archive_download_override_for_test (
             string? archive_path

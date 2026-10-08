@@ -1,6 +1,6 @@
 # Ask the Model interface guide
 
-This guide explains the user-facing controls in Ask the Model v0.5.0 and the state transitions that matter when using repository-grounded chat.
+This guide explains the user-facing controls in Ask the Model v0.6.0 and the state transitions that matter when using repository-grounded chat.
 
 The guide is intentionally text-first. A dedicated visual application guide is deferred until a representation can be produced and reviewed against the real GTK interface without introducing invented controls, proportions, decoration, or layout.
 
@@ -14,7 +14,7 @@ The adjacent **Refresh models** button repeats provider discovery. AtM does not 
 
 ### Repository selector
 
-The repository selector controls the scientific source scope for the next conversation. The fixed v0.5.0 catalog is:
+The repository selector controls the scientific source scope for the next conversation. The fixed EWD/CBD/RMD catalog is:
 
 - **EWD** — Empirical World3 Dynamics;
 - **CBD** — Cognitive Belief Dynamics;
@@ -34,7 +34,7 @@ A compact global instrument-style control sits at the end of the header:
 
 `Optimizations  [switch]`
 
-It controls the post-v0.5.0 runtime optimization program as one application-wide mode:
+It controls the v0.6.0 qualified runtime optimization program as one application-wide mode:
 
 - every AtM process starts with **OFF** selected;
 - the state is session-only and is not remembered after restart;
@@ -65,7 +65,7 @@ A failed update leaves the last valid snapshot available. When repairing a local
 
 When **Optimizations ON** is active, Download/Update also uses a nonblocking cross-process repository mutation lease. If another AtM process is already changing repository authority, the operation stops before repository staging is touched and reports that another Ask the Model instance is currently updating repository state. Ordinary repository reads and grounding do not wait for this global mutation lease.
 
-With **Optimizations OFF**, this additional coordination layer is not used and the established v0.5.0 runtime path remains in effect.
+With **Optimizations OFF**, optional optimization paths are not activated and the established baseline runtime behavior remains in effect.
 
 ## Status LCD
 
@@ -113,6 +113,12 @@ Clicking a source reference opens a transient detail window containing:
 - an immutable GitHub permalink when one can be built safely.
 
 Markdown excerpts are converted to readable plain text for display. AtM does not execute repository Markdown/HTML as GTK markup.
+
+## Presentation and chart views
+
+Assistant responses are presented after the complete response is available. Headings, lists, quotes and code receive restrained semantic styling; emphasis is not converted to bold. Grounded Sources are separate accessible buttons. Copying a transcript selection preserves visible source references such as `[1]` and omits spinner/separator widgets.
+
+For the qualified chart path, select EWD before the first Send and enter `/chart gistemp <grounded question>`. The chart is shown only when the grounded answer cites the admitted annual GISTEMP source from that exact repository snapshot. AtM supplies the chart values and configuration from revalidated repository data; the model does not. Saved charts are reconstructed from pinned source data when History is opened.
 
 ## Prompt composer
 

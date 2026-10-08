@@ -2,35 +2,27 @@
 
 ## Release status
 
-**Current release: Ask the Model (AtM) v0.5.0 — Saved Conversation History and State Hardening, released 2026-09-24.**
+**Current release: Ask the Model (AtM) v0.6.0 — Qualified Presentation, Repository Optimizations and GISTEMP Charts; release candidate, not yet published; planned release date: 2026-10-08.**
 
-v0.5.0 retains the repository-grounded and startup-integrity boundaries of v0.3.0/v0.4.0 and adds explicit **Save to History** conversation archiving with exact-context restore, deterministic managed JSON mirrors, hardened durable conversation persistence and the application-owned SQLite Control DB generation model. It also promotes the post-v0.4.0 publication hardening and the effective Flatpak runtime-ref qualification fix.
+v0.6.0 retains the v0.5.0 repository-grounding, exact-context saved History, hardened SQLite state and startup-integrity boundaries. It adds complete-message semantic transcript presentation, accessible grounded Sources and semantic copy; a user-requested GISTEMP chart path with exact pinned-source revalidation and History reconstruction; and session-only repository optimizations that default to OFF.
 
 The project remains in the `0.x` initial-development series. The public API and repository-management surface are not yet considered stable enough for v1.0.
 
-## v0.5.0 release highlights
+## v0.6.0 release highlights
 
-The v0.5.0 capability boundary promotes the qualified post-v0.4.0 development work:
+- Complete assistant responses receive restrained semantic presentation. Grounded Sources remain accessible buttons, semantic copy preserves their numbered references, and live/History turns share the same completed-turn projection.
+- The explicit `/chart gistemp <grounded question>` request renders only the qualified complete annual global GISTEMP series from the exact pinned EWD snapshot. History stores a reconstruction recipe and rebuilds the chart from pinned source data; it does not persist numeric points or pixel state.
+- The session-only **Optimizations** switch starts OFF. ON enables individually qualified repository coordination, capacity admission, D1 source-cap policy, selected S1 local durability and bounded C1 reclamation. OFF preserves the established baseline. Reclamation is limited to the qualified post-action path; background, startup and ENOSPC-triggered GC remain disabled.
+- Grounded provider turns revalidate model and repository-generation identity before commit. Mismatch or cancellation fails closed before conversation history advances.
+- CHART-01/03, PRES-09, D1, C1-I10, A1-M12/M12b, Presentation Interaction, Invariant Registry and Flatpak qualifications passed together on the audited candidate before the release metadata update. The final release candidate must pass CI again after this metadata commit.
 
-- **Save to History** is the only user-visible conversation save transition; closing an unarchived chat or exiting normally discards that working conversation instead of silently persisting it;
-- History lists explicitly archived conversations only and exposes **Open** plus separately confirmed **Delete permanently**;
-- reopening a saved conversation reconstructs its durable transcript/provenance and requalifies the exact saved AI-model name/digest plus repository generation/version/SHA before continuation;
-- saved conversations receive deterministic managed JSON mirrors under `~/Ask the Model/Conversation Exports/`; unarchived working chats are not exported;
-- permanent deletion is fail-closed across the archived SQLite conversation and its managed JSON mirror;
-- committed turns use a separate hardened `conversations.sqlite3` path that preserves provider/display content, exact pinned model/repository identity and citation provenance before provider history advances;
-- repository-state runtime authority is the application-owned SQLite `control-state.sqlite3`, with verified legacy cutover, copy-on-write COMPLETE generations, generation-consistent reads and stale-writer guards;
-- Control DB connections and authority paths are qualified with SQLite defensive configuration, no-follow opens, writable-authority verification and a qualified XDG state root;
-- the effective Flatpak runtime parser accepts the real `runtime/ID/ARCH/BRANCH` form while retaining strict rejection of mismatched runtime identities;
-- Flatpak CI separates read-only verification/build from the main-only publication job, with verified artifact handoff and source-commit traceability;
-- production retrieval/context limits are shared with observational measurement tooling while the frozen R5 retrieval-quality gate remains unchanged and blocking.
+The release does not claim scientific certification, arbitrary chart support, model-authored scientific values, remote-filesystem durability, or generic automatic cleanup. The scientific repositories remain authoritative for their own models, data and validation.
 
-At publication time, the tagged v0.5.0 release and `main` share this capability boundary. Later **AtM Development** builds may move ahead independently and must continue to expose their exact source `main` commit SHA.
+## v0.6.0 capabilities added after v0.5.0
 
-## Development after v0.5.0
+v0.6.0 includes the OFF-by-default, session-only **Optimizations** gate. The gate is snapshotted once per operation; switching the UI later does not change an operation already in progress.
 
-Current AtM Development adds an OFF-by-default, session-only **Optimizations** gate without changing the tagged v0.5.0 capability boundary. The gate is snapshotted once per operation; switching the UI later does not change an operation already in progress.
-
-Current Development also adds a qualified display-only **Presentation layer** for chat transcripts. Assistant responses are normalized as complete messages into an AtM-owned semantic document and rendered into the existing GTK text buffer with restrained headings, lists, quotes and code presentation. Markdown emphasis is flattened rather than shown as raw delimiters or reintroduced as bold/italic; bold is reserved for the `You:` and `Assistant:` labels, using neutral light/dark palette colors. User text is preserved literally, grounded Sources buttons remain separate, and provider/persistence/retrieval/scientific content is unchanged by the presentation projection. Live generation now uses a non-text spinner beside a temporary `Assistant:` label, a one-shot near-bottom-aware scroll to the start of that response, and a non-copyable dashed turn separator after the completed answer/Sources; provider chunks remain hidden until the complete response is normalized. Grounded Sources are real accessible buttons numbered in validated first-use citation order and shared by live/History rendering. Semantic transcript copy serializes source anchors as `[N]` while omitting spinner/separator anchors, and Markdown Source excerpts use the same qualified Presentation plain-text projection; only the immutable citation provenance link is active. History keeps the earlier turn-separator decoration pending the planned live/History unification. This capability is post-v0.5.0 development behavior and is not retroactively attributed to the tagged v0.5.0 release.
+v0.6.0 also includes the qualified display-only **Presentation layer** for chat transcripts. Assistant responses are normalized as complete messages into an AtM-owned semantic document and rendered into the existing GTK text buffer with restrained headings, lists, quotes and code presentation. Markdown emphasis is flattened rather than shown as raw delimiters or reintroduced as bold/italic; bold is reserved for the `You:` and `Assistant:` labels, using neutral light/dark palette colors. User text is preserved literally, grounded Sources buttons remain separate, and provider/persistence/retrieval/scientific content is unchanged by the presentation projection. Live generation now uses a non-text spinner beside a temporary `Assistant:` label, a one-shot near-bottom-aware scroll to the start of that response, and a non-copyable dashed turn separator after the completed answer/Sources; provider chunks remain hidden until the complete response is normalized. Grounded Sources are real accessible buttons numbered in validated first-use citation order and shared by live/History rendering. Semantic transcript copy serializes source anchors as `[N]` while omitting spinner/separator anchors, and Markdown Source excerpts use the same qualified Presentation plain-text projection; only the immutable citation provenance link is active. PRES-08 now applies the same completed-turn separator decoration to live and History. This capability is part of v0.6.0 and is not retroactively attributed to the tagged v0.5.0 release.
 
 With Optimizations ON, the currently qualified runtime optimizations are:
 - one global cross-process repository authority-mutation lease for Download/Update;
@@ -41,12 +33,12 @@ With Optimizations ON, the currently qualified runtime optimizations are:
 
 Capacity admission is deliberately conservative. Exact C0-M1 repository ID + SHA profiles may use their frozen allocated-byte evidence. A new/unknown SHA receives no inherited historical snapshot/index byte prediction because structural stress falsified that predictor as a conservative bound. Structural inode checks and the selected 128 KiB / four-inode Control DB publication headroom remain active. Only proven preflight insufficiency is surfaced as `NO SPACE`; post-admission storage failures retain the established fail-closed path.
 
-With Optimizations OFF, these post-v0.5.0 optimization paths are not activated and the baseline repository behavior is retained.
+With Optimizations OFF, optional optimization paths are not activated and the established baseline repository behavior is retained.
 
 
 ### Qualified chart presentation development
 
-Post-v0.5.0 Development now includes a narrowly qualified GISTEMP chart presentation path. The reviewed GTK Chart/Data component is used by both live and History rendering. A chart is requested explicitly with `/chart gistemp <grounded question>`; the command is not model-derived and supplies no scientific values or chart configuration. The live path re-qualifies the pinned EWD snapshot through Admission → VerifiedSeries → ChartSpec before rendering and persists only the existing CHART-05 reconstruction recipe. The current admission remains limited to the complete annual global GISTEMP source, 1880–2025, and unsupported or unavailable data fails closed. No generic chart intent, arbitrary model-authored series, STEP/BAR, missing/event series or additional scientific source has been enabled.
+v0.6.0 includes a narrowly qualified GISTEMP chart presentation path. The reviewed GTK Chart/Data component is used by both live and History rendering. A chart is requested explicitly with `/chart gistemp <grounded question>`; the command is not model-derived and supplies no scientific values or chart configuration. The live path re-qualifies the pinned EWD snapshot through Admission → VerifiedSeries → ChartSpec before rendering and persists only the existing CHART-05 reconstruction recipe. The current admission remains limited to the complete annual global GISTEMP source, 1880–2025, and unsupported or unavailable data fails closed. No generic chart intent, arbitrary model-authored series, STEP/BAR, missing/event series or additional scientific source has been enabled.
 
 ## Canonical application role
 
@@ -62,7 +54,7 @@ Each repository remains authoritative for its own model definitions, data, assum
 
 ## Current functional boundary
 
-v0.5.0 provides:
+v0.6.0 retains the v0.5.0 baseline and adds:
 
 - GTK 4 / Granite desktop shell packaged for the elementary OS 8 Flatpak runtime;
 - local Ollama-compatible provider discovery on loopback;
@@ -99,6 +91,12 @@ v0.5.0 provides:
 - explicit **Save to History** archive semantics, archive-only History and exact-context continuation qualification;
 - deterministic managed JSON mirrors for archived conversations under `~/Ask the Model/Conversation Exports/`;
 - fail-closed permanent deletion across archived SQLite state and the managed JSON mirror.
+
+
+- complete assistant responses rendered through the semantic Presentation document, with accessible grounded Sources and semantic transcript copy;
+- live grounded-turn cancellation and exact model/repository-generation revalidation immediately before persistence commit;
+- an explicit GISTEMP chart request limited to the complete annual global source and exact pinned EWD snapshot, with fail-closed History reconstruction;
+- a session-only Optimizations switch defaulting OFF; qualified ON paths include repository leases, D1 source-cap 4, local capacity admission, selected S1 durability and bounded C1 reclamation, while OFF preserves baseline behavior.
 
 ## Repository lifecycle contract
 
@@ -139,6 +137,10 @@ Grounded evidence is retrieved only for the current turn. Repository text is tre
 
 Temporary model-visible source labels are resolved by AtM into persistent provenance objects. User-visible source details can expose an immutable GitHub permalink tied to the exact evidence revision.
 
+## Verification for v0.6.0
+
+The audited release candidate passed all 11 required workflows together before the synchronized metadata update: CHART-01, CHART-03, Presentation Interaction, D1, C1-I9, C1-I10, C1-M1, A1-M12, A1-M12b, Invariant Registry and Flatpak. The final metadata-bearing head must pass the same release CI gate before merge or tag creation. The chart qualification covers the native source/specification and GTK component, durable recipe reconstruction and Flatpak suite; it does not claim a dedicated full GTK Application interaction test for live request through restored History presentation.
+
 ## Verification for v0.5.0
 
 The v0.5.0 stack passes the Flatpak/Meson and invariant gates for startup qualification, repository snapshot integrity, Control DB authority/generation semantics, durable conversation persistence, exact-context History restore, archive-only managed exports, fail-closed permanent deletion, retrieval/provenance behavior and the independent G-O0 state/snapshot/index/provenance oracle. The packaged baseline remains elementary OS 8 / GTK 4.14; automated release qualification does not convert generated AI text into a scientific-model result.
@@ -170,7 +172,7 @@ v0.5.0 persists only conversations explicitly saved to History. Working turns us
 
 The Flatpak receives write access only to the dedicated `~/Ask the Model` directory for validated repository snapshots and managed conversation exports. It must not request broad Home or host filesystem access.
 
-## Not implemented in v0.5.0
+## Not implemented in v0.6.0
 
 - import of saved-conversation JSON archives;
 - retention-policy and bulk History management;
@@ -184,7 +186,7 @@ The Flatpak receives write access only to the dedicated `~/Ask the Model` direct
 - autonomous modification of scientific repositories;
 - cloud-provider integration owned by AtM.
 
-## What v0.5.0 does not claim
+## What v0.6.0 does not claim
 
 - scientific certification of a repository merely because it is READY;
 - validated scientific inference from AI-generated prose;
@@ -214,6 +216,7 @@ Any such work should preserve the invariants documented in `docs/DEVELOPMENT_GUI
 - `docs/ARCHITECTURE.md` — application architecture;
 - `docs/REPOSITORY_RETRIEVAL_ARCHITECTURE.md` — repository/retrieval architecture;
 - `docs/REPOSITORY_RETRIEVAL_ACCEPTANCE.md` — acceptance gates;
-- `releases/v0.5.0.md` — current release description;
+- `releases/v0.6.0.md` — current release description;
+- `releases/v0.5.0.md` — previous release description;
 - `releases/v0.4.0.md` — previous startup-integrity release description;
 - `CHANGELOG.md` — release history.

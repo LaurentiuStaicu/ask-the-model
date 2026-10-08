@@ -1,7 +1,10 @@
 # CHART-02: initial ChartSpec contract
 
-Status: implementation plan after the scoped complete-annual gate in CHART-01.
-No ChartSpec runtime or renderer is enabled by this document.
+Status: the initial ChartSpec contract is now used by the narrow GISTEMP application path described below.
+
+Current application behavior accepts only an explicit `/chart gistemp <grounded question>` request. It uses a grounded citation to the pinned EWD GISTEMP source, re-reads and re-qualifies that snapshot, and builds the ChartSpec used by the live and History chart views. The model does not supply chart values, axes, units, domains, or chart intent. Other adapters, arbitrary series, STEP, BAR, and missing/event data remain unsupported.
+
+The implementation-stage notes below preserve the original design and qualification history; statements that there was no application caller describe those earlier stages, not the current branch.
 
 The entry point consumes validated, owned or safely retained VerifiedSeries
 objects, not identity strings or model-authored arrays. The first allowed
@@ -117,6 +120,4 @@ input lifetime, invalid dimensions, altered specifications and tampered derived
 geometry. Validation reconstructs domains, labels and coordinates from the owned
 specification. No cached display data is scientific authority.
 
-Next: CHART-03 headless Cairo prototype and Data view, then visual review before
-application activation. CHART-04 caching/resampling and CHART-05 persistence remain
-separate work; this module has no application caller.
+Current integration is implemented in `src/Application.vala` through `ChartIntent`, `ChartNative`, and the conversation persistence chart recipe. CHART-01/03, the PRES-09 close/reopen reconstruction test, and the Flatpak suite provide the current qualification evidence. The separate CHART-01 source-audit JSON remains a record of its original source-audit stage; its historical `runtime_adapter_enabled: false` field is not the current application capability status.

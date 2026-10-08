@@ -19,13 +19,14 @@ permissions:
 jobs:
   qualify:
     runs-on: ubuntu-24.04
-    timeout-minutes: 15
+    timeout-minutes: 20
     steps:
       - uses: actions/checkout@v4
       - name: Install GTK test dependencies
         run: |
-          sudo apt-get update
-          sudo apt-get install -y --no-install-recommends gcc pkg-config valac libgtk-4-dev libjson-glib-dev fonts-dejavu-core xvfb xauth xdotool dbus-x11
+          sudo sed -i 's|http://azure.archive.ubuntu.com/ubuntu|https://archive.ubuntu.com/ubuntu|g' /etc/apt/sources.list.d/ubuntu.sources
+          sudo apt-get -o Acquire::Retries=3 -o Acquire::http::Timeout=30 -o Acquire::https::Timeout=30 update
+          sudo apt-get -o Acquire::Retries=3 -o Acquire::http::Timeout=30 -o Acquire::https::Timeout=30 install -y --no-install-recommends gcc pkg-config valac libgtk-4-dev libjson-glib-dev fonts-dejavu-core xvfb xauth xdotool dbus-x11
       - name: Compile and exercise native and Vala component
         env:
           GTK_A11Y: none

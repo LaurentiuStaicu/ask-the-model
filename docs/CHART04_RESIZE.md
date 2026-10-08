@@ -1,7 +1,6 @@
 # CHART-04: resize characterization and qualified viewport state
 
-Status: dormant chart/GTK optimization. No Application, Conversations, History or
-persistence caller is enabled by this slice.
+Status: the viewport-only resize path is part of the GTK Chart/Data component used by the live and History application views. CHART-03 exercises the widget resize behavior; the timing figures below are characterization evidence from their stated runs, not current release performance guarantees.
 
 ## Baseline characterization
 

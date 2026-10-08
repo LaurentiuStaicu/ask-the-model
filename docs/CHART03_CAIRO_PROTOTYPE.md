@@ -1,7 +1,12 @@
 # CHART-03: headless monochrome prototype
 
-Status: dormant native renderer and GTK component, linked only into tests. No
-application caller, persistence or chart prompt is enabled by these slices.
+Status: the renderer and GTK Chart/Data component are integrated in the application for the narrow GISTEMP path. The original prototype and component qualification history remains below.
+
+## Current application integration
+
+The application accepts only an explicit `/chart gistemp <grounded question>` request. It resolves an eligible citation to the pinned EWD GISTEMP snapshot, reconstructs and validates the source series and ChartSpec, then creates the GTK Chart/Data view. The completed assistant turn may persist a chart reconstruction recipe; History rebuilds the chart from the conversation's pinned snapshot and fails closed if identity or source validation fails. The model does not author chart intent or numeric values.
+
+CHART-01 and CHART-03 qualify the source/native and GTK component boundaries. PRES-09 exercises durable recipe attachment and close/reopen reconstruction, and Flatpak runs the Meson suite. These checks do not constitute a dedicated full GTK Application interaction test that enters `/chart gistemp` and verifies both live and restored chart presentation end to end.
 
 ## Contract and scientific boundary
 
@@ -108,10 +113,12 @@ external-keyboard qualification. The existing headless renderer/source suite
 retains its separate ASan/UBSan and leak checks.
 
 CI captures actual GTK Chart/Data/small-canvas PNGs through the widget snapshot
-and GSK renderer for visual inspection. No fake rows, synthesized observations,
-user conversation writes or Application caller are introduced. Live/History
-runtime binding, persisted chart reconstruction, clipboard/export controls,
-translation and screen-reader testing remain pending in the chart program.
+and GSK renderer for visual inspection. No fake rows or synthesized observations
+are introduced. The Application now supplies the live and History callers and
+persists only the qualified reconstruction recipe, never numeric chart points.
+Clipboard/export controls, translation, full screen-reader testing, and the
+end-to-end GTK Application interaction described above remain outside the current
+qualification claim.
 
 GTK references:
 - https://docs.gtk.org/gtk4/class.ColumnView.html
