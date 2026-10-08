@@ -2,7 +2,7 @@ cff-version: 1.2.0
 message: "If you use Ask the Model, please cite this version."
 type: software
 title: "Ask the Model"
-version: 0.6.0
+version: 0.6.1
 date-released: 2026-10-08
 authors:
   - family-names: "Staicu"
@@ -10,7 +10,7 @@ authors:
 repository-code: "https://github.com/LaurentiuStaicu/ask-the-model"
 url: "https://github.com/LaurentiuStaicu/ask-the-model"
 license: MIT
-abstract: "A local-first desktop interface for locally managed language models and repository-grounded exploration of scientific dynamical-model repositories. Ask the Model v0.6.0 adds semantic transcript presentation, accessible grounded sources, an explicitly requested and source-revalidated GISTEMP chart path, and session-only qualified repository optimizations that default to OFF. It retains explicit Save to History, exact-context restore, hardened SQLite state and exact-SHA provenance."
+abstract: "A local-first desktop interface for locally managed language models and repository-grounded exploration of scientific dynamical-model repositories. Ask the Model v0.6.1 corrects live GISTEMP chart rendering to use the complete pinned source independently of retrieved evidence excerpts, and recognizes clear natural-language chart requests while preserving the explicit command and source-revalidated GISTEMP boundary. It retains the v0.6.0 presentation, History and default-OFF optimization boundaries."
 keywords:
   - local AI
   - local-first
