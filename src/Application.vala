@@ -3526,10 +3526,16 @@ namespace AskTheModel {
                             }
                         }
 
-                        ConversationPersistenceCitation[] citations =
-                            persistence_citations (
-                                citation_resolution
-                            );
+                        ConversationPersistenceCitation[] citations;
+                        try {
+                            citations =
+                                persistence_citations (
+                                    citation_resolution
+                                );
+                        } catch (GLib.Error error) {
+                            state.persistence_failed = true;
+                            throw error;
+                        }
 
                         int64 committed_turn_no =
                             ConversationTurnCommitter.commit (
