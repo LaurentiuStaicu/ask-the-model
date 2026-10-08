@@ -6,6 +6,13 @@ namespace AskTheModel {
         NO_SPACE
     }
 
+    private errordomain GistempChartQualificationError {
+        EWD_NOT_SELECTED,
+        SNAPSHOT_UNAVAILABLE,
+        SOURCE_INVALID,
+        IDENTITIES_UNAVAILABLE
+    }
+
     private class ChatTabState : Object {
         public Gtk.Box page;
         public Gtk.TextView transcript;
@@ -36,6 +43,8 @@ namespace AskTheModel {
         public string? restored_read_only_reason = null;
         public bool archived = false;
         public bool follow_next_assistant = false;
+        public ChartKind active_chart_kind = ChartKind.NONE;
+        public ConversationPersistenceChart? active_chart_recipe = null;
 
         public ChatTabState (
             Gtk.Box page,
@@ -2792,6 +2801,183 @@ namespace AskTheModel {
             return button;
         }
 
+        private void qualify_live_gistemp_request (
+            ConversationSession session,
+            out ChartNative.Spec qualified_spec
+        ) throws GLib.Error {
+            qualified_spec = null;
+            ConversationRepositoryPin? chart_pin = null;
+
+            for (uint i = 0; i < session.repository_count (); i++) {
+                ConversationRepositoryPin? pin =
+                    session.repository_pin_at (i);
+                if (pin == null) {
+                    continue;
+                }
+                if (pin.repository_id == "ewd" ||
+                    pin.repository_id ==
+                        "LaurentiuStaicu/empirical-world3-dynamics") {
+                    chart_pin = pin;
+                    break;
+                }
+            }
+
+            if (chart_pin == null) {
+                throw new GistempChartQualificationError.EWD_NOT_SELECTED (
+                    "GISTEMP charts require EWD to be selected for this conversation. " +
+                    "Select EWD in Repository Scope and retry."
+                );
+            }
+
+            RepositoryDescriptor? descriptor =
+                repository_descriptor_for_id (chart_pin.repository_id);
+            if (descriptor == null) {
+                throw new GistempChartQualificationError.SOURCE_INVALID (
+                    "The pinned EWD repository required for the GISTEMP chart is unavailable."
+                );
+            }
+
+            string snapshot_path =
+                RepositoryLifecycleService.snapshot_path (
+                    descriptor,
+                    chart_pin.snapshot_sha
+                );
+            if (!GLib.FileUtils.test (
+                    snapshot_path,
+                    GLib.FileTest.IS_DIR
+                )) {
+                throw new GistempChartQualificationError.SNAPSHOT_UNAVAILABLE (
+                    "The pinned EWD snapshot required for the GISTEMP chart is unavailable."
+                );
+            }
+
+            ChartNative.Spec spec;
+            if (!ChartNative.reconstruct_live_gistemp (
+                    snapshot_path,
+                    chart_pin.repository_id,
+                    chart_pin.repository_version,
+                    chart_pin.snapshot_sha,
+                    out spec
+                ) || spec == null) {
+                throw new GistempChartQualificationError.SOURCE_INVALID (
+                    "The pinned GISTEMP source could not be re-qualified."
+                );
+            }
+
+            string? scientific_id = spec.series_scientific_id (0);
+            string? qualified_id = spec.series_qualified_id (0);
+            string? chart_spec_id = spec.id ();
+            if (scientific_id == null || qualified_id == null ||
+                chart_spec_id == null) {
+                throw new GistempChartQualificationError.IDENTITIES_UNAVAILABLE (
+                    "The qualified GISTEMP chart identities are unavailable."
+                );
+            }
+
+            qualified_spec = (owned) spec;
+        }
+
+        private Gtk.Widget build_active_chart_widget (
+            ChatTabState state
+        ) throws GLib.Error {
+            ConversationPersistenceChart? chart =
+                state.active_chart_recipe;
+
+            if (chart == null ||
+                !persistence_chart_is_gistemp (chart)) {
+                throw new GLib.IOError.INVALID_DATA (
+                    "No qualified GISTEMP chart recipe is active."
+                );
+            }
+
+            if (chart.series.length != 1) {
+                throw new GLib.IOError.INVALID_DATA (
+                    "The active GISTEMP chart recipe has invalid series cardinality."
+                );
+            }
+
+            ConversationPersistenceChartSeries series =
+                chart.series[0];
+            bool pin_matches = false;
+
+            for (uint i = 0; i < state.session.repository_count (); i++) {
+                ConversationRepositoryPin? pin =
+                    state.session.repository_pin_at (i);
+                if (pin == null) {
+                    continue;
+                }
+
+                if (pin.repository_id == series.repository_id &&
+                    pin.repository_version == series.repository_version &&
+                    pin.snapshot_sha == series.snapshot_sha) {
+                    pin_matches = true;
+                    break;
+                }
+            }
+
+            if (!pin_matches) {
+                throw new GLib.IOError.INVALID_DATA (
+                    "The active GISTEMP chart recipe is outside the conversation pin."
+                );
+            }
+
+            RepositoryDescriptor[] descriptors =
+                repository_descriptors_for_ids (
+                    { series.repository_id }
+                );
+            if (descriptors.length != 1) {
+                throw new GLib.IOError.NOT_FOUND (
+                    "The active GISTEMP chart repository is unavailable."
+                );
+            }
+
+            string snapshot_path =
+                RepositoryLifecycleService.snapshot_path (
+                    descriptors[0],
+                    series.snapshot_sha
+                );
+            if (!GLib.FileUtils.test (
+                    snapshot_path,
+                    GLib.FileTest.IS_DIR
+                )) {
+                throw new GLib.IOError.NOT_FOUND (
+                    "The pinned GISTEMP chart snapshot is unavailable."
+                );
+            }
+
+            ChartNative.Spec? spec = null;
+            if (!ChartNative.reconstruct_history_gistemp (
+                    snapshot_path,
+                    series.repository_id,
+                    series.repository_version,
+                    series.snapshot_sha,
+                    chart.chart_schema,
+                    chart.chart_spec_id,
+                    chart.chart_kind,
+                    chart.reconstruction_profile,
+                    series.series_profile,
+                    series.admission_profile,
+                    series.scientific_id,
+                    series.qualified_id,
+                    series.source_path,
+                    out spec
+                ) || spec == null) {
+                throw new GLib.IOError.INVALID_DATA (
+                    "The active GISTEMP chart source could not be re-qualified."
+                );
+            }
+
+            ChartNative.View view;
+            if (!ChartNative.create (spec, out view)) {
+                throw new GLib.IOError.FAILED (
+                    "The active GISTEMP chart could not be rendered."
+                );
+            }
+
+            view.add_css_class ("atm-history-chart");
+            return view;
+        }
+
         private Gtk.Widget[] build_live_chart_widgets (
             ConversationSession session,
             out ConversationPersistenceChart[] charts
@@ -2821,47 +3007,16 @@ namespace AskTheModel {
 
             const string source_path =
                 "science/data/processed/nasa_gistemp_global_2026.csv";
-            RepositoryDescriptor? descriptor =
-                repository_descriptor_for_id (
-                    chart_pin.repository_id
-                );
-            if (descriptor == null) {
-                throw new GLib.IOError.NOT_FOUND (
-                    "Qualified chart repository is unavailable."
-                );
-            }
-
-            string snapshot_path = RepositoryLifecycleService.snapshot_path (
-                descriptor,
-                chart_pin.snapshot_sha
-            );
-
-            if (!GLib.FileUtils.test (
-                    snapshot_path,
-                    GLib.FileTest.IS_DIR
-                )) {
-                throw new GLib.IOError.NOT_FOUND (
-                    "Qualified chart repository snapshot is unavailable."
-                );
-            }
 
             ChartNative.Spec spec;
-            if (!ChartNative.reconstruct_live_gistemp (
-                    snapshot_path,
-                    chart_pin.repository_id,
-                    chart_pin.repository_version,
-                    chart_pin.snapshot_sha,
-                    out spec
-                ) || spec == null) {
-                throw new GLib.IOError.INVALID_DATA (
-                    "Pinned GISTEMP source could not be re-qualified for chart presentation."
-                );
-            }
+            qualify_live_gistemp_request (
+                session,
+                out spec
+            );
 
             string? scientific_id = spec.series_scientific_id (0);
             string? qualified_id = spec.series_qualified_id (0);
             string? chart_spec_id = spec.id ();
-
             if (scientific_id == null || qualified_id == null ||
                 chart_spec_id == null) {
                 throw new GLib.IOError.INVALID_DATA (
@@ -3316,6 +3471,30 @@ namespace AskTheModel {
         ) {
             ChartIntent chart_intent =
                 ChartIntent.parse (prompt);
+            bool chart_follow_up =
+                !chart_intent.gistemp_requested &&
+                state.active_chart_kind == ChartKind.GISTEMP &&
+                state.active_chart_recipe != null &&
+                ChartIntent.is_chart_follow_up (prompt);
+
+            if (chart_follow_up) {
+                try {
+                    Gtk.Widget chart =
+                        build_active_chart_widget (state);
+                    state.presentation.append_completed_turn (
+                        "",
+                        {},
+                        { chart }
+                    );
+                } catch (GLib.Error error) {
+                    state.presentation.append_chart_status (
+                        "AtM could not regenerate the qualified GISTEMP chart: " +
+                        error.message
+                    );
+                }
+                return;
+            }
+
             string effective_prompt =
                 chart_intent.gistemp_requested
                     ? chart_intent.query
@@ -3348,6 +3527,7 @@ namespace AskTheModel {
             bool should_generate_title =
                 state.title_label.label == "New";
             bool grounded_turn_prepared = false;
+            bool session_started_for_request = false;
 
             try {
                 if (state.persistence_failed) {
@@ -3371,6 +3551,18 @@ namespace AskTheModel {
                     );
                 }
 
+                if (chart_intent.gistemp_requested &&
+                    !repository_id_in (state.repository_ids, "ewd") &&
+                    !repository_id_in (
+                        state.repository_ids,
+                        "LaurentiuStaicu/empirical-world3-dynamics"
+                    )) {
+                    throw new GistempChartQualificationError.EWD_NOT_SELECTED (
+                        "GISTEMP charts require EWD to be selected for this conversation. " +
+                        "Select EWD in Repository Scope and retry."
+                    );
+                }
+
                 if (!state.session.is_active ()) {
                     RepositoryDescriptor[] selected =
                         repository_descriptors_for_ids (
@@ -3387,6 +3579,7 @@ namespace AskTheModel {
                         state.model_name,
                         state.model_digest
                     );
+                    session_started_for_request = true;
                 }
 
                 if (!ollama_provider.select_model (
@@ -3401,6 +3594,14 @@ namespace AskTheModel {
                     state.model_name,
                     ollama_provider.model_digest
                 );
+
+                if (chart_intent.gistemp_requested) {
+                    ChartNative.Spec qualified_gistemp_spec;
+                    qualify_live_gistemp_request (
+                        state.session,
+                        out qualified_gistemp_spec
+                    );
+                }
 
                 bool needs_clarification;
                 string? system_instructions;
@@ -3568,6 +3769,15 @@ namespace AskTheModel {
                                 "Check that EWD is selected and its pinned snapshot is available."
                             );
                         }
+                        if (chart_intent.gistemp_requested &&
+                            live_chart_widgets.length > 0 &&
+                            live_charts.length > 0) {
+                            state.active_chart_kind = ChartKind.GISTEMP;
+                            state.active_chart_recipe = live_charts[0];
+                        } else if (!chart_intent.gistemp_requested) {
+                            state.active_chart_kind = ChartKind.NONE;
+                            state.active_chart_recipe = null;
+                        }
                         assistant_stream_started = true;
                         title_answer = visible_answer;
                     } else {
@@ -3600,6 +3810,8 @@ namespace AskTheModel {
                                 state,
                                 answer
                             );
+                            state.active_chart_kind = ChartKind.NONE;
+                            state.active_chart_recipe = null;
                             assistant_stream_started = true;
                         } else {
                             state.presentation.cancel_assistant_generation ();
@@ -3621,6 +3833,8 @@ namespace AskTheModel {
 
                 if (grounded_turn_prepared) {
                     state.session.abort_turn ();
+                } else if (session_started_for_request) {
+                    state.session.reset ();
                 }
 
                 if (!state.session.is_active ()) {
@@ -3967,6 +4181,13 @@ namespace AskTheModel {
             return resolution;
         }
 
+        private bool persistence_chart_is_gistemp (
+            ConversationPersistenceChart chart
+        ) {
+            return chart.reconstruction_profile ==
+                "atm-chart-reconstruct/gistemp-complete-annual/1";
+        }
+
         private void render_restored_snapshot (
             ChatTabState state,
             ConversationPersistenceSnapshot snapshot
@@ -3999,11 +4220,15 @@ namespace AskTheModel {
                         );
 
                     Gtk.Widget[] chart_widgets = {};
+                    bool charts_reconstructed = false;
                     try {
                         chart_widgets = build_history_chart_widgets (
                             snapshot,
                             message
                         );
+                        charts_reconstructed =
+                            message.charts.length > 0 &&
+                            chart_widgets.length == message.charts.length;
                     } catch (GLib.Error chart_error) {
                         var status = new Gtk.Label (
                             "Chart unavailable: %s".printf (
@@ -4029,6 +4254,24 @@ namespace AskTheModel {
                         chart_widgets
                     );
 
+                    ConversationPersistenceChart? restored_gistemp_recipe = null;
+                    foreach (ConversationPersistenceChart chart
+                             in message.charts) {
+                        if (persistence_chart_is_gistemp (chart)) {
+                            restored_gistemp_recipe = chart;
+                            break;
+                        }
+                    }
+
+                    if (restored_gistemp_recipe != null &&
+                        charts_reconstructed) {
+                        state.active_chart_kind = ChartKind.GISTEMP;
+                        state.active_chart_recipe = restored_gistemp_recipe;
+                    } else {
+                        state.active_chart_kind = ChartKind.NONE;
+                        state.active_chart_recipe = null;
+                    }
+
                     state.grounded_answers +=
                         message.provider_content;
                     state.grounded_citations +=
@@ -4038,6 +4281,8 @@ namespace AskTheModel {
                         state,
                         message.display_content
                     );
+                    state.active_chart_kind = ChartKind.NONE;
+                    state.active_chart_recipe = null;
                 }
             }
         }
