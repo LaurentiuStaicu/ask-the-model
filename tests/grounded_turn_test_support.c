@@ -87,7 +87,7 @@ atm_grounded_turn_fixture_create (
         "  \"display_name\": \"Fixture\",\n"
         "  \"version_source\": {\"type\": \"cff\", \"path\": \"CITATION.cff\"},\n"
         "  \"status_source\": \"STATUS.md\",\n"
-        "  \"required_paths\": [\"STATUS.md\"],\n"
+        "  \"required_paths\": [\"CITATION.cff\", \"STATUS.md\", \"model/core.json\"],\n"
         "  \"retrieval\": {\n"
         "    \"canonical\": [\"STATUS.md\"],\n"
         "    \"structural\": [],\n"
