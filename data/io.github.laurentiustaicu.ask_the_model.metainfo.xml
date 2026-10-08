@@ -45,6 +45,14 @@
   <content_rating type="oars-1.1"/>
 
   <releases>
+    <release version="0.6.2" date="2026-10-08">
+      <description>
+        <p>
+          Hardened grounded-turn durable commit ordering with final identity and cancellation gates,
+          fail-closed pre-boundary persistence and regression qualification.
+        </p>
+      </description>
+    </release>
     <release version="0.6.1" date="2026-10-08">
       <description>
         <p>

@@ -1,10 +1,10 @@
 # Application architecture boundary
 
-## Released state — v0.6.1
+## Released state — v0.6.2
 
-AtM v0.6.1 provides the functional GTK 4 / Granite local-chat application, desktop integration, AppStream metadata, elementary OS 8 Flatpak packaging, repository-grounded EWD/CBD/RMD conversation paths, startup qualification/snapshot integrity, hardened SQLite repository authority, explicit saved-conversation History, semantic transcript presentation, accessible grounded Sources, the source-revalidated GISTEMP chart path and qualified session-only repository optimizations defaulting to OFF.
+AtM v0.6.2 provides the functional GTK 4 / Granite local-chat application, desktop integration, AppStream metadata, elementary OS 8 Flatpak packaging, repository-grounded EWD/CBD/RMD conversation paths, startup qualification/snapshot integrity, hardened SQLite repository authority, explicit saved-conversation History, semantic transcript presentation, accessible grounded Sources, the source-revalidated GISTEMP chart path and qualified session-only repository optimizations defaulting to OFF.
 
-Repository selection, validated exact-SHA snapshots, deterministic retrieval, per-chat repository/model pinning, grounded citations and on-demand provenance inspection remain part of the released capability boundary. v0.6.1 retains the v0.6.0 presentation, chart and optimization behaviors while adding the qualified natural-language GISTEMP correction. Post-v0.6.1 grounded-turn durability work on main is intentionally unreleased and documented separately in STATUS.md and CHANGELOG.md.
+Repository selection, validated exact-SHA snapshots, deterministic retrieval, per-chat repository/model pinning, grounded citations and on-demand provenance inspection remain part of the released capability boundary. v0.6.2 retains the v0.6.1 presentation, chart and optimization behaviors while adding the grounded-turn durable commit correction. The durable-boundary qualification is now part of the released state.
 
 ## Repository-aware implementation — released in v0.3.0
 

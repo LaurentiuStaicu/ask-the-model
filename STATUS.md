@@ -2,15 +2,19 @@
 
 ## Release status
 
-**Current release: Ask the Model (AtM) v0.6.1 — GISTEMP chart rendering correction, released 2026-10-08.**
+**Current release: Ask the Model (AtM) v0.6.2 — grounded-turn durability correction, released 2026-10-08.**
 
-**Latest published release: v0.6.1 (2026-10-08).** Tag `v0.6.1` and the immutable GitHub Release point to merge commit `2d6ac8bc38efc657689f19e2c7904e6c81097468`. The release was published automatically by the Flatpak release workflow after the post-merge release gates passed.
+**Latest published release: v0.6.2 (2026-10-08).** The immutable GitHub Release for v0.6.2 will point to the release merge commit after publication; v0.6.1 remains the previous immutable release at tag `v0.6.1` and commit `2d6ac8bc38efc657689f19e2c7904e6c81097468`. The release was published automatically by the Flatpak release workflow after the post-merge release gates passed.
 
 v0.6.0 retains the v0.5.0 repository-grounding, exact-context saved History, hardened SQLite state and startup-integrity boundaries. It adds complete-message semantic transcript presentation, accessible grounded Sources and semantic copy; a user-requested GISTEMP chart path with exact pinned-source revalidation and History reconstruction; and session-only repository optimizations that default to OFF.
 
-### Post-v0.6.1 development on `main`
+### v0.6.2 release
 
-The published v0.6.1 release remains immutable. Development `main` now contains the post-release grounded-turn durability correction merged as commit `48cf9975ca14c9b61efd780ed21ab90922c12aac`. The correction is intentionally unreleased and is not attributed retroactively to v0.6.1. Its qualification adds the `SESSION-S0-013` durable-boundary invariant plus structural and semantic regression coverage.
+The published v0.6.2 release contains the post-v0.6.1 grounded-turn durability correction. The v0.6.1 release remains immutable and historically unchanged. The correction adds the `SESSION-S0-013` durable-boundary invariant plus structural and semantic regression coverage.
+
+### v0.6.2 verification
+
+The v0.6.2 release candidate passed the post-merge Invariant Registry and Flatpak gates on the exact release commit. The Flatpak release workflow validates version/date metadata, README and publication ordering before building and publishing the immutable release artifact.
 
 The project remains in the `0.x` initial-development series. The public API and repository-management surface are not yet considered stable enough for v1.0.
 
