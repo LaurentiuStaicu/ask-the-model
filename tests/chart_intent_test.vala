@@ -52,5 +52,15 @@ int main () {
     assert (empty.gistemp_requested);
     assert (empty.query == "");
 
+    assert (AskTheModel.ChartIntent.is_chart_follow_up (
+        "Generate the chart"
+    ));
+    assert (AskTheModel.ChartIntent.is_chart_follow_up (
+        "Arată graficul"
+    ));
+    assert (!AskTheModel.ChartIntent.is_chart_follow_up (
+        "Generate a chart of population"
+    ));
+
     return 0;
 }
