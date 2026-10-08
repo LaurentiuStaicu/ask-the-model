@@ -3423,11 +3423,12 @@ namespace AskTheModel {
                 if (chart_intent.gistemp_requested) {
                     grounded_system_instructions +=
                         "\nThe application handles the requested qualified " +
-                        "GISTEMP chart. Do not claim that you cannot render " +
-                        "charts. Answer the user's grounded question briefly " +
-                        "and cite the GISTEMP source when it is present in " +
-                        "the supplied evidence. Never invent data or chart " +
-                        "configuration.";
+                        "GISTEMP chart from the complete pinned source. Do " +
+                        "not claim that you cannot render charts or infer that " +
+                        "years are missing from the retrieved evidence excerpts. " +
+                        "Answer the user's grounded question briefly, avoid " +
+                        "listing unsupported data points, and never invent " +
+                        "data or chart configuration.";
                 }
 
                 if (cancellable.is_cancelled ()) {
