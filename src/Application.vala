@@ -3423,6 +3423,18 @@ namespace AskTheModel {
                     );
                 }
 
+                if (chart_intent.gistemp_requested &&
+                    !repository_id_in (state.repository_ids, "ewd") &&
+                    !repository_id_in (
+                        state.repository_ids,
+                        "LaurentiuStaicu/empirical-world3-dynamics"
+                    )) {
+                    throw new GistempChartQualificationError.EWD_NOT_SELECTED (
+                        "GISTEMP charts require EWD to be selected for this conversation. " +
+                        "Select EWD in Repository Scope and retry."
+                    );
+                }
+
                 if (!state.session.is_active ()) {
                     RepositoryDescriptor[] selected =
                         repository_descriptors_for_ids (
