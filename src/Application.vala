@@ -4104,7 +4104,8 @@ namespace AskTheModel {
                             message
                         );
                         charts_reconstructed =
-                            message.charts.length > 0;
+                            message.charts.length > 0 &&
+                            chart_widgets.length == message.charts.length;
                     } catch (GLib.Error chart_error) {
                         var status = new Gtk.Label (
                             "Chart unavailable: %s".printf (
