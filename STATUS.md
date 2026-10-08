@@ -2,7 +2,7 @@
 
 ## Release status
 
-**Current release: Ask the Model (AtM) v0.6.0 — Qualified Presentation, Repository Optimizations and GISTEMP Charts; release candidate, not yet published; planned release date: 2026-10-08.**
+**Current release: Ask the Model (AtM) v0.6.0 — Qualified Presentation, Repository Optimizations and GISTEMP Charts, released 2026-10-08.**
 
 v0.6.0 retains the v0.5.0 repository-grounding, exact-context saved History, hardened SQLite state and startup-integrity boundaries. It adds complete-message semantic transcript presentation, accessible grounded Sources and semantic copy; a user-requested GISTEMP chart path with exact pinned-source revalidation and History reconstruction; and session-only repository optimizations that default to OFF.
 
