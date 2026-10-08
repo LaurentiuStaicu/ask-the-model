@@ -8,6 +8,10 @@
 
 v0.6.0 retains the v0.5.0 repository-grounding, exact-context saved History, hardened SQLite state and startup-integrity boundaries. It adds complete-message semantic transcript presentation, accessible grounded Sources and semantic copy; a user-requested GISTEMP chart path with exact pinned-source revalidation and History reconstruction; and session-only repository optimizations that default to OFF.
 
+### Post-v0.6.1 development on `main`
+
+The published v0.6.1 release remains immutable. Development `main` now contains the post-release grounded-turn durability correction merged as commit `48cf9975ca14c9b61efd780ed21ab90922c12aac`. The correction is intentionally unreleased and is not attributed retroactively to v0.6.1. Its qualification adds the `SESSION-S0-013` durable-boundary invariant plus structural and semantic regression coverage.
+
 The project remains in the `0.x` initial-development series. The public API and repository-management surface are not yet considered stable enough for v1.0.
 
 ## v0.6.1 release
