@@ -4097,11 +4097,14 @@ namespace AskTheModel {
                         );
 
                     Gtk.Widget[] chart_widgets = {};
+                    bool charts_reconstructed = false;
                     try {
                         chart_widgets = build_history_chart_widgets (
                             snapshot,
                             message
                         );
+                        charts_reconstructed =
+                            message.charts.length > 0;
                     } catch (GLib.Error chart_error) {
                         var status = new Gtk.Label (
                             "Chart unavailable: %s".printf (
@@ -4127,11 +4130,20 @@ namespace AskTheModel {
                         chart_widgets
                     );
 
+                    bool has_gistemp_chart = false;
                     foreach (ConversationPersistenceChart chart
                              in message.charts) {
                         if (persistence_chart_is_gistemp (chart)) {
-                            state.active_chart_kind = ChartKind.GISTEMP;
+                            has_gistemp_chart = true;
+                            break;
                         }
+                    }
+
+                    if (has_gistemp_chart && charts_reconstructed) {
+                        state.active_chart_kind = ChartKind.GISTEMP;
+                    } else if (message.charts.length == 0 ||
+                               !charts_reconstructed) {
+                        state.active_chart_kind = ChartKind.NONE;
                     }
 
                     state.grounded_answers +=
@@ -4143,6 +4155,7 @@ namespace AskTheModel {
                         state,
                         message.display_content
                     );
+                    state.active_chart_kind = ChartKind.NONE;
                 }
             }
         }
