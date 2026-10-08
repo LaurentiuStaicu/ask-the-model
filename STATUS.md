@@ -2,11 +2,19 @@
 
 ## Release status
 
-**Current release: Ask the Model (AtM) v0.6.0 — Qualified Presentation, Repository Optimizations and GISTEMP Charts, released 2026-10-08.**
+**Current release: Ask the Model (AtM) v0.6.1 release candidate — GISTEMP chart rendering correction, planned release date: 2026-10-08.**
+
+**Latest published release: v0.6.0 (2026-10-08).** The `0.6.1` candidate is not published; its scope is limited to reliable rendering of the already qualified GISTEMP chart and natural-language recognition of requests for that chart.
 
 v0.6.0 retains the v0.5.0 repository-grounding, exact-context saved History, hardened SQLite state and startup-integrity boundaries. It adds complete-message semantic transcript presentation, accessible grounded Sources and semantic copy; a user-requested GISTEMP chart path with exact pinned-source revalidation and History reconstruction; and session-only repository optimizations that default to OFF.
 
 The project remains in the `0.x` initial-development series. The public API and repository-management surface are not yet considered stable enough for v1.0.
+
+## v0.6.1 release candidate
+
+- Natural-language requests for the qualified GISTEMP chart are recognized alongside `/chart gistemp`.
+- The chart reads the complete pinned, revalidated EWD GISTEMP series directly, rather than depending on sparse retrieval excerpts.
+- Scope remains limited to the existing GISTEMP chart; no generic chart support or model-authored values are added.
 
 ## v0.6.0 release highlights
 
