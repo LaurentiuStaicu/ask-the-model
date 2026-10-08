@@ -89,6 +89,17 @@ def main() -> int:
         for item in required
     }
 
+    model_gate_position = positions["state.session.require_model ("]
+    generation_id_position = grounded.find(
+        "state.session.repository_generation_id ()",
+        model_gate_position,
+    )
+    require(
+        generation_id_position >= 0,
+        "repository_generation_id gate marker missing after model gate",
+    )
+    positions["state.session.repository_generation_id ()"] = generation_id_position
+
     order = [
         "yield ollama_provider.chat_grounded (",
         "state.session.resolve_turn_citations (",
