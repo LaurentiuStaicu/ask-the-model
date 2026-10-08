@@ -3653,6 +3653,8 @@ namespace AskTheModel {
                         if (chart_intent.gistemp_requested &&
                             live_chart_widgets.length > 0) {
                             state.active_chart_kind = ChartKind.GISTEMP;
+                        } else if (!chart_intent.gistemp_requested) {
+                            state.active_chart_kind = ChartKind.NONE;
                         }
                         assistant_stream_started = true;
                         title_answer = visible_answer;
