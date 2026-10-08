@@ -4,7 +4,7 @@ Status: the renderer and GTK Chart/Data component are integrated in the applicat
 
 ## Current application integration
 
-The application accepts only an explicit `/chart gistemp <grounded question>` request. It resolves an eligible citation to the pinned EWD GISTEMP snapshot, reconstructs and validates the source series and ChartSpec, then creates the GTK Chart/Data view. The completed assistant turn may persist a chart reconstruction recipe; History rebuilds the chart from the conversation's pinned snapshot and fails closed if identity or source validation fails. The model does not author chart intent or numeric values.
+The application accepts the explicit `/chart gistemp <grounded question>` command and clear natural-language requests for a GISTEMP/global-temperature chart. It resolves an eligible citation to the pinned EWD GISTEMP snapshot, reconstructs and validates the source series and ChartSpec, then creates the GTK Chart/Data view. The completed assistant turn may persist a chart reconstruction recipe; History rebuilds the chart from the conversation's pinned snapshot and fails closed if identity or source validation fails. The model does not author chart intent or numeric values.
 
 CHART-01 and CHART-03 qualify the source/native and GTK component boundaries. PRES-09 exercises durable recipe attachment and close/reopen reconstruction, and Flatpak runs the Meson suite. These checks do not constitute a dedicated full GTK Application interaction test that enters `/chart gistemp` and verifies both live and restored chart presentation end to end.
 
@@ -67,17 +67,14 @@ original files as a preview artifact. Neither transport is application code.
 Visual inspection of these exact native PNGs is required before accepting the
 prototype's layout. User visual review precedes application activation.
 
-Next: user-facing GTK chart/Data view integration, keyboard/accessibility and
-same-component live/History rendering tests. CHART-04 cache/downsampling and
-CHART-05 persistence v3 remain separate gates. Broader scientific adapters stay
-in CHART-01's qualification ledger.
+The component is integrated into the application. A dedicated end-to-end GTK Application test for a live natural-language chart request followed by restored History presentation remains unqualified. CHART-04 cache/downsampling and CHART-05 persistence v3 remain separate gates. Broader scientific adapters stay in CHART-01's qualification ledger.
 
 Primary implementation references:
 - https://www.cairographics.org/manual/cairo-Image-Surfaces.html
 - https://www.cairographics.org/manual/cairo-text.html
 - https://www.cairographics.org/manual/cairo-Error-handling.html
 
-## Dormant GTK component
+## GTK Chart/Data component qualification
 
 `chart_view.h/.c` adds a reusable GTK4 Box subclass with Chart/Data stack pages,
 a native ColumnView in source order (year, exact anomaly, source row), and a

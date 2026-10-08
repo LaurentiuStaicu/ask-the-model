@@ -19,6 +19,28 @@ int main () {
     assert (!ordinary.gistemp_requested);
     assert (ordinary.query == "show me the global temperature trend");
 
+    var natural_romanian = AskTheModel.ChartIntent.parse (
+        "Arată-mi un grafic GISTEMP cu evoluția temperaturii globale în timp."
+    );
+    assert (natural_romanian.gistemp_requested);
+    assert (natural_romanian.query ==
+        "Arată-mi un grafic GISTEMP cu evoluția temperaturii globale în timp.");
+
+    var natural_english = AskTheModel.ChartIntent.parse (
+        "Show me a GISTEMP chart of global temperature over time."
+    );
+    assert (natural_english.gistemp_requested);
+
+    var capability_question = AskTheModel.ChartIntent.parse (
+        "Can you generate charts?"
+    );
+    assert (!capability_question.gistemp_requested);
+
+    var generic_chart = AskTheModel.ChartIntent.parse (
+        "Show me a chart of population over time."
+    );
+    assert (!generic_chart.gistemp_requested);
+
     var near_miss = AskTheModel.ChartIntent.parse (
         "/chart gistemp-ish Show the trend"
     );

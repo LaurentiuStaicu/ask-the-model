@@ -2793,49 +2793,38 @@ namespace AskTheModel {
         }
 
         private Gtk.Widget[] build_live_chart_widgets (
-            CitationResolution resolution,
+            ConversationSession session,
             out ConversationPersistenceChart[] charts
         ) throws GLib.Error {
             Gtk.Widget[] widgets = {};
             charts = {};
-            CitationReference? chart_citation = null;
 
-            for (uint i = 0; i < resolution.citation_count (); i++) {
-                CitationReference? citation = resolution.citation_at (i);
-                if (citation == null) {
+            ConversationRepositoryPin? chart_pin = null;
+            for (uint i = 0; i < session.repository_count (); i++) {
+                ConversationRepositoryPin? pin =
+                    session.repository_pin_at (i);
+                if (pin == null) {
                     continue;
                 }
 
-                if (citation.source_path !=
-                    "science/data/processed/nasa_gistemp_global_2026.csv") {
-                    continue;
-                }
-
-                if (citation.repository_id != "ewd" &&
-                    citation.repository_id !=
+                if (pin.repository_id == "ewd" ||
+                    pin.repository_id ==
                         "LaurentiuStaicu/empirical-world3-dynamics") {
-                    continue;
+                    chart_pin = pin;
+                    break;
                 }
-
-                if (chart_citation != null &&
-                    (chart_citation.repository_id != citation.repository_id ||
-                     chart_citation.repository_version != citation.repository_version ||
-                     chart_citation.snapshot_sha != citation.snapshot_sha ||
-                     chart_citation.source_path != citation.source_path)) {
-                    throw new GLib.IOError.INVALID_DATA (
-                        "Multiple distinct GISTEMP chart sources are not admitted by the current one-series profile."
-                    );
-                }
-
-                chart_citation = citation;
             }
 
-            if (chart_citation == null) {
+            if (chart_pin == null) {
                 return widgets;
             }
 
+            const string source_path =
+                "science/data/processed/nasa_gistemp_global_2026.csv";
             RepositoryDescriptor? descriptor =
-                repository_descriptor_for_id (chart_citation.repository_id);
+                repository_descriptor_for_id (
+                    chart_pin.repository_id
+                );
             if (descriptor == null) {
                 throw new GLib.IOError.NOT_FOUND (
                     "Qualified chart repository is unavailable."
@@ -2844,7 +2833,7 @@ namespace AskTheModel {
 
             string snapshot_path = RepositoryLifecycleService.snapshot_path (
                 descriptor,
-                chart_citation.snapshot_sha
+                chart_pin.snapshot_sha
             );
 
             if (!GLib.FileUtils.test (
@@ -2859,9 +2848,9 @@ namespace AskTheModel {
             ChartNative.Spec spec;
             if (!ChartNative.reconstruct_live_gistemp (
                     snapshot_path,
-                    chart_citation.repository_id,
-                    chart_citation.repository_version,
-                    chart_citation.snapshot_sha,
+                    chart_pin.repository_id,
+                    chart_pin.repository_version,
+                    chart_pin.snapshot_sha,
                     out spec
                 ) || spec == null) {
                 throw new GLib.IOError.INVALID_DATA (
@@ -2885,10 +2874,10 @@ namespace AskTheModel {
                 "atm-gistemp-pinned-admission/1",
                 scientific_id,
                 qualified_id,
-                chart_citation.repository_id,
-                chart_citation.repository_version,
-                chart_citation.snapshot_sha,
-                chart_citation.source_path
+                chart_pin.repository_id,
+                chart_pin.repository_version,
+                chart_pin.snapshot_sha,
+                source_path
             );
             charts = {
                 new ConversationPersistenceChart (
@@ -3429,6 +3418,19 @@ namespace AskTheModel {
                     );
                 grounded_turn_prepared = has_grounding;
 
+                string grounded_system_instructions =
+                    system_instructions ?? "";
+                if (chart_intent.gistemp_requested) {
+                    grounded_system_instructions +=
+                        "\nThe application handles the requested qualified " +
+                        "GISTEMP chart from the complete pinned source. Do " +
+                        "not claim that you cannot render charts or infer that " +
+                        "years are missing from the retrieved evidence excerpts. " +
+                        "Answer the user's grounded question briefly, avoid " +
+                        "listing unsupported data points, and never invent " +
+                        "data or chart configuration.";
+                }
+
                 if (cancellable.is_cancelled ()) {
                     throw new GLib.IOError.CANCELLED (
                         "Generation was stopped."
@@ -3447,7 +3449,7 @@ namespace AskTheModel {
                     if (has_grounding) {
                         answer = yield ollama_provider.chat_grounded (
                             effective_prompt,
-                            system_instructions ?? "",
+                            grounded_system_instructions,
                             evidence_text ?? "",
                             post_evidence_reminder ?? "",
                             state.conversation,
@@ -3518,7 +3520,7 @@ namespace AskTheModel {
                             try {
                                 live_chart_widgets =
                                     build_live_chart_widgets (
-                                        citation_resolution,
+                                        state.session,
                                         out live_charts
                                     );
 
@@ -3559,6 +3561,13 @@ namespace AskTheModel {
                             citation_resolution,
                             live_chart_widgets
                         );
+                        if (chart_intent.gistemp_requested &&
+                            live_chart_widgets.length == 0) {
+                            state.presentation.append_chart_status (
+                                "AtM could not render the qualified GISTEMP chart. " +
+                                "Check that EWD is selected and its pinned snapshot is available."
+                            );
+                        }
                         assistant_stream_started = true;
                         title_answer = visible_answer;
                     } else {
