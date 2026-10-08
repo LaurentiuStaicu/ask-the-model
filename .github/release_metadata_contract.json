@@ -69,6 +69,12 @@
     "saved_conversation_history": "v0.5.0 makes explicit Save to History the only user-visible conversation save transition; later lifecycle changes must preserve exact-context restore and fail-closed permanent deletion semantics unless deliberately redesigned and documented.",
     "presentation": "v0.6.0 qualifies semantic transcript presentation and accessible grounded Sources; future presentation changes must preserve provider/persistence content and citation provenance boundaries.",
     "optimizations": "v0.6.0 exposes the session-only Optimizations gate defaulting OFF; qualified ON policies remain bounded and individually evidenced, while OFF retains the established baseline.",
-    "charting": "v0.6.0 supports only explicit GISTEMP chart intent from the exact pinned EWD source; no generic/model-authored chart values or arbitrary source adapters are implied."
+    "charting": "v0.6.0 supports only explicit GISTEMP chart intent from the exact pinned EWD source. The planned v0.6.1 correction also recognizes clear natural-language requests and renders from the complete pinned source independently of retrieved evidence excerpts; no generic/model-authored chart values or arbitrary source adapters are implied."
+  },
+  "release_candidate": {
+    "version": "0.6.1",
+    "date": "2026-10-08",
+    "status": "planned",
+    "scope": "Correct live rendering of the qualified pinned GISTEMP series and natural-language request recognition; no generic charts or model-authored numeric values."
   }
 }
