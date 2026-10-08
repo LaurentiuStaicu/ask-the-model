@@ -2827,9 +2827,6 @@ namespace AskTheModel {
                 );
             }
 
-            const string source_path =
-                "science/data/processed/nasa_gistemp_global_2026.csv";
-
             RepositoryDescriptor? descriptor =
                 repository_descriptor_for_id (
                     chart_pin.repository_id
