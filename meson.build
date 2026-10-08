@@ -2058,7 +2058,8 @@ grounded_turn_commit_protocol_test = executable(
     glib_dep,
     gio_dep,
     json_glib_dep,
-    sqlite_dep
+    sqlite_dep,
+    soup_dep
   ],
   link_args: [
     '-lyaml'
