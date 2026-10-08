@@ -2026,6 +2026,7 @@ grounded_turn_commit_protocol_test = executable(
     'src/ConversationStoreNative.vapi',
     'src/ConversationPersistenceStore.vala',
     'src/ConversationExport.vala',
+    'src/OllamaProvider.vala',
     'src/cff_version.c',
     'src/repository_sources.c',
     'src/markdown_sections.c',
