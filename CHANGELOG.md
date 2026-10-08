@@ -4,7 +4,8 @@ All notable public releases of Ask the Model are recorded here.
 
 ## Unreleased
 
-No unreleased changes yet.
+- Accept clear natural-language requests for the qualified GISTEMP chart in addition to the explicit `/chart gistemp` command. Chart intent remains application-detected and restricted to the pinned, revalidated GISTEMP series.
+
 
 ## 0.6.0 - 2026-10-08
 
