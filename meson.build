@@ -2018,6 +2018,63 @@ test(
   conversation_session_test
 )
 
+grounded_turn_commit_protocol_test = executable(
+  'grounded-turn-commit-protocol-test',
+  [
+    'src/ConversationGrounding.vala',
+    'src/ConversationSession.vala',
+    'src/ConversationStoreNative.vapi',
+    'src/ConversationPersistenceStore.vala',
+    'src/ConversationExport.vala',
+    'src/OllamaProvider.vala',
+    'src/TurnGuardNative.vapi',
+    'src/conversation_turn_guard.c',
+    'src/ChatRequestBuilder.vala',
+    'src/cff_version.c',
+    'src/repository_sources.c',
+    'src/markdown_sections.c',
+    'src/csv_table.c',
+    'src/structured_json.c',
+    'src/retrieval_index.c',
+    'src/coordination_lease.c',
+    'src/repository_generation_lease.c',
+    'src/retrieval_index_lifecycle.c',
+    'src/retrieval_query.c',
+    'src/retrieval_rank.c',
+    'src/retrieval_scope.c',
+    'src/retrieval_normalize.c',
+    'src/retrieval_router.c',
+    'src/retrieval_conversation.c',
+    'src/grounding_context.c',
+    'src/citation_labels.c',
+    'src/conversation_grounding.c',
+    'src/conversation_store.c',
+    'tests/grounded_turn_test_support.c',
+    'tests/grounded_turn_commit_protocol_test.vala',
+    resources
+  ],
+  include_directories: [
+    include_directories('src'),
+    include_directories('tests')
+  ],
+  dependencies: [
+    glib_dep,
+    gio_dep,
+    json_glib_dep,
+    sqlite_dep,
+    soup_dep
+  ],
+  link_args: [
+    '-lyaml'
+  ],
+  install: false
+)
+
+test(
+  'grounded-turn-commit-protocol',
+  grounded_turn_commit_protocol_test
+)
+
 repository_lifecycle_service_test = executable(
   'repository-lifecycle-service-test',
   [

@@ -674,6 +674,21 @@
       ]
     },
     {
+      "id": "SESSION-S0-013",
+      "category": "SESSION",
+      "severity": "S0",
+      "lifecycle": "enforced",
+      "statement": "A grounded conversation turn must not advance ConversationSession grounding state before its corresponding durable SQLite turn has committed successfully. The durable commit must occur only after a final cancellation/model/repository-generation identity gate. If durable persistence fails before the boundary is crossed, the prepared grounding turn must be aborted and no durable turn may exist. Once the durable boundary succeeds, later cancellation, chart, presentation, or title failures must not abort or roll back the committed grounded turn.",
+      "enforced_by": [
+        "src/Application.vala",
+        "src/ConversationSession.vala",
+        "src/ConversationPersistenceStore.vala"
+      ],
+      "tested_by": [
+        "meson:grounded-turn-commit-protocol"
+      ]
+    },
+    {
       "id": "SESSION-S1-002",
       "category": "SESSION",
       "severity": "S1",
