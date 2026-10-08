@@ -20,11 +20,11 @@
       chat tabs and lets users explicitly save selected conversations to local History.
     </p>
     <p>
-      Version 0.5.0 retains repository-grounded exploration for the fixed Empirical
-      World3 Dynamics, Cognitive Belief Dynamics and Romanian Monetary Dynamics
-      repository suite and adds explicit saved-conversation History with exact-context
-      restore, deterministic managed JSON mirrors and hardened SQLite state authority.
-      Upstream Git SHA provenance remains distinct from local integrity verification.
+      Version 0.6.0 retains repository-grounded exploration, exact-context saved History,
+      hardened SQLite state authority and upstream Git SHA provenance. It adds semantic
+      transcript presentation, accessible grounded Sources, an explicitly requested
+      GISTEMP chart reconstructed from its pinned source, and qualified session-only
+      repository optimizations that default to OFF.
     </p>
     <p>
       AtM remains an interface and retrieval layer. The external provider owns
@@ -45,6 +45,15 @@
   <content_rating type="oars-1.1"/>
 
   <releases>
+    <release version="0.6.0" date="2026-10-08">
+      <description>
+        <p>
+          Qualified semantic presentation and grounded Sources, explicit GISTEMP
+          chart rendering with pinned-source History reconstruction, and default-OFF
+          session-only repository optimizations with bounded qualified policies.
+        </p>
+      </description>
+    </release>
     <release version="0.5.0" date="2026-09-24">
       <description>
         <p>
