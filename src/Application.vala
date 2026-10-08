@@ -43,6 +43,7 @@ namespace AskTheModel {
         public string? restored_read_only_reason = null;
         public bool archived = false;
         public bool follow_next_assistant = false;
+        public ChartKind active_chart_kind = ChartKind.NONE;
 
         public ChatTabState (
             Gtk.Box page,
@@ -3368,6 +3369,13 @@ namespace AskTheModel {
         ) {
             ChartIntent chart_intent =
                 ChartIntent.parse (prompt);
+            if (!chart_intent.gistemp_requested &&
+                state.active_chart_kind == ChartKind.GISTEMP &&
+                ChartIntent.is_chart_follow_up (prompt)) {
+                chart_intent = ChartIntent.parse (
+                    "/chart gistemp " + prompt
+                );
+            }
             string effective_prompt =
                 chart_intent.gistemp_requested
                     ? chart_intent.query
@@ -3642,6 +3650,10 @@ namespace AskTheModel {
                                 "Check that EWD is selected and its pinned snapshot is available."
                             );
                         }
+                        if (chart_intent.gistemp_requested &&
+                            live_chart_widgets.length > 0) {
+                            state.active_chart_kind = ChartKind.GISTEMP;
+                        }
                         assistant_stream_started = true;
                         title_answer = visible_answer;
                     } else {
@@ -3674,6 +3686,7 @@ namespace AskTheModel {
                                 state,
                                 answer
                             );
+                            state.active_chart_kind = ChartKind.NONE;
                             assistant_stream_started = true;
                         } else {
                             state.presentation.cancel_assistant_generation ();
