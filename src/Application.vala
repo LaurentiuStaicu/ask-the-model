@@ -2872,7 +2872,7 @@ namespace AskTheModel {
                 );
             }
 
-            qualified_spec = spec;
+            qualified_spec = (owned) spec;
         }
 
         private Gtk.Widget[] build_live_chart_widgets (
