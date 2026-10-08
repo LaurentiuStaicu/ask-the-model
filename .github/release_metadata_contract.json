@@ -9,10 +9,10 @@
     "policy": "Release version changes are deliberate. A minor release is appropriate when substantial backward-compatible user-facing functionality is added; patch releases are reserved for compatible corrections."
   },
   "current_public_release": {
-    "version": "0.5.0",
-    "date": "2026-09-24",
+    "version": "0.6.0",
+    "date": "2026-10-08",
     "version_bump_required_now": false,
-    "reason": "v0.5.0 promotes explicit saved-conversation History with exact-context restore and deterministic managed exports, together with the hardened SQLite Control DB/conversation-state, qualification and publication work completed after v0.4.0."
+    "reason": "v0.6.0 promotes qualified semantic transcript and source presentation, explicit source-revalidated GISTEMP chart rendering with History reconstruction, and default-OFF session-only repository optimizations, while preserving the v0.5.0 saved-History, exact-context and hardened state boundaries."
   },
   "canonical_sources": {
     "version": "meson.build project() version",
@@ -66,6 +66,9 @@
     "new_capability": "Substantial new user-facing capability should normally prepare a new 0.x minor release while the public API remains pre-1.0.",
     "released_versions_are_immutable": true,
     "startup_integrity": "v0.4.0 introduced offline startup qualification and local snapshot-integrity verification; later releases must preserve the distinction between upstream Git revision identity and AtM local integrity seals.",
-    "saved_conversation_history": "v0.5.0 makes explicit Save to History the only user-visible conversation save transition; later lifecycle changes must preserve exact-context restore and fail-closed permanent deletion semantics unless deliberately redesigned and documented."
+    "saved_conversation_history": "v0.5.0 makes explicit Save to History the only user-visible conversation save transition; later lifecycle changes must preserve exact-context restore and fail-closed permanent deletion semantics unless deliberately redesigned and documented.",
+    "presentation": "v0.6.0 qualifies semantic transcript presentation and accessible grounded Sources; future presentation changes must preserve provider/persistence content and citation provenance boundaries.",
+    "optimizations": "v0.6.0 exposes the session-only Optimizations gate defaulting OFF; qualified ON policies remain bounded and individually evidenced, while OFF retains the established baseline.",
+    "charting": "v0.6.0 supports only explicit GISTEMP chart intent from the exact pinned EWD source; no generic/model-authored chart values or arbitrary source adapters are implied."
   }
 }
