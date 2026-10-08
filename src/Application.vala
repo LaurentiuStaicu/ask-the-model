@@ -44,6 +44,7 @@ namespace AskTheModel {
         public bool archived = false;
         public bool follow_next_assistant = false;
         public ChartKind active_chart_kind = ChartKind.NONE;
+        public ConversationPersistenceChart? active_chart_recipe = null;
 
         public ChatTabState (
             Gtk.Box page,
@@ -2876,6 +2877,107 @@ namespace AskTheModel {
             qualified_spec = (owned) spec;
         }
 
+        private Gtk.Widget build_active_chart_widget (
+            ChatTabState state
+        ) throws GLib.Error {
+            ConversationPersistenceChart? chart =
+                state.active_chart_recipe;
+
+            if (chart == null ||
+                !persistence_chart_is_gistemp (chart)) {
+                throw new GLib.IOError.INVALID_DATA (
+                    "No qualified GISTEMP chart recipe is active."
+                );
+            }
+
+            if (chart.series.length != 1) {
+                throw new GLib.IOError.INVALID_DATA (
+                    "The active GISTEMP chart recipe has invalid series cardinality."
+                );
+            }
+
+            ConversationPersistenceChartSeries series =
+                chart.series[0];
+            bool pin_matches = false;
+
+            for (uint i = 0; i < state.session.repository_count (); i++) {
+                ConversationRepositoryPin? pin =
+                    state.session.repository_pin_at (i);
+                if (pin == null) {
+                    continue;
+                }
+
+                if (pin.repository_id == series.repository_id &&
+                    pin.repository_version == series.repository_version &&
+                    pin.snapshot_sha == series.snapshot_sha) {
+                    pin_matches = true;
+                    break;
+                }
+            }
+
+            if (!pin_matches) {
+                throw new GLib.IOError.INVALID_DATA (
+                    "The active GISTEMP chart recipe is outside the conversation pin."
+                );
+            }
+
+            RepositoryDescriptor[] descriptors =
+                repository_descriptors_for_ids (
+                    { series.repository_id }
+                );
+            if (descriptors.length != 1) {
+                throw new GLib.IOError.NOT_FOUND (
+                    "The active GISTEMP chart repository is unavailable."
+                );
+            }
+
+            string snapshot_path =
+                RepositoryLifecycleService.snapshot_path (
+                    descriptors[0],
+                    series.snapshot_sha
+                );
+            if (!GLib.FileUtils.test (
+                    snapshot_path,
+                    GLib.FileTest.IS_DIR
+                )) {
+                throw new GLib.IOError.NOT_FOUND (
+                    "The pinned GISTEMP chart snapshot is unavailable."
+                );
+            }
+
+            ChartNative.Spec? spec = null;
+            if (!ChartNative.reconstruct_history_gistemp (
+                    snapshot_path,
+                    series.repository_id,
+                    series.repository_version,
+                    series.snapshot_sha,
+                    chart.chart_schema,
+                    chart.chart_spec_id,
+                    chart.chart_kind,
+                    chart.reconstruction_profile,
+                    series.series_profile,
+                    series.admission_profile,
+                    series.scientific_id,
+                    series.qualified_id,
+                    series.source_path,
+                    out spec
+                ) || spec == null) {
+                throw new GLib.IOError.INVALID_DATA (
+                    "The active GISTEMP chart source could not be re-qualified."
+                );
+            }
+
+            ChartNative.View view;
+            if (!ChartNative.create (spec, out view)) {
+                throw new GLib.IOError.FAILED (
+                    "The active GISTEMP chart could not be rendered."
+                );
+            }
+
+            view.add_css_class ("atm-history-chart");
+            return view;
+        }
+
         private Gtk.Widget[] build_live_chart_widgets (
             ConversationSession session,
             out ConversationPersistenceChart[] charts
@@ -3369,13 +3471,27 @@ namespace AskTheModel {
         ) {
             ChartIntent chart_intent =
                 ChartIntent.parse (prompt);
-            if (!chart_intent.gistemp_requested &&
+            bool chart_follow_up =
+                !chart_intent.gistemp_requested &&
                 state.active_chart_kind == ChartKind.GISTEMP &&
-                ChartIntent.is_chart_follow_up (prompt)) {
-                chart_intent = ChartIntent.parse (
-                    "/chart gistemp " + prompt
-                );
+                state.active_chart_recipe != null &&
+                ChartIntent.is_chart_follow_up (prompt);
+
+            if (chart_follow_up) {
+                try {
+                    Gtk.Widget chart =
+                        build_active_chart_widget (state);
+                    state.presentation.append_chart_widget (chart);
+                    state.presentation.append_turn_separator ();
+                } catch (GLib.Error error) {
+                    state.presentation.append_chart_status (
+                        "AtM could not regenerate the qualified GISTEMP chart: " +
+                        error.message
+                    );
+                }
+                return;
             }
+
             string effective_prompt =
                 chart_intent.gistemp_requested
                     ? chart_intent.query
@@ -3651,10 +3767,13 @@ namespace AskTheModel {
                             );
                         }
                         if (chart_intent.gistemp_requested &&
-                            live_chart_widgets.length > 0) {
+                            live_chart_widgets.length > 0 &&
+                            live_charts.length > 0) {
                             state.active_chart_kind = ChartKind.GISTEMP;
+                            state.active_chart_recipe = live_charts[0];
                         } else if (!chart_intent.gistemp_requested) {
                             state.active_chart_kind = ChartKind.NONE;
+                            state.active_chart_recipe = null;
                         }
                         assistant_stream_started = true;
                         title_answer = visible_answer;
@@ -3689,6 +3808,7 @@ namespace AskTheModel {
                                 answer
                             );
                             state.active_chart_kind = ChartKind.NONE;
+                            state.active_chart_recipe = null;
                             assistant_stream_started = true;
                         } else {
                             state.presentation.cancel_assistant_generation ();
@@ -4131,20 +4251,22 @@ namespace AskTheModel {
                         chart_widgets
                     );
 
-                    bool has_gistemp_chart = false;
+                    ConversationPersistenceChart? restored_gistemp_recipe = null;
                     foreach (ConversationPersistenceChart chart
                              in message.charts) {
                         if (persistence_chart_is_gistemp (chart)) {
-                            has_gistemp_chart = true;
+                            restored_gistemp_recipe = chart;
                             break;
                         }
                     }
 
-                    if (has_gistemp_chart && charts_reconstructed) {
+                    if (restored_gistemp_recipe != null &&
+                        charts_reconstructed) {
                         state.active_chart_kind = ChartKind.GISTEMP;
-                    } else if (message.charts.length == 0 ||
-                               !charts_reconstructed) {
+                        state.active_chart_recipe = restored_gistemp_recipe;
+                    } else {
                         state.active_chart_kind = ChartKind.NONE;
+                        state.active_chart_recipe = null;
                     }
 
                     state.grounded_answers +=
@@ -4157,6 +4279,7 @@ namespace AskTheModel {
                         message.display_content
                     );
                     state.active_chart_kind = ChartKind.NONE;
+                    state.active_chart_recipe = null;
                 }
             }
         }
