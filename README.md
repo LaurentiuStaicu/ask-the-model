@@ -158,7 +158,7 @@ flatpak run io.github.laurentiustaicu.ask_the_model
 
 <small>A raw GGUF file does not become visible to AtM merely because it exists on disk; it must first be registered with a compatible provider. For model sources, GGUF import, parameter scales, quantization, context windows, starter examples, storage, CPU/GPU checks and Ollama management commands, see <a href="docs/MODEL_GUIDE.md">Choosing, installing and managing AI models</a>.</small>
 
-<small><strong>Model capability does not automatically become AtM capability.</strong> AtM v0.6.1 provides text chat and repository-grounded text retrieval, semantic transcript presentation and the corrected GISTEMP chart path, requested explicitly or in clear natural language. Image input and tool-calling controls are not part of this release, and the default chat path requests <code>think: false</code>.</small>
+<small><strong>Model capability does not automatically become AtM capability.</strong> AtM v0.6.1 currently provides text chat and repository-grounded text retrieval, semantic transcript presentation and the corrected GISTEMP chart path, requested explicitly or in clear natural language. Image input and tool-calling controls are not part of this release, and the default chat path requests <code>think: false</code>.</small>
 
 <small>If a model is too slow, consumes too much memory or does not appear in AtM, use <a href="docs/TROUBLESHOOTING.md">Troubleshooting</a> for symptom-by-symptom checks rather than treating model size or download success as proof of compatibility.</small>
 
