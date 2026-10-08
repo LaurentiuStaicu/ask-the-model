@@ -4058,6 +4058,13 @@ namespace AskTheModel {
             return resolution;
         }
 
+        private bool persistence_chart_is_gistemp (
+            ConversationPersistenceChart chart
+        ) {
+            return chart.reconstruction_profile ==
+                "atm-chart-reconstruct/gistemp-complete-annual/1";
+        }
+
         private void render_restored_snapshot (
             ChatTabState state,
             ConversationPersistenceSnapshot snapshot
@@ -4119,6 +4126,13 @@ namespace AskTheModel {
                         resolution,
                         chart_widgets
                     );
+
+                    foreach (ConversationPersistenceChart chart
+                             in message.charts) {
+                        if (persistence_chart_is_gistemp (chart)) {
+                            state.active_chart_kind = ChartKind.GISTEMP;
+                        }
+                    }
 
                     state.grounded_answers +=
                         message.provider_content;
