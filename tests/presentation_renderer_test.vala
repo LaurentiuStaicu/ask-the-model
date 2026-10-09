@@ -135,6 +135,39 @@ test_rendering_projection () {
 }
 
 private void
+test_chart_widget_newline_rendering () {
+    var view = new Gtk.TextView ();
+    var renderer = new PresentationRenderer (view);
+    renderer.append_assistant ("Răspuns");
+
+    var chart = new Gtk.Label ("Grafic");
+    renderer.append_chart_widget (chart);
+
+    assert (chart.has_css_class ("atm-chart-attachment"));
+    assert (view.buffer.text == "Assistant: Răspuns\n\n");
+    assert (!view.buffer.text.contains ("\\n"));
+
+    var status_view = new Gtk.TextView ();
+    var status_renderer = new PresentationRenderer (status_view);
+    status_renderer.append_chart_status ("Grafic indisponibil");
+
+    assert (status_view.buffer.text == "\n");
+    assert (!status_view.buffer.text.contains ("\\n"));
+
+    Gtk.TextIter iter;
+    status_view.buffer.get_start_iter (out iter);
+    unowned Gtk.TextChildAnchor? anchor = iter.get_child_anchor ();
+    assert (anchor != null);
+    bool found_status = false;
+    foreach (unowned Gtk.Widget widget in anchor.get_widgets ()) {
+        if (widget.has_css_class ("atm-chart-status")) {
+            found_status = true;
+        }
+    }
+    assert (found_status);
+}
+
+private void
 test_palette_and_theme_update () {
     var view = new Gtk.TextView ();
     var buffer = view.buffer;
@@ -566,6 +599,10 @@ main (string[] args) {
     Test.add_func (
         "/presentation-renderer/projection",
         test_rendering_projection
+    );
+    Test.add_func (
+        "/presentation-renderer/chart-widget-newlines",
+        test_chart_widget_newline_rendering
     );
     Test.add_func (
         "/presentation-renderer/palette",
