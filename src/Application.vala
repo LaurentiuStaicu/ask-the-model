@@ -2792,6 +2792,79 @@ namespace AskTheModel {
             return button;
         }
 
+        private void qualify_live_gistemp_request (
+            ConversationSession session
+        ) throws GLib.Error {
+            ConversationRepositoryPin? chart_pin = null;
+
+            for (uint i = 0; i < session.repository_count (); i++) {
+                ConversationRepositoryPin? pin =
+                    session.repository_pin_at (i);
+                if (pin == null) {
+                    continue;
+                }
+
+                if (pin.repository_id == "ewd" ||
+                    pin.repository_id ==
+                        "LaurentiuStaicu/empirical-world3-dynamics") {
+                    chart_pin = pin;
+                    break;
+                }
+            }
+
+            if (chart_pin == null) {
+                throw new GLib.IOError.FAILED (
+                    "GISTEMP charts require EWD to be selected for this conversation. " +
+                    "Select EWD in Repository Scope and retry."
+                );
+            }
+
+            RepositoryDescriptor? descriptor =
+                repository_descriptor_for_id (chart_pin.repository_id);
+            if (descriptor == null) {
+                throw new GLib.IOError.NOT_FOUND (
+                    "The pinned EWD repository required for the GISTEMP chart is unavailable."
+                );
+            }
+
+            string snapshot_path =
+                RepositoryLifecycleService.snapshot_path (
+                    descriptor,
+                    chart_pin.snapshot_sha
+                );
+            if (!GLib.FileUtils.test (
+                    snapshot_path,
+                    GLib.FileTest.IS_DIR
+                )) {
+                throw new GLib.IOError.NOT_FOUND (
+                    "The pinned EWD snapshot required for the GISTEMP chart is unavailable."
+                );
+            }
+
+            ChartNative.Spec spec;
+            if (!ChartNative.reconstruct_live_gistemp (
+                    snapshot_path,
+                    chart_pin.repository_id,
+                    chart_pin.repository_version,
+                    chart_pin.snapshot_sha,
+                    out spec
+                ) || spec == null) {
+                throw new GLib.IOError.INVALID_DATA (
+                    "The pinned GISTEMP source could not be re-qualified."
+                );
+            }
+
+            string? scientific_id = spec.series_scientific_id (0);
+            string? qualified_id = spec.series_qualified_id (0);
+            string? chart_spec_id = spec.id ();
+            if (scientific_id == null || qualified_id == null ||
+                chart_spec_id == null) {
+                throw new GLib.IOError.INVALID_DATA (
+                    "The qualified GISTEMP chart identities are unavailable."
+                );
+            }
+        }
+
         private Gtk.Widget[] build_live_chart_widgets (
             ConversationSession session,
             out ConversationPersistenceChart[] charts
@@ -3349,6 +3422,7 @@ namespace AskTheModel {
                 state.title_label.label == "New";
             bool grounded_turn_prepared = false;
             bool turn_durably_committed = false;
+            bool session_started_for_request = false;
 
             try {
                 if (state.persistence_failed) {
@@ -3372,6 +3446,18 @@ namespace AskTheModel {
                     );
                 }
 
+                if (chart_intent.gistemp_requested &&
+                    !repository_id_in (state.repository_ids, "ewd") &&
+                    !repository_id_in (
+                        state.repository_ids,
+                        "LaurentiuStaicu/empirical-world3-dynamics"
+                    )) {
+                    throw new GLib.IOError.FAILED (
+                        "GISTEMP charts require EWD to be selected for this conversation. " +
+                        "Select EWD in Repository Scope and retry."
+                    );
+                }
+
                 if (!state.session.is_active ()) {
                     RepositoryDescriptor[] selected =
                         repository_descriptors_for_ids (
@@ -3388,6 +3474,7 @@ namespace AskTheModel {
                         state.model_name,
                         state.model_digest
                     );
+                    session_started_for_request = true;
                 }
 
                 if (!ollama_provider.select_model (
@@ -3402,6 +3489,10 @@ namespace AskTheModel {
                     state.model_name,
                     ollama_provider.model_digest
                 );
+
+                if (chart_intent.gistemp_requested) {
+                    qualify_live_gistemp_request (state.session);
+                }
 
                 bool needs_clarification;
                 string? system_instructions;
@@ -3672,6 +3763,9 @@ namespace AskTheModel {
                 if (grounded_turn_prepared &&
                     !turn_durably_committed) {
                     state.session.abort_turn ();
+                } else if (session_started_for_request &&
+                    !turn_durably_committed) {
+                    state.session.reset ();
                 }
 
                 if (!state.session.is_active ()) {
