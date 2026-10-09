@@ -1,4 +1,4 @@
-[CCode (cheader_filename = "chart_view.h")]
+[CCode (cheader_filename = "chart_view.h,chart_history_reconstruct.h")]
 namespace AskTheModel.ChartNative {
     [Compact]
     [CCode (cname = "AtmChartSpec", free_function = "atm_chart_spec_free", has_type_id = false)]
