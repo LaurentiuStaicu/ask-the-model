@@ -1,0 +1,72 @@
+
+# ---------------------------------------------------------------------------
+# CHART-M1c: generic source-bound evidence, SRA and series adapter.
+#
+# These three targets link the new descriptor-driven layers alongside the
+# legacy per-source modules, because every test in this block compares the two
+# and needs both present. Nothing above this point is modified: the existing
+# gistemp-evidence, energy-institute-evidence, gistemp-sra, verified-series,
+# chart-spec and History targets keep their current source lists and their
+# pinned legacy modules.
+#
+# Note for review: series-evidence-equivalence-test is the only target in the
+# build that links both admission families into one binary. That is required by
+# series_evidence_adapters.c, which carries a descriptor for each source.
+# ---------------------------------------------------------------------------
+
+series_evidence_equivalence_test = executable(
+  'series-evidence-equivalence-test',
+  ['src/series_evidence.c', 'src/series_evidence_adapters.c',
+   'src/gistemp_evidence.c', 'src/gistemp_admission.c',
+   'src/energy_institute_evidence.c', 'src/energy_institute_admission.c',
+   'src/energy_institute_candidate.c', 'src/annual_series_candidate.c',
+   'src/scientific_canonical.c', 'src/scientific_artifact.c',
+   'tests/series_evidence_equivalence_test.c'],
+  include_directories: include_directories('src'),
+  dependencies: [glib_dep, json_glib_dep],
+  install: false
+)
+test('series-evidence-equivalence', series_evidence_equivalence_test,
+  env: {'ATM_CHART01_FIXTURE': meson.current_source_dir() / 'tests/fixtures/chart01'})
+
+# This target links series_sra.c and gistemp_sra.c into one binary, which no
+# existing target does, so the two implementations can be compared directly.
+series_sra_equivalence_test = executable(
+  'series-sra-equivalence-test',
+  ['src/series_sra.c', 'src/series_evidence.c',
+   'src/series_evidence_adapters.c',
+   'src/gistemp_sra.c', 'src/gistemp_evidence.c', 'src/gistemp_admission.c',
+   'src/energy_institute_evidence.c', 'src/energy_institute_admission.c',
+   'src/energy_institute_candidate.c', 'src/annual_series_candidate.c',
+   'src/scientific_canonical.c', 'src/scientific_artifact.c',
+   'src/scientific_result.c', 'src/scientific_operation.c',
+   'src/scientific_derivation.c',
+   'tests/series_sra_equivalence_test.c'],
+  include_directories: include_directories('src'),
+  dependencies: [glib_dep, json_glib_dep],
+  install: false
+)
+test('series-sra-equivalence', series_sra_equivalence_test,
+  env: {'ATM_CHART01_FIXTURE': meson.current_source_dir() / 'tests/fixtures/chart01'})
+
+# The adapter has no legacy counterpart to compare against, because no
+# source-specific module ever produced an AtmSeriesContract. This target links
+# series_adapter.c against the shared layer plus series_contract.c.
+series_adapter_test = executable(
+  'series-adapter-test',
+  ['src/series_adapter.c', 'src/series_sra.c', 'src/series_evidence.c',
+   'src/series_evidence_adapters.c',
+   'src/series_contract.c',
+   'src/gistemp_evidence.c', 'src/gistemp_admission.c',
+   'src/energy_institute_evidence.c', 'src/energy_institute_admission.c',
+   'src/energy_institute_candidate.c', 'src/annual_series_candidate.c',
+   'src/scientific_canonical.c', 'src/scientific_artifact.c',
+   'src/scientific_result.c', 'src/scientific_operation.c',
+   'src/scientific_derivation.c',
+   'tests/series_adapter_test.c'],
+  include_directories: include_directories('src'),
+  dependencies: [glib_dep, json_glib_dep],
+  install: false
+)
+test('series-adapter', series_adapter_test,
+  env: {'ATM_CHART01_FIXTURE': meson.current_source_dir() / 'tests/fixtures/chart01'})

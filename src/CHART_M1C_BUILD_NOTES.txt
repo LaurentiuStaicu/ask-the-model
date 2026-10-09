@@ -1,0 +1,29 @@
+
+# ---------------------------------------------------------------------------
+# CHART-M1c: retire the two equivalence targets.
+#
+# gistemp-evidence-equivalence and the SRA equivalence target did their job:
+# they compared artifact against artifact, storage digest against storage
+# digest, and both finalized identities, across both admitted sources. Every
+# comparison passed, which is what made it safe to build the generic layers.
+#
+# They are now redundant with series-adapter and verified-series-contract,
+# which exercise the same shared chain without needing a legacy side to
+# compare against. The test files stay in the tree for reference; only the
+# build targets go.
+#
+# NOT retired: energy-institute-evidence-test. It exercises the Energy
+# Institute evidence module directly and has no replacement.
+#
+# The three legacy modules themselves stay in the application and test targets
+# for now. Under option C, verified_series.c keeps the pinned identities and
+# therefore keeps calling atm_gistemp_sra_new and atm_gistemp_evidence_new, so
+# every target that links verified_series.c must keep linking the legacy chain.
+# Removing them is a consequence of the chart_spec decision, not a build edit.
+#
+# Series-source-install list at the top of this block says what to add:
+#   series_evidence.c, series_evidence_adapters.c, series_sra.c,
+#   series_adapter.c, series_contract.c, verified_series_contract.c
+# It is left as a comment rather than a live change so the build file stays
+# valid until the three new targets are added deliberately.
+# ---------------------------------------------------------------------------
