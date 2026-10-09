@@ -79,8 +79,10 @@ atm_chart_history_reconstruct_gistemp (
     static const char *expected_repository =
         "LaurentiuStaicu/empirical-world3-dynamics";
     static const char *expected_repository_key = "ewd";
-    static const char *expected_snapshot =
+    static const char *expected_snapshot_initial =
         "d9e249339663015f6d1c05752338a955bf64ad0b";
+    static const char *expected_snapshot_current =
+        "dc710d8e604c0fff713a3acfdb18ab47a1a902bb";
     static const char *expected_schema = ATM_CHART_SPEC_SCHEMA;
     static const char *expected_reconstruction =
         "atm-chart-reconstruct/gistemp-complete-annual/1";
@@ -119,7 +121,8 @@ atm_chart_history_reconstruct_gistemp (
 
     if ((g_strcmp0 (repository_id, expected_repository_key) != 0 &&
          g_strcmp0 (repository_id, expected_repository) != 0) ||
-        g_strcmp0 (snapshot_sha, expected_snapshot) != 0) {
+        (g_strcmp0 (snapshot_sha, expected_snapshot_initial) != 0 &&
+         g_strcmp0 (snapshot_sha, expected_snapshot_current) != 0)) {
         return reject (error, "Persisted chart repository identity is not admitted.");
     }
 
@@ -221,8 +224,10 @@ atm_chart_live_reconstruct_gistemp (
     static const char *expected_repository =
         "LaurentiuStaicu/empirical-world3-dynamics";
     static const char *expected_repository_key = "ewd";
-    static const char *expected_snapshot =
+    static const char *expected_snapshot_initial =
         "d9e249339663015f6d1c05752338a955bf64ad0b";
+    static const char *expected_snapshot_current =
+        "dc710d8e604c0fff713a3acfdb18ab47a1a902bb";
     static const char *source_paths[ATM_GISTEMP_SOURCE_COUNT] = {
         "science/data/processed/nasa_gistemp_global_2026.csv",
         "science/data/processed/nasa_gistemp_global_2026.provenance.json",
@@ -249,7 +254,8 @@ atm_chart_live_reconstruct_gistemp (
 
     if ((g_strcmp0 (repository_id, expected_repository_key) != 0 &&
          g_strcmp0 (repository_id, expected_repository) != 0) ||
-        g_strcmp0 (snapshot_sha, expected_snapshot) != 0) {
+        (g_strcmp0 (snapshot_sha, expected_snapshot_initial) != 0 &&
+         g_strcmp0 (snapshot_sha, expected_snapshot_current) != 0)) {
         return reject (error, "Live chart repository identity is not admitted.");
     }
 
