@@ -2957,7 +2957,7 @@ namespace AskTheModel {
                     1,
                     "atm-chart-spec/1",
                     chart_spec_id,
-                    "LINE",
+                    "line",
                     "atm-chart-reconstruct/gistemp-complete-annual/1",
                     { series }
                 )

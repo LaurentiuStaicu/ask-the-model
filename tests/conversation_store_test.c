@@ -2331,6 +2331,23 @@ test_chart_binding_write_load (void)
     );
     g_assert_no_error (error);
 
+    /* The native persistence contract deliberately requires normalized kinds. */
+    AtmConversationChartInput uppercase_kind_chart = chart;
+    uppercase_kind_chart.ordinal = 2;
+    uppercase_kind_chart.chart_kind = "LINE";
+    g_assert_false (
+        atm_conversation_store_attach_chart (
+            store, conversation_id, grounded_turn,
+            &uppercase_kind_chart, &error
+        )
+    );
+    g_assert_error (
+        error,
+        ATM_CONVERSATION_STORE_ERROR,
+        ATM_CONVERSATION_STORE_ERROR_ARGUMENT
+    );
+    g_clear_error (&error);
+
     g_assert_false (
         atm_conversation_store_attach_chart (
             store, conversation_id, grounded_turn, &chart, &error
