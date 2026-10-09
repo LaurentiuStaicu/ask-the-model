@@ -24,4 +24,16 @@ gboolean atm_chart_history_reconstruct_gistemp (
     GError **error
 );
 
+
+/* Live reconstruction entry point; declaration needed by the C test caller
+ * and the C emitted by Vala for Application.vala. */
+gboolean atm_chart_live_reconstruct_gistemp (
+    const char *snapshot_path,
+    const char *repository_id,
+    const char *repository_version,
+    const char *snapshot_sha,
+    AtmChartSpec **out,
+    GError **error
+);
+
 G_END_DECLS
