@@ -65,6 +65,26 @@ def main() -> int:
         "grounded preparation",
     )
 
+    qualification_gate = marker(
+        send,
+        "qualify_live_gistemp_request (state.session);",
+        "GISTEMP pre-model qualification",
+    )
+    preparation_gate = marker(
+        send,
+        "state.session.prepare_turn (",
+        "grounded preparation",
+    )
+    require(
+        qualification_gate < preparation_gate,
+        "GISTEMP source qualification must finish before grounded turn preparation and any model call",
+    )
+    marker(
+        send,
+        'if (chart_intent.gistemp_requested &&\n                    !repository_id_in (state.repository_ids, "ewd")',
+        "GISTEMP repository-scope fail-closed gate",
+    )
+
     required = [
         "yield ollama_provider.chat_grounded (",
         "state.session.resolve_turn_citations (",
