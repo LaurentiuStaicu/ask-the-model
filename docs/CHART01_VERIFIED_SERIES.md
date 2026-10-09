@@ -98,6 +98,30 @@ M1b must bind the parsed candidate to qualified data and metadata through an
 explicit profile admission. Only that later layer may construct VerifiedSeries.
 The candidate API has no qualified-series ID, unit setter or rendering authority.
 
+## Additional reviewed EWD snapshot for live reconstruction
+
+The live chart admission also accepts EWD commit
+`dc710d8e604c0fff713a3acfdb18ab47a1a902bb`. This is an explicit second
+snapshot policy, not a moving-branch exception. It preserves the original
+snapshot admission so previously persisted conversations remain reconstructable.
+
+The GISTEMP CSV and provenance bytes are identical to the first pinned snapshot.
+The current snapshot's exact SHA-256 values for the two changed metadata files
+are:
+
+- `science/data/input_manifest.json`: `ece72aed0d444484635e38171df703a775e5922df95b8783385cbfed7e2ffbd6`
+- `science/data/registry.csv`: `6ff4e0bffe03cce368dcd278d6ca57b6e8f181aa241dea7206508499ec3fa3b8`
+
+Admission remains fail-closed: repository identity, snapshot SHA, and all four
+source-file digests must match one complete reviewed policy bundle. The newer
+manifest must still bind the exact CSV and provenance hashes, and its registry
+must retain the reviewed empirical annual Celsius-anomaly semantics and the
+boundary against treating this observation as World3 persistent pollution.
+Unknown snapshots, mixed metadata bundles, and modified files remain rejected.
+The source audit fixture and report continue to document the original snapshot;
+the runtime admission tests separately exercise the additional snapshot and
+rebuild preservation.
+
 ## M1b pinned source admission
 
 `gistemp_admission.h/.c` introduces the independent policy

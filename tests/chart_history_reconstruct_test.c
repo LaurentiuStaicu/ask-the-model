@@ -134,6 +134,28 @@ test_reconstruct_and_identity (void)
 }
 
 static void
+test_live_reconstruct_current_snapshot (void)
+{
+    const char *root = g_getenv ("ATM_CHART01_FIXTURE");
+    g_assert_nonnull (root);
+    char *snapshot = g_build_filename (root, "ewd-current", NULL);
+    AtmChartSpec *spec = NULL;
+    GError *error = NULL;
+    g_assert_true (atm_chart_live_reconstruct_gistemp (
+        snapshot,
+        "ewd",
+        "main",
+        "dc710d8e604c0fff713a3acfdb18ab47a1a902bb",
+        &spec,
+        &error
+    ));
+    g_assert_no_error (error);
+    g_assert_nonnull (spec);
+    atm_chart_spec_free (spec);
+    g_free (snapshot);
+}
+
+static void
 test_reject_tampered_identity_and_snapshot (void)
 {
     char *snapshot = fixture_snapshot ();
@@ -191,6 +213,10 @@ main (int argc, char **argv)
     g_test_add_func (
         "/chart/history-reconstruct/identity",
         test_reconstruct_and_identity
+    );
+    g_test_add_func (
+        "/chart/history-reconstruct/current-snapshot",
+        test_live_reconstruct_current_snapshot
     );
     g_test_add_func (
         "/chart/history-reconstruct/fail-closed",

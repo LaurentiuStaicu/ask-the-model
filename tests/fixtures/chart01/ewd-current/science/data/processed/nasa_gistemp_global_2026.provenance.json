@@ -1,0 +1,15 @@
+{
+  "institution": "NASA Goddard Institute for Space Studies",
+  "dataset": "GISTEMP v4 Land-Ocean Temperature Index",
+  "source_url": "https://data.giss.nasa.gov/gistemp/tabledata_v4/GLB.Ts+dSST.csv",
+  "accessed_on": "2026-08-31",
+  "raw_file": "data/raw/climate/GISTEMP_v4_2026-08-31.csv",
+  "raw_sha256": "6cfa44e7bbacd9b12cb10bdd64b3182c2735fa3f3a95688e1f7bc8e5dfcece93",
+  "coverage": {
+    "start_year": 1880,
+    "end_year": 2025
+  },
+  "selection": "Global annual J-D Land-Ocean Temperature Index",
+  "unit": "degrees Celsius relative to the 1951-1980 mean",
+  "revision_note": "GISTEMP is revised when late station and ocean observations arrive; the hash fixes the exact snapshot used by this audit."
+}
