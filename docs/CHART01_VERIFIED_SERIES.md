@@ -109,8 +109,8 @@ The GISTEMP CSV and provenance bytes are identical to the first pinned snapshot.
 The current snapshot's exact SHA-256 values for the two changed metadata files
 are:
 
-- `science/data/input_manifest.json`: `260a6d3ef0af5083f3ae4a30ff51d17cc9a172d7811e749bb0db5497a13c952e`
-- `science/data/registry.csv`: `345e1964691ef34599ca84fa0393bcbc00248746a3bd33443156d0d81494880f`
+- `science/data/input_manifest.json`: `ece72aed0d444484635e38171df703a775e5922df95b8783385cbfed7e2ffbd6`
+- `science/data/registry.csv`: `6ff4e0bffe03cce368dcd278d6ca57b6e8f181aa241dea7206508499ec3fa3b8`
 
 Admission remains fail-closed: repository identity, snapshot SHA, and all four
 source-file digests must match one complete reviewed policy bundle. The newer
