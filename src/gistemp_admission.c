@@ -13,8 +13,8 @@ static const SourcePolicy policy_initial[] = {
 static const SourcePolicy policy_current[] = {
     {"science/data/processed/nasa_gistemp_global_2026.csv", "c03e15198201c491cfbd665ad655f72c54f2df19db9c93614b5a2fb4ee5590fb"},
     {"science/data/processed/nasa_gistemp_global_2026.provenance.json", "2ac56f0f060fbba0b15f483a2510b293fe5cfbebb2a8e39816f3b73270496ed9"},
-    {"science/data/input_manifest.json", "ece72aed0d444484635e38171df703a775e5922df95b8783385cbfed7e2ffbd6"},
-    {"science/data/registry.csv", "f501a35536e9d78645926ecd603c97fcee804a0bf6a2d5d3fc1eec7896fd7ca4"},
+    {"science/data/input_manifest.json", "260a6d3ef0af5083f3ae4a30ff51d17cc9a172d7811e749bb0db5497a13c952e"},
+    {"science/data/registry.csv", "345e1964691ef34599ca84fa0393bcbc00248746a3bd33443156d0d81494880f"},
 };
 static const SourcePolicy *policy_for_snapshot (const char *snapshot)
 {
