@@ -280,12 +280,12 @@ namespace AskTheModel {
                 return;
             }
 
-            insert_raw ("\\n");
+            insert_raw ("\n");
             append_semantic_child (
                 chart,
                 "atm-chart-attachment"
             );
-            insert_raw ("\\n");
+            insert_raw ("\n");
         }
 
         public void append_chart_status (
@@ -304,7 +304,7 @@ namespace AskTheModel {
                 label,
                 "atm-chart-status"
             );
-            insert_raw ("\\n");
+            insert_raw ("\n");
         }
 
         public void append_sources (
