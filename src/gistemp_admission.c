@@ -1,16 +1,32 @@
 #include "gistemp_admission.h"
 
 static const char repository_id[] = "LaurentiuStaicu/empirical-world3-dynamics";
-static const char snapshot_id[] = "d9e249339663015f6d1c05752338a955bf64ad0b";
-static const struct { const char *path; const char *digest; } policy[] = {
+static const char snapshot_id_initial[] = "d9e249339663015f6d1c05752338a955bf64ad0b";
+static const char snapshot_id_current[] = "dc710d8e604c0fff713a3acfdb18ab47a1a902bb";
+typedef struct { const char *path; const char *digest; } SourcePolicy;
+static const SourcePolicy policy_initial[] = {
     {"science/data/processed/nasa_gistemp_global_2026.csv", "c03e15198201c491cfbd665ad655f72c54f2df19db9c93614b5a2fb4ee5590fb"},
     {"science/data/processed/nasa_gistemp_global_2026.provenance.json", "2ac56f0f060fbba0b15f483a2510b293fe5cfbebb2a8e39816f3b73270496ed9"},
     {"science/data/input_manifest.json", "887bfec97515472e22084a6e28655b1d644d86949dc59b5a506801346a1fce8e"},
     {"science/data/registry.csv", "0637a1842706d2303750d6591851830987f3899de681e432c32b2be7b71adf4d"},
 };
+static const SourcePolicy policy_current[] = {
+    {"science/data/processed/nasa_gistemp_global_2026.csv", "c03e15198201c491cfbd665ad655f72c54f2df19db9c93614b5a2fb4ee5590fb"},
+    {"science/data/processed/nasa_gistemp_global_2026.provenance.json", "2ac56f0f060fbba0b15f483a2510b293fe5cfbebb2a8e39816f3b73270496ed9"},
+    {"science/data/input_manifest.json", "ece72aed0d444484635e38171df703a775e5922df95b8783385cbfed7e2ffbd6"},
+    {"science/data/registry.csv", "f501a35536e9d78645926ecd603c97fcee804a0bf6a2d5d3fc1eec7896fd7ca4"},
+};
+static const SourcePolicy *policy_for_snapshot (const char *snapshot)
+{
+    if (g_strcmp0 (snapshot, snapshot_id_initial) == 0) return policy_initial;
+    if (g_strcmp0 (snapshot, snapshot_id_current) == 0) return policy_current;
+    return NULL;
+}
 struct AtmGistempAdmission {
     GBytes *sources[ATM_GISTEMP_SOURCE_COUNT];
     AtmAnnualSeriesCandidate *candidate;
+    const SourcePolicy *policy;
+    char *snapshot;
 };
 
 static gboolean reject (GError **error, AtmAnnualSeriesError code, const char *message)
@@ -24,6 +40,7 @@ void atm_gistemp_admission_free (AtmGistempAdmission *a)
     for (guint i = 0; i < ATM_GISTEMP_SOURCE_COUNT; i++)
         g_clear_pointer (&a->sources[i], g_bytes_unref);
     atm_annual_series_candidate_free (a->candidate);
+    g_free (a->snapshot);
     g_free (a);
 }
 gboolean atm_gistemp_admission_new (const char *repository, const char *snapshot,
@@ -32,7 +49,8 @@ gboolean atm_gistemp_admission_new (const char *repository, const char *snapshot
 {
     if (out == NULL || *out != NULL || sources == NULL)
         return reject (error, ATM_ANNUAL_SERIES_ERROR_ARGUMENT, "Invalid admission arguments.");
-    if (g_strcmp0 (repository, repository_id) != 0 || g_strcmp0 (snapshot, snapshot_id) != 0)
+    const SourcePolicy *selected_policy = policy_for_snapshot (snapshot);
+    if (g_strcmp0 (repository, repository_id) != 0 || selected_policy == NULL)
         return reject (error, ATM_ANNUAL_SERIES_ERROR_SHAPE, "Source snapshot is not admitted.");
     /* Bound the complete bundle before any source allocation. */
     for (guint i = 0; i < ATM_GISTEMP_SOURCE_COUNT; i++) {
@@ -42,13 +60,15 @@ gboolean atm_gistemp_admission_new (const char *repository, const char *snapshot
             return reject (error, ATM_ANNUAL_SERIES_ERROR_LIMIT, "Admission source exceeds byte ceiling.");
     }
     AtmGistempAdmission *a = g_new0 (AtmGistempAdmission, 1);
+    a->policy = selected_policy;
+    a->snapshot = g_strdup (snapshot);
     for (guint i = 0; i < ATM_GISTEMP_SOURCE_COUNT; i++) {
         gsize size;
         const guint8 *bytes = g_bytes_get_data (sources[i], &size);
         a->sources[i] = g_bytes_new (bytes, size);
         bytes = g_bytes_get_data (a->sources[i], &size);
         char *digest = g_compute_checksum_for_data (G_CHECKSUM_SHA256, bytes, size);
-        gboolean matches = g_str_equal (digest, policy[i].digest);
+        gboolean matches = g_str_equal (digest, selected_policy[i].digest);
         g_free (digest);
         if (!matches) {
             reject (error, ATM_ANNUAL_SERIES_ERROR_SHAPE, "Source bytes do not match admitted policy.");
@@ -71,13 +91,13 @@ invalid:
 const AtmAnnualSeriesCandidate *atm_gistemp_admission_candidate (const AtmGistempAdmission *a)
 { return a != NULL ? a->candidate : NULL; }
 const char *atm_gistemp_admission_source_path (const AtmGistempAdmission *a, guint i)
-{ return a != NULL && i < ATM_GISTEMP_SOURCE_COUNT ? policy[i].path : NULL; }
+{ return a != NULL && i < ATM_GISTEMP_SOURCE_COUNT ? a->policy[i].path : NULL; }
 const char *atm_gistemp_admission_source_digest (const AtmGistempAdmission *a, guint i)
-{ return a != NULL && i < ATM_GISTEMP_SOURCE_COUNT ? policy[i].digest : NULL; }
+{ return a != NULL && i < ATM_GISTEMP_SOURCE_COUNT ? a->policy[i].digest : NULL; }
 const char *atm_gistemp_admission_repository (const AtmGistempAdmission *a)
 { return a != NULL ? repository_id : NULL; }
 const char *atm_gistemp_admission_snapshot (const AtmGistempAdmission *a)
-{ return a != NULL ? snapshot_id : NULL; }
+{ return a != NULL ? a->snapshot : NULL; }
 /* Reviewed interpretation of the exact retained provenance and registry bytes.
  * Any source revision needs an explicit policy review, not caller setters. */
 const char *atm_gistemp_admission_unit (const AtmGistempAdmission *a)
@@ -102,5 +122,5 @@ gboolean atm_gistemp_admission_rebuild (const AtmGistempAdmission *source,
 {
     if (source == NULL)
         return reject (error, ATM_ANNUAL_SERIES_ERROR_ARGUMENT, "Missing admitted source.");
-    return atm_gistemp_admission_new (repository_id, snapshot_id, source->sources, out, error);
+    return atm_gistemp_admission_new (repository_id, source->snapshot, source->sources, out, error);
 }
