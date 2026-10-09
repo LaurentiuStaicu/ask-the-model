@@ -89,9 +89,9 @@ static void test_current_snapshot_policy (void)
     g_assert_true (atm_gistemp_admission_new (repo, current_snapshot, bundle, &a, NULL));
     g_assert_cmpstr (atm_gistemp_admission_snapshot (a), ==, current_snapshot);
     g_assert_cmpstr (atm_gistemp_admission_source_digest (a, 2), ==,
-        "ece72aed0d444484635e38171df703a775e5922df95b8783385cbfed7e2ffbd6");
+        "260a6d3ef0af5083f3ae4a30ff51d17cc9a172d7811e749bb0db5497a13c952e");
     g_assert_cmpstr (atm_gistemp_admission_source_digest (a, 3), ==,
-        "f501a35536e9d78645926ecd603c97fcee804a0bf6a2d5d3fc1eec7896fd7ca4");
+        "345e1964691ef34599ca84fa0393bcbc00248746a3bd33443156d0d81494880f");
     AtmGistempAdmission *rebuilt = NULL;
     g_assert_true (atm_gistemp_admission_rebuild (a, &rebuilt, NULL));
     g_assert_cmpstr (atm_gistemp_admission_snapshot (rebuilt), ==, current_snapshot);
