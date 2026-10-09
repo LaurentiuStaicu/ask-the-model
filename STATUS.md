@@ -4,7 +4,7 @@
 
 **Current release: Ask the Model (AtM) v0.6.2 — grounded-turn durability correction, released 2026-10-08.**
 
-**Latest published release: v0.6.2 (2026-10-08).** The immutable GitHub Release for v0.6.2 will point to the release merge commit after publication; v0.6.1 remains the previous immutable release at tag `v0.6.1` and commit `2d6ac8bc38efc657689f19e2c7904e6c81097468`. The release was published automatically by the Flatpak release workflow after the post-merge release gates passed.
+**Latest published release: v0.6.2 (2026-10-08).** The immutable GitHub Release for v0.6.2 points to the release merge commit `a7b0ef7800a8c717a6da5a3c7f19dd6f6753896a`; v0.6.1 remains the previous immutable release at tag `v0.6.1` and commit `2d6ac8bc38efc657689f19e2c7904e6c81097468`. The release was published automatically by the Flatpak release workflow after the post-merge release gates passed.
 
 v0.6.0 retains the v0.5.0 repository-grounding, exact-context saved History, hardened SQLite state and startup-integrity boundaries. It adds complete-message semantic transcript presentation, accessible grounded Sources and semantic copy; a user-requested GISTEMP chart path with exact pinned-source revalidation and History reconstruction; and session-only repository optimizations that default to OFF.
 
