@@ -97,8 +97,8 @@ static void test_candidate_parser_boundaries (void)
     g_bytes_unref (source);
 
     const char *short_year =
-        "year,total_primary_energy_ej,fossil_energy_ej,oil_ej,gas_ej,coal_ej,nuclear_ej,hydro_ej,renewables_ej,non_fossil_energy_ej,fossil_share,non_fossil_share,component_reconciliation_error_ej\\n"
-        "196,149.6960972,0,0,0,0,0,0,0,0,0,0,0\\n";
+        "year,total_primary_energy_ej,fossil_energy_ej,oil_ej,gas_ej,coal_ej,nuclear_ej,hydro_ej,renewables_ej,non_fossil_energy_ej,fossil_share,non_fossil_share,component_reconciliation_error_ej\n"
+        "196,149.6960972,0,0,0,0,0,0,0,0,0,0,0\n";
     source = g_bytes_new_static (short_year, strlen (short_year));
     g_assert_false (atm_energy_institute_candidate_parse (source, &candidate, &error));
     g_assert_error (error, ATM_EI_CANDIDATE_ERROR, ATM_EI_CANDIDATE_ERROR_SHAPE);
@@ -107,8 +107,8 @@ static void test_candidate_parser_boundaries (void)
     g_bytes_unref (source);
 
     const char *extra_column =
-        "year,total_primary_energy_ej,fossil_energy_ej,oil_ej,gas_ej,coal_ej,nuclear_ej,hydro_ej,renewables_ej,non_fossil_energy_ej,fossil_share,non_fossil_share,component_reconciliation_error_ej\\n"
-        "1965,149.6960972,0,0,0,0,0,0,0,0,0,0,0,unexpected\\n";
+        "year,total_primary_energy_ej,fossil_energy_ej,oil_ej,gas_ej,coal_ej,nuclear_ej,hydro_ej,renewables_ej,non_fossil_energy_ej,fossil_share,non_fossil_share,component_reconciliation_error_ej\n"
+        "1965,149.6960972,0,0,0,0,0,0,0,0,0,0,0,unexpected\n";
     source = g_bytes_new_static (extra_column, strlen (extra_column));
     g_assert_false (atm_energy_institute_candidate_parse (source, &candidate, &error));
     g_assert_error (error, ATM_EI_CANDIDATE_ERROR, ATM_EI_CANDIDATE_ERROR_SHAPE);
