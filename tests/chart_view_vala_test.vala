@@ -4,10 +4,19 @@ extern Spec fixture (uint kind);
 int main (string[] args) {
     Gtk.init ();
     Spec? spec = fixture (1);
+    string? chart_spec_id = spec.id ();
+    string? scientific_id = spec.series_scientific_id (0);
+    string? qualified_id = spec.series_qualified_id (0);
+    assert (chart_spec_id != null && chart_spec_id.length > 0);
+    assert (scientific_id != null && scientific_id.length > 0);
+    assert (qualified_id != null && qualified_id.length > 0);
     try {
         View view;
         assert (create (spec, out view));
         spec = null;
+        assert (chart_spec_id != null && chart_spec_id.length > 0);
+        assert (scientific_id != null && scientific_id.length > 0);
+        assert (qualified_id != null && qualified_id.length > 0);
         assert (view.row_count () == 146);
         view.show_data ();
         assert (view.visible_page () == "data");
