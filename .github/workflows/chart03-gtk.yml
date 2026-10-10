@@ -59,6 +59,14 @@ jobs:
             src/ChartNative.vapi tests/chart_view_vala_test.vala "${sources[@]}" \
             -o /tmp/chart-view-vala-test
           xvfb-run -a dbus-run-session -- /tmp/chart-view-vala-test
+          # Exercise Vala ownership annotations under ASan as well as UBSan.
+          valac --pkg gtk4 --pkg json-glib-1.0 --pkg cairo --pkg gio-2.0 \
+            -X -Isrc -X -Itests -X -lm -X -fsanitize=address,undefined \
+            src/ChartNative.vapi tests/chart_view_vala_test.vala "${sources[@]}" \
+            -o /tmp/chart-view-vala-test-asan
+          ASAN_OPTIONS=detect_leaks=0:halt_on_error=1 \
+            UBSAN_OPTIONS=halt_on_error=1:print_stacktrace=1 \
+            xvfb-run -a dbus-run-session -- /tmp/chart-view-vala-test-asan
       - name: Publish GTK preview diagnostics
         run: python3 scripts/chart03_gtk_preview_log.py /tmp/chart03-gtk-preview
       - uses: actions/upload-artifact@v4
