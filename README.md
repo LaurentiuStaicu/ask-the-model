@@ -5,7 +5,7 @@
 <h2 align="center">Ask the Model (AtM)</h2>
 
 <p align="center">
-  <a href="https://github.com/LaurentiuStaicu/ask-the-model/releases/latest"><img alt="Version: 0.6.2" src="https://img.shields.io/github/v/tag/LaurentiuStaicu/ask-the-model?sort=semver&style=flat-square&label=release&color=333333"></a>
+  <a href="https://github.com/LaurentiuStaicu/ask-the-model/releases/latest"><img alt="Version: 0.6.3" src="https://img.shields.io/github/v/tag/LaurentiuStaicu/ask-the-model?sort=semver&style=flat-square&label=release&color=333333"></a>
   <a href="LICENSE"><img alt="MIT License" src="https://img.shields.io/badge/license-MIT-707070?style=flat-square"></a>
   <a href="#supported-platform-and-compatibility"><img alt="Linux / Flatpak" src="https://img.shields.io/badge/platform-Linux%20%2F%20Flatpak-a0a0a0?style=flat-square"></a>
 </p>
@@ -32,7 +32,7 @@
 
 <small><strong>Ask the Model</strong> provides the interface and retrieval/provenance layer. A <strong>local provider</strong>, such as Ollama, loads and runs AI models. The <strong>AI model</strong> remains a separate artifact that must currently be downloaded and managed through the provider rather than AtM.</small>
 
-<small>Version 0.6.2 hardens the grounded-turn persistence boundary after the v0.6.1 GISTEMP chart release. A grounded turn now advances session state only after its corresponding durable SQLite turn commits successfully, with final cancellation/model/repository-generation gates and fail-closed pre-boundary persistence. The release preserves the qualified v0.6.1 chart behavior, v0.6.0 semantic presentation, accessible Sources, exact-context saved History and default-OFF repository optimizations. EWD, CBD and RMD remain authoritative for their code, data, assumptions, provenance and validation.</small>
+<small>Version 0.6.3 corrects qualified live GISTEMP chart admission for the reviewed current EWD snapshot and aligns Vala chart getter ownership declarations with the C API. It preserves the v0.6.2 grounded-turn durability boundary, fail-closed persistence, v0.6.0 semantic presentation, accessible Sources, exact-context saved History and default-OFF repository optimizations. EWD, CBD and RMD remain authoritative for their code, data, assumptions, provenance and validation.</small>
 
 ### Repository-grounded scientific-model chat
 
