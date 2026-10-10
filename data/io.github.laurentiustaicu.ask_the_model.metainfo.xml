@@ -44,6 +44,13 @@
 
   <content_rating type="oars-1.1"/>
 
+  <screenshots>
+    <screenshot type="default">
+      <caption>Ask the Model running on the elementary OS desktop</caption>
+      <image type="source">https://raw.githubusercontent.com/LaurentiuStaicu/ask-the-model/main/data/atm-screenshot.png</image>
+    </screenshot>
+  </screenshots>
+
   <releases>
     <release version="0.6.3" date="2026-10-10">
       <description>
