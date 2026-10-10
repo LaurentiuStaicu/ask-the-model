@@ -20,11 +20,11 @@
       chat tabs and lets users explicitly save selected conversations to local History.
     </p>
     <p>
-      Version 0.6.1 corrects live GISTEMP chart rendering to use the complete pinned,
-      revalidated source independently of retrieval excerpts, and recognizes clear
-      natural-language chart requests alongside the explicit command. The chart remains
-      limited to the qualified GISTEMP profile; no generic charts or model-authored data
-      are enabled.
+      Version 0.6.3 corrects qualified live GISTEMP chart admission for the reviewed
+      current EWD snapshot and distinguishes repository identity errors from snapshot
+      identity errors. It also corrects Vala chart getter ownership declarations to match
+      the C API. The chart remains limited to the qualified GISTEMP profile; no generic
+      charts or model-authored data are enabled.
     </p>
     <p>
       AtM remains an interface and retrieval layer. The external provider owns
@@ -45,6 +45,14 @@
   <content_rating type="oars-1.1"/>
 
   <releases>
+    <release version="0.6.3" date="2026-10-10">
+      <description>
+        <p>
+          Corrected qualified live GISTEMP chart admission for the reviewed current EWD
+          snapshot, improved identity diagnostics and fixed Vala chart getter ownership.
+        </p>
+      </description>
+    </release>
     <release version="0.6.2" date="2026-10-08">
       <description>
         <p>
