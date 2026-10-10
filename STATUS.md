@@ -2,9 +2,17 @@
 
 ## Release status
 
-**Current release: Ask the Model (AtM) v0.6.2 — grounded-turn durability correction, released 2026-10-08.**
+**Current release: Ask the Model (AtM) v0.6.3 — planned release date: 2026-10-10. qualified GISTEMP chart admission and Vala ownership correction.**
 
-**Latest published release: v0.6.2 (2026-10-08).** The immutable GitHub Release for v0.6.2 points to the release merge commit `a7b0ef7800a8c717a6da5a3c7f19dd6f6753896a`; v0.6.1 remains the previous immutable release at tag `v0.6.1` and commit `2d6ac8bc38efc657689f19e2c7904e6c81097468`. The release was published automatically by the Flatpak release workflow after the post-merge release gates passed.
+**Latest published release: v0.6.2 (2026-10-08).** The v0.6.3 candidate contains the merged PR #403 chart correction and will be published by the Flatpak release workflow only after the metadata, build and post-merge release gates pass. v0.6.2 remains the immutable current public release until v0.6.3 is published; v0.6.1 is the preceding GISTEMP chart release.
+
+### v0.6.3 release
+
+The release corrects live GISTEMP chart admission so the reviewed current EWD snapshot is accepted, while unknown repository identities, snapshots and source bytes remain rejected. It also splits repository-identity and snapshot-identity diagnostics and corrects the Vala ownership annotations for borrowed chart identity getters. The release retains the v0.6.2 durable-turn commit boundary and all existing chart-scope restrictions.
+
+### v0.6.3 verification
+
+Release publication is conditional on the metadata validation, Flatpak build/test job and post-merge CI gates. The full interactive GISTEMP path must still be checked on the published Flatpak; focused native sanitizer coverage is not represented as an end-to-end GUI test.
 
 v0.6.0 retains the v0.5.0 repository-grounding, exact-context saved History, hardened SQLite state and startup-integrity boundaries. It adds complete-message semantic transcript presentation, accessible grounded Sources and semantic copy; a user-requested GISTEMP chart path with exact pinned-source revalidation and History reconstruction; and session-only repository optimizations that default to OFF.
 
