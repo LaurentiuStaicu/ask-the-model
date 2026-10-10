@@ -9,10 +9,10 @@
     "policy": "Release version changes are deliberate. A minor release is appropriate when substantial backward-compatible user-facing functionality is added; patch releases are reserved for compatible corrections."
   },
   "current_public_release": {
-    "version": "0.6.2",
-    "date": "2026-10-08",
+    "version": "0.6.3",
+    "date": "2026-10-10",
     "version_bump_required_now": false,
-    "reason": "v0.6.2 is the published compatible grounded-turn durability correction; v0.6.1 remains immutable as the previous public release."
+    "reason": "v0.6.3 is the next compatible correction release for the reviewed current EWD GISTEMP snapshot admission and chart getter ownership; publication is gated on CI."
   },
   "canonical_sources": {
     "version": "meson.build project() version",
