@@ -252,11 +252,19 @@ atm_chart_live_reconstruct_gistemp (
         return reject (error, "Incomplete live chart reconstruction identity.");
     }
 
-    if ((g_strcmp0 (repository_id, expected_repository_key) != 0 &&
-         g_strcmp0 (repository_id, expected_repository) != 0) ||
-        (g_strcmp0 (snapshot_sha, expected_snapshot_initial) != 0 &&
-         g_strcmp0 (snapshot_sha, expected_snapshot_current) != 0)) {
-        return reject (error, "Live chart repository identity is not admitted.");
+    if (g_strcmp0 (repository_id, expected_repository_key) != 0 &&
+        g_strcmp0 (repository_id, expected_repository) != 0) {
+        g_set_error (error, ATM_SRA_ERROR, ATM_SRA_ERROR_IDENTITY,
+            "Live chart repository is not admitted (repository_id=%s).",
+            repository_id);
+        return FALSE;
+    }
+    if (g_strcmp0 (snapshot_sha, expected_snapshot_initial) != 0 &&
+        g_strcmp0 (snapshot_sha, expected_snapshot_current) != 0) {
+        g_set_error (error, ATM_SRA_ERROR, ATM_SRA_ERROR_IDENTITY,
+            "Live chart snapshot is not admitted (repository_id=%s snapshot_sha=%s).",
+            repository_id, snapshot_sha);
+        return FALSE;
     }
 
     admission_repository =
