@@ -6,6 +6,17 @@ All notable public releases of Ask the Model are recorded here.
 
 No unreleased public changes are currently recorded.
 
+## 0.6.3 - 2026-10-10
+
+Correct qualified live GISTEMP chart admission for the reviewed current EWD snapshot.
+
+### User-facing correction
+
+- Admit the explicitly reviewed EWD snapshot `dc710d8e604c0fff713a3acfdb18ab47a1a902bb` for live GISTEMP chart reconstruction, while preserving fail-closed rejection of unreviewed snapshots and changed source bytes.
+- Distinguish repository-identity rejection from snapshot-identity rejection in diagnostics.
+- Correct Vala getter ownership declarations to match the C API's borrowed pointers, with focused ASan/UBSan regression coverage.
+- Keep the chart restricted to the complete annual GISTEMP source and preserve existing grounded-turn durability and persistence boundaries.
+
 ## 0.6.2 - 2026-10-08
 
 Harden grounded-turn durable commit ordering and fail-closed persistence.
