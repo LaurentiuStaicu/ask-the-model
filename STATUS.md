@@ -2,9 +2,9 @@
 
 ## Release status
 
-**Current release: Ask the Model (AtM) v0.6.3 — qualified GISTEMP chart admission and Vala ownership correction, released 2026-10-10.**
+**Current release: Ask the Model (AtM) v0.6.3 — planned release date 2026-10-10; qualified GISTEMP chart admission and Vala ownership correction.**
 
-**Latest published release: v0.6.3 (2026-10-10).** The v0.6.3 release is prepared from the merged PR #403 chart correction and is published by the Flatpak release workflow only after the release gates pass. v0.6.2 remains the immutable previous release at tag `v0.6.2`; v0.6.1 remains the preceding GISTEMP chart release.
+**Latest published release: v0.6.2 (2026-10-08).** The v0.6.3 candidate contains the merged PR #403 chart correction and will be published by the Flatpak release workflow only after the metadata, build and post-merge release gates pass. v0.6.2 remains the immutable current public release until v0.6.3 is published; v0.6.1 is the preceding GISTEMP chart release.
 
 ### v0.6.3 release
 
