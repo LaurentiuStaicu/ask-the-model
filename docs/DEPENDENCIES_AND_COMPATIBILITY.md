@@ -170,7 +170,7 @@ sudo apt install meson valac build-essential libgtk-4-dev libgranite-7-dev libso
 
 For a Flatpak **development build**, `flatpak-builder` and `io.elementary.Sdk//8` are also required. CI builds against that same elementary SDK baseline and runs the Meson test suite inside the Flatpak build environment.
 
-The SQLite/libarchive/libyaml platform probe verifies implementation prerequisites for the repository-aware layer and enforces that the only development filesystem grant is the dedicated `~/Ask the Model:create` path rather than Home/host access. The v0.6.3 release exposes the fixed EWD/CBD/RMD repository selector, lifecycle controls, deterministic retrieval and provenance UI, plus the qualified GISTEMP chart correction. Test executables are not installed in the application bundle.
+The SQLite/libarchive/libyaml platform probe verifies implementation prerequisites for the repository-aware layer and enforces that the only development filesystem grant is the dedicated `~/Ask the Model:create` path rather than Home/host access. The v0.6.3 release exposes the fixed EWD/CBD/RMD repository selector, lifecycle controls, deterministic retrieval and provenance UI. It also includes the qualified GISTEMP chart correction. Test executables are not installed in the application bundle.
 
 ## Privacy and network boundary
 
