@@ -2,9 +2,11 @@
 
 ## Release status
 
-**Current release: Ask the Model (AtM) v0.6.3 — planned release date: 2026-10-10. qualified GISTEMP chart admission and Vala ownership correction.**
+**Latest published release: Ask the Model (AtM) v0.6.3 — 2026-10-10, immutable.** This release provides the qualified GISTEMP chart-admission and Vala ownership correction.
 
-**Latest published release: v0.6.2 (2026-10-08).** The v0.6.3 candidate contains the merged PR #403 chart correction and will be published by the Flatpak release workflow only after the metadata, build and post-merge release gates pass. v0.6.2 remains the immutable current public release until v0.6.3 is published; v0.6.1 is the preceding GISTEMP chart release.
+The published release tag points to commit `26ae12e4ee17cc4ed5dfd3e16a5b27fd277bc6a9`. Its immutable `AskTheModel.flatpak` asset is 481,016 bytes with SHA-256 `ffa3457c673201665adaf565fcfb7a9c55e0be627e7458e3c059b8b0247a6958`. See the [published v0.6.3 release](https://github.com/LaurentiuStaicu/ask-the-model/releases/tag/v0.6.3).
+
+**Development head checked 2026-10-12:** `main` is at `c35b39d45018221f51e256ed1dc9b353a5c24916`, 98 commits ahead of the v0.6.3 release tag and zero commits behind it. These post-release commits are development history, not contents of the immutable v0.6.3 Flatpak. PR #423 integrated the generic source-bound Evidence/SRA chain and the approved, narrowly scoped Energy Institute processed-snapshot qualification; PR #424 added a live/History generic-series parity gate. PR #430 has now integrated the additional generic series/SRA contract hardening, including exact SRA qualification-identity binding and mutable-qualifier digest validation. These post-release changes do not make Energy Institute a rendered `VerifiedSeries` or enable arbitrary charts; they are not part of the published v0.6.3 artifact.
 
 ### v0.6.3 release
 
@@ -12,7 +14,7 @@ The release corrects live GISTEMP chart admission so the reviewed current EWD sn
 
 ### v0.6.3 verification
 
-Release publication is conditional on the metadata validation, Flatpak build/test job and post-merge CI gates. The full interactive GISTEMP path must still be checked on the published Flatpak; focused native sanitizer coverage is not represented as an end-to-end GUI test.
+The immutable v0.6.3 release has been published after the release workflow completed. The focused native sanitizer coverage documented for this correction is not, by itself, a full end-to-end GUI interaction test; automated qualification and manual observation are distinct evidence classes.
 
 v0.6.0 retains the v0.5.0 repository-grounding, exact-context saved History, hardened SQLite state and startup-integrity boundaries. It adds complete-message semantic transcript presentation, accessible grounded Sources and semantic copy; a user-requested GISTEMP chart path with exact pinned-source revalidation and History reconstruction; and session-only repository optimizations that default to OFF.
 
