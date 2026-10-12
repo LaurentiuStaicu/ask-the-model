@@ -22,6 +22,7 @@
 #include "series_evidence_adapters.h"
 #include "series_sra.h"
 #include "gistemp_admission.h"
+#include "annual_series_candidate.h"
 
 #define ATM_TEST_REPOSITORY "LaurentiuStaicu/empirical-world3-dynamics"
 #define ATM_TEST_SNAPSHOT   "d9e249339663015f6d1c05752338a955bf64ad0b"
