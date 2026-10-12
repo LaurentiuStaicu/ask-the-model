@@ -1,16 +1,13 @@
 namespace AskTheModel {
     /*
-     * Vala bindings for the M11 publication barrier (src/publication_barrier.h).
+     * Vala binding for the managed-export reconciliation barrier
+     * (src/publication_barrier.h). The original type/file name is retained
+     * within this patch.
      *
-     * The barrier supplies the condition ConversationPersistenceStore is
-     * missing: an unarchived conversation may not be discarded until its managed export
-     * has been reconciled successfully. The store currently discards unarchived conversations
-     * BEFORE its automatic export runs, and that export is best-effort, so a
-     * failed export becomes a log line and the next startup deletes the row.
-     *
-     * Keeping the binding in its own file rather than inline in the store is
-     * deliberate: the store is large, and the C symbol names are the part a
-     * reviewer most needs to see in one place next to the header they mirror.
+     * An unarchived working row may be discarded only after its stale managed
+     * JSON export was removed or confirmed absent. An archived row's export is
+     * synchronized, but archived rows are not cleanup candidates. Failures must
+     * reach the startup cleanup gate rather than being swallowed as warnings.
      */
 
     namespace PublicationBarrierNative {
@@ -50,10 +47,8 @@ namespace AskTheModel {
     }
 
     /*
-     * Thin wrapper over the C barrier. Both methods swallow the C error into a
-     * warning and answer with the conservative value, because the caller is a
-     * startup cleanup that must not throw: an unevaluable discard decision is
-     * not permission to delete, so it returns false.
+     * Thin wrapper over the C barrier. An unevaluable discard decision is not
+     * permission to delete, so may_discard returns false.
      */
 
     public class PublicationBarrier : Object {
@@ -87,7 +82,7 @@ namespace AskTheModel {
                 );
             } catch (GLib.Error error) {
                 warning (
-                    "AtM: publication outcome could not be recorded for %s: %s",
+                    "AtM: export-reconciliation outcome could not be recorded for %s: %s",
                     conversation_id,
                     error.message
                 );
@@ -96,8 +91,8 @@ namespace AskTheModel {
 
         public bool may_discard (string conversation_id) {
             if (handle == null) {
-                /* No barrier means no evidence of publication, which is not
-                 * permission to discard. */
+                /* No barrier means no evidence of successful reconciliation, which
+                 * is not permission to discard. */
                 return false;
             }
 
