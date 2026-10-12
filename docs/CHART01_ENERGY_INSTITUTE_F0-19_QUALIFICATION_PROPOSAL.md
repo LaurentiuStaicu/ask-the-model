@@ -31,6 +31,12 @@ The same pinned EWD bundle still describes the series as `ei_primary_energy` / â
 
 The snapshot obligation must therefore include an explicit reviewed precedence rule: AtM preserves the EWD metadata bytes for provenance and source identity, while the approved semantic contract follows the pinned `tes_ej` mapping and the official Energy Institute methodology for the 2026 edition. The reviewer must accept that interpretation explicitly. It must not be treated as an automatic consequence of a hash match or CI success. If that precedence is not accepted, keep the semantic change and F0-19 qualification gate unresolved until EWD's metadata are corrected and re-pinned or the source contract models the discrepancy directly.
 
+### Independent EWD source-equivalence evidence
+
+EWD's R-FDC-6 primary-source audit records Energy Institute 2026 as `L4 / PASS` for its declared diagnostic/candidate role. It compares the pinned EWD mirror with an archived official EI 2026 CSV obtained through the OWID ETL public snapshot. The complete files are not byte-identical (21,056,006 versus 21,056,126 bytes), and the audit records one unrelated difference outside the EWD-used rows. For the declared EWD role, however, all 427 `Total World` observations for 1965â€“2025 across `tes_ej`, oil, gas, coal, nuclear, hydro and renewables TES match exactly: zero missing rows, zero mismatches, and maximum absolute difference zero. See the [EWD R-FDC-6 record at its September 28, 2026 closure commit](https://github.com/LaurentiuStaicu/empirical-world3-dynamics/blob/dc710d8e604c0fff713a3acfdb18ab47a1a902bb/science/data/provenance/primary_source_audit_2026-09-22.json) and the [EWD primary-source audit report](https://github.com/LaurentiuStaicu/empirical-world3-dynamics/blob/dc710d8e604c0fff713a3acfdb18ab47a1a902bb/science/docs/primary-source-provenance-audit-2026-09-22.md).
+
+This is strong independent provenance for the selected EWD observations and `tes_ej` mapping. It is not proof that AtM's present Evidence/SRA builder downloads the archive or re-executes EWD's ingest path: AtM's admission input remains the four pinned EWD files listed above. The proposed obligation must state that boundary, while treating EWD's R-FDC-6 record as supporting provenance rather than silently folding that external execution into AtM's own qualification tests.
+
 ## Recommended scope if the source-snapshot contract is accepted
 
 **Proposed identifier only; not an approved canonical obligation:**
@@ -58,7 +64,7 @@ Existing admission, Evidence, descriptor-equivalence, and fail-closed tests cove
 
 ## Why this does not claim raw-source reproduction
 
-The provenance's raw-input hash is useful as a traceability reference, but a hash does not supply the raw bytes. Reproducing the upstream calculation would require a second contract: include and pin the exact raw Energy Institute CSV, pin the transformation code and its dependencies/configuration, specify the extraction and calculation environment, and test raw-to-processed reproduction. Until then, the defensible claim is snapshot-level reconstruction.
+The raw bytes are available through a separately audited EWD/OWID transport path, but they are not inputs to the current four-file AtM admission. Reproducing the upstream calculation *inside AtM's own qualification boundary* would require a second contract: include or explicitly admit the immutable raw-source bytes, pin the transformation code and its dependencies/configuration, specify the extraction and calculation environment, and test raw-to-processed reproduction. EWD's R-FDC-6 audit is valuable external provenance, but the current AtM SRA builder does not execute that pipeline. Until AtM explicitly adds and tests the stronger contract, the defensible AtM claim is snapshot-level reconstruction supported by independent EWD provenance.
 
 This distinction is consistent with the existing GISTEMP boundary: its qualification reconstructs the reviewed, byte-pinned processed source and explicitly does not claim to reproduce NASA's raw-to-processed calculation. The Energy Institute obligation should be equally explicit, but source-specific.
 
