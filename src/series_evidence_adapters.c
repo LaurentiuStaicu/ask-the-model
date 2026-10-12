@@ -344,7 +344,10 @@ const AtmSeriesEvidenceDescriptor ATM_EI_EVIDENCE_DESCRIPTOR = {
     .point_semantic_type = "ewd.energy_institute_total_energy_supply_observation",
     /* Preserve the pinned EWD column spelling even though its metric name is legacy. */
     .point_locator_columns = "year,total_primary_energy_ej",
-    .canonical_obligation = NULL, /* TODO(F0-19): SRA qualification is gated */
+    /* F0-19 approved 2026-10-12: qualify reconstruction of this exact
+     * processed EWD snapshot, not independent reproduction of the raw EI
+     * processing pipeline. Semantic precedence is recorded in limitations. */
+    .canonical_obligation = "atm-energy-institute-ewd-tes-pinned-snapshot-reconstruction/1",
     .semantic_profile = ATM_EI_EVIDENCE_PROFILE "@2",
     .limitations = ATM_EI_LIMITATIONS,
     .admission_rebuild = energy_rebuild,
