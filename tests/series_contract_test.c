@@ -29,8 +29,10 @@ static AtmScientificArtifact *support_artifact (void)
     return a;
 }
 
-static AtmSraResult *qualified_with_artifact_mode (AtmScientificArtifact *a,
-                                                       gboolean qualify_break)
+static AtmSraResult *
+qualified_with_artifact_mode_obligation (AtmScientificArtifact *a,
+                                         gboolean qualify_break,
+                                         const char *canonical_obligation)
 {
     AtmSraResult *q = atm_sra_result_new (ATM_SRA_ANSWERED);
     GError *error = NULL;
@@ -62,7 +64,8 @@ static AtmSraResult *qualified_with_artifact_mode (AtmScientificArtifact *a,
     g_assert_no_error (error);
     g_assert_true (atm_sra_result_add_fact (q, missing, &error));
     g_assert_no_error (error);
-    g_assert_true (atm_sra_qualification_add_canonical_obligation (q, "atm-sra/1", &error));
+    g_assert_true (atm_sra_qualification_add_canonical_obligation (
+        q, canonical_obligation, &error));
     g_assert_no_error (error);
     char *snapshot = g_strdup_printf ("ewd@0.1.0#%s", SHA);
     g_assert_true (atm_sra_qualification_add_repository_snapshot (q, snapshot, &error));
@@ -79,6 +82,12 @@ static AtmSraResult *qualified_with_artifact_mode (AtmScientificArtifact *a,
     g_assert_true (atm_sra_result_finalize (q, &error));
     g_assert_no_error (error);
     return q;
+}
+
+static AtmSraResult *
+qualified_with_artifact_mode (AtmScientificArtifact *a, gboolean qualify_break)
+{
+    return qualified_with_artifact_mode_obligation (a, qualify_break, "atm-sra/1");
 }
 
 static AtmSraResult *qualified_with_artifact (AtmScientificArtifact *a)
@@ -634,6 +643,53 @@ static void test_first_break_rejected (void)
     atm_scientific_artifact_free (a);
 }
 
+static void
+test_qualified_series_identity_binds_sra_qualification (void)
+{
+    AtmScientificArtifact *a = support_artifact ();
+    AtmSraResult *q1 = qualified_with_artifact (a);
+    AtmSraResult *q2 = qualified_with_artifact_mode_obligation (
+        a, FALSE, "atm-sra/alternate-obligation/1");
+    GError *error = NULL;
+
+    g_assert_true (atm_sra_result_validate (q1, &error));
+    g_assert_no_error (error);
+    g_assert_true (atm_sra_result_validate (q2, &error));
+    g_assert_no_error (error);
+    g_assert_cmpstr (q1->qualification->qualified_artifact_id, !=,
+                     q2->qualification->qualified_artifact_id);
+
+    const char *support[] = { a->qualified_artifact_id };
+    AtmSeriesContract *s1 = base ();
+    AtmSeriesContract *s2 = base ();
+    g_assert_true (atm_series_contract_add_point (
+        s1, "1880", ATM_SERIES_Y_NUMERIC, "1.0000", "1", 0, FALSE,
+        FALSE, NULL, NULL, support, 1, &error));
+    g_assert_no_error (error);
+    g_assert_true (atm_series_contract_add_point (
+        s2, "1880", ATM_SERIES_Y_NUMERIC, "1.0000", "1", 0, FALSE,
+        FALSE, NULL, NULL, support, 1, &error));
+    g_assert_no_error (error);
+
+    g_assert_true (atm_series_contract_validate (s1, q1, &error));
+    g_assert_no_error (error);
+    g_assert_true (atm_series_contract_validate (s2, q2, &error));
+    g_assert_no_error (error);
+
+    /* Identical scientific data share content identity, but a different
+     * SRA qualification envelope must produce a different qualified identity. */
+    g_assert_cmpstr (atm_series_contract_scientific_id (s1), ==,
+                     atm_series_contract_scientific_id (s2));
+    g_assert_cmpstr (atm_series_contract_qualified_id (s1), !=,
+                     atm_series_contract_qualified_id (s2));
+
+    atm_series_contract_free (s1);
+    atm_series_contract_free (s2);
+    atm_sra_result_free (q1);
+    atm_sra_result_free (q2);
+    atm_scientific_artifact_free (a);
+}
+
 static void test_caller_identity_not_authoritative (void)
 {
     AtmScientificArtifact *a = support_artifact ();
@@ -912,6 +968,8 @@ int main (int argc, char **argv)
     g_test_add_func ("/series-contract/support-unique-set", test_numeric_point_support_must_match_as_unique_set);
     g_test_add_func ("/series-contract/break-reason-requires-break", test_break_reason_requires_break);
     g_test_add_func ("/series-contract/first-break", test_first_break_rejected);
+    g_test_add_func ("/series-contract/qualified-identity-binds-sra",
+                     test_qualified_series_identity_binds_sra_qualification);
     g_test_add_func ("/series-contract/identity", test_caller_identity_not_authoritative);
     g_test_add_func ("/series-contract/artifact-snapshot-binding", test_sra_artifact_snapshot_must_be_qualified);
     g_test_add_func ("/series-contract/snapshot-binding", test_contract_snapshot_must_be_qualified);
