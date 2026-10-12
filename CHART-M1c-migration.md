@@ -28,8 +28,10 @@ the four descriptors       GISTEMP, Energy Institute
 gistemp_admission          energy_institute_admission   (unchanged)
 ```
 
-Both sources reach the same finalized SRA and can materialise the same general
-contract. No source name appears in the shared construction path.
+GISTEMP reaches the finalized generic SRA and contract. Energy Institute currently
+reaches the source-bound generic Evidence layer only: its SRA/contract path is
+deliberately blocked until F0-19 supplies an authoritative reconstruction
+obligation. The shared builder remains source-agnostic.
 
 ## Files on the branch
 
@@ -40,7 +42,7 @@ contract. No source name appears in the shared construction path.
 | `src/series_sra.h` / `.c` | `gistemp_sra.c` | generic `build_result` |
 | `src/series_adapter.h` / `.c` | — | evidence to general contract bridge |
 | `tests/series_evidence_equivalence_test.c` | — | 7 tests |
-| `tests/series_sra_equivalence_test.c` | — | 4 tests |
+| `tests/series_sra_equivalence_test.c` | — | 5 tests, including the Energy Institute qualification gate |
 | `tests/series_adapter_test.c` | — | 5 tests |
 
 Nothing existing is modified or deleted. `gistemp_evidence.c`,
@@ -50,10 +52,13 @@ follow-up commit, made only after those tests pass.
 
 ## Design decisions for review
 
-**One open value.** `ATM_EI_RECONSTRUCTION_OBLIGATION` is declared once in
-`series_evidence_adapters.h` under `TODO(F0-19)` with the symmetric value. A
-wrong obligation produces an SRA that passes generic validation, because its
-envelope is internally consistent. It is merely different, not detectably wrong.
+**Fail-closed qualification gate (F0-19).** The pinned Energy Institute
+provenance, EWD input manifest and registry do not define an AtM canonical
+reconstruction obligation. The EI descriptor therefore leaves
+`canonical_obligation` unset. Generic Evidence construction and byte-equivalence
+tests remain enabled, but `atm_series_sra_new()` refuses to qualify the EI source
+until the obligation is approved and recorded. The symmetric GISTEMP value is
+not reused as a guess.
 
 **Limitations are per source, not shared.** GISTEMP carries three; Energy
 Institute carries four, including the M0 decision that the 2019-2023 component
@@ -106,9 +111,10 @@ The three test files together establish:
 
 - every artifact of both sources is byte-identical between the legacy module and
   the generic layer, index by index, including per-point support;
-- both finalized result identities, the whole qualification envelope, every
-  established fact with its qualifiers and support order, and the limitation set
-  are identical between `gistemp_sra.c` and `series_sra.c`;
+- the finalized SRA identities, qualification envelope, established facts and
+  limitation set match between `gistemp_sra.c` and `series_sra.c` for GISTEMP;
+- Energy Institute Evidence remains byte-equivalent to the legacy evidence path,
+  while the new native SRA gate rejects promotion without an approved obligation;
 - the extraction produces no derived facts, constraints or conflicts;
 - admission through the adapter validates against the finalized SRA and is
   deterministic;
