@@ -547,6 +547,31 @@ calendar_year_scope_encloses_points (const AtmSeriesContract *s)
     return FALSE;
 }
 
+static gboolean
+contract_snapshot_is_qualified (const AtmSeriesContract *s, const AtmSraResult *q)
+{
+    if (s == NULL || q == NULL || q->qualification == NULL ||
+        q->qualification->repository_snapshots == NULL ||
+        !bounded (s->repository_id, ATM_SERIES_CONTRACT_MAX_TEXT) ||
+        !bounded (s->repository_version, ATM_SERIES_CONTRACT_MAX_TEXT) ||
+        !bounded (s->snapshot_sha, ATM_SERIES_CONTRACT_MAX_TEXT))
+        return FALSE;
+
+    char *expected = g_strdup_printf ("%s@%s#%s",
+        s->repository_id, s->repository_version, s->snapshot_sha);
+    gboolean found = FALSE;
+    for (guint i = 0; i < q->qualification->repository_snapshots->len; i++) {
+        const char *qualified = g_ptr_array_index (
+            q->qualification->repository_snapshots, i);
+        if (g_strcmp0 (qualified, expected) == 0) {
+            found = TRUE;
+            break;
+        }
+    }
+    g_free (expected);
+    return found;
+}
+
 gboolean
 atm_series_contract_validate (AtmSeriesContract *s, const AtmSraResult *q, GError **error)
 {
@@ -555,6 +580,12 @@ atm_series_contract_validate (AtmSeriesContract *s, const AtmSraResult *q, GErro
         return fail (error, ATM_SERIES_CONTRACT_ERROR_SUPPORT, "Series requires finalized qualification.");
     if (!atm_sra_result_validate (q, error))
         return FALSE;
+    /* A contract may only name a repository version and snapshot explicitly
+     * present in the qualification envelope it is validated against. Otherwise
+     * valid point facts could be re-labelled as belonging to another snapshot. */
+    if (!contract_snapshot_is_qualified (s, q))
+        return fail (error, ATM_SERIES_CONTRACT_ERROR_IDENTITY,
+                     "Series repository/version/snapshot is not present in finalized qualification.");
     if (s->points == NULL || s->points->len == 0 || s->points->len > ATM_SERIES_CONTRACT_MAX_POINTS)
         return fail (error, ATM_SERIES_CONTRACT_ERROR_LIMIT, "Invalid series point count.");
     if (s->x_kind == ATM_SERIES_X_CALENDAR_YEAR && g_strcmp0 (s->x_unit, "calendar_year") != 0)
