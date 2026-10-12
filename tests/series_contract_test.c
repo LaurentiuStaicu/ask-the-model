@@ -691,7 +691,7 @@ static AtmSeriesContract *base_kind (AtmSeriesXKind kind);
 static void test_last_break_and_all_missing_are_supported (void)
 {
     AtmScientificArtifact *a = support_artifact ();
-    AtmSraResult *q = qualified_with_artifact (a);
+    AtmSraResult *q = qualified_with_artifact_mode (a, TRUE);
     const char *support[] = { a->qualified_artifact_id };
     GError *error = NULL;
 
