@@ -776,6 +776,25 @@ static void test_non_calendar_coordinates_bind_to_matching_sra_qualifier (void)
     }
 }
 
+static void test_calendar_year_negative_zero_rejected (void)
+{
+    AtmScientificArtifact *a = support_artifact ();
+    AtmSeriesContract *s = base ();
+    const char *support[] = { a->qualified_artifact_id };
+    GError *error = NULL;
+
+    /* Calendar X has one canonical spelling for numeric zero. */
+    g_assert_false (atm_series_contract_add_point (
+        s, "-0", ATM_SERIES_Y_MISSING, NULL, NULL, 0,
+        FALSE, FALSE, "source_missing", NULL, support, 1, &error));
+    g_assert_error (error, ATM_SERIES_CONTRACT_ERROR,
+                    ATM_SERIES_CONTRACT_ERROR_ARGUMENT);
+    g_clear_error (&error);
+
+    atm_series_contract_free (s);
+    atm_scientific_artifact_free (a);
+}
+
 static void test_invalid_utc_calendar_rejected (void)
 {
     AtmScientificArtifact *a = support_artifact ();
@@ -839,6 +858,7 @@ int main (int argc, char **argv)
     g_test_add_func ("/series-contract/identity", test_caller_identity_not_authoritative);
     g_test_add_func ("/series-contract/snapshot-binding", test_contract_snapshot_must_be_qualified);
     g_test_add_func ("/series-contract/non-calendar-coordinate-binding", test_non_calendar_coordinates_bind_to_matching_sra_qualifier);
+    g_test_add_func ("/series-contract/calendar-year-negative-zero", test_calendar_year_negative_zero_rejected);
     g_test_add_func ("/series-contract/utc-calendar", test_invalid_utc_calendar_rejected);
     g_test_add_func ("/series-contract/event-overflow", test_event_ordinal_overflow_rejected);
     g_test_add_func ("/series-contract/missing-boundaries", test_last_break_and_all_missing_are_supported);
