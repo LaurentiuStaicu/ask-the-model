@@ -372,6 +372,79 @@ fact_supports_belong_to_evidence (const AtmSraEstablishedFact *fact,
     return TRUE;
 }
 
+/* Independent fixed-point reference used to verify every SRA fact against
+ * the original admitted decimal token. Deliberately does not call the
+ * production scientific-decimal parser used by the candidate adapter. */
+static gboolean
+reference_canonical_fixed_decimal (const char *token,
+                                   char **out_coefficient,
+                                   gint64 *out_exponent)
+{
+    if (token == NULL || out_coefficient == NULL || *out_coefficient != NULL ||
+        out_exponent == NULL)
+        return FALSE;
+
+    const char *cursor = token;
+    gboolean negative = FALSE;
+    if (*cursor == '+' || *cursor == '-') {
+        negative = *cursor == '-';
+        cursor++;
+    }
+    if (!g_ascii_isdigit (*cursor))
+        return FALSE;
+
+    GString *digits = g_string_new (NULL);
+    while (g_ascii_isdigit (*cursor))
+        g_string_append_c (digits, *cursor++);
+
+    if (*cursor != '.') {
+        g_string_free (digits, TRUE);
+        return FALSE;
+    }
+    cursor++;
+
+    guint64 fractional_digits = 0;
+    if (!g_ascii_isdigit (*cursor)) {
+        g_string_free (digits, TRUE);
+        return FALSE;
+    }
+    while (g_ascii_isdigit (*cursor)) {
+        g_string_append_c (digits, *cursor++);
+        fractional_digits++;
+    }
+    if (*cursor != '\0' || fractional_digits > G_MAXINT64) {
+        g_string_free (digits, TRUE);
+        return FALSE;
+    }
+
+    gint64 exponent = -(gint64) fractional_digits;
+    guint first_nonzero = 0;
+    while (first_nonzero < digits->len &&
+           digits->str[first_nonzero] == '0')
+        first_nonzero++;
+
+    if (first_nonzero == digits->len) {
+        *out_coefficient = g_strdup ("0");
+        *out_exponent = 0;
+        g_string_free (digits, TRUE);
+        return TRUE;
+    }
+
+    if (first_nonzero > 0)
+        g_string_erase (digits, 0, first_nonzero);
+    while (digits->len > 1 && digits->str[digits->len - 1] == '0') {
+        g_string_truncate (digits, digits->len - 1);
+        exponent++;
+    }
+
+    *out_coefficient = negative
+        ? g_strconcat ("-", digits->str, NULL)
+        : g_strdup (digits->str);
+    *out_exponent = exponent;
+    g_string_free (digits, TRUE);
+    return TRUE;
+}
+
 static void
 test_energy_sra_qualifies_approved_snapshot (void)
 {
@@ -435,6 +508,20 @@ test_energy_sra_qualifies_approved_snapshot (void)
         g_assert_cmpstr (fact->unit, ==, "exajoules/year");
         g_assert_cmpstr (fact->dimension, ==, "energy_flow_rate");
         g_assert_true (fact_supports_belong_to_evidence (fact, evidence, i));
+
+        /* Check all 61 SRA values against an independent canonicalization of
+         * the exact token retained from this point's admitted CSV row. */
+        char *expected_coefficient = NULL;
+        gint64 expected_exponent = 0;
+        g_assert_true (reference_canonical_fixed_decimal (
+            atm_series_evidence_point_source_decimal (evidence, i),
+            &expected_coefficient, &expected_exponent));
+        char *expected_value = g_strdup_printf (
+            "%se%" G_GINT64_FORMAT, expected_coefficient, expected_exponent);
+        g_assert_cmpstr (fact->value, ==, expected_value);
+        g_free (expected_value);
+        g_free (expected_coefficient);
+
         g_assert_nonnull (strstr (fact->qualifiers_json, "physical_energy_content"));
     }
     const AtmSraEstablishedFact *first =
