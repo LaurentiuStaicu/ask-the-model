@@ -125,6 +125,10 @@ The native test files together establish:
 - scenario metadata must equal the scenario asserted in every admitted point
   payload, and temporal scope must match the point coverage before the contract
   can be returned;
+- numeric points must match numeric SRA facts, while a MISSING point requires an
+  explicit SRA fact for the same year, scenario, missing reason and support set;
+  this contract-level rule does not itself implement missing-row ingestion or
+  rendering in the current numeric-only GISTEMP and Energy Institute adapters;
 - argument and descriptor guards hold, and a pre-populated output is left
   untouched on every failure path.
 
@@ -132,22 +136,16 @@ All three resolve fixtures as `ATM_CHART01_FIXTURE` plus the nested `ewd/`
 paths, and assert the four source files against
 `tests/fixtures/chart01/source-lock.json` before any comparison runs.
 
-## Not verified
+## Remaining qualification limits
 
-The build has not been run. No toolchain was available. The signatures were
-written against the published headers, and the first `meson` run is the real
-check. The most likely compile errors are:
-
-1. the Energy Institute admission and evidence API, whose symbol names came from
-the header index rather than a compiled reference;
-2. `atm_series_contract_new`, called with 17 positional arguments read from
-   `series_contract.h` — a wrong order is a compile error, not a silent wrong
-   behaviour;
-3. `series_adapter.c` uses `descriptor->source_count` as the offset to the first
-   observation artifact, which assumes `series_evidence.c` keeps source bindings
-   on the leading indices. That holds today, but an explicit
-   `atm_series_evidence_first_point_index()` accessor would make the dependency
-   visible instead of implied.
+The generic native suites are compiled and run by the CHART-01 native workflow
+with warnings treated as errors and AddressSanitizer/UndefinedBehaviorSanitizer
+enabled. The Flatpak workflow separately verifies the application build. These
+checks do not qualify Energy Institute as a VerifiedSeries: its canonical
+obligation remains unapproved under F0-19. The current pinned GISTEMP and Energy
+Institute evidence adapters emit numeric observations only; adding contract-level
+support for explicit missing facts does not itself implement missing-row
+ingestion or rendering in those source adapters.
 
 ## Squash note
 
