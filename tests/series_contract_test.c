@@ -736,6 +736,103 @@ test_qualified_series_identity_binds_sra_qualification (void)
     atm_scientific_artifact_free (a);
 }
 
+static AtmSeriesContract *
+base_for_single_year (void)
+{
+    AtmSeriesContract *s = base ();
+    g_free (s->time_scope);
+    s->time_scope = g_strdup ("1880-1880");
+    return s;
+}
+
+/* Equal mathematical values with different source token spellings must share
+ * scientific identity; their original spelling is retained in qualification. */
+static void
+test_source_spelling_changes_qualification_only (void)
+{
+    AtmScientificArtifact *a = support_artifact ();
+    AtmSraResult *q = qualified_with_single_coordinate_fact (
+        a, "calendar_year", "1880");
+    const char *support[] = { a->qualified_artifact_id };
+    GError *error = NULL;
+    AtmSeriesContract *s1 = base_for_single_year ();
+    AtmSeriesContract *s2 = base_for_single_year ();
+
+    g_assert_true (atm_series_contract_add_point (
+        s1, "1880", ATM_SERIES_Y_NUMERIC, "1.0", "1", 0, FALSE,
+        FALSE, NULL, NULL, support, 1, &error));
+    g_assert_no_error (error);
+    g_assert_true (atm_series_contract_add_point (
+        s2, "1880", ATM_SERIES_Y_NUMERIC, "1.000", "1", 0, FALSE,
+        FALSE, NULL, NULL, support, 1, &error));
+    g_assert_no_error (error);
+
+    g_assert_true (atm_series_contract_validate (s1, q, &error));
+    g_assert_no_error (error);
+    g_assert_true (atm_series_contract_validate (s2, q, &error));
+    g_assert_no_error (error);
+    g_assert_cmpstr (atm_series_contract_scientific_id (s1), ==,
+                     atm_series_contract_scientific_id (s2));
+    g_assert_cmpstr (atm_series_contract_qualified_id (s1), !=,
+                     atm_series_contract_qualified_id (s2));
+
+    atm_series_contract_free (s1);
+    atm_series_contract_free (s2);
+    atm_sra_result_free (q);
+    atm_scientific_artifact_free (a);
+}
+
+/* Point support is provenance, not mathematical content. Different qualified
+ * support must preserve the scientific ID while changing qualified identity. */
+static void
+test_support_changes_qualification_only (void)
+{
+    AtmScientificArtifact *a = support_artifact ();
+    AtmScientificArtifact *b = support_artifact_other ();
+    AtmSraResult *q1 = qualified_with_single_coordinate_fact (
+        a, "calendar_year", "1880");
+    AtmSraResult *q2 = qualified_with_single_coordinate_fact_two_supports (
+        a, b, "calendar_year", "1880");
+    const char *support_a[] = { a->qualified_artifact_id };
+    const char *support_ab[] = {
+        a->qualified_artifact_id,
+        b->qualified_artifact_id
+    };
+    GError *error = NULL;
+    AtmSeriesContract *s1 = base_for_single_year ();
+    AtmSeriesContract *s2 = base_for_single_year ();
+
+    g_assert_cmpstr (q1->qualification->scientific_content_id, ==,
+                     q2->qualification->scientific_content_id);
+    g_assert_cmpstr (q1->qualification->qualified_artifact_id, !=,
+                     q2->qualification->qualified_artifact_id);
+
+    g_assert_true (atm_series_contract_add_point (
+        s1, "1880", ATM_SERIES_Y_NUMERIC, "1.0", "1", 0, FALSE,
+        FALSE, NULL, NULL, support_a, 1, &error));
+    g_assert_no_error (error);
+    g_assert_true (atm_series_contract_add_point (
+        s2, "1880", ATM_SERIES_Y_NUMERIC, "1.0", "1", 0, FALSE,
+        FALSE, NULL, NULL, support_ab, 2, &error));
+    g_assert_no_error (error);
+
+    g_assert_true (atm_series_contract_validate (s1, q1, &error));
+    g_assert_no_error (error);
+    g_assert_true (atm_series_contract_validate (s2, q2, &error));
+    g_assert_no_error (error);
+    g_assert_cmpstr (atm_series_contract_scientific_id (s1), ==,
+                     atm_series_contract_scientific_id (s2));
+    g_assert_cmpstr (atm_series_contract_qualified_id (s1), !=,
+                     atm_series_contract_qualified_id (s2));
+
+    atm_series_contract_free (s1);
+    atm_series_contract_free (s2);
+    atm_sra_result_free (q1);
+    atm_sra_result_free (q2);
+    atm_scientific_artifact_free (a);
+    atm_scientific_artifact_free (b);
+}
+
 static void test_caller_identity_not_authoritative (void)
 {
     AtmScientificArtifact *a = support_artifact ();
@@ -1016,6 +1113,10 @@ int main (int argc, char **argv)
     g_test_add_func ("/series-contract/first-break", test_first_break_rejected);
     g_test_add_func ("/series-contract/qualified-identity-binds-sra",
                      test_qualified_series_identity_binds_sra_qualification);
+    g_test_add_func ("/series-contract/source-spelling-qualification-only",
+                     test_source_spelling_changes_qualification_only);
+    g_test_add_func ("/series-contract/support-qualification-only",
+                     test_support_changes_qualification_only);
     g_test_add_func ("/series-contract/identity", test_caller_identity_not_authoritative);
     g_test_add_func ("/series-contract/artifact-snapshot-binding", test_sra_artifact_snapshot_must_be_qualified);
     g_test_add_func ("/series-contract/snapshot-binding", test_contract_snapshot_must_be_qualified);
