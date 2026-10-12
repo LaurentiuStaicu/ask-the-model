@@ -70,8 +70,9 @@ descriptor_valid (const AtmSeriesEvidenceDescriptor *d)
 
     if (d->admission_rebuild == NULL || d->admission_free == NULL ||
         d->admission_snapshot == NULL || d->admission_source_path == NULL ||
-        d->admission_source_digest == NULL || d->admission_candidate == NULL ||
-        d->source_payload == NULL || d->point_payload == NULL)
+        d->admission_source_digest == NULL || d->admission_point_count == NULL ||
+        d->admission_point == NULL || d->source_payload == NULL ||
+        d->point_payload == NULL)
         return FALSE;
 
     return TRUE;
@@ -143,18 +144,20 @@ static gboolean
 append_point_observations (AtmSeriesEvidence *e, GError **error)
 {
     const AtmSeriesEvidenceDescriptor *d = e->descriptor;
-    const AtmAnnualSeriesCandidate *c = d->admission_candidate (e->admission);
-    if (c == NULL) return reject (error, "Admitted bundle exposes no point series.");
-
-    guint points = atm_annual_series_candidate_count (c);
+    guint points = d->admission_point_count (e->admission);
     if (points == 0 || points != d->evidence_count - d->source_count)
         return reject (error, "Unexpected source-evidence coverage.");
 
     for (guint i = 0; i < points; i++) {
+        AtmSeriesEvidencePoint point = {0};
+        if (!d->admission_point (e->admission, i, &point) ||
+            point.source_decimal == NULL || point.coefficient == NULL)
+            return reject (error, "Admitted bundle exposes an invalid source point.");
+
         char *locator = g_strdup_printf ("csv:row:%u:columns:%s",
-            atm_annual_series_candidate_source_row (c, i), d->point_locator_columns);
+            point.source_row, d->point_locator_columns);
         char *logical = g_strdup_printf ("%s%u",
-            d->point_logical_prefix, atm_annual_series_candidate_year (c, i));
+            d->point_logical_prefix, point.year);
         gboolean ok = append_artifact (e, 0, locator, logical,
             d->point_semantic_type,
             d->point_payload (e->admission, i), error);
@@ -255,14 +258,25 @@ atm_series_evidence_at (const AtmSeriesEvidence *e, guint i)
 }
 
 const char *
+atm_series_evidence_point_source_decimal (const AtmSeriesEvidence *e, guint point)
+{
+    if (e == NULL || e->descriptor == NULL ||
+        e->descriptor->admission_point == NULL ||
+        point >= e->descriptor->admission_point_count (e->admission))
+        return NULL;
+
+    AtmSeriesEvidencePoint source_point = {0};
+    return e->descriptor->admission_point (e->admission, point, &source_point)
+        ? source_point.source_decimal : NULL;
+}
+
+const char *
 atm_series_evidence_point_support (const AtmSeriesEvidence *e, guint point, guint support)
 {
     if (e == NULL || e->descriptor == NULL) return NULL;
 
     const AtmSeriesEvidenceDescriptor *d = e->descriptor;
-    const AtmAnnualSeriesCandidate *c = d->admission_candidate (e->admission);
-    if (c == NULL) return NULL;
-    if (point >= atm_annual_series_candidate_count (c) || support >= d->support_per_point)
+    if (point >= d->admission_point_count (e->admission) || support >= d->support_per_point)
         return NULL;
 
     /* Source bindings occupy [0, source_count); each point's own observation
