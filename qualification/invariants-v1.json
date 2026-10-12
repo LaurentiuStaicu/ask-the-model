@@ -719,6 +719,21 @@
         "meson:conversation-persistence-store",
         "meson:publication-barrier"
       ]
+    },
+    {
+      "id": "SCIENTIFIC-S1-004",
+      "category": "SCIENTIFIC",
+      "severity": "S1",
+      "lifecycle": "enforced",
+      "statement": "The Energy Institute output series for the pinned processed TES snapshot may be materialized only through the reviewed source-specific constructor. It must retain exactly 61 consecutive annual observations (1965–2025), exact source decimals and five qualified evidence-support IDs per point, bind its profile and full SRA-qualified identity into the generic series identity, and pass a fresh source-to-Evidence/SRA-to-series reconstruction. The generic Evidence/SRA descriptor remains without output-series approval, and this qualification alone must not enable chart rendering, History persistence or derived transformations.",
+      "enforced_by": [
+        "src/energy_institute_verified_series.c",
+        "src/series_adapter.c",
+        "src/series_contract.c"
+      ],
+      "tested_by": [
+        "meson:energy-institute-verified-series"
+      ]
     }
   ]
 }
