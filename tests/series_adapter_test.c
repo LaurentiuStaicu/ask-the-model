@@ -166,6 +166,9 @@ test_contract_points_carry_admitted_years (void)
     g_assert_true (atm_series_adapter_admit (&ATM_GISTEMP_EVIDENCE_DESCRIPTOR,
         &GISTEMP_METADATA, admission, &contract, &error));
     g_assert_no_error (error);
+    const AtmAnnualSeriesCandidate *candidate =
+        atm_gistemp_admission_candidate (admission);
+    g_assert_nonnull (candidate);
 
     for (guint i = 0; i < contract->points->len; i++) {
         const AtmSeriesContractPoint *p = g_ptr_array_index (contract->points, i);
@@ -178,6 +181,13 @@ test_contract_points_carry_admitted_years (void)
         g_assert_nonnull (p->x);
         g_assert_nonnull (p->source_decimal);
         g_assert_nonnull (p->coefficient);
+        const char *source_decimal = atm_annual_series_candidate_decimal (candidate, i);
+        g_assert_nonnull (source_decimal);
+        g_assert_cmpstr (p->source_decimal, ==, source_decimal);
+        gboolean expected_negative_zero =
+            source_decimal[0] == '-' && g_strcmp0 (p->coefficient, "0") == 0 &&
+            p->exponent == 0;
+        g_assert_cmpint (p->negative_zero, ==, expected_negative_zero);
         g_assert_cmpuint (p->support->len, ==,
                           ATM_GISTEMP_EVIDENCE_DESCRIPTOR.support_per_point);
 
