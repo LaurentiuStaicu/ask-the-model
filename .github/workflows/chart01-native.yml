@@ -37,6 +37,8 @@ on:
       - 'src/energy_institute_admission.*'
       - 'src/energy_institute_candidate.*'
       - 'src/energy_institute_evidence.*'
+      - 'src/energy_institute_verified_series.*'
+      - 'tests/energy_institute_verified_series_test.c'
       - 'src/series_evidence.*'
       - 'src/series_evidence_adapters.*'
       - 'src/series_sra.*'
@@ -192,6 +194,21 @@ jobs:
             $(pkg-config --cflags --libs glib-2.0 json-glib-1.0) -lm \
             -o /tmp/energy-institute-evidence-test
           /tmp/energy-institute-evidence-test
+
+          # Qualify the bounded Energy Institute output-series candidate under ASan/UBSan.
+          # This type remains dormant: it has no ChartSpec or Application caller.
+          cc -std=c11 -Wall -Wextra -Werror -g -O1 \\
+            -fsanitize=address,undefined -fno-omit-frame-pointer -Isrc \\
+            src/energy_institute_verified_series.c src/series_adapter.c \\
+            src/series_sra.c src/series_evidence.c src/series_evidence_adapters.c \\
+            src/series_contract.c src/gistemp_admission.c src/annual_series_candidate.c \\
+            src/energy_institute_admission.c src/energy_institute_candidate.c \\
+            src/scientific_canonical.c src/scientific_artifact.c \\
+            src/scientific_result.c src/scientific_operation.c src/scientific_derivation.c \\
+            tests/energy_institute_verified_series_test.c \\
+            $(pkg-config --cflags --libs glib-2.0 json-glib-1.0) -lm \\
+            -o /tmp/energy-institute-verified-series-test
+          /tmp/energy-institute-verified-series-test
 
           # The generic Evidence/SRA constructors must be byte/identity equivalent to legacy source modules.
           cc -std=c11 -Wall -Wextra -Werror -g -O1 \
