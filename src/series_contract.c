@@ -368,8 +368,17 @@ point_matches_established_fact (const AtmSeriesContract *s,
         g_strcmp0 (fact->dimension, s->y_dimension) != 0)
         return FALSE;
 
-    char *expected_value = g_strdup_printf ("%se%" G_GINT64_FORMAT,
-                                             p->coefficient, p->exponent);
+    char *expected_value = NULL;
+    if (p->y_status == ATM_SERIES_Y_NUMERIC) {
+        if (p->coefficient == NULL)
+            return FALSE;
+        expected_value = g_strdup_printf ("%se%" G_GINT64_FORMAT,
+                                           p->coefficient, p->exponent);
+    } else if (p->y_status == ATM_SERIES_Y_MISSING) {
+        expected_value = g_strdup ("MISSING");
+    } else {
+        return FALSE;
+    }
     gboolean value_matches = g_strcmp0 (fact->value, expected_value) == 0;
     g_free (expected_value);
     if (!value_matches)
@@ -393,6 +402,8 @@ point_matches_established_fact (const AtmSeriesContract *s,
     JsonObject *object = json_node_get_object (root);
     const char *year = NULL;
     const char *scenario = NULL;
+    const char *y_status = NULL;
+    const char *missing_reason = NULL;
     if (json_object_has_member (object, "calendar_year")) {
         JsonNode *node = json_object_get_member (object, "calendar_year");
         if (JSON_NODE_HOLDS_VALUE (node) &&
@@ -405,13 +416,32 @@ point_matches_established_fact (const AtmSeriesContract *s,
             json_node_get_value_type (node) == G_TYPE_STRING)
             scenario = json_node_get_string (node);
     }
-    /* Scenario is source evidence too. A caller must not relabel observed
-     * facts as a model scenario by using the low-level contract API directly. */
-    gboolean x_matches = g_strcmp0 (year, p->x) == 0 &&
-                         bounded (s->scenario, ATM_SERIES_CONTRACT_MAX_TEXT) &&
-                         g_strcmp0 (scenario, s->scenario) == 0;
+    if (json_object_has_member (object, "y_status")) {
+        JsonNode *node = json_object_get_member (object, "y_status");
+        if (JSON_NODE_HOLDS_VALUE (node) &&
+            json_node_get_value_type (node) == G_TYPE_STRING)
+            y_status = json_node_get_string (node);
+    }
+    if (json_object_has_member (object, "missing_reason")) {
+        JsonNode *node = json_object_get_member (object, "missing_reason");
+        if (JSON_NODE_HOLDS_VALUE (node) &&
+            json_node_get_value_type (node) == G_TYPE_STRING)
+            missing_reason = json_node_get_string (node);
+    }
+    const char *expected_status = p->y_status == ATM_SERIES_Y_NUMERIC
+        ? "NUMERIC" : "MISSING";
+    gboolean status_matches = g_strcmp0 (y_status, expected_status) == 0;
+    gboolean reason_matches = p->y_status == ATM_SERIES_Y_NUMERIC ||
+        g_strcmp0 (missing_reason, p->missing_reason) == 0;
+    /* Scenario and observation status are source evidence too. A caller must
+     * not relabel an observation or assert a missing value without matching
+     * SRA qualifiers. */
+    gboolean qualifiers_match = g_strcmp0 (year, p->x) == 0 &&
+        bounded (s->scenario, ATM_SERIES_CONTRACT_MAX_TEXT) &&
+        g_strcmp0 (scenario, s->scenario) == 0 &&
+        status_matches && reason_matches;
     g_object_unref (parser);
-    if (!x_matches)
+    if (!qualifiers_match)
         return FALSE;
 
     if (fact->support == NULL || fact->support->len != p->support->len)
@@ -568,6 +598,13 @@ atm_series_contract_validate (AtmSeriesContract *s, const AtmSraResult *q, GErro
             return fail (error, ATM_SERIES_CONTRACT_ERROR_SHAPE, "Break requires a bounded reason.");
         if (p->break_before && i == 0)
             return fail (error, ATM_SERIES_CONTRACT_ERROR_ORDER, "First point cannot begin with a discontinuity.");
+        /* MISSING is a scientific assertion too: it must match an explicit
+         * established SRA fact, not only a caller-provided reason string. Do
+         * this after ordering/break checks so their established errors persist. */
+        if (p->y_status == ATM_SERIES_Y_MISSING &&
+            !point_is_bound_to_sra_fact (s, p, q))
+            return fail (error, ATM_SERIES_CONTRACT_ERROR_SHAPE,
+                         "MISSING point does not match an established SRA missing fact.");
         previous = p;
     }
     if (numeric == 0 && missing == 0)
