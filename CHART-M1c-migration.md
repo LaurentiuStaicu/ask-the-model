@@ -122,8 +122,9 @@ The native test files together establish:
 - every point carries its admitted year, and the coefficient/exponent the
   contract recomputed from the source decimal agrees with what the adapter
   supplied;
-- different reviewed metadata produces a different identity, which is how the
-  test detects metadata that is bound into the contract rather than decorative;
+- scenario metadata must equal the scenario asserted in every admitted point
+  payload, and temporal scope must match the point coverage before the contract
+  can be returned;
 - argument and descriptor guards hold, and a pre-populated output is left
   untouched on every failure path.
 
