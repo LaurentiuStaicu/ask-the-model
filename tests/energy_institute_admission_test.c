@@ -245,15 +245,15 @@ test_current_snapshot_policy_and_reconstruction (void)
 
     /* Exact bundle binding: a current manifest/registry cannot be mixed with
      * the older bundle, and the old bundle cannot be relabeled as current. */
-    GBytes *current_manifest_old_rest[4] = {
+    GBytes *current_bundle_with_old_manifest[4] = {
         current_inputs[0], current_inputs[1], inputs[2], current_inputs[3]
     };
-    reject_bundle (repo, current_snapshot, current_manifest_old_rest,
+    reject_bundle (repo, current_snapshot, current_bundle_with_old_manifest,
                    ATM_EI_CANDIDATE_ERROR_SHAPE);
-    GBytes *old_manifest_current_registry[4] = {
+    GBytes *old_bundle_with_current_manifest[4] = {
         inputs[0], inputs[1], current_inputs[2], inputs[3]
     };
-    reject_bundle (repo, snapshot, old_manifest_current_registry,
+    reject_bundle (repo, snapshot, old_bundle_with_current_manifest,
                    ATM_EI_CANDIDATE_ERROR_SHAPE);
     reject_bundle (repo, "dc710d8e604c0fff713a3acfdb18ab47a1a902bc",
                    current_inputs, ATM_EI_CANDIDATE_ERROR_SHAPE);
