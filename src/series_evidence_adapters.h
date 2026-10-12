@@ -37,7 +37,8 @@ G_BEGIN_DECLS
 #define ATM_EI_LIMITATIONS \
     ((const char *const[]) { \
         "Pinned processed observations; the upstream Energy Institute calculation is not reproduced by AtM.", \
-        "Total Energy Supply (TES) under the Physical Energy Content method; the EWD input column retains the legacy name total_primary_energy_ej.", \
+        "Total Energy Supply (TES) under Physical Energy Content; the EWD input column retains the legacy name total_primary_energy_ej.", \
+        "Approved semantic precedence: the pinned tes_ej mapping and EI 2026 methodology define the metric; legacy EWD primary-energy labels remain provenance only.", \
         "This gross flow series does not directly observe EROI, net energy or a World3 resource stock.", \
         "The 2019-2023 component reconciliation residual is retained as provenance, not repaired or redistributed.", \
         "No VerifiedSeries, rendering or general missing-value authority.", \
