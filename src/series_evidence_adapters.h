@@ -12,9 +12,10 @@ G_BEGIN_DECLS
  * reviewed statement of which sources a series is built from, in which order,
  * with which profile and payload vocabulary.
  *
- * Energy Institute Evidence is admitted, but SRA qualification is blocked
- * because no authoritative reconstruction obligation has been recorded for it.
- * Do not infer one by symmetry with GISTEMP.
+ * Energy Institute SRA qualification is approved only for reconstruction
+ * of the exact pinned EWD processed snapshot. This is not a claim that AtM
+ * independently reproduces the upstream raw-to-processed Energy Institute
+ * pipeline; the semantic-precedence decision is recorded in its limitations.
  */
 
 /* Fixed source order, matching the admission policy: the observations file
@@ -45,11 +46,10 @@ G_BEGIN_DECLS
         NULL })
 
 /*
- * TODO(F0-19): the pinned Energy Institute provenance JSON, input manifest and
- * registry do not define an AtM canonical reconstruction obligation. Leave
- * this descriptor field NULL: the generic Evidence layer can still preserve the
- * admitted bytes and observations, while generic SRA qualification fails closed.
- * Replace NULL only after the obligation is approved and recorded authoritatively.
+ * F0-19 decision recorded 2026-10-12: the approved claim is reconstruction of
+ * the exact pinned EWD processed TES snapshot under Physical Energy Content.
+ * The raw Energy Institute processing pipeline remains explicitly out of scope.
+ * See docs/CHART01_ENERGY_INSTITUTE_F0-19_QUALIFICATION_PROPOSAL.md.
  */
 
 extern const AtmSeriesEvidenceDescriptor ATM_GISTEMP_EVIDENCE_DESCRIPTOR;
