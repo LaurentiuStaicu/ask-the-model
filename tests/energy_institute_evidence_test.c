@@ -81,6 +81,14 @@ static void test_identity_support(void)
         "1496960972");
     g_assert_cmpstr(json_object_get_string_member(object, "exponent"), ==, "-7");
     g_assert_cmpstr(json_object_get_string_member(object, "calendar_year"), ==, "1965");
+    g_assert_cmpstr(json_object_get_string_member(object, "schema"), ==,
+        "atm-energy-institute-annual-observation/2");
+    g_assert_cmpstr(json_object_get_string_member(object, "subject"), ==,
+        "global_total_energy_supply");
+    g_assert_cmpstr(json_object_get_string_member(object, "attribute"), ==,
+        "total_energy_supply");
+    g_assert_cmpstr(json_object_get_string_member(object, "energy_accounting_method"), ==,
+        "physical_energy_content");
     g_assert_cmpstr(first->locator, ==,
         "csv:row:2:columns:year,total_primary_energy_ej");
     g_assert_cmpstr(
@@ -128,17 +136,18 @@ static void test_rehashed_forgery(void)
 {
     AtmEnergyInstituteEvidence *e = build();
     const char *keys[] = {
-        "coefficient", "unit", "geography", "calendar_year", NULL, "source_sha256"
+        "coefficient", "unit", "geography", "calendar_year",
+        "energy_accounting_method", NULL, "source_sha256"
     };
     const char *values[] = {
-        "999", "joules", "Europe", "1966", NULL,
+        "999", "joules", "Europe", "1966", "fossil_fuel_equivalent", NULL,
         "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa"
     };
 
     for (guint i = 0; i < G_N_ELEMENTS(keys); i++) {
         AtmScientificArtifact *target =
             (AtmScientificArtifact *) atm_energy_institute_evidence_at(
-                e, i == 5 ? 0 : 4);
+                e, i == 6 ? 0 : 4);
         AtmScientificArtifact *forged = forge(target, keys[i], values[i]);
         AtmScientificArtifact original = *target;
         *target = *forged;
