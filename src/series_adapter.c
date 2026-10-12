@@ -185,12 +185,24 @@ atm_series_adapter_from_evidence (const AtmSeriesEvidenceDescriptor *descriptor,
         const char *year_text = required_text (po, "calendar_year", error);
         const char *coefficient = required_text (po, "coefficient", error);
         const char *exponent_text = required_text (po, "exponent", error);
+        const char *point_scenario = required_text (po, "scenario", error);
 
-        if (year_text == NULL || coefficient == NULL || exponent_text == NULL) {
+        if (year_text == NULL || coefficient == NULL || exponent_text == NULL ||
+            point_scenario == NULL) {
             g_free (support);
             atm_series_contract_free (series);
             g_object_unref (point_parser);
             return FALSE;
+        }
+
+        /* Scenario is asserted by the admitted point payload. Do not let
+         * caller metadata relabel observed evidence as a model scenario. */
+        if (g_strcmp0 (point_scenario, metadata->scenario) != 0) {
+            g_free (support);
+            atm_series_contract_free (series);
+            g_object_unref (point_parser);
+            return reject (error,
+                "Series scenario does not match admitted observation payload.");
         }
 
         /* Keep the exact token from the rebuilt, admitted CSV. The Evidence
