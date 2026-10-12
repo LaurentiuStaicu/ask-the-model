@@ -554,7 +554,24 @@ static void test_missing_point_must_match_sra_fact (void)
     g_clear_error (&error);
     atm_series_contract_free (s);
 
-    /* Only the explicit matching missing fact authorizes this point. */
+    /* A MISSING point must not retain a numeric exponent after its value
+     * and coefficient have been cleared. The exponent is part of the numeric
+     * representation and must be canonical zero when Y is MISSING. */
+    s = base ();
+    g_assert_true (atm_series_contract_add_point (
+        s, "1881", ATM_SERIES_Y_MISSING, NULL, NULL, 42, FALSE,
+        FALSE, "source_missing", NULL, support, 1, &error));
+    g_assert_no_error (error);
+    g_assert_false (atm_series_contract_validate (s, q, &error));
+    g_assert_error (error, ATM_SERIES_CONTRACT_ERROR,
+                    ATM_SERIES_CONTRACT_ERROR_NUMERIC);
+    g_assert_nonnull (g_strstr_len (error->message, -1,
+                                    "MISSING cannot carry numeric value or exponent"));
+    g_clear_error (&error);
+    atm_series_contract_free (s);
+
+    /* Only the explicit matching missing fact authorizes this point, and its
+     * absent numeric representation is canonical (including exponent zero). */
     s = base ();
     g_assert_true (atm_series_contract_add_point (
         s, "1881", ATM_SERIES_Y_MISSING, NULL, NULL, 0, FALSE,
