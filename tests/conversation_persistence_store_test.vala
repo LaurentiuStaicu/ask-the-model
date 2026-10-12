@@ -1239,6 +1239,11 @@ test_unarchived_row_retained_when_export_reconciliation_fails ()
                 new AskTheModel.ConversationPersistenceStore (
                     root
                 );
+
+            /* Application calls this public cleanup again after restore; it
+             * must revalidate instead of bypassing the constructor's barrier. */
+            reopened_store.discard_unarchived_conversations ();
+
             bool found = false;
             foreach (
                 AskTheModel.ConversationPersistenceSummary summary
