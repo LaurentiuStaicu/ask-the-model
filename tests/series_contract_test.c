@@ -656,6 +656,33 @@ static void test_caller_identity_not_authoritative (void)
     atm_scientific_artifact_free (a);
 }
 
+static void test_sra_artifact_snapshot_must_be_qualified (void)
+{
+    AtmScientificArtifact *a = support_artifact ();
+    AtmSraResult *q = atm_sra_result_new (ATM_SRA_ANSWERED);
+    GError *error = NULL;
+    const char *other_sha =
+        "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa";
+
+    /* The envelope cannot merely claim a repository snapshot that differs
+     * from the provenance bound into the artifact's qualified identity. */
+    char *snapshot = g_strdup_printf ("ewd@0.1.0#%s", other_sha);
+    g_assert_true (atm_sra_qualification_add_repository_snapshot (
+        q, snapshot, &error));
+    g_assert_no_error (error);
+    g_free (snapshot);
+
+    g_assert_false (atm_sra_qualification_add_evidence_artifact (
+        q, a, &error));
+    g_assert_error (error, ATM_SRA_ERROR, ATM_SRA_ERROR_SUPPORT);
+    g_assert_nonnull (g_strstr_len (error->message, -1,
+        "repository/version/snapshot is absent from qualification"));
+    g_clear_error (&error);
+
+    atm_sra_result_free (q);
+    atm_scientific_artifact_free (a);
+}
+
 static void
 test_contract_snapshot_must_be_qualified (void)
 {
@@ -886,6 +913,7 @@ int main (int argc, char **argv)
     g_test_add_func ("/series-contract/break-reason-requires-break", test_break_reason_requires_break);
     g_test_add_func ("/series-contract/first-break", test_first_break_rejected);
     g_test_add_func ("/series-contract/identity", test_caller_identity_not_authoritative);
+    g_test_add_func ("/series-contract/artifact-snapshot-binding", test_sra_artifact_snapshot_must_be_qualified);
     g_test_add_func ("/series-contract/snapshot-binding", test_contract_snapshot_must_be_qualified);
     g_test_add_func ("/series-contract/non-calendar-coordinate-binding", test_non_calendar_coordinates_bind_to_matching_sra_qualifier);
     g_test_add_func ("/series-contract/metadata-bounds-after-mutation", test_metadata_bounds_rechecked_after_mutation);
