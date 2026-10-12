@@ -776,6 +776,36 @@ static void test_non_calendar_coordinates_bind_to_matching_sra_qualifier (void)
     }
 }
 
+static void test_metadata_bounds_rechecked_after_mutation (void)
+{
+    AtmScientificArtifact *a = support_artifact ();
+    AtmSraResult *q = qualified_with_artifact (a);
+    AtmSeriesContract *s = base ();
+    const char *support[] = { a->qualified_artifact_id };
+    GError *error = NULL;
+
+    g_assert_true (atm_series_contract_add_point (
+        s, "1880", ATM_SERIES_Y_NUMERIC, "1.0000", "1", 0, FALSE,
+        FALSE, NULL, NULL, support, 1, &error));
+    g_assert_no_error (error);
+
+    /* Construction bounded this field, but the public struct can be mutated
+     * before validation. It must not reach canonical identity serialization. */
+    g_free (s->series_semantics);
+    s->series_semantics = g_strnfill (ATM_SERIES_CONTRACT_MAX_TEXT + 1u, 'x');
+
+    g_assert_false (atm_series_contract_validate (s, q, &error));
+    g_assert_error (error, ATM_SERIES_CONTRACT_ERROR,
+                    ATM_SERIES_CONTRACT_ERROR_SHAPE);
+    g_assert_nonnull (g_strstr_len (error->message, -1,
+                                    "Invalid or oversized series metadata"));
+    g_clear_error (&error);
+
+    atm_series_contract_free (s);
+    atm_sra_result_free (q);
+    atm_scientific_artifact_free (a);
+}
+
 static void test_calendar_year_negative_zero_rejected (void)
 {
     AtmScientificArtifact *a = support_artifact ();
@@ -858,6 +888,7 @@ int main (int argc, char **argv)
     g_test_add_func ("/series-contract/identity", test_caller_identity_not_authoritative);
     g_test_add_func ("/series-contract/snapshot-binding", test_contract_snapshot_must_be_qualified);
     g_test_add_func ("/series-contract/non-calendar-coordinate-binding", test_non_calendar_coordinates_bind_to_matching_sra_qualifier);
+    g_test_add_func ("/series-contract/metadata-bounds-after-mutation", test_metadata_bounds_rechecked_after_mutation);
     g_test_add_func ("/series-contract/calendar-year-negative-zero", test_calendar_year_negative_zero_rejected);
     g_test_add_func ("/series-contract/utc-calendar", test_invalid_utc_calendar_rejected);
     g_test_add_func ("/series-contract/event-overflow", test_event_ordinal_overflow_rejected);
