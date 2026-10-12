@@ -74,8 +74,9 @@ typedef struct {
      * to the shared construction path.
      */
 
-    /* Canonical reconstruction obligation, e.g.
-     * "atm-gistemp-source-reconstruction/1". */
+    /* Canonical reconstruction obligation for SRA qualification.
+     * NULL is permitted for Evidence-only sources whose obligation has not been
+     * approved; the generic SRA builder must then fail closed. */
     const char *canonical_obligation;
 
     /* Semantic profile bound into the qualification envelope, including its
