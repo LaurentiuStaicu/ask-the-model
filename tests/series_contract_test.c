@@ -254,7 +254,7 @@ static void test_caller_identity_not_authoritative (void)
     g_assert_error (error, ATM_SERIES_CONTRACT_ERROR,
                     ATM_SERIES_CONTRACT_ERROR_IDENTITY);
     g_clear_error (&error);
-    s->scientific_content_id = NULL;
+    g_clear_pointer (&s->scientific_content_id, g_free);
     atm_series_contract_free (s);
     atm_sra_result_free (q);
     atm_scientific_artifact_free (a);
