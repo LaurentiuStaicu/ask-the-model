@@ -12,9 +12,9 @@ G_BEGIN_DECLS
  * reviewed statement of which sources a series is built from, in which order,
  * with which profile and payload vocabulary.
  *
- * One open value: the Energy Institute canonical reconstruction obligation is
- * not yet fixed. It is declared below in exactly one place, so the decision
- * lands as a one-line change and nothing else in the chain depends on it.
+ * Energy Institute Evidence is admitted, but SRA qualification is blocked
+ * because no authoritative reconstruction obligation has been recorded for it.
+ * Do not infer one by symmetry with GISTEMP.
  */
 
 /* Fixed source order, matching the admission policy: the observations file
@@ -43,16 +43,12 @@ G_BEGIN_DECLS
         NULL })
 
 /*
- * TODO(F0-19): Energy Institute canonical reconstruction obligation.
- *
- * GISTEMP fixes "atm-gistemp-source-reconstruction/1". The symmetric value is
- * used below so the chain is complete and testable; confirm it against the
- * Energy Institute qualification record before this leaves review, because a
- * wrong obligation string produces identities that are merely different rather
- * than detectably wrong.
+ * TODO(F0-19): the pinned Energy Institute provenance JSON, input manifest and
+ * registry do not define an AtM canonical reconstruction obligation. Leave
+ * this descriptor field NULL: the generic Evidence layer can still preserve the
+ * admitted bytes and observations, while generic SRA qualification fails closed.
+ * Replace NULL only after the obligation is approved and recorded authoritatively.
  */
-#define ATM_EI_RECONSTRUCTION_OBLIGATION \
-    "atm-energy-institute-source-reconstruction/1"
 
 extern const AtmSeriesEvidenceDescriptor ATM_GISTEMP_EVIDENCE_DESCRIPTOR;
 extern const AtmSeriesEvidenceDescriptor ATM_EI_EVIDENCE_DESCRIPTOR;
