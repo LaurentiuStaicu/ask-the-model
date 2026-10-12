@@ -5,7 +5,11 @@
 
 G_BEGIN_DECLS
 
-#define ATM_SERIES_CONTRACT_SCHEMA "atm-verified-series/1"
+/* Separate identity namespace from the pinned legacy VerifiedSeries schema and IDs. */
+#define ATM_SERIES_CONTRACT_SCHEMA "atm-series-contract/1"
+#define ATM_SERIES_CONTRACT_QUALIFICATION_SCHEMA "atm-series-contract-qualification/1"
+#define ATM_SERIES_CONTRACT_SCIENTIFIC_ID_DOMAIN "atm.series-contract.v1"
+#define ATM_SERIES_CONTRACT_QUALIFIED_ID_DOMAIN "atm.series-contract.qualification.v1"
 #define ATM_SERIES_CONTRACT_NUMERIC_PROFILE "exact_decimal_coefficient_exponent/1"
 
 #define ATM_SERIES_CONTRACT_MAX_POINTS 10000u

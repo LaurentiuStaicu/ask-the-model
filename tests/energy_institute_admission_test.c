@@ -7,6 +7,67 @@ static GBytes *inputs[4];
 static char *buffers[4];
 static gsize lengths[4];
 
+ /*
+  * Independently walk the pinned CSV rows and compare every parsed candidate
+  * point with the raw year and second-column token. The legacy/generic
+  * equivalence test uses the same candidate parser, so it is not an independent
+  * check that all 61 row-to-value mappings are correct.
+  */
+static void assert_all_candidate_points_match_source_csv (
+    const AtmEnergyInstituteCandidate *candidate)
+{
+    g_assert_nonnull(candidate);
+    g_assert_nonnull(buffers[0]);
+
+    const char *cursor = buffers[0];
+    const char *limit = cursor + lengths[0];
+    const char *header_end = memchr(cursor, '\n', (gsize) (limit - cursor));
+    g_assert_nonnull(header_end);
+    cursor = header_end + 1;
+
+    guint count = atm_energy_institute_candidate_count(candidate);
+    g_assert_cmpuint(count, ==, 61u);
+
+    for (guint i = 0; i < count; i++) {
+        const char *row_end = memchr(cursor, '\n', (gsize) (limit - cursor));
+        if (row_end == NULL)
+            row_end = limit;
+        g_assert_true(row_end > cursor);
+        g_assert_null(memchr(cursor, '\r', (gsize) (row_end - cursor)));
+
+        const char *first_comma =
+            memchr(cursor, ',', (gsize) (row_end - cursor));
+        g_assert_nonnull(first_comma);
+        const char *second_comma =
+            memchr(first_comma + 1, ',',
+                   (gsize) (row_end - (first_comma + 1)));
+        g_assert_nonnull(second_comma);
+
+        char *source_year = g_strndup(cursor, (gsize) (first_comma - cursor));
+        char *source_decimal = g_strndup(
+            first_comma + 1, (gsize) (second_comma - (first_comma + 1)));
+        char *expected_year = g_strdup_printf("%u", 1965u + i);
+
+        g_assert_cmpstr(source_year, ==, expected_year);
+        g_assert_cmpuint(atm_energy_institute_candidate_year(candidate, i),
+                         ==, 1965u + i);
+        g_assert_cmpuint(atm_energy_institute_candidate_source_row(candidate, i),
+                         ==, i + 2u);
+        g_assert_cmpstr(atm_energy_institute_candidate_decimal(candidate, i),
+                        ==, source_decimal);
+
+        g_free(expected_year);
+        g_free(source_decimal);
+        g_free(source_year);
+
+        cursor = row_end < limit ? row_end + 1 : limit;
+        if (i + 1u < count)
+            g_assert_true(cursor < limit);
+    }
+
+    g_assert_true(cursor == limit);
+}
+
 static void load_sources (void)
 {
     const char *root = g_getenv ("ATM_CHART01_FIXTURE");
@@ -40,6 +101,7 @@ static void test_policy (void)
     AtmEnergyInstituteAdmission *a = NULL;
     g_assert_true (atm_energy_institute_admission_new (repo, snapshot, inputs, &a, NULL));
     const AtmEnergyInstituteCandidate *c = atm_energy_institute_admission_candidate (a);
+    assert_all_candidate_points_match_source_csv (c);
     g_assert_cmpuint (atm_energy_institute_candidate_count (c), ==, 61);
     g_assert_cmpuint (atm_energy_institute_candidate_year (c, 0), ==, 1965);
     g_assert_cmpuint (atm_energy_institute_candidate_year (c, 60), ==, 2025);
@@ -52,9 +114,11 @@ static void test_policy (void)
     g_assert_cmpstr (atm_energy_institute_admission_dataset (a), ==,
                     "Statistical Review of World Energy 2026");
     g_assert_cmpstr (atm_energy_institute_admission_subject (a), ==,
-                    "global_primary_energy_supply");
+                    "global_total_energy_supply");
     g_assert_cmpstr (atm_energy_institute_admission_attribute (a), ==,
-                    "total_primary_energy");
+                    "total_energy_supply");
+    g_assert_cmpstr (atm_energy_institute_admission_accounting_method (a), ==,
+                    "physical_energy_content");
     g_assert_cmpstr (atm_energy_institute_admission_epistemic_status (a), ==, "empirical");
     g_assert_cmpstr (atm_energy_institute_admission_x_semantics (a), ==, "calendar_year");
     for (guint i = 0; i < 4; i++)
@@ -117,6 +181,24 @@ static void test_candidate_parser_boundaries (void)
     g_bytes_unref (source);
 }
 
+static void test_nonconsecutive_years_rejected (void)
+{
+    const char *source_text =
+        "year,total_primary_energy_ej,fossil_energy_ej,oil_ej,gas_ej,coal_ej,nuclear_ej,hydro_ej,renewables_ej,non_fossil_energy_ej,fossil_share,non_fossil_share,component_reconciliation_error_ej\n"
+        "1965,149.6960972,0,0,0,0,0,0,0,0,0,0,0\n"
+        "1967,150.0000000,0,0,0,0,0,0,0,0,0,0,0\n";
+    GBytes *source = g_bytes_new_static (source_text, strlen (source_text));
+    AtmEnergyInstituteCandidate *candidate = NULL;
+    GError *error = NULL;
+
+    g_assert_false (atm_energy_institute_candidate_parse (source, &candidate, &error));
+    g_assert_error (error, ATM_EI_CANDIDATE_ERROR, ATM_EI_CANDIDATE_ERROR_ORDER);
+    g_assert_null (candidate);
+
+    g_clear_error (&error);
+    g_bytes_unref (source);
+}
+
 int main (int argc, char **argv)
 {
     g_test_init (&argc, &argv, NULL);
@@ -124,6 +206,7 @@ int main (int argc, char **argv)
     g_test_add_func ("/energy-institute-admission/policy", test_policy);
     g_test_add_func ("/energy-institute-admission/tamper", test_tamper_and_shape);
     g_test_add_func ("/energy-institute-admission/parser-boundaries", test_candidate_parser_boundaries);
+    g_test_add_func ("/energy-institute-admission/nonconsecutive-years", test_nonconsecutive_years_rejected);
     int result = g_test_run ();
     for (guint i = 0; i < 4; i++) {
         g_bytes_unref (inputs[i]);

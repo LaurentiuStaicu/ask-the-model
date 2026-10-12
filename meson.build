@@ -2809,3 +2809,75 @@ test(
   env: {'ATM_M12_TEST_BASE_URL': 'http://127.0.0.1:0'}
 )
 
+
+# CHART-M1c: generic source-bound evidence/SRA, adapter, and legacy bridge.
+# These are test-only targets; production chart behavior remains unchanged.
+series_evidence_equivalence_test = executable(
+  'series-evidence-equivalence-test',
+  ['src/series_evidence.c', 'src/series_evidence_adapters.c',
+   'src/gistemp_evidence.c', 'src/gistemp_admission.c',
+   'src/energy_institute_evidence.c', 'src/energy_institute_admission.c',
+   'src/energy_institute_candidate.c', 'src/annual_series_candidate.c',
+   'src/scientific_canonical.c', 'src/scientific_artifact.c',
+   'tests/series_evidence_equivalence_test.c'],
+  include_directories: include_directories('src'),
+  dependencies: [glib_dep, json_glib_dep],
+  install: false
+)
+test('series-evidence-equivalence', series_evidence_equivalence_test,
+  env: {'ATM_CHART01_FIXTURE': meson.current_source_dir() / 'tests/fixtures/chart01'})
+
+series_sra_equivalence_test = executable(
+  'series-sra-equivalence-test',
+  ['src/series_sra.c', 'src/series_evidence.c',
+   'src/series_evidence_adapters.c',
+   'src/gistemp_sra.c', 'src/gistemp_evidence.c', 'src/gistemp_admission.c',
+   'src/energy_institute_evidence.c', 'src/energy_institute_admission.c',
+   'src/energy_institute_candidate.c', 'src/annual_series_candidate.c',
+   'src/scientific_canonical.c', 'src/scientific_artifact.c',
+   'src/scientific_result.c', 'src/scientific_operation.c',
+   'src/scientific_derivation.c',
+   'tests/series_sra_equivalence_test.c'],
+  include_directories: include_directories('src'),
+  dependencies: [glib_dep, json_glib_dep],
+  install: false
+)
+test('series-sra-equivalence', series_sra_equivalence_test,
+  env: {'ATM_CHART01_FIXTURE': meson.current_source_dir() / 'tests/fixtures/chart01'})
+
+series_adapter_test = executable(
+  'series-adapter-test',
+  ['src/series_adapter.c', 'src/series_sra.c', 'src/series_evidence.c',
+   'src/series_evidence_adapters.c', 'src/series_contract.c',
+   'src/gistemp_evidence.c', 'src/gistemp_admission.c',
+   'src/energy_institute_evidence.c', 'src/energy_institute_admission.c',
+   'src/energy_institute_candidate.c', 'src/annual_series_candidate.c',
+   'src/scientific_canonical.c', 'src/scientific_artifact.c',
+   'src/scientific_result.c', 'src/scientific_operation.c',
+   'src/scientific_derivation.c',
+   'tests/series_adapter_test.c'],
+  include_directories: include_directories('src'),
+  dependencies: [glib_dep, json_glib_dep],
+  install: false
+)
+test('series-adapter', series_adapter_test,
+  env: {'ATM_CHART01_FIXTURE': meson.current_source_dir() / 'tests/fixtures/chart01'})
+
+verified_series_contract_test = executable(
+  'verified-series-contract-test',
+  ['src/verified_series_contract.c', 'src/verified_series.c',
+   'src/gistemp_sra.c', 'src/gistemp_evidence.c', 'src/gistemp_admission.c',
+   'src/energy_institute_evidence.c', 'src/energy_institute_admission.c',
+   'src/energy_institute_candidate.c',
+   'src/series_adapter.c', 'src/series_sra.c', 'src/series_evidence.c',
+   'src/series_evidence_adapters.c', 'src/series_contract.c',
+   'src/annual_series_candidate.c', 'src/scientific_canonical.c',
+   'src/scientific_artifact.c', 'src/scientific_result.c',
+   'src/scientific_operation.c', 'src/scientific_derivation.c',
+   'tests/verified_series_contract_test.c'],
+  include_directories: include_directories('src'),
+  dependencies: [glib_dep, json_glib_dep],
+  install: false
+)
+test('verified-series-contract', verified_series_contract_test,
+  env: {'ATM_CHART01_FIXTURE': meson.current_source_dir() / 'tests/fixtures/chart01'})

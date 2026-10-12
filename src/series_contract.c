@@ -25,6 +25,33 @@ static gboolean bounded (const char *text, gsize max)
     return n > 0 && n <= max && g_utf8_validate (text, (gssize) n, NULL);
 }
 
+/* The contract is a public mutable struct. Recheck every bounded metadata
+ * field at validation time, not only in the constructor, before serializing
+ * caller-editable fields into canonical identities. */
+static gboolean
+series_metadata_valid (const AtmSeriesContract *s)
+{
+    return s != NULL &&
+        s->x_kind >= ATM_SERIES_X_CALENDAR_YEAR &&
+        s->x_kind <= ATM_SERIES_X_EVENT_ORDINAL &&
+        bounded (s->subject, ATM_SERIES_CONTRACT_MAX_TEXT) &&
+        bounded (s->attribute, ATM_SERIES_CONTRACT_MAX_TEXT) &&
+        bounded (s->x_unit, ATM_SERIES_CONTRACT_MAX_TEXT) &&
+        bounded (s->x_dimension, ATM_SERIES_CONTRACT_MAX_TEXT) &&
+        bounded (s->y_unit, ATM_SERIES_CONTRACT_MAX_TEXT) &&
+        bounded (s->y_dimension, ATM_SERIES_CONTRACT_MAX_TEXT) &&
+        bounded (s->series_semantics, ATM_SERIES_CONTRACT_MAX_TEXT) &&
+        bounded (s->scenario, ATM_SERIES_CONTRACT_MAX_TEXT) &&
+        bounded (s->time_scope, ATM_SERIES_CONTRACT_MAX_TEXT) &&
+        bounded (s->epistemic_status, ATM_SERIES_CONTRACT_MAX_TEXT) &&
+        bounded (s->repository_id, ATM_SERIES_CONTRACT_MAX_TEXT) &&
+        bounded (s->repository_version, ATM_SERIES_CONTRACT_MAX_TEXT) &&
+        bounded (s->snapshot_sha, ATM_SERIES_CONTRACT_MAX_TEXT) &&
+        bounded (s->source_path, ATM_SERIES_CONTRACT_MAX_TEXT) &&
+        bounded (s->profile_id, ATM_SERIES_CONTRACT_MAX_TEXT) &&
+        bounded (s->profile_version, ATM_SERIES_CONTRACT_MAX_TEXT);
+}
+
 static gboolean hex64 (const char *text)
 {
     if (!bounded (text, 64) || strlen (text) != 64) return FALSE;
@@ -175,6 +202,9 @@ x_valid (AtmSeriesXKind kind, const char *x)
         if (n < 1 || n > 6) return FALSE;
         gsize start = x[0] == '-' ? 1 : 0;
         if (start == n) return FALSE;
+        /* A signed zero has the same numeric coordinate as "0" but a
+         * different serialized identity. Keep X coordinates canonical. */
+        if (start == 1 && n - start == 1 && x[start] == '0') return FALSE;
         if (x[start] == '0' && n - start > 1) return FALSE;
         for (gsize i = start; i < n; i++)
             if (!g_ascii_isdigit (x[i])) return FALSE;
@@ -199,11 +229,12 @@ point_numeric_valid (const AtmSeriesContractPoint *p, GError **error)
     atm_scientific_decimal_free (decimal);
     if (!matches)
         return fail (error, ATM_SERIES_CONTRACT_ERROR_NUMERIC, "Decimal coefficient/exponent mismatch.");
-    if (p->negative_zero) {
-        if (g_strcmp0 (p->coefficient, "0") != 0 || p->exponent != 0 ||
-            p->source_decimal[0] != '-')
-            return fail (error, ATM_SERIES_CONTRACT_ERROR_NUMERIC, "Invalid signed-zero representation.");
-    }
+    gboolean zero_value = g_strcmp0 (p->coefficient, "0") == 0 &&
+                           p->exponent == 0;
+    gboolean source_negative_zero = zero_value && p->source_decimal[0] == '-';
+    if (p->negative_zero != source_negative_zero)
+        return fail (error, ATM_SERIES_CONTRACT_ERROR_NUMERIC,
+                     "Signed-zero flag disagrees with source decimal.");
     return TRUE;
 }
 
@@ -326,7 +357,7 @@ build_qualified_json (const AtmSeriesContract *s, const char *scientific_id, cha
 {
     JsonBuilder *b = json_builder_new ();
     json_builder_begin_object (b);
-    text_member (b, "schema", "atm-verified-series-qualification/1");
+    text_member (b, "schema", ATM_SERIES_CONTRACT_QUALIFICATION_SCHEMA);
     text_member (b, "scientific_content_id", scientific_id);
     text_member (b, "repository_id", s->repository_id);
     text_member (b, "repository_version", s->repository_version);
@@ -352,6 +383,183 @@ support_is_qualified (const AtmSraResult *q, const char *id)
     return FALSE;
 }
 
+/* Numeric points must correspond to an established SRA fact, not merely
+ * cite evidence that appears somewhere in the qualification envelope. The
+ * fact's qualifiers preserve the admitted observation payload, including X. */
+static gboolean
+point_matches_established_fact (const AtmSeriesContract *s,
+                                const AtmSeriesContractPoint *p,
+                                const AtmSraEstablishedFact *fact)
+{
+    if (fact == NULL || fact->qualifiers_json == NULL ||
+        g_strcmp0 (fact->subject_id, s->subject) != 0 ||
+        g_strcmp0 (fact->attribute, s->attribute) != 0 ||
+        g_strcmp0 (fact->unit, s->y_unit) != 0 ||
+        g_strcmp0 (fact->dimension, s->y_dimension) != 0)
+        return FALSE;
+
+    char *expected_value = NULL;
+    if (p->y_status == ATM_SERIES_Y_NUMERIC) {
+        if (p->coefficient == NULL)
+            return FALSE;
+        expected_value = g_strdup_printf ("%se%" G_GINT64_FORMAT,
+                                           p->coefficient, p->exponent);
+    } else if (p->y_status == ATM_SERIES_Y_MISSING) {
+        expected_value = g_strdup ("MISSING");
+    } else {
+        return FALSE;
+    }
+    gboolean value_matches = g_strcmp0 (fact->value, expected_value) == 0;
+    g_free (expected_value);
+    if (!value_matches)
+        return FALSE;
+
+    JsonParser *parser = json_parser_new ();
+    GError *parse_error = NULL;
+    gboolean parsed = json_parser_load_from_data (parser, fact->qualifiers_json,
+                                                   -1, &parse_error);
+    g_clear_error (&parse_error);
+    if (!parsed) {
+        g_object_unref (parser);
+        return FALSE;
+    }
+
+    JsonNode *root = json_parser_get_root (parser);
+    if (!JSON_NODE_HOLDS_OBJECT (root)) {
+        g_object_unref (parser);
+        return FALSE;
+    }
+    JsonObject *object = json_node_get_object (root);
+    const char *x_value = NULL;
+    const char *scenario = NULL;
+    const char *epistemic_status = NULL;
+    const char *y_status = NULL;
+    const char *missing_reason = NULL;
+    const char *break_reason = NULL;
+    gboolean fact_break_before = FALSE;
+    /* Bind X according to the declared coordinate kind. A universal
+     * calendar_year lookup makes the advertised UTC/event variants unusable
+     * for numeric or MISSING facts, even when their own coordinate is qualified. */
+    const char *x_member =
+        s->x_kind == ATM_SERIES_X_CALENDAR_YEAR ? "calendar_year" :
+        s->x_kind == ATM_SERIES_X_UTC_INSTANT ? "utc_instant" :
+        s->x_kind == ATM_SERIES_X_EVENT_ORDINAL ? "event_ordinal" : NULL;
+    if (x_member != NULL && json_object_has_member (object, x_member)) {
+        JsonNode *node = json_object_get_member (object, x_member);
+        if (JSON_NODE_HOLDS_VALUE (node) &&
+            json_node_get_value_type (node) == G_TYPE_STRING)
+            x_value = json_node_get_string (node);
+    }
+    if (json_object_has_member (object, "scenario")) {
+        JsonNode *node = json_object_get_member (object, "scenario");
+        if (JSON_NODE_HOLDS_VALUE (node) &&
+            json_node_get_value_type (node) == G_TYPE_STRING)
+            scenario = json_node_get_string (node);
+    }
+    if (json_object_has_member (object, "epistemic_status")) {
+        JsonNode *node = json_object_get_member (object, "epistemic_status");
+        if (JSON_NODE_HOLDS_VALUE (node) &&
+            json_node_get_value_type (node) == G_TYPE_STRING)
+            epistemic_status = json_node_get_string (node);
+    }
+    if (json_object_has_member (object, "y_status")) {
+        JsonNode *node = json_object_get_member (object, "y_status");
+        if (JSON_NODE_HOLDS_VALUE (node) &&
+            json_node_get_value_type (node) == G_TYPE_STRING)
+            y_status = json_node_get_string (node);
+    }
+    if (json_object_has_member (object, "missing_reason")) {
+        JsonNode *node = json_object_get_member (object, "missing_reason");
+        if (JSON_NODE_HOLDS_VALUE (node) &&
+            json_node_get_value_type (node) == G_TYPE_STRING)
+            missing_reason = json_node_get_string (node);
+    }
+    /* Discontinuity is scientific metadata too. A caller cannot add or erase
+     * a break unless that exact point fact carries the same assertion. */
+    if (json_object_has_member (object, "break_before")) {
+        JsonNode *node = json_object_get_member (object, "break_before");
+        if (!JSON_NODE_HOLDS_VALUE (node) ||
+            json_node_get_value_type (node) != G_TYPE_BOOLEAN) {
+            g_object_unref (parser);
+            return FALSE;
+        }
+        fact_break_before = json_node_get_boolean (node);
+    }
+    if (json_object_has_member (object, "break_reason")) {
+        JsonNode *node = json_object_get_member (object, "break_reason");
+        if (JSON_NODE_HOLDS_VALUE (node) &&
+            json_node_get_value_type (node) == G_TYPE_STRING)
+            break_reason = json_node_get_string (node);
+        else if (!JSON_NODE_HOLDS_NULL (node)) {
+            g_object_unref (parser);
+            return FALSE;
+        }
+    }
+    const char *expected_status = p->y_status == ATM_SERIES_Y_NUMERIC
+        ? "NUMERIC" : "MISSING";
+    gboolean status_matches = g_strcmp0 (y_status, expected_status) == 0;
+    gboolean reason_matches = p->y_status == ATM_SERIES_Y_NUMERIC ||
+        g_strcmp0 (missing_reason, p->missing_reason) == 0;
+    /* Scenario and observation status are source evidence too. A caller must
+     * not relabel an observation or assert a missing value without matching
+     * SRA qualifiers. */
+    gboolean qualifiers_match = x_value != NULL &&
+        g_strcmp0 (x_value, p->x) == 0 &&
+        bounded (s->scenario, ATM_SERIES_CONTRACT_MAX_TEXT) &&
+        g_strcmp0 (scenario, s->scenario) == 0 &&
+        g_strcmp0 (epistemic_status, s->epistemic_status) == 0 &&
+        status_matches && reason_matches &&
+        fact_break_before == p->break_before &&
+        g_strcmp0 (break_reason, p->break_reason) == 0;
+    g_object_unref (parser);
+    if (!qualifiers_match)
+        return FALSE;
+
+    if (fact->support == NULL || fact->support->len != p->support->len)
+        return FALSE;
+
+    /* Finalized SRA canonicalizes support by sorting and deduplicating it.
+     * The contract may retain descriptor/source order, so compare unique sets,
+     * not positions. Still reject duplicates in the supplied point support. */
+    for (guint i = 0; i < p->support->len; i++) {
+        const char *point_id = g_ptr_array_index (p->support, i);
+        if (point_id == NULL)
+            return FALSE;
+
+        for (guint j = 0; j < i; j++) {
+            if (g_strcmp0 (point_id, g_ptr_array_index (p->support, j)) == 0)
+                return FALSE;
+        }
+
+        gboolean found = FALSE;
+        for (guint j = 0; j < fact->support->len; j++) {
+            if (g_strcmp0 (point_id, g_ptr_array_index (fact->support, j)) == 0) {
+                found = TRUE;
+                break;
+            }
+        }
+        if (!found)
+            return FALSE;
+    }
+    return TRUE;
+}
+
+static gboolean
+point_is_bound_to_sra_fact (const AtmSeriesContract *s,
+                            const AtmSeriesContractPoint *p,
+                            const AtmSraResult *q)
+{
+    if (q->established_facts == NULL)
+        return FALSE;
+    for (guint i = 0; i < q->established_facts->len; i++) {
+        const AtmSraEstablishedFact *fact =
+            g_ptr_array_index (q->established_facts, i);
+        if (point_matches_established_fact (s, p, fact))
+            return TRUE;
+    }
+    return FALSE;
+}
+
 static gint
 compare_x (AtmSeriesXKind kind, const char *a, const char *b)
 {
@@ -368,14 +576,90 @@ compare_x (AtmSeriesXKind kind, const char *a, const char *b)
     return strcmp (a, b);
 }
 
+static gboolean
+calendar_year_scope_encloses_points (const AtmSeriesContract *s)
+{
+    if (s->x_kind != ATM_SERIES_X_CALENDAR_YEAR)
+        return TRUE;
+
+    if (!bounded (s->time_scope, ATM_SERIES_CONTRACT_MAX_TEXT) ||
+        s->points == NULL || s->points->len == 0)
+        return FALSE;
+
+    const AtmSeriesContractPoint *first =
+        g_ptr_array_index (s->points, 0);
+    const AtmSeriesContractPoint *last =
+        g_ptr_array_index (s->points, s->points->len - 1);
+    if (first == NULL || last == NULL ||
+        !x_valid (ATM_SERIES_X_CALENDAR_YEAR, first->x) ||
+        !x_valid (ATM_SERIES_X_CALENDAR_YEAR, last->x))
+        return FALSE;
+
+    /* Parse the scope by trying each '-' as the range separator. This also
+     * handles negative calendar years, whose text itself contains a minus. */
+    for (const char *separator = s->time_scope;
+         *separator != '\0'; separator++) {
+        if (*separator != '-')
+            continue;
+
+        char *start = g_strndup (s->time_scope,
+                                 (gsize) (separator - s->time_scope));
+        const char *end = separator + 1;
+        gboolean valid = x_valid (ATM_SERIES_X_CALENDAR_YEAR, start) &&
+                         x_valid (ATM_SERIES_X_CALENDAR_YEAR, end);
+        gboolean encloses = valid &&
+            compare_x (ATM_SERIES_X_CALENDAR_YEAR, start, end) <= 0 &&
+            compare_x (ATM_SERIES_X_CALENDAR_YEAR, start, first->x) <= 0 &&
+            compare_x (ATM_SERIES_X_CALENDAR_YEAR, end, last->x) >= 0;
+        g_free (start);
+        if (encloses)
+            return TRUE;
+    }
+    return FALSE;
+}
+
+static gboolean
+contract_snapshot_is_qualified (const AtmSeriesContract *s, const AtmSraResult *q)
+{
+    if (s == NULL || q == NULL || q->qualification == NULL ||
+        q->qualification->repository_snapshots == NULL ||
+        !bounded (s->repository_id, ATM_SERIES_CONTRACT_MAX_TEXT) ||
+        !bounded (s->repository_version, ATM_SERIES_CONTRACT_MAX_TEXT) ||
+        !bounded (s->snapshot_sha, ATM_SERIES_CONTRACT_MAX_TEXT))
+        return FALSE;
+
+    char *expected = g_strdup_printf ("%s@%s#%s",
+        s->repository_id, s->repository_version, s->snapshot_sha);
+    gboolean found = FALSE;
+    for (guint i = 0; i < q->qualification->repository_snapshots->len; i++) {
+        const char *qualified = g_ptr_array_index (
+            q->qualification->repository_snapshots, i);
+        if (g_strcmp0 (qualified, expected) == 0) {
+            found = TRUE;
+            break;
+        }
+    }
+    g_free (expected);
+    return found;
+}
+
 gboolean
 atm_series_contract_validate (AtmSeriesContract *s, const AtmSraResult *q, GError **error)
 {
     if (s == NULL || q == NULL || !q->finalized || q->qualification == NULL ||
         q->qualification->evidence_atom_ids == NULL)
         return fail (error, ATM_SERIES_CONTRACT_ERROR_SUPPORT, "Series requires finalized qualification.");
+    if (!series_metadata_valid (s))
+        return fail (error, ATM_SERIES_CONTRACT_ERROR_SHAPE,
+                     "Invalid or oversized series metadata.");
     if (!atm_sra_result_validate (q, error))
         return FALSE;
+    /* A contract may only name a repository version and snapshot explicitly
+     * present in the qualification envelope it is validated against. Otherwise
+     * valid point facts could be re-labelled as belonging to another snapshot. */
+    if (!contract_snapshot_is_qualified (s, q))
+        return fail (error, ATM_SERIES_CONTRACT_ERROR_IDENTITY,
+                     "Series repository/version/snapshot is not present in finalized qualification.");
     if (s->points == NULL || s->points->len == 0 || s->points->len > ATM_SERIES_CONTRACT_MAX_POINTS)
         return fail (error, ATM_SERIES_CONTRACT_ERROR_LIMIT, "Invalid series point count.");
     if (s->x_kind == ATM_SERIES_X_CALENDAR_YEAR && g_strcmp0 (s->x_unit, "calendar_year") != 0)
@@ -384,6 +668,15 @@ atm_series_contract_validate (AtmSeriesContract *s, const AtmSraResult *q, GErro
         return fail (error, ATM_SERIES_CONTRACT_ERROR_SHAPE, "UTC-instant X requires UTC unit.");
     if (s->x_kind == ATM_SERIES_X_EVENT_ORDINAL && g_strcmp0 (s->x_unit, "event") != 0)
         return fail (error, ATM_SERIES_CONTRACT_ERROR_SHAPE, "Event ordinal X requires event unit.");
+    /* X kind constrains coordinate dimension as well as its display unit.
+     * Calendar years and UTC instants are temporal coordinates; don't allow
+     * a valid annual SRA fact to be relabelled as mass, length, or another
+     * unrelated dimension at the generic contract boundary. */
+    if ((s->x_kind == ATM_SERIES_X_CALENDAR_YEAR ||
+         s->x_kind == ATM_SERIES_X_UTC_INSTANT) &&
+        g_strcmp0 (s->x_dimension, "time") != 0)
+        return fail (error, ATM_SERIES_CONTRACT_ERROR_SHAPE,
+                     "Temporal X requires time dimension.");
 
     guint numeric = 0, missing = 0;
     const AtmSeriesContractPoint *previous = NULL;
@@ -398,10 +691,20 @@ atm_series_contract_validate (AtmSeriesContract *s, const AtmSraResult *q, GErro
         for (guint k = 0; k < p->support->len; k++)
             if (!support_is_qualified (q, g_ptr_array_index (p->support, k)))
                 return fail (error, ATM_SERIES_CONTRACT_ERROR_SUPPORT, "Point support is not in finalized qualification.");
+        if (p->break_before && !bounded (p->break_reason, ATM_SERIES_CONTRACT_MAX_TEXT))
+            return fail (error, ATM_SERIES_CONTRACT_ERROR_SHAPE, "Break requires a bounded reason.");
+        if (!p->break_before && p->break_reason != NULL)
+            return fail (error, ATM_SERIES_CONTRACT_ERROR_SHAPE,
+                         "Break reason requires break_before.");
+        if (p->break_before && i == 0)
+            return fail (error, ATM_SERIES_CONTRACT_ERROR_ORDER, "First point cannot begin with a discontinuity.");
         if (p->y_status == ATM_SERIES_Y_NUMERIC) {
             if (p->missing_reason != NULL || (p->break_before && p->break_reason == NULL))
                 return fail (error, ATM_SERIES_CONTRACT_ERROR_SHAPE, "Numeric point has invalid missing/break semantics.");
             if (!point_numeric_valid (p, error)) return FALSE;
+            if (!point_is_bound_to_sra_fact (s, p, q))
+                return fail (error, ATM_SERIES_CONTRACT_ERROR_SHAPE,
+                             "Numeric point does not match an established SRA fact.");
             numeric++;
         } else if (p->y_status == ATM_SERIES_Y_MISSING) {
             if (!bounded (p->missing_reason, ATM_SERIES_CONTRACT_MAX_TEXT))
@@ -412,27 +715,34 @@ atm_series_contract_validate (AtmSeriesContract *s, const AtmSraResult *q, GErro
         } else {
             return fail (error, ATM_SERIES_CONTRACT_ERROR_SHAPE, "Unknown Y status.");
         }
-        if (p->break_before && !bounded (p->break_reason, ATM_SERIES_CONTRACT_MAX_TEXT))
-            return fail (error, ATM_SERIES_CONTRACT_ERROR_SHAPE, "Break requires a bounded reason.");
-        if (p->break_before && i == 0)
-            return fail (error, ATM_SERIES_CONTRACT_ERROR_ORDER, "First point cannot begin with a discontinuity.");
+        /* MISSING is a scientific assertion too: it must match an explicit
+         * established SRA fact, not only a caller-provided reason string. Do
+         * this after ordering/break checks so their established errors persist. */
+        if (p->y_status == ATM_SERIES_Y_MISSING &&
+            !point_is_bound_to_sra_fact (s, p, q))
+            return fail (error, ATM_SERIES_CONTRACT_ERROR_SHAPE,
+                         "MISSING point does not match an established SRA missing fact.");
         previous = p;
     }
     if (numeric == 0 && missing == 0)
         return fail (error, ATM_SERIES_CONTRACT_ERROR_SHAPE, "Series contains no points.");
+    if (!calendar_year_scope_encloses_points (s))
+        return fail (error, ATM_SERIES_CONTRACT_ERROR_SHAPE,
+                     "Calendar-year time scope does not enclose the series points.");
     if (s->scientific_content_id != NULL || s->qualified_series_id != NULL)
         return fail (error, ATM_SERIES_CONTRACT_ERROR_IDENTITY, "Caller identity strings are not authoritative.");
     char *scientific_json = NULL;
     if (!build_scientific_json (s, &scientific_json, error)) return FALSE;
-    if (!atm_scientific_content_id_json ("atm.verified-series.v1", scientific_json,
-                                         &s->scientific_content_id, error)) {
+    if (!atm_scientific_content_id_json (ATM_SERIES_CONTRACT_SCIENTIFIC_ID_DOMAIN,
+                                         scientific_json, &s->scientific_content_id, error)) {
         g_free (scientific_json); return FALSE;
     }
     g_free (scientific_json);
     char *qualified_json = NULL;
     if (!build_qualified_json (s, s->scientific_content_id, &qualified_json, error)) return FALSE;
     gboolean ok = atm_scientific_content_id_json (
-        "atm.verified-series.qualification.v1", qualified_json, &s->qualified_series_id, error);
+        ATM_SERIES_CONTRACT_QUALIFIED_ID_DOMAIN, qualified_json,
+        &s->qualified_series_id, error);
     g_free (qualified_json);
     return ok;
 }
