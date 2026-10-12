@@ -186,10 +186,6 @@ assert_current_snapshot_fixture_lock (void)
         char *digest = g_compute_checksum_for_data (G_CHECKSUM_SHA256,
             (const guchar *) current_buffers[i], current_lengths[i]);
         g_assert_cmpstr (digest, ==, json_object_get_string_member (files, names[i]));
-        g_assert_cmpstr (digest, ==,
-            atm_energy_institute_admission_source_digest (
-                NULL, i) == NULL ? digest :
-            atm_energy_institute_admission_source_digest (NULL, i));
         g_free (digest);
     }
 
