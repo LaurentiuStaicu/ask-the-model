@@ -23,7 +23,13 @@ The upstream transport receipt is retained as provenance only:
 - transport commit: `9fc01fc0ae5aea3955968f920e5cd1394fe5ad34`
 - input SHA-256: `c19b4922cb08316b45d7024233e8cd9d35e14429ee8cf65ab767e647cefc1f95`
 
-The EWD registry identifies `ei_primary_energy` as an empirical annual series in **exajoules/year**, with the explicit conceptual boundary that these are gross primary-energy supply observations. They constrain the energy mix but do not directly observe EROI or net energy.
+The transport code in that pinned commit selects the raw Energy Institute total using `Var == "tes_ej"`. Energy Institute's methodology says that from the 2025 edition onward, Total Energy Supply (TES) is calculated using the Physical Energy Content method; the former Primary Energy Consumption measure used the fossil-fuel-equivalent method and remains a separate measure. See the [Energy Institute methodology note](https://www.energyinst.org/statistical-review/about).
+
+The EWD registry and processed CSV retain legacy identifiers such as `ei_primary_energy` and `total_primary_energy_ej`. AtM preserves those bytes and column names for source reproducibility, but does not propagate the legacy label into the semantic contract. The admitted AtM profile therefore labels this value as **Total Energy Supply (TES)** and binds `energy_accounting_method = physical_energy_content` into each observation payload. The method interpretation changes the semantic profile/payload version; the pinned CSV and its hashes are unchanged.
+
+The pinned EWD registry concept and provenance `boundary_note` still describe the series as “Primary energy supply” / “gross primary-energy supply.” This is a real semantic metadata conflict, not just a filename difference. The AtM v2 interpretation follows the pinned transport's `tes_ej` mapping and the official Energy Institute methodology; the F0-19 proposal records that the precedence rule must be explicitly reviewed before SRA qualification.
+
+The value is a gross annual energy-supply flow. It constrains the energy mix but does not directly observe EROI or net energy.
 
 ## Candidate series
 
@@ -34,11 +40,13 @@ The first qualification candidate is deliberately narrow:
 - X: calendar year
 - X unit: `calendar_year`
 - X dimension: time
-- Y: `total_primary_energy_ej`
+- Y metric: Total Energy Supply (TES), Physical Energy Content method
+- pinned EWD column: `total_primary_energy_ej` (legacy column name, preserved byte-for-byte)
 - Y unit: `exajoules/year`
 - Y dimension: energy-flow rate
-- subject: global primary-energy supply
-- attribute: total primary energy
+- subject: `global_total_energy_supply`
+- attribute: `total_energy_supply`
+- accounting method: `physical_energy_content`
 - frequency: annual
 - geography: Total World
 - epistemic status: empirical observation
@@ -58,7 +66,7 @@ For 1965–2018 and 2024–2025 the residual is at a small numerical-reconciliat
 - 2022: 0.45502217 EJ
 - 2023: 0.41971255 EJ
 
-These rows must not be silently repaired, redistributed, normalized, or recomputed by an AtM adapter. The candidate series therefore uses the authoritative `total_primary_energy_ej` column directly and treats the reconciliation column as provenance/audit evidence, not as a correction instruction.
+These rows must not be silently repaired, redistributed, normalized, or recomputed by an AtM adapter. The candidate series therefore uses the pinned `total_primary_energy_ej` column directly as the source locator/value field, but interprets its metric according to the upstream `tes_ej` mapping as Total Energy Supply. The reconciliation column remains provenance/audit evidence, not a correction instruction.
 
 The fossil/non-fossil component columns are not independent evidence for the total. A future multi-series adapter must explicitly qualify their semantic relationship before exposing them together.
 
@@ -79,11 +87,13 @@ Before qualification, a dedicated adapter must establish:
 9. independent reconstruction from the pinned bytes;
 10. tests for mutation, reordered rows, changed values, changed source spelling, provenance changes, and identity forgery.
 
-No existing GISTEMP profile is widened by this audit. The Energy Institute source must receive its own profile/version.
+No existing GISTEMP profile is widened by this audit. The Energy Institute source uses the versioned TES semantic profile `atm-profile/ewd-energy-institute-tes-physical-content/v2`. F0-19 still blocks SRA qualification because the source bundle does not define an approved AtM reconstruction obligation.
+
+The unresolved scope is recorded in [`CHART01_ENERGY_INSTITUTE_F0-19_QUALIFICATION_PROPOSAL.md`](CHART01_ENERGY_INSTITUTE_F0-19_QUALIFICATION_PROPOSAL.md). It proposes a bounded obligation for reconstruction of the pinned EWD processed snapshot, explicitly not reproduction of the upstream raw-to-processed calculation. The candidate identifier is not active; `canonical_obligation` remains `NULL` until the scope is explicitly approved.
 
 ## Explicit non-claims
 
-This audit does not claim that primary-energy supply is:
+This audit does not claim that Total Energy Supply (TES) is:
 
 - World3's resource-stock state;
 - net energy;
