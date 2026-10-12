@@ -1,6 +1,7 @@
 #include "chart_history_reconstruct.h"
 #include "gistemp_admission.h"
 #include "verified_series.h"
+#include "verified_series_contract.h"
 #include <gio/gio.h>
 #include <string.h>
 
@@ -9,6 +10,134 @@ reject (GError **error, const char *message)
 {
     g_set_error_literal (error, ATM_SRA_ERROR, ATM_SRA_ERROR_IDENTITY, message);
     return FALSE;
+}
+
+static gboolean
+generic_series_metadata_matches (const AtmGistempAdmission *admission,
+                                 const AtmSeriesContract *generic)
+{
+    const AtmSeriesAdapterMetadata *metadata =
+        atm_verified_series_gistemp_metadata ();
+    char *expected_repository_version = g_strdup_printf (
+        "snapshot:%s", atm_gistemp_admission_snapshot (admission));
+
+    gboolean matches =
+        generic != NULL &&
+        generic->x_kind == ATM_SERIES_X_CALENDAR_YEAR &&
+        g_strcmp0 (generic->subject,
+                   atm_gistemp_admission_subject (admission)) == 0 &&
+        g_strcmp0 (generic->attribute,
+                   atm_gistemp_admission_attribute (admission)) == 0 &&
+        g_strcmp0 (generic->x_unit, "calendar_year") == 0 &&
+        g_strcmp0 (generic->x_dimension, "time") == 0 &&
+        g_strcmp0 (generic->y_unit,
+                   atm_gistemp_admission_unit (admission)) == 0 &&
+        g_strcmp0 (generic->y_dimension, "temperature_difference") == 0 &&
+        g_strcmp0 (generic->series_semantics,
+                   metadata->series_semantics) == 0 &&
+        g_strcmp0 (generic->scenario, metadata->scenario) == 0 &&
+        g_strcmp0 (generic->time_scope, metadata->time_scope) == 0 &&
+        g_strcmp0 (generic->epistemic_status,
+                   atm_gistemp_admission_epistemic_status (admission)) == 0 &&
+        g_strcmp0 (generic->repository_id, "ewd") == 0 &&
+        g_strcmp0 (generic->repository_version,
+                   expected_repository_version) == 0 &&
+        g_strcmp0 (generic->snapshot_sha,
+                   atm_gistemp_admission_snapshot (admission)) == 0 &&
+        g_strcmp0 (generic->source_path,
+                   atm_gistemp_admission_source_path (admission, 0)) == 0 &&
+        g_strcmp0 (generic->profile_id, metadata->profile_id) == 0 &&
+        g_strcmp0 (generic->profile_version, metadata->profile_version) == 0;
+
+    g_free (expected_repository_version);
+    return matches;
+}
+
+static gboolean
+validate_generic_gistemp_parity (const AtmGistempAdmission *admission,
+                                 const AtmVerifiedSeries *legacy,
+                                 GError **error)
+{
+    AtmSeriesContract *generic = NULL;
+    if (!atm_verified_series_contract (admission, &generic, error))
+        return FALSE;
+
+    if (!generic_series_metadata_matches (admission, generic)) {
+        atm_series_contract_free (generic);
+        return reject (error,
+            "Generic series metadata disagrees with pinned GISTEMP qualification.");
+    }
+
+    gboolean matches =
+        generic->points != NULL &&
+        generic->points->len == atm_verified_series_count (legacy);
+    if (!matches) {
+        atm_series_contract_free (generic);
+        return reject (error,
+            "Generic and persisted GISTEMP series have different point counts.");
+    }
+
+    for (guint i = 0; i < generic->points->len; i++) {
+        const AtmSeriesContractPoint *point =
+            g_ptr_array_index (generic->points, i);
+        const AtmVerifiedPoint *verified =
+            atm_verified_series_point (legacy, i);
+        char *year = verified != NULL
+            ? g_strdup_printf ("%u", verified->calendar_year)
+            : NULL;
+
+        matches = point != NULL && verified != NULL && year != NULL &&
+            point->order == verified->order &&
+            point->y_status == ATM_SERIES_Y_NUMERIC &&
+            verified->y_status == ATM_VERIFIED_Y_NUMERIC &&
+            g_strcmp0 (point->x, year) == 0 &&
+            g_strcmp0 (point->source_decimal, verified->source_decimal) == 0 &&
+            g_strcmp0 (point->coefficient, verified->coefficient) == 0 &&
+            point->exponent == verified->exponent &&
+            point->negative_zero ==
+                (verified->source_decimal != NULL &&
+                 verified->source_decimal[0] == '-' &&
+                 g_strcmp0 (verified->coefficient, "0") == 0 &&
+                 verified->exponent == 0) &&
+            !point->break_before && point->missing_reason == NULL &&
+            point->break_reason == NULL &&
+            point->support != NULL && verified->support != NULL &&
+            point->support->len == verified->support->len;
+        g_free (year);
+
+        if (matches) {
+            /* Require one-to-one support equality. Membership alone would
+             * permit a duplicate generic ID to mask an omitted legacy ID. */
+            gboolean *matched = g_new0 (gboolean, verified->support->len);
+            for (guint j = 0; j < point->support->len; j++) {
+                const char *support_id = g_ptr_array_index (point->support, j);
+                gboolean found = FALSE;
+                for (guint k = 0; k < verified->support->len; k++) {
+                    if (!matched[k] &&
+                        g_strcmp0 (support_id,
+                                   g_ptr_array_index (verified->support, k)) == 0) {
+                        matched[k] = TRUE;
+                        found = TRUE;
+                        break;
+                    }
+                }
+                if (!found) {
+                    matches = FALSE;
+                    break;
+                }
+            }
+            g_free (matched);
+        }
+
+        if (!matches) {
+            atm_series_contract_free (generic);
+            return reject (error,
+                "Generic series disagrees with the pinned VerifiedSeries points or support.");
+        }
+    }
+
+    atm_series_contract_free (generic);
+    return TRUE;
 }
 
 static gboolean
@@ -170,6 +299,13 @@ atm_chart_history_reconstruct_gistemp (
         goto cleanup;
     }
 
+    /* Keep legacy persisted IDs authoritative, but require the generic
+     * source-bound chain to reconstruct identical point values and support
+     * before this series can reach ChartSpec or rendering. */
+    if (!validate_generic_gistemp_parity (admission, series, error)) {
+        goto cleanup;
+    }
+
     if (g_strcmp0 (
             atm_verified_series_scientific_id (series),
             scientific_id) != 0 ||
@@ -295,6 +431,11 @@ atm_chart_live_reconstruct_gistemp (
             admission,
             &series,
             error)) {
+        goto cleanup;
+    }
+
+    /* The live route uses the same generic proof as History before ChartSpec. */
+    if (!validate_generic_gistemp_parity (admission, series, error)) {
         goto cleanup;
     }
 
