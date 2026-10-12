@@ -35,17 +35,69 @@ static AtmSraResult *qualified_with_artifact (AtmScientificArtifact *a)
     GError *error = NULL;
     AtmSraEstablishedFact *f1 = atm_sra_established_fact_new (
         "fact-1", "observation", "subject", "attribute", "1e0", "unit", "dimension",
-        "{\"calendar_year\":\"1880\",\"scenario\":\"baseline\"}");
+        "{\"calendar_year\":\"1880\",\"scenario\":\"baseline\",\"y_status\":\"NUMERIC\"}");
     AtmSraEstablishedFact *f2 = atm_sra_established_fact_new (
         "fact-2", "observation", "subject", "attribute", "0e0", "unit", "dimension",
-        "{\"calendar_year\":\"1882\",\"scenario\":\"baseline\"}");
+        "{\"calendar_year\":\"1882\",\"scenario\":\"baseline\",\"y_status\":\"NUMERIC\"}");
+    AtmSraEstablishedFact *missing = atm_sra_established_fact_new (
+        "fact-missing-1881", "observation", "subject", "attribute",
+        "MISSING", "unit", "dimension",
+        "{\"calendar_year\":\"1881\",\"scenario\":\"baseline\","
+        "\"y_status\":\"MISSING\",\"missing_reason\":\"source_missing\"}");
     g_assert_true (atm_sra_fact_add_support (f1, a->qualified_artifact_id, &error));
     g_assert_no_error (error);
     g_assert_true (atm_sra_fact_add_support (f2, a->qualified_artifact_id, &error));
     g_assert_no_error (error);
+    g_assert_true (atm_sra_fact_add_support (missing, a->qualified_artifact_id, &error));
+    g_assert_no_error (error);
     g_assert_true (atm_sra_result_add_fact (q, f1, &error));
     g_assert_no_error (error);
     g_assert_true (atm_sra_result_add_fact (q, f2, &error));
+    g_assert_no_error (error);
+    g_assert_true (atm_sra_result_add_fact (q, missing, &error));
+    g_assert_no_error (error);
+    g_assert_true (atm_sra_qualification_add_canonical_obligation (q, "atm-sra/1", &error));
+    g_assert_no_error (error);
+    char *snapshot = g_strdup_printf ("ewd@0.1.0#%s", SHA);
+    g_assert_true (atm_sra_qualification_add_repository_snapshot (q, snapshot, &error));
+    g_free (snapshot);
+    g_assert_no_error (error);
+    g_assert_true (atm_sra_qualification_add_evidence_artifact (q, a, &error));
+    g_assert_no_error (error);
+    g_assert_true (atm_sra_qualification_add_semantic_profile (
+        q, "atm-profile/ewd/v1@1", &error));
+    g_assert_no_error (error);
+    g_assert_true (atm_sra_qualification_set_numeric_profile (
+        q, ATM_SERIES_CONTRACT_NUMERIC_PROFILE, &error));
+    g_assert_no_error (error);
+    g_assert_true (atm_sra_result_finalize (q, &error));
+    g_assert_no_error (error);
+    return q;
+}
+
+static AtmSraResult *
+qualified_with_missing_facts (AtmScientificArtifact *a)
+{
+    AtmSraResult *q = atm_sra_result_new (ATM_SRA_ANSWERED);
+    GError *error = NULL;
+    AtmSraEstablishedFact *f0 = atm_sra_established_fact_new (
+        "fact-missing-1880", "observation", "subject", "attribute",
+        "MISSING", "unit", "dimension",
+        "{\"calendar_year\":\"1880\",\"scenario\":\"baseline\","
+        "\"y_status\":\"MISSING\",\"missing_reason\":\"source_missing\"}");
+    AtmSraEstablishedFact *f1 = atm_sra_established_fact_new (
+        "fact-missing-1881", "observation", "subject", "attribute",
+        "MISSING", "unit", "dimension",
+        "{\"calendar_year\":\"1881\",\"scenario\":\"baseline\","
+        "\"y_status\":\"MISSING\",\"missing_reason\":\"source_missing\"}");
+
+    g_assert_true (atm_sra_fact_add_support (f0, a->qualified_artifact_id, &error));
+    g_assert_no_error (error);
+    g_assert_true (atm_sra_fact_add_support (f1, a->qualified_artifact_id, &error));
+    g_assert_no_error (error);
+    g_assert_true (atm_sra_result_add_fact (q, f0, &error));
+    g_assert_no_error (error);
+    g_assert_true (atm_sra_result_add_fact (q, f1, &error));
     g_assert_no_error (error);
     g_assert_true (atm_sra_qualification_add_canonical_obligation (q, "atm-sra/1", &error));
     g_assert_no_error (error);
@@ -100,7 +152,7 @@ qualified_with_two_artifacts (AtmScientificArtifact *a, AtmScientificArtifact *b
     AtmSraEstablishedFact *fact = atm_sra_established_fact_new (
         "fact-two-supports", "observation", "subject", "attribute",
         "1e0", "unit", "dimension",
-        "{\"calendar_year\":\"1880\",\"scenario\":\"baseline\"}");
+        "{\"calendar_year\":\"1880\",\"scenario\":\"baseline\",\"y_status\":\"NUMERIC\"}");
 
     g_assert_true (atm_sra_fact_add_support (fact, a->qualified_artifact_id, &error));
     g_assert_no_error (error);
@@ -349,6 +401,51 @@ static void test_direct_time_scope_must_enclose_points (void)
     atm_scientific_artifact_free (a);
 }
 
+static void test_missing_point_must_match_sra_fact (void)
+{
+    AtmScientificArtifact *a = support_artifact ();
+    AtmSraResult *q = qualified_with_artifact (a);
+    const char *support[] = { a->qualified_artifact_id };
+    GError *error = NULL;
+
+    /* A numeric fact for the same year must not authorize a MISSING point. */
+    AtmSeriesContract *s = base ();
+    g_assert_true (atm_series_contract_add_point (
+        s, "1880", ATM_SERIES_Y_MISSING, NULL, NULL, 0, FALSE,
+        FALSE, "source_missing", NULL, support, 1, &error));
+    g_assert_no_error (error);
+    g_assert_false (atm_series_contract_validate (s, q, &error));
+    g_assert_error (error, ATM_SERIES_CONTRACT_ERROR,
+                    ATM_SERIES_CONTRACT_ERROR_SHAPE);
+    g_clear_error (&error);
+    atm_series_contract_free (s);
+
+    /* The year and MISSING status match, but the claimed reason does not. */
+    s = base ();
+    g_assert_true (atm_series_contract_add_point (
+        s, "1881", ATM_SERIES_Y_MISSING, NULL, NULL, 0, FALSE,
+        FALSE, "not_reported", NULL, support, 1, &error));
+    g_assert_no_error (error);
+    g_assert_false (atm_series_contract_validate (s, q, &error));
+    g_assert_error (error, ATM_SERIES_CONTRACT_ERROR,
+                    ATM_SERIES_CONTRACT_ERROR_SHAPE);
+    g_clear_error (&error);
+    atm_series_contract_free (s);
+
+    /* Only the explicit matching missing fact authorizes this point. */
+    s = base ();
+    g_assert_true (atm_series_contract_add_point (
+        s, "1881", ATM_SERIES_Y_MISSING, NULL, NULL, 0, FALSE,
+        FALSE, "source_missing", NULL, support, 1, &error));
+    g_assert_no_error (error);
+    g_assert_true (atm_series_contract_validate (s, q, &error));
+    g_assert_no_error (error);
+    atm_series_contract_free (s);
+
+    atm_sra_result_free (q);
+    atm_scientific_artifact_free (a);
+}
+
 static void test_unqualified_support_rejected (void)
 {
     AtmScientificArtifact *a = support_artifact ();
@@ -433,6 +530,7 @@ static void test_last_break_and_all_missing_are_supported (void)
     g_assert_no_error (error);
     atm_series_contract_free (broken);
 
+    AtmSraResult *q_missing = qualified_with_missing_facts (a);
     AtmSeriesContract *missing = base_kind (ATM_SERIES_X_CALENDAR_YEAR);
     g_assert_true (atm_series_contract_add_point (
         missing, "1880", ATM_SERIES_Y_MISSING, NULL, NULL, 0,
@@ -442,9 +540,10 @@ static void test_last_break_and_all_missing_are_supported (void)
         missing, "1881", ATM_SERIES_Y_MISSING, NULL, NULL, 0,
         FALSE, FALSE, "source_missing", NULL, support, 1, &error));
     g_assert_no_error (error);
-    g_assert_true (atm_series_contract_validate (missing, q, &error));
+    g_assert_true (atm_series_contract_validate (missing, q_missing, &error));
     g_assert_no_error (error);
     atm_series_contract_free (missing);
+    atm_sra_result_free (q_missing);
 
     atm_sra_result_free (q);
     atm_scientific_artifact_free (a);
@@ -518,6 +617,7 @@ int main (int argc, char **argv)
     g_test_add_func ("/series-contract/duplicate-x", test_duplicate_x_rejected);
     g_test_add_func ("/series-contract/support", test_unqualified_support_rejected);
     g_test_add_func ("/series-contract/fact-binding", test_numeric_point_must_match_sra_fact);
+    g_test_add_func ("/series-contract/missing-point-fact-binding", test_missing_point_must_match_sra_fact);
     g_test_add_func ("/series-contract/direct-scenario-binding", test_direct_scenario_must_match_sra_fact);
     g_test_add_func ("/series-contract/direct-time-scope", test_direct_time_scope_must_enclose_points);
     g_test_add_func ("/series-contract/support-unique-set", test_numeric_point_support_must_match_as_unique_set);
