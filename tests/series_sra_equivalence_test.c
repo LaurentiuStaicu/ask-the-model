@@ -341,26 +341,34 @@ string_array_contains (const GPtrArray *array, const char *value)
 
 static gboolean
 fact_supports_belong_to_evidence (const AtmSraEstablishedFact *fact,
-                                  const AtmSeriesEvidence *evidence)
+                                  const AtmSeriesEvidence *evidence,
+                                  guint point)
 {
     if (fact == NULL || fact->support == NULL || evidence == NULL ||
         fact->support->len != ATM_EI_SOURCE_COUNT + 1u)
         return FALSE;
 
+    /* The SRA must bind exactly the expected source set for this point, once
+     * each. Merely finding all IDs somewhere in the evidence would let a
+     * duplicated ID conceal an omitted support or support from another year. */
+    gboolean matched[ATM_EI_SOURCE_COUNT + 1u] = { FALSE };
     for (guint i = 0; i < fact->support->len; i++) {
         const char *support_id = g_ptr_array_index (fact->support, i);
         gboolean found = FALSE;
-        for (guint j = 0; j < atm_series_evidence_count (evidence); j++) {
-            const AtmScientificArtifact *artifact =
-                atm_series_evidence_at (evidence, j);
-            if (artifact != NULL &&
-                g_strcmp0 (support_id, artifact->qualified_artifact_id) == 0) {
+        for (guint j = 0; j < ATM_EI_SOURCE_COUNT + 1u; j++) {
+            const char *expected =
+                atm_series_evidence_point_support (evidence, point, j);
+            if (!matched[j] && expected != NULL &&
+                g_strcmp0 (support_id, expected) == 0) {
+                matched[j] = TRUE;
                 found = TRUE;
                 break;
             }
         }
         if (!found) return FALSE;
     }
+    for (guint j = 0; j < ATM_EI_SOURCE_COUNT + 1u; j++)
+        if (!matched[j]) return FALSE;
     return TRUE;
 }
 
@@ -426,7 +434,7 @@ test_energy_sra_qualifies_approved_snapshot (void)
         g_assert_cmpstr (fact->attribute, ==, "total_energy_supply");
         g_assert_cmpstr (fact->unit, ==, "exajoules/year");
         g_assert_cmpstr (fact->dimension, ==, "energy_flow_rate");
-        g_assert_true (fact_supports_belong_to_evidence (fact, evidence));
+        g_assert_true (fact_supports_belong_to_evidence (fact, evidence, i));
         g_assert_nonnull (strstr (fact->qualifiers_json, "physical_energy_content"));
     }
     const AtmSraEstablishedFact *first =
