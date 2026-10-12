@@ -136,6 +136,41 @@ build_energy_admission (void)
     return admission;
 }
 
+static GBytes *
+load_current_fixture (const char *relative)
+{
+    const char *root = g_getenv ("ATM_CHART01_FIXTURE");
+    if (root == NULL)
+        g_error ("ATM_CHART01_FIXTURE must point at tests/fixtures/chart01.");
+    char *path = g_build_filename (root, "ewd-current", relative, NULL);
+    gchar *data = NULL;
+    gsize length = 0;
+    GError *error = NULL;
+    if (!g_file_get_contents (path, &data, &length, &error))
+        g_error ("Cannot read current-snapshot fixture %s: %s", path, error->message);
+    g_free (path);
+    return g_bytes_new_take (data, length);
+}
+
+static AtmEnergyInstituteAdmission *
+build_energy_admission_current (void)
+{
+    GBytes *sources[ATM_EI_SOURCE_COUNT] = {
+        load_current_fixture ("science/data/processed/energy_institute_global_2026.csv"),
+        load_current_fixture ("science/data/processed/energy_institute_global_2026.provenance.json"),
+        load_current_fixture ("science/data/input_manifest.json"),
+        load_current_fixture ("science/data/registry.csv"),
+    };
+    AtmEnergyInstituteAdmission *admission = NULL;
+    GError *error = NULL;
+    const char *current_snapshot = "dc710d8e604c0fff713a3acfdb18ab47a1a902bb";
+    g_assert_true (atm_energy_institute_admission_new (ATM_TEST_REPOSITORY,
+        current_snapshot, sources, &admission, &error));
+    g_assert_no_error (error);
+    for (guint i = 0; i < ATM_EI_SOURCE_COUNT; i++) g_bytes_unref (sources[i]);
+    return admission;
+}
+
 static void
 assert_id_list_matches (const char *label,
                         const GPtrArray *before,
@@ -558,6 +593,72 @@ test_energy_sra_qualifies_approved_snapshot (void)
 }
 
 static void
+test_energy_sra_qualifies_current_snapshot_with_distinct_qualified_identity (void)
+{
+    AtmEnergyInstituteAdmission *original_admission = build_energy_admission ();
+    AtmEnergyInstituteAdmission *current_admission = build_energy_admission_current ();
+    AtmSeriesSra *original_sra = NULL, *current_sra = NULL;
+    GError *error = NULL;
+
+    g_assert_true (atm_series_sra_new (&ATM_EI_EVIDENCE_DESCRIPTOR,
+        original_admission, &original_sra, &error));
+    g_assert_no_error (error);
+    g_assert_true (atm_series_sra_new (&ATM_EI_EVIDENCE_DESCRIPTOR,
+        current_admission, &current_sra, &error));
+    g_assert_no_error (error);
+    g_assert_true (atm_series_sra_validate (original_sra, &error));
+    g_assert_no_error (error);
+    g_assert_true (atm_series_sra_validate (current_sra, &error));
+    g_assert_no_error (error);
+
+    const AtmSraResult *original = atm_series_sra_result (original_sra);
+    const AtmSraResult *current = atm_series_sra_result (current_sra);
+    g_assert_cmpuint (atm_series_evidence_count (
+        atm_series_sra_evidence (current_sra)), ==, 65u);
+    g_assert_cmpuint (current->established_facts->len, ==, 61u);
+    g_assert_cmpstr (g_ptr_array_index (
+        current->qualification->repository_snapshots, 0), ==,
+        "ewd@snapshot:dc710d8e604c0fff713a3acfdb18ab47a1a902bb#dc710d8e604c0fff713a3acfdb18ab47a1a902bb");
+
+    /* The two snapshots contain the same EI observations and the same EI
+     * registry row, so scientific fact content stays identical. Their full
+     * manifest/registry bytes and snapshot pins differ, so qualified identity
+     * and source-binding support must not be aliased. */
+    g_assert_cmpstr (current->qualification->scientific_content_id, ==,
+                     original->qualification->scientific_content_id);
+    g_assert_cmpstr (current->qualification->qualified_artifact_id, !=,
+                     original->qualification->qualified_artifact_id);
+    g_assert_cmpuint (current->qualification->evidence_atom_ids->len, ==, 65u);
+
+    for (guint i = 0; i < 61; i++) {
+        const AtmSraEstablishedFact *old_fact =
+            g_ptr_array_index (original->established_facts, i);
+        const AtmSraEstablishedFact *new_fact =
+            g_ptr_array_index (current->established_facts, i);
+        g_assert_cmpstr (new_fact->fact_id, ==, old_fact->fact_id);
+        g_assert_cmpstr (new_fact->value, ==, old_fact->value);
+        g_assert_cmpstr (new_fact->unit, ==, old_fact->unit);
+        g_assert_cmpstr (new_fact->dimension, ==, old_fact->dimension);
+        g_assert_cmpstr (new_fact->qualifiers_json, ==, old_fact->qualifiers_json);
+        g_assert_cmpstr (new_fact->qualifiers_content_id, ==,
+                         old_fact->qualifiers_content_id);
+        g_assert_cmpuint (new_fact->support->len, ==, 5u);
+        g_assert_cmpuint (old_fact->support->len, ==, 5u);
+        gboolean same_support = TRUE;
+        for (guint j = 0; j < new_fact->support->len; j++)
+            same_support = same_support &&
+                g_strcmp0 (g_ptr_array_index (new_fact->support, j),
+                           g_ptr_array_index (old_fact->support, j)) == 0;
+        g_assert_false (same_support);
+    }
+
+    atm_series_sra_free (current_sra);
+    atm_series_sra_free (original_sra);
+    atm_energy_institute_admission_free (current_admission);
+    atm_energy_institute_admission_free (original_admission);
+}
+
+static void
 test_energy_sra_fails_closed_without_approved_obligation (void)
 {
     AtmEnergyInstituteAdmission *admission = build_energy_admission ();
@@ -599,6 +700,8 @@ main (int argc, char **argv)
     g_test_add_func ("/sra/validate-reconstruction", test_generic_sra_validate_is_reconstruction_guard);
     g_test_add_func ("/sra/ei-approved-snapshot-qualification",
                      test_energy_sra_qualifies_approved_snapshot);
+    g_test_add_func ("/sra/ei-current-snapshot-distinct-qualification",
+                     test_energy_sra_qualifies_current_snapshot_with_distinct_qualified_identity);
     g_test_add_func ("/sra/ei-fails-closed-without-obligation",
                      test_energy_sra_fails_closed_without_approved_obligation);
 

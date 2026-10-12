@@ -734,6 +734,23 @@
       "tested_by": [
         "meson:energy-institute-verified-series"
       ]
+    },
+    {
+      "id": "SCIENTIFIC-S1-005",
+      "category": "SCIENTIFIC",
+      "severity": "S1",
+      "lifecycle": "enforced",
+      "statement": "Energy Institute admission must accept only the exact reviewed four-file bundles for snapshot d9e249339663015f6d1c05752338a955bf64ad0b or dc710d8e604c0fff713a3acfdb18ab47a1a902bb. The EI observations and source-provenance files may be shared byte-identical inputs, but the complete manifest and registry must match the selected snapshot; no cross-snapshot file substitution is allowed. Reconstructed SRA fact content must remain equal across the two bundles while repository snapshot and exact qualified identity/support remain distinct.",
+      "enforced_by": [
+        "src/energy_institute_admission.c",
+        "src/series_evidence.c",
+        "src/series_sra.c",
+        "src/series_contract.c"
+      ],
+      "tested_by": [
+        "meson:energy-institute-admission",
+        "meson:series-sra-equivalence"
+      ]
     }
   ]
 }

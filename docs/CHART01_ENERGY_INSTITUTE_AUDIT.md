@@ -15,6 +15,21 @@ The audited source is the exact EWD snapshot:
 - registry: `science/data/registry.csv`
 - input manifest: `science/data/input_manifest.json`
 
+## Exact current-snapshot bundle admission (profile v3)
+
+The admission policy change under qualification adds a second explicitly pinned four-file bundle at EWD snapshot `dc710d8e604c0fff713a3acfdb18ab47a1a902bb`, the snapshot already recognized as current by the GISTEMP History path. This is not a wildcard update rule: all four file digests are fixed for each accepted commit, cross-snapshot mixtures are rejected, and rebuilding the SRA binds the selected commit and its source-support identities.
+
+| File | SHA-256 at `dc710d…` |
+| --- | --- |
+| `science/data/processed/energy_institute_global_2026.csv` | `46b30240372b392f7e7aabb7b63a0521afd9a9af2574ff044867ea84d0a1074c` |
+| `science/data/processed/energy_institute_global_2026.provenance.json` | `1eca3a26375f7d56a0c4540eabccd8ea0d10c984dc1381757b2f4464f34e6a57` |
+| `science/data/input_manifest.json` | `ece72aed0d444484635e38171df703a775e5922df95b8783385cbfed7e2ffbd6` |
+| `science/data/registry.csv` | `6ff4e0bffe03cce368dcd278d6ca57b6e8f181aa241dea7206508499ec3fa3b8` |
+
+The EI CSV, provenance JSON and the complete `ei_primary_energy` registry row are unchanged between `d9e249…` and `dc710d…`. The manifest and registry as full files are different because the wider EWD snapshot changed. The second bundle is therefore qualified as its own exact input set: its semantic fact content remains the same, but its SRA qualified identity and support identities must differ because repository snapshot and complete source-binding bytes differ. Matching observation files alone is insufficient for admission.
+
+Until this profile-v3 change is merged and its CI passes, the main-branch admission remains the original `d9e249…` bundle. Neither bundle grants raw-to-processed reproduction or downstream chart authority.
+
 The source provenance identifies the authority as **Energy Institute**, dataset **Statistical Review of World Energy 2026**, geography **Total World**, coverage **1965–2025**, and the original input file as `Statistical Review of World Energy Narrow format.csv`.
 
 The upstream transport receipt is retained as provenance only:

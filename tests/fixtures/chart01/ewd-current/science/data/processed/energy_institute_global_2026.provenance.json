@@ -1,0 +1,17 @@
+{
+  "authority": "Energy Institute",
+  "dataset": "Statistical Review of World Energy 2026",
+  "official_url": "https://www.energyinst.org/statistical-review/resources-and-data-downloads",
+  "transport_url": "https://github.com/shanewhi/world-energy-data",
+  "transport_commit": "9fc01fc0ae5aea3955968f920e5cd1394fe5ad34",
+  "input_filename": "Statistical Review of World Energy Narrow format.csv",
+  "input_sha256": "c19b4922cb08316b45d7024233e8cd9d35e14429ee8cf65ab767e647cefc1f95",
+  "input_size_bytes": 21056006,
+  "coverage": {
+    "start_year": 1965,
+    "end_year": 2025
+  },
+  "geography": "Total World",
+  "output": "data/processed/energy_institute_global_2026.csv",
+  "boundary_note": "These are gross primary-energy supply observations. They constrain the energy mix but do not directly observe EROI or net energy."
+}

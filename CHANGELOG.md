@@ -9,6 +9,10 @@ All notable public releases of Ask the Model are recorded here.
 - Reconcile managed conversation JSON exports before startup cleanup. An unarchived SQLite row is removed only after the export path is confirmed absent or otherwise reconciled successfully; failed or unknown reconciliation keeps the row for a later retry instead of silently losing its recoverable state.
 - Keep retained unarchived working rows out of History. When the export obstruction is removed, the next successful reconciliation resumes normal cleanup. This change does not alter the immutable v0.6.3 release artifact.
 
+### Scientific-source qualification
+
+- Extend the dormant native Energy Institute admission policy to two exact, versioned EWD snapshot bundles, each pinning all four files independently. The EI observations and source provenance remain byte-identical between the two bundles; manifest/registry differences retain distinct SRA qualified identities/support, and cross-bundle mixtures fail closed. This is source qualification only: it adds no chart route or History behavior and does not alter the immutable v0.6.3 artifact.
+
 ## 0.6.3 - 2026-10-10
 
 Correct qualified live GISTEMP chart admission for the reviewed current EWD snapshot.
