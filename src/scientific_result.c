@@ -673,6 +673,32 @@ add_validated_artifact (
         return FALSE;
     }
 
+    /* The snapshot list is part of qualification, not a free parallel label.
+     * Require each admitted artifact's exact repository/version/snapshot tuple
+     * to be named before its qualified identity can enter the envelope. */
+    char *artifact_snapshot = g_strdup_printf ("%s@%s#%s",
+        artifact->repository_id, artifact->repository_version,
+        artifact->snapshot_sha);
+    gboolean snapshot_is_qualified = FALSE;
+    GPtrArray *snapshots = result->qualification->repository_snapshots;
+    for (guint i = 0; snapshots != NULL && i < snapshots->len; i++) {
+        if (g_strcmp0 (g_ptr_array_index (snapshots, i),
+                       artifact_snapshot) == 0) {
+            snapshot_is_qualified = TRUE;
+            break;
+        }
+    }
+    g_free (artifact_snapshot);
+    if (!snapshot_is_qualified) {
+        g_set_error_literal (
+            error,
+            ATM_SRA_ERROR,
+            ATM_SRA_ERROR_SUPPORT,
+            "SRA artifact repository/version/snapshot is absent from qualification."
+        );
+        return FALSE;
+    }
+
     return add_unique_string (
         result,
         target,
