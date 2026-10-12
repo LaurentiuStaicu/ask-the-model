@@ -1866,6 +1866,58 @@ support_is_qualified (
     return TRUE;
 }
 
+/* AtmSraEstablishedFact is a public mutable struct. Its content identity
+ * stores qualifiers_content_id, while downstream consumers read qualifiers_json.
+ * Recompute the digest at both finalize and validate boundaries so post-finalize
+ * JSON mutation cannot change fact semantics without changing the SRA identity. */
+static gboolean
+fact_qualifiers_identity_valid (
+    const AtmSraEstablishedFact *fact,
+    GError **error
+)
+{
+    if (fact == NULL) {
+        g_set_error_literal (error, ATM_SRA_ERROR, ATM_SRA_ERROR_SHAPE,
+                             "SRA established fact is NULL.");
+        return FALSE;
+    }
+
+    if (fact->qualifiers_json == NULL) {
+        if (fact->qualifiers_content_id == NULL)
+            return TRUE;
+        g_set_error_literal (error, ATM_SRA_ERROR, ATM_SRA_ERROR_IDENTITY,
+                             "SRA fact has a qualifier identity without qualifier JSON.");
+        return FALSE;
+    }
+
+    char *expected_id = NULL;
+    GError *canonical_error = NULL;
+    if (!atm_scientific_content_id_json (
+            "atm.sra.qualifiers.v1",
+            fact->qualifiers_json,
+            &expected_id,
+            &canonical_error)) {
+        g_set_error (error, ATM_SRA_ERROR, ATM_SRA_ERROR_IDENTITY,
+                     "SRA fact qualifiers cannot be canonicalized: %s.",
+                     canonical_error != NULL
+                         ? canonical_error->message
+                         : "unknown error");
+        g_clear_error (&canonical_error);
+        g_free (expected_id);
+        return FALSE;
+    }
+
+    gboolean matches = g_strcmp0 (expected_id,
+                                  fact->qualifiers_content_id) == 0;
+    g_free (expected_id);
+    if (!matches) {
+        g_set_error_literal (error, ATM_SRA_ERROR, ATM_SRA_ERROR_IDENTITY,
+                             "SRA fact qualifiers disagree with their canonical qualifier identity.");
+        return FALSE;
+    }
+    return TRUE;
+}
+
 static gboolean
 sra_shape_valid (
     AtmSraResult *result,
@@ -1946,7 +1998,8 @@ sra_shape_valid (
                 i
             );
 
-        if (!support_is_qualified (
+        if (!fact_qualifiers_identity_valid (fact, error) ||
+            !support_is_qualified (
                 result,
                 fact->support,
                 error
