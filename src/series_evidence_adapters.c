@@ -342,7 +342,7 @@ const AtmSeriesEvidenceDescriptor ATM_EI_EVIDENCE_DESCRIPTOR = {
     .point_semantic_type = "ewd.energy_institute_annual_observation",
     /* Column spelling is fixed by the admitted CSV dialect. */
     .point_locator_columns = "year,total_primary_energy_ej",
-    .canonical_obligation = ATM_EI_RECONSTRUCTION_OBLIGATION,
+    .canonical_obligation = NULL, /* TODO(F0-19): SRA qualification is gated */
     .semantic_profile = ATM_EI_EVIDENCE_PROFILE "@1",
     .limitations = ATM_EI_LIMITATIONS,
     .admission_rebuild = energy_rebuild,
