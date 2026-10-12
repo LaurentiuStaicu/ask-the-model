@@ -29,7 +29,8 @@ static AtmScientificArtifact *support_artifact (void)
     return a;
 }
 
-static AtmSraResult *qualified_with_artifact (AtmScientificArtifact *a)
+static AtmSraResult *qualified_with_artifact_mode (AtmScientificArtifact *a,
+                                                       gboolean qualify_break)
 {
     AtmSraResult *q = atm_sra_result_new (ATM_SRA_ANSWERED);
     GError *error = NULL;
@@ -39,11 +40,16 @@ static AtmSraResult *qualified_with_artifact (AtmScientificArtifact *a)
     AtmSraEstablishedFact *f2 = atm_sra_established_fact_new (
         "fact-2", "observation", "subject", "attribute", "0e0", "unit", "dimension",
         "{\"calendar_year\":\"1882\",\"scenario\":\"baseline\",\"epistemic_status\":\"observed\",\"y_status\":\"NUMERIC\"}");
+    const char *break_fields = qualify_break
+        ? ",\"break_before\":true,\"break_reason\":\"measurement_gap\"" : "";
+    char *missing_qualifiers = g_strdup_printf (
+        "{\"calendar_year\":\"1881\",\"scenario\":\"baseline\",\"epistemic_status\":\"observed\","
+        "\"y_status\":\"MISSING\",\"missing_reason\":\"source_missing\"%s}",
+        break_fields);
     AtmSraEstablishedFact *missing = atm_sra_established_fact_new (
         "fact-missing-1881", "observation", "subject", "attribute",
-        "MISSING", "unit", "dimension",
-        "{\"calendar_year\":\"1881\",\"scenario\":\"baseline\",\"epistemic_status\":\"observed\","
-        "\"y_status\":\"MISSING\",\"missing_reason\":\"source_missing\"}");
+        "MISSING", "unit", "dimension", missing_qualifiers);
+    g_free (missing_qualifiers);
     g_assert_true (atm_sra_fact_add_support (f1, a->qualified_artifact_id, &error));
     g_assert_no_error (error);
     g_assert_true (atm_sra_fact_add_support (f2, a->qualified_artifact_id, &error));
@@ -73,6 +79,11 @@ static AtmSraResult *qualified_with_artifact (AtmScientificArtifact *a)
     g_assert_true (atm_sra_result_finalize (q, &error));
     g_assert_no_error (error);
     return q;
+}
+
+static AtmSraResult *qualified_with_artifact (AtmScientificArtifact *a)
+{
+    return qualified_with_artifact_mode (a, FALSE);
 }
 
 static AtmSraResult *
