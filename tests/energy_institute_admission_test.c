@@ -7,6 +7,67 @@ static GBytes *inputs[4];
 static char *buffers[4];
 static gsize lengths[4];
 
+ /*
+  * Independently walk the pinned CSV rows and compare every parsed candidate
+  * point with the raw year and second-column token. The legacy/generic
+  * equivalence test uses the same candidate parser, so it is not an independent
+  * check that all 61 row-to-value mappings are correct.
+  */
+static void assert_all_candidate_points_match_source_csv (
+    const AtmEnergyInstituteCandidate *candidate)
+{
+    g_assert_nonnull(candidate);
+    g_assert_nonnull(buffers[0]);
+
+    const char *cursor = buffers[0];
+    const char *limit = cursor + lengths[0];
+    const char *header_end = memchr(cursor, '\n', (gsize) (limit - cursor));
+    g_assert_nonnull(header_end);
+    cursor = header_end + 1;
+
+    guint count = atm_energy_institute_candidate_count(candidate);
+    g_assert_cmpuint(count, ==, 61u);
+
+    for (guint i = 0; i < count; i++) {
+        const char *row_end = memchr(cursor, '\n', (gsize) (limit - cursor));
+        if (row_end == NULL)
+            row_end = limit;
+        g_assert_true(row_end > cursor);
+        g_assert_null(memchr(cursor, '\r', (gsize) (row_end - cursor)));
+
+        const char *first_comma =
+            memchr(cursor, ',', (gsize) (row_end - cursor));
+        g_assert_nonnull(first_comma);
+        const char *second_comma =
+            memchr(first_comma + 1, ',',
+                   (gsize) (row_end - (first_comma + 1)));
+        g_assert_nonnull(second_comma);
+
+        char *source_year = g_strndup(cursor, (gsize) (first_comma - cursor));
+        char *source_decimal = g_strndup(
+            first_comma + 1, (gsize) (second_comma - (first_comma + 1)));
+        char *expected_year = g_strdup_printf("%u", 1965u + i);
+
+        g_assert_cmpstr(source_year, ==, expected_year);
+        g_assert_cmpuint(atm_energy_institute_candidate_year(candidate, i),
+                         ==, 1965u + i);
+        g_assert_cmpuint(atm_energy_institute_candidate_source_row(candidate, i),
+                         ==, i + 2u);
+        g_assert_cmpstr(atm_energy_institute_candidate_decimal(candidate, i),
+                        ==, source_decimal);
+
+        g_free(expected_year);
+        g_free(source_decimal);
+        g_free(source_year);
+
+        cursor = row_end < limit ? row_end + 1 : limit;
+        if (i + 1u < count)
+            g_assert_true(cursor < limit);
+    }
+
+    g_assert_true(cursor == limit);
+}
+
 static void load_sources (void)
 {
     const char *root = g_getenv ("ATM_CHART01_FIXTURE");
@@ -40,6 +101,7 @@ static void test_policy (void)
     AtmEnergyInstituteAdmission *a = NULL;
     g_assert_true (atm_energy_institute_admission_new (repo, snapshot, inputs, &a, NULL));
     const AtmEnergyInstituteCandidate *c = atm_energy_institute_admission_candidate (a);
+    assert_all_candidate_points_match_source_csv (c);
     g_assert_cmpuint (atm_energy_institute_candidate_count (c), ==, 61);
     g_assert_cmpuint (atm_energy_institute_candidate_year (c, 0), ==, 1965);
     g_assert_cmpuint (atm_energy_institute_candidate_year (c, 60), ==, 2025);
