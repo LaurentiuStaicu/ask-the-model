@@ -246,11 +246,12 @@ static AtmSeriesContract *base (void)
 static void test_missing_and_break_are_explicit (void)
 {
     AtmScientificArtifact *a = support_artifact ();
-    AtmSraResult *q = qualified_with_artifact (a);
-    AtmSeriesContract *s = base ();
     const char *support[] = { a->qualified_artifact_id };
     GError *error = NULL;
 
+    /* A missing observation alone does not qualify a discontinuity label. */
+    AtmSraResult *q = qualified_with_artifact (a);
+    AtmSeriesContract *s = base ();
     g_assert_true (atm_series_contract_add_point (
         s, "1880", ATM_SERIES_Y_NUMERIC, "1.0000", "1", 0, FALSE,
         FALSE, NULL, NULL, support, 1, &error));
@@ -263,6 +264,30 @@ static void test_missing_and_break_are_explicit (void)
         s, "1882", ATM_SERIES_Y_NUMERIC, "-0.0000", "0", 0, TRUE,
         FALSE, NULL, NULL, support, 1, &error));
     g_assert_no_error (error);
+    g_assert_false (atm_series_contract_validate (s, q, &error));
+    g_assert_error (error, ATM_SERIES_CONTRACT_ERROR,
+                    ATM_SERIES_CONTRACT_ERROR_SHAPE);
+    g_clear_error (&error);
+    atm_series_contract_free (s);
+    atm_sra_result_free (q);
+
+    /* The same series is accepted when its missing-point SRA fact explicitly
+     * carries the matching break_before and break_reason qualifiers. */
+    q = qualified_with_artifact_mode (a, TRUE);
+    s = base ();
+    g_assert_true (atm_series_contract_add_point (
+        s, "1880", ATM_SERIES_Y_NUMERIC, "1.0000", "1", 0, FALSE,
+        FALSE, NULL, NULL, support, 1, &error));
+    g_assert_no_error (error);
+    g_assert_true (atm_series_contract_add_point (
+        s, "1881", ATM_SERIES_Y_MISSING, NULL, NULL, 0, FALSE,
+        TRUE, "source_missing", "measurement_gap", support, 1, &error));
+    g_assert_no_error (error);
+    g_assert_true (atm_series_contract_add_point (
+        s, "1882", ATM_SERIES_Y_NUMERIC, "-0.0000", "0", 0, TRUE,
+        FALSE, NULL, NULL, support, 1, &error));
+    g_assert_no_error (error);
+
     gboolean valid = atm_series_contract_validate (s, q, &error);
     if (!valid && error != NULL)
         g_test_message ("contract validation error: %s", error->message);
