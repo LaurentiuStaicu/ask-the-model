@@ -260,7 +260,7 @@ static void test_numeric_point_must_match_sra_fact (void)
     atm_scientific_artifact_free (a);
 }
 
-static void test_numeric_point_support_must_match_exactly (void)
+static void test_numeric_point_support_must_match_as_unique_set (void)
 {
     AtmScientificArtifact *a = support_artifact ();
     AtmScientificArtifact *b = support_artifact_other ();
@@ -280,6 +280,8 @@ static void test_numeric_point_support_must_match_exactly (void)
     g_clear_error (&error);
     atm_series_contract_free (s);
 
+    /* Reordering is valid: finalized SRA support is a canonical sorted set,
+     * not a positional list. The same two unique IDs must be accepted. */
     const char *reordered_support[] = {
         b->qualified_artifact_id, a->qualified_artifact_id
     };
@@ -288,9 +290,9 @@ static void test_numeric_point_support_must_match_exactly (void)
         s, "1880", ATM_SERIES_Y_NUMERIC, "1.0000", "1", 0, FALSE,
         FALSE, NULL, NULL, reordered_support, G_N_ELEMENTS (reordered_support), &error));
     g_assert_no_error (error);
-    g_assert_false (atm_series_contract_validate (s, q, &error));
-    g_assert_error (error, ATM_SERIES_CONTRACT_ERROR, ATM_SERIES_CONTRACT_ERROR_SHAPE);
-    g_clear_error (&error);
+    g_assert_true (atm_series_contract_validate (s, q, &error));
+    g_assert_no_error (error);
+    g_assert_nonnull (atm_series_contract_scientific_id (s));
     atm_series_contract_free (s);
 
     atm_sra_result_free (q);
@@ -466,7 +468,7 @@ int main (int argc, char **argv)
     g_test_add_func ("/series-contract/duplicate-x", test_duplicate_x_rejected);
     g_test_add_func ("/series-contract/support", test_unqualified_support_rejected);
     g_test_add_func ("/series-contract/fact-binding", test_numeric_point_must_match_sra_fact);
-    g_test_add_func ("/series-contract/support-exact-order", test_numeric_point_support_must_match_exactly);
+    g_test_add_func ("/series-contract/support-unique-set", test_numeric_point_support_must_match_as_unique_set);
     g_test_add_func ("/series-contract/first-break", test_first_break_rejected);
     g_test_add_func ("/series-contract/identity", test_caller_identity_not_authoritative);
     g_test_add_func ("/series-contract/utc-calendar", test_invalid_utc_calendar_rejected);
