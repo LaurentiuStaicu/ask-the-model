@@ -43,12 +43,13 @@ obligation. The shared builder remains source-agnostic.
 | `src/series_adapter.h` / `.c` | — | evidence to general contract bridge |
 | `tests/series_evidence_equivalence_test.c` | — | 7 tests |
 | `tests/series_sra_equivalence_test.c` | — | 5 tests, including the Energy Institute qualification gate |
-| `tests/series_adapter_test.c` | — | 5 tests |
+| `tests/series_adapter_test.c` | — | 7 tests |
 
-Nothing existing is modified or deleted. `gistemp_evidence.c`,
-`energy_institute_evidence.c` and `gistemp_sra.c` must stay in the build so the
-equivalence tests have a legacy side to compare against. Removing them is a
-follow-up commit, made only after those tests pass.
+The legacy per-source modules remain unchanged and linked as equivalence baselines:
+`gistemp_evidence.c`, `energy_institute_evidence.c` and `gistemp_sra.c` must
+stay in the build until the native equivalence tests pass and the migration is
+explicitly approved. This remediation changes the generic layers and tests only;
+removing the legacy implementations remains a separate follow-up.
 
 ## Design decisions for review
 
@@ -74,10 +75,10 @@ rejects one that disagrees, at construction rather than at first use.
 the extracted point count to equal `evidence_count - source_count`, so a
 wrong-count descriptor fails early instead of mid-construction.
 
-**No source header in the shared layer.** `series_evidence.c` reaches points
-through the existing `AtmAnnualSeriesCandidate` interface, which both admitted
-sources already implement. The descriptor carries admission callbacks, so the
-shared layer never sees either concrete admission type.
+**Typed source callbacks in the shared layer.** `series_evidence.c` does not
+cast GISTEMP and Energy Institute candidates to a shared concrete C type. Each
+descriptor uses callbacks implemented with its own admission/candidate API. The
+callbacks also expose the original decimal token from the owned admission.
 
 **The adapter reads structure from the artifact, not from a caller.** Subject,
 attribute, unit and dimension come from the observation payload, which is the
@@ -107,7 +108,7 @@ deliberate widening of the general contract and belongs in its own review.
 
 ## Test evidence
 
-The three test files together establish:
+The native test files together establish:
 
 - every artifact of both sources is byte-identical between the legacy module and
   the generic layer, index by index, including per-point support;
