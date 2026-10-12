@@ -53,6 +53,9 @@ const char *atm_energy_institute_admission_subject (
 const char *atm_energy_institute_admission_attribute (
     const AtmEnergyInstituteAdmission *admission
 );
+const char *atm_energy_institute_admission_accounting_method (
+    const AtmEnergyInstituteAdmission *admission
+);
 const char *atm_energy_institute_admission_epistemic_status (
     const AtmEnergyInstituteAdmission *admission
 );
