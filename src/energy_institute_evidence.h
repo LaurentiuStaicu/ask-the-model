@@ -4,7 +4,7 @@
 
 G_BEGIN_DECLS
 
-#define ATM_EI_EVIDENCE_PROFILE "atm-profile/ewd-energy-institute-pinned/v1"
+#define ATM_EI_EVIDENCE_PROFILE "atm-profile/ewd-energy-institute-tes-physical-content/v2"
 #define ATM_EI_EVIDENCE_COUNT 65u
 
 typedef struct AtmEnergyInstituteEvidence AtmEnergyInstituteEvidence;
