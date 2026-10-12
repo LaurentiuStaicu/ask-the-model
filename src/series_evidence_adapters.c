@@ -203,6 +203,10 @@ const AtmSeriesEvidenceDescriptor ATM_GISTEMP_EVIDENCE_DESCRIPTOR = {
     .point_locator_columns = "year,temperature_anomaly_c_1951_1980",
     .canonical_obligation = "atm-gistemp-source-reconstruction/1",
     .semantic_profile = ATM_GISTEMP_EVIDENCE_PROFILE "@1",
+    .series_semantics = "empirical_annual_observations",
+    .series_scenario = "not_applicable",
+    .series_profile_id = "atm-series/gistemp-complete-annual/1",
+    .series_profile_version = "1",
     .limitations = ATM_GISTEMP_LIMITATIONS,
     .admission_rebuild = gistemp_rebuild,
     .admission_free = gistemp_free,
@@ -349,6 +353,9 @@ const AtmSeriesEvidenceDescriptor ATM_EI_EVIDENCE_DESCRIPTOR = {
      * processing pipeline. Semantic precedence is recorded in limitations. */
     .canonical_obligation = "atm-energy-institute-ewd-tes-pinned-snapshot-reconstruction/1",
     .semantic_profile = ATM_EI_EVIDENCE_PROFILE "@2",
+    /* F0-19 approves processed-snapshot SRA reconstruction only. Deliberately
+     * no series profile is declared here, so the source-bound series adapter
+     * cannot mint an EI series contract or promote EI to VerifiedSeries. */
     .limitations = ATM_EI_LIMITATIONS,
     .admission_rebuild = energy_rebuild,
     .admission_free = energy_free,
