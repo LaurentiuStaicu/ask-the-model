@@ -4,7 +4,10 @@ All notable public releases of Ask the Model are recorded here.
 
 ## Unreleased
 
-No unreleased public changes are currently recorded.
+### Reliability correction
+
+- Reconcile managed conversation JSON exports before startup cleanup. An unarchived SQLite row is removed only after the export path is confirmed absent or otherwise reconciled successfully; failed or unknown reconciliation keeps the row for a later retry instead of silently losing its recoverable state.
+- Keep retained unarchived working rows out of History. When the export obstruction is removed, the next successful reconciliation resumes normal cleanup. This change does not alter the immutable v0.6.3 release artifact.
 
 ## 0.6.3 - 2026-10-10
 
