@@ -243,6 +243,63 @@ atm_series_adapter_admit (const AtmSeriesEvidenceDescriptor *descriptor,
     return TRUE;
 }
 
+/* Compare every identity-bearing field, not just cached identifiers.
+ * AtmSeriesContract is a public mutable struct, so a caller could otherwise
+ * mutate a point after validation while leaving its minted IDs unchanged. */
+static gboolean
+series_material_matches (const AtmSeriesContract *actual,
+                         const AtmSeriesContract *expected)
+{
+    if (actual == NULL || expected == NULL ||
+        actual->x_kind != expected->x_kind ||
+        g_strcmp0 (actual->subject, expected->subject) != 0 ||
+        g_strcmp0 (actual->attribute, expected->attribute) != 0 ||
+        g_strcmp0 (actual->x_unit, expected->x_unit) != 0 ||
+        g_strcmp0 (actual->x_dimension, expected->x_dimension) != 0 ||
+        g_strcmp0 (actual->y_unit, expected->y_unit) != 0 ||
+        g_strcmp0 (actual->y_dimension, expected->y_dimension) != 0 ||
+        g_strcmp0 (actual->series_semantics, expected->series_semantics) != 0 ||
+        g_strcmp0 (actual->scenario, expected->scenario) != 0 ||
+        g_strcmp0 (actual->time_scope, expected->time_scope) != 0 ||
+        g_strcmp0 (actual->epistemic_status, expected->epistemic_status) != 0 ||
+        g_strcmp0 (actual->repository_id, expected->repository_id) != 0 ||
+        g_strcmp0 (actual->repository_version, expected->repository_version) != 0 ||
+        g_strcmp0 (actual->snapshot_sha, expected->snapshot_sha) != 0 ||
+        g_strcmp0 (actual->source_path, expected->source_path) != 0 ||
+        g_strcmp0 (actual->profile_id, expected->profile_id) != 0 ||
+        g_strcmp0 (actual->profile_version, expected->profile_version) != 0 ||
+        g_strcmp0 (actual->scientific_content_id, expected->scientific_content_id) != 0 ||
+        g_strcmp0 (actual->qualified_series_id, expected->qualified_series_id) != 0 ||
+        actual->points == NULL || expected->points == NULL ||
+        actual->points->len != expected->points->len)
+        return FALSE;
+
+    for (guint i = 0; i < actual->points->len; i++) {
+        const AtmSeriesContractPoint *a = g_ptr_array_index (actual->points, i);
+        const AtmSeriesContractPoint *b = g_ptr_array_index (expected->points, i);
+        if (a == NULL || b == NULL ||
+            a->order != b->order ||
+            g_strcmp0 (a->x, b->x) != 0 ||
+            a->y_status != b->y_status ||
+            g_strcmp0 (a->source_decimal, b->source_decimal) != 0 ||
+            g_strcmp0 (a->coefficient, b->coefficient) != 0 ||
+            a->exponent != b->exponent ||
+            a->negative_zero != b->negative_zero ||
+            a->break_before != b->break_before ||
+            g_strcmp0 (a->missing_reason, b->missing_reason) != 0 ||
+            g_strcmp0 (a->break_reason, b->break_reason) != 0 ||
+            a->support == NULL || b->support == NULL ||
+            a->support->len != b->support->len)
+            return FALSE;
+
+        for (guint j = 0; j < a->support->len; j++)
+            if (g_strcmp0 (g_ptr_array_index (a->support, j),
+                           g_ptr_array_index (b->support, j)) != 0)
+                return FALSE;
+    }
+    return TRUE;
+}
+
 gboolean
 atm_series_adapter_revalidate (const AtmSeriesContract *contract,
                                const AtmSeriesEvidenceDescriptor *descriptor,
@@ -279,11 +336,7 @@ atm_series_adapter_revalidate (const AtmSeriesContract *contract,
     /* Compare both identities. A contract whose identity disagrees with a
      * reconstruction from the same admitted bytes is rejected, which is the
      * guarantee the source-specific module provided. */
-    gboolean matches =
-        g_strcmp0 (atm_series_contract_scientific_id (contract),
-                   atm_series_contract_scientific_id (rebuilt)) == 0 &&
-        g_strcmp0 (atm_series_contract_qualified_id (contract),
-                   atm_series_contract_qualified_id (rebuilt)) == 0;
+    gboolean matches = series_material_matches (contract, rebuilt);
 
     atm_series_contract_free (rebuilt);
     atm_series_sra_free (sra);
