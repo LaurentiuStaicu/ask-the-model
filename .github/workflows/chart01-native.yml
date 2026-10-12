@@ -13,6 +13,8 @@ on:
       - 'src/series_adapter.*'
       - 'src/series_contract.*'
       - 'src/verified_series_contract.*'
+      - 'tests/energy_institute_admission_test.c'
+      - 'tests/energy_institute_evidence_test.c'
       - 'tests/series_evidence_equivalence_test.c'
       - 'tests/series_sra_equivalence_test.c'
       - 'tests/series_adapter_test.c'
@@ -97,6 +99,26 @@ jobs:
             $(pkg-config --cflags --libs glib-2.0 json-glib-1.0) -lm \
             -o /tmp/gistemp-evidence-test
           /tmp/gistemp-evidence-test
+
+          # Exercise the Energy Institute's source-specific tests directly, not
+          # only through the generic descriptor-equivalence suite. In particular,
+          # the evidence forgery test must cover accounting-method metadata.
+          cc -std=c11 -Wall -Wextra -Werror -g -O1 \
+            -fsanitize=address,undefined -fno-omit-frame-pointer -Isrc \
+            src/energy_institute_admission.c src/energy_institute_candidate.c \
+            src/scientific_canonical.c tests/energy_institute_admission_test.c \
+            $(pkg-config --cflags --libs glib-2.0 json-glib-1.0) -lm \
+            -o /tmp/energy-institute-admission-test
+          /tmp/energy-institute-admission-test
+          cc -std=c11 -Wall -Wextra -Werror -g -O1 \
+            -fsanitize=address,undefined -fno-omit-frame-pointer -Isrc \
+            src/energy_institute_evidence.c src/energy_institute_admission.c \
+            src/energy_institute_candidate.c src/scientific_canonical.c \
+            src/scientific_artifact.c tests/energy_institute_evidence_test.c \
+            $(pkg-config --cflags --libs glib-2.0 json-glib-1.0) -lm \
+            -o /tmp/energy-institute-evidence-test
+          /tmp/energy-institute-evidence-test
+
           cc -std=c11 -Wall -Wextra -Werror -g -O1 \
             -fsanitize=address,undefined -fno-omit-frame-pointer -Isrc \
             src/gistemp_sra.c src/gistemp_evidence.c src/gistemp_admission.c \
