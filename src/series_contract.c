@@ -402,6 +402,7 @@ point_matches_established_fact (const AtmSeriesContract *s,
     JsonObject *object = json_node_get_object (root);
     const char *year = NULL;
     const char *scenario = NULL;
+    const char *epistemic_status = NULL;
     const char *y_status = NULL;
     const char *missing_reason = NULL;
     if (json_object_has_member (object, "calendar_year")) {
@@ -415,6 +416,12 @@ point_matches_established_fact (const AtmSeriesContract *s,
         if (JSON_NODE_HOLDS_VALUE (node) &&
             json_node_get_value_type (node) == G_TYPE_STRING)
             scenario = json_node_get_string (node);
+    }
+    if (json_object_has_member (object, "epistemic_status")) {
+        JsonNode *node = json_object_get_member (object, "epistemic_status");
+        if (JSON_NODE_HOLDS_VALUE (node) &&
+            json_node_get_value_type (node) == G_TYPE_STRING)
+            epistemic_status = json_node_get_string (node);
     }
     if (json_object_has_member (object, "y_status")) {
         JsonNode *node = json_object_get_member (object, "y_status");
@@ -439,6 +446,7 @@ point_matches_established_fact (const AtmSeriesContract *s,
     gboolean qualifiers_match = g_strcmp0 (year, p->x) == 0 &&
         bounded (s->scenario, ATM_SERIES_CONTRACT_MAX_TEXT) &&
         g_strcmp0 (scenario, s->scenario) == 0 &&
+        g_strcmp0 (epistemic_status, s->epistemic_status) == 0 &&
         status_matches && reason_matches;
     g_object_unref (parser);
     if (!qualifiers_match)
