@@ -79,9 +79,22 @@ typedef struct {
      * approved; the generic SRA builder must then fail closed. */
     const char *canonical_obligation;
 
-    /* Semantic profile bound into the qualification envelope, including its
-     * version suffix, e.g. "atm-profile/ewd-gistemp-pinned/v1@1". */
+    /* Semantic profile bound into the SRA qualification envelope, including its
+     * version suffix, e.g. "atm-profile/ewd-gistemp-pinned/v1@1". This is the
+     * evidence/SRA profile namespace, not the downstream series profile. */
     const char *semantic_profile;
+
+    /* Reviewed output-series metadata, separate from the evidence semantic_profile.
+     * The generic adapter requires these fields and requires caller metadata to
+     * match them exactly before minting a source-bound series contract. NULL means
+     * this descriptor has no approved generic series/VerifiedSeries profile yet;
+     * the adapter must fail closed. In particular, F0-19 permits EI SRA
+     * reconstruction but does not approve an EI series profile. */
+    const char *series_semantics;
+    const char *series_scenario;
+    const char *series_epistemic_status;
+    const char *series_profile_id;
+    const char *series_profile_version;
 
     /* Scientific limitations of this source, NULL-terminated. Rendered verbatim
      * into the finalized SRA; never inherited from another source. */

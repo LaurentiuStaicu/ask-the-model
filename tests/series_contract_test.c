@@ -29,8 +29,11 @@ static AtmScientificArtifact *support_artifact (void)
     return a;
 }
 
-static AtmSraResult *qualified_with_artifact_mode (AtmScientificArtifact *a,
-                                                       gboolean qualify_break)
+static AtmSraResult *
+qualified_with_artifact_mode_full (AtmScientificArtifact *a,
+                                   gboolean qualify_break,
+                                   const char *canonical_obligation,
+                                   const char *numeric_profile)
 {
     AtmSraResult *q = atm_sra_result_new (ATM_SRA_ANSWERED);
     GError *error = NULL;
@@ -62,7 +65,8 @@ static AtmSraResult *qualified_with_artifact_mode (AtmScientificArtifact *a,
     g_assert_no_error (error);
     g_assert_true (atm_sra_result_add_fact (q, missing, &error));
     g_assert_no_error (error);
-    g_assert_true (atm_sra_qualification_add_canonical_obligation (q, "atm-sra/1", &error));
+    g_assert_true (atm_sra_qualification_add_canonical_obligation (
+        q, canonical_obligation, &error));
     g_assert_no_error (error);
     char *snapshot = g_strdup_printf ("ewd@0.1.0#%s", SHA);
     g_assert_true (atm_sra_qualification_add_repository_snapshot (q, snapshot, &error));
@@ -74,11 +78,32 @@ static AtmSraResult *qualified_with_artifact_mode (AtmScientificArtifact *a,
         q, "atm-profile/ewd/v1@1", &error));
     g_assert_no_error (error);
     g_assert_true (atm_sra_qualification_set_numeric_profile (
-        q, ATM_SERIES_CONTRACT_NUMERIC_PROFILE, &error));
+        q, numeric_profile, &error));
     g_assert_no_error (error);
     g_assert_true (atm_sra_result_finalize (q, &error));
     g_assert_no_error (error);
     return q;
+}
+
+static AtmSraResult *qualified_with_artifact_mode (AtmScientificArtifact *a,
+                                                    gboolean qualify_break)
+{
+    return qualified_with_artifact_mode_full (
+        a, qualify_break, "atm-sra/1", ATM_SERIES_CONTRACT_NUMERIC_PROFILE);
+}
+
+static AtmSraResult *qualified_with_artifact_mode_profile (
+    AtmScientificArtifact *a, gboolean qualify_break, const char *numeric_profile)
+{
+    return qualified_with_artifact_mode_full (
+        a, qualify_break, "atm-sra/1", numeric_profile);
+}
+
+static AtmSraResult *qualified_with_artifact_mode_obligation (
+    AtmScientificArtifact *a, gboolean qualify_break, const char *canonical_obligation)
+{
+    return qualified_with_artifact_mode_full (
+        a, qualify_break, canonical_obligation, ATM_SERIES_CONTRACT_NUMERIC_PROFILE);
 }
 
 static AtmSraResult *qualified_with_artifact (AtmScientificArtifact *a)
@@ -230,6 +255,46 @@ qualified_with_two_artifacts (AtmScientificArtifact *a, AtmScientificArtifact *b
     return q;
 }
 
+static AtmSraResult *
+qualified_with_numeric_fact_missing_reason (AtmScientificArtifact *a,
+                                            gboolean malformed_reason_type)
+{
+    AtmSraResult *q = atm_sra_result_new (ATM_SRA_ANSWERED);
+    GError *error = NULL;
+    const char *qualifiers = malformed_reason_type
+        ? "{\"calendar_year\":\"1880\",\"scenario\":\"baseline\","
+          "\"epistemic_status\":\"observed\",\"y_status\":\"NUMERIC\","
+          "\"missing_reason\":42}"
+        : "{\"calendar_year\":\"1880\",\"scenario\":\"baseline\","
+          "\"epistemic_status\":\"observed\",\"y_status\":\"NUMERIC\","
+          "\"missing_reason\":\"source_missing\"}";
+    AtmSraEstablishedFact *fact = atm_sra_established_fact_new (
+        "fact-numeric-with-missing-reason", "observation", "subject",
+        "attribute", "1e0", "unit", "dimension", qualifiers);
+    g_assert_nonnull (fact);
+    g_assert_true (atm_sra_fact_add_support (fact, a->qualified_artifact_id, &error));
+    g_assert_no_error (error);
+    g_assert_true (atm_sra_result_add_fact (q, fact, &error));
+    g_assert_no_error (error);
+    g_assert_true (atm_sra_qualification_add_canonical_obligation (q, "atm-sra/1", &error));
+    g_assert_no_error (error);
+    char *snapshot = g_strdup_printf ("ewd@0.1.0#%s", SHA);
+    g_assert_true (atm_sra_qualification_add_repository_snapshot (q, snapshot, &error));
+    g_free (snapshot);
+    g_assert_no_error (error);
+    g_assert_true (atm_sra_qualification_add_evidence_artifact (q, a, &error));
+    g_assert_no_error (error);
+    g_assert_true (atm_sra_qualification_add_semantic_profile (
+        q, "atm-profile/ewd/v1@1", &error));
+    g_assert_no_error (error);
+    g_assert_true (atm_sra_qualification_set_numeric_profile (
+        q, ATM_SERIES_CONTRACT_NUMERIC_PROFILE, &error));
+    g_assert_no_error (error);
+    g_assert_true (atm_sra_result_finalize (q, &error));
+    g_assert_no_error (error);
+    return q;
+}
+
 static AtmSeriesContract *base (void)
 {
     GError *error = NULL;
@@ -350,6 +415,32 @@ static void test_duplicate_x_rejected (void)
     g_assert_false (atm_series_contract_validate (s, q, &error));
     g_assert_error (error, ATM_SERIES_CONTRACT_ERROR,
                     ATM_SERIES_CONTRACT_ERROR_ORDER);
+    g_clear_error (&error);
+    atm_series_contract_free (s);
+    atm_sra_result_free (q);
+    atm_scientific_artifact_free (a);
+}
+
+static void
+test_sra_numeric_profile_must_match_contract (void)
+{
+    AtmScientificArtifact *a = support_artifact ();
+    AtmSraResult *q = qualified_with_artifact_mode_profile (
+        a, FALSE, "binary64_roundtrip/1");
+    AtmSeriesContract *s = base ();
+    const char *support[] = { a->qualified_artifact_id };
+    GError *error = NULL;
+    g_assert_true (atm_sra_result_validate (q, &error));
+    g_assert_no_error (error);
+    g_assert_true (atm_series_contract_add_point (
+        s, "1880", ATM_SERIES_Y_NUMERIC, "1.0000", "1", 0, FALSE,
+        FALSE, NULL, NULL, support, 1, &error));
+    g_assert_no_error (error);
+    g_assert_false (atm_series_contract_validate (s, q, &error));
+    g_assert_error (error, ATM_SERIES_CONTRACT_ERROR,
+                    ATM_SERIES_CONTRACT_ERROR_NUMERIC);
+    g_assert_nonnull (g_strstr_len (error->message, -1,
+        "SRA numeric profile does not match series contract numeric profile"));
     g_clear_error (&error);
     atm_series_contract_free (s);
     atm_sra_result_free (q);
@@ -523,6 +614,32 @@ static void test_direct_time_scope_must_enclose_points (void)
     atm_scientific_artifact_free (a);
 }
 
+static void
+test_numeric_fact_rejects_missing_reason (void)
+{
+    AtmScientificArtifact *a = support_artifact ();
+    const char *support[] = { a->qualified_artifact_id };
+    GError *error = NULL;
+    for (guint malformed = 0; malformed < 2; malformed++) {
+        AtmSraResult *q = qualified_with_numeric_fact_missing_reason (a,
+                                                                       malformed != 0);
+        AtmSeriesContract *s = base ();
+        g_assert_true (atm_series_contract_add_point (
+            s, "1880", ATM_SERIES_Y_NUMERIC, "1.0000", "1", 0, FALSE,
+            FALSE, NULL, NULL, support, 1, &error));
+        g_assert_no_error (error);
+        g_assert_false (atm_series_contract_validate (s, q, &error));
+        g_assert_error (error, ATM_SERIES_CONTRACT_ERROR,
+                        ATM_SERIES_CONTRACT_ERROR_SHAPE);
+        g_assert_nonnull (g_strstr_len (error->message, -1,
+            "Numeric point does not match an established SRA fact"));
+        g_clear_error (&error);
+        atm_series_contract_free (s);
+        atm_sra_result_free (q);
+    }
+    atm_scientific_artifact_free (a);
+}
+
 static void test_missing_point_must_match_sra_fact (void)
 {
     AtmScientificArtifact *a = support_artifact ();
@@ -554,7 +671,23 @@ static void test_missing_point_must_match_sra_fact (void)
     g_clear_error (&error);
     atm_series_contract_free (s);
 
-    /* Only the explicit matching missing fact authorizes this point. */
+    /* MISSING cannot retain a nonzero numeric exponent after its value and
+     * coefficient are cleared. */
+    s = base ();
+    g_assert_true (atm_series_contract_add_point (
+        s, "1881", ATM_SERIES_Y_MISSING, NULL, NULL, 42, FALSE,
+        FALSE, "source_missing", NULL, support, 1, &error));
+    g_assert_no_error (error);
+    g_assert_false (atm_series_contract_validate (s, q, &error));
+    g_assert_error (error, ATM_SERIES_CONTRACT_ERROR,
+                    ATM_SERIES_CONTRACT_ERROR_NUMERIC);
+    g_assert_nonnull (g_strstr_len (error->message, -1,
+        "MISSING cannot carry numeric value or exponent"));
+    g_clear_error (&error);
+    atm_series_contract_free (s);
+
+    /* Only the explicit matching missing fact authorizes the canonical state,
+     * with no numeric representation (including exponent zero). */
     s = base ();
     g_assert_true (atm_series_contract_add_point (
         s, "1881", ATM_SERIES_Y_MISSING, NULL, NULL, 0, FALSE,
@@ -631,6 +764,46 @@ static void test_first_break_rejected (void)
     g_clear_error (&error);
     atm_series_contract_free (s);
     atm_sra_result_free (q);
+    atm_scientific_artifact_free (a);
+}
+
+static void
+test_qualified_series_identity_binds_sra_qualification (void)
+{
+    AtmScientificArtifact *a = support_artifact ();
+    AtmSraResult *q1 = qualified_with_artifact (a);
+    AtmSraResult *q2 = qualified_with_artifact_mode_obligation (
+        a, FALSE, "atm-sra/alternate-obligation/1");
+    GError *error = NULL;
+    g_assert_true (atm_sra_result_validate (q1, &error));
+    g_assert_no_error (error);
+    g_assert_true (atm_sra_result_validate (q2, &error));
+    g_assert_no_error (error);
+    g_assert_cmpstr (q1->qualification->qualified_artifact_id, !=,
+                     q2->qualification->qualified_artifact_id);
+    const char *support[] = { a->qualified_artifact_id };
+    AtmSeriesContract *s1 = base ();
+    AtmSeriesContract *s2 = base ();
+    g_assert_true (atm_series_contract_add_point (
+        s1, "1880", ATM_SERIES_Y_NUMERIC, "1.0000", "1", 0, FALSE,
+        FALSE, NULL, NULL, support, 1, &error));
+    g_assert_no_error (error);
+    g_assert_true (atm_series_contract_add_point (
+        s2, "1880", ATM_SERIES_Y_NUMERIC, "1.0000", "1", 0, FALSE,
+        FALSE, NULL, NULL, support, 1, &error));
+    g_assert_no_error (error);
+    g_assert_true (atm_series_contract_validate (s1, q1, &error));
+    g_assert_no_error (error);
+    g_assert_true (atm_series_contract_validate (s2, q2, &error));
+    g_assert_no_error (error);
+    g_assert_cmpstr (atm_series_contract_scientific_id (s1), ==,
+                     atm_series_contract_scientific_id (s2));
+    g_assert_cmpstr (atm_series_contract_qualified_id (s1), !=,
+                     atm_series_contract_qualified_id (s2));
+    atm_series_contract_free (s1);
+    atm_series_contract_free (s2);
+    atm_sra_result_free (q1);
+    atm_sra_result_free (q2);
     atm_scientific_artifact_free (a);
 }
 
@@ -904,7 +1077,11 @@ int main (int argc, char **argv)
     g_test_add_func ("/series-contract/duplicate-x", test_duplicate_x_rejected);
     g_test_add_func ("/series-contract/support", test_unqualified_support_rejected);
     g_test_add_func ("/series-contract/fact-binding", test_numeric_point_must_match_sra_fact);
+    g_test_add_func ("/series-contract/sra-numeric-profile",
+                     test_sra_numeric_profile_must_match_contract);
     g_test_add_func ("/series-contract/missing-point-fact-binding", test_missing_point_must_match_sra_fact);
+    g_test_add_func ("/series-contract/numeric-fact-no-missing-reason",
+                     test_numeric_fact_rejects_missing_reason);
     g_test_add_func ("/series-contract/direct-epistemic-status-binding", test_epistemic_status_must_match_sra_fact);
     g_test_add_func ("/series-contract/calendar-year-dimension", test_calendar_year_dimension_must_be_time);
     g_test_add_func ("/series-contract/direct-scenario-binding", test_direct_scenario_must_match_sra_fact);
@@ -912,6 +1089,8 @@ int main (int argc, char **argv)
     g_test_add_func ("/series-contract/support-unique-set", test_numeric_point_support_must_match_as_unique_set);
     g_test_add_func ("/series-contract/break-reason-requires-break", test_break_reason_requires_break);
     g_test_add_func ("/series-contract/first-break", test_first_break_rejected);
+    g_test_add_func ("/series-contract/qualified-identity-binds-sra",
+                     test_qualified_series_identity_binds_sra_qualification);
     g_test_add_func ("/series-contract/identity", test_caller_identity_not_authoritative);
     g_test_add_func ("/series-contract/artifact-snapshot-binding", test_sra_artifact_snapshot_must_be_qualified);
     g_test_add_func ("/series-contract/snapshot-binding", test_contract_snapshot_must_be_qualified);

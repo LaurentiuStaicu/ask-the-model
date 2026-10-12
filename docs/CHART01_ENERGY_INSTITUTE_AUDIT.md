@@ -2,7 +2,7 @@
 
 ## Scope
 
-This audit documents the source-bound Energy Institute candidate and the approved, pinned-snapshot SRA qualification implemented on the CHART-M1c integration branch. It does not create a `VerifiedSeries`, `ChartSpec`, runtime chart path, persistence state, or model-output authority.
+This audit documents the source-bound Energy Institute candidate and the approved, pinned-snapshot SRA qualification integrated on `main` through PR #423. It does not create a `VerifiedSeries`, `ChartSpec`, runtime chart path, persistence state, or model-output authority.
 
 The audited source is the exact EWD snapshot:
 
@@ -76,7 +76,7 @@ This source is sufficiently specified for a source-audit slice but is **not yet 
 
 The approved source-bound SRA path now enforces the pinned four-file admission, bounded CSV parsing, 61 consecutive annual observations, exact decimal preservation, source locators and source-bound Evidence for all four inputs plus every point. The generic SRA is reconstructed and validated against the pinned evidence; each of the 61 facts binds its five support artifacts and deterministic qualification envelope. Registered tests cover source-byte mutation, malformed/nonconsecutive rows, all-point qualification, exact endpoint values, semantic metadata, anomaly preservation, finalized-result mutation and the NULL-obligation negative control.
 
-No existing GISTEMP profile is widened by this audit. The Energy Institute source uses the versioned TES semantic profile `atm-profile/ewd-energy-institute-tes-physical-content/v2`. F0-19's scope decision is resolved for the bounded claim of reconstructing the pinned EWD processed snapshot, not independently reproducing Energy Institute's raw-to-processed pipeline. The canonical obligation is `atm-energy-institute-ewd-tes-pinned-snapshot-reconstruction/1` on the CHART-M1c integration branch; this branch has not yet been merged into `main`.
+No existing GISTEMP profile is widened by this audit. The Energy Institute source uses the versioned TES semantic profile `atm-profile/ewd-energy-institute-tes-physical-content/v2`. F0-19's scope decision is integrated on `main` via PR #423 for the bounded claim of reconstructing the pinned EWD processed snapshot, not independently reproducing Energy Institute's raw-to-processed pipeline. The active canonical obligation is `atm-energy-institute-ewd-tes-pinned-snapshot-reconstruction/1`. This authorizes the source-bound Evidence/SRA reconstruction only; it does not promote Energy Institute to `VerifiedSeries` or authorize a chart route. Source-bound series-profile admission and downstream chart/persistence gates remain separate.
 
 The accepted decision, semantic-precedence rule, proof boundary and future requirements for any raw-to-processed claim are recorded in [`CHART01_ENERGY_INSTITUTE_F0-19_QUALIFICATION_PROPOSAL.md`](CHART01_ENERGY_INSTITUTE_F0-19_QUALIFICATION_PROPOSAL.md).
 
@@ -92,11 +92,11 @@ This audit does not claim that Total Energy Supply (TES) is:
 - a calibrated World3 trajectory;
 - sufficient evidence for a chart without the remaining CHART-01 and CHART-02 qualification gates.
 
-It also does not authorize runtime access to the source file. The future adapter must consume an explicitly admitted, byte-pinned source bundle, following the existing GISTEMP qualification architecture.
+The integrated Evidence/SRA path consumes the explicitly admitted, byte-pinned four-file source bundle. This does not authorize arbitrary runtime source access, a raw-source download, or execution of Energy Institute's upstream processing pipeline. The UI chart flow remains governed by separate source-profile and downstream qualification gates.
 
 ## M0 / F0-19 decision
 
-**PASS for the approved source-snapshot SRA qualification scope on the integration branch.**
+**PASS on `main` via PR #423 for the approved source-snapshot Evidence/SRA qualification scope only.**
 
 The source has an explicit authority, dataset vintage, geography, coverage, unit, frequency, processed-file identity and accepted TES semantic precedence. The 2019–2023 reconciliation anomaly remains uncorrected and explicitly recorded. The qualification claims faithful reconstruction of the pinned processed observations only.
 

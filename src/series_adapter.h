@@ -24,16 +24,17 @@ G_BEGIN_DECLS
 
 typedef struct {
     /*
-     * Bounded metadata bound into the general contract. These are the reviewed
-     * scientific statements about the series, and they are deliberately not
-     * derived from artifact payloads: the contract carries them so that identity
-     * is a function of reviewed inputs.
+     * Metadata supplied by a caller, then checked against the reviewed
+     * output-series profile declared by the source descriptor. These parameters
+     * are not themselves approvals. series_semantics, scenario, profile_id and
+     * profile_version must match the descriptor exactly; time_scope is instead
+     * validated against the admitted point coverage.
      */
 
     const char *series_semantics;   /* "empirical_annual_observations" */
     const char *scenario;           /* "not_applicable" */
     const char *time_scope;         /* e.g. "1880-2025" */
-    const char *profile_id;         /* the general contract's series profile */
+    const char *profile_id;         /* the reviewed generic series profile */
     const char *profile_version;    /* "1" */
 } AtmSeriesAdapterMetadata;
 

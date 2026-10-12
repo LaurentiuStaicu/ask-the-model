@@ -353,12 +353,18 @@ build_scientific_json (const AtmSeriesContract *s, char **out, GError **error)
 }
 
 static gboolean
-build_qualified_json (const AtmSeriesContract *s, const char *scientific_id, char **out, GError **error)
+build_qualified_json (const AtmSeriesContract *s,
+                      const char *scientific_id,
+                      const char *sra_qualified_artifact_id,
+                      char **out,
+                      GError **error)
 {
     JsonBuilder *b = json_builder_new ();
     json_builder_begin_object (b);
     text_member (b, "schema", ATM_SERIES_CONTRACT_QUALIFICATION_SCHEMA);
     text_member (b, "scientific_content_id", scientific_id);
+    /* Bind identity to the exact SRA qualification that authorized the series. */
+    text_member (b, "sra_qualified_artifact_id", sra_qualified_artifact_id);
     text_member (b, "repository_id", s->repository_id);
     text_member (b, "repository_version", s->repository_version);
     text_member (b, "snapshot_sha", s->snapshot_sha);
@@ -471,8 +477,12 @@ point_matches_established_fact (const AtmSeriesContract *s,
     if (json_object_has_member (object, "missing_reason")) {
         JsonNode *node = json_object_get_member (object, "missing_reason");
         if (JSON_NODE_HOLDS_VALUE (node) &&
-            json_node_get_value_type (node) == G_TYPE_STRING)
+            json_node_get_value_type (node) == G_TYPE_STRING) {
             missing_reason = json_node_get_string (node);
+        } else if (!JSON_NODE_HOLDS_NULL (node)) {
+            g_object_unref (parser);
+            return FALSE;
+        }
     }
     /* Discontinuity is scientific metadata too. A caller cannot add or erase
      * a break unless that exact point fact carries the same assertion. */
@@ -498,8 +508,9 @@ point_matches_established_fact (const AtmSeriesContract *s,
     const char *expected_status = p->y_status == ATM_SERIES_Y_NUMERIC
         ? "NUMERIC" : "MISSING";
     gboolean status_matches = g_strcmp0 (y_status, expected_status) == 0;
-    gboolean reason_matches = p->y_status == ATM_SERIES_Y_NUMERIC ||
-        g_strcmp0 (missing_reason, p->missing_reason) == 0;
+    gboolean reason_matches = p->y_status == ATM_SERIES_Y_NUMERIC
+        ? missing_reason == NULL
+        : g_strcmp0 (missing_reason, p->missing_reason) == 0;
     /* Scenario and observation status are source evidence too. A caller must
      * not relabel an observation or assert a missing value without matching
      * SRA qualifiers. */
@@ -654,6 +665,13 @@ atm_series_contract_validate (AtmSeriesContract *s, const AtmSraResult *q, GErro
                      "Invalid or oversized series metadata.");
     if (!atm_sra_result_validate (q, error))
         return FALSE;
+    /* This contract interprets numeric values as exact decimal coefficient /
+     * exponent pairs. Do not reinterpret an SRA qualified under a different
+     * numeric profile, even if that SRA is internally valid. */
+    if (g_strcmp0 (q->qualification->numeric_profile,
+                   ATM_SERIES_CONTRACT_NUMERIC_PROFILE) != 0)
+        return fail (error, ATM_SERIES_CONTRACT_ERROR_NUMERIC,
+                     "SRA numeric profile does not match series contract numeric profile.");
     /* A contract may only name a repository version and snapshot explicitly
      * present in the qualification envelope it is validated against. Otherwise
      * valid point facts could be re-labelled as belonging to another snapshot. */
@@ -709,8 +727,10 @@ atm_series_contract_validate (AtmSeriesContract *s, const AtmSraResult *q, GErro
         } else if (p->y_status == ATM_SERIES_Y_MISSING) {
             if (!bounded (p->missing_reason, ATM_SERIES_CONTRACT_MAX_TEXT))
                 return fail (error, ATM_SERIES_CONTRACT_ERROR_SHAPE, "MISSING requires a bounded reason.");
-            if (p->source_decimal != NULL || p->coefficient != NULL || p->negative_zero)
-                return fail (error, ATM_SERIES_CONTRACT_ERROR_NUMERIC, "MISSING cannot carry numeric value.");
+            if (p->source_decimal != NULL || p->coefficient != NULL ||
+                p->exponent != 0 || p->negative_zero)
+                return fail (error, ATM_SERIES_CONTRACT_ERROR_NUMERIC,
+                             "MISSING cannot carry numeric value or exponent.");
             missing++;
         } else {
             return fail (error, ATM_SERIES_CONTRACT_ERROR_SHAPE, "Unknown Y status.");
@@ -739,7 +759,10 @@ atm_series_contract_validate (AtmSeriesContract *s, const AtmSraResult *q, GErro
     }
     g_free (scientific_json);
     char *qualified_json = NULL;
-    if (!build_qualified_json (s, s->scientific_content_id, &qualified_json, error)) return FALSE;
+    if (!build_qualified_json (s, s->scientific_content_id,
+                               q->qualification->qualified_artifact_id,
+                               &qualified_json, error))
+        return FALSE;
     gboolean ok = atm_scientific_content_id_json (
         ATM_SERIES_CONTRACT_QUALIFIED_ID_DOMAIN, qualified_json,
         &s->qualified_series_id, error);
