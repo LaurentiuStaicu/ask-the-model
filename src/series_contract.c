@@ -392,13 +392,24 @@ point_matches_established_fact (const AtmSeriesContract *s,
     }
     JsonObject *object = json_node_get_object (root);
     const char *year = NULL;
+    const char *scenario = NULL;
     if (json_object_has_member (object, "calendar_year")) {
         JsonNode *node = json_object_get_member (object, "calendar_year");
         if (JSON_NODE_HOLDS_VALUE (node) &&
             json_node_get_value_type (node) == G_TYPE_STRING)
             year = json_node_get_string (node);
     }
-    gboolean x_matches = g_strcmp0 (year, p->x) == 0;
+    if (json_object_has_member (object, "scenario")) {
+        JsonNode *node = json_object_get_member (object, "scenario");
+        if (JSON_NODE_HOLDS_VALUE (node) &&
+            json_node_get_value_type (node) == G_TYPE_STRING)
+            scenario = json_node_get_string (node);
+    }
+    /* Scenario is source evidence too. A caller must not relabel observed
+     * facts as a model scenario by using the low-level contract API directly. */
+    gboolean x_matches = g_strcmp0 (year, p->x) == 0 &&
+                         bounded (s->scenario, ATM_SERIES_CONTRACT_MAX_TEXT) &&
+                         g_strcmp0 (scenario, s->scenario) == 0;
     g_object_unref (parser);
     if (!x_matches)
         return FALSE;
@@ -464,6 +475,48 @@ compare_x (AtmSeriesXKind kind, const char *a, const char *b)
     return strcmp (a, b);
 }
 
+static gboolean
+calendar_year_scope_encloses_points (const AtmSeriesContract *s)
+{
+    if (s->x_kind != ATM_SERIES_X_CALENDAR_YEAR)
+        return TRUE;
+
+    if (!bounded (s->time_scope, ATM_SERIES_CONTRACT_MAX_TEXT) ||
+        s->points == NULL || s->points->len == 0)
+        return FALSE;
+
+    const AtmSeriesContractPoint *first =
+        g_ptr_array_index (s->points, 0);
+    const AtmSeriesContractPoint *last =
+        g_ptr_array_index (s->points, s->points->len - 1);
+    if (first == NULL || last == NULL ||
+        !x_valid (ATM_SERIES_X_CALENDAR_YEAR, first->x) ||
+        !x_valid (ATM_SERIES_X_CALENDAR_YEAR, last->x))
+        return FALSE;
+
+    /* Parse the scope by trying each '-' as the range separator. This also
+     * handles negative calendar years, whose text itself contains a minus. */
+    for (const char *separator = s->time_scope;
+         *separator != '\0'; separator++) {
+        if (*separator != '-')
+            continue;
+
+        char *start = g_strndup (s->time_scope,
+                                 (gsize) (separator - s->time_scope));
+        const char *end = separator + 1;
+        gboolean valid = x_valid (ATM_SERIES_X_CALENDAR_YEAR, start) &&
+                         x_valid (ATM_SERIES_X_CALENDAR_YEAR, end);
+        gboolean encloses = valid &&
+            compare_x (ATM_SERIES_X_CALENDAR_YEAR, start, end) <= 0 &&
+            compare_x (ATM_SERIES_X_CALENDAR_YEAR, start, first->x) <= 0 &&
+            compare_x (ATM_SERIES_X_CALENDAR_YEAR, end, last->x) >= 0;
+        g_free (start);
+        if (encloses)
+            return TRUE;
+    }
+    return FALSE;
+}
+
 gboolean
 atm_series_contract_validate (AtmSeriesContract *s, const AtmSraResult *q, GError **error)
 {
@@ -519,6 +572,9 @@ atm_series_contract_validate (AtmSeriesContract *s, const AtmSraResult *q, GErro
     }
     if (numeric == 0 && missing == 0)
         return fail (error, ATM_SERIES_CONTRACT_ERROR_SHAPE, "Series contains no points.");
+    if (!calendar_year_scope_encloses_points (s))
+        return fail (error, ATM_SERIES_CONTRACT_ERROR_SHAPE,
+                     "Calendar-year time scope does not enclose the series points.");
     if (s->scientific_content_id != NULL || s->qualified_series_id != NULL)
         return fail (error, ATM_SERIES_CONTRACT_ERROR_IDENTITY, "Caller identity strings are not authoritative.");
     char *scientific_json = NULL;
