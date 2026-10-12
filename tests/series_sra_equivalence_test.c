@@ -24,6 +24,7 @@
 
 #include <glib.h>
 #include <json-glib/json-glib.h>
+#include <string.h>
 
 #include "series_sra.h"
 #include "series_evidence_adapters.h"
