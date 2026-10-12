@@ -259,6 +259,28 @@ test_time_scope_must_match_points (void)
     atm_gistemp_admission_free (admission);
 }
 
+/* Scenario is a fact carried by every admitted point, not a free label
+ * the caller may use to relabel observations as a model scenario. */
+static void
+test_scenario_must_match_observation_payload (void)
+{
+    AtmGistempAdmission *admission = build_gistemp_admission ();
+    AtmSeriesAdapterMetadata altered = GISTEMP_METADATA;
+    altered.scenario = "baseline";
+    AtmSeriesContract *out = NULL;
+    GError *error = NULL;
+
+    g_assert_false (atm_series_adapter_admit (&ATM_GISTEMP_EVIDENCE_DESCRIPTOR,
+        &altered, admission, &out, &error));
+    g_assert_error (error, ATM_SERIES_CONTRACT_ERROR,
+                    ATM_SERIES_CONTRACT_ERROR_SHAPE);
+    g_assert_null (out);
+    g_assert_nonnull (g_strstr_len (error->message, -1,
+                                    "scenario does not match admitted observation payload"));
+    g_clear_error (&error);
+    atm_gistemp_admission_free (admission);
+}
+
 /* Equal-looking source descriptors are still not interchangeable: GISTEMP
  * and Energy Institute share structural arities but carry different evidence. */
 static void
@@ -370,6 +392,8 @@ main (int argc, char **argv)
     g_test_add_func ("/adapter/revalidate", test_adapter_revalidate_accepts_reconstruction);
     g_test_add_func ("/adapter/revalidate-rejects-mutated-point", test_adapter_revalidate_rejects_mutated_point);
     g_test_add_func ("/adapter/time-scope-matches-points", test_time_scope_must_match_points);
+    g_test_add_func ("/adapter/scenario-matches-payload",
+                     test_scenario_must_match_observation_payload);
     g_test_add_func ("/adapter/descriptor-mismatch", test_descriptor_mismatch_rejected);
     g_test_add_func ("/adapter/argument-guards", test_argument_guards);
 
