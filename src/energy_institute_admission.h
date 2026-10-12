@@ -3,7 +3,7 @@
 
 G_BEGIN_DECLS
 
-#define ATM_EI_ADMISSION_PROFILE "atm-energy-institute-pinned-admission/1"
+#define ATM_EI_ADMISSION_PROFILE "atm-energy-institute-pinned-admission/2"
 #define ATM_EI_SOURCE_COUNT 4u
 #define ATM_EI_SOURCE_MAX_BYTES ((gsize) 65536)
 
@@ -51,6 +51,9 @@ const char *atm_energy_institute_admission_subject (
     const AtmEnergyInstituteAdmission *admission
 );
 const char *atm_energy_institute_admission_attribute (
+    const AtmEnergyInstituteAdmission *admission
+);
+const char *atm_energy_institute_admission_accounting_method (
     const AtmEnergyInstituteAdmission *admission
 );
 const char *atm_energy_institute_admission_epistemic_status (
