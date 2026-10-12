@@ -262,7 +262,7 @@ test_time_scope_must_match_points (void)
 /* Scenario is a fact carried by every admitted point, not a free label
  * the caller may use to relabel observations as a model scenario. */
 static void
-test_scenario_must_match_observation_payload (void)
+test_scenario_must_match_reviewed_profile (void)
 {
     AtmGistempAdmission *admission = build_gistemp_admission ();
     AtmSeriesAdapterMetadata altered = GISTEMP_METADATA;
@@ -276,7 +276,7 @@ test_scenario_must_match_observation_payload (void)
                     ATM_SERIES_CONTRACT_ERROR_SHAPE);
     g_assert_null (out);
     g_assert_nonnull (g_strstr_len (error->message, -1,
-                                    "scenario does not match admitted observation payload"));
+                                    "Series metadata disagrees with the source-reviewed series profile"));
     g_clear_error (&error);
     atm_gistemp_admission_free (admission);
 }
@@ -463,7 +463,7 @@ main (int argc, char **argv)
     g_test_add_func ("/adapter/revalidate-rejects-mutated-point", test_adapter_revalidate_rejects_mutated_point);
     g_test_add_func ("/adapter/time-scope-matches-points", test_time_scope_must_match_points);
     g_test_add_func ("/adapter/scenario-matches-payload",
-                     test_scenario_must_match_observation_payload);
+                     test_scenario_must_match_reviewed_profile);
     g_test_add_func ("/adapter/reviewed-series-profile",
                      test_unreviewed_series_profile_metadata_rejected);
     g_test_add_func ("/adapter/descriptor-mismatch", test_descriptor_mismatch_rejected);
