@@ -320,6 +320,13 @@ test_descriptor_shape (void)
                       ATM_EI_EVIDENCE_DESCRIPTOR.source_count + 1u);
     g_assert_cmpuint (ATM_EI_EVIDENCE_DESCRIPTOR.evidence_count, ==, 65u);
     g_assert_cmpuint (ATM_EI_EVIDENCE_DESCRIPTOR.source_count, ==, 4u);
+    g_assert_cmpstr (ATM_EI_EVIDENCE_DESCRIPTOR.profile_version, ==, "2");
+    g_assert_cmpstr (ATM_EI_EVIDENCE_DESCRIPTOR.point_payload_schema, ==,
+                    "atm-energy-institute-annual-observation/2");
+    g_assert_cmpstr (ATM_EI_EVIDENCE_DESCRIPTOR.point_semantic_type, ==,
+                    "ewd.energy_institute_total_energy_supply_observation");
+    g_assert_cmpstr (ATM_EI_EVIDENCE_DESCRIPTOR.semantic_profile, ==,
+                    ATM_EI_EVIDENCE_PROFILE "@2");
     g_assert_null (ATM_EI_EVIDENCE_DESCRIPTOR.canonical_obligation);
     g_assert_nonnull (ATM_GISTEMP_EVIDENCE_DESCRIPTOR.canonical_obligation);
     g_assert_cmpuint (ATM_GISTEMP_EVIDENCE_DESCRIPTOR.evidence_count, ==, 150u);
