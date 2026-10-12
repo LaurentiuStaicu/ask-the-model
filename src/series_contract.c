@@ -405,16 +405,13 @@ point_matches_established_fact (const AtmSeriesContract *s,
 
     if (fact->support == NULL || fact->support->len != p->support->len)
         return FALSE;
+
+    /* Support is an ordered evidence list. A set-membership test would allow
+     * duplicate IDs to stand in for a different supporting artifact. */
     for (guint i = 0; i < p->support->len; i++) {
-        const char *support_id = g_ptr_array_index (p->support, i);
-        gboolean found = FALSE;
-        for (guint j = 0; j < fact->support->len; j++) {
-            if (g_strcmp0 (support_id, g_ptr_array_index (fact->support, j)) == 0) {
-                found = TRUE;
-                break;
-            }
-        }
-        if (!found)
+        const char *point_id = g_ptr_array_index (p->support, i);
+        const char *fact_id = g_ptr_array_index (fact->support, i);
+        if (g_strcmp0 (point_id, fact_id) != 0)
             return FALSE;
     }
     return TRUE;
