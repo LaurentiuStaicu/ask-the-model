@@ -1244,12 +1244,22 @@ test_unarchived_row_retained_when_export_reconciliation_fails ()
         Test.expect_message (
             null,
             GLib.LogLevelFlags.LEVEL_WARNING,
+            "*AtM: discard decision could not be evaluated for *"
+        );
+        Test.expect_message (
+            null,
+            GLib.LogLevelFlags.LEVEL_WARNING,
             "*AtM: retaining unarchived conversation * because export reconciliation failed or is unknown*"
         );
         Test.expect_message (
             null,
             GLib.LogLevelFlags.LEVEL_WARNING,
             "*AtM: retaining unarchived conversation * because export reconciliation failed:*"
+        );
+        Test.expect_message (
+            null,
+            GLib.LogLevelFlags.LEVEL_WARNING,
+            "*AtM: discard decision could not be evaluated for *"
         );
         Test.expect_message (
             null,
