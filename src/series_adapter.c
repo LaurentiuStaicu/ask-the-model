@@ -51,10 +51,10 @@ reviewed_series_metadata_matches (
         descriptor->series_scenario == NULL ||
         descriptor->series_profile_id == NULL ||
         descriptor->series_profile_version == NULL ||
-        descriptor->series_semantics[0] == '\\0' ||
-        descriptor->series_scenario[0] == '\\0' ||
-        descriptor->series_profile_id[0] == '\\0' ||
-        descriptor->series_profile_version[0] == '\\0')
+        descriptor->series_semantics[0] == '\0' ||
+        descriptor->series_scenario[0] == '\0' ||
+        descriptor->series_profile_id[0] == '\0' ||
+        descriptor->series_profile_version[0] == '\0')
         return reject (error,
             "Source descriptor has no reviewed generic series profile.");
 
