@@ -175,6 +175,9 @@ x_valid (AtmSeriesXKind kind, const char *x)
         if (n < 1 || n > 6) return FALSE;
         gsize start = x[0] == '-' ? 1 : 0;
         if (start == n) return FALSE;
+        /* A signed zero has the same numeric coordinate as "0" but a
+         * different serialized identity. Keep X coordinates canonical. */
+        if (start == 1 && n - start == 1 && x[start] == '0') return FALSE;
         if (x[start] == '0' && n - start > 1) return FALSE;
         for (gsize i = start; i < n; i++)
             if (!g_ascii_isdigit (x[i])) return FALSE;
