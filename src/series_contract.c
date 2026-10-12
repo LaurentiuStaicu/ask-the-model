@@ -400,16 +400,23 @@ point_matches_established_fact (const AtmSeriesContract *s,
         return FALSE;
     }
     JsonObject *object = json_node_get_object (root);
-    const char *year = NULL;
+    const char *x_value = NULL;
     const char *scenario = NULL;
     const char *epistemic_status = NULL;
     const char *y_status = NULL;
     const char *missing_reason = NULL;
-    if (json_object_has_member (object, "calendar_year")) {
-        JsonNode *node = json_object_get_member (object, "calendar_year");
+    /* Bind X according to the declared coordinate kind. A universal
+     * calendar_year lookup makes the advertised UTC/event variants unusable
+     * for numeric or MISSING facts, even when their own coordinate is qualified. */
+    const char *x_member =
+        s->x_kind == ATM_SERIES_X_CALENDAR_YEAR ? "calendar_year" :
+        s->x_kind == ATM_SERIES_X_UTC_INSTANT ? "utc_instant" :
+        s->x_kind == ATM_SERIES_X_EVENT_ORDINAL ? "event_ordinal" : NULL;
+    if (x_member != NULL && json_object_has_member (object, x_member)) {
+        JsonNode *node = json_object_get_member (object, x_member);
         if (JSON_NODE_HOLDS_VALUE (node) &&
             json_node_get_value_type (node) == G_TYPE_STRING)
-            year = json_node_get_string (node);
+            x_value = json_node_get_string (node);
     }
     if (json_object_has_member (object, "scenario")) {
         JsonNode *node = json_object_get_member (object, "scenario");
@@ -443,7 +450,8 @@ point_matches_established_fact (const AtmSeriesContract *s,
     /* Scenario and observation status are source evidence too. A caller must
      * not relabel an observation or assert a missing value without matching
      * SRA qualifiers. */
-    gboolean qualifiers_match = g_strcmp0 (year, p->x) == 0 &&
+    gboolean qualifiers_match = x_value != NULL &&
+        g_strcmp0 (x_value, p->x) == 0 &&
         bounded (s->scenario, ATM_SERIES_CONTRACT_MAX_TEXT) &&
         g_strcmp0 (scenario, s->scenario) == 0 &&
         g_strcmp0 (epistemic_status, s->epistemic_status) == 0 &&
