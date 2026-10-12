@@ -36,8 +36,9 @@ G_BEGIN_DECLS
 
 #define ATM_EI_LIMITATIONS \
     ((const char *const[]) { \
-        "Pinned processed observations; the upstream Energy Institute calculation is not reproduced.", \
-        "Gross primary-energy supply observations; these do not observe EROI, net energy or a World3 resource stock.", \
+        "Pinned processed observations; the upstream Energy Institute calculation is not reproduced by AtM.", \
+        "Total Energy Supply (TES) under the Physical Energy Content method; the EWD input column retains the legacy name total_primary_energy_ej.", \
+        "This gross flow series does not directly observe EROI, net energy or a World3 resource stock.", \
         "The 2019-2023 component reconciliation residual is retained as provenance, not repaired or redistributed.", \
         "No VerifiedSeries, rendering or general missing-value authority.", \
         NULL })
