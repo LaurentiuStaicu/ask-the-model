@@ -64,7 +64,7 @@ descriptor_valid (const AtmSeriesEvidenceDescriptor *d)
     if (d->source_logical_stem == NULL || d->point_logical_prefix == NULL ||
         d->source_payload_schema == NULL || d->source_semantic_type == NULL ||
         d->point_payload_schema == NULL || d->point_semantic_type == NULL ||
-        d->point_locator_columns == NULL || d->canonical_obligation == NULL ||
+        d->point_locator_columns == NULL ||
         d->semantic_profile == NULL || d->limitations == NULL ||
         d->limitations[0] == NULL)
         return FALSE;
