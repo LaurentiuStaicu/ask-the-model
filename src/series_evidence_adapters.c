@@ -4,8 +4,10 @@
 
 #include "gistemp_admission.h"
 #include "gistemp_evidence.h"
+#include "annual_series_candidate.h"
 #include "energy_institute_admission.h"
 #include "energy_institute_evidence.h"
+#include "energy_institute_candidate.h"
 
 /*
  * Source-bound evidence adapters.
@@ -118,10 +120,28 @@ gistemp_source_digest (gconstpointer admission, guint index)
     return atm_gistemp_admission_source_digest ((const AtmGistempAdmission *) admission, index);
 }
 
-static const AtmAnnualSeriesCandidate *
-gistemp_candidate (gconstpointer admission)
+static guint
+gistemp_point_count (gconstpointer admission)
 {
-    return atm_gistemp_admission_candidate ((const AtmGistempAdmission *) admission);
+    return atm_annual_series_candidate_count (
+        atm_gistemp_admission_candidate ((const AtmGistempAdmission *) admission));
+}
+
+static gboolean
+gistemp_point (gconstpointer admission, guint index, AtmSeriesEvidencePoint *out)
+{
+    if (out == NULL) return FALSE;
+    const AtmAnnualSeriesCandidate *candidate =
+        atm_gistemp_admission_candidate ((const AtmGistempAdmission *) admission);
+    if (candidate == NULL || index >= atm_annual_series_candidate_count (candidate))
+        return FALSE;
+
+    out->year = atm_annual_series_candidate_year (candidate, index);
+    out->source_row = atm_annual_series_candidate_source_row (candidate, index);
+    out->source_decimal = atm_annual_series_candidate_decimal (candidate, index);
+    out->coefficient = atm_annual_series_candidate_coefficient (candidate, index);
+    out->exponent = atm_annual_series_candidate_exponent (candidate, index);
+    return out->source_decimal != NULL && out->coefficient != NULL;
 }
 
 static char *
@@ -189,7 +209,8 @@ const AtmSeriesEvidenceDescriptor ATM_GISTEMP_EVIDENCE_DESCRIPTOR = {
     .admission_snapshot = gistemp_snapshot,
     .admission_source_path = gistemp_source_path,
     .admission_source_digest = gistemp_source_digest,
-    .admission_candidate = gistemp_candidate,
+    .admission_point_count = gistemp_point_count,
+    .admission_point = gistemp_point,
     .source_payload = gistemp_source_payload,
     .point_payload = gistemp_point_payload,
 };
@@ -236,12 +257,30 @@ energy_source_digest (gconstpointer admission, guint index)
         (const AtmEnergyInstituteAdmission *) admission, index);
 }
 
-static const AtmAnnualSeriesCandidate *
-energy_candidate (gconstpointer admission)
+static guint
+energy_point_count (gconstpointer admission)
 {
-    return (const AtmAnnualSeriesCandidate *)
+    return atm_energy_institute_candidate_count (
+        atm_energy_institute_admission_candidate (
+            (const AtmEnergyInstituteAdmission *) admission));
+}
+
+static gboolean
+energy_point (gconstpointer admission, guint index, AtmSeriesEvidencePoint *out)
+{
+    if (out == NULL) return FALSE;
+    const AtmEnergyInstituteCandidate *candidate =
         atm_energy_institute_admission_candidate (
             (const AtmEnergyInstituteAdmission *) admission);
+    if (candidate == NULL || index >= atm_energy_institute_candidate_count (candidate))
+        return FALSE;
+
+    out->year = atm_energy_institute_candidate_year (candidate, index);
+    out->source_row = atm_energy_institute_candidate_source_row (candidate, index);
+    out->source_decimal = atm_energy_institute_candidate_decimal (candidate, index);
+    out->coefficient = atm_energy_institute_candidate_coefficient (candidate, index);
+    out->exponent = atm_energy_institute_candidate_exponent (candidate, index);
+    return out->source_decimal != NULL && out->coefficient != NULL;
 }
 
 static char *
@@ -311,7 +350,8 @@ const AtmSeriesEvidenceDescriptor ATM_EI_EVIDENCE_DESCRIPTOR = {
     .admission_snapshot = energy_snapshot,
     .admission_source_path = energy_source_path,
     .admission_source_digest = energy_source_digest,
-    .admission_candidate = energy_candidate,
+    .admission_point_count = energy_point_count,
+    .admission_point = energy_point,
     .source_payload = energy_source_payload,
     .point_payload = energy_point_payload,
 };
