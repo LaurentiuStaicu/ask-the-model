@@ -405,6 +405,8 @@ point_matches_established_fact (const AtmSeriesContract *s,
     const char *epistemic_status = NULL;
     const char *y_status = NULL;
     const char *missing_reason = NULL;
+    const char *break_reason = NULL;
+    gboolean fact_break_before = FALSE;
     /* Bind X according to the declared coordinate kind. A universal
      * calendar_year lookup makes the advertised UTC/event variants unusable
      * for numeric or MISSING facts, even when their own coordinate is qualified. */
@@ -442,6 +444,27 @@ point_matches_established_fact (const AtmSeriesContract *s,
             json_node_get_value_type (node) == G_TYPE_STRING)
             missing_reason = json_node_get_string (node);
     }
+    /* Discontinuity is scientific metadata too. A caller cannot add or erase
+     * a break unless that exact point fact carries the same assertion. */
+    if (json_object_has_member (object, "break_before")) {
+        JsonNode *node = json_object_get_member (object, "break_before");
+        if (!JSON_NODE_HOLDS_VALUE (node) ||
+            json_node_get_value_type (node) != G_TYPE_BOOLEAN) {
+            g_object_unref (parser);
+            return FALSE;
+        }
+        fact_break_before = json_node_get_boolean (node);
+    }
+    if (json_object_has_member (object, "break_reason")) {
+        JsonNode *node = json_object_get_member (object, "break_reason");
+        if (JSON_NODE_HOLDS_VALUE (node) &&
+            json_node_get_value_type (node) == G_TYPE_STRING)
+            break_reason = json_node_get_string (node);
+        else if (!JSON_NODE_HOLDS_NULL (node)) {
+            g_object_unref (parser);
+            return FALSE;
+        }
+    }
     const char *expected_status = p->y_status == ATM_SERIES_Y_NUMERIC
         ? "NUMERIC" : "MISSING";
     gboolean status_matches = g_strcmp0 (y_status, expected_status) == 0;
@@ -455,7 +478,9 @@ point_matches_established_fact (const AtmSeriesContract *s,
         bounded (s->scenario, ATM_SERIES_CONTRACT_MAX_TEXT) &&
         g_strcmp0 (scenario, s->scenario) == 0 &&
         g_strcmp0 (epistemic_status, s->epistemic_status) == 0 &&
-        status_matches && reason_matches;
+        status_matches && reason_matches &&
+        fact_break_before == p->break_before &&
+        g_strcmp0 (break_reason, p->break_reason) == 0;
     g_object_unref (parser);
     if (!qualifiers_match)
         return FALSE;
