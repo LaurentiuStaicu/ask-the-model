@@ -2,7 +2,7 @@
 
 ## Scope
 
-This audit establishes a dormant source-bound candidate for a second real scientific series under CHART-01. It does not create a VerifiedSeries, ChartSpec, runtime chart path, persistence state, or model-output authority.
+This audit documents the source-bound Energy Institute candidate and the approved, pinned-snapshot SRA qualification implemented on the CHART-M1c integration branch. It does not create a `VerifiedSeries`, `ChartSpec`, runtime chart path, persistence state, or model-output authority.
 
 The audited source is the exact EWD snapshot:
 
@@ -27,7 +27,7 @@ The transport code in that pinned commit selects the raw Energy Institute total 
 
 The EWD registry and processed CSV retain legacy identifiers such as `ei_primary_energy` and `total_primary_energy_ej`. AtM preserves those bytes and column names for source reproducibility, but does not propagate the legacy label into the semantic contract. The admitted AtM profile therefore labels this value as **Total Energy Supply (TES)** and binds `energy_accounting_method = physical_energy_content` into each observation payload. The method interpretation changes the semantic profile/payload version; the pinned CSV and its hashes are unchanged.
 
-The pinned EWD registry concept and provenance `boundary_note` still describe the series as “Primary energy supply” / “gross primary-energy supply.” This is a real semantic metadata conflict, not just a filename difference. The AtM v2 interpretation follows the pinned transport's `tes_ej` mapping and the official Energy Institute methodology; the F0-19 proposal records that the precedence rule must be explicitly reviewed before SRA qualification.
+The pinned EWD registry concept and provenance `boundary_note` still describe the series as “Primary energy supply” / “gross primary-energy supply.” This is a real semantic metadata conflict, not just a filename difference. The project reviewer explicitly approved on 2026-10-12 that AtM v2 follows the pinned transport's `tes_ej` mapping and the official Energy Institute 2026 methodology, while preserving the old labels only as provenance. This precedence rule is recorded in the finalized SRA limitations.
 
 The value is a gross annual energy-supply flow. It constrains the energy mix but does not directly observe EROI or net energy.
 
@@ -74,22 +74,11 @@ The fossil/non-fossil component columns are not independent evidence for the tot
 
 This source is sufficiently specified for a source-audit slice but is **not yet a qualified VerifiedSeries**.
 
-Before qualification, a dedicated adapter must establish:
+The approved source-bound SRA path now enforces the pinned four-file admission, bounded CSV parsing, 61 consecutive annual observations, exact decimal preservation, source locators and source-bound Evidence for all four inputs plus every point. The generic SRA is reconstructed and validated against the pinned evidence; each of the 61 facts binds its five support artifacts and deterministic qualification envelope. Registered tests cover source-byte mutation, malformed/nonconsecutive rows, all-point qualification, exact endpoint values, semantic metadata, anomaly preservation, finalized-result mutation and the NULL-obligation negative control.
 
-1. exact CSV dialect and bounded parser behavior;
-2. complete 61-point extraction with consecutive calendar years;
-3. exact decimal preservation;
-4. source-row and source-column locators;
-5. source-bound evidence artifacts for the processed file and provenance/manifest/registry metadata;
-6. finalized SRA support for every point;
-7. explicit treatment of the 2019–2023 reconciliation anomaly without altering observations;
-8. deterministic scientific and qualified series identities;
-9. independent reconstruction from the pinned bytes;
-10. tests for mutation, reordered rows, changed values, changed source spelling, provenance changes, and identity forgery.
+No existing GISTEMP profile is widened by this audit. The Energy Institute source uses the versioned TES semantic profile `atm-profile/ewd-energy-institute-tes-physical-content/v2`. F0-19's scope decision is resolved for the bounded claim of reconstructing the pinned EWD processed snapshot, not independently reproducing Energy Institute's raw-to-processed pipeline. The canonical obligation is `atm-energy-institute-ewd-tes-pinned-snapshot-reconstruction/1` on the CHART-M1c integration branch; this branch has not yet been merged into `main`.
 
-No existing GISTEMP profile is widened by this audit. The Energy Institute source uses the versioned TES semantic profile `atm-profile/ewd-energy-institute-tes-physical-content/v2`. F0-19 still blocks SRA qualification because the source bundle does not define an approved AtM reconstruction obligation.
-
-The unresolved scope is recorded in [`CHART01_ENERGY_INSTITUTE_F0-19_QUALIFICATION_PROPOSAL.md`](CHART01_ENERGY_INSTITUTE_F0-19_QUALIFICATION_PROPOSAL.md). It proposes a bounded obligation for reconstruction of the pinned EWD processed snapshot, explicitly not reproduction of the upstream raw-to-processed calculation. The candidate identifier is not active; `canonical_obligation` remains `NULL` until the scope is explicitly approved.
+The accepted decision, semantic-precedence rule, proof boundary and future requirements for any raw-to-processed claim are recorded in [`CHART01_ENERGY_INSTITUTE_F0-19_QUALIFICATION_PROPOSAL.md`](CHART01_ENERGY_INSTITUTE_F0-19_QUALIFICATION_PROPOSAL.md).
 
 ## Explicit non-claims
 
@@ -105,10 +94,10 @@ This audit does not claim that Total Energy Supply (TES) is:
 
 It also does not authorize runtime access to the source file. The future adapter must consume an explicitly admitted, byte-pinned source bundle, following the existing GISTEMP qualification architecture.
 
-## M0 decision
+## M0 / F0-19 decision
 
-**PASS for source-audit continuation.**
+**PASS for the approved source-snapshot SRA qualification scope on the integration branch.**
 
-The source has an explicit authority, dataset vintage, geography, coverage, unit, frequency, processed-file identity and semantic boundary. The reconciliation anomaly is observable and can be preserved without inventing a correction.
+The source has an explicit authority, dataset vintage, geography, coverage, unit, frequency, processed-file identity and accepted TES semantic precedence. The 2019–2023 reconciliation anomaly remains uncorrected and explicitly recorded. The qualification claims faithful reconstruction of the pinned processed observations only.
 
-The next slice is a dormant source-specific admission/parser for the exact pinned Energy Institute table. Runtime chart activation remains out of scope.
+`VerifiedSeries` promotion, chart rendering, persistence, transformations to EROI/net energy/World3 resource stock, and independent raw-to-processed reproduction remain out of scope and require separate qualification.
