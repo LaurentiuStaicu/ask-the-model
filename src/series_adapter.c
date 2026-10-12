@@ -49,10 +49,12 @@ reviewed_series_metadata_matches (
 {
     if (descriptor->series_semantics == NULL ||
         descriptor->series_scenario == NULL ||
+        descriptor->series_epistemic_status == NULL ||
         descriptor->series_profile_id == NULL ||
         descriptor->series_profile_version == NULL ||
         descriptor->series_semantics[0] == '\0' ||
         descriptor->series_scenario[0] == '\0' ||
+        descriptor->series_epistemic_status[0] == '\0' ||
         descriptor->series_profile_id[0] == '\0' ||
         descriptor->series_profile_version[0] == '\0')
         return reject (error,
@@ -180,7 +182,7 @@ atm_series_adapter_from_evidence (const AtmSeriesEvidenceDescriptor *descriptor,
         metadata->series_semantics,
         metadata->scenario,
         metadata->time_scope,
-        "empirical",
+        descriptor->series_epistemic_status,
         first->repository_id,
         first->repository_version,
         first->snapshot_sha,
