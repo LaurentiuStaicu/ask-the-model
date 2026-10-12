@@ -654,6 +654,13 @@ atm_series_contract_validate (AtmSeriesContract *s, const AtmSraResult *q, GErro
                      "Invalid or oversized series metadata.");
     if (!atm_sra_result_validate (q, error))
         return FALSE;
+    /* The contract validates exact decimal coefficient/exponent values. A
+     * valid SRA qualified under a different numeric interpretation cannot be
+     * silently reinterpreted by this series contract. */
+    if (g_strcmp0 (q->qualification->numeric_profile,
+                   ATM_SERIES_CONTRACT_NUMERIC_PROFILE) != 0)
+        return fail (error, ATM_SERIES_CONTRACT_ERROR_NUMERIC,
+                     "SRA numeric profile does not match series contract numeric profile.");
     /* A contract may only name a repository version and snapshot explicitly
      * present in the qualification envelope it is validated against. Otherwise
      * valid point facts could be re-labelled as belonging to another snapshot. */
