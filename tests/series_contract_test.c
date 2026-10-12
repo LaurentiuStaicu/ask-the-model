@@ -35,10 +35,10 @@ static AtmSraResult *qualified_with_artifact (AtmScientificArtifact *a)
     GError *error = NULL;
     AtmSraEstablishedFact *f1 = atm_sra_established_fact_new (
         "fact-1", "observation", "subject", "attribute", "1e0", "unit", "dimension",
-        "{\"calendar_year\":\"1880\"}");
+        "{\"calendar_year\":\"1880\",\"scenario\":\"baseline\"}");
     AtmSraEstablishedFact *f2 = atm_sra_established_fact_new (
         "fact-2", "observation", "subject", "attribute", "0e0", "unit", "dimension",
-        "{\"calendar_year\":\"1882\"}");
+        "{\"calendar_year\":\"1882\",\"scenario\":\"baseline\"}");
     g_assert_true (atm_sra_fact_add_support (f1, a->qualified_artifact_id, &error));
     g_assert_no_error (error);
     g_assert_true (atm_sra_fact_add_support (f2, a->qualified_artifact_id, &error));
@@ -99,7 +99,8 @@ qualified_with_two_artifacts (AtmScientificArtifact *a, AtmScientificArtifact *b
     GError *error = NULL;
     AtmSraEstablishedFact *fact = atm_sra_established_fact_new (
         "fact-two-supports", "observation", "subject", "attribute",
-        "1e0", "unit", "dimension", "{\"calendar_year\":\"1880\"}");
+        "1e0", "unit", "dimension",
+        "{\"calendar_year\":\"1880\",\"scenario\":\"baseline\"}");
 
     g_assert_true (atm_sra_fact_add_support (fact, a->qualified_artifact_id, &error));
     g_assert_no_error (error);
@@ -300,6 +301,54 @@ static void test_numeric_point_support_must_match_as_unique_set (void)
     atm_scientific_artifact_free (a);
 }
 
+static void test_direct_scenario_must_match_sra_fact (void)
+{
+    AtmScientificArtifact *a = support_artifact ();
+    AtmSraResult *q = qualified_with_artifact (a);
+    AtmSeriesContract *s = base ();
+    const char *support[] = { a->qualified_artifact_id };
+    GError *error = NULL;
+
+    g_free (s->scenario);
+    s->scenario = g_strdup ("not_applicable");
+    g_assert_true (atm_series_contract_add_point (
+        s, "1880", ATM_SERIES_Y_NUMERIC, "1.0000", "1", 0, FALSE,
+        FALSE, NULL, NULL, support, 1, &error));
+    g_assert_no_error (error);
+    g_assert_false (atm_series_contract_validate (s, q, &error));
+    g_assert_error (error, ATM_SERIES_CONTRACT_ERROR,
+                    ATM_SERIES_CONTRACT_ERROR_SHAPE);
+    g_clear_error (&error);
+
+    atm_series_contract_free (s);
+    atm_sra_result_free (q);
+    atm_scientific_artifact_free (a);
+}
+
+static void test_direct_time_scope_must_enclose_points (void)
+{
+    AtmScientificArtifact *a = support_artifact ();
+    AtmSraResult *q = qualified_with_artifact (a);
+    AtmSeriesContract *s = base ();
+    const char *support[] = { a->qualified_artifact_id };
+    GError *error = NULL;
+
+    g_free (s->time_scope);
+    s->time_scope = g_strdup ("1881-2025");
+    g_assert_true (atm_series_contract_add_point (
+        s, "1880", ATM_SERIES_Y_NUMERIC, "1.0000", "1", 0, FALSE,
+        FALSE, NULL, NULL, support, 1, &error));
+    g_assert_no_error (error);
+    g_assert_false (atm_series_contract_validate (s, q, &error));
+    g_assert_error (error, ATM_SERIES_CONTRACT_ERROR,
+                    ATM_SERIES_CONTRACT_ERROR_SHAPE);
+    g_clear_error (&error);
+
+    atm_series_contract_free (s);
+    atm_sra_result_free (q);
+    atm_scientific_artifact_free (a);
+}
+
 static void test_unqualified_support_rejected (void)
 {
     AtmScientificArtifact *a = support_artifact ();
@@ -409,7 +458,8 @@ static AtmSeriesContract *base_kind (AtmSeriesXKind kind)
         kind == ATM_SERIES_X_UTC_INSTANT ? "UTC" :
             kind == ATM_SERIES_X_EVENT_ORDINAL ? "event" : "calendar_year",
         "time", "unit", "dimension",
-        "empirical_observations", "baseline", "scope", "observed",
+        "empirical_observations", "baseline",
+        kind == ATM_SERIES_X_CALENDAR_YEAR ? "1880-2025" : "scope", "observed",
         "ewd", "0.1.0", SHA, "data/series.csv", "fixture-series", "1", &error);
     g_assert_no_error (error);
     g_assert_nonnull (s);
@@ -468,6 +518,8 @@ int main (int argc, char **argv)
     g_test_add_func ("/series-contract/duplicate-x", test_duplicate_x_rejected);
     g_test_add_func ("/series-contract/support", test_unqualified_support_rejected);
     g_test_add_func ("/series-contract/fact-binding", test_numeric_point_must_match_sra_fact);
+    g_test_add_func ("/series-contract/direct-scenario-binding", test_direct_scenario_must_match_sra_fact);
+    g_test_add_func ("/series-contract/direct-time-scope", test_direct_time_scope_must_enclose_points);
     g_test_add_func ("/series-contract/support-unique-set", test_numeric_point_support_must_match_as_unique_set);
     g_test_add_func ("/series-contract/first-break", test_first_break_rejected);
     g_test_add_func ("/series-contract/identity", test_caller_identity_not_authoritative);
