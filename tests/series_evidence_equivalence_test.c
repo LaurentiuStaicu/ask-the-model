@@ -320,6 +320,8 @@ test_descriptor_shape (void)
                       ATM_EI_EVIDENCE_DESCRIPTOR.source_count + 1u);
     g_assert_cmpuint (ATM_EI_EVIDENCE_DESCRIPTOR.evidence_count, ==, 65u);
     g_assert_cmpuint (ATM_EI_EVIDENCE_DESCRIPTOR.source_count, ==, 4u);
+    g_assert_null (ATM_EI_EVIDENCE_DESCRIPTOR.canonical_obligation);
+    g_assert_nonnull (ATM_GISTEMP_EVIDENCE_DESCRIPTOR.canonical_obligation);
     g_assert_cmpuint (ATM_GISTEMP_EVIDENCE_DESCRIPTOR.evidence_count, ==, 150u);
     g_assert_cmpuint (ATM_GISTEMP_EVIDENCE_DESCRIPTOR.source_count, ==, 4u);
 
