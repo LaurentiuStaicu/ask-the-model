@@ -32,6 +32,8 @@ on:
       - 'tests/fixtures/chart01/**'
       - 'meson.build'
       - '.github/workflows/chart01-native.yml'
+      - 'src/series_contract.*'
+      - 'tests/series_contract_test.c'
   workflow_dispatch:
 
 permissions:
@@ -147,6 +149,16 @@ jobs:
             -c src/verified_series.c -o /tmp/verified-series-production.o
           nm -g /tmp/verified-series-production.o | python3 -c \
             'import sys; assert "atm_verified_series_test_rehash" not in sys.stdin.read()'
+          # Generic series contract invariants: execute under ASan+UBSan, not only in Meson metadata.
+          cc -std=c11 -Wall -Wextra -Werror -g -O1 \
+            -fsanitize=address,undefined -fno-omit-frame-pointer -Isrc \
+            src/series_contract.c src/scientific_canonical.c \
+            src/scientific_artifact.c src/scientific_result.c \
+            src/scientific_operation.c src/scientific_derivation.c \
+            tests/series_contract_test.c \
+            $(pkg-config --cflags --libs glib-2.0 json-glib-1.0) -lm \
+            -o /tmp/series-contract-test
+          /tmp/series-contract-test
       - name: Publish bounded headless preview diagnostics
         run: python3 scripts/chart03_preview_log.py /tmp/chart03-preview
       - uses: actions/upload-artifact@v4
