@@ -275,6 +275,31 @@ test_descriptor_mismatch_rejected (void)
     atm_gistemp_admission_free (admission);
 }
 
+static void
+test_adapter_revalidate_rejects_mutated_point (void)
+{
+    AtmGistempAdmission *admission = build_gistemp_admission ();
+    AtmSeriesContract *contract = NULL;
+    GError *error = NULL;
+
+    g_assert_true (atm_series_adapter_admit (&ATM_GISTEMP_EVIDENCE_DESCRIPTOR,
+        &GISTEMP_METADATA, admission, &contract, &error));
+    g_assert_no_error (error);
+    g_assert_nonnull (atm_series_contract_scientific_id (contract));
+
+    AtmSeriesContractPoint *point = g_ptr_array_index (contract->points, 0);
+    g_free (point->source_decimal);
+    point->source_decimal = g_strdup ("999.0");
+
+    g_assert_false (atm_series_adapter_revalidate (contract,
+        &ATM_GISTEMP_EVIDENCE_DESCRIPTOR, &GISTEMP_METADATA, admission, &error));
+    g_assert_error (error, ATM_SERIES_CONTRACT_ERROR, ATM_SERIES_CONTRACT_ERROR_SHAPE);
+    g_clear_error (&error);
+
+    atm_series_contract_free (contract);
+    atm_gistemp_admission_free (admission);
+}
+
 /* Argument and metadata guards, with output ownership preserved. */
 static void
 test_argument_guards (void)
@@ -334,6 +359,7 @@ main (int argc, char **argv)
     g_test_add_func ("/adapter/admit-valid", test_admit_produces_valid_contract);
     g_test_add_func ("/adapter/points-carry-years", test_contract_points_carry_admitted_years);
     g_test_add_func ("/adapter/revalidate", test_adapter_revalidate_accepts_reconstruction);
+    g_test_add_func ("/adapter/revalidate-rejects-mutated-point", test_adapter_revalidate_rejects_mutated_point);
     g_test_add_func ("/adapter/metadata-bound-into-identity", test_metadata_is_bound_into_identity);
     g_test_add_func ("/adapter/descriptor-mismatch", test_descriptor_mismatch_rejected);
     g_test_add_func ("/adapter/argument-guards", test_argument_guards);
