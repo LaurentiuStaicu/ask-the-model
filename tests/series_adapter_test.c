@@ -250,6 +250,31 @@ test_metadata_is_bound_into_identity (void)
     atm_gistemp_admission_free (admission);
 }
 
+/* Equal-looking source descriptors are still not interchangeable: GISTEMP
+ * and Energy Institute share structural arities but carry different evidence. */
+static void
+test_descriptor_mismatch_rejected (void)
+{
+    AtmGistempAdmission *admission = build_gistemp_admission ();
+    AtmSeriesSra *sra = NULL;
+    AtmSeriesContract *out = NULL;
+    GError *error = NULL;
+
+    g_assert_true (atm_series_sra_new (&ATM_GISTEMP_EVIDENCE_DESCRIPTOR,
+                                       admission, &sra, &error));
+    g_assert_no_error (error);
+    g_assert_false (atm_series_adapter_from_evidence (
+        &ATM_EI_EVIDENCE_DESCRIPTOR, &GISTEMP_METADATA,
+        atm_series_sra_evidence (sra), &out, &error));
+    g_assert_error (error, ATM_SERIES_CONTRACT_ERROR,
+                    ATM_SERIES_CONTRACT_ERROR_SHAPE);
+    g_assert_null (out);
+    g_clear_error (&error);
+
+    atm_series_sra_free (sra);
+    atm_gistemp_admission_free (admission);
+}
+
 /* Argument and metadata guards, with output ownership preserved. */
 static void
 test_argument_guards (void)
@@ -310,6 +335,7 @@ main (int argc, char **argv)
     g_test_add_func ("/adapter/points-carry-years", test_contract_points_carry_admitted_years);
     g_test_add_func ("/adapter/revalidate", test_adapter_revalidate_accepts_reconstruction);
     g_test_add_func ("/adapter/metadata-bound-into-identity", test_metadata_is_bound_into_identity);
+    g_test_add_func ("/adapter/descriptor-mismatch", test_descriptor_mismatch_rejected);
     g_test_add_func ("/adapter/argument-guards", test_argument_guards);
 
     return g_test_run ();
