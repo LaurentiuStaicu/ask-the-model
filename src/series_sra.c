@@ -119,6 +119,12 @@ build_result (const AtmSeriesEvidenceDescriptor *descriptor,
               const AtmSeriesEvidence *evidence,
               GError **error)
 {
+    if (descriptor->canonical_obligation == NULL ||
+        descriptor->canonical_obligation[0] == '\0') {
+        reject (error,
+            "Source SRA qualification is blocked until its canonical reconstruction obligation is approved.");
+        return NULL;
+    }
     if (!atm_series_evidence_validate (evidence, error)) return NULL;
 
     const AtmScientificArtifact *first = atm_series_evidence_at (evidence, 0);
@@ -207,6 +213,9 @@ atm_series_sra_new (const AtmSeriesEvidenceDescriptor *descriptor,
     if (!atm_series_evidence_new (descriptor, admission, &s->evidence, error))
         goto invalid;
 
+    /* Evidence construction is separate from qualification policy. A valid
+     * source bundle may be retained as Evidence-only while its SRA obligation
+     * remains unapproved; build_result rejects that state explicitly. */
     s->result = build_result (descriptor, s->evidence, error);
     if (s->result == NULL) goto invalid;
 
