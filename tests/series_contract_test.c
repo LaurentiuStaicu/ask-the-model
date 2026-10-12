@@ -188,7 +188,7 @@ static AtmSeriesContract *base (void)
         ATM_SERIES_X_CALENDAR_YEAR, "subject", "attribute",
         "calendar_year", "time", "unit", "dimension",
         "empirical_observations", "baseline", "1880-2025", "observed",
-        "fixture", "1", SHA, "data/series.csv", "fixture-series", "1", &error);
+        "ewd", "0.1.0", SHA, "data/series.csv", "fixture-series", "1", &error);
     g_assert_no_error (error);
     g_assert_nonnull (s);
     return s;
