@@ -92,6 +92,7 @@ typedef struct {
      * reconstruction but does not approve an EI series profile. */
     const char *series_semantics;
     const char *series_scenario;
+    const char *series_epistemic_status;
     const char *series_profile_id;
     const char *series_profile_version;
 
