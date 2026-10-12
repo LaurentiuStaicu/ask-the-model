@@ -462,7 +462,7 @@ main (int argc, char **argv)
     g_test_add_func ("/adapter/revalidate", test_adapter_revalidate_accepts_reconstruction);
     g_test_add_func ("/adapter/revalidate-rejects-mutated-point", test_adapter_revalidate_rejects_mutated_point);
     g_test_add_func ("/adapter/time-scope-matches-points", test_time_scope_must_match_points);
-    g_test_add_func ("/adapter/scenario-matches-payload",
+    g_test_add_func ("/adapter/scenario-matches-reviewed-profile",
                      test_scenario_must_match_reviewed_profile);
     g_test_add_func ("/adapter/reviewed-series-profile",
                      test_unreviewed_series_profile_metadata_rejected);
