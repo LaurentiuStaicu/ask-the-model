@@ -352,6 +352,89 @@ support_is_qualified (const AtmSraResult *q, const char *id)
     return FALSE;
 }
 
+/* Numeric points must correspond to an established SRA fact, not merely
+ * cite evidence that appears somewhere in the qualification envelope. The
+ * fact's qualifiers preserve the admitted observation payload, including X. */
+static gboolean
+point_matches_established_fact (const AtmSeriesContract *s,
+                                const AtmSeriesContractPoint *p,
+                                const AtmSraEstablishedFact *fact)
+{
+    if (fact == NULL || fact->qualifiers_json == NULL ||
+        g_strcmp0 (fact->subject_id, s->subject) != 0 ||
+        g_strcmp0 (fact->attribute, s->attribute) != 0 ||
+        g_strcmp0 (fact->unit, s->y_unit) != 0 ||
+        g_strcmp0 (fact->dimension, s->y_dimension) != 0)
+        return FALSE;
+
+    char *expected_value = g_strdup_printf ("%se%" G_GINT64_FORMAT,
+                                             p->coefficient, p->exponent);
+    gboolean value_matches = g_strcmp0 (fact->value, expected_value) == 0;
+    g_free (expected_value);
+    if (!value_matches)
+        return FALSE;
+
+    JsonParser *parser = json_parser_new ();
+    GError *parse_error = NULL;
+    gboolean parsed = json_parser_load_from_data (parser, fact->qualifiers_json,
+                                                   -1, &parse_error);
+    g_clear_error (&parse_error);
+    if (!parsed) {
+        g_object_unref (parser);
+        return FALSE;
+    }
+
+    JsonNode *root = json_parser_get_root (parser);
+    if (!JSON_NODE_HOLDS_OBJECT (root)) {
+        g_object_unref (parser);
+        return FALSE;
+    }
+    JsonObject *object = json_node_get_object (root);
+    const char *year = NULL;
+    if (json_object_has_member (object, "calendar_year")) {
+        JsonNode *node = json_object_get_member (object, "calendar_year");
+        if (JSON_NODE_HOLDS_VALUE (node) &&
+            json_node_get_value_type (node) == G_TYPE_STRING)
+            year = json_node_get_string (node);
+    }
+    gboolean x_matches = g_strcmp0 (year, p->x) == 0;
+    g_object_unref (parser);
+    if (!x_matches)
+        return FALSE;
+
+    if (fact->support == NULL || fact->support->len != p->support->len)
+        return FALSE;
+    for (guint i = 0; i < p->support->len; i++) {
+        const char *support_id = g_ptr_array_index (p->support, i);
+        gboolean found = FALSE;
+        for (guint j = 0; j < fact->support->len; j++) {
+            if (g_strcmp0 (support_id, g_ptr_array_index (fact->support, j)) == 0) {
+                found = TRUE;
+                break;
+            }
+        }
+        if (!found)
+            return FALSE;
+    }
+    return TRUE;
+}
+
+static gboolean
+point_is_bound_to_sra_fact (const AtmSeriesContract *s,
+                            const AtmSeriesContractPoint *p,
+                            const AtmSraResult *q)
+{
+    if (q->established_facts == NULL)
+        return FALSE;
+    for (guint i = 0; i < q->established_facts->len; i++) {
+        const AtmSraEstablishedFact *fact =
+            g_ptr_array_index (q->established_facts, i);
+        if (point_matches_established_fact (s, p, fact))
+            return TRUE;
+    }
+    return FALSE;
+}
+
 static gint
 compare_x (AtmSeriesXKind kind, const char *a, const char *b)
 {
@@ -402,6 +485,9 @@ atm_series_contract_validate (AtmSeriesContract *s, const AtmSraResult *q, GErro
             if (p->missing_reason != NULL || (p->break_before && p->break_reason == NULL))
                 return fail (error, ATM_SERIES_CONTRACT_ERROR_SHAPE, "Numeric point has invalid missing/break semantics.");
             if (!point_numeric_valid (p, error)) return FALSE;
+            if (!point_is_bound_to_sra_fact (s, p, q))
+                return fail (error, ATM_SERIES_CONTRACT_ERROR_SHAPE,
+                             "Numeric point does not match an established SRA fact.");
             numeric++;
         } else if (p->y_status == ATM_SERIES_Y_MISSING) {
             if (!bounded (p->missing_reason, ATM_SERIES_CONTRACT_MAX_TEXT))
