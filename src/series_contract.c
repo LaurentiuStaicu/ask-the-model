@@ -353,12 +353,19 @@ build_scientific_json (const AtmSeriesContract *s, char **out, GError **error)
 }
 
 static gboolean
-build_qualified_json (const AtmSeriesContract *s, const char *scientific_id, char **out, GError **error)
+build_qualified_json (const AtmSeriesContract *s,
+                      const char *scientific_id,
+                      const char *sra_qualified_artifact_id,
+                      char **out,
+                      GError **error)
 {
     JsonBuilder *b = json_builder_new ();
     json_builder_begin_object (b);
     text_member (b, "schema", ATM_SERIES_CONTRACT_QUALIFICATION_SCHEMA);
     text_member (b, "scientific_content_id", scientific_id);
+    /* The qualified series identity must bind the exact SRA envelope whose
+     * facts/support authorized validation, not only the source snapshot. */
+    text_member (b, "sra_qualified_artifact_id", sra_qualified_artifact_id);
     text_member (b, "repository_id", s->repository_id);
     text_member (b, "repository_version", s->repository_version);
     text_member (b, "snapshot_sha", s->snapshot_sha);
@@ -739,7 +746,10 @@ atm_series_contract_validate (AtmSeriesContract *s, const AtmSraResult *q, GErro
     }
     g_free (scientific_json);
     char *qualified_json = NULL;
-    if (!build_qualified_json (s, s->scientific_content_id, &qualified_json, error)) return FALSE;
+    if (!build_qualified_json (s, s->scientific_content_id,
+                               q->qualification->qualified_artifact_id,
+                               &qualified_json, error))
+        return FALSE;
     gboolean ok = atm_scientific_content_id_json (
         ATM_SERIES_CONTRACT_QUALIFIED_ID_DOMAIN, qualified_json,
         &s->qualified_series_id, error);
