@@ -2700,3 +2700,115 @@ pres09_chart_history_e2e_test = executable(
 )
 test('pres09-chart-history-e2e', pres09_chart_history_e2e_test,
   env: {'ATM_CHART01_FIXTURE': meson.current_source_dir() / 'tests/fixtures/chart01'})
+
+# CHART-M1c generic native tests. These blocks were previously stored in
+# append-only review fragments and were not evaluated by the project build.
+
+# ---------------------------------------------------------------------------
+# CHART-M1c: generic source-bound evidence, SRA and series adapter.
+#
+# These three targets link the new descriptor-driven layers alongside the
+# legacy per-source modules, because every test in this block compares the two
+# and needs both present. Nothing above this point is modified: the existing
+# gistemp-evidence, energy-institute-evidence, gistemp-sra, verified-series,
+# chart-spec and History targets keep their current source lists and their
+# pinned legacy modules.
+#
+# Note for review: series-evidence-equivalence-test is the only target in the
+# build that links both admission families into one binary. That is required by
+# series_evidence_adapters.c, which carries a descriptor for each source.
+# ---------------------------------------------------------------------------
+
+series_evidence_equivalence_test = executable(
+  'series-evidence-equivalence-test',
+  ['src/series_evidence.c', 'src/series_evidence_adapters.c',
+   'src/gistemp_evidence.c', 'src/gistemp_admission.c',
+   'src/energy_institute_evidence.c', 'src/energy_institute_admission.c',
+   'src/energy_institute_candidate.c', 'src/annual_series_candidate.c',
+   'src/scientific_canonical.c', 'src/scientific_artifact.c',
+   'tests/series_evidence_equivalence_test.c'],
+  include_directories: include_directories('src'),
+  dependencies: [glib_dep, json_glib_dep],
+  install: false
+)
+test('series-evidence-equivalence', series_evidence_equivalence_test,
+  env: {'ATM_CHART01_FIXTURE': meson.current_source_dir() / 'tests/fixtures/chart01'})
+
+# This target links series_sra.c and gistemp_sra.c into one binary, which no
+# existing target does, so the two implementations can be compared directly.
+series_sra_equivalence_test = executable(
+  'series-sra-equivalence-test',
+  ['src/series_sra.c', 'src/series_evidence.c',
+   'src/series_evidence_adapters.c',
+   'src/gistemp_sra.c', 'src/gistemp_evidence.c', 'src/gistemp_admission.c',
+   'src/energy_institute_evidence.c', 'src/energy_institute_admission.c',
+   'src/energy_institute_candidate.c', 'src/annual_series_candidate.c',
+   'src/scientific_canonical.c', 'src/scientific_artifact.c',
+   'src/scientific_result.c', 'src/scientific_operation.c',
+   'src/scientific_derivation.c',
+   'tests/series_sra_equivalence_test.c'],
+  include_directories: include_directories('src'),
+  dependencies: [glib_dep, json_glib_dep],
+  install: false
+)
+test('series-sra-equivalence', series_sra_equivalence_test,
+  env: {'ATM_CHART01_FIXTURE': meson.current_source_dir() / 'tests/fixtures/chart01'})
+
+# The adapter has no legacy counterpart to compare against, because no
+# source-specific module ever produced an AtmSeriesContract. This target links
+# series_adapter.c against the shared layer plus series_contract.c.
+series_adapter_test = executable(
+  'series-adapter-test',
+  ['src/series_adapter.c', 'src/series_sra.c', 'src/series_evidence.c',
+   'src/series_evidence_adapters.c',
+   'src/series_contract.c',
+   'src/gistemp_evidence.c', 'src/gistemp_admission.c',
+   'src/energy_institute_evidence.c', 'src/energy_institute_admission.c',
+   'src/energy_institute_candidate.c', 'src/annual_series_candidate.c',
+   'src/scientific_canonical.c', 'src/scientific_artifact.c',
+   'src/scientific_result.c', 'src/scientific_operation.c',
+   'src/scientific_derivation.c',
+   'tests/series_adapter_test.c'],
+  include_directories: include_directories('src'),
+  dependencies: [glib_dep, json_glib_dep],
+  install: false
+)
+test('series-adapter', series_adapter_test,
+  env: {'ATM_CHART01_FIXTURE': meson.current_source_dir() / 'tests/fixtures/chart01'})
+
+# ---------------------------------------------------------------------------
+# CHART-M1c: option C bridge, pinned VerifiedSeries -> general contract.
+#
+# Isolated target. This is the only place in the build where both families are
+# linked on purpose: verified_series_contract.c reads the pinned GISTEMP chain
+# (verified_series -> gistemp_sra -> gistemp_evidence) and the shared chain
+# (series_adapter -> series_sra -> series_evidence) to produce the general
+# contract.
+#
+# series_evidence_adapters.c carries a descriptor for each admitted source, so
+# this target needs BOTH admission families, not just GISTEMP. Omitting the
+# Energy Institute sources compiles clean up to the adapter and then fails to
+# link on 20 undefined atm_energy_institute_* references.
+#
+# Nothing above this point is modified, so the build stays valid whether or not
+# this block is used.
+# ---------------------------------------------------------------------------
+
+verified_series_contract_test = executable(
+  'verified-series-contract-test',
+  ['src/verified_series_contract.c', 'src/verified_series.c',
+   'src/gistemp_sra.c', 'src/gistemp_evidence.c', 'src/gistemp_admission.c',
+   'src/energy_institute_evidence.c', 'src/energy_institute_admission.c',
+   'src/energy_institute_candidate.c',
+   'src/series_adapter.c', 'src/series_sra.c', 'src/series_evidence.c',
+   'src/series_evidence_adapters.c', 'src/series_contract.c',
+   'src/annual_series_candidate.c', 'src/scientific_canonical.c',
+   'src/scientific_artifact.c', 'src/scientific_result.c',
+   'src/scientific_operation.c', 'src/scientific_derivation.c',
+   'tests/verified_series_contract_test.c'],
+  include_directories: include_directories('src'),
+  dependencies: [glib_dep, json_glib_dep],
+  install: false
+)
+test('verified-series-contract', verified_series_contract_test,
+  env: {'ATM_CHART01_FIXTURE': meson.current_source_dir() / 'tests/fixtures/chart01'})
