@@ -629,7 +629,7 @@
       "category": "SESSION",
       "severity": "S0",
       "lifecycle": "enforced",
-      "statement": "Conversation Close, explicit Archive and permanent Delete must remain distinct operations. Archive is the only user-visible save transition and must set archived before the tab is removed. Closing an unarchived durable tab must discard its temporary conversation row rather than retain it in History; normal shutdown and next-start cleanup must likewise remove unarchived working rows. An archived conversation reopened from History retains archived=true and therefore survives Close. Permanent deletion must require an explicit user choice and remove exactly one archived conversation, with repository pins, messages and citations removed through the conversation-store foreign-key cascade. Failed close/archive/delete persistence must not be reported as a successful lifecycle transition.",
+      "statement": "Conversation Close, explicit Archive and permanent Delete must remain distinct operations. Archive is the only user-visible save transition and must set archived before the tab is removed. Closing an unarchived durable tab should discard its temporary conversation row rather than retain it in History; normal shutdown and next-start cleanup should likewise remove unarchived working rows only after managed-export reconciliation succeeds. If reconciliation fails or is unknown, retain the unarchived row fail-closed so a stale managed export cannot outlive its SQLite source; the retained row must remain absent from History and may be cleaned up after later successful reconciliation. An archived conversation reopened from History retains archived=true and therefore survives Close. Permanent deletion must require an explicit user choice and remove exactly one archived conversation, with repository pins, messages and citations removed through the conversation-store foreign-key cascade. Failed close/archive/delete persistence must not be reported as a successful lifecycle transition.",
       "enforced_by": [
         "src/Application.vala",
         "src/ConversationPersistenceStore.vala",
@@ -702,6 +702,22 @@
       ],
       "tested_by": [
         "meson:ollama-provider-turn-guard"
+      ]
+    },
+    {
+      "id": "LIFECYCLE-S1-001",
+      "category": "LIFECYCLE",
+      "severity": "S1",
+      "lifecycle": "enforced",
+      "statement": "Startup cleanup may discard an unarchived conversation row only after the latest managed-export reconciliation succeeded. For an unarchived row, reconciliation means removal or confirmed absence of its derived JSON export; failed or unknown reconciliation must retain the SQLite row and fail closed. Reconciliation must precede the discard pass.",
+      "enforced_by": [
+        "src/ConversationPersistenceStore.vala",
+        "src/PublicationBarrier.vala",
+        "src/publication_barrier.c"
+      ],
+      "tested_by": [
+        "meson:conversation-persistence-store",
+        "meson:publication-barrier"
       ]
     }
   ]
