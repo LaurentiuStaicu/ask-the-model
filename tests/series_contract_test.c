@@ -514,6 +514,32 @@ static void test_unqualified_support_rejected (void)
     atm_scientific_artifact_free (a);
 }
 
+static void test_break_reason_requires_break (void)
+{
+    AtmScientificArtifact *a = support_artifact ();
+    AtmSraResult *q = qualified_with_artifact (a);
+    AtmSeriesContract *s = base ();
+    const char *support[] = { a->qualified_artifact_id };
+    GError *error = NULL;
+
+    /* A reason without break_before is contradictory metadata, not a dormant
+     * discontinuity declaration. */
+    g_assert_true (atm_series_contract_add_point (
+        s, "1880", ATM_SERIES_Y_NUMERIC, "1.0000", "1", 0, FALSE,
+        FALSE, NULL, "measurement_gap", support, 1, &error));
+    g_assert_no_error (error);
+    g_assert_false (atm_series_contract_validate (s, q, &error));
+    g_assert_error (error, ATM_SERIES_CONTRACT_ERROR,
+                    ATM_SERIES_CONTRACT_ERROR_SHAPE);
+    g_assert_nonnull (g_strstr_len (error->message, -1,
+                                    "Break reason requires break_before"));
+    g_clear_error (&error);
+
+    atm_series_contract_free (s);
+    atm_sra_result_free (q);
+    atm_scientific_artifact_free (a);
+}
+
 static void test_first_break_rejected (void)
 {
     AtmScientificArtifact *a = support_artifact ();
@@ -701,6 +727,7 @@ int main (int argc, char **argv)
     g_test_add_func ("/series-contract/direct-scenario-binding", test_direct_scenario_must_match_sra_fact);
     g_test_add_func ("/series-contract/direct-time-scope", test_direct_time_scope_must_enclose_points);
     g_test_add_func ("/series-contract/support-unique-set", test_numeric_point_support_must_match_as_unique_set);
+    g_test_add_func ("/series-contract/break-reason-requires-break", test_break_reason_requires_break);
     g_test_add_func ("/series-contract/first-break", test_first_break_rejected);
     g_test_add_func ("/series-contract/identity", test_caller_identity_not_authoritative);
     g_test_add_func ("/series-contract/snapshot-binding", test_contract_snapshot_must_be_qualified);
