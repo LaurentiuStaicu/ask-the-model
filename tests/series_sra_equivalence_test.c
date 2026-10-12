@@ -29,6 +29,7 @@
 #include "series_evidence_adapters.h"
 #include "gistemp_admission.h"
 #include "gistemp_sra.h"
+#include "energy_institute_admission.h"
 
 #define ATM_TEST_REPOSITORY "LaurentiuStaicu/empirical-world3-dynamics"
 #define ATM_TEST_SNAPSHOT   "d9e249339663015f6d1c05752338a955bf64ad0b"
@@ -112,6 +113,24 @@ build_gistemp_admission (void)
         ATM_TEST_SNAPSHOT, sources, &admission, &error));
     g_assert_no_error (error);
     for (guint i = 0; i < ATM_GISTEMP_SOURCE_COUNT; i++) g_bytes_unref (sources[i]);
+    return admission;
+}
+
+static AtmEnergyInstituteAdmission *
+build_energy_admission (void)
+{
+    GBytes *sources[ATM_EI_SOURCE_COUNT] = {
+        load_fixture ("science/data/processed/energy_institute_global_2026.csv"),
+        load_fixture ("science/data/processed/energy_institute_global_2026.provenance.json"),
+        load_fixture ("science/data/input_manifest.json"),
+        load_fixture ("science/data/registry.csv"),
+    };
+    AtmEnergyInstituteAdmission *admission = NULL;
+    GError *error = NULL;
+    g_assert_true (atm_energy_institute_admission_new (ATM_TEST_REPOSITORY,
+        ATM_TEST_SNAPSHOT, sources, &admission, &error));
+    g_assert_no_error (error);
+    for (guint i = 0; i < ATM_EI_SOURCE_COUNT; i++) g_bytes_unref (sources[i]);
     return admission;
 }
 
@@ -307,6 +326,36 @@ test_generic_sra_validate_is_reconstruction_guard (void)
     atm_gistemp_admission_free (admission);
 }
 
+static void
+test_energy_sra_fails_closed_without_approved_obligation (void)
+{
+    AtmEnergyInstituteAdmission *admission = build_energy_admission ();
+    AtmSeriesEvidence *evidence = NULL;
+    AtmSeriesSra *sra = NULL;
+    GError *error = NULL;
+
+    g_assert_null (ATM_EI_EVIDENCE_DESCRIPTOR.canonical_obligation);
+
+    /* Source-bound Evidence remains available and preserves all 65 artifacts. */
+    g_assert_true (atm_series_evidence_new (&ATM_EI_EVIDENCE_DESCRIPTOR,
+        admission, &evidence, &error));
+    g_assert_no_error (error);
+    g_assert_cmpuint (atm_series_evidence_count (evidence), ==,
+                      ATM_EI_EVIDENCE_DESCRIPTOR.evidence_count);
+
+    /* But it must not be promoted to a qualified SRA using a guessed policy. */
+    g_assert_false (atm_series_sra_new (&ATM_EI_EVIDENCE_DESCRIPTOR,
+        admission, &sra, &error));
+    g_assert_error (error, ATM_SRA_ERROR, ATM_SRA_ERROR_IDENTITY);
+    g_assert_nonnull (g_strstr_len (error->message, -1,
+                                    "canonical reconstruction obligation is approved"));
+    g_assert_null (sra);
+    g_clear_error (&error);
+
+    atm_series_evidence_free (evidence);
+    atm_energy_institute_admission_free (admission);
+}
+
 int
 main (int argc, char **argv)
 {
@@ -321,6 +370,8 @@ main (int argc, char **argv)
     g_test_add_func ("/sra/rejects-bad-descriptor", test_generic_sra_rejects_bad_descriptor);
     g_test_add_func ("/sra/argument-guards", test_generic_sra_argument_guards);
     g_test_add_func ("/sra/validate-reconstruction", test_generic_sra_validate_is_reconstruction_guard);
+    g_test_add_func ("/sra/ei-fails-closed-without-obligation",
+                     test_energy_sra_fails_closed_without_approved_obligation);
 
     return g_test_run ();
 }
