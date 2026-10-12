@@ -231,16 +231,21 @@ qualified_with_two_artifacts (AtmScientificArtifact *a, AtmScientificArtifact *b
 }
 
 static AtmSraResult *
-qualified_with_numeric_fact_missing_reason (AtmScientificArtifact *a)
+qualified_with_numeric_fact_missing_reason (AtmScientificArtifact *a,
+                                            gboolean malformed_reason_type)
 {
     AtmSraResult *q = atm_sra_result_new (ATM_SRA_ANSWERED);
     GError *error = NULL;
+    const char *qualifiers = malformed_reason_type
+        ? "{\"calendar_year\":\"1880\",\"scenario\":\"baseline\","
+          "\"epistemic_status\":\"observed\",\"y_status\":\"NUMERIC\","
+          "\"missing_reason\":42}"
+        : "{\"calendar_year\":\"1880\",\"scenario\":\"baseline\","
+          "\"epistemic_status\":\"observed\",\"y_status\":\"NUMERIC\","
+          "\"missing_reason\":\"source_missing\"}";
     AtmSraEstablishedFact *fact = atm_sra_established_fact_new (
         "fact-numeric-with-missing-reason", "observation", "subject",
-        "attribute", "1e0", "unit", "dimension",
-        "{\"calendar_year\":\"1880\",\"scenario\":\"baseline\","
-        "\"epistemic_status\":\"observed\",\"y_status\":\"NUMERIC\","
-        "\"missing_reason\":\"source_missing\"}");
+        "attribute", "1e0", "unit", "dimension", qualifiers);
 
     g_assert_nonnull (fact);
     g_assert_true (atm_sra_fact_add_support (fact, a->qualified_artifact_id, &error));
@@ -563,28 +568,31 @@ static void
 test_numeric_fact_rejects_missing_reason (void)
 {
     AtmScientificArtifact *a = support_artifact ();
-    AtmSraResult *q = qualified_with_numeric_fact_missing_reason (a);
-    AtmSeriesContract *s = base ();
     const char *support[] = { a->qualified_artifact_id };
     GError *error = NULL;
 
-    g_assert_true (atm_series_contract_add_point (
-        s, "1880", ATM_SERIES_Y_NUMERIC, "1.0000", "1", 0, FALSE,
-        FALSE, NULL, NULL, support, 1, &error));
-    g_assert_no_error (error);
+    /* A string-valued reason contradicts NUMERIC, and a malformed non-string
+     * reason is rejected instead of being silently treated as absent. */
+    for (guint malformed = 0; malformed < 2; malformed++) {
+        AtmSraResult *q = qualified_with_numeric_fact_missing_reason (a,
+                                                                       malformed != 0);
+        AtmSeriesContract *s = base ();
+        g_assert_true (atm_series_contract_add_point (
+            s, "1880", ATM_SERIES_Y_NUMERIC, "1.0000", "1", 0, FALSE,
+            FALSE, NULL, NULL, support, 1, &error));
+        g_assert_no_error (error);
 
-    /* The SRA object is internally finalized, but its fact contradicts its
-     * own NUMERIC status by also declaring a missing reason. The series must
-     * not treat that contradictory qualifier as harmless extra metadata. */
-    g_assert_false (atm_series_contract_validate (s, q, &error));
-    g_assert_error (error, ATM_SERIES_CONTRACT_ERROR,
-                    ATM_SERIES_CONTRACT_ERROR_SHAPE);
-    g_assert_nonnull (g_strstr_len (error->message, -1,
-                                    "Numeric point does not match an established SRA fact"));
-    g_clear_error (&error);
+        g_assert_false (atm_series_contract_validate (s, q, &error));
+        g_assert_error (error, ATM_SERIES_CONTRACT_ERROR,
+                        ATM_SERIES_CONTRACT_ERROR_SHAPE);
+        g_assert_nonnull (g_strstr_len (error->message, -1,
+            "Numeric point does not match an established SRA fact"));
+        g_clear_error (&error);
 
-    atm_series_contract_free (s);
-    atm_sra_result_free (q);
+        atm_series_contract_free (s);
+        atm_sra_result_free (q);
+    }
+
     atm_scientific_artifact_free (a);
 }
 
