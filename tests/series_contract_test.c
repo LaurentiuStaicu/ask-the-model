@@ -676,7 +676,7 @@ static void test_sra_artifact_snapshot_must_be_qualified (void)
         q, a, &error));
     g_assert_error (error, ATM_SRA_ERROR, ATM_SRA_ERROR_SUPPORT);
     g_assert_nonnull (g_strstr_len (error->message, -1,
-        "repository/version/snapshot is absent from qualification"));
+        "repository/snapshot is absent or ambiguous in qualification"));
     g_clear_error (&error);
 
     atm_sra_result_free (q);
