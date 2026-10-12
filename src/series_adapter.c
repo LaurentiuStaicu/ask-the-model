@@ -333,9 +333,8 @@ atm_series_adapter_revalidate (const AtmSeriesContract *contract,
         return FALSE;
     }
 
-    /* Compare both identities. A contract whose identity disagrees with a
-     * reconstruction from the same admitted bytes is rejected, which is the
-     * guarantee the source-specific module provided. */
+    /* Compare every field and both IDs. Cached IDs alone are insufficient
+     * because public contract fields may have changed since validation. */
     gboolean matches = series_material_matches (contract, rebuilt);
 
     atm_series_contract_free (rebuilt);
