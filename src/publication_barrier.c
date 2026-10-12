@@ -3,22 +3,20 @@
 #include <string.h>
 
 /*
- * Publication barrier: the condition ConversationPersistenceStore is missing.
+ * Managed-export reconciliation state machine. No I/O, no locks and no
+ * wall-clock comparisons: the store reports the real result and the barrier
+ * answers whether an unarchived row may be discarded.
  *
- * Pure state machine over per-conversation publish/reconciliation outcomes. No I/O, no locks,
- * no wall-clock comparisons: the caller reports what happened, the barrier
- * records it and answers whether a discard is allowed.
- *
- * The reason a later failure clears an earlier success: the newer attempt is
- * the truth about the current export. If the export for a conversation failed
- * on this run, the file on disk is not the one the row describes, whatever an
- * earlier run managed to write.
+ * A successful outcome means that an archived row's mirror was synchronized,
+ * or an unarchived row's stale mirror was removed/confirmed absent. A later
+ * failure supersedes an earlier success because the current reconciliation is
+ * what governs whether cleanup is safe.
  */
 
 typedef struct {
     char *conversation_id;
-    gboolean published;
-    gint64 published_at_us;   /* recorded only on success; caller's use only */
+    gboolean published;       /* legacy field: latest reconciliation succeeded */
+    gint64 published_at_us;    /* legacy caller metadata; never compared */
 } Entry;
 
 struct AtmPublicationBarrier {
@@ -92,7 +90,7 @@ atm_publication_barrier_record (AtmPublicationBarrier *barrier,
     char *id = normalize_id (conversation_id);
     if (id == NULL) {
         return fail (error, ATM_PUBLICATION_BARRIER_ERROR_ARGUMENT,
-                     "A publish outcome requires a conversation identifier.");
+                     "An export-reconciliation outcome requires a conversation identifier.");
     }
 
     Entry *entry = g_hash_table_lookup (barrier->entries, id);
@@ -102,8 +100,7 @@ atm_publication_barrier_record (AtmPublicationBarrier *barrier,
         g_hash_table_insert (barrier->entries, entry->conversation_id, entry);
     }
 
-    /* The newer attempt is the truth, in both directions: a success publishes,
-     * a failure unpublishes an earlier success. */
+    /* The newest reconciliation outcome supersedes the previous one. */
     entry->published = succeeded;
     entry->published_at_us = succeeded ? published_at_us : 0;
 
@@ -133,12 +130,12 @@ atm_publication_barrier_may_discard (const AtmPublicationBarrier *barrier,
         /* Nothing is known about this conversation. Discarding on absence of
          * evidence is exactly the fault this barrier exists to prevent. */
         return fail (error, ATM_PUBLICATION_BARRIER_ERROR_UNPUBLISHED,
-                     "Conversation has no recorded publish outcome and may not be discarded.");
+                     "Conversation has no recorded export-reconciliation outcome and may not be discarded.");
     }
 
     if (!entry->published) {
         return fail (error, ATM_PUBLICATION_BARRIER_ERROR_LAST_PUBLISH_FAILED,
-                     "Conversation's last publish attempt failed and it may not be discarded.");
+                     "Conversation's latest export reconciliation failed and it may not be discarded.");
     }
 
     return TRUE;
