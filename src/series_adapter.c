@@ -37,6 +37,26 @@ metadata_valid (const AtmSeriesAdapterMetadata *m)
 }
 
 /* Read a required string member, failing closed when absent or non-string. */
+static gboolean
+time_scope_matches_points (const AtmSeriesContract *series)
+{
+    if (series == NULL || series->x_kind != ATM_SERIES_X_CALENDAR_YEAR ||
+        series->points == NULL || series->points->len == 0)
+        return FALSE;
+
+    const AtmSeriesContractPoint *first =
+        g_ptr_array_index (series->points, 0);
+    const AtmSeriesContractPoint *last =
+        g_ptr_array_index (series->points, series->points->len - 1);
+    if (first == NULL || last == NULL || first->x == NULL || last->x == NULL)
+        return FALSE;
+
+    char *expected = g_strdup_printf ("%s-%s", first->x, last->x);
+    gboolean matches = g_strcmp0 (series->time_scope, expected) == 0;
+    g_free (expected);
+    return matches;
+}
+
 static const char *
 required_text (JsonObject *o, const char *name, GError **error)
 {
@@ -213,6 +233,12 @@ atm_series_adapter_from_evidence (const AtmSeriesEvidenceDescriptor *descriptor,
             atm_series_contract_free (series);
             return FALSE;
         }
+    }
+
+    if (!time_scope_matches_points (series)) {
+        atm_series_contract_free (series);
+        return reject (error,
+            "Declared time scope does not match admitted point coverage.");
     }
 
     *out = series;
