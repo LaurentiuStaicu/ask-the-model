@@ -471,8 +471,12 @@ point_matches_established_fact (const AtmSeriesContract *s,
     if (json_object_has_member (object, "missing_reason")) {
         JsonNode *node = json_object_get_member (object, "missing_reason");
         if (JSON_NODE_HOLDS_VALUE (node) &&
-            json_node_get_value_type (node) == G_TYPE_STRING)
+            json_node_get_value_type (node) == G_TYPE_STRING) {
             missing_reason = json_node_get_string (node);
+        } else if (!JSON_NODE_HOLDS_NULL (node)) {
+            g_object_unref (parser);
+            return FALSE;
+        }
     }
     /* Discontinuity is scientific metadata too. A caller cannot add or erase
      * a break unless that exact point fact carries the same assertion. */
@@ -498,8 +502,9 @@ point_matches_established_fact (const AtmSeriesContract *s,
     const char *expected_status = p->y_status == ATM_SERIES_Y_NUMERIC
         ? "NUMERIC" : "MISSING";
     gboolean status_matches = g_strcmp0 (y_status, expected_status) == 0;
-    gboolean reason_matches = p->y_status == ATM_SERIES_Y_NUMERIC ||
-        g_strcmp0 (missing_reason, p->missing_reason) == 0;
+    gboolean reason_matches = p->y_status == ATM_SERIES_Y_NUMERIC
+        ? missing_reason == NULL
+        : g_strcmp0 (missing_reason, p->missing_reason) == 0;
     /* Scenario and observation status are source evidence too. A caller must
      * not relabel an observation or assert a missing value without matching
      * SRA qualifiers. */
