@@ -2,7 +2,7 @@
 
 ## Release status
 
-**Latest published release: Ask the Model (AtM) v0.6.3 — 2026-10-10, immutable.** This release provides the qualified GISTEMP chart-admission and Vala ownership correction.
+**Current release: Ask the Model (AtM) v0.6.3 — released 2026-10-10. Immutable public release.** This release provides the qualified GISTEMP chart-admission and Vala ownership correction.
 
 The published release tag points to commit `26ae12e4ee17cc4ed5dfd3e16a5b27fd277bc6a9`. Its immutable `AskTheModel.flatpak` asset is 481,016 bytes with SHA-256 `ffa3457c673201665adaf565fcfb7a9c55e0be627e7458e3c059b8b0247a6958`. See the [published v0.6.3 release](https://github.com/LaurentiuStaicu/ask-the-model/releases/tag/v0.6.3).
 
