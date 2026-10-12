@@ -96,9 +96,10 @@ static AtmSraResult *qualified_with_artifact (AtmScientificArtifact *a)
 }
 
 static AtmSraResult *
-qualified_with_single_coordinate_fact (AtmScientificArtifact *a,
-                                      const char *coordinate_key,
-                                      const char *coordinate_value)
+qualified_with_single_coordinate_fact_value (AtmScientificArtifact *a,
+                                            const char *coordinate_key,
+                                            const char *coordinate_value,
+                                            const char *fact_value)
 {
     AtmSraResult *q = atm_sra_result_new (ATM_SRA_ANSWERED);
     GError *error = NULL;
@@ -107,7 +108,7 @@ qualified_with_single_coordinate_fact (AtmScientificArtifact *a,
         coordinate_key, coordinate_value);
     AtmSraEstablishedFact *fact = atm_sra_established_fact_new (
         "coordinate-fact", "observation", "subject", "attribute",
-        "1e0", "unit", "dimension", qualifiers);
+        fact_value, "unit", "dimension", qualifiers);
     g_free (qualifiers);
     g_assert_nonnull (fact);
     g_assert_true (atm_sra_fact_add_support (fact, a->qualified_artifact_id, &error));
@@ -131,6 +132,15 @@ qualified_with_single_coordinate_fact (AtmScientificArtifact *a,
     g_assert_true (atm_sra_result_finalize (q, &error));
     g_assert_no_error (error);
     return q;
+}
+
+static AtmSraResult *
+qualified_with_single_coordinate_fact (AtmScientificArtifact *a,
+                                      const char *coordinate_key,
+                                      const char *coordinate_value)
+{
+    return qualified_with_single_coordinate_fact_value (
+        a, coordinate_key, coordinate_value, "1e0");
 }
 
 static AtmSraResult *
@@ -782,6 +792,43 @@ test_source_spelling_changes_qualification_only (void)
     atm_scientific_artifact_free (a);
 }
 
+/* Signed zero retains its source sign in qualification but has the same
+ * exact-decimal mathematical value (zero) for scientific content identity. */
+static void
+test_signed_zero_changes_qualification_only (void)
+{
+    AtmScientificArtifact *a = support_artifact ();
+    AtmSraResult *q = qualified_with_single_coordinate_fact_value (
+        a, "calendar_year", "1880", "0e0");
+    const char *support[] = { a->qualified_artifact_id };
+    GError *error = NULL;
+    AtmSeriesContract *positive = base_for_single_year ();
+    AtmSeriesContract *negative = base_for_single_year ();
+
+    g_assert_true (atm_series_contract_add_point (
+        positive, "1880", ATM_SERIES_Y_NUMERIC, "0", "0", 0, FALSE,
+        FALSE, NULL, NULL, support, 1, &error));
+    g_assert_no_error (error);
+    g_assert_true (atm_series_contract_add_point (
+        negative, "1880", ATM_SERIES_Y_NUMERIC, "-0", "0", 0, TRUE,
+        FALSE, NULL, NULL, support, 1, &error));
+    g_assert_no_error (error);
+
+    g_assert_true (atm_series_contract_validate (positive, q, &error));
+    g_assert_no_error (error);
+    g_assert_true (atm_series_contract_validate (negative, q, &error));
+    g_assert_no_error (error);
+    g_assert_cmpstr (atm_series_contract_scientific_id (positive), ==,
+                     atm_series_contract_scientific_id (negative));
+    g_assert_cmpstr (atm_series_contract_qualified_id (positive), !=,
+                     atm_series_contract_qualified_id (negative));
+
+    atm_series_contract_free (positive);
+    atm_series_contract_free (negative);
+    atm_sra_result_free (q);
+    atm_scientific_artifact_free (a);
+}
+
 /* Point support is provenance, not mathematical content. Different qualified
  * support must preserve the scientific ID while changing qualified identity. */
 static void
@@ -1115,6 +1162,8 @@ int main (int argc, char **argv)
                      test_qualified_series_identity_binds_sra_qualification);
     g_test_add_func ("/series-contract/source-spelling-qualification-only",
                      test_source_spelling_changes_qualification_only);
+    g_test_add_func ("/series-contract/signed-zero-qualification-only",
+                     test_signed_zero_changes_qualification_only);
     g_test_add_func ("/series-contract/support-qualification-only",
                      test_support_changes_qualification_only);
     g_test_add_func ("/series-contract/identity", test_caller_identity_not_authoritative);
