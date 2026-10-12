@@ -47,11 +47,13 @@ static char *point_payload (const AtmEnergyInstituteAdmission *a, guint index)
         atm_energy_institute_admission_candidate (a);
     JsonBuilder *b = json_builder_new ();
     json_builder_begin_object (b);
-    add_string (b, "schema", "atm-energy-institute-annual-observation/1");
+    add_string (b, "schema", "atm-energy-institute-annual-observation/2");
     add_string (b, "dataset", atm_energy_institute_admission_dataset (a));
     add_string (b, "geography", atm_energy_institute_admission_geography (a));
     add_string (b, "subject", atm_energy_institute_admission_subject (a));
     add_string (b, "attribute", atm_energy_institute_admission_attribute (a));
+    add_string (b, "energy_accounting_method",
+                atm_energy_institute_admission_accounting_method (a));
     add_string (b, "x_semantics", atm_energy_institute_admission_x_semantics (a));
     char *year = g_strdup_printf ("%u",
         atm_energy_institute_candidate_year (c, index));
@@ -86,7 +88,7 @@ static gboolean append_artifact (
     AtmScientificEvidenceAtom atom = {0};
     atom.status = ATM_SCIENTIFIC_EVIDENCE_TYPED_VALIDATED;
     atom.profile_id = ATM_EI_EVIDENCE_PROFILE;
-    atom.profile_version = "1";
+    atom.profile_version = "2";
     atom.repository_id = "ewd";
     const char *snapshot = atm_energy_institute_admission_snapshot (e->admission);
     char *version = g_strconcat ("snapshot:", snapshot, NULL);
@@ -149,7 +151,7 @@ gboolean atm_energy_institute_evidence_new (
         char *logical = g_strdup_printf("ewd:energy-institute-annual:%u",
             atm_energy_institute_candidate_year(c, i));
         gboolean ok = append_artifact(e, 0, locator, logical,
-            "ewd.energy_institute_annual_observation",
+            "ewd.energy_institute_total_energy_supply_observation",
             point_payload(e->admission, i), error);
         g_free(logical);
         g_free(locator);
