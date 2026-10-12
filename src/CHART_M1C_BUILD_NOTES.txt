@@ -21,9 +21,7 @@
 # every target that links verified_series.c must keep linking the legacy chain.
 # Removing them is a consequence of the chart_spec decision, not a build edit.
 #
-# Series-source-install list at the top of this block says what to add:
-#   series_evidence.c, series_evidence_adapters.c, series_sra.c,
-#   series_adapter.c, series_contract.c, verified_series_contract.c
-# It is left as a comment rather than a live change so the build file stays
-# valid until the three new targets are added deliberately.
+# The generic equivalence, adapter and bridge tests are now declared in the
+# primary meson.build file. Their first CI build is the actual integration
+# check; app Flatpak success without these target declarations was not enough.
 # ---------------------------------------------------------------------------
