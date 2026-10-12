@@ -226,6 +226,13 @@ test_gistemp_evidence_equivalence (void)
                             ATM_GISTEMP_SOURCE_COUNT + 1u, generic,
                             gistemp_support_of, legacy);
 
+    const AtmAnnualSeriesCandidate *candidate =
+        atm_gistemp_admission_candidate (admission);
+    g_assert_nonnull (candidate);
+    for (guint i = 0; i < atm_annual_series_candidate_count (candidate); i++)
+        g_assert_cmpstr (atm_series_evidence_point_source_decimal (generic, i), ==,
+                         atm_annual_series_candidate_decimal (candidate, i));
+
     g_free (ids);
     g_free (digests);
     atm_series_evidence_free (generic);
@@ -273,6 +280,13 @@ test_energy_evidence_equivalence (void)
     assert_support_matches ("energy", points,
                             ATM_EI_SOURCE_COUNT + 1u, generic,
                             energy_support_of, legacy);
+
+    const AtmEnergyInstituteCandidate *candidate =
+        atm_energy_institute_admission_candidate (admission);
+    g_assert_nonnull (candidate);
+    for (guint i = 0; i < atm_energy_institute_candidate_count (candidate); i++)
+        g_assert_cmpstr (atm_series_evidence_point_source_decimal (generic, i), ==,
+                         atm_energy_institute_candidate_decimal (candidate, i));
 
     /* The pinned first and last locators, from the legacy test. A changed
      * locator column or row base breaks both artifact identity and these
