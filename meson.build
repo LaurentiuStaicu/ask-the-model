@@ -2893,6 +2893,26 @@ series_adapter_test = executable(
 test('series-adapter', series_adapter_test,
   env: {'ATM_CHART01_FIXTURE': meson.current_source_dir() / 'tests/fixtures/chart01'})
 
+# CHART-01: source-bound, dormant Energy Institute annual VerifiedSeries.
+# The object is qualification-only and has no ChartSpec/Application caller.
+energy_institute_verified_series_test = executable(
+  'energy-institute-verified-series-test',
+  ['src/energy_institute_verified_series.c',
+   'src/series_adapter.c', 'src/series_sra.c', 'src/series_evidence.c',
+   'src/series_evidence_adapters.c', 'src/series_contract.c',
+   'src/gistemp_admission.c', 'src/annual_series_candidate.c',
+   'src/energy_institute_admission.c', 'src/energy_institute_candidate.c',
+   'src/scientific_canonical.c', 'src/scientific_artifact.c',
+   'src/scientific_result.c', 'src/scientific_operation.c',
+   'src/scientific_derivation.c',
+   'tests/energy_institute_verified_series_test.c'],
+  include_directories: include_directories('src'),
+  dependencies: [glib_dep, json_glib_dep],
+  install: false
+)
+test('energy-institute-verified-series', energy_institute_verified_series_test,
+  env: {'ATM_CHART01_FIXTURE': meson.current_source_dir() / 'tests/fixtures/chart01'})
+
 verified_series_contract_test = executable(
   'verified-series-contract-test',
   ['src/verified_series_contract.c', 'src/verified_series.c',
