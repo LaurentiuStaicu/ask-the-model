@@ -205,6 +205,7 @@ const AtmSeriesEvidenceDescriptor ATM_GISTEMP_EVIDENCE_DESCRIPTOR = {
     .semantic_profile = ATM_GISTEMP_EVIDENCE_PROFILE "@1",
     .series_semantics = "empirical_annual_observations",
     .series_scenario = "not_applicable",
+    .series_epistemic_status = "empirical",
     .series_profile_id = "atm-series/gistemp-complete-annual/1",
     .series_profile_version = "1",
     .limitations = ATM_GISTEMP_LIMITATIONS,
