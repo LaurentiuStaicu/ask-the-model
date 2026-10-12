@@ -117,6 +117,24 @@ static void test_candidate_parser_boundaries (void)
     g_bytes_unref (source);
 }
 
+static void test_nonconsecutive_years_rejected (void)
+{
+    const char *source_text =
+        "year,total_primary_energy_ej,fossil_energy_ej,oil_ej,gas_ej,coal_ej,nuclear_ej,hydro_ej,renewables_ej,non_fossil_energy_ej,fossil_share,non_fossil_share,component_reconciliation_error_ej\n"
+        "1965,149.6960972,0,0,0,0,0,0,0,0,0,0,0\n"
+        "1967,150.0000000,0,0,0,0,0,0,0,0,0,0,0\n";
+    GBytes *source = g_bytes_new_static (source_text, strlen (source_text));
+    AtmEnergyInstituteCandidate *candidate = NULL;
+    GError *error = NULL;
+
+    g_assert_false (atm_energy_institute_candidate_parse (source, &candidate, &error));
+    g_assert_error (error, ATM_EI_CANDIDATE_ERROR, ATM_EI_CANDIDATE_ERROR_ORDER);
+    g_assert_null (candidate);
+
+    g_clear_error (&error);
+    g_bytes_unref (source);
+}
+
 int main (int argc, char **argv)
 {
     g_test_init (&argc, &argv, NULL);
@@ -124,6 +142,7 @@ int main (int argc, char **argv)
     g_test_add_func ("/energy-institute-admission/policy", test_policy);
     g_test_add_func ("/energy-institute-admission/tamper", test_tamper_and_shape);
     g_test_add_func ("/energy-institute-admission/parser-boundaries", test_candidate_parser_boundaries);
+    g_test_add_func ("/energy-institute-admission/nonconsecutive-years", test_nonconsecutive_years_rejected);
     int result = g_test_run ();
     for (guint i = 0; i < 4; i++) {
         g_bytes_unref (inputs[i]);
