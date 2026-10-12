@@ -602,6 +602,15 @@ atm_series_contract_validate (AtmSeriesContract *s, const AtmSraResult *q, GErro
         return fail (error, ATM_SERIES_CONTRACT_ERROR_SHAPE, "UTC-instant X requires UTC unit.");
     if (s->x_kind == ATM_SERIES_X_EVENT_ORDINAL && g_strcmp0 (s->x_unit, "event") != 0)
         return fail (error, ATM_SERIES_CONTRACT_ERROR_SHAPE, "Event ordinal X requires event unit.");
+    /* X kind constrains coordinate dimension as well as its display unit.
+     * Calendar years and UTC instants are temporal coordinates; don't allow
+     * a valid annual SRA fact to be relabelled as mass, length, or another
+     * unrelated dimension at the generic contract boundary. */
+    if ((s->x_kind == ATM_SERIES_X_CALENDAR_YEAR ||
+         s->x_kind == ATM_SERIES_X_UTC_INSTANT) &&
+        g_strcmp0 (s->x_dimension, "time") != 0)
+        return fail (error, ATM_SERIES_CONTRACT_ERROR_SHAPE,
+                     "Temporal X requires time dimension.");
 
     guint numeric = 0, missing = 0;
     const AtmSeriesContractPoint *previous = NULL;

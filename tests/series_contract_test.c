@@ -377,6 +377,30 @@ static void test_epistemic_status_must_match_sra_fact (void)
     atm_scientific_artifact_free (a);
 }
 
+static void test_calendar_year_dimension_must_be_time (void)
+{
+    AtmScientificArtifact *a = support_artifact ();
+    AtmSraResult *q = qualified_with_artifact (a);
+    AtmSeriesContract *s = base ();
+    g_free (s->x_dimension);
+    s->x_dimension = g_strdup ("mass");
+    const char *support[] = { a->qualified_artifact_id };
+    GError *error = NULL;
+
+    g_assert_true (atm_series_contract_add_point (
+        s, "1880", ATM_SERIES_Y_NUMERIC, "1.0000", "1", 0, FALSE,
+        FALSE, NULL, NULL, support, 1, &error));
+    g_assert_no_error (error);
+    g_assert_false (atm_series_contract_validate (s, q, &error));
+    g_assert_error (error, ATM_SERIES_CONTRACT_ERROR,
+                    ATM_SERIES_CONTRACT_ERROR_SHAPE);
+    g_clear_error (&error);
+
+    atm_series_contract_free (s);
+    atm_sra_result_free (q);
+    atm_scientific_artifact_free (a);
+}
+
 static void test_direct_scenario_must_match_sra_fact (void)
 {
     AtmScientificArtifact *a = support_artifact ();
@@ -673,6 +697,7 @@ int main (int argc, char **argv)
     g_test_add_func ("/series-contract/fact-binding", test_numeric_point_must_match_sra_fact);
     g_test_add_func ("/series-contract/missing-point-fact-binding", test_missing_point_must_match_sra_fact);
     g_test_add_func ("/series-contract/direct-epistemic-status-binding", test_epistemic_status_must_match_sra_fact);
+    g_test_add_func ("/series-contract/calendar-year-dimension", test_calendar_year_dimension_must_be_time);
     g_test_add_func ("/series-contract/direct-scenario-binding", test_direct_scenario_must_match_sra_fact);
     g_test_add_func ("/series-contract/direct-time-scope", test_direct_time_scope_must_enclose_points);
     g_test_add_func ("/series-contract/support-unique-set", test_numeric_point_support_must_match_as_unique_set);
