@@ -1,7 +1,6 @@
 #pragma once
 
 #include <glib.h>
-#include "annual_series_candidate.h"
 #include "scientific_artifact.h"
 
 G_BEGIN_DECLS
@@ -25,10 +24,19 @@ G_BEGIN_DECLS
  * through the existing Scientific Plane constructor. A caller cannot supply an
  * evidence atom, a point payload, a metadata field, an identity or a point.
  *
- * The point series is reached through the existing AtmAnnualSeriesCandidate
- * abstraction, which both admitted sources already implement. No callback
- * table is needed for point access, and no GISTEMP type appears here.
+ * Source-specific point access uses typed descriptor callbacks. The generic
+ * layer never casts one source's candidate to another source's C type; it can
+ * also retain the original source decimal spelling without changing the
+ * existing evidence-artifact payload schema.
  */
+
+typedef struct {
+    guint year;
+    guint source_row;
+    const char *source_decimal; /* borrowed from the owned admission */
+    const char *coefficient;    /* borrowed canonical decimal coefficient */
+    gint64 exponent;
+} AtmSeriesEvidencePoint;
 
 typedef struct {
     /* Source-specific, fixed at compile time. */
@@ -78,9 +86,9 @@ typedef struct {
      * into the finalized SRA; never inherited from another source. */
     const char *const *limitations;
 
-    /* Bridges to the source-specific admission. The generic layer never sees
-     * the concrete admission type; it receives the admitted point series
-     * through the shared candidate interface. */
+    /* Bridges to the source-specific admission. Callbacks are implemented with
+     * the concrete source type, so the generic layer does not type-pun candidate
+     * objects that merely happen to have similar layouts. */
 
     /* Rebuild an owned admission copy into *out. */
     gboolean (*admission_rebuild) (gconstpointer admission, gpointer *out, GError **error);
@@ -89,8 +97,10 @@ typedef struct {
     const char *(*admission_source_path)   (gconstpointer admission, guint index);
     const char *(*admission_source_digest) (gconstpointer admission, guint index);
 
-    /* Borrowed candidate owned by the rebuilt admission. */
-    const AtmAnnualSeriesCandidate *(*admission_candidate) (gconstpointer admission);
+    /* Point count and borrowed point view from the rebuilt admission. */
+    guint    (*admission_point_count) (gconstpointer admission);
+    gboolean (*admission_point) (gconstpointer admission, guint index,
+                                 AtmSeriesEvidencePoint *point);
 
     /* Payload builders. Both return an owned string. */
     char *(*source_payload) (gconstpointer admission, guint index);
@@ -119,6 +129,11 @@ guint atm_series_evidence_count (const AtmSeriesEvidence *evidence);
 const AtmScientificArtifact *atm_series_evidence_at (
     const AtmSeriesEvidence *evidence,
     guint index);
+
+/* Original decimal token borrowed from the pinned/rebuilt source bytes. */
+const char *atm_series_evidence_point_source_decimal (
+    const AtmSeriesEvidence *evidence,
+    guint point);
 
 /* support_per_point borrowed ids per point: the source bindings first, then the
  * point's own observation artifact. Invalid point/support indices return NULL. */
