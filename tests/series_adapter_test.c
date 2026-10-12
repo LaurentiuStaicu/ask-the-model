@@ -232,10 +232,10 @@ test_adapter_revalidate_accepts_reconstruction (void)
     atm_gistemp_admission_free (admission);
 }
 
-/* A different reviewed metadata set must produce a different identity. If it did
- * not, the metadata would not be bound into the contract at all. */
+/* Time scope must describe the observed X coverage, not just be hashed
+ * as caller-supplied metadata. The admitted GISTEMP series ends at 2025. */
 static void
-test_metadata_is_bound_into_identity (void)
+test_time_scope_must_match_points (void)
 {
     AtmGistempAdmission *admission = build_gistemp_admission ();
 
@@ -249,14 +249,12 @@ test_metadata_is_bound_into_identity (void)
     altered.time_scope = "1880-2024";
 
     AtmSeriesContract *changed = NULL;
-    g_assert_true (atm_series_adapter_admit (&ATM_GISTEMP_EVIDENCE_DESCRIPTOR,
+    g_assert_false (atm_series_adapter_admit (&ATM_GISTEMP_EVIDENCE_DESCRIPTOR,
         &altered, admission, &changed, &error));
-    g_assert_no_error (error);
+    g_assert_error (error, ATM_SERIES_CONTRACT_ERROR, ATM_SERIES_CONTRACT_ERROR_SHAPE);
+    g_assert_null (changed);
+    g_clear_error (&error);
 
-    g_assert_cmpstr (atm_series_contract_scientific_id (baseline), !=,
-                     atm_series_contract_scientific_id (changed));
-
-    atm_series_contract_free (changed);
     atm_series_contract_free (baseline);
     atm_gistemp_admission_free (admission);
 }
@@ -371,7 +369,7 @@ main (int argc, char **argv)
     g_test_add_func ("/adapter/points-carry-years", test_contract_points_carry_admitted_years);
     g_test_add_func ("/adapter/revalidate", test_adapter_revalidate_accepts_reconstruction);
     g_test_add_func ("/adapter/revalidate-rejects-mutated-point", test_adapter_revalidate_rejects_mutated_point);
-    g_test_add_func ("/adapter/metadata-bound-into-identity", test_metadata_is_bound_into_identity);
+    g_test_add_func ("/adapter/time-scope-matches-points", test_time_scope_must_match_points);
     g_test_add_func ("/adapter/descriptor-mismatch", test_descriptor_mismatch_rejected);
     g_test_add_func ("/adapter/argument-guards", test_argument_guards);
 
