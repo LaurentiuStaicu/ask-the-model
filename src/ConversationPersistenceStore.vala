@@ -580,22 +580,6 @@ namespace AskTheModel {
             );
         }
 
-        private void remove_automatic_export_best_effort (
-            string conversation_id
-        ) {
-            try {
-                remove_automatic_export_required (
-                    conversation_id
-                );
-            } catch (GLib.Error error) {
-                warning (
-                    "AtM: automatic conversation export could not be removed for %s: %s",
-                    conversation_id,
-                    error.message
-                );
-            }
-        }
-
         private void sync_automatic_export_best_effort (
             string conversation_id
         ) {
