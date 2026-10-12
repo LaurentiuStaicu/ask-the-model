@@ -658,6 +658,13 @@ atm_series_contract_validate (AtmSeriesContract *s, const AtmSraResult *q, GErro
         for (guint k = 0; k < p->support->len; k++)
             if (!support_is_qualified (q, g_ptr_array_index (p->support, k)))
                 return fail (error, ATM_SERIES_CONTRACT_ERROR_SUPPORT, "Point support is not in finalized qualification.");
+        if (p->break_before && !bounded (p->break_reason, ATM_SERIES_CONTRACT_MAX_TEXT))
+            return fail (error, ATM_SERIES_CONTRACT_ERROR_SHAPE, "Break requires a bounded reason.");
+        if (!p->break_before && p->break_reason != NULL)
+            return fail (error, ATM_SERIES_CONTRACT_ERROR_SHAPE,
+                         "Break reason requires break_before.");
+        if (p->break_before && i == 0)
+            return fail (error, ATM_SERIES_CONTRACT_ERROR_ORDER, "First point cannot begin with a discontinuity.");
         if (p->y_status == ATM_SERIES_Y_NUMERIC) {
             if (p->missing_reason != NULL || (p->break_before && p->break_reason == NULL))
                 return fail (error, ATM_SERIES_CONTRACT_ERROR_SHAPE, "Numeric point has invalid missing/break semantics.");
@@ -675,13 +682,6 @@ atm_series_contract_validate (AtmSeriesContract *s, const AtmSraResult *q, GErro
         } else {
             return fail (error, ATM_SERIES_CONTRACT_ERROR_SHAPE, "Unknown Y status.");
         }
-        if (p->break_before && !bounded (p->break_reason, ATM_SERIES_CONTRACT_MAX_TEXT))
-            return fail (error, ATM_SERIES_CONTRACT_ERROR_SHAPE, "Break requires a bounded reason.");
-        if (!p->break_before && p->break_reason != NULL)
-            return fail (error, ATM_SERIES_CONTRACT_ERROR_SHAPE,
-                         "Break reason requires break_before.");
-        if (p->break_before && i == 0)
-            return fail (error, ATM_SERIES_CONTRACT_ERROR_ORDER, "First point cannot begin with a discontinuity.");
         /* MISSING is a scientific assertion too: it must match an explicit
          * established SRA fact, not only a caller-provided reason string. Do
          * this after ordering/break checks so their established errors persist. */
