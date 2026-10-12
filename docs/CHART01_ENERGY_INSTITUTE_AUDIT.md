@@ -87,6 +87,8 @@ Before qualification, a dedicated adapter must establish:
 
 No existing GISTEMP profile is widened by this audit. The Energy Institute source uses the versioned TES semantic profile `atm-profile/ewd-energy-institute-tes-physical-content/v2`. F0-19 still blocks SRA qualification because the source bundle does not define an approved AtM reconstruction obligation.
 
+The unresolved scope is recorded in [`CHART01_ENERGY_INSTITUTE_F0-19_QUALIFICATION_PROPOSAL.md`](CHART01_ENERGY_INSTITUTE_F0-19_QUALIFICATION_PROPOSAL.md). It proposes a bounded obligation for reconstruction of the pinned EWD processed snapshot, explicitly not reproduction of the upstream raw-to-processed calculation. The candidate identifier is not active; `canonical_obligation` remains `NULL` until the scope is explicitly approved.
+
 ## Explicit non-claims
 
 This audit does not claim that Total Energy Supply (TES) is:
