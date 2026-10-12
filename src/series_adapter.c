@@ -73,6 +73,8 @@ atm_series_adapter_from_evidence (const AtmSeriesEvidenceDescriptor *descriptor,
      * reinterpret an evidence collection built under another descriptor. */
     if (atm_series_evidence_descriptor (evidence) != descriptor)
         return reject (error, "Series descriptor does not match source evidence.");
+    if (!atm_series_evidence_validate (evidence, error))
+        return FALSE;
 
     const AtmScientificArtifact *first = atm_series_evidence_at (evidence, 0);
     if (first == NULL)
@@ -171,12 +173,23 @@ atm_series_adapter_from_evidence (const AtmSeriesEvidenceDescriptor *descriptor,
             return FALSE;
         }
 
-        /* Source decimal: coefficient followed by exponent, matching the form
-         * the SRA fact value uses. The contract recomputes coefficient and
-         * exponent from this token, so a mismatch is caught at add_point. No
-         * binary64 conversion occurs anywhere. */
-        char *source_decimal = g_strdup_printf ("%se%s", coefficient, exponent_text);
+        /* Keep the exact token from the rebuilt, admitted CSV. The Evidence
+         * artifact intentionally retains its legacy coefficient/exponent shape
+         * so source-equivalence identities remain stable; its owned admission
+         * is the authoritative place to recover the original spelling. */
+        const char *source_token =
+            atm_series_evidence_point_source_decimal (evidence, i);
+        if (source_token == NULL) {
+            g_free (support);
+            atm_series_contract_free (series);
+            g_object_unref (point_parser);
+            return reject (error, "Admitted source point has no original decimal token.");
+        }
+        char *source_decimal = g_strdup (source_token);
         gint64 exponent = g_ascii_strtoll (exponent_text, NULL, 10);
+        gboolean negative_zero =
+            g_strcmp0 (coefficient, "0") == 0 && exponent == 0 &&
+            source_decimal[0] == '-';
 
         gboolean added = atm_series_contract_add_point (series,
             year_text,
@@ -184,7 +197,7 @@ atm_series_adapter_from_evidence (const AtmSeriesEvidenceDescriptor *descriptor,
             source_decimal,
             coefficient,
             exponent,
-            FALSE,      /* negative_zero: the source spelling carries it */
+            negative_zero,
             FALSE,      /* break_before */
             NULL,       /* missing_reason */
             NULL,       /* break_reason */
