@@ -41,7 +41,7 @@ This is strong independent provenance for the selected EWD observations and `tes
 
 > Given only the admitted EWD snapshot and its byte-pinned files, AtM reconstructs the same source-bound Evidence and SRA facts for the 61 annual Total Energy Supply observations, retaining exact source decimal tokens, year and source-row/column locators, the reviewed TES/Physical Energy Content interpretation, and the exact evidence support set. The result claims faithful reconstruction of this pinned processed snapshot, not independent reproduction of Energy Institute's raw-to-processed pipeline.
 
-The obligation binds to the semantic profile `atm-profile/ewd-energy-institute-tes-physical-content/v2` and numeric profile `exact_decimal_coefficient_exponent/1`. A new source edition, input bundle, semantic method or output vocabulary requires a separately reviewed profile/obligation update; it must not be admitted merely because the CSV shape looks compatible.
+The obligation binds to the semantic profile `atm-profile/ewd-energy-institute-tes-physical-content/v2` and numeric profile `exact_decimal_coefficient_exponent/1`. A new source edition, input bundle, semantic method or output vocabulary requires an explicit, separately reviewed qualification change; a changed semantic claim requires a new semantic profile/obligation, and a changed exact input bundle requires a new admission-policy version plus snapshot-specific Evidence/SRA reconstruction tests. It must not be admitted merely because the CSV shape looks compatible.
 
 ### Qualification controls and registered regression tests
 
@@ -55,6 +55,12 @@ The obligation binds to the semantic profile `atm-profile/ewd-energy-institute-t
 8. **Separate downstream gates:** this obligation would qualify only the source-bound SRA for this pinned snapshot. It does not automatically qualify a `VerifiedSeries`, authorize chart rendering, change persistence, or calibrate a World3 trajectory.
 
 The registered generic SRA test now checks the approved obligation and semantic profile, all 61 fact rows, five evidence-support IDs per point, exact endpoint decimal values, semantic-precedence and anomaly limitations, finalized-result mutation rejection, and the negative control that a descriptor with a NULL obligation remains fail-closed. Existing admission tests reject byte mutations to each of the four pinned source files, and parser tests reject malformed or nonconsecutive rows. These tests establish the stated snapshot reconstruction contract; they do not establish upstream raw-to-processed reproduction or downstream chart qualification.
+
+## Additional exact-bundle admission for the current EWD snapshot
+
+The admission-policy v3 change under qualification adds `dc710d8e604c0fff713a3acfdb18ab47a1a902bb` as a second exact snapshot option; it does not replace or mutate the original `d9e249339663015f6d1c05752338a955bf64ad0b` bundle. The approved semantic profile `atm-profile/ewd-energy-institute-tes-physical-content/v2` and canonical reconstruction obligation `atm-energy-institute-ewd-tes-pinned-snapshot-reconstruction/1` remain unchanged because the source edition, selected 61 observation tokens, accepted `tes_ej` → TES/Physical Energy Content interpretation, geographic coverage and scientific claim are unchanged.
+
+The admission policy nevertheless pins a distinct manifest/registry pair for the current EWD snapshot, in addition to the unchanged CSV and provenance SHA-256 values. The complete EI registry row and manifest entries for the EI CSV/provenance were compared and found identical; this does not make the full files identical. The two admitted snapshots must be rebuilt independently: the SRA scientific fact-content identity must remain equal, while the repository-qualified SRA identity and observation support IDs differ because the full snapshot and source-binding artifacts differ. Mixed bundles and other snapshots are rejected. This preserves the approved snapshot-level claim and does not authorize arbitrary files or snapshot substitution.
 
 ## Why this does not claim raw-source reproduction
 
