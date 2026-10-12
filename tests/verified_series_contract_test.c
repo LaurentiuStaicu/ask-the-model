@@ -77,6 +77,12 @@ build_gistemp_admission (void)
 static void
 test_bridge_returns_valid_contract (void)
 {
+    /* Generic contracts have a different JSON shape and must not reuse the
+     * legacy persisted schema identifier. The legacy module's pinned IDs below
+     * remain authoritative for existing stored charts. */
+    g_assert_cmpstr (ATM_SERIES_CONTRACT_SCHEMA, !=, ATM_VERIFIED_SERIES_SCHEMA);
+    g_assert_cmpstr (ATM_SERIES_CONTRACT_QUALIFICATION_SCHEMA, !=,
+                     "atm-verified-series-qualification/1");
     AtmGistempAdmission *admission = build_gistemp_admission ();
 
     AtmSeriesContract *first = NULL;
