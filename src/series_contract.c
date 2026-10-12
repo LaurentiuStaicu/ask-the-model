@@ -25,6 +25,33 @@ static gboolean bounded (const char *text, gsize max)
     return n > 0 && n <= max && g_utf8_validate (text, (gssize) n, NULL);
 }
 
+/* The contract is a public mutable struct. Recheck every bounded metadata
+ * field at validation time, not only in the constructor, before serializing
+ * caller-editable fields into canonical identities. */
+static gboolean
+series_metadata_valid (const AtmSeriesContract *s)
+{
+    return s != NULL &&
+        s->x_kind >= ATM_SERIES_X_CALENDAR_YEAR &&
+        s->x_kind <= ATM_SERIES_X_EVENT_ORDINAL &&
+        bounded (s->subject, ATM_SERIES_CONTRACT_MAX_TEXT) &&
+        bounded (s->attribute, ATM_SERIES_CONTRACT_MAX_TEXT) &&
+        bounded (s->x_unit, ATM_SERIES_CONTRACT_MAX_TEXT) &&
+        bounded (s->x_dimension, ATM_SERIES_CONTRACT_MAX_TEXT) &&
+        bounded (s->y_unit, ATM_SERIES_CONTRACT_MAX_TEXT) &&
+        bounded (s->y_dimension, ATM_SERIES_CONTRACT_MAX_TEXT) &&
+        bounded (s->series_semantics, ATM_SERIES_CONTRACT_MAX_TEXT) &&
+        bounded (s->scenario, ATM_SERIES_CONTRACT_MAX_TEXT) &&
+        bounded (s->time_scope, ATM_SERIES_CONTRACT_MAX_TEXT) &&
+        bounded (s->epistemic_status, ATM_SERIES_CONTRACT_MAX_TEXT) &&
+        bounded (s->repository_id, ATM_SERIES_CONTRACT_MAX_TEXT) &&
+        bounded (s->repository_version, ATM_SERIES_CONTRACT_MAX_TEXT) &&
+        bounded (s->snapshot_sha, ATM_SERIES_CONTRACT_MAX_TEXT) &&
+        bounded (s->source_path, ATM_SERIES_CONTRACT_MAX_TEXT) &&
+        bounded (s->profile_id, ATM_SERIES_CONTRACT_MAX_TEXT) &&
+        bounded (s->profile_version, ATM_SERIES_CONTRACT_MAX_TEXT);
+}
+
 static gboolean hex64 (const char *text)
 {
     if (!bounded (text, 64) || strlen (text) != 64) return FALSE;
@@ -622,6 +649,9 @@ atm_series_contract_validate (AtmSeriesContract *s, const AtmSraResult *q, GErro
     if (s == NULL || q == NULL || !q->finalized || q->qualification == NULL ||
         q->qualification->evidence_atom_ids == NULL)
         return fail (error, ATM_SERIES_CONTRACT_ERROR_SUPPORT, "Series requires finalized qualification.");
+    if (!series_metadata_valid (s))
+        return fail (error, ATM_SERIES_CONTRACT_ERROR_SHAPE,
+                     "Invalid or oversized series metadata.");
     if (!atm_sra_result_validate (q, error))
         return FALSE;
     /* A contract may only name a repository version and snapshot explicitly
