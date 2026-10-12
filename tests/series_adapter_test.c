@@ -328,6 +328,33 @@ static void
 test_descriptor_mismatch_rejected (void)
 {
     AtmGistempAdmission *admission = build_gistemp_admission ();
+    AtmSeriesEvidenceDescriptor copied_descriptor =
+        ATM_GISTEMP_EVIDENCE_DESCRIPTOR;
+    AtmSeriesSra *sra = NULL;
+    AtmSeriesContract *out = NULL;
+    GError *error = NULL;
+
+    g_assert_true (atm_series_sra_new (&ATM_GISTEMP_EVIDENCE_DESCRIPTOR,
+                                       admission, &sra, &error));
+    g_assert_no_error (error);
+    g_assert_false (atm_series_adapter_from_evidence (
+        &copied_descriptor, &GISTEMP_METADATA,
+        atm_series_sra_evidence (sra), &out, &error));
+    g_assert_error (error, ATM_SERIES_CONTRACT_ERROR,
+                    ATM_SERIES_CONTRACT_ERROR_SHAPE);
+    g_assert_nonnull (g_strstr_len (error->message, -1,
+                                    "Series descriptor does not match source evidence"));
+    g_assert_null (out);
+    g_clear_error (&error);
+
+    atm_series_sra_free (sra);
+    atm_gistemp_admission_free (admission);
+}
+
+static void
+test_unapproved_ei_series_profile_fails_closed (void)
+{
+    AtmGistempAdmission *admission = build_gistemp_admission ();
     AtmSeriesSra *sra = NULL;
     AtmSeriesContract *out = NULL;
     GError *error = NULL;
@@ -340,6 +367,8 @@ test_descriptor_mismatch_rejected (void)
         atm_series_sra_evidence (sra), &out, &error));
     g_assert_error (error, ATM_SERIES_CONTRACT_ERROR,
                     ATM_SERIES_CONTRACT_ERROR_SHAPE);
+    g_assert_nonnull (g_strstr_len (error->message, -1,
+                                    "Source descriptor has no reviewed generic series profile"));
     g_assert_null (out);
     g_clear_error (&error);
 
@@ -438,6 +467,8 @@ main (int argc, char **argv)
     g_test_add_func ("/adapter/reviewed-series-profile",
                      test_unreviewed_series_profile_metadata_rejected);
     g_test_add_func ("/adapter/descriptor-mismatch", test_descriptor_mismatch_rejected);
+    g_test_add_func ("/adapter/unapproved-ei-series-profile",
+                     test_unapproved_ei_series_profile_fails_closed);
     g_test_add_func ("/adapter/argument-guards", test_argument_guards);
 
     return g_test_run ();
