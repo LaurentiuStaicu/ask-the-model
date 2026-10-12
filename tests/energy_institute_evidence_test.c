@@ -81,6 +81,14 @@ static void test_identity_support(void)
         "1496960972");
     g_assert_cmpstr(json_object_get_string_member(object, "exponent"), ==, "-7");
     g_assert_cmpstr(json_object_get_string_member(object, "calendar_year"), ==, "1965");
+    g_assert_cmpstr(json_object_get_string_member(object, "schema"), ==,
+        "atm-energy-institute-annual-observation/2");
+    g_assert_cmpstr(json_object_get_string_member(object, "subject"), ==,
+        "global_total_energy_supply");
+    g_assert_cmpstr(json_object_get_string_member(object, "attribute"), ==,
+        "total_energy_supply");
+    g_assert_cmpstr(json_object_get_string_member(object, "energy_accounting_method"), ==,
+        "physical_energy_content");
     g_assert_cmpstr(first->locator, ==,
         "csv:row:2:columns:year,total_primary_energy_ej");
     g_assert_cmpstr(
