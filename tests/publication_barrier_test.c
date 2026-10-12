@@ -1,20 +1,19 @@
-/* Qualification test for the M11 publication barrier.
+/* Qualification test for the managed-export reconciliation barrier.
  *
- * The barrier supplies the condition ConversationPersistenceStore is missing:
- * a conversation may not be discarded until it has been durably published.
- * Today the constructor discards unarchived conversations BEFORE the automatic
- * export runs, and the export is best-effort, so a failed export becomes a
- * warning and the next startup deletes a row whose export never landed.
+ * Only archived conversations have managed JSON mirrors. An unarchived row
+ * may be discarded only after any stale mirror has been removed or confirmed
+ * absent; failed or unknown reconciliation must refuse deletion.
  *
- * Every case below runs without SQLite, without a filesystem and without a
- * conversation store, because the barrier is a pure state machine.
+ * These unit cases exercise the pure state machine without SQLite, filesystem
+ * calls, or a conversation store. The store-level failure/retry regression is
+ * in conversation_persistence_store_test.vala.
  */
 
 #include <glib.h>
 
 #include "publication_barrier.h"
 
-/* A published conversation may be discarded. */
+/* A successful export-reconciliation outcome permits discard. */
 static void
 test_published_may_be_discarded (void)
 {
@@ -35,8 +34,8 @@ test_published_may_be_discarded (void)
     atm_publication_barrier_free (barrier);
 }
 
-/* The fault this barrier exists for: publish failed, so the discard must be
- * refused rather than silently losing the conversation. */
+/* The fault this barrier exists for: reconciliation failed, so discard must
+ * be refused rather than leaving an inconsistent managed-export path. */
 static void
 test_failed_publish_refuses_discard (void)
 {
@@ -58,8 +57,8 @@ test_failed_publish_refuses_discard (void)
     atm_publication_barrier_free (barrier);
 }
 
-/* A conversation the barrier has never heard of may not be discarded. Absence
- * of evidence is not evidence of publication. */
+/* A conversation with no recorded reconciliation outcome may not be
+ * discarded. Absence of evidence is not evidence of successful cleanup. */
 static void
 test_unknown_conversation_refuses_discard (void)
 {
@@ -76,8 +75,8 @@ test_unknown_conversation_refuses_discard (void)
     atm_publication_barrier_free (barrier);
 }
 
-/* The newer attempt is the truth: a failure after a success unpublishes, and a
- * success after a failure republishes. */
+/* The newest outcome is authoritative: failed reconciliation after success
+ * blocks discard, while later successful reconciliation restores permission. */
 static void
 test_later_outcome_overrides_earlier (void)
 {
@@ -107,7 +106,7 @@ test_later_outcome_overrides_earlier (void)
     atm_publication_barrier_free (barrier);
 }
 
-/* Mixed set: the discard decision is per conversation, not global. */
+/* Mixed outcome set: the discard decision is per conversation, not global. */
 static void
 test_decisions_are_per_conversation (void)
 {
@@ -177,10 +176,9 @@ test_argument_guards (void)
     atm_publication_barrier_free (barrier);
 }
 
-/* The store's actual sequence, modelled: several conversations are persisted,
- * some exports fail, and then the startup cleanup asks what it may discard.
- * Under the current store every unarchived row is deleted; under the barrier
- * only the published ones are. */
+/* Model the cleanup decision for several rows. Successful reconciliation
+ * allows discard; failure or an unknown outcome retains the row for retry.
+ * The end-to-end persistence-store test exercises the real removal failure. */
 static void
 test_startup_cleanup_sequence (void)
 {
