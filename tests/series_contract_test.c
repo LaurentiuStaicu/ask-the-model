@@ -508,6 +508,36 @@ static void test_caller_identity_not_authoritative (void)
     atm_scientific_artifact_free (a);
 }
 
+static void
+test_contract_snapshot_must_be_qualified (void)
+{
+    AtmScientificArtifact *a = support_artifact ();
+    AtmSraResult *q = qualified_with_artifact (a);
+    AtmSeriesContract *s = base ();
+    const char *support[] = { a->qualified_artifact_id };
+    GError *error = NULL;
+
+    g_assert_true (atm_series_contract_add_point (
+        s, "1880", ATM_SERIES_Y_NUMERIC, "1.0000", "1", 0, FALSE,
+        FALSE, NULL, NULL, support, 1, &error));
+    g_assert_no_error (error);
+
+    /* Point facts/support still match, but a changed source version must not
+     * be minted into a qualified contract against the old SRA envelope. */
+    g_free (s->repository_version);
+    s->repository_version = g_strdup ("unqualified-version");
+    g_assert_false (atm_series_contract_validate (s, q, &error));
+    g_assert_error (error, ATM_SERIES_CONTRACT_ERROR,
+                    ATM_SERIES_CONTRACT_ERROR_IDENTITY);
+    g_assert_nonnull (g_strstr_len (error->message, -1,
+        "repository/version/snapshot is not present in finalized qualification"));
+    g_clear_error (&error);
+
+    atm_series_contract_free (s);
+    atm_sra_result_free (q);
+    atm_scientific_artifact_free (a);
+}
+
 static AtmSeriesContract *base_kind (AtmSeriesXKind kind);
 
 static void test_last_break_and_all_missing_are_supported (void)
@@ -623,6 +653,7 @@ int main (int argc, char **argv)
     g_test_add_func ("/series-contract/support-unique-set", test_numeric_point_support_must_match_as_unique_set);
     g_test_add_func ("/series-contract/first-break", test_first_break_rejected);
     g_test_add_func ("/series-contract/identity", test_caller_identity_not_authoritative);
+    g_test_add_func ("/series-contract/snapshot-binding", test_contract_snapshot_must_be_qualified);
     g_test_add_func ("/series-contract/utc-calendar", test_invalid_utc_calendar_rejected);
     g_test_add_func ("/series-contract/event-overflow", test_event_ordinal_overflow_rejected);
     g_test_add_func ("/series-contract/missing-boundaries", test_last_break_and_all_missing_are_supported);
