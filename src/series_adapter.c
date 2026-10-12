@@ -36,6 +36,42 @@ metadata_valid (const AtmSeriesAdapterMetadata *m)
            m->profile_version != NULL;
 }
 
+/* An SRA semantic profile qualifies evidence facts; it is not automatically an
+ * approval of the output-series profile. The descriptor must separately name
+ * the reviewed series semantics/scenario/profile before this adapter may mint
+ * source-bound series identities. */
+static gboolean
+reviewed_series_metadata_matches (
+    const AtmSeriesEvidenceDescriptor *descriptor,
+    const AtmSeriesAdapterMetadata *metadata,
+    GError **error
+)
+{
+    if (descriptor->series_semantics == NULL ||
+        descriptor->series_scenario == NULL ||
+        descriptor->series_profile_id == NULL ||
+        descriptor->series_profile_version == NULL ||
+        descriptor->series_semantics[0] == '\\0' ||
+        descriptor->series_scenario[0] == '\\0' ||
+        descriptor->series_profile_id[0] == '\\0' ||
+        descriptor->series_profile_version[0] == '\\0')
+        return reject (error,
+            "Source descriptor has no reviewed generic series profile.");
+
+    if (g_strcmp0 (metadata->series_semantics,
+                   descriptor->series_semantics) != 0 ||
+        g_strcmp0 (metadata->scenario,
+                   descriptor->series_scenario) != 0 ||
+        g_strcmp0 (metadata->profile_id,
+                   descriptor->series_profile_id) != 0 ||
+        g_strcmp0 (metadata->profile_version,
+                   descriptor->series_profile_version) != 0)
+        return reject (error,
+            "Series metadata disagrees with the source-reviewed series profile.");
+
+    return TRUE;
+}
+
 /* Read a required string member, failing closed when absent or non-string. */
 static gboolean
 time_scope_matches_points (const AtmSeriesContract *series)
@@ -88,6 +124,8 @@ atm_series_adapter_from_evidence (const AtmSeriesEvidenceDescriptor *descriptor,
         return reject (error, "Invalid series-adapter arguments.");
     if (!metadata_valid (metadata))
         return reject (error, "Invalid series-adapter metadata.");
+    if (!reviewed_series_metadata_matches (descriptor, metadata, error))
+        return FALSE;
 
     /* A descriptor is part of the source identity, not a hint. Refuse to
      * reinterpret an evidence collection built under another descriptor. */
