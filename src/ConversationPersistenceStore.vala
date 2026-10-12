@@ -463,11 +463,46 @@ namespace AskTheModel {
                 ConversationPersistenceSummary summary
                 in list_conversations ()
             ) {
-                if (!summary.archived) {
-                    delete_conversation (
+                if (summary.archived) {
+                    continue;
+                }
+
+                /* This public path is used after restore and at shutdown, so it
+                 * must not bypass the startup barrier's export-reconciliation
+                 * requirement. Reconcile again because the export path may have
+                 * changed since construction. */
+                bool reconciled = false;
+                try {
+                    sync_automatic_export_required (
                         summary.conversation_id
                     );
+                    reconciled = true;
+                } catch (GLib.Error error) {
+                    warning (
+                        "AtM: retaining unarchived conversation %s because export reconciliation failed: %s",
+                        summary.conversation_id,
+                        error.message
+                    );
                 }
+
+                publication_barrier.record (
+                    summary.conversation_id,
+                    reconciled
+                );
+
+                if (!publication_barrier.may_discard (
+                        summary.conversation_id
+                    )) {
+                    warning (
+                        "AtM: retaining unarchived conversation %s because export reconciliation is not qualified",
+                        summary.conversation_id
+                    );
+                    continue;
+                }
+
+                delete_conversation (
+                    summary.conversation_id
+                );
             }
         }
 
