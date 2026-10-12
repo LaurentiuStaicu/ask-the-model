@@ -644,6 +644,9 @@ atm_series_contract_validate (AtmSeriesContract *s, const AtmSraResult *q, GErro
         }
         if (p->break_before && !bounded (p->break_reason, ATM_SERIES_CONTRACT_MAX_TEXT))
             return fail (error, ATM_SERIES_CONTRACT_ERROR_SHAPE, "Break requires a bounded reason.");
+        if (!p->break_before && p->break_reason != NULL)
+            return fail (error, ATM_SERIES_CONTRACT_ERROR_SHAPE,
+                         "Break reason requires break_before.");
         if (p->break_before && i == 0)
             return fail (error, ATM_SERIES_CONTRACT_ERROR_ORDER, "First point cannot begin with a discontinuity.");
         /* MISSING is a scientific assertion too: it must match an explicit
