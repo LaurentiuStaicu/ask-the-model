@@ -27,6 +27,8 @@ The transport code in that pinned commit selects the raw Energy Institute total 
 
 The EWD registry and processed CSV retain legacy identifiers such as `ei_primary_energy` and `total_primary_energy_ej`. AtM preserves those bytes and column names for source reproducibility, but does not propagate the legacy label into the semantic contract. The admitted AtM profile therefore labels this value as **Total Energy Supply (TES)** and binds `energy_accounting_method = physical_energy_content` into each observation payload. The method interpretation changes the semantic profile/payload version; the pinned CSV and its hashes are unchanged.
 
+The pinned EWD registry concept and provenance `boundary_note` still describe the series as “Primary energy supply” / “gross primary-energy supply.” This is a real semantic metadata conflict, not just a filename difference. The AtM v2 interpretation follows the pinned transport's `tes_ej` mapping and the official Energy Institute methodology; the F0-19 proposal records that the precedence rule must be explicitly reviewed before SRA qualification.
+
 The value is a gross annual energy-supply flow. It constrains the energy mix but does not directly observe EROI or net energy.
 
 ## Candidate series
