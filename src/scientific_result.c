@@ -674,27 +674,48 @@ add_validated_artifact (
     }
 
     /* The snapshot list is part of qualification, not a free parallel label.
-     * Require each admitted artifact's exact repository/version/snapshot tuple
-     * to be named before its qualified identity can enter the envelope. */
-    char *artifact_snapshot = g_strdup_printf ("%s@%s#%s",
-        artifact->repository_id, artifact->repository_version,
-        artifact->snapshot_sha);
+     * Evidence artifacts carry a repository version, so require the exact
+     * tuple. Control artifacts intentionally have no repository_version in
+     * SCI-04; bind those by repository+snapshot and reject ambiguous version
+     * matches rather than inventing a version for the control artifact. */
     gboolean snapshot_is_qualified = FALSE;
     GPtrArray *snapshots = result->qualification->repository_snapshots;
-    for (guint i = 0; snapshots != NULL && i < snapshots->len; i++) {
-        if (g_strcmp0 (g_ptr_array_index (snapshots, i),
-                       artifact_snapshot) == 0) {
-            snapshot_is_qualified = TRUE;
-            break;
+    if (artifact->kind == ATM_SCIENTIFIC_ARTIFACT_KIND_EVIDENCE) {
+        char *artifact_snapshot = g_strdup_printf ("%s@%s#%s",
+            artifact->repository_id, artifact->repository_version,
+            artifact->snapshot_sha);
+        for (guint i = 0; snapshots != NULL && i < snapshots->len; i++) {
+            if (g_strcmp0 (g_ptr_array_index (snapshots, i),
+                           artifact_snapshot) == 0) {
+                snapshot_is_qualified = TRUE;
+                break;
+            }
         }
+        g_free (artifact_snapshot);
+    } else {
+        char *prefix = g_strdup_printf ("%s@", artifact->repository_id);
+        char *suffix = g_strdup_printf ("#%s", artifact->snapshot_sha);
+        guint matches = 0;
+        for (guint i = 0; snapshots != NULL && i < snapshots->len; i++) {
+            const char *snapshot = g_ptr_array_index (snapshots, i);
+            gsize length = snapshot != NULL ? strlen (snapshot) : 0;
+            gsize prefix_length = strlen (prefix);
+            gsize suffix_length = strlen (suffix);
+            if (length > prefix_length + suffix_length &&
+                g_str_has_prefix (snapshot, prefix) &&
+                g_str_has_suffix (snapshot, suffix))
+                matches++;
+        }
+        g_free (prefix);
+        g_free (suffix);
+        snapshot_is_qualified = matches == 1;
     }
-    g_free (artifact_snapshot);
     if (!snapshot_is_qualified) {
         g_set_error_literal (
             error,
             ATM_SRA_ERROR,
             ATM_SRA_ERROR_SUPPORT,
-            "SRA artifact repository/version/snapshot is absent from qualification."
+            "SRA artifact repository/snapshot is absent or ambiguous in qualification."
         );
         return FALSE;
     }
