@@ -69,11 +69,18 @@ atm_series_adapter_from_evidence (const AtmSeriesEvidenceDescriptor *descriptor,
     if (!metadata_valid (metadata))
         return reject (error, "Invalid series-adapter metadata.");
 
+    /* A descriptor is part of the source identity, not a hint. Refuse to
+     * reinterpret an evidence collection built under another descriptor. */
+    if (atm_series_evidence_descriptor (evidence) != descriptor)
+        return reject (error, "Series descriptor does not match source evidence.");
+
     const AtmScientificArtifact *first = atm_series_evidence_at (evidence, 0);
     if (first == NULL)
         return reject (error, "Source evidence exposes no artifacts.");
 
     guint artifact_count = atm_series_evidence_count (evidence);
+    if (artifact_count != descriptor->evidence_count)
+        return reject (error, "Source evidence artifact count does not match descriptor.");
     if (artifact_count <= descriptor->source_count)
         return reject (error, "Source evidence carries no observations.");
 
