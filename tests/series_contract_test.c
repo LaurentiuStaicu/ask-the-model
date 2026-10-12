@@ -76,6 +76,44 @@ static AtmSraResult *qualified_with_artifact (AtmScientificArtifact *a)
 }
 
 static AtmSraResult *
+qualified_with_single_coordinate_fact (AtmScientificArtifact *a,
+                                      const char *coordinate_key,
+                                      const char *coordinate_value)
+{
+    AtmSraResult *q = atm_sra_result_new (ATM_SRA_ANSWERED);
+    GError *error = NULL;
+    char *qualifiers = g_strdup_printf (
+        "{\"%s\":\"%s\",\"scenario\":\"baseline\",\"epistemic_status\":\"observed\",\"y_status\":\"NUMERIC\"}",
+        coordinate_key, coordinate_value);
+    AtmSraEstablishedFact *fact = atm_sra_established_fact_new (
+        "coordinate-fact", "observation", "subject", "attribute",
+        "1e0", "unit", "dimension", qualifiers);
+    g_free (qualifiers);
+    g_assert_nonnull (fact);
+    g_assert_true (atm_sra_fact_add_support (fact, a->qualified_artifact_id, &error));
+    g_assert_no_error (error);
+    g_assert_true (atm_sra_result_add_fact (q, fact, &error));
+    g_assert_no_error (error);
+    g_assert_true (atm_sra_qualification_add_canonical_obligation (q, "atm-sra/1", &error));
+    g_assert_no_error (error);
+    char *snapshot = g_strdup_printf ("ewd@0.1.0#%s", SHA);
+    g_assert_true (atm_sra_qualification_add_repository_snapshot (q, snapshot, &error));
+    g_free (snapshot);
+    g_assert_no_error (error);
+    g_assert_true (atm_sra_qualification_add_evidence_artifact (q, a, &error));
+    g_assert_no_error (error);
+    g_assert_true (atm_sra_qualification_add_semantic_profile (
+        q, "atm-profile/ewd/v1@1", &error));
+    g_assert_no_error (error);
+    g_assert_true (atm_sra_qualification_set_numeric_profile (
+        q, ATM_SERIES_CONTRACT_NUMERIC_PROFILE, &error));
+    g_assert_no_error (error);
+    g_assert_true (atm_sra_result_finalize (q, &error));
+    g_assert_no_error (error);
+    return q;
+}
+
+static AtmSraResult *
 qualified_with_missing_facts (AtmScientificArtifact *a)
 {
     AtmSraResult *q = atm_sra_result_new (ATM_SRA_ANSWERED);
@@ -669,6 +707,39 @@ static AtmSeriesContract *base_kind (AtmSeriesXKind kind)
     return s;
 }
 
+static void test_non_calendar_coordinates_bind_to_matching_sra_qualifier (void)
+{
+    const struct {
+        AtmSeriesXKind kind;
+        const char *qualifier;
+        const char *coordinate;
+    } cases[] = {
+        { ATM_SERIES_X_UTC_INSTANT, "utc_instant", "2026-01-01T00:00:00Z" },
+        { ATM_SERIES_X_EVENT_ORDINAL, "event_ordinal", "42" },
+    };
+
+    for (guint i = 0; i < G_N_ELEMENTS (cases); i++) {
+        AtmScientificArtifact *a = support_artifact ();
+        AtmSraResult *q = qualified_with_single_coordinate_fact (
+            a, cases[i].qualifier, cases[i].coordinate);
+        AtmSeriesContract *s = base_kind (cases[i].kind);
+        const char *support[] = { a->qualified_artifact_id };
+        GError *error = NULL;
+
+        g_assert_true (atm_series_contract_add_point (
+            s, cases[i].coordinate, ATM_SERIES_Y_NUMERIC, "1.0000", "1", 0,
+            FALSE, FALSE, NULL, NULL, support, 1, &error));
+        g_assert_no_error (error);
+        g_assert_true (atm_series_contract_validate (s, q, &error));
+        g_assert_no_error (error);
+        g_assert_nonnull (atm_series_contract_scientific_id (s));
+
+        atm_series_contract_free (s);
+        atm_sra_result_free (q);
+        atm_scientific_artifact_free (a);
+    }
+}
+
 static void test_invalid_utc_calendar_rejected (void)
 {
     AtmScientificArtifact *a = support_artifact ();
@@ -731,6 +802,7 @@ int main (int argc, char **argv)
     g_test_add_func ("/series-contract/first-break", test_first_break_rejected);
     g_test_add_func ("/series-contract/identity", test_caller_identity_not_authoritative);
     g_test_add_func ("/series-contract/snapshot-binding", test_contract_snapshot_must_be_qualified);
+    g_test_add_func ("/series-contract/non-calendar-coordinate-binding", test_non_calendar_coordinates_bind_to_matching_sra_qualifier);
     g_test_add_func ("/series-contract/utc-calendar", test_invalid_utc_calendar_rejected);
     g_test_add_func ("/series-contract/event-overflow", test_event_ordinal_overflow_rejected);
     g_test_add_func ("/series-contract/missing-boundaries", test_last_break_and_all_missing_are_supported);
