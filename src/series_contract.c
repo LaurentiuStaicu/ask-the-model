@@ -329,17 +329,13 @@ build_scientific_json (const AtmSeriesContract *s, char **out, GError **error)
         text_member (b, "x", p->x);
         json_builder_set_member_name (b, "y_status");
         json_builder_add_int_value (b, p->y_status);
-        text_member (b, "source_decimal", p->source_decimal);
         text_member (b, "coefficient", p->coefficient);
         json_builder_set_member_name (b, "exponent");
         json_builder_add_int_value (b, p->exponent);
-        json_builder_set_member_name (b, "negative_zero");
-        json_builder_add_boolean_value (b, p->negative_zero);
         json_builder_set_member_name (b, "break_before");
         json_builder_add_boolean_value (b, p->break_before);
         text_member (b, "missing_reason", p->missing_reason);
         text_member (b, "break_reason", p->break_reason);
-        strings_member (b, "support", p->support);
         json_builder_end_object (b);
     }
     json_builder_end_array (b);
@@ -372,6 +368,23 @@ build_qualified_json (const AtmSeriesContract *s,
     text_member (b, "source_path", s->source_path);
     text_member (b, "profile_id", s->profile_id);
     text_member (b, "profile_version", s->profile_version);
+    /* Original decimal spelling, signed zero and source support are qualification
+     * material. Bind each point's mapping here, not in the mathematical identity. */
+    json_builder_set_member_name (b, "point_bindings");
+    json_builder_begin_array (b);
+    for (guint i = 0; i < s->points->len; i++) {
+        const AtmSeriesContractPoint *p =
+            g_ptr_array_index (s->points, i);
+        json_builder_begin_object (b);
+        json_builder_set_member_name (b, "order");
+        json_builder_add_int_value (b, p->order);
+        text_member (b, "source_decimal", p->source_decimal);
+        json_builder_set_member_name (b, "negative_zero");
+        json_builder_add_boolean_value (b, p->negative_zero);
+        strings_member (b, "support", p->support);
+        json_builder_end_object (b);
+    }
+    json_builder_end_array (b);
     json_builder_end_object (b);
     JsonNode *root = json_builder_get_root (b);
     *out = json_to_string (root, FALSE);
