@@ -134,6 +134,52 @@ qualified_with_single_coordinate_fact (AtmScientificArtifact *a,
 }
 
 static AtmSraResult *
+qualified_with_single_coordinate_fact_two_supports (
+    AtmScientificArtifact *a,
+    AtmScientificArtifact *b,
+    const char *coordinate_key,
+    const char *coordinate_value
+)
+{
+    AtmSraResult *q = atm_sra_result_new (ATM_SRA_ANSWERED);
+    GError *error = NULL;
+    char *qualifiers = g_strdup_printf (
+        "{\"%s\":\"%s\",\"scenario\":\"baseline\","
+        "\"epistemic_status\":\"observed\",\"y_status\":\"NUMERIC\"}",
+        coordinate_key, coordinate_value);
+    AtmSraEstablishedFact *fact = atm_sra_established_fact_new (
+        "coordinate-fact", "observation", "subject", "attribute",
+        "1e0", "unit", "dimension", qualifiers);
+    g_free (qualifiers);
+    g_assert_nonnull (fact);
+    g_assert_true (atm_sra_fact_add_support (fact, a->qualified_artifact_id, &error));
+    g_assert_no_error (error);
+    g_assert_true (atm_sra_fact_add_support (fact, b->qualified_artifact_id, &error));
+    g_assert_no_error (error);
+    g_assert_true (atm_sra_result_add_fact (q, fact, &error));
+    g_assert_no_error (error);
+    g_assert_true (atm_sra_qualification_add_canonical_obligation (q, "atm-sra/1", &error));
+    g_assert_no_error (error);
+    char *snapshot = g_strdup_printf ("ewd@0.1.0#%s", SHA);
+    g_assert_true (atm_sra_qualification_add_repository_snapshot (q, snapshot, &error));
+    g_free (snapshot);
+    g_assert_no_error (error);
+    g_assert_true (atm_sra_qualification_add_evidence_artifact (q, a, &error));
+    g_assert_no_error (error);
+    g_assert_true (atm_sra_qualification_add_evidence_artifact (q, b, &error));
+    g_assert_no_error (error);
+    g_assert_true (atm_sra_qualification_add_semantic_profile (
+        q, "atm-profile/ewd/v1@1", &error));
+    g_assert_no_error (error);
+    g_assert_true (atm_sra_qualification_set_numeric_profile (
+        q, ATM_SERIES_CONTRACT_NUMERIC_PROFILE, &error));
+    g_assert_no_error (error);
+    g_assert_true (atm_sra_result_finalize (q, &error));
+    g_assert_no_error (error);
+    return q;
+}
+
+static AtmSraResult *
 qualified_with_missing_facts (AtmScientificArtifact *a)
 {
     AtmSraResult *q = atm_sra_result_new (ATM_SRA_ANSWERED);
