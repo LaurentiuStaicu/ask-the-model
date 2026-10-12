@@ -281,6 +281,47 @@ test_scenario_must_match_observation_payload (void)
     atm_gistemp_admission_free (admission);
 }
 
+/* Series profile labels are not caller-authoritative: the output profile
+ * must match the reviewed profile declared by the source descriptor. */
+static void
+test_unreviewed_series_profile_metadata_rejected (void)
+{
+    AtmGistempAdmission *admission = build_gistemp_admission ();
+    const struct {
+        const char *field;
+        const char *semantics;
+        const char *profile_id;
+        const char *profile_version;
+    } cases[] = {
+        { "series_semantics", "synthetic_model_projection", NULL, NULL },
+        { "profile_id", NULL, "atm-series/unreviewed-profile/1", NULL },
+        { "profile_version", NULL, NULL, "999" },
+    };
+
+    for (guint i = 0; i < G_N_ELEMENTS (cases); i++) {
+        AtmSeriesAdapterMetadata altered = GISTEMP_METADATA;
+        if (g_strcmp0 (cases[i].field, "series_semantics") == 0)
+            altered.series_semantics = cases[i].semantics;
+        else if (g_strcmp0 (cases[i].field, "profile_id") == 0)
+            altered.profile_id = cases[i].profile_id;
+        else
+            altered.profile_version = cases[i].profile_version;
+
+        AtmSeriesContract *out = NULL;
+        GError *error = NULL;
+        g_assert_false (atm_series_adapter_admit (
+            &ATM_GISTEMP_EVIDENCE_DESCRIPTOR, &altered, admission, &out, &error));
+        g_assert_error (error, ATM_SERIES_CONTRACT_ERROR,
+                        ATM_SERIES_CONTRACT_ERROR_SHAPE);
+        g_assert_null (out);
+        g_assert_nonnull (g_strstr_len (error->message, -1,
+            "Series metadata disagrees with the source-reviewed series profile"));
+        g_clear_error (&error);
+    }
+
+    atm_gistemp_admission_free (admission);
+}
+
 /* Equal-looking source descriptors are still not interchangeable: GISTEMP
  * and Energy Institute share structural arities but carry different evidence. */
 static void
@@ -394,6 +435,8 @@ main (int argc, char **argv)
     g_test_add_func ("/adapter/time-scope-matches-points", test_time_scope_must_match_points);
     g_test_add_func ("/adapter/scenario-matches-payload",
                      test_scenario_must_match_observation_payload);
+    g_test_add_func ("/adapter/reviewed-series-profile",
+                     test_unreviewed_series_profile_metadata_rejected);
     g_test_add_func ("/adapter/descriptor-mismatch", test_descriptor_mismatch_rejected);
     g_test_add_func ("/adapter/argument-guards", test_argument_guards);
 
