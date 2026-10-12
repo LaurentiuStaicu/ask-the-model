@@ -370,6 +370,8 @@ namespace AskTheModel {
 
     public class ConversationPersistenceStore : Object {
         private ConversationStoreNative.Store native_store;
+        private PublicationBarrier publication_barrier =
+            new PublicationBarrier ();
         public string path { get; private set; }
         public string export_root { get; private set; }
 
@@ -413,11 +415,14 @@ namespace AskTheModel {
 
             native_store = (owned) opened;
 
-            discard_unarchived_conversations_best_effort ();
-
+            /* Reconcile managed exports before deciding whether unarchived
+             * working rows may be discarded. A failed or unknown reconciliation
+             * must retain the row so it can be retried on a later startup. */
             if (automatic_export_directory_ready ()) {
                 sync_all_automatic_exports_best_effort ();
             }
+
+            discard_unarchived_conversations_best_effort ();
         }
 
         private void discard_unarchived_conversations_best_effort () {
@@ -427,6 +432,16 @@ namespace AskTheModel {
                     in list_conversations ()
                 ) {
                     if (summary.archived) {
+                        continue;
+                    }
+
+                    if (!publication_barrier.may_discard (
+                            summary.conversation_id
+                        )) {
+                        warning (
+                            "AtM: retaining unarchived conversation %s because export reconciliation failed or is unknown",
+                            summary.conversation_id
+                        );
                         continue;
                     }
 
@@ -462,13 +477,27 @@ namespace AskTheModel {
                     ConversationPersistenceSummary summary
                     in list_conversations ()
                 ) {
-                    sync_automatic_export_best_effort (
-                        summary.conversation_id
+                    bool reconciled = false;
+                    try {
+                        sync_automatic_export_required (
+                            summary.conversation_id
+                        );
+                        reconciled = true;
+                    } catch (GLib.Error error) {
+                        warning (
+                            "AtM: automatic conversation export could not be synchronized for %s: %s",
+                            summary.conversation_id,
+                            error.message
+                        );
+                    }
+                    publication_barrier.record (
+                        summary.conversation_id,
+                        reconciled
                     );
                 }
             } catch (GLib.Error error) {
                 warning (
-                    "AtM: existing automatic conversation exports could not be synchronized: %s",
+                    "AtM: existing automatic conversation exports could not be enumerated: %s",
                     error.message
                 );
             }
@@ -535,46 +564,9 @@ namespace AskTheModel {
         private void sync_automatic_export_best_effort (
             string conversation_id
         ) {
-            if (!GLib.Regex.match_simple (
-                    "^[A-Za-z0-9-]+$",
-                    conversation_id
-                )) {
-                warning (
-                    "AtM: automatic conversation export refused an invalid conversation id."
-                );
-                return;
-            }
-
             try {
-                ConversationPersistenceSnapshot snapshot =
-                    load_snapshot (
-                        conversation_id
-                    );
-
-                if (!snapshot.archived) {
-                    remove_automatic_export_best_effort (
-                        conversation_id
-                    );
-                    return;
-                }
-
-                if (!automatic_export_directory_ready ()) {
-                    return;
-                }
-
-                string json =
-                    ConversationExport.serialize_snapshot (
-                        snapshot
-                    );
-
-                GLib.FileUtils.set_contents_full (
-                    automatic_export_path (
-                        conversation_id
-                    ),
-                    json,
-                    -1,
-                    GLib.FileSetContentsFlags.CONSISTENT,
-                    0600
+                sync_automatic_export_required (
+                    conversation_id
                 );
             } catch (GLib.Error error) {
                 warning (
@@ -583,6 +575,58 @@ namespace AskTheModel {
                     error.message
                 );
             }
+        }
+
+        /* Startup's barrier must observe the real result, not a swallowed
+         * best-effort warning. Ordinary export callers keep their existing
+         * best-effort behavior through the wrapper above. */
+        private void sync_automatic_export_required (
+            string conversation_id
+        ) throws GLib.Error {
+            if (!GLib.Regex.match_simple (
+                    "^[A-Za-z0-9-]+$",
+                    conversation_id
+                )) {
+                throw new GLib.IOError.INVALID_DATA (
+                    "Conversation identity is invalid for managed export synchronization."
+                );
+            }
+
+            ConversationPersistenceSnapshot snapshot =
+                load_snapshot (
+                    conversation_id
+                );
+
+            /* Unarchived working rows intentionally have no managed export.
+             * Reconciliation means that any stale export is removed. Failure
+             * must reach the barrier and prevent the row from being discarded. */
+            if (!snapshot.archived) {
+                remove_automatic_export_required (
+                    conversation_id
+                );
+                return;
+            }
+
+            if (!automatic_export_directory_ready ()) {
+                throw new GLib.IOError.FAILED (
+                    "Automatic conversation export directory is not ready."
+                );
+            }
+
+            string json =
+                ConversationExport.serialize_snapshot (
+                    snapshot
+                );
+
+            GLib.FileUtils.set_contents_full (
+                automatic_export_path (
+                    conversation_id
+                ),
+                json,
+                -1,
+                GLib.FileSetContentsFlags.CONSISTENT,
+                0600
+            );
         }
 
         private void remove_automatic_export_required (
