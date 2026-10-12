@@ -1,0 +1,13 @@
+{
+  "schema": "atm-ei-snapshot-fixture-lock/1",
+  "repository": "LaurentiuStaicu/empirical-world3-dynamics",
+  "snapshot": "dc710d8e604c0fff713a3acfdb18ab47a1a902bb",
+  "admission_profile": "atm-energy-institute-pinned-admission/3",
+  "note": "The EI CSV and provenance blobs are identical to the already-locked d9e249... fixture; the complete manifest and registry blobs are snapshot-specific and stored verbatim under ewd-current.",
+  "files": {
+    "science/data/processed/energy_institute_global_2026.csv": "46b30240372b392f7e7aabb7b63a0521afd9a9af2574ff044867ea84d0a1074c",
+    "science/data/processed/energy_institute_global_2026.provenance.json": "1eca3a26375f7d56a0c4540eabccd8ea0d10c984dc1381757b2f4464f34e6a57",
+    "science/data/input_manifest.json": "ece72aed0d444484635e38171df703a775e5922df95b8783385cbfed7e2ffbd6",
+    "science/data/registry.csv": "6ff4e0bffe03cce368dcd278d6ca57b6e8f181aa241dea7206508499ec3fa3b8"
+  }
+}
