@@ -52,9 +52,11 @@ static void test_policy (void)
     g_assert_cmpstr (atm_energy_institute_admission_dataset (a), ==,
                     "Statistical Review of World Energy 2026");
     g_assert_cmpstr (atm_energy_institute_admission_subject (a), ==,
-                    "global_primary_energy_supply");
+                    "global_total_energy_supply");
     g_assert_cmpstr (atm_energy_institute_admission_attribute (a), ==,
-                    "total_primary_energy");
+                    "total_energy_supply");
+    g_assert_cmpstr (atm_energy_institute_admission_accounting_method (a), ==,
+                    "physical_energy_content");
     g_assert_cmpstr (atm_energy_institute_admission_epistemic_status (a), ==, "empirical");
     g_assert_cmpstr (atm_energy_institute_admission_x_semantics (a), ==, "calendar_year");
     for (guint i = 0; i < 4; i++)
