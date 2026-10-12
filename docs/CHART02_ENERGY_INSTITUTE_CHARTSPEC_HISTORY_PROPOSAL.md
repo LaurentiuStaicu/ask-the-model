@@ -19,7 +19,7 @@
 The proposed contract permits only this reviewed source/profile pair initially:
 
 - Existing GISTEMP v1: `atm-chart-spec/1` + `atm-chart-reconstruct/gistemp-complete-annual/1` + `atm-series/gistemp-complete-annual/1` + `atm-gistemp-pinned-admission/1`. It retains every current identity, source allowlist, UI behavior and History reconstruction rule.
-- Proposed EI v2: `atm-chart-spec/2` + `atm-chart-reconstruct/energy-institute-tes-complete-annual/1` + `atm-series/energy-institute-tes-complete-annual/1` + `atm-energy-institute-pinned-admission/2`. It binds only the exact EWD commit and four-file admission already qualified at CHART-01, the TES / Physical Energy Content semantic interpretation, the series qualified ID and the finalized SRA qualification. It does not assert upstream raw-to-processed reproduction.
+- Proposed EI v2: `atm-chart-spec/2` + `atm-chart-reconstruct/energy-institute-tes-complete-annual/1` + `atm-series/energy-institute-tes-complete-annual/1` + the exact reviewed Energy Institute admission profile. The currently qualified profile is `atm-energy-institute-pinned-admission/2` for commit `d9e249…`; it must not be assumed to admit commit `dc710d…`. Supporting the latter requires a separate, versioned allowlist/qualification for its complete four-file bundle and SRA reconstruction. Each supported snapshot binds to its own qualified series identity. EI v2 binds the TES / Physical Energy Content semantic interpretation and finalized SRA qualification; it does not assert upstream raw-to-processed reproduction.
 
 These are an exact allowlist of compatible tuples, not freely combinable metadata. Unknown combinations, schema versions, sources, profiles, series counts and reconstruction handlers must fail closed. The initial EI chart is one series; multi-series composition is not part of this gate.
 
@@ -73,6 +73,7 @@ Do not add a user-facing EI chart intent or new live/History renderer caller in 
 
 ## Ordered implementation gates
 
+- **C2-0 — EI snapshot/admission compatibility:** decide whether the application can reconstruct the exact `d9e249…` tree for History or whether current `dc710d…` support is required; for the latter, qualify the complete snapshot-specific manifest/registry bundle and SRA chain under an explicit versioned policy. Test both accepted/rejected snapshot cases and their distinct qualified identities. Do not treat equal CSV/provenance blobs as proof that the changed manifest/registry is admitted. This gate precedes chart construction and History support.
 - **C2a — native ChartSpec v2:** source-bound constructor, tagged identity, neutral point accessors and negative/reconstruction tests; no renderer or persistence change.
 - **C2b — EI display profile:** deterministic bounded display conversion and axis policy with ASan/UBSan, precision/range/overflow and resize/fallback tests; preserve GISTEMP projection bit-for-bit.
 - **C2c — conversation-store v4:** atomic migration, exact tuple allowlist and fail-closed compatibility; preserve all existing chart rows.
