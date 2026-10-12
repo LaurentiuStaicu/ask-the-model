@@ -1233,7 +1233,29 @@ test_unarchived_row_retained_when_export_reconciliation_fails ()
         );
 
         /* The stale export path cannot be removed. The SQLite row must survive
-         * this startup rather than losing the last recoverable conversation. */
+         * this startup rather than losing the last recoverable conversation.
+         * GLib makes unexpected warnings fatal inside tests, so expect the four
+         * warnings emitted by the two guarded cleanup attempts below. */
+        Test.expect_message (
+            null,
+            GLib.LogLevelFlags.LEVEL_WARNING,
+            "*AtM: automatic conversation export could not be synchronized for *"
+        );
+        Test.expect_message (
+            null,
+            GLib.LogLevelFlags.LEVEL_WARNING,
+            "*AtM: retaining unarchived conversation * because export reconciliation failed or is unknown*"
+        );
+        Test.expect_message (
+            null,
+            GLib.LogLevelFlags.LEVEL_WARNING,
+            "*AtM: retaining unarchived conversation * because export reconciliation failed:*"
+        );
+        Test.expect_message (
+            null,
+            GLib.LogLevelFlags.LEVEL_WARNING,
+            "*AtM: retaining unarchived conversation * because export reconciliation is not qualified*"
+        );
         {
             var reopened_store =
                 new AskTheModel.ConversationPersistenceStore (
@@ -1243,6 +1265,7 @@ test_unarchived_row_retained_when_export_reconciliation_fails ()
             /* Application calls this public cleanup again after restore; it
              * must revalidate instead of bypassing the constructor's barrier. */
             reopened_store.discard_unarchived_conversations ();
+            Test.assert_expected_messages ();
 
             bool found = false;
             foreach (
