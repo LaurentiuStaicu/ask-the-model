@@ -255,7 +255,7 @@ as a chart-series identity.
 
 ## M1c4 general VerifiedSeries contract
 
-The dormant native contract `atm-verified-series/1` is now pinned separately from the GISTEMP adapter. It is a semantic container/validator, not a source adapter and not chart authority. It supports exactly three X kinds: integer calendar year, canonical UTC instant (`YYYY-MM-DDTHH:MM:SSZ` with real calendar/time fields), and non-negative event ordinal representable as an unsigned 64-bit integer. X values are strictly increasing; duplicate X values reject and no automatic sorting occurs.
+The dormant native contract `atm-verified-series/1` is now pinned separately from the GISTEMP adapter. It is a semantic container/validator, not a source adapter and not chart authority. It supports exactly three X kinds: integer calendar year, canonical UTC instant (`YYYY-MM-DDTHH:MM:SSZ` with real calendar/time fields), and non-negative event ordinal representable as an unsigned 64-bit integer. X values are strictly increasing; duplicate X values reject and no automatic sorting occurs. During fact binding, the SRA qualifier key is coordinate-specific: `calendar_year`, `utc_instant`, or `event_ordinal`, respectively; its string value must equal the contract point's X value.
 
 Y is explicitly `NUMERIC` or `MISSING`. Numeric values retain the source decimal token plus canonical coefficient/exponent; signed zero is preserved only as the exact `-0` representation. MISSING never carries a numeric value and requires an explicit bounded reason. A discontinuity is represented only by `break_before=true` with a bounded reason. A first-point break is rejected; a final break and an all-MISSING series are valid contract states because neither invents a value or silently joins observations.
 
