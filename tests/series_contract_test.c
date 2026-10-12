@@ -112,6 +112,37 @@ static void test_missing_and_break_are_explicit (void)
     atm_scientific_artifact_free (a);
 }
 
+static void test_signed_zero_flag_matches_source (void)
+{
+    AtmScientificArtifact *a = support_artifact ();
+    AtmSraResult *q = qualified_with_artifact (a);
+    const char *support[] = { a->qualified_artifact_id };
+    GError *error = NULL;
+
+    AtmSeriesContract *s = base ();
+    g_assert_true (atm_series_contract_add_point (
+        s, "1880", ATM_SERIES_Y_NUMERIC, "-0.0000", "0", 0, FALSE,
+        FALSE, NULL, NULL, support, 1, &error));
+    g_assert_no_error (error);
+    g_assert_false (atm_series_contract_validate (s, q, &error));
+    g_assert_error (error, ATM_SERIES_CONTRACT_ERROR, ATM_SERIES_CONTRACT_ERROR_NUMERIC);
+    g_clear_error (&error);
+    atm_series_contract_free (s);
+
+    s = base ();
+    g_assert_true (atm_series_contract_add_point (
+        s, "1880", ATM_SERIES_Y_NUMERIC, "0.0000", "0", 0, TRUE,
+        FALSE, NULL, NULL, support, 1, &error));
+    g_assert_no_error (error);
+    g_assert_false (atm_series_contract_validate (s, q, &error));
+    g_assert_error (error, ATM_SERIES_CONTRACT_ERROR, ATM_SERIES_CONTRACT_ERROR_NUMERIC);
+    g_clear_error (&error);
+
+    atm_series_contract_free (s);
+    atm_sra_result_free (q);
+    atm_scientific_artifact_free (a);
+}
+
 static void test_duplicate_x_rejected (void)
 {
     AtmScientificArtifact *a = support_artifact ();
@@ -331,6 +362,7 @@ int main (int argc, char **argv)
 {
     g_test_init (&argc, &argv, NULL);
     g_test_add_func ("/series-contract/missing-break", test_missing_and_break_are_explicit);
+    g_test_add_func ("/series-contract/signed-zero-flag", test_signed_zero_flag_matches_source);
     g_test_add_func ("/series-contract/duplicate-x", test_duplicate_x_rejected);
     g_test_add_func ("/series-contract/support", test_unqualified_support_rejected);
     g_test_add_func ("/series-contract/fact-binding", test_numeric_point_must_match_sra_fact);
