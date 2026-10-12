@@ -25,6 +25,12 @@ The pinned transport code in [`shanewhi/world-energy-data@9fc01fc0ae5aea3955968f
 
 The processed table contains 61 consecutive annual observations, 1965–2025, in the legacy-named column `total_primary_energy_ej`. AtM profile v2 interprets that column as Total Energy Supply and records `energy_accounting_method = physical_energy_content`; it does not modify the pinned CSV, its hashes, decimal tokens or row values. The 2019–2023 component-reconciliation residual remains observational provenance and must not be corrected or distributed by the adapter.
 
+### Semantic metadata conflict requiring explicit acceptance
+
+The same pinned EWD bundle still describes the series as `ei_primary_energy` / “Primary energy supply and fuel mix” in `registry.csv`, and the provenance `boundary_note` says “gross primary-energy supply observations.” These are not semantically identical to the TES label used by AtM v2. The pinned transport mapping to `tes_ej` and Energy Institute's current methodology support the TES interpretation, but the bundle contains this legacy/conflicting wording.
+
+The snapshot obligation must therefore include an explicit reviewed precedence rule: AtM preserves the EWD metadata bytes for provenance and source identity, while the approved semantic contract follows the pinned `tes_ej` mapping and the official Energy Institute methodology for the 2026 edition. The reviewer must accept that interpretation explicitly. It must not be treated as an automatic consequence of a hash match or CI success. If that precedence is not accepted, keep the semantic change and F0-19 qualification gate unresolved until EWD's metadata are corrected and re-pinned or the source contract models the discrepancy directly.
+
 ## Recommended scope if the source-snapshot contract is accepted
 
 **Proposed identifier only; not an approved canonical obligation:**
@@ -41,7 +47,7 @@ The obligation would bind to the current semantic profile `atm-profile/ewd-energ
 
 1. **Pinned source bundle:** admission verifies the exact EWD repository/snapshot and four source files, including manifest relationships and digests, before parsing or constructing artifacts.
 2. **Full extraction:** the candidate has exactly 61 consecutive years, 1965–2025, `Total World`, and every value is the exact source token from `total_primary_energy_ej`; no float round-trip, sorting, imputation, or silent repair is allowed.
-3. **Semantic binding:** each point binds year, value, unit `exajoules/year`, energy-flow-rate dimension, annual frequency, empirical status, `scenario = not_applicable`, TES and `physical_energy_content` to the pinned source evidence and current v2 payload.
+3. **Semantic binding and conflict decision:** each point binds year, value, unit `exajoules/year`, energy-flow-rate dimension, annual frequency, empirical status, `scenario = not_applicable`, TES and `physical_energy_content` to the pinned source evidence and current v2 payload. The qualification record must explicitly accept how this AtM interpretation supersedes the legacy “primary energy” description in the pinned EWD registry/provenance; if that decision is not approved, qualification stays blocked.
 4. **SRA binding:** each of the 61 established observation facts is derived from the reconstructed admitted Evidence, with its exact support set. No caller-authored facts, derived facts, constraints, conflicts or transformations to EROI, net energy, fossil share or the World3 resource stock are authorized by this obligation.
 5. **Anomaly preservation:** the 2019–2023 reconciliation values remain in the source evidence and audit trail, but are not used to rewrite the total or any components.
 6. **Independent reconstruction and mutation resistance:** the Evidence/SRA output is deterministic from the pinned bytes; mutations to any admitted file, row order, calendar year, exact decimal token, locator, scenario, unit, TES method, source identity or support must be rejected by reconstruction/revalidation tests. A forged identity or rehashed artifact must not override source reconstruction.
