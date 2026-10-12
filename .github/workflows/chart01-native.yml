@@ -32,6 +32,20 @@ on:
       - 'tests/fixtures/chart01/**'
       - 'meson.build'
       - '.github/workflows/chart01-native.yml'
+      - 'src/energy_institute_admission.*'
+      - 'src/energy_institute_candidate.*'
+      - 'src/energy_institute_evidence.*'
+      - 'src/series_evidence.*'
+      - 'src/series_evidence_adapters.*'
+      - 'src/series_sra.*'
+      - 'src/series_adapter.*'
+      - 'src/verified_series_contract.*'
+      - 'tests/energy_institute_admission_test.c'
+      - 'tests/energy_institute_evidence_test.c'
+      - 'tests/series_evidence_equivalence_test.c'
+      - 'tests/series_sra_equivalence_test.c'
+      - 'tests/series_adapter_test.c'
+      - 'tests/verified_series_contract_test.c'
       - 'src/series_contract.*'
       - 'tests/series_contract_test.c'
   workflow_dispatch:
@@ -159,6 +173,75 @@ jobs:
             $(pkg-config --cflags --libs glib-2.0 json-glib-1.0) -lm \
             -o /tmp/series-contract-test
           /tmp/series-contract-test
+
+          # Exercise the Energy Institute's source-specific parser/admission and evidence paths.
+          cc -std=c11 -Wall -Wextra -Werror -g -O1 \
+            -fsanitize=address,undefined -fno-omit-frame-pointer -Isrc \
+            src/energy_institute_admission.c src/energy_institute_candidate.c \
+            src/scientific_canonical.c tests/energy_institute_admission_test.c \
+            $(pkg-config --cflags --libs glib-2.0 json-glib-1.0) -lm \
+            -o /tmp/energy-institute-admission-test
+          /tmp/energy-institute-admission-test
+          cc -std=c11 -Wall -Wextra -Werror -g -O1 \
+            -fsanitize=address,undefined -fno-omit-frame-pointer -Isrc \
+            src/energy_institute_evidence.c src/energy_institute_admission.c \
+            src/energy_institute_candidate.c src/scientific_canonical.c \
+            src/scientific_artifact.c tests/energy_institute_evidence_test.c \
+            $(pkg-config --cflags --libs glib-2.0 json-glib-1.0) -lm \
+            -o /tmp/energy-institute-evidence-test
+          /tmp/energy-institute-evidence-test
+
+          # The generic Evidence/SRA constructors must be byte/identity equivalent to legacy source modules.
+          cc -std=c11 -Wall -Wextra -Werror -g -O1 \
+            -fsanitize=address,undefined -fno-omit-frame-pointer -Isrc \
+            src/series_evidence.c src/series_evidence_adapters.c \
+            src/gistemp_evidence.c src/gistemp_admission.c \
+            src/energy_institute_evidence.c src/energy_institute_admission.c \
+            src/energy_institute_candidate.c src/annual_series_candidate.c \
+            src/scientific_canonical.c src/scientific_artifact.c \
+            tests/series_evidence_equivalence_test.c \
+            $(pkg-config --cflags --libs glib-2.0 json-glib-1.0) -lm \
+            -o /tmp/series-evidence-equivalence-test
+          /tmp/series-evidence-equivalence-test
+          cc -std=c11 -Wall -Wextra -Werror -g -O1 \
+            -fsanitize=address,undefined -fno-omit-frame-pointer -Isrc \
+            src/series_sra.c src/series_evidence.c src/series_evidence_adapters.c \
+            src/gistemp_sra.c src/gistemp_evidence.c src/gistemp_admission.c \
+            src/energy_institute_evidence.c src/energy_institute_admission.c \
+            src/energy_institute_candidate.c src/annual_series_candidate.c \
+            src/scientific_canonical.c src/scientific_artifact.c \
+            src/scientific_result.c src/scientific_operation.c \
+            src/scientific_derivation.c tests/series_sra_equivalence_test.c \
+            $(pkg-config --cflags --libs glib-2.0 json-glib-1.0) -lm \
+            -o /tmp/series-sra-equivalence-test
+          /tmp/series-sra-equivalence-test
+          cc -std=c11 -Wall -Wextra -Werror -g -O1 \
+            -fsanitize=address,undefined -fno-omit-frame-pointer -Isrc \
+            src/series_adapter.c src/series_sra.c src/series_evidence.c \
+            src/series_evidence_adapters.c src/series_contract.c \
+            src/gistemp_evidence.c src/gistemp_admission.c \
+            src/energy_institute_evidence.c src/energy_institute_admission.c \
+            src/energy_institute_candidate.c src/annual_series_candidate.c \
+            src/scientific_canonical.c src/scientific_artifact.c \
+            src/scientific_result.c src/scientific_operation.c \
+            src/scientific_derivation.c tests/series_adapter_test.c \
+            $(pkg-config --cflags --libs glib-2.0 json-glib-1.0) -lm \
+            -o /tmp/series-adapter-test
+          /tmp/series-adapter-test
+          cc -std=c11 -Wall -Wextra -Werror -g -O1 \
+            -fsanitize=address,undefined -fno-omit-frame-pointer -Isrc \
+            src/verified_series_contract.c src/verified_series.c \
+            src/gistemp_sra.c src/gistemp_evidence.c src/gistemp_admission.c \
+            src/energy_institute_evidence.c src/energy_institute_admission.c \
+            src/energy_institute_candidate.c src/annual_series_candidate.c \
+            src/series_adapter.c src/series_sra.c src/series_evidence.c \
+            src/series_evidence_adapters.c src/series_contract.c \
+            src/scientific_canonical.c src/scientific_artifact.c \
+            src/scientific_result.c src/scientific_operation.c \
+            src/scientific_derivation.c tests/verified_series_contract_test.c \
+            $(pkg-config --cflags --libs glib-2.0 json-glib-1.0) -lm \
+            -o /tmp/verified-series-contract-test
+          /tmp/verified-series-contract-test
       - name: Publish bounded headless preview diagnostics
         run: python3 scripts/chart03_preview_log.py /tmp/chart03-preview
       - uses: actions/upload-artifact@v4
