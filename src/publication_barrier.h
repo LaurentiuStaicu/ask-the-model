@@ -5,41 +5,27 @@
 G_BEGIN_DECLS
 
 /*
- * Publication barrier: a conversation may not be discarded until it has been
- * durably published.
+ * Managed-export reconciliation barrier (the original module name is retained
+ * for compatibility within this patch).
  *
- * M11 identifies this fault class:
+ * Only explicitly archived conversations are saved to History and receive a
+ * managed JSON mirror. Unarchived working rows intentionally have no mirror.
+ * Before an unarchived row is discarded, startup must successfully remove any
+ * stale export path or confirm that it is absent. If that reconciliation
+ * fails or cannot be evaluated, the SQLite row is retained and stays out of
+ * History so cleanup can be retried later.
  *
- *   SUCCESS -> persist OK -> metadata OK -> publish FAILS
+ * For archived rows reconciliation means writing the current JSON mirror; an
+ * archived row is never a startup-discard candidate. For unarchived rows it
+ * means successful removal or confirmed absence of the derived mirror. The
+ * barrier records the most recent reconciliation outcome per conversation and
+ * authorizes discard only after success.
  *
- * and in ConversationPersistenceStore the two halves are composed in the wrong
- * order. The constructor discards every unarchived conversation BEFORE it runs
- * the automatic export:
- *
- *   native_store = opened;
- *   discard_unarchived_conversations_best_effort ();
- *   if (automatic_export_directory_ready ()) {
- *       sync_all_automatic_exports_best_effort ();
- *   }
- *
- * and the export is best-effort, so a failure becomes a warning in the log
- * rather than a condition anything reacts to. The row is still in SQLite, but
- * its export is missing, and the next startup deletes the row because it is
- * unarchived.
- *
- * The store already holds verification that could catch the inconsistency -
- * ConversationPersistenceSnapshot.require_continuation_identity compares the
- * model name AND digest and validates the repository generation - but it runs
- * on reopen. By then the row is gone.
- *
- * This module supplies the missing condition: an unarchived conversation is discardable only when its latest managed-export
- * reconciliation succeeded (publish for archived state, successful removal or
- * confirmed absence for unarchived state). It is a pure state machine, no
- * I/O and no locks, so the failure mode becomes deterministically testable.
- *
- * It does not perform publishing and does not decide what publishing means.
- * The caller reports success or failure; the barrier records it and answers the
- * discard question.
+ * The previous startup sequence discarded unarchived rows before export
+ * reconciliation, while the best-effort helper swallowed filesystem errors.
+ * A stale managed-export path could therefore remain after its source row was
+ * deleted. This module is a pure state machine: it performs no I/O and holds
+ * no locks; the store reports the real reconciliation result.
  */
 
 typedef enum {
@@ -62,13 +48,13 @@ AtmPublicationBarrier *atm_publication_barrier_new (void);
 void atm_publication_barrier_free (AtmPublicationBarrier *barrier);
 
 /*
- * Record the outcome of a publish attempt. `conversation_id` must be non-empty
- * after stripping. A success marks the conversation published; a failure marks
- * it unpublished and clears any earlier success, because the newer attempt is
- * the truth about the current export.
+ * Record the latest managed-export reconciliation outcome. `conversation_id`
+ * must be non-empty after stripping. Success means the archived mirror was
+ * synchronized or an unarchived mirror was removed/confirmed absent; failure
+ * supersedes any earlier success.
  *
- * `published_at_us` is recorded only on success and only for the caller's use;
- * the barrier never compares wall-clock values.
+ * `published_at_us` is a legacy parameter retained by this internal API. The
+ * barrier never compares wall-clock values.
  */
 gboolean atm_publication_barrier_record (AtmPublicationBarrier *barrier,
                                          const char *conversation_id,
@@ -79,19 +65,19 @@ gboolean atm_publication_barrier_record (AtmPublicationBarrier *barrier,
 /*
  * Answer whether the conversation may be discarded.
  *
- * TRUE only when the most recent publish attempt for that conversation
- * succeeded. An unknown conversation and a failed one both refuse, with
- * distinct error codes so a caller can tell "never published" from "publish
- * failed".
+ * TRUE only when the most recent managed-export reconciliation succeeded.
+ * An unknown conversation and a failed reconciliation both refuse, with
+ * distinct error codes so the caller can distinguish "not reconciled" from
+ * "reconciliation failed".
  */
 gboolean atm_publication_barrier_may_discard (const AtmPublicationBarrier *barrier,
                                               const char *conversation_id,
                                               GError **error);
 
-/* Number of conversations with a recorded successful publish. */
+/* Number of conversations with a recorded successful reconciliation. */
 guint atm_publication_barrier_published_count (const AtmPublicationBarrier *barrier);
 
-/* Number of conversations with a recorded failed publish. */
+/* Number of conversations with a recorded failed reconciliation. */
 guint atm_publication_barrier_failed_count (const AtmPublicationBarrier *barrier);
 
 /* Number of distinct conversations the barrier knows about. */
