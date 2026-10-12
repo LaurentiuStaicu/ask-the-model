@@ -199,11 +199,12 @@ point_numeric_valid (const AtmSeriesContractPoint *p, GError **error)
     atm_scientific_decimal_free (decimal);
     if (!matches)
         return fail (error, ATM_SERIES_CONTRACT_ERROR_NUMERIC, "Decimal coefficient/exponent mismatch.");
-    if (p->negative_zero) {
-        if (g_strcmp0 (p->coefficient, "0") != 0 || p->exponent != 0 ||
-            p->source_decimal[0] != '-')
-            return fail (error, ATM_SERIES_CONTRACT_ERROR_NUMERIC, "Invalid signed-zero representation.");
-    }
+    gboolean zero_value = g_strcmp0 (p->coefficient, "0") == 0 &&
+                           p->exponent == 0;
+    gboolean source_negative_zero = zero_value && p->source_decimal[0] == '-';
+    if (p->negative_zero != source_negative_zero)
+        return fail (error, ATM_SERIES_CONTRACT_ERROR_NUMERIC,
+                     "Signed-zero flag disagrees with source decimal.");
     return TRUE;
 }
 
