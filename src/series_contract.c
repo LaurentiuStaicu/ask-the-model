@@ -327,7 +327,7 @@ build_qualified_json (const AtmSeriesContract *s, const char *scientific_id, cha
 {
     JsonBuilder *b = json_builder_new ();
     json_builder_begin_object (b);
-    text_member (b, "schema", "atm-verified-series-qualification/1");
+    text_member (b, "schema", ATM_SERIES_CONTRACT_QUALIFICATION_SCHEMA);
     text_member (b, "scientific_content_id", scientific_id);
     text_member (b, "repository_id", s->repository_id);
     text_member (b, "repository_version", s->repository_version);
@@ -511,15 +511,16 @@ atm_series_contract_validate (AtmSeriesContract *s, const AtmSraResult *q, GErro
         return fail (error, ATM_SERIES_CONTRACT_ERROR_IDENTITY, "Caller identity strings are not authoritative.");
     char *scientific_json = NULL;
     if (!build_scientific_json (s, &scientific_json, error)) return FALSE;
-    if (!atm_scientific_content_id_json ("atm.verified-series.v1", scientific_json,
-                                         &s->scientific_content_id, error)) {
+    if (!atm_scientific_content_id_json (ATM_SERIES_CONTRACT_SCIENTIFIC_ID_DOMAIN,
+                                         scientific_json, &s->scientific_content_id, error)) {
         g_free (scientific_json); return FALSE;
     }
     g_free (scientific_json);
     char *qualified_json = NULL;
     if (!build_qualified_json (s, s->scientific_content_id, &qualified_json, error)) return FALSE;
     gboolean ok = atm_scientific_content_id_json (
-        "atm.verified-series.qualification.v1", qualified_json, &s->qualified_series_id, error);
+        ATM_SERIES_CONTRACT_QUALIFIED_ID_DOMAIN, qualified_json,
+        &s->qualified_series_id, error);
     g_free (qualified_json);
     return ok;
 }
