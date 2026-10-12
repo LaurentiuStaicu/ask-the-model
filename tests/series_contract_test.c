@@ -29,8 +29,10 @@ static AtmScientificArtifact *support_artifact (void)
     return a;
 }
 
-static AtmSraResult *qualified_with_artifact_mode (AtmScientificArtifact *a,
-                                                       gboolean qualify_break)
+static AtmSraResult *qualified_with_artifact_mode_profile (
+    AtmScientificArtifact *a,
+    gboolean qualify_break,
+    const char *numeric_profile)
 {
     AtmSraResult *q = atm_sra_result_new (ATM_SRA_ANSWERED);
     GError *error = NULL;
@@ -74,11 +76,18 @@ static AtmSraResult *qualified_with_artifact_mode (AtmScientificArtifact *a,
         q, "atm-profile/ewd/v1@1", &error));
     g_assert_no_error (error);
     g_assert_true (atm_sra_qualification_set_numeric_profile (
-        q, ATM_SERIES_CONTRACT_NUMERIC_PROFILE, &error));
+        q, numeric_profile, &error));
     g_assert_no_error (error);
     g_assert_true (atm_sra_result_finalize (q, &error));
     g_assert_no_error (error);
     return q;
+}
+
+static AtmSraResult *
+qualified_with_artifact_mode (AtmScientificArtifact *a, gboolean qualify_break)
+{
+    return qualified_with_artifact_mode_profile (
+        a, qualify_break, ATM_SERIES_CONTRACT_NUMERIC_PROFILE);
 }
 
 static AtmSraResult *qualified_with_artifact (AtmScientificArtifact *a)
@@ -351,6 +360,38 @@ static void test_duplicate_x_rejected (void)
     g_assert_error (error, ATM_SERIES_CONTRACT_ERROR,
                     ATM_SERIES_CONTRACT_ERROR_ORDER);
     g_clear_error (&error);
+    atm_series_contract_free (s);
+    atm_sra_result_free (q);
+    atm_scientific_artifact_free (a);
+}
+
+static void
+test_sra_numeric_profile_must_match_contract (void)
+{
+    AtmScientificArtifact *a = support_artifact ();
+    AtmSraResult *q = qualified_with_artifact_mode_profile (
+        a, FALSE, "binary64_roundtrip/1");
+    AtmSeriesContract *s = base ();
+    const char *support[] = { a->qualified_artifact_id };
+    GError *error = NULL;
+
+    g_assert_true (atm_sra_result_validate (q, &error));
+    g_assert_no_error (error);
+
+    g_assert_true (atm_series_contract_add_point (
+        s, "1880", ATM_SERIES_Y_NUMERIC, "1.0000", "1", 0, FALSE,
+        FALSE, NULL, NULL, support, 1, &error));
+    g_assert_no_error (error);
+
+    /* The SRA is internally valid, but it declares a numeric interpretation
+     * the exact-decimal series contract must not silently reinterpret. */
+    g_assert_false (atm_series_contract_validate (s, q, &error));
+    g_assert_error (error, ATM_SERIES_CONTRACT_ERROR,
+                    ATM_SERIES_CONTRACT_ERROR_NUMERIC);
+    g_assert_nonnull (g_strstr_len (error->message, -1,
+        "SRA numeric profile does not match series contract numeric profile"));
+    g_clear_error (&error);
+
     atm_series_contract_free (s);
     atm_sra_result_free (q);
     atm_scientific_artifact_free (a);
@@ -904,6 +945,8 @@ int main (int argc, char **argv)
     g_test_add_func ("/series-contract/duplicate-x", test_duplicate_x_rejected);
     g_test_add_func ("/series-contract/support", test_unqualified_support_rejected);
     g_test_add_func ("/series-contract/fact-binding", test_numeric_point_must_match_sra_fact);
+    g_test_add_func ("/series-contract/sra-numeric-profile",
+                     test_sra_numeric_profile_must_match_contract);
     g_test_add_func ("/series-contract/missing-point-fact-binding", test_missing_point_must_match_sra_fact);
     g_test_add_func ("/series-contract/direct-epistemic-status-binding", test_epistemic_status_must_match_sra_fact);
     g_test_add_func ("/series-contract/calendar-year-dimension", test_calendar_year_dimension_must_be_time);
