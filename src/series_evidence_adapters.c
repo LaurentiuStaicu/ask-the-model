@@ -300,11 +300,13 @@ energy_point_payload (gconstpointer admission, guint index)
         atm_energy_institute_admission_candidate (a);
     JsonBuilder *b = json_builder_new ();
     json_builder_begin_object (b);
-    add_string (b, "schema", "atm-energy-institute-annual-observation/1");
+    add_string (b, "schema", "atm-energy-institute-annual-observation/2");
     add_text (b, "dataset", atm_energy_institute_admission_dataset (a));
     add_text (b, "geography", atm_energy_institute_admission_geography (a));
     add_text (b, "subject", atm_energy_institute_admission_subject (a));
     add_text (b, "attribute", atm_energy_institute_admission_attribute (a));
+    add_text (b, "energy_accounting_method",
+              atm_energy_institute_admission_accounting_method (a));
     add_text (b, "x_semantics", atm_energy_institute_admission_x_semantics (a));
     char *year = uint_payload_value (atm_energy_institute_candidate_year (c, index));
     add_string (b, "calendar_year", year);
@@ -328,7 +330,7 @@ energy_point_payload (gconstpointer admission, guint index)
 
 const AtmSeriesEvidenceDescriptor ATM_EI_EVIDENCE_DESCRIPTOR = {
     .profile_id = ATM_EI_EVIDENCE_PROFILE,
-    .profile_version = "1",
+    .profile_version = "2",
     .repository_id = "ewd",
     .source_count = ATM_EI_SOURCE_COUNT,
     .evidence_count = ATM_EI_EVIDENCE_COUNT,
@@ -338,12 +340,12 @@ const AtmSeriesEvidenceDescriptor ATM_EI_EVIDENCE_DESCRIPTOR = {
     .point_logical_prefix = "ewd:energy-institute-annual:",
     .source_payload_schema = "atm-energy-institute-source-binding/1",
     .source_semantic_type = "ewd.energy_institute_source_binding",
-    .point_payload_schema = "atm-energy-institute-annual-observation/1",
-    .point_semantic_type = "ewd.energy_institute_annual_observation",
-    /* Column spelling is fixed by the admitted CSV dialect. */
+    .point_payload_schema = "atm-energy-institute-annual-observation/2",
+    .point_semantic_type = "ewd.energy_institute_total_energy_supply_observation",
+    /* Preserve the pinned EWD column spelling even though its metric name is legacy. */
     .point_locator_columns = "year,total_primary_energy_ej",
     .canonical_obligation = NULL, /* TODO(F0-19): SRA qualification is gated */
-    .semantic_profile = ATM_EI_EVIDENCE_PROFILE "@1",
+    .semantic_profile = ATM_EI_EVIDENCE_PROFILE "@2",
     .limitations = ATM_EI_LIMITATIONS,
     .admission_rebuild = energy_rebuild,
     .admission_free = energy_free,
