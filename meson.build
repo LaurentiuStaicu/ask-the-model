@@ -81,6 +81,8 @@ executable(
     'src/ControlRepositoryState.vala',
     'src/ConversationStoreNative.vapi',
     'src/ConversationPersistenceStore.vala',
+    'src/PublicationBarrier.vala',
+    'src/publication_barrier.c',
     'src/ConversationExport.vala',
     'src/StartupQualificationRecord.vala',
     'src/StartupQualificationNative.vapi',
@@ -461,6 +463,8 @@ conversation_persistence_store_test = executable(
   [
     'src/ConversationStoreNative.vapi',
     'src/ConversationPersistenceStore.vala',
+    'src/PublicationBarrier.vala',
+    'src/publication_barrier.c',
     'src/ConversationExport.vala',
     'src/OllamaProvider.vala',
     'src/TurnGuardNative.vapi',
@@ -518,6 +522,8 @@ repository_gc_durable_roots_test = executable(
     'src/ControlRepositoryState.vala',
     'src/ConversationStoreNative.vapi',
     'src/ConversationPersistenceStore.vala',
+    'src/PublicationBarrier.vala',
+    'src/publication_barrier.c',
     'src/ConversationExport.vala',
     'src/OllamaProvider.vala',
     'src/TurnGuardNative.vapi',
@@ -567,6 +573,8 @@ repository_gc_isolation_orchestrator_test = executable(
     'src/ControlRepositoryState.vala',
     'src/ConversationStoreNative.vapi',
     'src/ConversationPersistenceStore.vala',
+    'src/PublicationBarrier.vala',
+    'src/publication_barrier.c',
     'src/ConversationExport.vala',
     'src/OllamaProvider.vala',
     'src/TurnGuardNative.vapi',
@@ -618,6 +626,8 @@ repository_gc_purge_orchestrator_test = executable(
     'src/ControlRepositoryState.vala',
     'src/ConversationStoreNative.vapi',
     'src/ConversationPersistenceStore.vala',
+    'src/PublicationBarrier.vala',
+    'src/publication_barrier.c',
     'src/ConversationExport.vala',
     'src/OllamaProvider.vala',
     'src/TurnGuardNative.vapi',
@@ -2033,6 +2043,8 @@ grounded_turn_commit_protocol_test = executable(
     'src/ConversationSession.vala',
     'src/ConversationStoreNative.vapi',
     'src/ConversationPersistenceStore.vala',
+    'src/PublicationBarrier.vala',
+    'src/publication_barrier.c',
     'src/ConversationExport.vala',
     'src/OllamaProvider.vala',
     'src/TurnGuardNative.vapi',
@@ -2093,6 +2105,8 @@ repository_lifecycle_service_test = executable(
     'src/ControlRepositoryState.vala',
     'src/ConversationStoreNative.vapi',
     'src/ConversationPersistenceStore.vala',
+    'src/PublicationBarrier.vala',
+    'src/publication_barrier.c',
     'src/ConversationExport.vala',
     'src/OllamaProvider.vala',
     'src/TurnGuardNative.vapi',
@@ -2180,6 +2194,8 @@ repository_lifecycle_durability_fault_test = executable(
     'src/ControlRepositoryState.vala',
     'src/ConversationStoreNative.vapi',
     'src/ConversationPersistenceStore.vala',
+    'src/PublicationBarrier.vala',
+    'src/publication_barrier.c',
     'src/ConversationExport.vala',
     'src/OllamaProvider.vala',
     'src/TurnGuardNative.vapi',
@@ -2895,3 +2911,17 @@ verified_series_contract_test = executable(
 )
 test('verified-series-contract', verified_series_contract_test,
   env: {'ATM_CHART01_FIXTURE': meson.current_source_dir() / 'tests/fixtures/chart01'})
+
+# ---------------------------------------------------------------------------
+# M11: publication barrier state-machine qualification.
+# ---------------------------------------------------------------------------
+
+publication_barrier_test = executable(
+  'publication-barrier-test',
+  ['src/publication_barrier.c',
+   'tests/publication_barrier_test.c'],
+  include_directories: include_directories('src'),
+  dependencies: [glib_dep],
+  install: false
+)
+test('publication-barrier', publication_barrier_test)
