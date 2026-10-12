@@ -863,42 +863,42 @@ test_post_finalize_mutation_breaks_validation (void)
         atm_sra_result_new (ATM_SRA_ANSWERED);
 
     qualify_base (result, pair.a, NULL);
+    AtmSraEstablishedFact *fact = atm_sra_established_fact_new (
+        "fact", "categorical", "subject", "attribute", "one", NULL, NULL,
+        "{\"scenario\":\"original\"}");
+    g_assert_nonnull (fact);
     g_assert_true (
-        atm_sra_result_add_fact (
-            result,
-            new_fact ("fact", "one", pair.a->qualified_artifact_id),
-            &error
-        )
-    );
+        atm_sra_fact_add_support (fact, pair.a->qualified_artifact_id, &error));
     g_assert_no_error (error);
-    g_assert_true (
-        atm_sra_result_finalize (
-            result,
-            &error
-        )
-    );
+    g_assert_true (atm_sra_result_add_fact (result, fact, &error));
+    g_assert_no_error (error);
+    g_assert_true (atm_sra_result_finalize (result, &error));
     g_assert_no_error (error);
 
-    AtmSraEstablishedFact *fact =
-        g_ptr_array_index (
-            result->established_facts,
-            0
-        );
-    g_free (fact->value);
+    char *original_value = fact->value;
     fact->value = g_strdup ("tampered");
-
-    g_assert_false (
-        atm_sra_result_validate (
-            result,
-            &error
-        )
-    );
-    g_assert_error (
-        error,
-        ATM_SRA_ERROR,
-        ATM_SRA_ERROR_IDENTITY
-    );
+    g_assert_false (atm_sra_result_validate (result, &error));
+    g_assert_error (error, ATM_SRA_ERROR, ATM_SRA_ERROR_IDENTITY);
     g_clear_error (&error);
+    g_free (fact->value);
+    fact->value = original_value;
+    g_assert_true (atm_sra_result_validate (result, &error));
+    g_assert_no_error (error);
+
+    /* The fact's current qualifiers are read by series consumers, while the
+     * SRA content ID uses qualifiers_content_id. A post-finalize JSON mutation
+     * must therefore be caught by recomputing the qualifier digest. */
+    char *original_qualifiers = fact->qualifiers_json;
+    fact->qualifiers_json = g_strdup ("{\"scenario\":\"tampered\"}");
+    g_assert_false (atm_sra_result_validate (result, &error));
+    g_assert_error (error, ATM_SRA_ERROR, ATM_SRA_ERROR_IDENTITY);
+    g_assert_nonnull (g_strstr_len (error->message, -1,
+        "SRA fact qualifiers disagree with their canonical qualifier identity"));
+    g_clear_error (&error);
+    g_free (fact->qualifiers_json);
+    fact->qualifiers_json = original_qualifiers;
+    g_assert_true (atm_sra_result_validate (result, &error));
+    g_assert_no_error (error);
 
     atm_sra_result_free (result);
     artifact_pair_clear (&pair);
