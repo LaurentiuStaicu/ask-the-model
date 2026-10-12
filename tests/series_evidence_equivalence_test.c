@@ -327,7 +327,8 @@ test_descriptor_shape (void)
                     "ewd.energy_institute_total_energy_supply_observation");
     g_assert_cmpstr (ATM_EI_EVIDENCE_DESCRIPTOR.semantic_profile, ==,
                     ATM_EI_EVIDENCE_PROFILE "@2");
-    g_assert_null (ATM_EI_EVIDENCE_DESCRIPTOR.canonical_obligation);
+    g_assert_cmpstr (ATM_EI_EVIDENCE_DESCRIPTOR.canonical_obligation, ==,
+                    "atm-energy-institute-ewd-tes-pinned-snapshot-reconstruction/1");
     g_assert_nonnull (ATM_GISTEMP_EVIDENCE_DESCRIPTOR.canonical_obligation);
     g_assert_cmpuint (ATM_GISTEMP_EVIDENCE_DESCRIPTOR.evidence_count, ==, 150u);
     g_assert_cmpuint (ATM_GISTEMP_EVIDENCE_DESCRIPTOR.source_count, ==, 4u);
