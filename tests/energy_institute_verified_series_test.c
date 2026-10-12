@@ -65,14 +65,12 @@ build_series (void)
 }
 
 static void
-assert_rejected_then_restored (AtmEnergyInstituteVerifiedSeries *series)
+assert_rejected (AtmEnergyInstituteVerifiedSeries *series)
 {
     GError *error = NULL;
     g_assert_false (atm_energy_institute_verified_series_validate (series, &error));
     g_assert_nonnull (error);
     g_clear_error (&error);
-    g_assert_true (atm_energy_institute_verified_series_validate (series, &error));
-    g_assert_no_error (error);
 }
 
 static void
@@ -235,9 +233,10 @@ test_material_mutations_fail_reconstruction (void)
 
     char *original_profile = contract->profile_id;
     contract->profile_id = g_strdup ("atm-series/unreviewed/1");
-    assert_rejected_then_restored (series);
+    assert_rejected (series);
     g_free (contract->profile_id);
     contract->profile_id = original_profile;
+    g_assert_true (atm_energy_institute_verified_series_validate (series, NULL));
 
     char *qualified_id = (char *) atm_series_contract_qualified_id (contract);
     char original_char = qualified_id[0];
