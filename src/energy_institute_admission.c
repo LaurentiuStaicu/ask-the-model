@@ -95,9 +95,11 @@ const char *atm_energy_institute_admission_geography (const AtmEnergyInstituteAd
 const char *atm_energy_institute_admission_dataset (const AtmEnergyInstituteAdmission *a)
 { return a != NULL ? "Statistical Review of World Energy 2026" : NULL; }
 const char *atm_energy_institute_admission_subject (const AtmEnergyInstituteAdmission *a)
-{ return a != NULL ? "global_primary_energy_supply" : NULL; }
+{ return a != NULL ? "global_total_energy_supply" : NULL; }
 const char *atm_energy_institute_admission_attribute (const AtmEnergyInstituteAdmission *a)
-{ return a != NULL ? "total_primary_energy" : NULL; }
+{ return a != NULL ? "total_energy_supply" : NULL; }
+const char *atm_energy_institute_admission_accounting_method (const AtmEnergyInstituteAdmission *a)
+{ return a != NULL ? "physical_energy_content" : NULL; }
 const char *atm_energy_institute_admission_epistemic_status (const AtmEnergyInstituteAdmission *a)
 { return a != NULL ? "empirical" : NULL; }
 const char *atm_energy_institute_admission_x_semantics (const AtmEnergyInstituteAdmission *a)
