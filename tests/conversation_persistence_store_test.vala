@@ -1179,6 +1179,135 @@ test_unarchived_conversations_are_discarded_on_reopen ()
 }
 
 private static void
+test_unarchived_row_retained_when_export_reconciliation_fails ()
+{
+    string root = new_temp_root ();
+    string conversation_id = "";
+    string export_root = "";
+
+    try {
+        {
+            var first_store =
+                new AskTheModel.ConversationPersistenceStore (
+                    root
+                );
+            export_root = first_store.export_root;
+            conversation_id =
+                first_store.create_conversation (
+                    "Retain on export cleanup failure",
+                    450,
+                    "model-temporary",
+                    null,
+                    0,
+                    {}
+                );
+            assert (
+                first_store.commit_turn (
+                    conversation_id,
+                    "temporary",
+                    "answer",
+                    "answer",
+                    false,
+                    451,
+                    {}
+                ) == 0
+            );
+        }
+
+        string export_path =
+            GLib.Path.build_filename (
+                export_root,
+                "%s.json".printf (
+                    conversation_id
+                )
+            );
+        assert (GLib.DirUtils.create (export_path, 0700) == 0);
+        string blocker =
+            GLib.Path.build_filename (
+                export_path,
+                "blocker"
+            );
+        GLib.FileUtils.set_contents (
+            blocker,
+            "block"
+        );
+
+        /* The stale export path cannot be removed. The SQLite row must survive
+         * this startup rather than losing the last recoverable conversation.
+         * GLib makes unexpected warnings fatal inside tests, so expect the four
+         * warnings emitted by the two guarded cleanup attempts below. */
+        Test.expect_message (
+            null,
+            GLib.LogLevelFlags.LEVEL_WARNING,
+            "*AtM: automatic conversation export could not be synchronized for *"
+        );
+        Test.expect_message (
+            null,
+            GLib.LogLevelFlags.LEVEL_WARNING,
+            "*AtM: discard decision could not be evaluated for *"
+        );
+        Test.expect_message (
+            null,
+            GLib.LogLevelFlags.LEVEL_WARNING,
+            "*AtM: retaining unarchived conversation * because export reconciliation failed or is unknown*"
+        );
+        Test.expect_message (
+            null,
+            GLib.LogLevelFlags.LEVEL_WARNING,
+            "*AtM: retaining unarchived conversation * because export reconciliation failed:*"
+        );
+        Test.expect_message (
+            null,
+            GLib.LogLevelFlags.LEVEL_WARNING,
+            "*AtM: discard decision could not be evaluated for *"
+        );
+        Test.expect_message (
+            null,
+            GLib.LogLevelFlags.LEVEL_WARNING,
+            "*AtM: retaining unarchived conversation * because export reconciliation is not qualified*"
+        );
+        {
+            var reopened_store =
+                new AskTheModel.ConversationPersistenceStore (
+                    root
+                );
+
+            /* Application calls this public cleanup again after restore; it
+             * must revalidate instead of bypassing the constructor's barrier. */
+            reopened_store.discard_unarchived_conversations ();
+            Test.assert_expected_messages ();
+
+            bool found = false;
+            foreach (
+                AskTheModel.ConversationPersistenceSummary summary
+                in reopened_store.list_conversations ()
+            ) {
+                if (summary.conversation_id == conversation_id) {
+                    found = true;
+                }
+            }
+            assert (found);
+            assert (GLib.FileUtils.test (export_path, GLib.FileTest.IS_DIR));
+        }
+
+        assert (GLib.FileUtils.remove (blocker) == 0);
+        assert (GLib.DirUtils.remove (export_path) == 0);
+
+        /* Once reconciliation succeeds, normal working-row cleanup resumes. */
+        {
+            var recovered_store =
+                new AskTheModel.ConversationPersistenceStore (
+                    root
+                );
+            assert (recovered_store.list_conversations ().length == 0);
+        }
+    } catch (Error error) {
+        critical ("%s", error.message);
+        assert_not_reached ();
+    }
+}
+
+private static void
 test_permanent_delete_fails_closed_when_export_cannot_be_removed ()
 {
     string root = new_temp_root ();
@@ -1299,6 +1428,10 @@ main (string[] args)
     Test.add_func (
         "/conversation-persistence/unarchived-discard-on-reopen",
         test_unarchived_conversations_are_discarded_on_reopen
+    );
+    Test.add_func (
+        "/conversation-persistence/unarchived-retained-on-export-failure",
+        test_unarchived_row_retained_when_export_reconciliation_fails
     );
     Test.add_func (
         "/conversation-persistence/permanent-delete-export-fail-closed",
