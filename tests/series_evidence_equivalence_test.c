@@ -28,6 +28,8 @@
 #include <json-glib/json-glib.h>
 
 #include "series_evidence_adapters.h"
+#include "annual_series_candidate.h"
+#include "energy_institute_candidate.h"
 #include "gistemp_admission.h"
 #include "gistemp_evidence.h"
 #include "energy_institute_admission.h"
