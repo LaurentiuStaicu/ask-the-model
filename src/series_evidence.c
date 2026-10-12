@@ -10,9 +10,10 @@
  * differed between them is a descriptor field. The collection logic, the
  * payload plumbing and the reconstruction-comparison validation are shared.
  *
- * The point series is read through the existing AtmAnnualSeriesCandidate
- * abstraction, which both admitted sources already implement. No GISTEMP type
- * and no source-specific header appears in this file or in its header.
+ * Point access is provided by typed descriptor callbacks implemented beside
+ * each source's admission API. The shared layer neither sees nor casts concrete
+ * candidate types, while the original decimal token remains available from the
+ * owned, reconstructed admission.
  */
 
 struct AtmSeriesEvidence {
