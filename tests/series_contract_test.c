@@ -230,6 +230,42 @@ qualified_with_two_artifacts (AtmScientificArtifact *a, AtmScientificArtifact *b
     return q;
 }
 
+static AtmSraResult *
+qualified_with_numeric_fact_missing_reason (AtmScientificArtifact *a)
+{
+    AtmSraResult *q = atm_sra_result_new (ATM_SRA_ANSWERED);
+    GError *error = NULL;
+    AtmSraEstablishedFact *fact = atm_sra_established_fact_new (
+        "fact-numeric-with-missing-reason", "observation", "subject",
+        "attribute", "1e0", "unit", "dimension",
+        "{\"calendar_year\":\"1880\",\"scenario\":\"baseline\","
+        "\"epistemic_status\":\"observed\",\"y_status\":\"NUMERIC\","
+        "\"missing_reason\":\"source_missing\"}");
+
+    g_assert_nonnull (fact);
+    g_assert_true (atm_sra_fact_add_support (fact, a->qualified_artifact_id, &error));
+    g_assert_no_error (error);
+    g_assert_true (atm_sra_result_add_fact (q, fact, &error));
+    g_assert_no_error (error);
+    g_assert_true (atm_sra_qualification_add_canonical_obligation (q, "atm-sra/1", &error));
+    g_assert_no_error (error);
+    char *snapshot = g_strdup_printf ("ewd@0.1.0#%s", SHA);
+    g_assert_true (atm_sra_qualification_add_repository_snapshot (q, snapshot, &error));
+    g_free (snapshot);
+    g_assert_no_error (error);
+    g_assert_true (atm_sra_qualification_add_evidence_artifact (q, a, &error));
+    g_assert_no_error (error);
+    g_assert_true (atm_sra_qualification_add_semantic_profile (
+        q, "atm-profile/ewd/v1@1", &error));
+    g_assert_no_error (error);
+    g_assert_true (atm_sra_qualification_set_numeric_profile (
+        q, ATM_SERIES_CONTRACT_NUMERIC_PROFILE, &error));
+    g_assert_no_error (error);
+    g_assert_true (atm_sra_result_finalize (q, &error));
+    g_assert_no_error (error);
+    return q;
+}
+
 static AtmSeriesContract *base (void)
 {
     GError *error = NULL;
@@ -516,6 +552,35 @@ static void test_direct_time_scope_must_enclose_points (void)
     g_assert_false (atm_series_contract_validate (s, q, &error));
     g_assert_error (error, ATM_SERIES_CONTRACT_ERROR,
                     ATM_SERIES_CONTRACT_ERROR_SHAPE);
+    g_clear_error (&error);
+
+    atm_series_contract_free (s);
+    atm_sra_result_free (q);
+    atm_scientific_artifact_free (a);
+}
+
+static void
+test_numeric_fact_rejects_missing_reason (void)
+{
+    AtmScientificArtifact *a = support_artifact ();
+    AtmSraResult *q = qualified_with_numeric_fact_missing_reason (a);
+    AtmSeriesContract *s = base ();
+    const char *support[] = { a->qualified_artifact_id };
+    GError *error = NULL;
+
+    g_assert_true (atm_series_contract_add_point (
+        s, "1880", ATM_SERIES_Y_NUMERIC, "1.0000", "1", 0, FALSE,
+        FALSE, NULL, NULL, support, 1, &error));
+    g_assert_no_error (error);
+
+    /* The SRA object is internally finalized, but its fact contradicts its
+     * own NUMERIC status by also declaring a missing reason. The series must
+     * not treat that contradictory qualifier as harmless extra metadata. */
+    g_assert_false (atm_series_contract_validate (s, q, &error));
+    g_assert_error (error, ATM_SERIES_CONTRACT_ERROR,
+                    ATM_SERIES_CONTRACT_ERROR_SHAPE);
+    g_assert_nonnull (g_strstr_len (error->message, -1,
+                                    "Numeric point does not match an established SRA fact"));
     g_clear_error (&error);
 
     atm_series_contract_free (s);
@@ -922,6 +987,8 @@ int main (int argc, char **argv)
     g_test_add_func ("/series-contract/support", test_unqualified_support_rejected);
     g_test_add_func ("/series-contract/fact-binding", test_numeric_point_must_match_sra_fact);
     g_test_add_func ("/series-contract/missing-point-fact-binding", test_missing_point_must_match_sra_fact);
+    g_test_add_func ("/series-contract/numeric-fact-no-missing-reason",
+                     test_numeric_fact_rejects_missing_reason);
     g_test_add_func ("/series-contract/direct-epistemic-status-binding", test_epistemic_status_must_match_sra_fact);
     g_test_add_func ("/series-contract/calendar-year-dimension", test_calendar_year_dimension_must_be_time);
     g_test_add_func ("/series-contract/direct-scenario-binding", test_direct_scenario_must_match_sra_fact);
