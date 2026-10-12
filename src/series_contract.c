@@ -709,8 +709,10 @@ atm_series_contract_validate (AtmSeriesContract *s, const AtmSraResult *q, GErro
         } else if (p->y_status == ATM_SERIES_Y_MISSING) {
             if (!bounded (p->missing_reason, ATM_SERIES_CONTRACT_MAX_TEXT))
                 return fail (error, ATM_SERIES_CONTRACT_ERROR_SHAPE, "MISSING requires a bounded reason.");
-            if (p->source_decimal != NULL || p->coefficient != NULL || p->negative_zero)
-                return fail (error, ATM_SERIES_CONTRACT_ERROR_NUMERIC, "MISSING cannot carry numeric value.");
+            if (p->source_decimal != NULL || p->coefficient != NULL ||
+                p->exponent != 0 || p->negative_zero)
+                return fail (error, ATM_SERIES_CONTRACT_ERROR_NUMERIC,
+                             "MISSING cannot carry numeric value or exponent.");
             missing++;
         } else {
             return fail (error, ATM_SERIES_CONTRACT_ERROR_SHAPE, "Unknown Y status.");
