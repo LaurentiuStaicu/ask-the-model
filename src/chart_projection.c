@@ -74,6 +74,10 @@ _atm_chart_projection_ei_decimal_micro (const char *coefficient,
 
     guint64 micro = 0;
     if (exponent == -7) {
+        /* Check the source value before quantization so rounding cannot admit
+         * an exact value just above 1000 EJ/year. */
+        if (value > G_GUINT64_CONSTANT (10000000000))
+            return reject (error, "EI source decimal exceeds 1000 EJ/year.");
         micro = value / 10 + ((value % 10) >= 5 ? 1u : 0u);
     } else {
         for (gint64 i = 0; i < exponent + 6; i++) {
