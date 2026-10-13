@@ -260,7 +260,12 @@ gboolean atm_chart_view_new (const AtmChartSpec *spec, AtmChartView **out, GErro
     gtk_drawing_area_set_content_height (self->area, 348);
     gtk_widget_set_hexpand (GTK_WIDGET (self->area), TRUE); gtk_widget_set_vexpand (GTK_WIDGET (self->area), TRUE);
     gtk_widget_set_focusable (GTK_WIDGET (self->area), TRUE);
-    accessible (GTK_WIDGET (self->area), "Global annual temperature anomaly chart", "Exact observations and provenance are in Data.");
+    accessible (GTK_WIDGET (self->area),
+        is_ei ? "Energy Institute global total energy supply chart"
+              : "Global annual temperature anomaly chart",
+        is_ei
+            ? "Exact TES observations and source provenance are in Data."
+            : "Exact observations and provenance are in Data.");
     gtk_drawing_area_set_draw_func (self->area, draw, self, NULL);
     g_signal_connect (self->area, "resize", G_CALLBACK (resize), self);
     g_signal_connect (self->area, "notify::scale-factor", G_CALLBACK (scale_changed), self);
