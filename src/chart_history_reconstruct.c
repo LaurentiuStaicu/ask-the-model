@@ -2,6 +2,8 @@
 #include "gistemp_admission.h"
 #include "verified_series.h"
 #include "verified_series_contract.h"
+#include "energy_institute_admission.h"
+#include "energy_institute_verified_series.h"
 #include <gio/gio.h>
 #include <string.h>
 
@@ -346,6 +348,184 @@ cleanup:
     return ok;
 }
 
+
+
+
+gboolean
+atm_chart_history_reconstruct_energy_institute (
+    const char *snapshot_path,
+    const char *repository_id,
+    const char *repository_version,
+    const char *snapshot_sha,
+    const char *chart_schema,
+    const char *chart_spec_id,
+    const char *chart_kind,
+    const char *reconstruction_profile,
+    const char *series_profile,
+    const char *admission_profile,
+    const char *scientific_id,
+    const char *qualified_id,
+    const char *source_path,
+    AtmChartSpec **out,
+    GError **error
+)
+{
+    static const char *expected_repository =
+        "LaurentiuStaicu/empirical-world3-dynamics";
+    static const char *expected_repository_key = "ewd";
+    static const char *expected_snapshot_initial =
+        "d9e249339663015f6d1c05752338a955bf64ad0b";
+    static const char *expected_snapshot_current =
+        "dc710d8e604c0fff713a3acfdb18ab47a1a902bb";
+    static const char *expected_reconstruction =
+        "atm-chart-reconstruct/energy-institute-tes-complete-annual/1";
+    static const char *expected_source =
+        "science/data/processed/energy_institute_global_2026.csv";
+    static const char *source_paths[ATM_EI_SOURCE_COUNT] = {
+        "science/data/processed/energy_institute_global_2026.csv",
+        "science/data/processed/energy_institute_global_2026.provenance.json",
+        "science/data/input_manifest.json",
+        "science/data/registry.csv"
+    };
+
+    GBytes *sources[ATM_EI_SOURCE_COUNT] = { NULL, NULL, NULL, NULL };
+    AtmEnergyInstituteAdmission *admission = NULL;
+    AtmEnergyInstituteVerifiedSeries *series = NULL;
+    AtmChartSpec *spec = NULL;
+    AtmChartKind kind;
+    const char *admission_repository = NULL;
+    char *expected_repository_version = NULL;
+    gboolean ok = FALSE;
+
+    g_return_val_if_fail (out != NULL && *out == NULL, FALSE);
+
+    if (snapshot_path == NULL ||
+        repository_id == NULL ||
+        repository_version == NULL ||
+        snapshot_sha == NULL ||
+        chart_schema == NULL ||
+        chart_spec_id == NULL ||
+        chart_kind == NULL ||
+        reconstruction_profile == NULL ||
+        series_profile == NULL ||
+        admission_profile == NULL ||
+        scientific_id == NULL ||
+        qualified_id == NULL ||
+        source_path == NULL) {
+        return reject (error,
+            "Incomplete persisted Energy Institute chart reconstruction recipe.");
+    }
+
+    if ((g_strcmp0 (repository_id, expected_repository_key) != 0 &&
+         g_strcmp0 (repository_id, expected_repository) != 0) ||
+        (g_strcmp0 (snapshot_sha, expected_snapshot_initial) != 0 &&
+         g_strcmp0 (snapshot_sha, expected_snapshot_current) != 0)) {
+        return reject (error,
+            "Persisted Energy Institute repository identity or snapshot is not admitted.");
+    }
+
+    /* The store persists the canonical repository key; the admission contract
+     * binds the immutable EWD repository identity. EI's v4 tuple additionally
+     * requires repository_version to be exactly snapshot:<snapshot_sha>. */
+    admission_repository =
+        g_strcmp0 (repository_id, expected_repository_key) == 0
+            ? expected_repository
+            : repository_id;
+    expected_repository_version =
+        g_strconcat ("snapshot:", snapshot_sha, NULL);
+
+    if (g_strcmp0 (repository_version, expected_repository_version) != 0 ||
+        g_strcmp0 (chart_schema, ATM_CHART_SPEC_V2_SCHEMA) != 0 ||
+        g_strcmp0 (series_profile, ATM_EI_VERIFIED_SERIES_PROFILE) != 0 ||
+        g_strcmp0 (admission_profile, ATM_EI_ADMISSION_PROFILE) != 0 ||
+        g_strcmp0 (reconstruction_profile, expected_reconstruction) != 0 ||
+        g_strcmp0 (source_path, expected_source) != 0) {
+        g_free (expected_repository_version);
+        return reject (error,
+            "Persisted Energy Institute chart reconstruction profile is not admitted.");
+    }
+    g_free (expected_repository_version);
+
+    if (!chart_kind_from_text (chart_kind, &kind, error))
+        return FALSE;
+
+    for (guint i = 0; i < ATM_EI_SOURCE_COUNT; i++) {
+        if (!read_source (snapshot_path, source_paths[i], &sources[i], error))
+            goto cleanup;
+    }
+
+    if (!atm_energy_institute_admission_new (
+            admission_repository,
+            snapshot_sha,
+            sources,
+            &admission,
+            error))
+        goto cleanup;
+
+    if (!atm_energy_institute_verified_series_from_admission (
+            admission,
+            &series,
+            error))
+        goto cleanup;
+
+    /* Reconstruct the complete source-bound chain from the pinned bytes.
+     * The opaque EI series constructor rebuilds admission, Evidence, finalized
+     * SRA and all 61 source points before ChartSpec v2 can be created. */
+    if (g_strcmp0 (
+            atm_energy_institute_admission_repository (admission),
+            expected_repository) != 0 ||
+        g_strcmp0 (
+            atm_energy_institute_admission_snapshot (admission),
+            snapshot_sha) != 0 ||
+        g_strcmp0 (
+            atm_energy_institute_admission_source_path (admission, 0),
+            source_path) != 0 ||
+        g_strcmp0 (
+            atm_energy_institute_verified_series_scientific_id (series),
+            scientific_id) != 0 ||
+        g_strcmp0 (
+            atm_energy_institute_verified_series_qualified_id (series),
+            qualified_id) != 0) {
+        reject (error,
+            "Persisted Energy Institute series identities disagree with rebuilt source.");
+        goto cleanup;
+    }
+
+    if (!atm_chart_spec_new_energy_institute_v2 (
+            kind,
+            series,
+            &spec,
+            error))
+        goto cleanup;
+
+    if (g_strcmp0 (atm_chart_spec_schema (spec), chart_schema) != 0 ||
+        g_strcmp0 (atm_chart_spec_id (spec), chart_spec_id) != 0 ||
+        g_strcmp0 (atm_chart_spec_series_profile (spec),
+                   ATM_EI_VERIFIED_SERIES_PROFILE) != 0 ||
+        g_strcmp0 (atm_chart_spec_series_scientific_id (spec, 0),
+                   scientific_id) != 0 ||
+        g_strcmp0 (atm_chart_spec_series_qualified_id (spec, 0),
+                   qualified_id) != 0 ||
+        g_strcmp0 (
+            atm_energy_institute_admission_source_path (admission, 0),
+            source_path) != 0) {
+        reject (error,
+            "Persisted Energy Institute ChartSpec identity disagrees with rebuilt source.");
+        goto cleanup;
+    }
+
+    *out = spec;
+    spec = NULL;
+    ok = TRUE;
+
+cleanup:
+    atm_chart_spec_free (spec);
+    atm_energy_institute_verified_series_free (series);
+    atm_energy_institute_admission_free (admission);
+    for (guint i = 0; i < ATM_EI_SOURCE_COUNT; i++)
+        g_clear_pointer (&sources[i], g_bytes_unref);
+    return ok;
+}
 
 gboolean
 atm_chart_live_reconstruct_gistemp (

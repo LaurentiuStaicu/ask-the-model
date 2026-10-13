@@ -799,6 +799,23 @@
       "tested_by": [
         "meson:conversation-store"
       ]
+    }, 
+    {
+      "id": "SCIENTIFIC-S1-009",
+      "category": "SCIENTIFIC",
+      "severity": "S1",
+      "lifecycle": "enforced",
+      "statement": "An Energy Institute TES ChartSpec v2 History recipe may be reconstructed only by re-reading and admitting the complete four-file bundle at one of the two approved EWD snapshots, binding repository_version to snapshot:<snapshot_sha>, and rebuilding Evidence, finalized SRA, the 61-point source-bound series and ChartSpec v2. The reconstructed chart, scientific-series and qualified-series identities must equal the persisted recipe, and schema/reconstruction/series/admission/source/version/snapshot mismatches fail closed. Persisted points, display coordinates and model output are never numeric authority. This native reconstruction entry point does not itself enable application History dispatch or rendering.",
+      "enforced_by": [
+        "src/chart_history_reconstruct.c",
+        "src/energy_institute_admission.c",
+        "src/energy_institute_verified_series.c",
+        "src/chart_spec.c"
+      ],
+      "tested_by": [
+        "meson:chart-history-reconstruct"
+      ]
     }
+
   ]
 }

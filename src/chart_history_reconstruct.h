@@ -25,6 +25,28 @@ gboolean atm_chart_history_reconstruct_gistemp (
 );
 
 
+/* Reconstruct a persisted qualified Energy Institute TES v2 chart from the
+ * exact four-file bundle at the conversation's pinned EWD snapshot. Source
+ * admission, Evidence/SRA/series identity and ChartSpec v2 are rebuilt; no
+ * stored numeric points, display coordinates or model output are trusted. */
+gboolean atm_chart_history_reconstruct_energy_institute (
+    const char *snapshot_path,
+    const char *repository_id,
+    const char *repository_version,
+    const char *snapshot_sha,
+    const char *chart_schema,
+    const char *chart_spec_id,
+    const char *chart_kind,
+    const char *reconstruction_profile,
+    const char *series_profile,
+    const char *admission_profile,
+    const char *scientific_id,
+    const char *qualified_id,
+    const char *source_path,
+    AtmChartSpec **out,
+    GError **error
+);
+
 /* Live reconstruction entry point; declaration needed by the C test caller
  * and the C emitted by Vala for Application.vala. */
 gboolean atm_chart_live_reconstruct_gistemp (
