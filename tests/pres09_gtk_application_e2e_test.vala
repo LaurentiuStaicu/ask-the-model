@@ -383,7 +383,7 @@ private static int run_application_phase (
         return 1;
     }
 
-    GLib.List<GLib.Uri>? uris = server.get_uris ();
+    GLib.SList<GLib.Uri>? uris = server.get_uris ();
     if (uris == null || uris.data == null) {
         stderr.printf ("PRES-09 fake provider did not expose a local URI.\n");
         server.disconnect ();
