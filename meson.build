@@ -2738,6 +2738,20 @@ energy_institute_admission_test = executable(
 test('energy-institute-admission', energy_institute_admission_test,
   env: {'ATM_CHART01_FIXTURE': meson.current_source_dir() / 'tests/fixtures/chart01'})
 
+# CHART-01 BNR BLS: exact five-file source admission and native C01 candidate;
+# deliberately test-only, with no application route or MISSING fact minting.
+bnr_bls_panel_test = executable(
+  'bnr-bls-panel-test',
+  ['src/bnr_bls_panel.c', 'src/scientific_canonical.c',
+   'tests/bnr_bls_panel_test.c'],
+  include_directories: include_directories('src'),
+  dependencies: [glib_dep, json_glib_dep],
+  install: false
+)
+test('bnr-bls-panel', bnr_bls_panel_test,
+  env: {'ATM_BNR_BLS_FIXTURE': meson.current_source_dir() /
+    'tests/fixtures/chart01/rmd-bnr-bls'})
+
 # CHART-01 M1c1: source-bound artifacts; still no application caller.
 gistemp_evidence_test = executable(
   'gistemp-evidence-test',
