@@ -1,7 +1,22 @@
 # CHART-04: dormant M4 LINE reduction core
 
-Status: dormant display-layer primitive, linked only into tests. It is not called
-by the Cairo renderer, GTK component, Application, conversation store or History.
+**Current decision — 2026-10-13:** keep M4 dormant; it is not a completion blocker
+for the currently admitted 146-point GISTEMP and 61-point Energy Institute routes.
+The current GISTEMP profile normally stays below the raster-column density
+threshold, and no current product requirement demonstrates a need to activate
+reduction. Reconsider activation only when a qualified profile exceeds viewport
+density or measurements show a meaningful need.
+
+Before M4 may affect application pixels, a separate gate must qualify the exact
+projected-X-to-raster-column mapping, version the render-plan key, and compare
+full versus reduced Cairo output on representative and adversarial fixtures.
+Until that gate passes, the full qualified series remains the rendering input.
+History continues to reconstruct complete qualified source data and must never
+persist or treat the reduced render plan as scientific state.
+
+Status of the primitive: implemented and tested natively, but linked only into
+tests. It is not called by the Cairo renderer, GTK component, Application,
+conversation store or History.
 
 ## Boundary
 
