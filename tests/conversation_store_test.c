@@ -398,7 +398,163 @@ create_v2_store (
 }
 
 static void
-test_v1_to_v3_migration (void)
+create_v3_store (
+    const char *path
+)
+{
+    GError *error = NULL;
+    GBytes *bytes = g_resources_lookup_data (
+        "/io/github/laurentiustaicu/ask_the_model/schemas/conversation-store-v3.sql",
+        G_RESOURCE_LOOKUP_FLAGS_NONE,
+        &error
+    );
+    g_assert_no_error (error);
+    g_assert_nonnull (bytes);
+    gsize size = 0;
+    const char *data = g_bytes_get_data (bytes, &size);
+    g_assert_nonnull (data);
+    g_assert_cmpuint (size, >, 0);
+
+    char *schema = g_strndup (data, size);
+    char *sql = g_strdup_printf (
+        "BEGIN IMMEDIATE;%s"
+        "PRAGMA application_id=%u;"
+        "PRAGMA user_version=3;"
+        "COMMIT;",
+        schema,
+        (guint) ATM_CONVERSATION_STORE_APPLICATION_ID
+    );
+    raw_exec (path, sql);
+    g_free (sql);
+    g_free (schema);
+    g_bytes_unref (bytes);
+}
+
+static void
+insert_v3_gistemp_chart_fixture (
+    const char *path
+)
+{
+    raw_exec (
+        path,
+        "PRAGMA foreign_keys=ON;"
+        "BEGIN IMMEDIATE;"
+        "INSERT INTO conversations("
+        "conversation_id,title,created_at_us,updated_at_us,"
+        "model_name,model_digest,repository_generation_id,archived,open_on_startup"
+        ") VALUES("
+        "'v3-chart-conv','V3 Chart',1,2,'model-a',NULL,7,1,0"
+        ");"
+        "INSERT INTO conversation_repositories("
+        "conversation_id,repository_id,repository_version,snapshot_sha"
+        ") VALUES("
+        "'v3-chart-conv','ewd','0.1.0',"
+        "'0123456789abcdef0123456789abcdef01234567'"
+        ");"
+        "INSERT INTO messages("
+        "message_id,conversation_id,sequence_no,turn_no,role,"
+        "provider_content,display_content,grounded,created_at_us"
+        ") VALUES("
+        "'v3-chart-user','v3-chart-conv',0,0,'user','q','q',0,1"
+        ");"
+        "INSERT INTO messages("
+        "message_id,conversation_id,sequence_no,turn_no,role,"
+        "provider_content,display_content,grounded,created_at_us"
+        ") VALUES("
+        "'v3-chart-assistant','v3-chart-conv',1,0,'assistant','a','a',1,2"
+        ");"
+        "INSERT INTO message_charts("
+        "message_id,ordinal,chart_schema,chart_spec_id,chart_kind,reconstruction_profile"
+        ") VALUES("
+        "'v3-chart-assistant',1,'atm-chart-spec/1',"
+        "'aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa',"
+        "'line','atm-chart-reconstruct/gistemp-complete-annual/1'"
+        ");"
+        "INSERT INTO chart_series("
+        "message_id,chart_ordinal,series_ordinal,series_profile,admission_profile,"
+        "scientific_id,qualified_id,repository_id,repository_version,snapshot_sha,source_path"
+        ") VALUES("
+        "'v3-chart-assistant',1,0,'atm-series/gistemp-complete-annual/1',"
+        "'atm-gistemp-pinned-admission/1',"
+        "'bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb',"
+        "'cccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccc',"
+        "'ewd','0.1.0','0123456789abcdef0123456789abcdef01234567',"
+        "'science/data/processed/nasa_gistemp_global_2026.csv'"
+        ");"
+        "COMMIT;"
+    );
+}
+
+static void
+test_v3_to_v4_migration_preserves_chart_rows (void)
+{
+    char *root = new_temp_root ("atm-conversation-v3-v4-XXXXXX");
+    char *path = store_path (root);
+    create_v3_store (path);
+    insert_v3_gistemp_chart_fixture (path);
+
+    AtmConversationStore *store = NULL;
+    GError *error = NULL;
+    g_assert_true (atm_conversation_store_open (path, &store, &error));
+    g_assert_no_error (error);
+    g_assert_cmpint (atm_conversation_store_schema_version (store), ==, 4);
+    g_assert_true (atm_conversation_store_validate (store, &error));
+    g_assert_no_error (error);
+    g_assert_cmpint (raw_int64 (path, "PRAGMA user_version;"), ==, 4);
+    g_assert_cmpint (raw_int64 (path,
+        "SELECT count(*) FROM message_charts WHERE chart_schema='atm-chart-spec/1' "
+        "AND chart_spec_id='aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa' "
+        "AND reconstruction_profile='atm-chart-reconstruct/gistemp-complete-annual/1';"), ==, 1);
+    g_assert_cmpint (raw_int64 (path,
+        "SELECT count(*) FROM chart_series WHERE series_profile='atm-series/gistemp-complete-annual/1' "
+        "AND admission_profile='atm-gistemp-pinned-admission/1' "
+        "AND scientific_id='bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb' "
+        "AND qualified_id='cccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccc';"), ==, 1);
+    g_assert_cmpint (raw_int64 (path,
+        "SELECT count(*) FROM pragma_foreign_key_check;"), ==, 0);
+
+    char *schema_id = raw_text (path,
+        "SELECT schema_id FROM installation WHERE singleton_id=1;");
+    g_assert_cmpstr (schema_id, ==, "atm-conversation-store/4");
+    g_free (schema_id);
+    atm_conversation_store_close (store);
+    g_free (path);
+    remove_tree_best_effort (root);
+    g_free (root);
+}
+
+static void
+test_v3_to_v4_migration_rollback (void)
+{
+    char *root = new_temp_root ("atm-conversation-v3-v4-rollback-XXXXXX");
+    char *path = store_path (root);
+    create_v3_store (path);
+    insert_v3_gistemp_chart_fixture (path);
+    raw_exec (path, "CREATE TABLE message_charts_v4(dummy INTEGER) STRICT;");
+
+    AtmConversationStore *store = NULL;
+    GError *error = NULL;
+    g_assert_false (atm_conversation_store_open (path, &store, &error));
+    g_assert_nonnull (error);
+    g_assert_null (store);
+    g_clear_error (&error);
+
+    g_assert_cmpint (raw_int64 (path, "PRAGMA user_version;"), ==, 3);
+    char *schema_id = raw_text (path,
+        "SELECT schema_id FROM installation WHERE singleton_id=1;");
+    g_assert_cmpstr (schema_id, ==, "atm-conversation-store/3");
+    g_free (schema_id);
+    g_assert_cmpint (raw_int64 (path, "SELECT count(*) FROM message_charts;"), ==, 1);
+    g_assert_cmpint (raw_int64 (path, "SELECT count(*) FROM chart_series;"), ==, 1);
+    g_assert_cmpint (raw_int64 (path, "SELECT count(*) FROM pragma_foreign_key_check;"), ==, 0);
+
+    g_free (path);
+    remove_tree_best_effort (root);
+    g_free (root);
+}
+
+static void
+test_v1_to_v4_migration (void)
 {
     char *root = new_temp_root (
         "atm-conversation-migration-XXXXXX"
@@ -582,7 +738,7 @@ test_v1_to_v3_migration_rollback (void)
 }
 
 static void
-test_v2_to_v3_migration (void)
+test_v2_to_v4_migration (void)
 {
     char *root = new_temp_root ("atm-conversation-v2-v3-XXXXXX");
     char *path = store_path (root);
@@ -2752,20 +2908,28 @@ main (int argc, char **argv)
         test_bootstrap_and_reopen
     );
     g_test_add_func (
-        "/conversation-store/v1-to-v3-migration",
-        test_v1_to_v3_migration
+        "/conversation-store/v1-to-v4-migration",
+        test_v1_to_v4_migration
     );
     g_test_add_func (
         "/conversation-store/v1-to-v3-rollback",
         test_v1_to_v3_migration_rollback
     );
     g_test_add_func (
-        "/conversation-store/v2-to-v3-migration",
-        test_v2_to_v3_migration
+        "/conversation-store/v2-to-v4-migration",
+        test_v2_to_v4_migration
     );
     g_test_add_func (
         "/conversation-store/v2-to-v3-rollback",
         test_v2_to_v3_migration_rollback
+    );
+    g_test_add_func (
+        "/conversation-store/v3-to-v4-migration",
+        test_v3_to_v4_migration_preserves_chart_rows
+    );
+    g_test_add_func (
+        "/conversation-store/v3-to-v4-rollback",
+        test_v3_to_v4_migration_rollback
     );
     g_test_add_func (
         "/conversation-store/chart-recipe-semantics",
