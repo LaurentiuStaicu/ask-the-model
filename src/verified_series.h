@@ -37,6 +37,8 @@ const char *atm_verified_series_scientific_id (const AtmVerifiedSeries *series);
 const char *atm_verified_series_qualified_id (const AtmVerifiedSeries *series);
 const char *atm_verified_series_unit (const AtmVerifiedSeries *series);
 const char *atm_verified_series_reference_period (const AtmVerifiedSeries *series);
+const char *atm_verified_series_snapshot_sha (const AtmVerifiedSeries *series);
+const char *atm_verified_series_source_path (const AtmVerifiedSeries *series);
 guint atm_verified_series_support_count (const AtmVerifiedSeries *series);
 const char *atm_verified_series_support (const AtmVerifiedSeries *series, guint index);
 G_END_DECLS

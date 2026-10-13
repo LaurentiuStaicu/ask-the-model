@@ -253,6 +253,10 @@ const char *atm_verified_series_unit (const AtmVerifiedSeries *s)
 { return s != NULL ? atm_gistemp_admission_unit (s->admission) : NULL; }
 const char *atm_verified_series_reference_period (const AtmVerifiedSeries *s)
 { return s != NULL ? atm_gistemp_admission_reference_period (s->admission) : NULL; }
+const char *atm_verified_series_snapshot_sha (const AtmVerifiedSeries *s)
+{ return s != NULL ? atm_gistemp_admission_snapshot (s->admission) : NULL; }
+const char *atm_verified_series_source_path (const AtmVerifiedSeries *s)
+{ return s != NULL ? atm_gistemp_admission_source_path (s->admission, 0) : NULL; }
 guint atm_verified_series_support_count (const AtmVerifiedSeries *s)
 { return s != NULL ? atm_gistemp_sra_result (s->sra)->qualification->evidence_atom_ids->len : 0; }
 const char *atm_verified_series_support (const AtmVerifiedSeries *s, guint i)
