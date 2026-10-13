@@ -5345,7 +5345,7 @@ namespace AskTheModel {
                 pres09_test_request_started = true;
                 state.prompt.buffer.text =
                     "/chart energy-institute Show the global TES trend.";
-                state.send_button.activate ();
+                state.send_button.clicked ();
                 return true;
             }
 
@@ -5386,7 +5386,7 @@ namespace AskTheModel {
                 pres09_test_live_turn = 1;
                 state.prompt.buffer.text =
                     "/chart gistemp Show the global temperature anomaly trend.";
-                state.send_button.activate ();
+                state.send_button.clicked ();
                 return true;
             }
 
