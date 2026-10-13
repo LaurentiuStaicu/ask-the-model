@@ -279,7 +279,7 @@ test_refinalized_fact_forgery_is_rejected (void)
     g_assert_no_error (error);
 
     g_assert_false (atm_bnr_bls_sra_validate (sra, &error));
-    g_assert_error (error, ATM_BNR_BLS_SRA_ERROR, ATM_BNR_BLS_SRA_ERROR_IDENTITY);
+    g_assert_error (error, ATM_BNR_BLS_SRA_ERROR, (gint) ATM_BNR_BLS_SRA_ERROR_IDENTITY);
     g_clear_error (&error);
     atm_bnr_bls_sra_free (sra);
 }
@@ -290,13 +290,13 @@ test_invalid_arguments_fail_closed (void)
     AtmBnrBlsSra *sra = NULL;
     GError *error = NULL;
     g_assert_false (atm_bnr_bls_sra_new (NULL, &sra, &error));
-    g_assert_error (error, ATM_BNR_BLS_SRA_ERROR, ATM_BNR_BLS_SRA_ERROR_ARGUMENT);
+    g_assert_error (error, ATM_BNR_BLS_SRA_ERROR, (gint) ATM_BNR_BLS_SRA_ERROR_ARGUMENT);
     g_assert_null (sra);
     g_clear_error (&error);
 
     AtmBnrBlsPanel *panel = build_panel ();
     g_assert_false (atm_bnr_bls_sra_new (panel, NULL, &error));
-    g_assert_error (error, ATM_BNR_BLS_SRA_ERROR, ATM_BNR_BLS_SRA_ERROR_ARGUMENT);
+    g_assert_error (error, ATM_BNR_BLS_SRA_ERROR, (gint) ATM_BNR_BLS_SRA_ERROR_ARGUMENT);
     g_clear_error (&error);
     atm_bnr_bls_panel_free (panel);
 }
