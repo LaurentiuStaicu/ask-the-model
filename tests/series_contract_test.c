@@ -524,7 +524,23 @@ static void test_numeric_source_decimal_must_match_qualified_fact (void)
     atm_sra_result_free (q);
 
     /* A normalized zero without a qualified original token cannot prove
-     * whether the source was +0 or -0. */
+     * the distinctive negative-zero claim. */
+    q = qualified_with_single_source_decimal_fact (
+        a, "calendar_year", "1882", NULL);
+    s = base ();
+    g_assert_true (atm_series_contract_add_point (
+        s, "1882", ATM_SERIES_Y_NUMERIC, "-0.0000", "0", 0, TRUE,
+        FALSE, NULL, NULL, support, 1, &error));
+    g_assert_no_error (error);
+    g_assert_false (atm_series_contract_validate (s, q, &error));
+    g_assert_error (error, ATM_SERIES_CONTRACT_ERROR,
+                    ATM_SERIES_CONTRACT_ERROR_SHAPE);
+    g_clear_error (&error);
+    atm_series_contract_free (s);
+    atm_sra_result_free (q);
+
+    /* Generic facts with normalized ordinary zero remain compatible when
+     * source-specific lexical metadata is not part of their schema. */
     q = qualified_with_single_source_decimal_fact (
         a, "calendar_year", "1882", NULL);
     s = base ();
@@ -532,10 +548,8 @@ static void test_numeric_source_decimal_must_match_qualified_fact (void)
         s, "1882", ATM_SERIES_Y_NUMERIC, "0.0000", "0", 0, FALSE,
         FALSE, NULL, NULL, support, 1, &error));
     g_assert_no_error (error);
-    g_assert_false (atm_series_contract_validate (s, q, &error));
-    g_assert_error (error, ATM_SERIES_CONTRACT_ERROR,
-                    ATM_SERIES_CONTRACT_ERROR_SHAPE);
-    g_clear_error (&error);
+    g_assert_true (atm_series_contract_validate (s, q, &error));
+    g_assert_no_error (error);
     atm_series_contract_free (s);
     atm_sra_result_free (q);
 
