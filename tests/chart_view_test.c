@@ -1,5 +1,7 @@
 #include "chart_view.h"
 #include "chart_fixture.h"
+#include "energy_institute_admission.h"
+#include "energy_institute_verified_series.h"
 #include <string.h>
 
 static void settle (void)
@@ -27,6 +29,88 @@ static AtmChartView *build_view (void)
     AtmChartSpec *spec = atm_chart_test_spec (ATM_CHART_LINE); AtmChartView *view = NULL;
     g_assert_true (atm_chart_view_new (spec, &view, NULL)); atm_chart_spec_free (spec); return view;
 }
+
+static AtmChartView *build_ei_view (void)
+{
+    const char *root = g_getenv ("ATM_CHART01_FIXTURE");
+    const char *snapshot = "dc710d8e604c0fff713a3acfdb18ab47a1a902bb";
+    const char *paths[ATM_EI_SOURCE_COUNT] = {
+        "science/data/processed/energy_institute_global_2026.csv",
+        "science/data/processed/energy_institute_global_2026.provenance.json",
+        "science/data/input_manifest.json",
+        "science/data/registry.csv"
+    };
+    g_assert_nonnull (root);
+    GBytes *sources[ATM_EI_SOURCE_COUNT] = { NULL, NULL, NULL, NULL };
+    GError *error = NULL;
+    for (guint i = 0; i < ATM_EI_SOURCE_COUNT; i++) {
+        char *path = g_build_filename (root, "ewd-current", paths[i], NULL);
+        char *contents = NULL;
+        gsize length = 0;
+        g_assert_true (g_file_get_contents (path, &contents, &length, &error));
+        g_assert_no_error (error);
+        g_free (path);
+        sources[i] = g_bytes_new_take (contents, length);
+    }
+    AtmEnergyInstituteAdmission *admission = NULL;
+    AtmEnergyInstituteVerifiedSeries *series = NULL;
+    AtmChartSpec *spec = NULL;
+    AtmChartView *view = NULL;
+    g_assert_true (atm_energy_institute_admission_new (
+        "LaurentiuStaicu/empirical-world3-dynamics",
+        snapshot, sources, &admission, &error));
+    g_assert_no_error (error);
+    for (guint i = 0; i < ATM_EI_SOURCE_COUNT; i++)
+        g_bytes_unref (sources[i]);
+    g_assert_true (atm_energy_institute_verified_series_from_admission (
+        admission, &series, &error));
+    g_assert_no_error (error);
+    g_assert_true (atm_chart_spec_new_energy_institute_v2 (
+        ATM_CHART_LINE, series, &spec, &error));
+    g_assert_no_error (error);
+    atm_energy_institute_verified_series_free (series);
+    atm_energy_institute_admission_free (admission);
+    g_assert_true (atm_chart_view_new (spec, &view, &error));
+    g_assert_no_error (error);
+    atm_chart_spec_free (spec);
+    return view;
+}
+
+static void test_ei_data_lifetime (void)
+{
+    AtmChartView *view = build_ei_view ();
+    g_assert_false (g_object_is_floating (view));
+    g_assert_cmpuint (atm_chart_view_row_count (view), ==, 61u);
+    const char *data = atm_chart_view_data (view);
+    g_assert_nonnull (data);
+    g_assert_nonnull (strstr (data, "# unit\texajoules/year"));
+    g_assert_nonnull (strstr (data, "# source_snapshot\tdc710d8e604c0fff713a3acfdb18ab47a1a902bb"));
+    char *saved_data = g_strdup (data);
+
+    g_assert_true (atm_chart_view_select_row (view, 0));
+    char *provenance = atm_chart_view_provenance (view);
+    g_assert_nonnull (provenance);
+    g_assert_true (g_str_has_prefix (provenance, "Year: 1965\nExact TES: "));
+    g_assert_nonnull (strstr (provenance, "Physical Energy Content"));
+    g_assert_nonnull (strstr (provenance, "Source row: 2\n"));
+    g_assert_nonnull (strstr (provenance, "Snapshot: dc710d8e604c0fff713a3acfdb18ab47a1a902bb"));
+    g_free (provenance);
+
+    g_assert_true (atm_chart_view_select_row (view, 60));
+    provenance = atm_chart_view_provenance (view);
+    g_assert_true (g_str_has_prefix (provenance, "Year: 2025\nExact TES: "));
+    g_assert_nonnull (strstr (provenance, "Source row: 62\n"));
+    g_free (provenance);
+
+    atm_chart_view_show_data (view);
+    g_assert_cmpstr (atm_chart_view_visible_page (view), ==, "data");
+    atm_chart_view_show_chart (view);
+    g_assert_cmpstr (atm_chart_view_visible_page (view), ==, "chart");
+    g_assert_cmpstr (atm_chart_view_data (view), ==, saved_data);
+    g_free (saved_data);
+    g_object_unref (view);
+}
+
 static void test_data_lifetime (void)
 {
     AtmChartView *view = build_view ();
@@ -135,6 +219,7 @@ int main (int argc, char **argv)
 {
     gtk_init (); g_test_init (&argc,&argv,NULL);
     g_test_add_func ("/chart-view/data-lifetime",test_data_lifetime);
+    g_test_add_func ("/chart-view/ei-data-lifetime",test_ei_data_lifetime);
     g_test_add_func ("/chart-view/resize-coalescing",test_resize_coalescing);
     g_test_add_func ("/chart-view/keyboard-window",test_keyboard_window);
     g_test_add_func ("/chart-view/invalid",test_invalid);

@@ -30,6 +30,7 @@ typedef struct AtmChartSpec AtmChartSpec;
 typedef struct {
     guint order;
     guint calendar_year;
+    guint source_row;
     AtmChartPointStatus y_status;
     const char *source_decimal;
     const char *coefficient;
@@ -72,6 +73,9 @@ const char *atm_chart_spec_x_dimension (const AtmChartSpec *spec);
 const char *atm_chart_spec_y_unit (const AtmChartSpec *spec);
 const char *atm_chart_spec_y_dimension (const AtmChartSpec *spec);
 const char *atm_chart_spec_series_profile (const AtmChartSpec *spec);
+const char *atm_chart_spec_series_snapshot_sha (const AtmChartSpec *spec, guint index);
+const char *atm_chart_spec_series_source_path (const AtmChartSpec *spec, guint index);
+const char *atm_chart_spec_series_repository_id (const AtmChartSpec *spec, guint index);
 
 const AtmVerifiedSeries *atm_chart_spec_series (const AtmChartSpec *spec, guint index);
 const char *atm_chart_spec_series_scientific_id (const AtmChartSpec *spec, guint index);

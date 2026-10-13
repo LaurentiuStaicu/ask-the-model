@@ -2560,11 +2560,12 @@ test_chart_binding_write_load (void)
     /* The v4 allowlist admits the source-bound EI v2 tuple, but not cross-paired
      * schema/reconstruction/series/admission profiles or unpinned snapshots. */
     const char *ei_snapshot = "d9e249339663015f6d1c05752338a955bf64ad0b";
+    const char *ei_repository_version = "0.1.0";
     const char *ei_version =
         "snapshot:d9e249339663015f6d1c05752338a955bf64ad0b";
     AtmConversationRepositoryInput ei_repository = {
         .repository_id = "ewd",
-        .repository_version = ei_version,
+        .repository_version = ei_repository_version,
         .snapshot_sha = ei_snapshot
     };
     char *ei_conversation_id = NULL;
@@ -2576,7 +2577,7 @@ test_chart_binding_write_load (void)
     AtmConversationCitationInput ei_citation = {
         .label = "EI-S1",
         .repository_id = "ewd",
-        .repository_version = ei_version,
+        .repository_version = ei_repository_version,
         .snapshot_sha = ei_snapshot,
         .logical_source_id = "ei-primary-energy",
         .source_path = "science/data/processed/energy_institute_global_2026.csv",
@@ -2618,6 +2619,21 @@ test_chart_binding_write_load (void)
     g_assert_true (atm_conversation_store_attach_chart (
         store, ei_conversation_id, ei_grounded_turn, &ei_chart, &error));
     g_assert_no_error (error);
+
+    /* Repository release version and immutable chart-source snapshot version
+     * are different identities: the conversation pin keeps CITATION.cff's
+     * version, while the EI chart recipe binds snapshot:<sha>. */
+    AtmConversationChartSeriesInput wrong_ei_version = ei_series;
+    wrong_ei_version.repository_version = ei_repository_version;
+    AtmConversationChartInput wrong_ei_version_chart = ei_chart;
+    wrong_ei_version_chart.ordinal = 2;
+    wrong_ei_version_chart.series = &wrong_ei_version;
+    g_assert_false (atm_conversation_store_attach_chart (
+        store, ei_conversation_id, ei_grounded_turn,
+        &wrong_ei_version_chart, &error));
+    g_assert_error (error, ATM_CONVERSATION_STORE_ERROR,
+                    ATM_CONVERSATION_STORE_ERROR_ARGUMENT);
+    g_clear_error (&error);
 
     AtmConversationChartInput mixed_tuple = ei_chart;
     mixed_tuple.ordinal = 2;
@@ -2761,6 +2777,9 @@ test_chart_binding_write_load (void)
     g_assert_cmpuint (atm_conversation_snapshot_message_count (ei_snapshot_state), ==, 2);
     g_assert_cmpuint (
         atm_conversation_snapshot_message_chart_count_at (ei_snapshot_state, 1), ==, 1);
+    g_assert_cmpstr (
+        atm_conversation_snapshot_repository_version_at (ei_snapshot_state, 0),
+        ==, ei_repository_version);
     g_assert_cmpstr (
         atm_conversation_snapshot_chart_schema_at (ei_snapshot_state, 1, 0),
         ==, "atm-chart-spec/2");

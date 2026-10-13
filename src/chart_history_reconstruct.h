@@ -47,6 +47,17 @@ gboolean atm_chart_history_reconstruct_energy_institute (
     GError **error
 );
 
+/* Rebuild a live EI v2 chart from the approved four-file snapshot. CFF release
+ * version remains separate from the ChartSpec source version (snapshot:<sha>). */
+gboolean atm_chart_live_reconstruct_energy_institute (
+    const char *snapshot_path,
+    const char *repository_id,
+    const char *snapshot_sha,
+    const char *chart_kind,
+    AtmChartSpec **out,
+    GError **error
+);
+
 /* Live reconstruction entry point; declaration needed by the C test caller
  * and the C emitted by Vala for Application.vala. */
 gboolean atm_chart_live_reconstruct_gistemp (

@@ -87,11 +87,26 @@ static gboolean apply_pending_resize (gpointer data)
     if (ok) {
         self->render_width = width; self->render_height = height; self->render_scale = scale;
     }
+    const AtmChartSpec *spec = self->render != NULL
+        ? atm_chart_render_spec (self->render) : NULL;
+    gboolean is_ei = spec != NULL &&
+        atm_chart_spec_version (spec) == ATM_CHART_SPEC_VERSION_ENERGY_INSTITUTE_V2;
     gtk_widget_set_visible (GTK_WIDGET (self->status), !ok);
-    gtk_label_set_text (self->status, !ok ? "Chart unavailable at this size or scale. Exact values are in Data." : "");
-    accessible (GTK_WIDGET (self->area), "Global annual temperature anomaly chart",
-        !ok || atm_chart_render_is_fallback (self->render) ? "Chart unavailable. Switch to Data for all 146 exact observations." :
-        "146 empirical observations from 1880 to 2025. Degrees Celsius relative to 1951-1980. Exact values are in Data.");
+    gtk_label_set_text (self->status, !ok
+        ? (is_ei
+            ? "Chart unavailable at this size or scale. All 61 exact TES observations remain in Data."
+            : "Chart unavailable at this size or scale. Exact values are in Data.")
+        : "");
+    accessible (GTK_WIDGET (self->area),
+        is_ei ? "Energy Institute global total energy supply chart"
+              : "Global annual temperature anomaly chart",
+        !ok || atm_chart_render_is_fallback (self->render)
+            ? (is_ei
+                ? "Chart unavailable. Switch to Data for all 61 exact TES observations."
+                : "Chart unavailable. Switch to Data for all 146 exact observations.")
+            : (is_ei
+                ? "61 annual empirical observations from 1965 to 2025. Total energy supply under Physical Energy Content. Units are exajoules per year. Exact values are in Data."
+                : "146 empirical observations from 1880 to 2025. Degrees Celsius relative to 1951-1980. Exact values are in Data."));
     g_clear_error (&error);
     gtk_widget_queue_draw (GTK_WIDGET (self->area));
     return G_SOURCE_REMOVE;
@@ -156,11 +171,28 @@ static void selection_changed (GObject *object, GParamSpec *pspec, gpointer data
         return;
     }
     GString *text = g_string_new (NULL);
-    g_string_append_printf (text, "Year: %s\nExact anomaly: %s deg C (1951-1980)\nCanonical decimal: %se%s\n"
-        "Source row: %s\nRepository: LaurentiuStaicu/empirical-world3-dynamics\n"
-        "Snapshot: d9e249339663015f6d1c05752338a955bf64ad0b\n"
-        "Path: science/data/processed/nasa_gistemp_global_2026.csv\n"
-        "Vintage: 2026-08-31\nQualified series: %s\nSupport identities:\n", c[1],c[2],c[3],c[4],c[5],c[6]);
+    const AtmChartSpec *spec = self->render != NULL
+        ? atm_chart_render_spec (self->render) : NULL;
+    gboolean is_ei = spec != NULL &&
+        atm_chart_spec_version (spec) == ATM_CHART_SPEC_VERSION_ENERGY_INSTITUTE_V2;
+    if (is_ei) {
+        g_string_append_printf (text,
+            "Year: %s\nExact TES: %s exajoules/year (Physical Energy Content)\n"
+            "Canonical decimal: %se%s\nSource row: %s\n"
+            "Repository: LaurentiuStaicu/empirical-world3-dynamics\n"
+            "Snapshot: %s\nPath: %s\n"
+            "Semantic interpretation: Global Total Energy Supply / Physical Energy Content\n"
+            "Qualified series: %s\nSupport identities:\n",
+            c[1], c[2], c[3], c[4], c[5],
+            atm_chart_spec_series_snapshot_sha (spec, 0),
+            atm_chart_spec_series_source_path (spec, 0), c[6]);
+    } else {
+        g_string_append_printf (text, "Year: %s\nExact anomaly: %s deg C (1951-1980)\nCanonical decimal: %se%s\n"
+            "Source row: %s\nRepository: LaurentiuStaicu/empirical-world3-dynamics\n"
+            "Snapshot: d9e249339663015f6d1c05752338a955bf64ad0b\n"
+            "Path: science/data/processed/nasa_gistemp_global_2026.csv\n"
+            "Vintage: 2026-08-31\nQualified series: %s\nSupport identities:\n", c[1],c[2],c[3],c[4],c[5],c[6]);
+    }
     char **ids = g_strsplit (c[7], ";", -1);
     for (guint i = 0; ids[i]; i++) g_string_append_printf (text, "%s\n", ids[i]);
     gtk_text_buffer_set_text (self->provenance, text->str, -1);
@@ -208,6 +240,8 @@ gboolean atm_chart_view_new (const AtmChartSpec *spec, AtmChartView **out, GErro
         gtk_string_list_append (self->rows, lines[i]);
     }
     g_strfreev (lines);
+    gboolean is_ei = atm_chart_spec_version (atm_chart_render_spec (initial)) ==
+        ATM_CHART_SPEC_VERSION_ENERGY_INSTITUTE_V2;
     accessible (GTK_WIDGET (self), "Qualified scientific chart and exact data", "Alt+1 opens Chart. Alt+2 opens Data.");
     self->stack = GTK_STACK (gtk_stack_new ()); gtk_stack_set_transition_type (self->stack, GTK_STACK_TRANSITION_TYPE_NONE);
     gtk_widget_set_vexpand (GTK_WIDGET (self->stack), TRUE);
@@ -226,20 +260,30 @@ gboolean atm_chart_view_new (const AtmChartSpec *spec, AtmChartView **out, GErro
     gtk_drawing_area_set_content_height (self->area, 348);
     gtk_widget_set_hexpand (GTK_WIDGET (self->area), TRUE); gtk_widget_set_vexpand (GTK_WIDGET (self->area), TRUE);
     gtk_widget_set_focusable (GTK_WIDGET (self->area), TRUE);
-    accessible (GTK_WIDGET (self->area), "Global annual temperature anomaly chart", "Exact observations and provenance are in Data.");
+    accessible (GTK_WIDGET (self->area),
+        is_ei ? "Energy Institute global total energy supply chart"
+              : "Global annual temperature anomaly chart",
+        is_ei
+            ? "Exact TES observations and source provenance are in Data."
+            : "Exact observations and provenance are in Data.");
     gtk_drawing_area_set_draw_func (self->area, draw, self, NULL);
     g_signal_connect (self->area, "resize", G_CALLBACK (resize), self);
     g_signal_connect (self->area, "notify::scale-factor", G_CALLBACK (scale_changed), self);
     gtk_box_append (GTK_BOX (chart), GTK_WIDGET (self->area)); gtk_stack_add_titled (self->stack, chart, "chart", "Chart");
     GtkWidget *data = gtk_box_new (GTK_ORIENTATION_VERTICAL, 8);
-    GtkWidget *unit = gtk_label_new ("Global annual anomaly (deg C), relative to 1951-1980. Exact source decimals.");
+    GtkWidget *unit = gtk_label_new (is_ei
+        ? "Global total energy supply (EJ/year; Physical Energy Content). Exact source decimals."
+        : "Global annual anomaly (deg C), relative to 1951-1980. Exact source decimals.");
     gtk_label_set_wrap (GTK_LABEL (unit), TRUE); gtk_label_set_xalign (GTK_LABEL (unit), 0);
     gtk_box_append (GTK_BOX (data), unit);
     self->selection = gtk_single_selection_new (G_LIST_MODEL (g_object_ref (self->rows)));
     self->table = GTK_COLUMN_VIEW (gtk_column_view_new (GTK_SELECTION_MODEL (g_object_ref (self->selection))));
     gtk_column_view_set_show_row_separators (self->table, TRUE); gtk_widget_add_css_class (GTK_WIDGET (self->table), "data-table");
     accessible (GTK_WIDGET (self->table), "Exact annual observations", "Select a year with arrow keys to inspect its provenance. Source order is preserved.");
-    const char *titles[] = {"Year", "Anomaly (deg C)", "Source row"}; guint fields[] = {1,2,5};
+    const char *titles[] = {
+        "Year", is_ei ? "TES (EJ/year)" : "Anomaly (deg C)", "Source row"
+    };
+    guint fields[] = {1,2,5};
     for (guint i = 0; i < 3; i++) {
         GtkListItemFactory *factory = gtk_signal_list_item_factory_new ();
         g_signal_connect (factory, "setup", G_CALLBACK (cell_setup), NULL);

@@ -1192,8 +1192,11 @@ validate_chart_semantics (
             "LEFT JOIN conversation_repositories r "
             "ON r.conversation_id=m.conversation_id "
             "AND r.repository_id=s.repository_id "
-            "AND r.repository_version=s.repository_version "
             "AND r.snapshot_sha=s.snapshot_sha "
+            "AND ("
+            " (c.chart_schema='atm-chart-spec/1' AND r.repository_version=s.repository_version) OR "
+            " (c.chart_schema='atm-chart-spec/2' AND s.repository_version='snapshot:' || s.snapshot_sha)"
+            ") "
             "WHERE r.repository_id IS NULL "
             "OR s.repository_id!='ewd' "
             "OR NOT ("
@@ -3670,8 +3673,11 @@ atm_conversation_store_attach_chart (
             "FROM conversation_repositories "
             "WHERE conversation_id=?1 "
             "AND repository_id=?2 "
-            "AND repository_version=?3 "
-            "AND snapshot_sha=?4;",
+            "AND snapshot_sha=?4 "
+            "AND ("
+            " (?5='atm-chart-spec/1' AND repository_version=?3) OR "
+            " (?5='atm-chart-spec/2' AND ?3=('snapshot:' || ?4))"
+            ");",
             &statement,
             error
         )) {
@@ -3681,6 +3687,7 @@ atm_conversation_store_attach_chart (
     sqlite3_bind_text (statement, 2, series->repository_id, -1, SQLITE_TRANSIENT);
     sqlite3_bind_text (statement, 3, series->repository_version, -1, SQLITE_TRANSIENT);
     sqlite3_bind_text (statement, 4, series->snapshot_sha, -1, SQLITE_TRANSIENT);
+    sqlite3_bind_text (statement, 5, chart->chart_schema, -1, SQLITE_TRANSIENT);
 
     rc = sqlite3_step (statement);
     if (rc != SQLITE_ROW || sqlite3_column_int64 (statement, 0) != 1 ||

@@ -376,10 +376,21 @@ test_ei_history_reconstructs_pinned_snapshots (void)
         g_assert_true (atm_energy_institute_verified_series_from_admission (
             admission, &series, &error));
         g_assert_no_error (error);
+
+        AtmChartSpec *live = NULL;
+        g_assert_true (atm_chart_live_reconstruct_energy_institute (
+            snapshot_path, "ewd", snapshots[i], "line", &live, &error));
+        g_assert_no_error (error);
+        g_assert_nonnull (live);
+
         g_assert_true (atm_chart_spec_new_energy_institute_v2 (
             ATM_CHART_LINE, series, &reference, &error));
         g_assert_no_error (error);
         g_assert_cmpuint (atm_chart_spec_point_count (reference, 0), ==, 61u);
+        g_assert_cmpstr (atm_chart_spec_id (live), ==, atm_chart_spec_id (reference));
+        g_assert_cmpstr (atm_chart_spec_series_qualified_id (live, 0), ==,
+                         atm_chart_spec_series_qualified_id (reference, 0));
+        g_assert_cmpuint (atm_chart_spec_point_count (live, 0), ==, 61u);
 
         EiHistoryRecipe recipe = {
             .repository_id = i == 0
@@ -526,6 +537,7 @@ test_ei_history_reconstructs_pinned_snapshots (void)
         }
 
         atm_chart_spec_free (restored);
+        atm_chart_spec_free (live);
         atm_chart_spec_free (reference);
         atm_energy_institute_verified_series_free (series);
         atm_energy_institute_admission_free (admission);
