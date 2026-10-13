@@ -2781,6 +2781,7 @@ test_chart_binding_write_load (void)
     g_assert_cmpint (raw_int64 (path, "SELECT count(*) FROM chart_series;"), ==, 0);
 
     atm_conversation_store_close (store);
+    g_free (ei_conversation_id);
     g_free (conversation_id);
     g_free (path);
     remove_tree_best_effort (root);
