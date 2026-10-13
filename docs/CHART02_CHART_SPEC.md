@@ -2,6 +2,8 @@
 
 Status: the initial ChartSpec contract is now used by the narrow GISTEMP application path described below.
 
+**C2a status, 2026-10-13: implemented, tested and integrated through PR #439.** The source-bound native Energy Institute `atm-chart-spec/2` constructor and source-neutral point accessors are available, while the GISTEMP v1 identity path remains unchanged. The EI display profile is explicitly `0-unqualified`; this stage does not admit projection, rendering, live intent, or History persistence.
+
 Current application behavior accepts only an explicit `/chart gistemp <grounded question>` request. It uses a grounded citation to the pinned EWD GISTEMP source, re-reads and re-qualifies that snapshot, and builds the ChartSpec used by the live and History chart views. The model does not supply chart values, axes, units, domains, or chart intent. Other adapters, arbitrary series, STEP, BAR, and missing/event data remain unsupported.
 
 The implementation-stage notes below preserve the original design and qualification history; statements that there was no application caller describe those earlier stages, not the current branch.
