@@ -1,12 +1,10 @@
 # CHART-02: initial ChartSpec contract
 
-Status: the initial ChartSpec contract is now used by the narrow GISTEMP application path described below.
+# CHART-02: source-qualified ChartSpec contracts
 
-**C2a status, 2026-10-13: implemented, tested and integrated through PR #439.** The source-bound native Energy Institute `atm-chart-spec/2` constructor and source-neutral point accessors are available, while the GISTEMP v1 identity path remains unchanged. The EI display profile is explicitly `0-unqualified`; this stage does not admit projection, rendering, live intent, or History persistence.
+**Current status (2026-10-13): GISTEMP v1 remains unchanged; Energy Institute v2 is integrated through C2a–C2e.** The application admits only the reviewed source-specific paths: `/chart gistemp` and `/chart energy-institute`, plus natural-language requests that unambiguously name one supported source and request a visualization. Live and History reconstruct from pinned source bytes; persisted recipes are not numeric authority. The model supplies neither scientific values nor units, axes, domains, transforms or chart metadata.
 
-Current application behavior accepts only an explicit `/chart gistemp <grounded question>` request. It uses a grounded citation to the pinned EWD GISTEMP source, re-reads and re-qualifies that snapshot, and builds the ChartSpec used by the live and History chart views. The model does not supply chart values, axes, units, domains, or chart intent. Other adapters, arbitrary series, STEP, BAR, and missing/event data remain unsupported.
-
-The implementation-stage notes below preserve the original design and qualification history; statements that there was no application caller describe those earlier stages, not the current branch.
+The implementation-stage notes below preserve the original design and qualification history. Statements that EI was `0-unqualified`, the renderer rejected EI, or no application caller existed refer to their original milestone gates and were superseded by C2c–C2e. Unsupported inputs still fail closed: no arbitrary source/series, model-authored values, STEP/BAR, general missing/event series, implicit conversions, smoothing or multi-source comparison UI is enabled.
 
 ## C2a: separate native Energy Institute ChartSpec v2
 
@@ -16,7 +14,7 @@ EI v2 is a single-series, calendar-year TES contract only. Before owning input, 
 
 The new source-neutral point view exposes calendar year, status, exact source-decimal token, canonical coefficient/exponent, discontinuity flag and borrowed support IDs for either admitted current source. EI uses EJ/year and energy-flow-rate dimension; it never passes through the GISTEMP temperature display conversion. Tests cover both admitted EI snapshots: the reconstructed SRA scientific fact content remains equivalent, but the generic series serialization includes each point's snapshot-qualified support IDs, so both series identities and the ChartSpec identities differ. Cross-snapshot mixes remain rejected by source admission.
 
-**C2a is not a rendering qualification.** The EI ChartSpec initially carried `0-unqualified`. C2b replaces that EI-only marker with qualified display profile version `1` after the separate projection gate passes. The change affects only EI v2 identity; no EI display values were persisted or used by an application route before qualification. No release artifact is changed by native ChartSpec qualification.
+**Historical C2a gate record:** at the C2a milestone, native ChartSpec v2 was not by itself a rendering qualification and its EI display marker was `0-unqualified`. C2b subsequently qualified display profile version `1`; C2c–C2e later integrated durable persistence, History reconstruction, and the application renderer. None of these development gates changes the immutable v0.6.3 release artifact.
 
 
 The entry point consumes validated, owned or safely retained VerifiedSeries
@@ -25,9 +23,9 @@ profile is `atm-series/gistemp-complete-annual/1`. The model may express intent
 and select qualified references; it cannot supply numeric values, units, scale
 policy or axis domains.
 
-## C2b: deterministic Energy Institute TES display projection
+## C2b: deterministic Energy Institute TES display projection (historical gate record)
 
-**C2b status, 2026-10-13: implemented, tested and integrated through PR #440. This is not a rendering or application integration gate.** The existing `atm-display/gistemp-linear/1` policy and its pinned reference output remain unchanged. Energy Institute uses the separate `atm-display/energy-institute-tes-linear/1` policy; EI v2 binds its policy ID and version into the ChartSpec identity, with version `1` reserved for this separately qualified profile.
+**C2b status, 2026-10-13: implemented, tested and integrated through PR #440.** At that stage the projection was native-only and not yet connected to the renderer/application; C2e later enabled the separately qualified EI presentation path. The existing `atm-display/gistemp-linear/1` policy and its pinned reference output remain unchanged. Energy Institute uses the separate `atm-display/energy-institute-tes-linear/1` policy; EI v2 binds its policy ID and version into the ChartSpec identity, with version `1` reserved for this separately qualified profile.
 
 The source data remains the exact annual TES observations in EJ/year, physical-energy-content basis. The display-only conversion uses integer arithmetic and an explicit canonical-coefficient allowlist, accepts coefficient exponents `-7..0`, rounds half-up to micro-EJ/year, and rejects malformed coefficients, unsupported precision, overflow, negative values, or exact source values outside `0..1000` EJ/year. The source token, scientific coefficient/exponent, evidence support and exact extrema in ChartSpec are unchanged by projection. Quantized display micro-units must never replace source data or be used in calculations, transformations, SRA facts, export, or History.
 
@@ -43,7 +41,7 @@ The EI projection policy passed the native ASan/UBSan suite for decimal precisio
 | Chart kinds | Line and scatter |
 | Steps | Reject until qualified state/event semantics exist |
 | Bars | Reject until explicit zero-baseline policy is implemented and tested |
-| Series count | 1–4 distinct qualified series; reject duplicates; currently only one unique source exists |
+| Series count | Native API retains a defensive 1–4 input ceiling and rejects duplicates; the application routes one admitted source series at a time and does not expose generic multi-series comparison |
 | Series compatibility | Exact compatible units, dimensions, reference periods and coordinate/observation semantics |
 | X coordinate | Calendar year, preserving source order |
 | Axes | Linear only; exact data-derived extents |
@@ -100,7 +98,8 @@ The native sanitizer and Meson tests cover deterministic identity, distinct kind
 exact source extrema, input lifetime, duplicates, cardinality, unsupported kinds,
 corrupted input, changed bounds/identity and changed owned series. Degenerate and
 multi-source synthetic fixtures are not represented as qualified source data.
-The module remains test-only, with no application caller or enabled chart UI.
+The preceding paragraph records the original native-only stage; later C2c–C2e
+integrated the independently admitted EI v2 renderer and application route.
 
 ## Bounded display projection
 
@@ -143,4 +142,4 @@ input lifetime, invalid dimensions, altered specifications and tampered derived
 geometry. Validation reconstructs domains, labels and coordinates from the owned
 specification. No cached display data is scientific authority.
 
-Current integration is implemented in `src/Application.vala` through `ChartIntent`, `ChartNative`, and the conversation persistence chart recipe. CHART-01/03, the PRES-09 close/reopen reconstruction test, and the Flatpak suite provide the current qualification evidence. The separate CHART-01 source-audit JSON remains a record of its original source-audit stage; its historical `runtime_adapter_enabled: false` field is not the current application capability status.
+Current integration in `src/Application.vala` uses `ChartIntent` and `ChartNative` for the two source-specific routes, with schema-v1 GISTEMP and schema-v2 EI conversation recipes. C2e's exact-head native/ASan/UBSan, GTK, resize, persistence, invariant and Flatpak checks passed, and the post-merge Flatpak/Invariant gates passed on the integration commit. The automated suite does not include a dedicated end-to-end GTK Application test that drives a live EI request through archive, close/reopen and restored History presentation; keep that gap visible in release readiness. The separate CHART-01 source-audit JSON remains a record of its original gate, so its historical `runtime_adapter_enabled: false` field is not the current application capability status.
