@@ -8,7 +8,7 @@ G_BEGIN_DECLS
 #define ATM_CHART_SPEC_V2_SCHEMA "atm-chart-spec/2"
 #define ATM_CHART_SPEC_MAX_SERIES 4
 #define ATM_CHART_SPEC_V2_EI_DISPLAY_PROFILE "atm-display/energy-institute-tes-linear"
-#define ATM_CHART_SPEC_V2_EI_DISPLAY_PROFILE_VERSION "0-unqualified"
+#define ATM_CHART_SPEC_V2_EI_DISPLAY_PROFILE_VERSION "1"
 
 /* STEP and BAR are reserved, not admitted by either current profile. */
 typedef enum { ATM_CHART_LINE = 1, ATM_CHART_SCATTER, ATM_CHART_STEP, ATM_CHART_BAR } AtmChartKind;
