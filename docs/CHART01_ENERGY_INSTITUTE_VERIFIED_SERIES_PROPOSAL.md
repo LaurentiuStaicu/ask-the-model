@@ -85,7 +85,15 @@ Only after native EI-series qualification is green should a separate chart integ
 
 Any persisted schema or canonical identity compatibility impact must be explicit before a migration or release. The existing v0.6.3 artifact remains immutable; none of the development qualifications described here should be described as part of that release.
 
-## Decision gates
+## Original decision gates (historical)
+
+- **Gate A — scientific/profile decision:** review the bounded claim, profile name/version, exact semantic fields, and the no-raw-pipeline/no-derivation limitations.
+- **Gate B — native series qualification:** implement only the source-bound `VerifiedSeries` layer and its deterministic negative/reconstruction tests; no runtime chart or persistence changes.
+- **Gate C — downstream chart contract:** explicitly review the source-neutral type/API and chart/history identity design; only then implement chart integration.
+- **Gate D — application/release readiness:** end-to-end live and History verification, exact-head CI, documentation and release evidence. No release is inferred from earlier gates.
+
+At the time of writing, this proposal was a design record rather than implementation authorization. The narrow scope was subsequently accepted and implemented; its scientific non-claims still apply.
+
 ## As-built status (updated 2026-10-13)
 
 Gate A — source/profile decision: approved within the narrow claim. F0-19 authorizes faithful reconstruction of the admitted, byte-pinned EWD processed snapshot. TES is interpreted as Total Energy Supply under the Physical Energy Content method. It does not claim an independent recreation of Energy Institute's raw-to-processed pipeline.
@@ -97,11 +105,3 @@ Gate C — ChartSpec/render/History: integrated. PR #439 adds source-bound Chart
 Gate D — application E2E: integrated. PR #447 adds a dedicated test-only GTK Application executable. The exact candidate head `f4c5c879fed905556bd7bc77c67c4a93735770b6` passed all 12 workflow runs, including live composer/send for EI v2 and GISTEMP v1, Save to History, separate-process restoration, exact Data/provenance comparison, and fail-closed behavior after source-manifest tampering. Documentation was synchronized by PR #448.
 
 **Remaining CHART-01 scope:** the general native contract expresses `NUMERIC`/`MISSING` and provenance-qualified breaks, but only the complete-annual GISTEMP profile and complete-annual EI TES profile are connected to source-qualified chart routes. Real adapters for missing observations, discontinuities, event/categorical series, derived series and broader repository/vintage combinations remain unqualified in issue #343. These require their own scientific source/profile decision and adversarial reconstruction tests; they must not be inferred from synthetic contract fixtures. The immutable v0.6.3 release and published Flatpak asset remain unchanged.
-
-
-- **Gate A — scientific/profile decision:** review the bounded claim, profile name/version, exact semantic fields, and the no-raw-pipeline/no-derivation limitations.
-- **Gate B — native series qualification:** implement only the source-bound `VerifiedSeries` layer and its deterministic negative/reconstruction tests; no runtime chart or persistence changes.
-- **Gate C — downstream chart contract:** explicitly review the source-neutral type/API and chart/history identity design; only then implement chart integration.
-- **Gate D — application/release readiness:** end-to-end live and History verification, exact-head CI, documentation and release evidence. No release is inferred from earlier gates.
-
-This proposal is intentionally not a code-change authorization. The current fail-closed boundary remains active until each applicable gate has been reviewed and qualified.
