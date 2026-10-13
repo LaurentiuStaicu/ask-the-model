@@ -66,6 +66,13 @@ gboolean atm_bnr_bls_panel_validate (
     GError **error
 );
 
+/* Return an independently owned copy rebuilt from the retained five files. */
+gboolean atm_bnr_bls_panel_rebuild (
+    const AtmBnrBlsPanel *panel,
+    AtmBnrBlsPanel **out_panel,
+    GError **error
+);
+
 void atm_bnr_bls_panel_free (AtmBnrBlsPanel *panel);
 
 const char *atm_bnr_bls_panel_repository (const AtmBnrBlsPanel *panel);
