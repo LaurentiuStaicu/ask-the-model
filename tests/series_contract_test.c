@@ -198,6 +198,53 @@ qualified_with_single_source_decimal_fact (
 }
 
 static AtmSraResult *
+qualified_with_single_numeric_payload_fact (
+    AtmScientificArtifact *a,
+    const char *coefficient,
+    const char *exponent,
+    const char *numeric_profile,
+    gboolean negative_zero
+)
+{
+    AtmSraResult *q = atm_sra_result_new (ATM_SRA_ANSWERED);
+    GError *error = NULL;
+    char *qualifiers = g_strdup_printf (
+        "{\"calendar_year\":\"1880\",\"scenario\":\"baseline\","
+        "\"epistemic_status\":\"observed\",\"y_status\":\"NUMERIC\","
+        "\"coefficient\":\"%s\",\"exponent\":\"%s\","
+        "\"numeric_profile\":\"%s\",\"negative_zero\":%s}",
+        coefficient, exponent, numeric_profile,
+        negative_zero ? "true" : "false");
+    AtmSraEstablishedFact *fact = atm_sra_established_fact_new (
+        "numeric-payload-fact", "observation", "subject", "attribute",
+        "1e0", "unit", "dimension", qualifiers);
+    g_free (qualifiers);
+    g_assert_nonnull (fact);
+    g_assert_true (atm_sra_fact_add_support (fact, a->qualified_artifact_id, &error));
+    g_assert_no_error (error);
+    g_assert_true (atm_sra_result_add_fact (q, fact, &error));
+    g_assert_no_error (error);
+    g_assert_true (atm_sra_qualification_add_canonical_obligation (
+        q, "atm-sra/1", &error));
+    g_assert_no_error (error);
+    char *snapshot = g_strdup_printf ("ewd@0.1.0#%s", SHA);
+    g_assert_true (atm_sra_qualification_add_repository_snapshot (q, snapshot, &error));
+    g_free (snapshot);
+    g_assert_no_error (error);
+    g_assert_true (atm_sra_qualification_add_evidence_artifact (q, a, &error));
+    g_assert_no_error (error);
+    g_assert_true (atm_sra_qualification_add_semantic_profile (
+        q, "atm-profile/ewd/v1@1", &error));
+    g_assert_no_error (error);
+    g_assert_true (atm_sra_qualification_set_numeric_profile (
+        q, ATM_SERIES_CONTRACT_NUMERIC_PROFILE, &error));
+    g_assert_no_error (error);
+    g_assert_true (atm_sra_result_finalize (q, &error));
+    g_assert_no_error (error);
+    return q;
+}
+
+static AtmSraResult *
 qualified_with_coordinate_facts (
     AtmScientificArtifact *a,
     const char *coordinate_key,
@@ -566,6 +613,52 @@ static void test_numeric_source_decimal_must_match_qualified_fact (void)
 
     atm_series_contract_free (s);
     atm_sra_result_free (q);
+    atm_scientific_artifact_free (a);
+}
+
+static void test_numeric_payload_qualifiers_must_match_point (void)
+{
+    AtmScientificArtifact *a = support_artifact ();
+    const char *support[] = { a->qualified_artifact_id };
+    const struct {
+        const char *coefficient;
+        const char *exponent;
+        const char *numeric_profile;
+        gboolean negative_zero;
+        gboolean valid;
+    } cases[] = {
+        { "2", "0", ATM_SERIES_CONTRACT_NUMERIC_PROFILE, FALSE, FALSE },
+        { "1", "1", ATM_SERIES_CONTRACT_NUMERIC_PROFILE, FALSE, FALSE },
+        { "1", "0", "different-numeric-profile/1", FALSE, FALSE },
+        { "1", "0", ATM_SERIES_CONTRACT_NUMERIC_PROFILE, TRUE, FALSE },
+        { "1", "0", ATM_SERIES_CONTRACT_NUMERIC_PROFILE, FALSE, TRUE }
+    };
+
+    for (guint i = 0; i < G_N_ELEMENTS (cases); i++) {
+        AtmSraResult *q = qualified_with_single_numeric_payload_fact (
+            a, cases[i].coefficient, cases[i].exponent,
+            cases[i].numeric_profile, cases[i].negative_zero);
+        AtmSeriesContract *s = base ();
+        GError *error = NULL;
+        g_assert_true (atm_series_contract_add_point (
+            s, "1880", ATM_SERIES_Y_NUMERIC, "1.0000", "1", 0, FALSE,
+            FALSE, NULL, NULL, support, 1, &error));
+        g_assert_no_error (error);
+
+        if (cases[i].valid) {
+            g_assert_true (atm_series_contract_validate (s, q, &error));
+            g_assert_no_error (error);
+            g_assert_nonnull (atm_series_contract_scientific_id (s));
+        } else {
+            g_assert_false (atm_series_contract_validate (s, q, &error));
+            g_assert_error (error, ATM_SERIES_CONTRACT_ERROR,
+                            ATM_SERIES_CONTRACT_ERROR_SHAPE);
+            g_clear_error (&error);
+        }
+
+        atm_series_contract_free (s);
+        atm_sra_result_free (q);
+    }
     atm_scientific_artifact_free (a);
 }
 
@@ -1395,6 +1488,8 @@ int main (int argc, char **argv)
     g_test_add_func ("/series-contract/signed-zero-flag", test_signed_zero_flag_matches_source);
     g_test_add_func ("/series-contract/source-decimal-binding",
                      test_numeric_source_decimal_must_match_qualified_fact);
+    g_test_add_func ("/series-contract/numeric-payload-binding",
+                     test_numeric_payload_qualifiers_must_match_point);
     g_test_add_func ("/series-contract/duplicate-x", test_duplicate_x_rejected);
     g_test_add_func ("/series-contract/support", test_unqualified_support_rejected);
     g_test_add_func ("/series-contract/fact-binding", test_numeric_point_must_match_sra_fact);
