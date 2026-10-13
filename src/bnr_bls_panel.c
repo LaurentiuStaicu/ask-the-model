@@ -750,6 +750,29 @@ atm_bnr_bls_panel_validate (
     return TRUE;
 }
 
+gboolean
+atm_bnr_bls_panel_rebuild (
+    const AtmBnrBlsPanel *panel,
+    AtmBnrBlsPanel **out_panel,
+    GError **error
+)
+{
+    if (panel == NULL || out_panel == NULL || *out_panel != NULL)
+        return fail (error, ATM_BNR_BLS_PANEL_ERROR_ARGUMENT,
+                     "Invalid BNR panel rebuild arguments.");
+
+    if (!atm_bnr_bls_panel_validate (panel, error))
+        return FALSE;
+
+    return atm_bnr_bls_panel_new (
+        panel->repository,
+        panel->snapshot_sha,
+        panel->sources,
+        out_panel,
+        error
+    );
+}
+
 const char *
 atm_bnr_bls_panel_repository (const AtmBnrBlsPanel *panel)
 {
