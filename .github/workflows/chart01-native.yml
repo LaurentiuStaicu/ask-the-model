@@ -6,8 +6,10 @@ on:
       - 'src/annual_series_candidate.*'
       - 'src/bnr_bls_panel.*'
       - 'src/bnr_bls_sra.*'
+      - 'src/bnr_bls_series_contract.*'
       - 'tests/bnr_bls_panel_test.c'
       - 'tests/bnr_bls_sra_test.c'
+      - 'tests/bnr_bls_series_contract_test.c'
       - 'src/gistemp_admission.*'
       - 'src/gistemp_evidence.*'
       - 'src/gistemp_sra.*'
@@ -246,6 +248,19 @@ jobs:
             -o /tmp/bnr-bls-sra-test
           ATM_BNR_BLS_FIXTURE=tests/fixtures/chart01/rmd-bnr-bls \
             /tmp/bnr-bls-sra-test
+
+          # Reconstruct the source-bound calendar-quarter SeriesContract from the finalized BNR SRA.
+          # Keep this output-series gate explicit under ASan/UBSan; it is not a production caller.
+          cc -std=c11 -Wall -Wextra -Werror -g -O1 \
+            -fsanitize=address,undefined -fno-omit-frame-pointer -Isrc \
+            src/bnr_bls_series_contract.c src/bnr_bls_sra.c src/bnr_bls_panel.c \
+            src/series_contract.c src/scientific_canonical.c src/scientific_artifact.c \
+            src/scientific_result.c src/scientific_operation.c src/scientific_derivation.c \
+            tests/bnr_bls_series_contract_test.c \
+            $(pkg-config --cflags --libs glib-2.0 json-glib-1.0) -lm \
+            -o /tmp/bnr-bls-series-contract-test
+          ATM_BNR_BLS_FIXTURE=tests/fixtures/chart01/rmd-bnr-bls \
+            /tmp/bnr-bls-series-contract-test
 
           # The generic Evidence/SRA constructors must be byte/identity equivalent to legacy source modules.
           cc -std=c11 -Wall -Wextra -Werror -g -O1 \
