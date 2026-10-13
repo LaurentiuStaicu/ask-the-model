@@ -517,7 +517,9 @@ test_ei_history_reconstructs_pinned_snapshots (void)
             char *tampered_snapshot = make_ei_fixture_copy (snapshot_path, -1, 2);
             g_assert_false (reconstruct_ei_recipe (
                 tampered_snapshot, &recipe, &rejected, &error));
-            g_assert_nonnull (error);
+            g_assert_error (error,
+                            ATM_EI_CANDIDATE_ERROR,
+                            ATM_EI_CANDIDATE_ERROR_SHAPE);
             g_assert_null (rejected);
             g_clear_error (&error);
             remove_ei_fixture_copy (tampered_snapshot);
