@@ -384,6 +384,74 @@ test_mutated_missing_support_is_rejected (void)
 }
 
 static void
+test_missing_fact_without_source_authority_is_rejected (void)
+{
+    AtmBnrBlsPanel *panel = build_panel ();
+    AtmBnrBlsSra *sra = build_sra (panel);
+    AtmBnrBlsSeriesContract *series = NULL;
+    AtmSraResult *result = (AtmSraResult *)
+        atm_bnr_bls_sra_result (sra);
+    AtmSraEstablishedFact *missing = (AtmSraEstablishedFact *)
+        find_fact (result, "rmd:bnr-bls-c01:2025-Q2");
+    const AtmSraEstablishedFact *numeric =
+        find_fact (result, "rmd:bnr-bls-c01:2025-Q1");
+    GError *error = NULL;
+
+    g_assert_nonnull (missing);
+    g_assert_nonnull (numeric);
+    g_assert_cmpuint (missing->support->len, ==, ATM_BNR_BLS_SOURCE_COUNT);
+    g_assert_cmpuint (numeric->support->len, ==,
+                      ATM_BNR_BLS_SOURCE_COUNT + 1u);
+
+    /*
+     * Replace one of the five source-authority artifacts with the valid
+     * observation artifact for 2025-Q1. The replacement remains a qualified
+     * evidence ID, but it cannot authorize the absence of 2025-Q2.
+     */
+    const char *unauthorized_support = NULL;
+    for (guint i = 0; i < numeric->support->len; i++) {
+        const char *candidate = g_ptr_array_index (numeric->support, i);
+        if (!array_has (missing->support, candidate)) {
+            unauthorized_support = candidate;
+            break;
+        }
+    }
+
+    g_assert_nonnull (unauthorized_support);
+    g_assert_true (valid_sha256 (unauthorized_support));
+    g_assert_false (array_has (missing->support, unauthorized_support));
+
+    g_free (g_ptr_array_index (missing->support, 0u));
+    g_ptr_array_index (missing->support, 0u) = g_strdup (unauthorized_support);
+
+    /*
+     * Re-finalize the forged result so rejection proves source reconstruction,
+     * rather than merely detecting a stale identity digest.
+     */
+    result->finalized = FALSE;
+    g_clear_pointer (&result->qualification->scientific_content_id, g_free);
+    g_clear_pointer (&result->qualification->qualified_artifact_id, g_free);
+    g_assert_true (atm_sra_result_finalize (result, &error));
+    g_assert_no_error (error);
+    g_assert_true (atm_sra_result_validate (result, &error));
+    g_assert_no_error (error);
+
+    g_assert_false (atm_bnr_bls_sra_validate (sra, &error));
+    g_assert_error (error, ATM_BNR_BLS_SRA_ERROR,
+                    (gint) ATM_BNR_BLS_SRA_ERROR_IDENTITY);
+    g_clear_error (&error);
+
+    g_assert_false (atm_bnr_bls_series_contract_from_sra (
+        panel, sra, &series, &error));
+    g_assert_nonnull (error);
+    g_assert_null (series);
+    g_clear_error (&error);
+
+    atm_bnr_bls_sra_free (sra);
+    atm_bnr_bls_panel_free (panel);
+}
+
+static void
 test_sra_from_a_different_or_mutated_authority_is_rejected (void)
 {
     AtmBnrBlsPanel *panel = build_panel ();
@@ -449,6 +517,9 @@ main (int argc, char **argv)
     g_test_add_func (
         "/bnr-bls-series-contract/mutated-missing-support-is-rejected",
         test_mutated_missing_support_is_rejected);
+    g_test_add_func (
+        "/bnr-bls-series-contract/missing-fact-without-source-authority-is-rejected",
+        test_missing_fact_without_source_authority_is_rejected);
     g_test_add_func (
         "/bnr-bls-series-contract/mutated-authority-is-rejected",
         test_sra_from_a_different_or_mutated_authority_is_rejected);
