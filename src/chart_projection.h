@@ -2,6 +2,7 @@
 #include "chart_spec.h"
 G_BEGIN_DECLS
 #define ATM_CHART_PROJECTION_POLICY "atm-display/gistemp-linear/1"
+#define ATM_CHART_PROJECTION_EI_POLICY "atm-display/energy-institute-tes-linear/1"
 #define ATM_CHART_PROJECTION_MAX_TICKS 17
 #define ATM_CHART_PROJECTION_MIN_WIDTH 320
 #define ATM_CHART_PROJECTION_MIN_HEIGHT 160
@@ -22,6 +23,8 @@ gboolean atm_chart_projection_validate (const AtmChartProjection *projection, GE
 void atm_chart_projection_free (AtmChartProjection *projection);
 /* Borrowed read-only; invalid index -> NULL. */
 const AtmChartSpec *atm_chart_projection_spec (const AtmChartProjection *projection);
+/* Exact versioned display policy selected for this immutable projection. */
+const char *atm_chart_projection_policy (const AtmChartProjection *projection);
 const AtmChartDisplayDomain *atm_chart_projection_domain (const AtmChartProjection *projection);
 guint atm_chart_projection_count (const AtmChartProjection *projection);
 const AtmChartProjectedPoint *atm_chart_projection_point (const AtmChartProjection *projection, guint index);
