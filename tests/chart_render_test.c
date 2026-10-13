@@ -106,18 +106,18 @@ test_ei_projection_renders_exact_data_and_resizes (void)
     const char *data = atm_chart_render_data (rendered);
     g_assert_nonnull (data);
     g_assert_nonnull (strstr (data, "# Energy Institute global total energy supply"));
-    g_assert_nonnull (strstr (data, "# unit\\texajoules/year"));
-    g_assert_nonnull (strstr (data, "# source_snapshot\\tdc710d8e604c0fff713a3acfdb18ab47a1a902bb"));
-    g_assert_nonnull (strstr (data, "# source_path\\tscience/data/processed/energy_institute_global_2026.csv"));
+    g_assert_nonnull (strstr (data, "# unit\texajoules/year"));
+    g_assert_nonnull (strstr (data, "# source_snapshot\tdc710d8e604c0fff713a3acfdb18ab47a1a902bb"));
+    g_assert_nonnull (strstr (data, "# source_path\tscience/data/processed/energy_institute_global_2026.csv"));
     g_assert_nonnull (strstr (data, "1965"));
     g_assert_nonnull (strstr (data, "2025"));
     g_assert_null (strstr (data, "GISTEMP global annual temperature anomaly"));
 
-    char **lines = g_strsplit (data, "\\n", -1);
+    char **lines = g_strsplit (data, "\n", -1);
     guint rows = 0;
     for (guint i = 0; lines[i] != NULL; i++) {
-        if (lines[i][0] == '\\0' || lines[i][0] == '#' ||
-            g_str_has_prefix (lines[i], "series\\t"))
+        if (lines[i][0] == '\0' || lines[i][0] == '#' ||
+            g_str_has_prefix (lines[i], "series\t"))
             continue;
         rows++;
     }
