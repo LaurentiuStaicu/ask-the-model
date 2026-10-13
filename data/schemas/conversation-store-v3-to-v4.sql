@@ -157,6 +157,28 @@ BEGIN
 END;
 
 
+CREATE TRIGGER message_charts_tuple_update
+BEFORE UPDATE ON message_charts
+FOR EACH ROW
+WHEN EXISTS (
+    SELECT 1 FROM chart_series s
+    WHERE s.message_id = OLD.message_id
+      AND s.chart_ordinal = OLD.ordinal
+      AND NOT (
+        (NEW.chart_schema = 'atm-chart-spec/1'
+         AND NEW.reconstruction_profile = 'atm-chart-reconstruct/gistemp-complete-annual/1'
+         AND s.series_profile = 'atm-series/gistemp-complete-annual/1'
+         AND s.admission_profile = 'atm-gistemp-pinned-admission/1') OR
+        (NEW.chart_schema = 'atm-chart-spec/2'
+         AND NEW.reconstruction_profile = 'atm-chart-reconstruct/energy-institute-tes-complete-annual/1'
+         AND s.series_profile = 'atm-series/energy-institute-tes-complete-annual/1'
+         AND s.admission_profile = 'atm-energy-institute-pinned-admission/3')
+      )
+)
+BEGIN
+    SELECT RAISE(ABORT, 'chart tuple update would invalidate existing chart series');
+END;
+
 CREATE TABLE installation_v4 (
     singleton_id INTEGER PRIMARY KEY CHECK (singleton_id = 1),
     schema_id TEXT NOT NULL
