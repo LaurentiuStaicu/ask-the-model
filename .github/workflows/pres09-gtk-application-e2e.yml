@@ -28,6 +28,13 @@ jobs:
     timeout-minutes: 20
     steps:
       - uses: actions/checkout@v4
+      - name: Checkout complete EWD fixture at the admitted immutable snapshot
+        uses: actions/checkout@v4
+        with:
+          repository: LaurentiuStaicu/empirical-world3-dynamics
+          ref: dc710d8e604c0fff713a3acfdb18ab47a1a902bb
+          path: ewd-full
+          fetch-depth: 1
       - name: Install GTK Application test dependencies
         run: |
           set -euo pipefail
@@ -55,6 +62,7 @@ jobs:
       - name: Run live, process-relaunch History, and tampered-source E2E
         env:
           ATM_CHART01_FIXTURE: tests/fixtures/chart01
+          ATM_PRES09_FULL_EWD_ROOT: ewd-full
           GTK_A11Y: none
           GTK_IM_MODULE: gtk-im-context-simple
           GDK_BACKEND: x11
