@@ -1,6 +1,6 @@
 # CHART-01 Energy Institute VerifiedSeries proposal
 
-**Status: design proposal only, 2026-10-12. No production code, chart route, persistence format, or public-release change is authorized by this document.** The scope-level F0-19 decision has already approved Evidence/SRA reconstruction of the pinned processed snapshot only. This proposal requests a separate review of whether that same bounded source can support a narrowly defined output-series contract.
+**Status: original design proposal dated 2026-10-12; the narrow proposal was subsequently implemented.** The F0-19 decision approved only Evidence/SRA reconstruction of the pinned processed snapshot. The source-bound EI TES `VerifiedSeries` wrapper was integrated by PR #435, the two exact admission bundles by PR #438, ChartSpec v2/display projection by #439/#440, conversation-store and History/live application integration by #441–#443, and the GTK live-to-History E2E by #447. This page preserves the original rationale and proposed contract as a historical design record; see “As-built status” below for current scope. Nothing here authorizes raw-to-processed reproduction or changes the immutable v0.6.3 release.
 
 ## Executive finding
 
@@ -11,7 +11,7 @@ The current generic source Evidence/SRA implementation is not an Energy Institut
 - `verified_series.c` is still a GISTEMP-specific implementation: it owns `AtmGistempAdmission` and `AtmGistempSra`, rebuilds that source, and asserts 146 points for 1880–2025.
 - `chart_spec.c` and `chart_history_reconstruct.c` also use GISTEMP-specific verified-series and reconstruction contracts. A metadata-only change to the EI descriptor would therefore neither produce a qualified EI `VerifiedSeries` nor safely enable a chart.
 
-This proposal keeps those gates separate and leaves the current GISTEMP behavior and canonical identities unchanged.
+This proposal correctly separated those gates at its writing date. Subsequent integration retained GISTEMP's behavior and canonical identities while adding a distinct EI TES v2 identity/reconstruction path; the historical findings below describe the pre-implementation design baseline.
 
 ## Proposed bounded claim
 
@@ -85,11 +85,23 @@ Only after native EI-series qualification is green should a separate chart integ
 
 Any persisted schema or canonical identity compatibility impact must be explicit before a migration or release. The existing v0.6.3 artifact remains immutable; none of the development qualifications described here should be described as part of that release.
 
-## Decision gates
+## Original decision gates (historical)
 
 - **Gate A — scientific/profile decision:** review the bounded claim, profile name/version, exact semantic fields, and the no-raw-pipeline/no-derivation limitations.
 - **Gate B — native series qualification:** implement only the source-bound `VerifiedSeries` layer and its deterministic negative/reconstruction tests; no runtime chart or persistence changes.
 - **Gate C — downstream chart contract:** explicitly review the source-neutral type/API and chart/history identity design; only then implement chart integration.
 - **Gate D — application/release readiness:** end-to-end live and History verification, exact-head CI, documentation and release evidence. No release is inferred from earlier gates.
 
-This proposal is intentionally not a code-change authorization. The current fail-closed boundary remains active until each applicable gate has been reviewed and qualified.
+At the time of writing, this proposal was a design record rather than implementation authorization. The narrow scope was subsequently accepted and implemented; its scientific non-claims still apply.
+
+## As-built status (updated 2026-10-13)
+
+Gate A — source/profile decision: approved within the narrow claim. F0-19 authorizes faithful reconstruction of the admitted, byte-pinned EWD processed snapshot. TES is interpreted as Total Energy Supply under the Physical Energy Content method. It does not claim an independent recreation of Energy Institute's raw-to-processed pipeline.
+
+Gate B — source-bound series qualification: integrated. PR #435 implements the EI-specific TES `VerifiedSeries` wrapper; PR #438 admits exactly two complete four-file snapshot bundles under profile v3. The shared GISTEMP descriptor/profile remains unchanged.
+
+Gate C — ChartSpec/render/History: integrated. PR #439 adds source-bound ChartSpec v2; #440 qualifies the deterministic display projection; #441 integrates conversation-store v4; #442 integrates native EI History reconstruction; #443 connects the source-specific live and History application routes. The chart recipe stores identity/provenance, not authoritative numeric points.
+
+Gate D — application E2E: integrated. PR #447 adds a dedicated test-only GTK Application executable. The exact candidate head `f4c5c879fed905556bd7bc77c67c4a93735770b6` passed all 12 workflow runs, including live composer/send for EI v2 and GISTEMP v1, Save to History, separate-process restoration, exact Data/provenance comparison, and fail-closed behavior after source-manifest tampering. Documentation was synchronized by PR #448.
+
+**Remaining CHART-01 scope:** the general native contract expresses `NUMERIC`/`MISSING` and provenance-qualified breaks, but only the complete-annual GISTEMP profile and complete-annual EI TES profile are connected to source-qualified chart routes. Real adapters for missing observations, discontinuities, event/categorical series, derived series and broader repository/vintage combinations remain unqualified in issue #343. These require their own scientific source/profile decision and adversarial reconstruction tests; they must not be inferred from synthetic contract fixtures. The immutable v0.6.3 release and published Flatpak asset remain unchanged.

@@ -85,13 +85,13 @@ These rows must not be silently repaired, redistributed, normalized, or recomput
 
 The fossil/non-fossil component columns are not independent evidence for the total. A future multi-series adapter must explicitly qualify their semantic relationship before exposing them together.
 
-## Admission boundary
+## Admission boundary at the F0-19 review (historical stage)
 
-This source is sufficiently specified for a source-audit slice but is **not yet a qualified VerifiedSeries**.
+At the time of the source audit, this source was sufficiently specified for Evidence/SRA reconstruction but was **not yet a qualified VerifiedSeries**. That qualification was subsequently completed by PR #435 and downstream chart/History/application integration by PRs #439–#443, with live-to-History E2E in #447.
 
 The approved source-bound SRA path now enforces the pinned four-file admission, bounded CSV parsing, 61 consecutive annual observations, exact decimal preservation, source locators and source-bound Evidence for all four inputs plus every point. The generic SRA is reconstructed and validated against the pinned evidence; each of the 61 facts binds its five support artifacts and deterministic qualification envelope. Registered tests cover source-byte mutation, malformed/nonconsecutive rows, all-point qualification, exact endpoint values, semantic metadata, anomaly preservation, finalized-result mutation and the NULL-obligation negative control.
 
-No existing GISTEMP profile is widened by this audit. The Energy Institute source uses the versioned TES semantic profile `atm-profile/ewd-energy-institute-tes-physical-content/v2`. F0-19's scope decision is integrated on `main` via PR #423 for the bounded claim of reconstructing the pinned EWD processed snapshot, not independently reproducing Energy Institute's raw-to-processed pipeline. The active canonical obligation is `atm-energy-institute-ewd-tes-pinned-snapshot-reconstruction/1`. This F0-19 decision itself authorizes only source-bound Evidence/SRA reconstruction; it did not promote Energy Institute to `VerifiedSeries` or authorize a chart route on its own. Subsequent separate gates have since been integrated: PR #435 qualifies the source-specific TES series; #439/#440 qualify ChartSpec v2 and projection; #441/#442 integrate durable schema-v4 recipes and native History reconstruction; #443 connects the live and History routes. This separation remains intentional, and no downstream step expands the bounded claim to raw-to-processed reproduction.
+No existing GISTEMP profile is widened by this audit. The Energy Institute source uses the versioned TES semantic profile `atm-profile/ewd-energy-institute-tes-physical-content/v2`. F0-19's scope decision is integrated on `main` via PR #423 for the bounded claim of reconstructing the pinned EWD processed snapshot, not independently reproducing Energy Institute's raw-to-processed pipeline. The active canonical obligation is `atm-energy-institute-ewd-tes-pinned-snapshot-reconstruction/1`. At the time it was approved, the F0-19 decision authorized only source-bound Evidence/SRA reconstruction; it did not promote Energy Institute to `VerifiedSeries` or authorize a chart route by itself. Subsequent separate gates have since been integrated: PR #435 qualifies the source-specific TES series; #439/#440 qualify ChartSpec v2 and projection; #441/#442 integrate durable schema-v4 recipes and native History reconstruction; #443 connects the live and History routes. This separation remains intentional, and no downstream step expands the bounded claim to raw-to-processed reproduction.
 
 The accepted decision, semantic-precedence rule, proof boundary and future requirements for any raw-to-processed claim are recorded in [`CHART01_ENERGY_INSTITUTE_F0-19_QUALIFICATION_PROPOSAL.md`](CHART01_ENERGY_INSTITUTE_F0-19_QUALIFICATION_PROPOSAL.md).
 
@@ -107,7 +107,7 @@ This audit does not claim that Total Energy Supply (TES) is:
 - a calibrated World3 trajectory;
 - sufficient evidence for a chart without the remaining CHART-01 and CHART-02 qualification gates.
 
-The integrated Evidence/SRA path consumes the explicitly admitted, byte-pinned four-file source bundle. This does not authorize arbitrary runtime source access, a raw-source download, or execution of Energy Institute's upstream processing pipeline. The UI chart flow remains governed by separate source-profile and downstream qualification gates.
+The integrated Evidence/SRA and UI chart paths consume only the explicitly admitted, byte-pinned four-file source bundles and source-specific profiles. The live and History routes are integrated and end-to-end-tested for the two approved snapshots, but this does not authorize arbitrary runtime source access, raw-source download or execution of Energy Institute's upstream processing pipeline. The UI chart flow remains governed by these source-profile and reconstruction gates.
 
 ## M0 / F0-19 decision
 
