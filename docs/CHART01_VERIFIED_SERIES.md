@@ -1,6 +1,6 @@
 # CHART-01: source audit and VerifiedSeries boundary
 
-Status: native complete-source qualification; no chart runtime. Tracks #343 after PRES-08.
+**Status updated 2026-10-13:** the two source-specific complete-annual chart routes, GISTEMP v1 and Energy Institute TES v2, are integrated in `main` via PRs #439–#443; PRES-09 live-to-History GTK Application E2E is integrated via #447. This document preserves CHART-01's native VerifiedSeries design and qualification history, not the full current application-capability ledger. The native generic series contract specifies `NUMERIC`/`MISSING` and provenance-bound breaks, but real source adapters for missing observations, discontinuities, event/categorical series and derived series remain unqualified in #343. The immutable v0.6.3 release remains unchanged.
 
 ## First pinned source
 
@@ -261,11 +261,11 @@ Y is explicitly `NUMERIC` or `MISSING`, and the two representations are mutually
 
 The general contract is bounded at 10,000 points, 32 support IDs per point and 256-byte metadata/reason fields, with bounded X and numeric encodings. It accepts only finalized SRA qualifications whose `numeric_profile` is exactly `exact_decimal_coefficient_exponent/1`; a merely nonempty but different numeric profile cannot be reinterpreted as exact-decimal series data. Because `AtmSeriesContract` is a public mutable struct, the validator rechecks every metadata ceiling on each validation call before canonical identity serialization; constructor-time checks alone are insufficient. Each admitted evidence artifact's exact repository/version/snapshot tuple must be present in the SRA qualification snapshot set before its qualified identity is admitted. SCI-04 control artifacts intentionally have no repository-version field, so they must match repository and snapshot to exactly one declared snapshot entry; ambiguous version matches fail closed. SRA validation recomputes each public established fact's `qualifiers_content_id` from its current `qualifiers_json` before those qualifiers may authorize a series point; mutating the JSON while retaining the cached digest is rejected. Point support must be a lowercase SHA-256 identity present in a finalized and independently validated SRA qualification; matching a caller-provided identity string is insufficient. The qualified series identity also binds the exact SRA `qualified_artifact_id` that authorized validation; two valid SRA envelopes that establish identical point facts/support but differ in qualification metadata therefore share scientific content identity but must produce different qualified-series identities. The qualified-identity schema and domain are versioned as `atm-series-contract-qualification/2` / `atm.series-contract.qualification.v2` for this addition. Scientific and qualified series identities are recomputed from canonical contract material and provenance.
 
-This general contract deliberately remains dormant. It does not change Application behavior, enable charts, or reinterpret model output. The source descriptor separately declares the reviewed output-series semantics, scenario, epistemic status and series profile; caller-supplied adapter metadata must match those declarations before the adapter can mint a source-bound series identity. The evidence/SRA semantic profile is a distinct namespace and does not implicitly approve a series profile. GISTEMP remains the only source with an approved profile on the shared `ATM_GISTEMP_EVIDENCE_DESCRIPTOR`.
+At the M1c4 milestone, this generic contract was a dormant semantic container and did not, by itself, enable Application routes or authorize model output as data. Subsequent work integrated the source-specific GISTEMP v1 path and a separate Energy Institute TES v2 wrapper, then connected only those reviewed paths to ChartSpec/rendering/History through PRs #439–#443. The contract is not an arbitrary-source adapter: source descriptors/profiles and source-bound reconstruction remain required. GISTEMP remains the only source with an approved output-series profile on the shared `ATM_GISTEMP_EVIDENCE_DESCRIPTOR`; EI uses its separately qualified source-specific wrapper and private descriptor copy.
 
 Energy Institute's shared `ATM_EI_EVIDENCE_DESCRIPTOR` intentionally still has no output-series profile. Passing it directly to the generic series adapter therefore fails closed even when a caller supplies matching-looking metadata. A separate, source-specific `AtmEnergyInstituteVerifiedSeries` candidate now records the proposed narrow TES profile in a private copy of that descriptor and wraps a validated generic `AtmSeriesContract`. Its constructor rebuilds the admitted snapshot and the full Evidence/SRA/series chain; validation compares every materialized field and both identities to a fresh source reconstruction. The native test qualifies exactly 61 consecutive annual observations (1965–2025), exact source decimals and five validated supports per point, while proving that the shared EI descriptor remains fail-closed.
 
-This candidate is compiled only into the `energy-institute-verified-series` test target. It has no `ChartSpec`, renderer, Application or History caller, and it does not establish compatibility with the existing GISTEMP-specific chart interfaces. The source-neutral/downstream API decision, chart integration and persistence remain separate gates; this code does not enable EI rendering or change the published release.
+At the original candidate stage (2026-10-12), this wrapper was compiled only into the `energy-institute-verified-series` test target and had no `ChartSpec`, renderer, Application or History caller. That historical gate was subsequently completed: PR #435 integrated source-specific EI VerifiedSeries qualification; PRs #439–#443 integrated ChartSpec v2, rendering, persistence, History and the live EI route. Those later integrations retain the same bounded processed-snapshot claim and do not change the published release.
 
 ## M1c3 first native VerifiedSeries
 
@@ -319,12 +319,9 @@ MISSING/break fields, changed source spelling, support/identity corruption and
 invalid API arguments. General missing/discontinuity qualification and downstream
 chart gates are not claimed by this complete-source implementation.
 
-## Complete-annual qualification closeout
+## Complete-annual qualification closeout (historical gate record)
 
-This is a scoped gate for the one admitted complete annual profile. It does not
-close the broader #343 requirements or qualify other repositories, vintages,
-events, missing observations or derived numeric series. ChartSpec work may use
-this profile once the closeout CI passes; the following exclusions remain gates.
+At the time of this closeout, the scope was one admitted complete-annual GISTEMP profile; the downstream ChartSpec/renderer/History gates were still future work. Those gates have since been integrated through PRs #439–#443, and the bounded live-to-History UI path passed PRES-09 in PR #447. This qualification record still does not close broader #343 requirements or qualify other repositories, vintages, events, missing observations or derived numeric series.
 
 | Requirement | Evidence and scope |
 | --- | --- |
@@ -337,7 +334,7 @@ this profile once the closeout CI passes; the following exclusions remain gates.
 | Ownership and limits | Owned source bytes and data, fixed complete-source counts, checked byte/token/support ceilings |
 | Missing/discontinuity boundary | First, last and all-MISSING cases reject; no zero filling, interpolation or joined gaps |
 | Generic missing/event/derived data | Not qualified; remains open in #343 and cannot enter this profile |
-| Runtime chart display | Not enabled; requires ChartSpec and renderer qualification |
+| Runtime chart display | GISTEMP v1 and EI TES v2 routes are integrated via PRs #439–#443; general missing/event/derived series remain outside the qualified runtime |
 
 The closeout fault-injection helper is compiled only with
 `ATM_VERIFIED_SERIES_TESTING`, only in the VerifiedSeries test target, and has no
