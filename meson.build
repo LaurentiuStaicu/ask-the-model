@@ -38,9 +38,7 @@ resources = gnome.compile_resources(
   c_name: 'ask_the_model'
 )
 
-executable(
-  meson.project_name(),
-  [
+application_sources = [
     'src/Application.vala',
     'src/presentation_document.c',
     'src/presentation_normalize.c',
@@ -151,7 +149,11 @@ executable(
     'src/csv_table.c',
     'src/structured_json.c',
     resources
-  ],
+]
+
+executable(
+  meson.project_name(),
+  application_sources,
   include_directories: include_directories('src'),
   dependencies: [
     gtk_dep,
@@ -169,6 +171,35 @@ executable(
   ],
   install: true
 )
+
+# This target recompiles the same production GTK Application with seams that
+# exist only in this test binary. It is excluded from normal/default builds.
+pres09_gtk_application_e2e_test = executable(
+  'pres09-gtk-application-e2e-test',
+  application_sources + ['tests/pres09_gtk_application_e2e_test.vala'],
+  include_directories: include_directories('src'),
+  dependencies: [
+    gtk_dep,
+    granite_dep,
+    soup_dep,
+    json_glib_dep,
+    sqlite_dep,
+    md4c_dep
+  ],
+  vala_args: [
+    '--define=ATM_M12_TEST',
+    '--define=ATM_PRES09_TEST'
+  ],
+  link_args: [
+    '-larchive',
+    '-lyaml',
+    '-lsqlite3',
+    '-lm'
+  ],
+  install: false,
+  build_by_default: false
+)
+
 
 repository_store_oracle = executable(
   'repository-store-oracle',
