@@ -1,11 +1,17 @@
 #include "chart_spec.h"
+#include "energy_institute_verified_series.h"
+#include "energy_institute_admission.h"
+#include "series_contract.h"
+#include "scientific_canonical.h"
 #include <json-glib/json-glib.h>
 #include <string.h>
 
 struct AtmChartSpec {
+    AtmChartSpecVersion version;
     AtmChartKind kind;
     guint count;
     AtmVerifiedSeries *series[ATM_CHART_SPEC_MAX_SERIES];
+    AtmEnergyInstituteVerifiedSeries *ei_series;
     guint x_min, x_max;
     AtmScientificDecimal y_min, y_max;
     char *id;
@@ -18,7 +24,10 @@ static gboolean reject (GError **error, const char *message)
 void atm_chart_spec_free (AtmChartSpec *s)
 {
     if (s == NULL) return;
-    for (guint i = 0; i < s->count; i++) atm_verified_series_free (s->series[i]);
+    if (s->version == ATM_CHART_SPEC_VERSION_ENERGY_INSTITUTE_V2)
+        atm_energy_institute_verified_series_free (s->ei_series);
+    else
+        for (guint i = 0; i < s->count; i++) atm_verified_series_free (s->series[i]);
     g_free (s->y_min.coefficient); g_free (s->y_max.coefficient);
     g_free (s->id); g_free (s);
 }
@@ -91,7 +100,9 @@ gboolean atm_chart_spec_new (AtmChartKind kind, const AtmVerifiedSeries *const *
     if (out == NULL || *out != NULL || input == NULL || count == 0 ||
         count > ATM_CHART_SPEC_MAX_SERIES || (kind != ATM_CHART_LINE && kind != ATM_CHART_SCATTER))
         return reject (error, "Unsupported ChartSpec arguments or kind.");
-    AtmChartSpec *s = g_new0 (AtmChartSpec, 1); s->kind = kind;
+    AtmChartSpec *s = g_new0 (AtmChartSpec, 1);
+    s->version = ATM_CHART_SPEC_VERSION_GISTEMP_V1;
+    s->kind = kind;
     const AtmVerifiedPoint *low = NULL, *high = NULL;
     s->x_min = G_MAXUINT;
     for (guint i = 0; i < count; i++) {
@@ -127,9 +138,208 @@ gboolean atm_chart_spec_new (AtmChartKind kind, const AtmVerifiedSeries *const *
 invalid:
     atm_chart_spec_free (s); return FALSE;
 }
+
+/* Compare exact contract decimals using the same integer-only ordering used
+ * by the legacy v1 path; no binary64 conversion or unit reinterpretation. */
+static gint compare_contract_points (const AtmSeriesContractPoint *a,
+                                     const AtmSeriesContractPoint *b)
+{
+    AtmVerifiedPoint left = {0}, right = {0};
+    left.coefficient = a->coefficient;
+    left.exponent = a->exponent;
+    right.coefficient = b->coefficient;
+    right.exponent = b->exponent;
+    return compare (&left, &right);
+}
+
+static gboolean contract_year (const AtmSeriesContractPoint *p, guint *year)
+{
+    if (p == NULL || p->x == NULL || year == NULL || p->x[0] == '\0')
+        return FALSE;
+    char *end = NULL;
+    guint64 parsed = g_ascii_strtoull (p->x, &end, 10);
+    if (end == p->x || end == NULL || *end != '\0' || parsed > G_MAXUINT)
+        return FALSE;
+    *year = (guint) parsed;
+    return TRUE;
+}
+
+static gboolean identity_v2 (const AtmChartSpec *s, char **out, GError **error)
+{
+    const AtmSeriesContract *c =
+        atm_energy_institute_verified_series_contract (s->ei_series);
+    if (c == NULL)
+        return reject (error, "Energy Institute ChartSpec has no source-bound contract.");
+
+    JsonBuilder *b = json_builder_new ();
+    json_builder_begin_object (b);
+    text (b, "schema", ATM_CHART_SPEC_V2_SCHEMA);
+    text (b, "identity_domain", "atm.chart-spec.v2");
+    text (b, "kind", s->kind == ATM_CHART_LINE ? "LINE" : "SCATTER");
+    text (b, "series_profile", c->profile_id);
+    text (b, "series_profile_version", c->profile_version);
+    text (b, "admission_profile", ATM_EI_ADMISSION_PROFILE);
+    text (b, "repository_id", c->repository_id);
+    text (b, "repository_version", c->repository_version);
+    text (b, "snapshot_sha", c->snapshot_sha);
+    text (b, "source_path", c->source_path);
+    text (b, "scientific_series_id", c->scientific_content_id);
+    text (b, "qualified_series_id", c->qualified_series_id);
+    text (b, "subject", c->subject);
+    text (b, "attribute", c->attribute);
+    text (b, "series_semantics", c->series_semantics);
+    text (b, "scenario", c->scenario);
+    text (b, "time_scope", c->time_scope);
+    text (b, "epistemic_status", c->epistemic_status);
+    text (b, "x_semantics", "calendar_year");
+    text (b, "x_unit", c->x_unit);
+    text (b, "x_dimension", c->x_dimension);
+    text (b, "x_scale", "linear");
+    text (b, "y_unit", c->y_unit);
+    text (b, "y_dimension", c->y_dimension);
+    text (b, "numeric_profile", ATM_SERIES_CONTRACT_NUMERIC_PROFILE);
+    text (b, "y_scale", "linear");
+    text (b, "missing_policy", "GAP");
+    text (b, "extent_policy", "exact_data_non_degenerate/1");
+    /* This is an explicit marker, not an approval to project or render EI. */
+    text (b, "display_profile_id", ATM_CHART_SPEC_V2_EI_DISPLAY_PROFILE);
+    text (b, "display_profile_version", ATM_CHART_SPEC_V2_EI_DISPLAY_PROFILE_VERSION);
+    json_builder_set_member_name (b, "point_count");
+    json_builder_add_int_value (b, (gint64) atm_energy_institute_verified_series_count (s->ei_series));
+    json_builder_set_member_name (b, "x_min");
+    json_builder_add_int_value (b, s->x_min);
+    json_builder_set_member_name (b, "x_max");
+    json_builder_add_int_value (b, s->x_max);
+    decimal (b, "y_min", &s->y_min);
+    decimal (b, "y_max", &s->y_max);
+    json_builder_set_member_name (b, "series");
+    json_builder_begin_array (b);
+    json_builder_begin_object (b);
+    text (b, "scientific_id", c->scientific_content_id);
+    text (b, "qualified_id", c->qualified_series_id);
+    text (b, "profile_id", c->profile_id);
+    text (b, "profile_version", c->profile_version);
+    json_builder_end_object (b);
+    json_builder_end_array (b);
+    json_builder_end_object (b);
+
+    JsonNode *root = json_builder_get_root (b);
+    char *json = json_to_string (root, FALSE);
+    gboolean ok = atm_scientific_content_id_json ("atm.chart-spec.v2", json, out, error);
+    g_free (json);
+    json_node_free (root);
+    g_object_unref (b);
+    return ok;
+}
+
+gboolean atm_chart_spec_new_energy_institute_v2 (
+    AtmChartKind kind,
+    const AtmEnergyInstituteVerifiedSeries *input,
+    AtmChartSpec **out,
+    GError **error)
+{
+    if (out == NULL || *out != NULL || input == NULL ||
+        (kind != ATM_CHART_LINE && kind != ATM_CHART_SCATTER))
+        return reject (error, "Unsupported Energy Institute ChartSpec v2 arguments or kind.");
+
+    AtmChartSpec *s = g_new0 (AtmChartSpec, 1);
+    s->version = ATM_CHART_SPEC_VERSION_ENERGY_INSTITUTE_V2;
+    s->kind = kind;
+    s->count = 1;
+
+    if (!atm_energy_institute_verified_series_rebuild (input, &s->ei_series, error))
+        goto invalid;
+
+    const AtmSeriesContract *c =
+        atm_energy_institute_verified_series_contract (s->ei_series);
+    if (c == NULL ||
+        c->x_kind != ATM_SERIES_X_CALENDAR_YEAR ||
+        g_strcmp0 (c->subject, "global_total_energy_supply") != 0 ||
+        g_strcmp0 (c->attribute, "total_energy_supply") != 0 ||
+        g_strcmp0 (c->x_unit, "calendar_year") != 0 ||
+        g_strcmp0 (c->x_dimension, "time") != 0 ||
+        g_strcmp0 (c->y_unit, "exajoules/year") != 0 ||
+        g_strcmp0 (c->y_dimension, "energy_flow_rate") != 0 ||
+        g_strcmp0 (c->series_semantics, "empirical_annual_observations") != 0 ||
+        g_strcmp0 (c->scenario, "not_applicable") != 0 ||
+        g_strcmp0 (c->time_scope, "1965-2025") != 0 ||
+        g_strcmp0 (c->epistemic_status, "empirical") != 0 ||
+        g_strcmp0 (c->repository_id, "ewd") != 0 ||
+        g_strcmp0 (c->profile_id, ATM_EI_VERIFIED_SERIES_PROFILE) != 0 ||
+        g_strcmp0 (c->profile_version, "1") != 0 ||
+        c->points == NULL || c->points->len != 61) {
+        reject (error, "Energy Institute ChartSpec v2 source/profile tuple is unsupported.");
+        goto invalid;
+    }
+
+    char *expected_version = g_strconcat ("snapshot:", c->snapshot_sha, NULL);
+    gboolean version_matches =
+        g_strcmp0 (c->repository_version, expected_version) == 0;
+    g_free (expected_version);
+    if (!version_matches) {
+        reject (error, "Energy Institute ChartSpec v2 repository version disagrees with its snapshot.");
+        goto invalid;
+    }
+
+    const AtmSeriesContractPoint *low = NULL, *high = NULL;
+    s->x_min = G_MAXUINT;
+    for (guint i = 0; i < c->points->len; i++) {
+        const AtmSeriesContractPoint *p = g_ptr_array_index (c->points, i);
+        guint year = 0;
+        if (p == NULL || p->order != i ||
+            !contract_year (p, &year) || year != 1965u + i ||
+            p->y_status != ATM_SERIES_Y_NUMERIC ||
+            p->coefficient == NULL || p->source_decimal == NULL ||
+            p->break_before || p->missing_reason != NULL || p->break_reason != NULL) {
+            reject (error, "Energy Institute ChartSpec v2 contains an unsupported point or gap.");
+            goto invalid;
+        }
+        s->x_min = MIN (s->x_min, year);
+        s->x_max = MAX (s->x_max, year);
+        if (low == NULL || compare_contract_points (p, low) < 0) low = p;
+        if (high == NULL || compare_contract_points (p, high) > 0) high = p;
+    }
+
+    if (low == NULL || high == NULL || s->x_min >= s->x_max ||
+        compare_contract_points (low, high) >= 0) {
+        reject (error, "Energy Institute ChartSpec v2 has empty or degenerate extents.");
+        goto invalid;
+    }
+    s->y_min.coefficient = g_strdup (low->coefficient);
+    s->y_min.exponent = low->exponent;
+    s->y_max.coefficient = g_strdup (high->coefficient);
+    s->y_max.exponent = high->exponent;
+    if (!identity_v2 (s, &s->id, error))
+        goto invalid;
+    *out = s;
+    return TRUE;
+
+invalid:
+    atm_chart_spec_free (s);
+    return FALSE;
+}
+
 gboolean atm_chart_spec_validate (const AtmChartSpec *s, GError **error)
 {
-    if (s == NULL || s->count == 0 || s->count > ATM_CHART_SPEC_MAX_SERIES)
+    if (s != NULL && s->version == ATM_CHART_SPEC_VERSION_ENERGY_INSTITUTE_V2) {
+        if (s->count != 1 || s->ei_series == NULL)
+            return reject (error, "Invalid Energy Institute ChartSpec v2 coverage.");
+        AtmChartSpec *expected = NULL;
+        if (!atm_chart_spec_new_energy_institute_v2 (s->kind, s->ei_series,
+                                                     &expected, error))
+            return FALSE;
+        gboolean matches =
+            s->x_min == expected->x_min && s->x_max == expected->x_max &&
+            s->y_min.exponent == expected->y_min.exponent &&
+            s->y_max.exponent == expected->y_max.exponent &&
+            g_strcmp0 (s->y_min.coefficient, expected->y_min.coefficient) == 0 &&
+            g_strcmp0 (s->y_max.coefficient, expected->y_max.coefficient) == 0 &&
+            g_strcmp0 (s->id, expected->id) == 0;
+        atm_chart_spec_free (expected);
+        return matches || reject (error, "Energy Institute ChartSpec v2 disagrees with reconstructed source.");
+    }
+    if (s == NULL || s->version != ATM_CHART_SPEC_VERSION_GISTEMP_V1 ||
+        s->count == 0 || s->count > ATM_CHART_SPEC_MAX_SERIES)
         return reject (error, "Invalid ChartSpec coverage.");
     const AtmVerifiedSeries *inputs[ATM_CHART_SPEC_MAX_SERIES];
     for (guint i = 0; i < s->count; i++) inputs[i] = s->series[i];
@@ -143,24 +353,133 @@ gboolean atm_chart_spec_validate (const AtmChartSpec *s, GError **error)
     atm_chart_spec_free (expected);
     return matches || reject (error, "ChartSpec disagrees with reconstructed series.");
 }
+AtmChartSpecVersion atm_chart_spec_version (const AtmChartSpec *s)
+{ return s ? s->version : 0; }
+const char *atm_chart_spec_schema (const AtmChartSpec *s)
+{
+    if (s == NULL) return NULL;
+    return s->version == ATM_CHART_SPEC_VERSION_ENERGY_INSTITUTE_V2
+        ? ATM_CHART_SPEC_V2_SCHEMA : ATM_CHART_SPEC_SCHEMA;
+}
 const char *atm_chart_spec_id (const AtmChartSpec *s) { return s ? s->id : NULL; }
 AtmChartKind atm_chart_spec_kind (const AtmChartSpec *s) { return s ? s->kind : 0; }
 guint atm_chart_spec_count (const AtmChartSpec *s) { return s ? s->count : 0; }
 const AtmVerifiedSeries *atm_chart_spec_series (const AtmChartSpec *s, guint i)
-{ return s && i < s->count ? s->series[i] : NULL; }
+{ return s && s->version == ATM_CHART_SPEC_VERSION_GISTEMP_V1 && i < s->count ? s->series[i] : NULL; }
 const char *atm_chart_spec_series_scientific_id (const AtmChartSpec *s, guint i)
-{ return s && i < s->count ? atm_verified_series_scientific_id (s->series[i]) : NULL; }
+{
+    if (s == NULL || i >= s->count) return NULL;
+    return s->version == ATM_CHART_SPEC_VERSION_ENERGY_INSTITUTE_V2
+        ? atm_energy_institute_verified_series_scientific_id (s->ei_series)
+        : atm_verified_series_scientific_id (s->series[i]);
+}
 const char *atm_chart_spec_series_qualified_id (const AtmChartSpec *s, guint i)
-{ return s && i < s->count ? atm_verified_series_qualified_id (s->series[i]) : NULL; }
+{
+    if (s == NULL || i >= s->count) return NULL;
+    return s->version == ATM_CHART_SPEC_VERSION_ENERGY_INSTITUTE_V2
+        ? atm_energy_institute_verified_series_qualified_id (s->ei_series)
+        : atm_verified_series_qualified_id (s->series[i]);
+}
 guint atm_chart_spec_x_min (const AtmChartSpec *s) { return s ? s->x_min : 0; }
 guint atm_chart_spec_x_max (const AtmChartSpec *s) { return s ? s->x_max : 0; }
 const AtmScientificDecimal *atm_chart_spec_y_min (const AtmChartSpec *s) { return s ? &s->y_min : NULL; }
 const AtmScientificDecimal *atm_chart_spec_y_max (const AtmChartSpec *s) { return s ? &s->y_max : NULL; }
 
+guint atm_chart_spec_point_count (const AtmChartSpec *s, guint series_index)
+{
+    if (s == NULL || series_index >= s->count) return 0;
+    if (s->version == ATM_CHART_SPEC_VERSION_ENERGY_INSTITUTE_V2)
+        return atm_energy_institute_verified_series_count (s->ei_series);
+    return atm_verified_series_count (s->series[series_index]);
+}
+
+gboolean atm_chart_spec_point (const AtmChartSpec *s, guint series_index,
+    guint point_index, AtmChartPointView *out)
+{
+    if (out == NULL) return FALSE;
+    *out = (AtmChartPointView) {0};
+    if (s == NULL || series_index >= s->count ||
+        point_index >= atm_chart_spec_point_count (s, series_index))
+        return FALSE;
+
+    if (s->version == ATM_CHART_SPEC_VERSION_ENERGY_INSTITUTE_V2) {
+        const AtmSeriesContractPoint *p =
+            atm_energy_institute_verified_series_point (s->ei_series, point_index);
+        if (p == NULL) return FALSE;
+        guint year = 0;
+        if (!contract_year (p, &year)) return FALSE;
+        out->order = p->order;
+        out->calendar_year = year;
+        out->y_status = p->y_status == ATM_SERIES_Y_NUMERIC
+            ? ATM_CHART_POINT_NUMERIC : ATM_CHART_POINT_MISSING;
+        out->source_decimal = p->source_decimal;
+        out->coefficient = p->coefficient;
+        out->exponent = p->exponent;
+        out->break_before = p->break_before;
+        out->support = p->support;
+        return TRUE;
+    }
+
+    if (s->version == ATM_CHART_SPEC_VERSION_GISTEMP_V1) {
+        const AtmVerifiedPoint *p =
+            atm_verified_series_point (s->series[series_index], point_index);
+        if (p == NULL) return FALSE;
+        out->order = p->order;
+        out->calendar_year = p->calendar_year;
+        out->y_status = p->y_status == ATM_VERIFIED_Y_NUMERIC
+            ? ATM_CHART_POINT_NUMERIC : ATM_CHART_POINT_MISSING;
+        out->source_decimal = p->source_decimal;
+        out->coefficient = p->coefficient;
+        out->exponent = p->exponent;
+        out->break_before = p->break_before;
+        out->support = p->support;
+        return TRUE;
+    }
+    return FALSE;
+}
+
+const char *atm_chart_spec_x_unit (const AtmChartSpec *s)
+{
+    if (s == NULL) return NULL;
+    if (s->version == ATM_CHART_SPEC_VERSION_ENERGY_INSTITUTE_V2)
+        return atm_energy_institute_verified_series_contract (s->ei_series)->x_unit;
+    return "calendar_year";
+}
+const char *atm_chart_spec_x_dimension (const AtmChartSpec *s)
+{
+    if (s == NULL) return NULL;
+    if (s->version == ATM_CHART_SPEC_VERSION_ENERGY_INSTITUTE_V2)
+        return atm_energy_institute_verified_series_contract (s->ei_series)->x_dimension;
+    return "time";
+}
+const char *atm_chart_spec_y_unit (const AtmChartSpec *s)
+{
+    if (s == NULL) return NULL;
+    if (s->version == ATM_CHART_SPEC_VERSION_ENERGY_INSTITUTE_V2)
+        return atm_energy_institute_verified_series_contract (s->ei_series)->y_unit;
+    return atm_verified_series_unit (s->series[0]);
+}
+const char *atm_chart_spec_y_dimension (const AtmChartSpec *s)
+{
+    if (s == NULL) return NULL;
+    if (s->version == ATM_CHART_SPEC_VERSION_ENERGY_INSTITUTE_V2)
+        return atm_energy_institute_verified_series_contract (s->ei_series)->y_dimension;
+    return "temperature_difference";
+}
+const char *atm_chart_spec_series_profile (const AtmChartSpec *s)
+{
+    if (s == NULL) return NULL;
+    if (s->version == ATM_CHART_SPEC_VERSION_ENERGY_INSTITUTE_V2)
+        return atm_energy_institute_verified_series_contract (s->ei_series)->profile_id;
+    return ATM_VERIFIED_SERIES_PROFILE;
+}
+
 gboolean atm_chart_spec_rebuild (const AtmChartSpec *s, AtmChartSpec **out, GError **error)
 {
     if (out == NULL || *out != NULL) return reject (error, "Invalid ChartSpec rebuild output.");
     if (!atm_chart_spec_validate (s, error)) return FALSE;
+    if (s->version == ATM_CHART_SPEC_VERSION_ENERGY_INSTITUTE_V2)
+        return atm_chart_spec_new_energy_institute_v2 (s->kind, s->ei_series, out, error);
     const AtmVerifiedSeries *inputs[ATM_CHART_SPEC_MAX_SERIES];
     for (guint i = 0; i < s->count; i++) inputs[i] = s->series[i];
     return atm_chart_spec_new (s->kind, inputs, s->count, out, error);
