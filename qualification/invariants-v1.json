@@ -751,6 +751,22 @@
         "meson:energy-institute-admission",
         "meson:series-sra-equivalence"
       ]
+    },
+    {
+      "id": "SCIENTIFIC-S1-006",
+      "category": "SCIENTIFIC",
+      "severity": "S1",
+      "lifecycle": "enforced",
+      "statement": "ChartSpec v1 must retain its existing GISTEMP identity serialization and IDs. Energy Institute ChartSpec v2 may be constructed only from the opaque source-specific Energy Institute VerifiedSeries that independently reconstructs an exactly admitted four-file snapshot and finalized SRA. Its separate v2 identity must bind the EI series scientific/qualified identities, profile, admission, snapshot, source path, semantics, exact decimal extents and kind; generic point accessors preserve exact source decimals and support IDs. The EI display profile remains explicitly unqualified, and this native contract alone must not enable projection, application intent, rendering or History persistence.",
+      "enforced_by": [
+        "src/chart_spec.c",
+        "src/energy_institute_verified_series.c",
+        "src/series_adapter.c"
+      ],
+      "tested_by": [
+        "meson:chart-spec",
+        "meson:energy-institute-verified-series"
+      ]
     }
   ]
 }
