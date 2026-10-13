@@ -462,15 +462,13 @@ point_matches_established_fact (const AtmSeriesContract *s,
     if (p->y_status == ATM_SERIES_Y_NUMERIC) {
         gboolean has_source_decimal =
             json_object_has_member (object, "source_decimal");
-        gboolean zero_value =
-            g_strcmp0 (p->coefficient, "0") == 0 && p->exponent == 0;
 
-        /* A normalized zero has lost its source sign. Do not qualify either
-         * positive or negative zero unless the original source token is part
-         * of the established fact. For nonzero values, older generic facts
-         * can still bind the canonical numeric value when they lack this
-         * optional lexical metadata. */
-        if (!has_source_decimal && zero_value) {
+        /* A negative-zero claim needs source-token evidence: the normalized
+         * SRA value 0e0 cannot establish its sign. Do not reject ordinary zero
+         * observations whose generic fact schema carries only the canonical
+         * numeric value; source-specific adapters separately reconstruct and
+         * verify their admitted source token. */
+        if (!has_source_decimal && p->negative_zero) {
             source_decimal_matches = FALSE;
         } else if (has_source_decimal) {
             JsonNode *node = json_object_get_member (object, "source_decimal");
