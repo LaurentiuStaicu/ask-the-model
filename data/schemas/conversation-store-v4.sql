@@ -7,7 +7,7 @@ CREATE TABLE installation (
 ) STRICT;
 
 INSERT INTO installation(singleton_id, schema_id)
-VALUES(1, 'atm-conversation-store/3');
+VALUES(1, 'atm-conversation-store/4');
 
 CREATE TABLE conversations (
     conversation_id TEXT PRIMARY KEY
