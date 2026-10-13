@@ -1,6 +1,6 @@
 # CHART-02 Energy Institute chart and History v2 proposal
 
-**Status: implementation record, updated 2026-10-13. C2c conversation-store v4, C2d native EI History reconstruction, and C2e application integration are integrated into `main`. C2e connects source-bound live intent, rendering/Data view, durable chart recipe, and History reconstruction without changing the release/version.** CHART-01 Gate B qualified a dormant source-bound Energy Institute series candidate; this record tracks the versioned chart/History contract and its gated implementation.
+**Status: implementation record, updated 2026-10-13. C2c conversation-store v4, C2d native EI History reconstruction, C2e application integration and the PRES-09 GTK Application E2E are integrated into `main`.** PR #447 qualifies the bounded live-to-History path for EI v2 and GISTEMP v1 through composer/send, Save to History, process relaunch, exact Data/provenance comparison and fail-closed source tampering. This record tracks the source-bound chart/History contract without changing the release/version. CHART-01 Gate B's F0-19 claim remains limited to reconstructing admitted processed EWD bytes, not reproducing the upstream raw-to-processed pipeline.
 
 ## Initial baseline findings (historical)
 
@@ -94,6 +94,7 @@ C2e was integrated into `main` via PR #443 on 2026-10-13. It connects the approv
 - **C2c — conversation-store v4: integrated into `main` via PR #441.** Atomic migration, exact tuple allowlist and fail-closed compatibility are implemented.
 - **C2d — EI History reconstruction: integrated into `main` via PR #442**, merge commit `cd7351cc3d8de3f868e5a7ebb07233a9e5f8099a`. Exact-head CI passed on the pre-merge candidate; stored points remain non-authoritative.
 - **C2e — application integration: integrated into `main` via PR #443**, merge commit `66a32cbd8858f8ce0a49704c6c542ceb580d68c2`. Adds `/chart energy-institute`, source-bound live reconstruction, EI-specific chart/Data presentation and v2 History dispatch that re-runs C2d reconstruction. The conversation pin retains repository release version `0.1.0` from `CITATION.cff`; the chart recipe separately uses `snapshot:<snapshot_sha>`. All nine exact-head CI workflows passed on candidate `a82003b78042b129797f6f2851c79e3de282ee5b`.
+- **PRES-09 GTK Application E2E: integrated via PR #447**, merge commit `1b27af38109879ec620925af1862224c755d2734`. All 12 exact-head workflows passed on `f4c5c879fed905556bd7bc77c67c4a93735770b6`. The test covers live EI v2 / GISTEMP v1 composer requests, archival, separate-process History reconstruction, exact Data/row provenance and fail-closed tampered-source restoration.
 
 Each gate has its own exact-head CI and acceptance evidence. None implies the others. No release is inferred from native-series qualification or from this proposal. The immutable v0.6.3 artifact remains unchanged.
 
@@ -139,7 +140,4 @@ reconstruction remain fail-closed.
 
 ### Release boundary
 
-C2e is integrated but **does not constitute a release**. It does not alter the
-published immutable v0.6.3 artifact or change the application version. Release
-qualification and packaging remain separate decisions; native-series
-qualification or application integration alone must not be reported as a launch.
+PRES-09 now qualifies the narrow live-to-History GTK Application route, but this is a test qualification and **does not constitute a release**. It does not alter the published immutable v0.6.3 artifact or change the application version. Release qualification and packaging remain separate decisions; native-series qualification, application integration or E2E test success alone must not be reported as a launch. The broader CHART-01 issue #343 remains open for contract semantics and adapters outside the two admitted routes.
