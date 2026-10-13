@@ -4,6 +4,10 @@ on:
   pull_request:
     paths:
       - 'src/annual_series_candidate.*'
+      - 'src/bnr_bls_panel.*'
+      - 'src/bnr_bls_sra.*'
+      - 'tests/bnr_bls_panel_test.c'
+      - 'tests/bnr_bls_sra_test.c'
       - 'src/gistemp_admission.*'
       - 'src/gistemp_evidence.*'
       - 'src/gistemp_sra.*'
@@ -221,6 +225,27 @@ jobs:
             $(pkg-config --cflags --libs glib-2.0 json-glib-1.0) -lm \
             -o /tmp/energy-institute-verified-series-test
           /tmp/energy-institute-verified-series-test
+
+          # BNR BLS source admission and C01 SRA: explicitly execute the five-file
+          # admission and its source-bound MISSING fact under ASan/UBSan.
+          cc -std=c11 -Wall -Wextra -Werror -g -O1 \
+            -fsanitize=address,undefined -fno-omit-frame-pointer -Isrc \
+            src/bnr_bls_panel.c src/scientific_canonical.c \
+            tests/bnr_bls_panel_test.c \
+            $(pkg-config --cflags --libs glib-2.0 json-glib-1.0) -lm \
+            -o /tmp/bnr-bls-panel-test
+          ATM_BNR_BLS_FIXTURE=tests/fixtures/chart01/rmd-bnr-bls \
+            /tmp/bnr-bls-panel-test
+          cc -std=c11 -Wall -Wextra -Werror -g -O1 \
+            -fsanitize=address,undefined -fno-omit-frame-pointer -Isrc \
+            src/bnr_bls_sra.c src/bnr_bls_panel.c \
+            src/scientific_canonical.c src/scientific_artifact.c \
+            src/scientific_result.c src/scientific_operation.c \
+            src/scientific_derivation.c tests/bnr_bls_sra_test.c \
+            $(pkg-config --cflags --libs glib-2.0 json-glib-1.0) -lm \
+            -o /tmp/bnr-bls-sra-test
+          ATM_BNR_BLS_FIXTURE=tests/fixtures/chart01/rmd-bnr-bls \
+            /tmp/bnr-bls-sra-test
 
           # The generic Evidence/SRA constructors must be byte/identity equivalent to legacy source modules.
           cc -std=c11 -Wall -Wextra -Werror -g -O1 \
