@@ -530,13 +530,23 @@ test_v3_to_v4_migration_rollback (void)
     char *path = store_path (root);
     create_v3_store (path);
     insert_v3_gistemp_chart_fixture (path);
-    raw_exec (path, "CREATE TABLE message_charts_v4(dummy INTEGER) STRICT;");
+    /* Force failure late: this trigger name is created only after the migration
+     * has copied the chart rows, dropped the old chart tables, renamed the new
+     * tables and recreated the index. Because this trigger belongs to messages,
+     * dropping chart_series cannot remove the collision. The transaction must
+     * restore the original v3 tables and rows. */
+    raw_exec (path,
+        "CREATE TRIGGER chart_series_tuple_insert "
+        "BEFORE INSERT ON messages BEGIN SELECT 1; END;"
+    );
 
     AtmConversationStore *store = NULL;
     GError *error = NULL;
     g_assert_false (atm_conversation_store_open (path, &store, &error));
     g_assert_nonnull (error);
     g_assert_null (store);
+    g_assert_nonnull (g_strstr_len (error->message, -1,
+        "chart_series_tuple_insert"));
     g_clear_error (&error);
 
     g_assert_cmpint (raw_int64 (path, "PRAGMA user_version;"), ==, 3);
@@ -547,6 +557,9 @@ test_v3_to_v4_migration_rollback (void)
     g_assert_cmpint (raw_int64 (path, "SELECT count(*) FROM message_charts;"), ==, 1);
     g_assert_cmpint (raw_int64 (path, "SELECT count(*) FROM chart_series;"), ==, 1);
     g_assert_cmpint (raw_int64 (path, "SELECT count(*) FROM pragma_foreign_key_check;"), ==, 0);
+    g_assert_cmpint (raw_int64 (path,
+        "SELECT count(*) FROM sqlite_schema WHERE type='trigger' "
+        "AND name='chart_series_tuple_insert' AND tbl_name='messages';"), ==, 1);
 
     g_free (path);
     remove_tree_best_effort (root);
