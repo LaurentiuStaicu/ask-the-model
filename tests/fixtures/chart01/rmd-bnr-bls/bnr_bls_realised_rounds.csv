@@ -1,0 +1,12 @@
+quarter,reference_date,source_id,source_kind,nfc_credit_standards,nfc_loan_demand,household_mortgage_credit_standards,household_consumer_credit_standards,household_mortgage_loan_demand,household_consumer_loan_demand
+2022-Q4,31/12/2022,bls_2023_feb,legacy_xls_full_cell_extraction,11.89,11.59,-7.72,12.76,-54.37,-77.83
+2023-Q1,31/03/2023,bls_2023_may,legacy_xls_full_cell_extraction,16.34,-13.28,28.31,23.58,-71.85,15.44
+2023-Q2,,bls_2023_aug,retained_legacy_xls_semantic_coordinate_review,15.54,16.49,-4.28,3.64,-23.36,50.76
+2023-Q3,30/09/2023,bls_2023_nov,retained_legacy_xls_semantic_coordinate_review,0.0,-29.52,-38.15,1.36,34.62,27.04
+2023-Q4,31/12/2023,bls_2024_feb,legacy_xls_full_cell_extraction,0.0,9.22,0.0,-3.03,29.8,-1.64
+2024-Q1,31/03/2024,bls_2024_may,legacy_xls_full_cell_extraction,0.0,17.08,-31.13,-46.52,69.93,81.76
+2024-Q2,,bls_2024_aug,retained_legacy_xls_semantic_coordinate_review,0.0,20.36,12.89,-14.16,13.34,70.06
+2024-Q3,30/09/2024,bls_2024_nov,legacy_xls_full_cell_extraction,12.54,-4.22,0.0,-14.4,34.21,-19.28
+2024-Q4,31/12/2024,bls_2025_feb,legacy_xls_full_cell_extraction,12.08,-15.37,-31.34,4.07,17.84,-35.76
+2025-Q1,31/03/2025,bls_2025_may_xlsx_review,independently_reviewed_xlsx_layout,11.71,22.55,-19.74,15.38,35.23,-17.12
+2025-Q3,30/09/2025,bls_2025_nov,legacy_xls_full_cell_extraction,9.46,-22.06,17.47,19.37,13.42,0.03
