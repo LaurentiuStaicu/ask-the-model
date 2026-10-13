@@ -696,6 +696,38 @@ calendar_quarter_scope_encloses_points (const AtmSeriesContract *s)
     return encloses;
 }
 
+/* UTC instants use a canonical inclusive ISO-8601 UTC range. Fixed-width,
+ * canonical endpoints let lexical ordering match chronological ordering. */
+static gboolean
+utc_instant_scope_encloses_points (const AtmSeriesContract *s)
+{
+    if (s->x_kind != ATM_SERIES_X_UTC_INSTANT)
+        return TRUE;
+    if (!bounded (s->time_scope, ATM_SERIES_CONTRACT_MAX_TEXT) ||
+        strlen (s->time_scope) != 42 ||
+        s->time_scope[20] != '.' || s->time_scope[21] != '.' ||
+        s->points == NULL || s->points->len == 0)
+        return FALSE;
+
+    char *start = g_strndup (s->time_scope, 20);
+    const char *end = s->time_scope + 22;
+    const AtmSeriesContractPoint *first =
+        g_ptr_array_index (s->points, 0);
+    const AtmSeriesContractPoint *last =
+        g_ptr_array_index (s->points, s->points->len - 1);
+    gboolean valid = first != NULL && last != NULL &&
+        x_valid (ATM_SERIES_X_UTC_INSTANT, start) &&
+        x_valid (ATM_SERIES_X_UTC_INSTANT, end) &&
+        x_valid (ATM_SERIES_X_UTC_INSTANT, first->x) &&
+        x_valid (ATM_SERIES_X_UTC_INSTANT, last->x);
+    gboolean encloses = valid &&
+        compare_x (ATM_SERIES_X_UTC_INSTANT, start, end) <= 0 &&
+        compare_x (ATM_SERIES_X_UTC_INSTANT, start, first->x) <= 0 &&
+        compare_x (ATM_SERIES_X_UTC_INSTANT, end, last->x) >= 0;
+    g_free (start);
+    return encloses;
+}
+
 static gboolean
 contract_snapshot_is_qualified (const AtmSeriesContract *s, const AtmSraResult *q)
 {
@@ -820,6 +852,9 @@ atm_series_contract_validate (AtmSeriesContract *s, const AtmSraResult *q, GErro
     if (!calendar_year_scope_encloses_points (s))
         return fail (error, ATM_SERIES_CONTRACT_ERROR_SHAPE,
                      "Calendar-year time scope does not enclose the series points.");
+    if (!utc_instant_scope_encloses_points (s))
+        return fail (error, ATM_SERIES_CONTRACT_ERROR_SHAPE,
+                     "UTC-instant time scope does not enclose the series points.");
     if (!calendar_quarter_scope_encloses_points (s))
         return fail (error, ATM_SERIES_CONTRACT_ERROR_SHAPE,
                      "Calendar-quarter time scope does not enclose the series points.");
