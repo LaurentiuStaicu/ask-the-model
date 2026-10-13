@@ -1,7 +1,6 @@
 #include "bnr_bls_panel.h"
 
 #include <json-glib/json-glib.h>
-#include <math.h>
 #include <string.h>
 
 #define BNR_MAX_SOURCE_BYTES ((gsize) 65536)
@@ -186,7 +185,7 @@ json_double_equals (JsonObject *object, const char *name, double expected)
         type != G_TYPE_INT && type != G_TYPE_LONG &&
         type != G_TYPE_UINT64 && type != G_TYPE_UINT)
         return FALSE;
-    return fabs (json_node_get_double (node) - expected) < 1e-12;
+    return json_node_get_double (node) == expected;
 }
 
 static JsonObject *
