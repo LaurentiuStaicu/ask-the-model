@@ -2,6 +2,16 @@
 
 **Status updated 2026-10-13:** the GISTEMP v1 and Energy Institute TES v2 complete-annual `VerifiedSeries` and chart routes are integrated through PRs #435 and #439–#443; PRES-09 live-to-History GTK Application E2E is integrated via #447. PR #454 separately integrates a source-bound BNR BLS C01 calendar-quarter adapter that creates generic `AtmSeriesContract` from the five-file pinned RMD panel plus finalized SRA, with 11 numeric observations and one source-authorized `MISSING` at 2025-Q2. It remains native/test-only: it is not the legacy `AtmVerifiedSeries`, and it enables no BNR chart route. This document preserves the native `VerifiedSeries` qualification boundary, not the full application-capability ledger. General missing/discontinuity/event/categorical/derived adapters remain unqualified in #343 beyond that one bounded absence case. The immutable v0.6.3 release remains unchanged.
 
+The generic native `atm-series-contract/1` is separate from the legacy
+`atm-verified-series/1`. For UTC-instant coordinates, its `time_scope` must
+be an inclusive canonical range
+`YYYY-MM-DDTHH:MM:SSZ..YYYY-MM-DDTHH:MM:SSZ`, and both endpoints must enclose
+the ordered points. An opaque placeholder such as `scope`, a reversed interval,
+or an interval outside the observations is rejected. This closes a generic
+metadata-validation gap only; it does not qualify another source adapter or
+enable additional chart runtime behavior.
+
+
 ## First pinned source
 
 EWD commit `d9e249339663015f6d1c05752338a955bf64ad0b`, path
