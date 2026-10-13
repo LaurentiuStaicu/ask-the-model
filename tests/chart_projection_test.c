@@ -168,7 +168,7 @@ test_ei_projection_both_snapshots_and_resize (void)
     for (guint i = 0; i < G_N_ELEMENTS (labels); i++) {
         const AtmChartTick *tick = atm_chart_projection_y_tick (base, i);
         g_assert_cmpstr (tick->label, ==, labels[i]);
-        g_assert_cmpfloat (tick->position, ==, 320.0 - (320.0 / 6.0) * i);
+        g_assert_cmpfloat_with_epsilon (tick->position, 320.0 - (320.0 / 6.0) * i, 1e-12);
     }
     const guint expected_years[] = {1965, 1975, 1985, 1995, 2005, 2015, 2025};
     for (guint i = 0; i < G_N_ELEMENTS (expected_years); i++)
