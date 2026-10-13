@@ -1043,6 +1043,7 @@ static void test_utc_instant_scope_must_enclose_points (void)
     const char *coordinate = "2026-01-01T00:00:00Z";
     const char *invalid_scopes[] = {
         "scope",
+        "2026-02-30T00:00:00Z..2026-12-31T23:59:59Z",
         "2027-01-01T00:00:00Z..2028-01-01T00:00:00Z",
         "2027-01-01T00:00:00Z..2025-01-01T00:00:00Z"
     };
