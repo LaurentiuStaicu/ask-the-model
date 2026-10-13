@@ -203,7 +203,7 @@ flatpak run io.github.laurentiustaicu.ask_the_model
 - <small>offers a session-only Optimizations switch that starts OFF; qualified repository optimizations are opt-in and preserve the baseline path when OFF;</small>
 - <small>follows desktop light/dark appearance and runs as a GTK 4 / Granite Flatpak for the elementary OS 8 runtime.</small>
 
-### What v0.6.2 still does not do
+### What v0.6.3 does not do
 
 - <small>download, import, move, update or delete AI model files through AtM;</small>
 - <small>install, start, stop or update the external provider through AtM;</small>
