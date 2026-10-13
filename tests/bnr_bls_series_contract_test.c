@@ -324,6 +324,66 @@ test_mutated_series_point_is_rejected (void)
 }
 
 static void
+test_mutated_missing_support_is_rejected (void)
+{
+    AtmBnrBlsPanel *panel = build_panel ();
+    AtmBnrBlsSra *sra = build_sra (panel);
+    AtmBnrBlsSeriesContract *series = NULL;
+    GError *error = NULL;
+
+    g_assert_true (atm_bnr_bls_series_contract_from_sra (
+        panel, sra, &series, &error));
+    g_assert_no_error (error);
+
+    AtmSeriesContract *mutable_contract = (AtmSeriesContract *)
+        atm_bnr_bls_series_contract_value (series);
+    AtmSeriesContractPoint *gap = g_ptr_array_index (
+        mutable_contract->points, 10u);
+    const AtmSeriesContractPoint *numeric = g_ptr_array_index (
+        mutable_contract->points, 0u);
+    g_assert_cmpint (gap->y_status, ==, ATM_SERIES_Y_MISSING);
+    g_assert_cmpint (numeric->y_status, ==, ATM_SERIES_Y_NUMERIC);
+
+    /*
+     * A numeric fact carries its own observation artifact in addition to the
+     * five source-authority IDs. Use that valid SHA-256 as an unauthorized
+     * replacement so this test reaches the provenance-set check, not a
+     * malformed-ID or wrong-length rejection.
+     */
+    const char *unauthorized_support = NULL;
+    for (guint i = 0; i < numeric->support->len; i++) {
+        const char *candidate = g_ptr_array_index (numeric->support, i);
+        if (!array_has (gap->support, candidate)) {
+            unauthorized_support = candidate;
+            break;
+        }
+    }
+
+    g_assert_nonnull (unauthorized_support);
+    g_assert_true (valid_sha256 (unauthorized_support));
+    g_assert_false (array_has (gap->support, unauthorized_support));
+    g_assert_cmpuint (gap->support->len, ==, ATM_BNR_BLS_SOURCE_COUNT);
+
+    g_free (g_ptr_array_index (gap->support, 0u));
+    g_ptr_array_index (gap->support, 0u) = g_strdup (unauthorized_support);
+
+    g_assert_false (atm_bnr_bls_series_contract_validate (series, &error));
+    g_assert_nonnull (error);
+    g_clear_error (&error);
+
+    AtmBnrBlsSeriesContract *rebuilt = NULL;
+    g_assert_false (atm_bnr_bls_series_contract_rebuild (
+        series, &rebuilt, &error));
+    g_assert_nonnull (error);
+    g_assert_null (rebuilt);
+    g_clear_error (&error);
+
+    atm_bnr_bls_series_contract_free (series);
+    atm_bnr_bls_sra_free (sra);
+    atm_bnr_bls_panel_free (panel);
+}
+
+static void
 test_sra_from_a_different_or_mutated_authority_is_rejected (void)
 {
     AtmBnrBlsPanel *panel = build_panel ();
@@ -386,6 +446,9 @@ main (int argc, char **argv)
     g_test_add_func (
         "/bnr-bls-series-contract/mutated-point-is-rejected",
         test_mutated_series_point_is_rejected);
+    g_test_add_func (
+        "/bnr-bls-series-contract/mutated-missing-support-is-rejected",
+        test_mutated_missing_support_is_rejected);
     g_test_add_func (
         "/bnr-bls-series-contract/mutated-authority-is-rejected",
         test_sra_from_a_different_or_mutated_authority_is_rejected);
