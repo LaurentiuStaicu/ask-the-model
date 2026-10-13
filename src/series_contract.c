@@ -459,13 +459,26 @@ point_matches_established_fact (const AtmSeriesContract *s,
      * normalized numeric value; otherwise equivalent spellings such as
      * 0.0000 and -0.0000 could be swapped while the SRA value stays 0e0. */
     gboolean source_decimal_matches = TRUE;
-    if (p->y_status == ATM_SERIES_Y_NUMERIC &&
-        json_object_has_member (object, "source_decimal")) {
-        JsonNode *node = json_object_get_member (object, "source_decimal");
-        source_decimal_matches =
-            JSON_NODE_HOLDS_VALUE (node) &&
-            json_node_get_value_type (node) == G_TYPE_STRING &&
-            g_strcmp0 (json_node_get_string (node), p->source_decimal) == 0;
+    if (p->y_status == ATM_SERIES_Y_NUMERIC) {
+        gboolean has_source_decimal =
+            json_object_has_member (object, "source_decimal");
+        gboolean zero_value =
+            g_strcmp0 (p->coefficient, "0") == 0 && p->exponent == 0;
+
+        /* A normalized zero has lost its source sign. Do not qualify either
+         * positive or negative zero unless the original source token is part
+         * of the established fact. For nonzero values, older generic facts
+         * can still bind the canonical numeric value when they lack this
+         * optional lexical metadata. */
+        if (!has_source_decimal && zero_value) {
+            source_decimal_matches = FALSE;
+        } else if (has_source_decimal) {
+            JsonNode *node = json_object_get_member (object, "source_decimal");
+            source_decimal_matches =
+                JSON_NODE_HOLDS_VALUE (node) &&
+                json_node_get_value_type (node) == G_TYPE_STRING &&
+                g_strcmp0 (json_node_get_string (node), p->source_decimal) == 0;
+        }
     }
 
     const char *x_value = NULL;
