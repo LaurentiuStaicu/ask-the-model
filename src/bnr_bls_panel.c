@@ -407,8 +407,9 @@ validate_cross_round_audit (JsonObject *root)
 {
     static const char *const missing_quarter[] = { ATM_BNR_BLS_MISSING_QUARTER };
     static const char *const hard_rules[] = {
-        "no_interpolation", "no_synthetic_quarter_creation",
-        "no_parameter_estimation", "no_model_selection",
+        "no_nfc_household_signal_aggregation", "no_parameter_estimation",
+        "no_model_selection", "no_lag_selection", "no_holdout_opening",
+        "no_causal_claim", "no_dsti_level_claim",
         "no_system_dynamics_activation", "no_behavioural_closure_change"
     };
 
@@ -423,18 +424,37 @@ validate_cross_round_audit (JsonObject *root)
                                missing_quarter, G_N_ELEMENTS (missing_quarter)) ||
         !json_bool_equals (root, "interpolation_performed", FALSE) ||
         !json_bool_equals (root, "synthetic_quarters_created", FALSE) ||
+        !json_bool_equals (root, "parameter_estimation_performed", FALSE) ||
+        !json_bool_equals (root, "model_selection_performed", FALSE) ||
+        !json_bool_equals (root, "system_dynamics_activation", FALSE) ||
+        !json_bool_equals (root, "behavioural_closure_change", FALSE) ||
         !json_has_true_rules (json_object_member (root, "hard_rules"),
                               hard_rules, G_N_ELEMENTS (hard_rules)))
         return FALSE;
 
     JsonObject *recovered = json_object_member (
         root, "recovered_missing_round_validations");
+    JsonObject *promotion = json_object_member (
+        root, "canonical_panel_promotion");
     return json_string_equals (
                recovered, "semantic_review",
                source_paths[ATM_BNR_BLS_SOURCE_SEMANTIC_AUDIT]) &&
            json_string_equals (
                recovered, "semantic_review_sha256",
-               BNR_EXPECTED_SEMANTIC_SHA256);
+               BNR_EXPECTED_SEMANTIC_SHA256) &&
+           json_string_equals (
+               promotion, "review",
+               source_paths[ATM_BNR_BLS_SOURCE_PROMOTION_REVIEW]) &&
+           json_string_equals (
+               promotion, "promoted_canonical_panel_sha256",
+               BNR_EXPECTED_PANEL_SHA256) &&
+           json_string_equals (
+               promotion, "remaining_gap",
+               ATM_BNR_BLS_MISSING_QUARTER) &&
+           json_bool_equals (
+               promotion, "parameter_estimation_authorized", FALSE) &&
+           json_bool_equals (
+               promotion, "behavioural_closure_change", FALSE);
 }
 
 static gboolean
