@@ -72,7 +72,7 @@ reject_bundle (
     GError *error = NULL;
     g_assert_false (atm_bnr_bls_panel_new (
         repository, snapshot, sources, &panel, &error));
-    g_assert_error (error, ATM_BNR_BLS_PANEL_ERROR, expected_error);
+    g_assert_error (error, ATM_BNR_BLS_PANEL_ERROR, (gint) expected_error);
     g_assert_null (panel);
     g_clear_error (&error);
 }
