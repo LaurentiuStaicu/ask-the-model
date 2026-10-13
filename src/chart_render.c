@@ -22,10 +22,55 @@ void atm_chart_render_free (AtmChartRender *r)
     if (r->surface != NULL) cairo_surface_destroy (r->surface);
     g_free (r->data); g_free (r);
 }
+
+static char *ei_data_view (const AtmChartSpec *spec)
+{
+    const char *snapshot = atm_chart_spec_series_snapshot_sha (spec, 0);
+    const char *path = atm_chart_spec_series_source_path (spec, 0);
+    const char *qualified_id = atm_chart_spec_series_qualified_id (spec, 0);
+    if (snapshot == NULL || path == NULL || qualified_id == NULL)
+        return NULL;
+
+    GString *s = g_string_new ("# Energy Institute global total energy supply (TES; Physical Energy Content)\n");
+    g_string_append_printf (s,
+        "# unit\t%s\n# semantics\tglobal_total_energy_supply / total_energy_supply\n"
+        "# chart_spec_id\t%s\n# source_repository\tLaurentiuStaicu/empirical-world3-dynamics\n"
+        "# source_snapshot\t%s\n# repository_version\tsnapshot:%s\n"
+        "# source_path\t%s\n# series_profile\t%s\n"
+        "series\tyear\tsource_decimal\tcoefficient\texponent\tsource_row\tqualified_series_id\tsupport_ids\n",
+        atm_chart_spec_y_unit (spec), atm_chart_spec_id (spec),
+        snapshot, snapshot, path, atm_chart_spec_series_profile (spec));
+
+    for (guint i = 0; i < atm_chart_spec_count (spec); i++) {
+        const char *series_id = atm_chart_spec_series_qualified_id (spec, i);
+        for (guint j = 0; j < atm_chart_spec_point_count (spec, i); j++) {
+            AtmChartPointView point = {0};
+            if (!atm_chart_spec_point (spec, i, j, &point) ||
+                point.y_status != ATM_CHART_POINT_NUMERIC ||
+                point.source_decimal == NULL || point.coefficient == NULL ||
+                point.support == NULL || point.support->len != 5u) {
+                g_string_free (s, TRUE);
+                return NULL;
+            }
+            g_string_append_printf (s, "%u\t%u\t%s\t%s\t%" G_GINT64_FORMAT "\t%u\t%s\t",
+                i, point.calendar_year, point.source_decimal, point.coefficient,
+                point.exponent, point.source_row, series_id);
+            for (guint k = 0; k < point.support->len; k++) {
+                if (k) g_string_append_c (s, ';');
+                g_string_append (s, g_ptr_array_index (point.support, k));
+            }
+            g_string_append_c (s, '\n');
+        }
+    }
+    return g_string_free (s, FALSE);
+}
+
 /* Closed, source-qualified ASCII metadata and exact source spelling. No model
  * strings enter the prototype. The future widget must use plain text cells. */
 static char *data_view (const AtmChartSpec *spec)
 {
+    if (atm_chart_spec_version (spec) == ATM_CHART_SPEC_VERSION_ENERGY_INSTITUTE_V2)
+        return ei_data_view (spec);
     GString *s = g_string_new ("# GISTEMP global annual temperature anomaly\n");
     g_string_append_printf (s, "# unit\t%s\n# reference_period\t%s\n# chart_spec_id\t%s\n",
         atm_verified_series_unit (atm_chart_spec_series (spec, 0)),
@@ -91,9 +136,87 @@ static gboolean layout_fits (cairo_t *cr, const AtmChartProjection *p, guint wid
     return fits (cr, "Anomaly relative to 1951-1980 (deg C)", width - 32) &&
         fits (cr, "Source: EWD pinned GISTEMP | vintage 2026-08-31", width - 32);
 }
+
+static void chart_energy_institute (cairo_t *cr, const AtmChartSpec *spec,
+    const AtmChartProjection *p, guint width, guint height)
+{
+    double left = 84, top = 108, pw = width - 112, ph = height - 188;
+    font (cr, 14, TRUE);
+    label (cr, "ENERGY INSTITUTE / GLOBAL TOTAL ENERGY SUPPLY", 16, 26, 0);
+    font (cr, 12, FALSE);
+    label (cr, "TES, Physical Energy Content (exajoules/year)", 16, 47, 0);
+    const char *kind = atm_chart_spec_kind (spec) == ATM_CHART_LINE ? "LINE" : "SCATTER";
+    char *summary = g_strdup_printf ("1965-2025 | 61 observations | empirical | %s", kind);
+    label (cr, summary, 16, 68, 0); g_free (summary);
+    label (cr, "EJ/year", left, 96, 0);
+    double dots[] = {1, 5};
+    for (guint i = 0; i < atm_chart_projection_y_tick_count (p); i++) {
+        const AtmChartTick *t = atm_chart_projection_y_tick (p, i);
+        double y = top + t->position;
+        cairo_set_dash (cr, dots, 2, 0); cairo_set_line_width (cr, 1);
+        cairo_move_to (cr, left, y); cairo_line_to (cr, left + pw, y); cairo_stroke (cr);
+        cairo_set_dash (cr, NULL, 0, 0);
+        label (cr, t->label, left - 12, y + 4, 1);
+    }
+    cairo_rectangle (cr, left, top, pw, ph); cairo_stroke (cr);
+    for (guint i = 0; i < atm_chart_projection_x_tick_count (p); i++) {
+        const AtmChartTick *t = atm_chart_projection_x_tick (p, i);
+        double x = left + t->position;
+        cairo_move_to (cr, x, top + ph); cairo_line_to (cr, x, top + ph + 5); cairo_stroke (cr);
+        label (cr, t->label, x, top + ph + 22, 0.5);
+    }
+    cairo_save (cr);
+    cairo_rectangle (cr, left - 3, top - 3, pw + 6, ph + 6); cairo_clip (cr);
+    cairo_set_line_width (cr, 1.5);
+    for (guint i = 0; i < atm_chart_projection_count (p); i++) {
+        const AtmChartProjectedPoint *point = atm_chart_projection_point (p, i);
+        double x = left + point->x, y = top + point->y;
+        if (atm_chart_spec_kind (spec) == ATM_CHART_SCATTER) {
+            cairo_rectangle (cr, x - 1.5, y - 1.5, 3, 3); cairo_fill (cr);
+        } else if (i == 0 || point->point_index == 0) {
+            if (i > 0) cairo_stroke (cr);
+            cairo_move_to (cr, x, y);
+        } else {
+            cairo_line_to (cr, x, y);
+        }
+    }
+    if (atm_chart_spec_kind (spec) == ATM_CHART_LINE) cairo_stroke (cr);
+    cairo_restore (cr);
+    font (cr, 12, FALSE);
+    label (cr, "Source: EWD pinned Energy Institute | Physical Energy Content", 16, height - 36, 0);
+    label (cr, "Exact values and provenance: Data view", 16, height - 16, 0);
+}
+
+static gboolean layout_fits_ei (cairo_t *cr, const AtmChartProjection *p, guint width)
+{
+    double previous_right = -1;
+    font (cr, 12, FALSE);
+    for (guint i = 0; i < atm_chart_projection_x_tick_count (p); i++) {
+        const AtmChartTick *t = atm_chart_projection_x_tick (p, i);
+        cairo_text_extents_t e; cairo_text_extents (cr, t->label, &e);
+        double center = 84 + t->position, left = center - e.width / 2, right = center + e.width / 2;
+        if (left < 12 || right > width - 12 || left < previous_right + 8) return FALSE;
+        previous_right = right;
+    }
+    double previous_top = 1e9;
+    for (guint i = 0; i < atm_chart_projection_y_tick_count (p); i++) {
+        const AtmChartTick *t = atm_chart_projection_y_tick (p, i);
+        cairo_text_extents_t e; cairo_text_extents (cr, t->label, &e);
+        double baseline = 108 + t->position + 4;
+        if (e.width > 60 || baseline + e.y_bearing + e.height + 4 > previous_top) return FALSE;
+        previous_top = baseline + e.y_bearing;
+    }
+    return fits (cr, "TES, Physical Energy Content (exajoules/year)", width - 32) &&
+        fits (cr, "Source: EWD pinned Energy Institute | Physical Energy Content", width - 32);
+}
+
 static void chart (cairo_t *cr, const AtmChartSpec *spec, const AtmChartProjection *p,
     guint width, guint height)
 {
+    if (atm_chart_spec_version (spec) == ATM_CHART_SPEC_VERSION_ENERGY_INSTITUTE_V2) {
+        chart_energy_institute (cr, spec, p, width, height);
+        return;
+    }
     double left = 84, top = 108, pw = width - 112, ph = height - 188;
     font (cr, 14, TRUE);
     label (cr, "GISTEMP / GLOBAL ANNUAL TEMPERATURE", 16, 26, 0);
@@ -162,6 +285,7 @@ static gboolean prepare_viewport (const AtmChartSpec *spec, guint width, guint h
     cairo_font_options_set_antialias (options, CAIRO_ANTIALIAS_NONE);
     cairo_set_font_options (cr, options); cairo_font_options_destroy (options);
 
+    gboolean is_ei = atm_chart_spec_version (spec) == ATM_CHART_SPEC_VERSION_ENERGY_INSTITUTE_V2;
     gboolean fallback = width < 432 || height < 348;
     AtmChartProjection *projection = NULL;
     if (!fallback) {
@@ -169,14 +293,25 @@ static gboolean prepare_viewport (const AtmChartSpec *spec, guint width, guint h
                 spec, width - 112, height - 188, &projection, error))
             goto invalid;
         font (cr, 14, TRUE);
-        fallback = !fits (cr, "GISTEMP / GLOBAL ANNUAL TEMPERATURE", width - 32);
-        font (cr, 12, FALSE);
-        fallback = fallback ||
-            !fits (cr, "1880-2025 | 146 observations | empirical | SCATTER", width - 32) ||
-            !layout_fits (cr, projection, width);
+        if (is_ei) {
+            fallback = !fits (cr, "ENERGY INSTITUTE / GLOBAL TOTAL ENERGY SUPPLY", width - 32);
+            font (cr, 12, FALSE);
+            const char *kind = atm_chart_spec_kind (spec) == ATM_CHART_LINE ? "LINE" : "SCATTER";
+            char *summary = g_strdup_printf ("1965-2025 | 61 observations | empirical | %s", kind);
+            fallback = fallback || !fits (cr, summary, width - 32) ||
+                !layout_fits_ei (cr, projection, width);
+            g_free (summary);
+        } else {
+            fallback = !fits (cr, "GISTEMP / GLOBAL ANNUAL TEMPERATURE", width - 32);
+            font (cr, 12, FALSE);
+            fallback = fallback ||
+                !fits (cr, "1880-2025 | 146 observations | empirical | SCATTER", width - 32) ||
+                !layout_fits (cr, projection, width);
+        }
     }
     if (fallback) {
-        font (cr, 14, TRUE); label (cr, "GISTEMP", 16, 30, 0);
+        font (cr, 14, TRUE);
+        label (cr, is_ei ? "Energy Institute TES" : "GISTEMP", 16, 30, 0);
         font (cr, 12, FALSE); label (cr, "Chart needs more space.", 16, 60, 0);
         label (cr, "Exact values remain", 16, 86, 0);
         label (cr, "available in Data view.", 16, 104, 0);
@@ -210,11 +345,11 @@ gboolean atm_chart_render_new (const AtmChartSpec *spec, guint width, guint heig
         width > ATM_CHART_RENDER_MAX_SIZE || height > ATM_CHART_RENDER_MAX_SIZE ||
         scale < 1 || scale > 2)
         return reject (error, "Invalid chart canvas dimensions or output.");
-    /* The existing renderer and Data view are GISTEMP-specific. EI display
-     * projection is a separate native qualification gate and must not be
-     * mistaken for permission to render or persist an EI chart. */
-    if (atm_chart_spec_version (spec) != ATM_CHART_SPEC_VERSION_GISTEMP_V1)
-        return reject (error, "Chart renderer only admits the qualified GISTEMP v1 profile.");
+    /* Both admitted source-specific chart profiles have independently qualified
+     * projections; arbitrary ChartSpec versions remain fail-closed. */
+    if (atm_chart_spec_version (spec) != ATM_CHART_SPEC_VERSION_GISTEMP_V1 &&
+        atm_chart_spec_version (spec) != ATM_CHART_SPEC_VERSION_ENERGY_INSTITUTE_V2)
+        return reject (error, "Chart renderer only admits qualified GISTEMP v1 or Energy Institute v2.");
     AtmChartRender *r = g_new0 (AtmChartRender, 1);
     if (!atm_chart_spec_rebuild (spec, &r->spec, error)) goto invalid;
     r->data = data_view (r->spec);
