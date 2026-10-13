@@ -49,9 +49,9 @@ Do not route EI values through `atm-display/gistemp-linear/1`. Introduce a separ
 
 This is presentation policy only. It must not claim that rounded pixel values are source values, affect SRA facts, change the stored exact decimals or authorize transformations to net energy, EROI, fossil share or World3 stocks. Missing/discontinuity semantics remain a separate CHART-01 gate; EI v1 profile accepts its complete numeric source only and does not silently interpolate or connect unknown gaps.
 
-## C2c implementation in review: atomic conversation-store v4
+## C2c integrated into main — atomic conversation-store v4
 
-C2a and C2b are now integrated as dormant native contracts. C2c adds the persistence compatibility boundary but does not connect an EI renderer or History handler.
+C2a and C2b remain integrated as dormant native contracts. C2c was merged into `main` on 2026-10-13 (merge commit `9c50ffac42dc4b2d1d36111451423aac4d5770d1`) and provides the persistence compatibility boundary without connecting an EI renderer or History handler.
 
 The v4 fresh schema and v3-to-v4 migration allow exactly two chart tuples: GISTEMP ChartSpec v1 with its existing reconstruction/series/admission profiles, and EI ChartSpec v2 with `atm-chart-reconstruct/energy-institute-tes-complete-annual/1`, `atm-series/energy-institute-tes-complete-annual/1`, and `atm-energy-institute-pinned-admission/3`. The EI series row is pinned to its exact processed CSV path and one of snapshots `d9e249339663015f6d1c05752338a955bf64ad0b` or `dc710d8e604c0fff713a3acfdb18ab47a1a902bb`, with `repository_version=snapshot:<snapshot_sha>`. SQL CHECKs and tuple triggers block cross-pairings; the native API and semantic validator independently enforce the same allowlist.
 
