@@ -95,7 +95,8 @@ Each gate has its own exact-head CI and acceptance evidence. None implies the ot
 
 ## C2d implementation candidate — native History reconstruction only
 
-The stacked branch `chart02/ei-history-reconstruction` adds a separate
+The branch `chart02/ei-history-reconstruction`, rebased onto `main` after
+C2c integration, adds a separate
 `atm_chart_history_reconstruct_energy_institute()` entry point and native
 regression coverage for both already admitted four-file snapshot fixtures.
 The entry point requires the stored v2 chart/schema, reconstruction, series and
@@ -109,6 +110,8 @@ metadata and an unsupported snapshot.
 
 This is a native reconstruction candidate only. It does not dispatch application
 History rows to the new entry point, add a live EI intent, persist point values,
-change GTK/rendering, or enable C2e. The branch is stacked on C2c and must not
-be integrated ahead of the v4 persistence boundary. The exact-head CHART-01
-native/ASan+UBSan and Flatpak/Meson workflows remain the acceptance gate.
+change GTK/rendering, or enable C2e. The branch now includes the v4 persistence
+boundary from `main`; C2d still requires technical review before merge. All five
+required workflows passed on exact head `cb14e88432ba254e9c12c4d11d30b877fade8a5e`
+(CHART-01 native/ASan+UBSan, CHART-03 GTK, CHART-04 resize, Invariant Registry,
+and Flatpak). These checks qualify this head's CI, not the code review or C2e.
