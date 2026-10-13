@@ -1,4 +1,7 @@
 #include "chart_projection.h"
+#include "chart_projection_internal.h"
+#include "energy_institute_verified_series.h"
+#include "energy_institute_admission.h"
 #include <json-glib/json-glib.h>
 #include <math.h>
 #include <string.h>
@@ -52,11 +55,215 @@ static AtmChartProjection *project (AtmChartSpec *spec, double width, double hei
     g_assert_true (atm_chart_projection_new (spec, width, height, &p, &error));
     g_assert_no_error (error); return p;
 }
+
+static AtmChartSpec *
+ei_specification (AtmChartKind kind, const char *snapshot)
+{
+    const char *root = g_getenv ("ATM_CHART01_FIXTURE");
+    g_assert_nonnull (root);
+    gboolean current = g_strcmp0 (snapshot,
+        "dc710d8e604c0fff713a3acfdb18ab47a1a902bb") == 0;
+    const char *bundle = current ? "ewd-current" : "ewd";
+    const char *paths[] = {
+        "science/data/processed/energy_institute_global_2026.csv",
+        "science/data/processed/energy_institute_global_2026.provenance.json",
+        "science/data/input_manifest.json",
+        "science/data/registry.csv"
+    };
+    GBytes *sources[ATM_EI_SOURCE_COUNT] = {NULL};
+    for (guint i = 0; i < ATM_EI_SOURCE_COUNT; i++) {
+        char *path = g_build_filename (root, bundle, paths[i], NULL);
+        char *bytes = NULL;
+        gsize length = 0;
+        GError *error = NULL;
+        g_assert_true (g_file_get_contents (path, &bytes, &length, &error));
+        g_assert_no_error (error);
+        g_free (path);
+        sources[i] = g_bytes_new_take (bytes, length);
+    }
+
+    AtmEnergyInstituteAdmission *admission = NULL;
+    AtmEnergyInstituteVerifiedSeries *series = NULL;
+    AtmChartSpec *spec = NULL;
+    GError *error = NULL;
+    g_assert_true (atm_energy_institute_admission_new (
+        "LaurentiuStaicu/empirical-world3-dynamics", snapshot, sources,
+        &admission, &error));
+    g_assert_no_error (error);
+    for (guint i = 0; i < ATM_EI_SOURCE_COUNT; i++)
+        g_bytes_unref (sources[i]);
+    g_assert_true (atm_energy_institute_verified_series_from_admission (
+        admission, &series, &error));
+    g_assert_no_error (error);
+    g_assert_true (atm_chart_spec_new_energy_institute_v2 (
+        kind, series, &spec, &error));
+    g_assert_no_error (error);
+    atm_energy_institute_verified_series_free (series);
+    atm_energy_institute_admission_free (admission);
+    return spec;
+}
+
+static void
+test_ei_decimal_conversion (void)
+{
+    gint64 value = -77;
+    GError *error = NULL;
+    g_assert_true (_atm_chart_projection_ei_decimal_micro ("1496960972", -7,
+        &value, &error));
+    g_assert_no_error (error);
+    g_assert_cmpint (value, ==, 149696097);
+    g_assert_true (_atm_chart_projection_ei_decimal_micro ("6003129128", -7,
+        &value, &error));
+    g_assert_no_error (error);
+    g_assert_cmpint (value, ==, 600312913);
+    g_assert_true (_atm_chart_projection_ei_decimal_micro ("100", 0,
+        &value, &error));
+    g_assert_no_error (error);
+    g_assert_cmpint (value, ==, 100000000);
+
+    struct {
+        const char *coefficient;
+        gint64 exponent;
+    } invalid[] = {
+        {NULL, -7}, {"", -7}, {"-12", -7}, {"+12", -7}, {"1.2", -7},
+        {"01", -7}, {"12", -8}, {"1", 1}, {"99999999999999999999", 0},
+        {"0", -7}, {"10000000001", -7}, {"1001", 0}
+    };
+    for (guint i = 0; i < G_N_ELEMENTS (invalid); i++) {
+        value = -77;
+        g_assert_false (_atm_chart_projection_ei_decimal_micro (
+            invalid[i].coefficient, invalid[i].exponent, &value, NULL));
+        g_assert_cmpint (value, ==, -77);
+    }
+    g_assert_false (_atm_chart_projection_ei_decimal_micro ("1", -7, NULL, NULL));
+}
+
+static void
+test_ei_projection_both_snapshots_and_resize (void)
+{
+    const char *old_snapshot = "d9e249339663015f6d1c05752338a955bf64ad0b";
+    const char *current_snapshot = "dc710d8e604c0fff713a3acfdb18ab47a1a902bb";
+    AtmChartSpec *old_spec = ei_specification (ATM_CHART_LINE, old_snapshot);
+    AtmChartSpec *current_spec = ei_specification (ATM_CHART_LINE, current_snapshot);
+    AtmChartProjection *old_projection = NULL, *base = NULL;
+    GError *error = NULL;
+
+    g_assert_cmpstr (ATM_CHART_SPEC_V2_EI_DISPLAY_PROFILE_VERSION, ==, "1");
+    g_assert_cmpstr (atm_chart_spec_id (old_spec), !=, atm_chart_spec_id (current_spec));
+    g_assert_true (atm_chart_projection_new (old_spec, 580, 320, &old_projection, &error));
+    g_assert_no_error (error);
+    g_assert_true (atm_chart_projection_new (current_spec, 580, 320, &base, &error));
+    g_assert_no_error (error);
+    g_assert_cmpstr (atm_chart_projection_policy (base), ==, ATM_CHART_PROJECTION_EI_POLICY);
+    g_assert_cmpuint (atm_chart_projection_count (base), ==, 61u);
+    g_assert_cmpuint (atm_chart_projection_x_tick_count (base), ==, 7u);
+    g_assert_cmpuint (atm_chart_projection_y_tick_count (base), ==, 7u);
+
+    const AtmChartDisplayDomain *domain = atm_chart_projection_domain (base);
+    g_assert_cmpfloat (domain->x_min, ==, 1965.0);
+    g_assert_cmpfloat (domain->x_max, ==, 2025.0);
+    g_assert_cmpfloat (domain->y_min, ==, 100.0);
+    g_assert_cmpfloat (domain->y_max, ==, 700.0);
+    const char *labels[] = {"100", "200", "300", "400", "500", "600", "700"};
+    for (guint i = 0; i < G_N_ELEMENTS (labels); i++) {
+        const AtmChartTick *tick = atm_chart_projection_y_tick (base, i);
+        g_assert_cmpstr (tick->label, ==, labels[i]);
+        g_assert_cmpfloat (tick->position, ==, 320.0 - (320.0 / 6.0) * i);
+    }
+    const guint expected_years[] = {1965, 1975, 1985, 1995, 2005, 2015, 2025};
+    for (guint i = 0; i < G_N_ELEMENTS (expected_years); i++)
+        g_assert_cmpuint (g_ascii_strtoull (
+            atm_chart_projection_x_tick (base, i)->label, NULL, 10), ==,
+            expected_years[i]);
+
+    AtmChartPointView first = {0}, last = {0};
+    g_assert_true (atm_chart_spec_point (
+        atm_chart_projection_spec (base), 0, 0, &first));
+    g_assert_true (atm_chart_spec_point (
+        atm_chart_projection_spec (base), 0, 60, &last));
+    g_assert_cmpstr (first.source_decimal, ==, "149.6960972");
+    g_assert_cmpstr (last.source_decimal, ==, "600.3129128");
+    g_assert_cmpuint (first.support->len, ==, 5u);
+    g_assert_cmpuint (last.support->len, ==, 5u);
+
+    for (guint size_case = 0; size_case < 4; size_case++) {
+        const double widths[] = {320.0, 480.0, 720.0, 8192.0};
+        const double heights[] = {160.0, 240.0, 360.0, 8192.0};
+        AtmChartProjection *p = NULL;
+        g_assert_true (atm_chart_projection_new (current_spec, widths[size_case],
+            heights[size_case], &p, &error));
+        g_assert_no_error (error);
+        g_assert_true (atm_chart_projection_validate (p, &error));
+        g_assert_no_error (error);
+        guint expected_ticks = size_case == 0 ? 5u : (size_case == 1 ? 7u : 13u);
+        g_assert_cmpuint (atm_chart_projection_x_tick_count (p), ==, expected_ticks);
+        g_assert_cmpuint (atm_chart_projection_count (p), ==, 61u);
+        for (guint i = 0; i < 61; i++) {
+            const AtmChartProjectedPoint *a = atm_chart_projection_point (base, i);
+            const AtmChartProjectedPoint *b = atm_chart_projection_point (p, i);
+            g_assert_true (isfinite (b->x) && isfinite (b->y));
+            g_assert_cmpfloat (b->x, >=, 0.0);
+            g_assert_cmpfloat (b->x, <=, widths[size_case]);
+            g_assert_cmpfloat (b->y, >=, 0.0);
+            g_assert_cmpfloat (b->y, <=, heights[size_case]);
+            g_assert_cmpfloat_with_epsilon (b->x / widths[size_case],
+                a->x / 580.0, 1e-12);
+            g_assert_cmpfloat_with_epsilon (b->y / heights[size_case],
+                a->y / 320.0, 1e-12);
+        }
+        atm_chart_projection_free (p);
+    }
+
+    for (guint i = 0; i < 61; i++) {
+        const AtmChartProjectedPoint *a = atm_chart_projection_point (old_projection, i);
+        const AtmChartProjectedPoint *b = atm_chart_projection_point (base, i);
+        g_assert_cmpfloat (a->x, ==, b->x);
+        g_assert_cmpfloat (a->y, ==, b->y);
+        g_assert_cmpuint (a->point_index, ==, b->point_index);
+    }
+
+    AtmChartProjection *saved = base;
+    g_assert_false (atm_chart_projection_new (current_spec, 319.0, 320.0,
+        &base, NULL));
+    g_assert_true (base == saved);
+    atm_chart_projection_free (old_projection);
+    atm_chart_projection_free (base);
+    atm_chart_spec_free (old_spec);
+    atm_chart_spec_free (current_spec);
+}
+
+static void
+test_ei_projection_tampering (void)
+{
+    AtmChartSpec *spec = ei_specification (ATM_CHART_LINE,
+        "dc710d8e604c0fff713a3acfdb18ab47a1a902bb");
+    AtmChartProjection *p = NULL;
+    g_assert_true (atm_chart_projection_new (spec, 580.0, 320.0, &p, NULL));
+    atm_chart_spec_free (spec);
+
+    AtmChartProjectedPoint *point =
+        (AtmChartProjectedPoint *) atm_chart_projection_point (p, 0);
+    double old_y = point->y;
+    point->y = NAN;
+    g_assert_false (atm_chart_projection_validate (p, NULL));
+    point->y = old_y;
+    g_assert_true (atm_chart_projection_validate (p, NULL));
+
+    AtmChartTick *tick = (AtmChartTick *)
+        atm_chart_projection_y_tick (p, 0);
+    tick->label[0] = 'x';
+    g_assert_false (atm_chart_projection_validate (p, NULL));
+    tick->label[0] = '1';
+    g_assert_true (atm_chart_projection_validate (p, NULL));
+    atm_chart_projection_free (p);
+}
+
 static void test_reference (void)
 {
     AtmChartSpec *spec = specification (ATM_CHART_LINE);
     char *id = g_strdup (atm_chart_spec_id (spec));
     AtmChartProjection *p = project (spec, 580, 160);
+    g_assert_cmpstr (atm_chart_projection_policy (p), ==, ATM_CHART_PROJECTION_POLICY);
     g_assert_true (atm_chart_projection_spec (p) != spec);
     /* Deliberate read-only violation: original input cannot change owned data. */
     ((AtmScientificDecimal *) atm_chart_spec_y_min (spec))->exponent++;
@@ -187,5 +394,8 @@ int main (int argc, char **argv)
     g_test_add_func ("/chart-projection/resize", test_resize);
     g_test_add_func ("/chart-projection/rejections", test_rejections);
     g_test_add_func ("/chart-projection/tampering", test_tampering);
+    g_test_add_func ("/chart-projection/ei-decimal-conversion", test_ei_decimal_conversion);
+    g_test_add_func ("/chart-projection/ei-policy-resize", test_ei_projection_both_snapshots_and_resize);
+    g_test_add_func ("/chart-projection/ei-tampering", test_ei_projection_tampering);
     return g_test_run ();
 }
