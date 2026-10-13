@@ -92,8 +92,19 @@ namespace AskTheModel {
             string? cache_root = null,
             string? state_root = null
         ) {
+#if ATM_PRES09_TEST
+            string? test_flatpak_info_path =
+                GLib.Environment.get_variable (
+                    "ATM_PRES09_TEST_FLATPAK_INFO"
+                );
+            this.flatpak_info_path =
+                flatpak_info_path ??
+                test_flatpak_info_path ??
+                "/.flatpak-info";
+#else
             this.flatpak_info_path =
                 flatpak_info_path ?? "/.flatpak-info";
+#endif
             this.data_root =
                 data_root ??
                 GLib.Path.build_filename (
