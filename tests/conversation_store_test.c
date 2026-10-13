@@ -918,6 +918,7 @@ test_chart_recipe_semantics (void)
 
     raw_exec (
         path,
+        "PRAGMA ignore_check_constraints=ON;"
         "UPDATE chart_series SET source_path='README.md';"
     );
 
@@ -1007,7 +1008,7 @@ test_newer_schema_rejected (void)
 
     raw_exec (
         path,
-        "PRAGMA user_version=4;"
+        "PRAGMA user_version=5;"
     );
 
     store = NULL;
@@ -2543,6 +2544,93 @@ test_chart_binding_write_load (void)
     );
     g_clear_error (&error);
 
+    /* The v4 allowlist admits the source-bound EI v2 tuple, but not cross-paired
+     * schema/reconstruction/series/admission profiles or unpinned snapshots. */
+    const char *ei_snapshot = "d9e249339663015f6d1c05752338a955bf64ad0b";
+    const char *ei_version =
+        "snapshot:d9e249339663015f6d1c05752338a955bf64ad0b";
+    AtmConversationRepositoryInput ei_repository = {
+        .repository_id = "ewd",
+        .repository_version = ei_version,
+        .snapshot_sha = ei_snapshot
+    };
+    char *ei_conversation_id = NULL;
+    g_assert_true (atm_conversation_store_create_conversation (
+        store, "EI Chart binding", 4, "model-a", NULL, 8,
+        &ei_repository, 1, &ei_conversation_id, &error));
+    g_assert_no_error (error);
+
+    AtmConversationCitationInput ei_citation = {
+        .label = "EI-S1",
+        .repository_id = "ewd",
+        .repository_version = ei_version,
+        .snapshot_sha = ei_snapshot,
+        .logical_source_id = "ei-primary-energy",
+        .source_path = "science/data/processed/energy_institute_global_2026.csv",
+        .locator = "rows 2-62",
+        .title = "Energy Institute global TES",
+        .excerpt = "Qualified annual total energy supply",
+        .immutable_permalink = NULL
+    };
+    gint64 ei_grounded_turn = -1;
+    g_assert_true (atm_conversation_store_commit_turn (
+        store, ei_conversation_id, "show TES", "answer [EI-S1]", "answer",
+        TRUE, 5, &ei_citation, 1, &ei_grounded_turn, &error));
+    g_assert_no_error (error);
+    g_assert_cmpint (ei_grounded_turn, ==, 0);
+
+    AtmConversationChartSeriesInput ei_series = {
+        .series_profile = "atm-series/energy-institute-tes-complete-annual/1",
+        .admission_profile = "atm-energy-institute-pinned-admission/3",
+        .scientific_id =
+            "dddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddd",
+        .qualified_id =
+            "eeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeee",
+        .repository_id = "ewd",
+        .repository_version = ei_version,
+        .snapshot_sha = ei_snapshot,
+        .source_path = "science/data/processed/energy_institute_global_2026.csv"
+    };
+    AtmConversationChartInput ei_chart = {
+        .ordinal = 1,
+        .chart_schema = "atm-chart-spec/2",
+        .chart_spec_id =
+            "ffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffff",
+        .chart_kind = "line",
+        .reconstruction_profile =
+            "atm-chart-reconstruct/energy-institute-tes-complete-annual/1",
+        .series = &ei_series,
+        .series_count = 1
+    };
+    g_assert_true (atm_conversation_store_attach_chart (
+        store, ei_conversation_id, ei_grounded_turn, &ei_chart, &error));
+    g_assert_no_error (error);
+
+    AtmConversationChartInput mixed_tuple = ei_chart;
+    mixed_tuple.ordinal = 2;
+    mixed_tuple.reconstruction_profile =
+        "atm-chart-reconstruct/gistemp-complete-annual/1";
+    g_assert_false (atm_conversation_store_attach_chart (
+        store, ei_conversation_id, ei_grounded_turn, &mixed_tuple, &error));
+    g_assert_error (error, ATM_CONVERSATION_STORE_ERROR,
+                    ATM_CONVERSATION_STORE_ERROR_ARGUMENT);
+    g_clear_error (&error);
+
+    AtmConversationChartSeriesInput unsupported_ei_snapshot = ei_series;
+    unsupported_ei_snapshot.snapshot_sha =
+        "1111111111111111111111111111111111111111";
+    unsupported_ei_snapshot.repository_version =
+        "snapshot:1111111111111111111111111111111111111111";
+    AtmConversationChartInput unsupported_snapshot_chart = ei_chart;
+    unsupported_snapshot_chart.ordinal = 2;
+    unsupported_snapshot_chart.series = &unsupported_ei_snapshot;
+    g_assert_false (atm_conversation_store_attach_chart (
+        store, ei_conversation_id, ei_grounded_turn,
+        &unsupported_snapshot_chart, &error));
+    g_assert_error (error, ATM_CONVERSATION_STORE_ERROR,
+                    ATM_CONVERSATION_STORE_ERROR_ARGUMENT);
+    g_clear_error (&error);
+
     gint64 ungrounded_turn = -1;
     g_assert_true (
         atm_conversation_store_commit_turn (
@@ -2653,6 +2741,36 @@ test_chart_binding_write_load (void)
 
     atm_conversation_snapshot_free (snapshot);
 
+    AtmConversationSnapshot *ei_snapshot_state = NULL;
+    g_assert_true (atm_conversation_store_load_snapshot (
+        store, ei_conversation_id, &ei_snapshot_state, &error));
+    g_assert_no_error (error);
+    g_assert_cmpuint (atm_conversation_snapshot_message_count (ei_snapshot_state), ==, 2);
+    g_assert_cmpuint (
+        atm_conversation_snapshot_message_chart_count_at (ei_snapshot_state, 1), ==, 1);
+    g_assert_cmpstr (
+        atm_conversation_snapshot_chart_schema_at (ei_snapshot_state, 1, 0),
+        ==, "atm-chart-spec/2");
+    g_assert_cmpstr (
+        atm_conversation_snapshot_chart_reconstruction_profile_at (ei_snapshot_state, 1, 0),
+        ==, ei_chart.reconstruction_profile);
+    g_assert_cmpstr (
+        atm_conversation_snapshot_chart_series_profile_at (ei_snapshot_state, 1, 0, 0),
+        ==, ei_series.series_profile);
+    g_assert_cmpstr (
+        atm_conversation_snapshot_chart_series_admission_profile_at (ei_snapshot_state, 1, 0, 0),
+        ==, ei_series.admission_profile);
+    g_assert_cmpstr (
+        atm_conversation_snapshot_chart_series_snapshot_sha_at (ei_snapshot_state, 1, 0, 0),
+        ==, ei_snapshot);
+    atm_conversation_snapshot_free (ei_snapshot_state);
+
+    g_assert_true (
+        atm_conversation_store_delete_conversation (
+            store, ei_conversation_id, &error
+        )
+    );
+    g_assert_no_error (error);
     g_assert_true (
         atm_conversation_store_delete_conversation (
             store, conversation_id, &error
