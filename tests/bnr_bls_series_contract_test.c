@@ -1,5 +1,6 @@
 #include "bnr_bls_series_contract.h"
 
+#include <json-glib/json-glib.h>
 #include <string.h>
 
 static char *buffers[ATM_BNR_BLS_SOURCE_COUNT];
