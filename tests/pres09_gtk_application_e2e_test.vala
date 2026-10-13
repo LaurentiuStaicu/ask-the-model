@@ -299,6 +299,17 @@ private static int run_orchestrator (
             return 1;
         }
 
+        void* control_store = null;
+        if (!ControlStateNative.open_for_test (
+                state_db,
+                out control_store
+            ) || control_store == null) {
+            stderr.printf ("PRES-09 could not initialize the isolated Control DB schema.\\n");
+            remove_tree_best_effort (File.new_for_path (root));
+            return 1;
+        }
+        ControlStateNative.close_for_test (control_store);
+
         int64 generation_id = 0;
         if (!ControlStateNative.set_current_values_guarded (
                 state_db,
