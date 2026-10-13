@@ -150,6 +150,49 @@ qualified_with_single_coordinate_fact (AtmScientificArtifact *a,
 }
 
 static AtmSraResult *
+qualified_with_single_source_decimal_fact (
+    AtmScientificArtifact *a,
+    const char *coordinate_key,
+    const char *coordinate_value,
+    const char *source_decimal
+)
+{
+    AtmSraResult *q = atm_sra_result_new (ATM_SRA_ANSWERED);
+    GError *error = NULL;
+    char *qualifiers = g_strdup_printf (
+        "{\"%s\":\"%s\",\"scenario\":\"baseline\","
+        "\"epistemic_status\":\"observed\",\"y_status\":\"NUMERIC\","
+        "\"source_decimal\":\"%s\"}",
+        coordinate_key, coordinate_value, source_decimal);
+    AtmSraEstablishedFact *fact = atm_sra_established_fact_new (
+        "source-decimal-fact", "observation", "subject", "attribute",
+        "0e0", "unit", "dimension", qualifiers);
+    g_free (qualifiers);
+    g_assert_nonnull (fact);
+    g_assert_true (atm_sra_fact_add_support (fact, a->qualified_artifact_id, &error));
+    g_assert_no_error (error);
+    g_assert_true (atm_sra_result_add_fact (q, fact, &error));
+    g_assert_no_error (error);
+    g_assert_true (atm_sra_qualification_add_canonical_obligation (q, "atm-sra/1", &error));
+    g_assert_no_error (error);
+    char *snapshot = g_strdup_printf ("ewd@0.1.0#%s", SHA);
+    g_assert_true (atm_sra_qualification_add_repository_snapshot (q, snapshot, &error));
+    g_free (snapshot);
+    g_assert_no_error (error);
+    g_assert_true (atm_sra_qualification_add_evidence_artifact (q, a, &error));
+    g_assert_no_error (error);
+    g_assert_true (atm_sra_qualification_add_semantic_profile (
+        q, "atm-profile/ewd/v1@1", &error));
+    g_assert_no_error (error);
+    g_assert_true (atm_sra_qualification_set_numeric_profile (
+        q, ATM_SERIES_CONTRACT_NUMERIC_PROFILE, &error));
+    g_assert_no_error (error);
+    g_assert_true (atm_sra_result_finalize (q, &error));
+    g_assert_no_error (error);
+    return q;
+}
+
+static AtmSraResult *
 qualified_with_coordinate_facts (
     AtmScientificArtifact *a,
     const char *coordinate_key,
@@ -447,6 +490,44 @@ static void test_signed_zero_flag_matches_source (void)
     g_assert_false (atm_series_contract_validate (s, q, &error));
     g_assert_error (error, ATM_SERIES_CONTRACT_ERROR, ATM_SERIES_CONTRACT_ERROR_NUMERIC);
     g_clear_error (&error);
+
+    atm_series_contract_free (s);
+    atm_sra_result_free (q);
+    atm_scientific_artifact_free (a);
+}
+
+static void test_numeric_source_decimal_must_match_qualified_fact (void)
+{
+    AtmScientificArtifact *a = support_artifact ();
+    const char *support[] = { a->qualified_artifact_id };
+    GError *error = NULL;
+
+    /* The normalized SRA value is 0e0 in both cases. The qualified original
+     * token still distinguishes positive from negative zero. */
+    AtmSraResult *q = qualified_with_single_source_decimal_fact (
+        a, "calendar_year", "1882", "0.0000");
+    AtmSeriesContract *s = base ();
+    g_assert_true (atm_series_contract_add_point (
+        s, "1882", ATM_SERIES_Y_NUMERIC, "-0.0000", "0", 0, TRUE,
+        FALSE, NULL, NULL, support, 1, &error));
+    g_assert_no_error (error);
+    g_assert_false (atm_series_contract_validate (s, q, &error));
+    g_assert_error (error, ATM_SERIES_CONTRACT_ERROR,
+                    ATM_SERIES_CONTRACT_ERROR_SHAPE);
+    g_clear_error (&error);
+    atm_series_contract_free (s);
+    atm_sra_result_free (q);
+
+    q = qualified_with_single_source_decimal_fact (
+        a, "calendar_year", "1882", "-0.0000");
+    s = base ();
+    g_assert_true (atm_series_contract_add_point (
+        s, "1882", ATM_SERIES_Y_NUMERIC, "-0.0000", "0", 0, TRUE,
+        FALSE, NULL, NULL, support, 1, &error));
+    g_assert_no_error (error);
+    g_assert_true (atm_series_contract_validate (s, q, &error));
+    g_assert_no_error (error);
+    g_assert_nonnull (atm_series_contract_scientific_id (s));
 
     atm_series_contract_free (s);
     atm_sra_result_free (q);
@@ -1277,6 +1358,8 @@ int main (int argc, char **argv)
     g_test_init (&argc, &argv, NULL);
     g_test_add_func ("/series-contract/missing-break", test_missing_and_break_are_explicit);
     g_test_add_func ("/series-contract/signed-zero-flag", test_signed_zero_flag_matches_source);
+    g_test_add_func ("/series-contract/source-decimal-binding",
+                     test_numeric_source_decimal_must_match_qualified_fact);
     g_test_add_func ("/series-contract/duplicate-x", test_duplicate_x_rejected);
     g_test_add_func ("/series-contract/support", test_unqualified_support_rejected);
     g_test_add_func ("/series-contract/fact-binding", test_numeric_point_must_match_sra_fact);
