@@ -5421,7 +5421,7 @@ namespace AskTheModel {
             }
 
             string? conversation_id = state.persistent_id;
-            state.lifecycle_button.activate ();
+            state.lifecycle_button.clicked ();
 
             if (conversation_id == null ||
                 conversation_store == null) {
@@ -5470,7 +5470,7 @@ namespace AskTheModel {
                     return true;
                 }
                 pres09_test_history_open_requested = true;
-                history_button.activate ();
+                history_button.clicked ();
                 return true;
             }
 
@@ -5485,7 +5485,7 @@ namespace AskTheModel {
                 }
 
                 pres09_test_history_open_clicked = true;
-                open_button.activate ();
+                open_button.clicked ();
                 return true;
             }
 
@@ -5523,7 +5523,7 @@ namespace AskTheModel {
                     return true;
                 }
                 pres09_test_history_open_requested = true;
-                history_button.activate ();
+                history_button.clicked ();
                 return true;
             }
 
@@ -5538,7 +5538,7 @@ namespace AskTheModel {
                 }
 
                 pres09_test_history_open_clicked = true;
-                open_button.activate ();
+                open_button.clicked ();
                 return true;
             }
 
