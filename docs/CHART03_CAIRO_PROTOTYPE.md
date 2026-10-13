@@ -1,12 +1,12 @@
 # CHART-03: headless monochrome prototype
 
-Status: the renderer and GTK Chart/Data component are integrated in the application for the narrow GISTEMP path. The original prototype and component qualification history remains below.
+**Status (2026-10-13):** the native Cairo renderer and GTK Chart/Data component now serve two explicitly qualified application paths: GISTEMP ChartSpec v1 and Energy Institute ChartSpec v2, integrated through C2e/PR #443. The prototype and component qualification history remains below; historic GISTEMP-only constraints still describe that source-specific path, not the whole current application.
 
 ## Current application integration
 
-The application accepts the explicit `/chart gistemp <grounded question>` command and clear natural-language requests for a GISTEMP/global-temperature chart. It resolves an eligible citation to the pinned EWD GISTEMP snapshot, reconstructs and validates the source series and ChartSpec, then creates the GTK Chart/Data view. The completed assistant turn may persist a chart reconstruction recipe; History rebuilds the chart from the conversation's pinned snapshot and fails closed if identity or source validation fails. The model does not author chart intent or numeric values.
+The application supports the explicit `/chart gistemp <grounded question>` and `/chart energy-institute <grounded question>` commands, plus natural-language visualization requests only when they identify exactly one supported source. Each route resolves eligible grounding against the selected pinned EWD snapshot, re-runs the source-specific admission and ChartSpec reconstruction, and then creates the source-specific GTK Chart/Data view. The saved conversation contains a reconstruction recipe, never authoritative numeric points; History re-reads the same pinned bundle and fails closed on source/profile/identity mismatches. The model does not author chart values, units, axes, domains or source metadata.
 
-CHART-01 and CHART-03 qualify the source/native and GTK component boundaries. PRES-09 exercises durable recipe attachment and close/reopen reconstruction, and Flatpak runs the Meson suite. These checks do not constitute a dedicated full GTK Application interaction test that enters `/chart gistemp` and verifies both live and restored chart presentation end to end.
+C2e is integrated through PR #443. Native/ASan/UBSan, GTK, resize, persistence, invariant-registry and Flatpak workflows all passed on its exact candidate head; post-merge Flatpak and Invariant checks passed too. However, there is no dedicated end-to-end GTK Application test that drives an EI request through archiving, close/reopen and restored History presentation. Component/native tests qualify their own layers and must not be represented as that full UI test.
 
 ## Contract and scientific boundary
 
@@ -67,7 +67,7 @@ original files as a preview artifact. Neither transport is application code.
 Visual inspection of these exact native PNGs is required before accepting the
 prototype's layout. User visual review precedes application activation.
 
-The component is integrated into the application. A dedicated end-to-end GTK Application test for a live natural-language chart request followed by restored History presentation remains unqualified. CHART-04 cache/downsampling and CHART-05 persistence v3 remain separate gates. Broader scientific adapters stay in CHART-01's qualification ledger.
+The component is integrated into the application for the source-specific GISTEMP v1 and Energy Institute v2 paths. C2c's conversation-store v4, C2d's source-bound EI History reconstruction and C2e's application dispatch are integrated. The end-to-end GTK Application test for a live EI request followed by archive/close/reopen and restored History presentation remains unqualified. The original prototype's statements about separate downstream gates are historical; general missing/discontinuity/event semantics, generic multi-series comparison, and other scientific adapters remain in CHART-01's qualification ledger.
 
 Primary implementation references:
 - https://www.cairographics.org/manual/cairo-Image-Surfaces.html
