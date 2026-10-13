@@ -33,7 +33,7 @@ series_metadata_valid (const AtmSeriesContract *s)
 {
     return s != NULL &&
         s->x_kind >= ATM_SERIES_X_CALENDAR_YEAR &&
-        s->x_kind <= ATM_SERIES_X_EVENT_ORDINAL &&
+        s->x_kind <= ATM_SERIES_X_CALENDAR_QUARTER &&
         bounded (s->subject, ATM_SERIES_CONTRACT_MAX_TEXT) &&
         bounded (s->attribute, ATM_SERIES_CONTRACT_MAX_TEXT) &&
         bounded (s->x_unit, ATM_SERIES_CONTRACT_MAX_TEXT) &&
@@ -127,7 +127,7 @@ atm_series_contract_new (
     const char *profile_version,
     GError **error)
 {
-    if (x_kind < ATM_SERIES_X_CALENDAR_YEAR || x_kind > ATM_SERIES_X_EVENT_ORDINAL ||
+    if (x_kind < ATM_SERIES_X_CALENDAR_YEAR || x_kind > ATM_SERIES_X_CALENDAR_QUARTER ||
         !bounded (subject, ATM_SERIES_CONTRACT_MAX_TEXT) ||
         !bounded (attribute, ATM_SERIES_CONTRACT_MAX_TEXT) ||
         !bounded (x_unit, ATM_SERIES_CONTRACT_MAX_TEXT) ||
@@ -209,6 +209,22 @@ x_valid (AtmSeriesXKind kind, const char *x)
         for (gsize i = start; i < n; i++)
             if (!g_ascii_isdigit (x[i])) return FALSE;
         return TRUE;
+    }
+    if (kind == ATM_SERIES_X_CALENDAR_QUARTER) {
+        /* Canonical calendar quarter: exactly YYYY-Qn, n in 1..4.
+         * Year zero and non-four-digit/padded coordinate variants are rejected. */
+        if (strlen (x) != 7 || x[4] != '-' || x[5] != 'Q' ||
+            x[6] < '1' || x[6] > '4')
+            return FALSE;
+        for (guint i = 0; i < 4; i++)
+            if (!g_ascii_isdigit (x[i]))
+                return FALSE;
+        guint year =
+            (guint) (x[0] - '0') * 1000u +
+            (guint) (x[1] - '0') * 100u +
+            (guint) (x[2] - '0') * 10u +
+            (guint) (x[3] - '0');
+        return year > 0;
     }
     return FALSE;
 }
@@ -308,7 +324,9 @@ build_scientific_json (const AtmSeriesContract *s, char **out, GError **error)
     text_member (b, "schema", ATM_SERIES_CONTRACT_SCHEMA);
     text_member (b, "x_kind",
         s->x_kind == ATM_SERIES_X_CALENDAR_YEAR ? "calendar_year" :
-        s->x_kind == ATM_SERIES_X_UTC_INSTANT ? "utc_instant" : "event_ordinal");
+        s->x_kind == ATM_SERIES_X_UTC_INSTANT ? "utc_instant" :
+        s->x_kind == ATM_SERIES_X_EVENT_ORDINAL ? "event_ordinal" :
+        "calendar_quarter");
     text_member (b, "subject", s->subject);
     text_member (b, "attribute", s->attribute);
     text_member (b, "x_unit", s->x_unit);
@@ -449,7 +467,8 @@ point_matches_established_fact (const AtmSeriesContract *s,
     const char *x_member =
         s->x_kind == ATM_SERIES_X_CALENDAR_YEAR ? "calendar_year" :
         s->x_kind == ATM_SERIES_X_UTC_INSTANT ? "utc_instant" :
-        s->x_kind == ATM_SERIES_X_EVENT_ORDINAL ? "event_ordinal" : NULL;
+        s->x_kind == ATM_SERIES_X_EVENT_ORDINAL ? "event_ordinal" :
+        s->x_kind == ATM_SERIES_X_CALENDAR_QUARTER ? "calendar_quarter" : NULL;
     if (x_member != NULL && json_object_has_member (object, x_member)) {
         JsonNode *node = json_object_get_member (object, x_member);
         if (JSON_NODE_HOLDS_VALUE (node) &&
@@ -571,12 +590,30 @@ point_is_bound_to_sra_fact (const AtmSeriesContract *s,
     return FALSE;
 }
 
+static guint64
+calendar_quarter_ordinal (const char *x)
+{
+    /* Callers validate the exact YYYY-Qn grammar before comparing. */
+    guint year =
+        (guint) (x[0] - '0') * 1000u +
+        (guint) (x[1] - '0') * 100u +
+        (guint) (x[2] - '0') * 10u +
+        (guint) (x[3] - '0');
+    guint quarter = (guint) (x[6] - '0');
+    return ((guint64) year * 4u) + (guint64) (quarter - 1u);
+}
+
 static gint
 compare_x (AtmSeriesXKind kind, const char *a, const char *b)
 {
     if (kind == ATM_SERIES_X_CALENDAR_YEAR) {
         gint64 ai = g_ascii_strtoll (a, NULL, 10);
         gint64 bi = g_ascii_strtoll (b, NULL, 10);
+        return ai < bi ? -1 : ai > bi ? 1 : 0;
+    }
+    if (kind == ATM_SERIES_X_CALENDAR_QUARTER) {
+        guint64 ai = calendar_quarter_ordinal (a);
+        guint64 bi = calendar_quarter_ordinal (b);
         return ai < bi ? -1 : ai > bi ? 1 : 0;
     }
     if (kind == ATM_SERIES_X_EVENT_ORDINAL) {
@@ -627,6 +664,36 @@ calendar_year_scope_encloses_points (const AtmSeriesContract *s)
             return TRUE;
     }
     return FALSE;
+}
+
+static gboolean
+calendar_quarter_scope_encloses_points (const AtmSeriesContract *s)
+{
+    if (s->x_kind != ATM_SERIES_X_CALENDAR_QUARTER)
+        return TRUE;
+    if (!bounded (s->time_scope, ATM_SERIES_CONTRACT_MAX_TEXT) ||
+        strlen (s->time_scope) != 16 ||
+        s->time_scope[7] != '.' || s->time_scope[8] != '.' ||
+        s->points == NULL || s->points->len == 0)
+        return FALSE;
+
+    char *start = g_strndup (s->time_scope, 7);
+    const char *end = s->time_scope + 9;
+    const AtmSeriesContractPoint *first =
+        g_ptr_array_index (s->points, 0);
+    const AtmSeriesContractPoint *last =
+        g_ptr_array_index (s->points, s->points->len - 1);
+    gboolean valid = first != NULL && last != NULL &&
+        x_valid (ATM_SERIES_X_CALENDAR_QUARTER, start) &&
+        x_valid (ATM_SERIES_X_CALENDAR_QUARTER, end) &&
+        x_valid (ATM_SERIES_X_CALENDAR_QUARTER, first->x) &&
+        x_valid (ATM_SERIES_X_CALENDAR_QUARTER, last->x);
+    gboolean encloses = valid &&
+        compare_x (ATM_SERIES_X_CALENDAR_QUARTER, start, end) <= 0 &&
+        compare_x (ATM_SERIES_X_CALENDAR_QUARTER, start, first->x) <= 0 &&
+        compare_x (ATM_SERIES_X_CALENDAR_QUARTER, end, last->x) >= 0;
+    g_free (start);
+    return encloses;
 }
 
 static gboolean
@@ -686,12 +753,16 @@ atm_series_contract_validate (AtmSeriesContract *s, const AtmSraResult *q, GErro
         return fail (error, ATM_SERIES_CONTRACT_ERROR_SHAPE, "UTC-instant X requires UTC unit.");
     if (s->x_kind == ATM_SERIES_X_EVENT_ORDINAL && g_strcmp0 (s->x_unit, "event") != 0)
         return fail (error, ATM_SERIES_CONTRACT_ERROR_SHAPE, "Event ordinal X requires event unit.");
+    if (s->x_kind == ATM_SERIES_X_CALENDAR_QUARTER &&
+        g_strcmp0 (s->x_unit, "calendar_quarter") != 0)
+        return fail (error, ATM_SERIES_CONTRACT_ERROR_SHAPE,
+                     "Calendar-quarter X requires calendar_quarter unit.");
     /* X kind constrains coordinate dimension as well as its display unit.
-     * Calendar years and UTC instants are temporal coordinates; don't allow
-     * a valid annual SRA fact to be relabelled as mass, length, or another
-     * unrelated dimension at the generic contract boundary. */
+     * Calendar years, quarters and UTC instants are temporal coordinates;
+     * do not allow them to be relabelled as an unrelated dimension. */
     if ((s->x_kind == ATM_SERIES_X_CALENDAR_YEAR ||
-         s->x_kind == ATM_SERIES_X_UTC_INSTANT) &&
+         s->x_kind == ATM_SERIES_X_UTC_INSTANT ||
+         s->x_kind == ATM_SERIES_X_CALENDAR_QUARTER) &&
         g_strcmp0 (s->x_dimension, "time") != 0)
         return fail (error, ATM_SERIES_CONTRACT_ERROR_SHAPE,
                      "Temporal X requires time dimension.");
@@ -749,6 +820,9 @@ atm_series_contract_validate (AtmSeriesContract *s, const AtmSraResult *q, GErro
     if (!calendar_year_scope_encloses_points (s))
         return fail (error, ATM_SERIES_CONTRACT_ERROR_SHAPE,
                      "Calendar-year time scope does not enclose the series points.");
+    if (!calendar_quarter_scope_encloses_points (s))
+        return fail (error, ATM_SERIES_CONTRACT_ERROR_SHAPE,
+                     "Calendar-quarter time scope does not enclose the series points.");
     if (s->scientific_content_id != NULL || s->qualified_series_id != NULL)
         return fail (error, ATM_SERIES_CONTRACT_ERROR_IDENTITY, "Caller identity strings are not authoritative.");
     char *scientific_json = NULL;

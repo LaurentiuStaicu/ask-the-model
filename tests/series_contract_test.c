@@ -150,6 +150,62 @@ qualified_with_single_coordinate_fact (AtmScientificArtifact *a,
 }
 
 static AtmSraResult *
+qualified_with_coordinate_facts (
+    AtmScientificArtifact *a,
+    const char *coordinate_key,
+    const char *const *coordinates,
+    const char *const *values,
+    guint count
+)
+{
+    AtmSraResult *q = atm_sra_result_new (ATM_SRA_ANSWERED);
+    GError *error = NULL;
+    g_assert_nonnull (coordinates);
+    g_assert_nonnull (values);
+    g_assert_cmpuint (count, >, 0);
+
+    for (guint i = 0; i < count; i++) {
+        char *qualifiers = g_strdup_printf (
+            "{\"%s\":\"%s\",\"scenario\":\"baseline\","
+            "\"epistemic_status\":\"observed\",\"y_status\":\"NUMERIC\"}",
+            coordinate_key, coordinates[i]);
+        char *id = g_strdup_printf ("coordinate-fact-%u", i);
+        AtmSraEstablishedFact *fact = atm_sra_established_fact_new (
+            id, "observation", "subject", "attribute", values[i],
+            "unit", "dimension", qualifiers);
+        g_free (id);
+        g_free (qualifiers);
+        g_assert_nonnull (fact);
+        g_assert_true (atm_sra_fact_add_support (
+            fact, a->qualified_artifact_id, &error));
+        g_assert_no_error (error);
+        g_assert_true (atm_sra_result_add_fact (q, fact, &error));
+        g_assert_no_error (error);
+    }
+
+    g_assert_true (atm_sra_qualification_add_canonical_obligation (
+        q, "atm-sra/1", &error));
+    g_assert_no_error (error);
+    char *snapshot = g_strdup_printf ("ewd@0.1.0#%s", SHA);
+    g_assert_true (atm_sra_qualification_add_repository_snapshot (
+        q, snapshot, &error));
+    g_free (snapshot);
+    g_assert_no_error (error);
+    g_assert_true (atm_sra_qualification_add_evidence_artifact (
+        q, a, &error));
+    g_assert_no_error (error);
+    g_assert_true (atm_sra_qualification_add_semantic_profile (
+        q, "atm-profile/ewd/v1@1", &error));
+    g_assert_no_error (error);
+    g_assert_true (atm_sra_qualification_set_numeric_profile (
+        q, ATM_SERIES_CONTRACT_NUMERIC_PROFILE, &error));
+    g_assert_no_error (error);
+    g_assert_true (atm_sra_result_finalize (q, &error));
+    g_assert_no_error (error);
+    return q;
+}
+
+static AtmSraResult *
 qualified_with_missing_facts (AtmScientificArtifact *a)
 {
     AtmSraResult *q = atm_sra_result_new (ATM_SRA_ANSWERED);
@@ -933,10 +989,14 @@ static AtmSeriesContract *base_kind (AtmSeriesXKind kind)
     AtmSeriesContract *s = atm_series_contract_new (
         kind, "subject", "attribute",
         kind == ATM_SERIES_X_UTC_INSTANT ? "UTC" :
-            kind == ATM_SERIES_X_EVENT_ORDINAL ? "event" : "calendar_year",
+            kind == ATM_SERIES_X_EVENT_ORDINAL ? "event" :
+            kind == ATM_SERIES_X_CALENDAR_QUARTER ? "calendar_quarter" :
+            "calendar_year",
         "time", "unit", "dimension",
         "empirical_observations", "baseline",
-        kind == ATM_SERIES_X_CALENDAR_YEAR ? "1880-2025" : "scope", "observed",
+        kind == ATM_SERIES_X_CALENDAR_YEAR ? "1880-2025" :
+            kind == ATM_SERIES_X_CALENDAR_QUARTER ? "2025-Q1..2025-Q4" :
+            "scope", "observed",
         "ewd", "0.1.0", SHA, "data/series.csv", "fixture-series", "1", &error);
     g_assert_no_error (error);
     g_assert_nonnull (s);
@@ -974,6 +1034,149 @@ static void test_non_calendar_coordinates_bind_to_matching_sra_qualifier (void)
         atm_sra_result_free (q);
         atm_scientific_artifact_free (a);
     }
+}
+
+static void test_calendar_quarter_coordinates_are_ordered_and_identity_bound (void)
+{
+    const char *coordinates[] = {
+        "2024-Q4",
+        "2025-Q1",
+        "2025-Q3"
+    };
+    const char *values[] = { "1e0", "2e0", "3e0" };
+    AtmScientificArtifact *a = support_artifact ();
+    AtmSraResult *q = qualified_with_coordinate_facts (
+        a, "calendar_quarter", coordinates, values, G_N_ELEMENTS (coordinates));
+    AtmSeriesContract *s = base_kind (ATM_SERIES_X_CALENDAR_QUARTER);
+    g_free (s->time_scope);
+    s->time_scope = g_strdup ("2024-Q4..2025-Q3");
+    const char *support[] = { a->qualified_artifact_id };
+    GError *error = NULL;
+
+    for (guint i = 0; i < G_N_ELEMENTS (coordinates); i++) {
+        char *decimal = g_strdup_printf ("%u.0000", i + 1);
+        char *coefficient = g_strdup_printf ("%u", i + 1);
+        g_assert_true (atm_series_contract_add_point (
+            s, coordinates[i], ATM_SERIES_Y_NUMERIC, decimal, coefficient, 0,
+            FALSE, FALSE, NULL, NULL, support, 1, &error));
+        g_assert_no_error (error);
+        g_free (decimal);
+        g_free (coefficient);
+    }
+
+    g_assert_true (atm_series_contract_validate (s, q, &error));
+    g_assert_no_error (error);
+    g_assert_cmpuint (s->points->len, ==, 3);
+    const AtmSeriesContractPoint *last =
+        g_ptr_array_index (s->points, 2);
+    g_assert_cmpstr (last->x, ==, "2025-Q3");
+    /* A gap between Q1 and Q3 remains an unfilled gap; ordering must not
+     * manufacture a Q2 point or convert the source observation into a break. */
+    g_assert_false (last->break_before);
+    g_assert_nonnull (atm_series_contract_scientific_id (s));
+    g_assert_nonnull (atm_series_contract_qualified_id (s));
+
+    atm_series_contract_free (s);
+    atm_sra_result_free (q);
+    atm_scientific_artifact_free (a);
+}
+
+static void test_calendar_quarter_malformed_coordinates_rejected (void)
+{
+    const char *invalid[] = {
+        "2025-Q0", "2025-Q5", "2025-QX", "2025-q1", "2025Q1",
+        "2025-Q01", "025-Q1", "0000-Q1", "2025-Q1x",
+        "2025-Q 1", "000A-Q1", "2025-QQ", "2025-Q4 "
+    };
+    AtmScientificArtifact *a = support_artifact ();
+    const char *support[] = { a->qualified_artifact_id };
+
+    for (guint i = 0; i < G_N_ELEMENTS (invalid); i++) {
+        AtmSeriesContract *s = base_kind (ATM_SERIES_X_CALENDAR_QUARTER);
+        GError *error = NULL;
+        g_assert_false (atm_series_contract_add_point (
+            s, invalid[i], ATM_SERIES_Y_NUMERIC, "1.0000", "1", 0,
+            FALSE, FALSE, NULL, NULL, support, 1, &error));
+        g_assert_error (error, ATM_SERIES_CONTRACT_ERROR,
+                        ATM_SERIES_CONTRACT_ERROR_ARGUMENT);
+        g_clear_error (&error);
+        atm_series_contract_free (s);
+    }
+
+    atm_scientific_artifact_free (a);
+}
+
+static void test_calendar_quarter_duplicate_and_reverse_rejected (void)
+{
+    const char *coordinates[] = { "2025-Q1", "2025-Q3" };
+    const char *values[] = { "1e0", "2e0" };
+    const char *cases[][2] = {
+        { "2025-Q1", "2025-Q1" },
+        { "2025-Q3", "2025-Q1" }
+    };
+    AtmScientificArtifact *a = support_artifact ();
+    AtmSraResult *q = qualified_with_coordinate_facts (
+        a, "calendar_quarter", coordinates, values, G_N_ELEMENTS (coordinates));
+    const char *support[] = { a->qualified_artifact_id };
+
+    for (guint i = 0; i < G_N_ELEMENTS (cases); i++) {
+        AtmSeriesContract *s = base_kind (ATM_SERIES_X_CALENDAR_QUARTER);
+        GError *error = NULL;
+        for (guint point = 0; point < 2; point++) {
+            gboolean is_q3 = g_strcmp0 (cases[i][point], "2025-Q3") == 0;
+            g_assert_true (atm_series_contract_add_point (
+                s, cases[i][point], ATM_SERIES_Y_NUMERIC,
+                is_q3 ? "2.0000" : "1.0000",
+                is_q3 ? "2" : "1", 0,
+                FALSE, FALSE, NULL, NULL, support, 1, &error));
+            g_assert_no_error (error);
+        }
+        g_assert_false (atm_series_contract_validate (s, q, &error));
+        g_assert_error (error, ATM_SERIES_CONTRACT_ERROR,
+                        ATM_SERIES_CONTRACT_ERROR_ORDER);
+        g_clear_error (&error);
+        atm_series_contract_free (s);
+    }
+
+    atm_sra_result_free (q);
+    atm_scientific_artifact_free (a);
+}
+
+static void test_calendar_quarter_requires_temporal_unit_dimension_and_scope (void)
+{
+    const char *coordinates[] = { "2025-Q1", "2025-Q3" };
+    const char *values[] = { "1e0", "2e0" };
+    AtmScientificArtifact *a = support_artifact ();
+    AtmSraResult *q = qualified_with_coordinate_facts (
+        a, "calendar_quarter", coordinates, values, G_N_ELEMENTS (coordinates));
+    const char *support[] = { a->qualified_artifact_id };
+
+    for (guint mode = 0; mode < 3; mode++) {
+        AtmSeriesContract *s = base_kind (ATM_SERIES_X_CALENDAR_QUARTER);
+        GError *error = NULL;
+        if (mode == 0) {
+            g_free (s->x_unit);
+            s->x_unit = g_strdup ("calendar_year");
+        } else if (mode == 1) {
+            g_free (s->x_dimension);
+            s->x_dimension = g_strdup ("mass");
+        } else {
+            g_free (s->time_scope);
+            s->time_scope = g_strdup ("2025-Q2..2025-Q4");
+        }
+        g_assert_true (atm_series_contract_add_point (
+            s, "2025-Q1", ATM_SERIES_Y_NUMERIC, "1.0000", "1", 0,
+            FALSE, FALSE, NULL, NULL, support, 1, &error));
+        g_assert_no_error (error);
+        g_assert_false (atm_series_contract_validate (s, q, &error));
+        g_assert_error (error, ATM_SERIES_CONTRACT_ERROR,
+                        ATM_SERIES_CONTRACT_ERROR_SHAPE);
+        g_clear_error (&error);
+        atm_series_contract_free (s);
+    }
+
+    atm_sra_result_free (q);
+    atm_scientific_artifact_free (a);
 }
 
 static void test_metadata_bounds_rechecked_after_mutation (void)
@@ -1095,6 +1298,14 @@ int main (int argc, char **argv)
     g_test_add_func ("/series-contract/artifact-snapshot-binding", test_sra_artifact_snapshot_must_be_qualified);
     g_test_add_func ("/series-contract/snapshot-binding", test_contract_snapshot_must_be_qualified);
     g_test_add_func ("/series-contract/non-calendar-coordinate-binding", test_non_calendar_coordinates_bind_to_matching_sra_qualifier);
+    g_test_add_func ("/series-contract/calendar-quarter-order-and-identity",
+                     test_calendar_quarter_coordinates_are_ordered_and_identity_bound);
+    g_test_add_func ("/series-contract/calendar-quarter-malformed",
+                     test_calendar_quarter_malformed_coordinates_rejected);
+    g_test_add_func ("/series-contract/calendar-quarter-order-rejection",
+                     test_calendar_quarter_duplicate_and_reverse_rejected);
+    g_test_add_func ("/series-contract/calendar-quarter-scope",
+                     test_calendar_quarter_requires_temporal_unit_dimension_and_scope);
     g_test_add_func ("/series-contract/metadata-bounds-after-mutation", test_metadata_bounds_rechecked_after_mutation);
     g_test_add_func ("/series-contract/calendar-year-negative-zero", test_calendar_year_negative_zero_rejected);
     g_test_add_func ("/series-contract/utc-calendar", test_invalid_utc_calendar_rejected);
