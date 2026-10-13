@@ -3,16 +3,7 @@ name: PRES-09 GTK Application E2E
 on:
   pull_request:
     paths:
-      - 'src/Application.vala'
-      - 'src/StartupQualificationService.vala'
-      - 'src/OllamaProvider.vala'
-      - 'src/ConversationPersistenceStore.vala'
-      - 'src/RepositoryLifecycleService.vala'
-      - 'src/ConversationGrounding.vala'
-      - 'src/ConversationSession.vala'
-      - 'src/chart_*'
-      - 'src/ChartNative.vapi'
-      - 'src/ChartIntent.vala'
+      - 'src/**'
       - 'tests/pres09_gtk_application_e2e_test.vala'
       - 'tests/fixtures/chart01/**'
       - 'meson.build'
