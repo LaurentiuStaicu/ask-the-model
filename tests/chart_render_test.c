@@ -1,4 +1,6 @@
 #include "chart_render.h"
+#include "energy_institute_verified_series.h"
+#include "energy_institute_admission.h"
 #include <fontconfig/fontconfig.h>
 #include <stdint.h>
 #include <string.h>
@@ -44,6 +46,60 @@ static AtmChartSpec *specification (AtmChartKind kind)
     AtmChartSpec *spec = NULL;
     g_assert_true (atm_chart_spec_new (kind, inputs, 1, &spec, NULL));
     atm_verified_series_free (s); return spec;
+}
+
+static AtmChartSpec *
+ei_specification_for_renderer_test (void)
+{
+    const char *root = g_getenv ("ATM_CHART01_FIXTURE");
+    g_assert_nonnull (root);
+    const char *snapshot = "dc710d8e604c0fff713a3acfdb18ab47a1a902bb";
+    const char *paths[] = {
+        "science/data/processed/energy_institute_global_2026.csv",
+        "science/data/processed/energy_institute_global_2026.provenance.json",
+        "science/data/input_manifest.json",
+        "science/data/registry.csv"
+    };
+    GBytes *sources[ATM_EI_SOURCE_COUNT] = {NULL};
+    for (guint i = 0; i < ATM_EI_SOURCE_COUNT; i++) {
+        char *path = g_build_filename (root, "ewd-current", paths[i], NULL);
+        char *bytes = NULL;
+        gsize length = 0;
+        GError *error = NULL;
+        g_assert_true (g_file_get_contents (path, &bytes, &length, &error));
+        g_assert_no_error (error);
+        g_free (path);
+        sources[i] = g_bytes_new_take (bytes, length);
+    }
+    AtmEnergyInstituteAdmission *admission = NULL;
+    AtmEnergyInstituteVerifiedSeries *series = NULL;
+    AtmChartSpec *spec = NULL;
+    GError *error = NULL;
+    g_assert_true (atm_energy_institute_admission_new (
+        "LaurentiuStaicu/empirical-world3-dynamics", snapshot,
+        sources, &admission, &error));
+    g_assert_no_error (error);
+    for (guint i = 0; i < ATM_EI_SOURCE_COUNT; i++)
+        g_bytes_unref (sources[i]);
+    g_assert_true (atm_energy_institute_verified_series_from_admission (
+        admission, &series, &error));
+    g_assert_no_error (error);
+    g_assert_true (atm_chart_spec_new_energy_institute_v2 (
+        ATM_CHART_LINE, series, &spec, &error));
+    g_assert_no_error (error);
+    atm_energy_institute_verified_series_free (series);
+    atm_energy_institute_admission_free (admission);
+    return spec;
+}
+
+static void
+test_ei_projection_does_not_enable_renderer (void)
+{
+    AtmChartSpec *spec = ei_specification_for_renderer_test ();
+    AtmChartRender *rendered = NULL;
+    g_assert_false (atm_chart_render_new (spec, 860, 500, 1, &rendered, NULL));
+    g_assert_null (rendered);
+    atm_chart_spec_free (spec);
 }
 
 static AtmChartRender *render (AtmChartSpec *spec, guint width, guint height, guint scale)
@@ -230,6 +286,7 @@ int main (int argc, char **argv)
     g_test_add_func ("/chart-render/scatter-scale", test_scatter_scale);
     g_test_add_func ("/chart-render/resize-transactional", test_resize_transactional);
     g_test_add_func ("/chart-render/fallback-arguments", test_fallback_arguments);
+    g_test_add_func ("/chart-render/ei-projection-not-renderable", test_ei_projection_does_not_enable_renderer);
     int result = g_test_run ();
     /* Release process-wide Cairo/Fontconfig test caches after every object is
      * destroyed, so leak checking remains enabled without suppressions. */

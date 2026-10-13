@@ -16,7 +16,7 @@ EI v2 is a single-series, calendar-year TES contract only. Before owning input, 
 
 The new source-neutral point view exposes calendar year, status, exact source-decimal token, canonical coefficient/exponent, discontinuity flag and borrowed support IDs for either admitted current source. EI uses EJ/year and energy-flow-rate dimension; it never passes through the GISTEMP temperature display conversion. Tests cover both admitted EI snapshots: the reconstructed SRA scientific fact content remains equivalent, but the generic series serialization includes each point's snapshot-qualified support IDs, so both series identities and the ChartSpec identities differ. Cross-snapshot mixes remain rejected by source admission.
 
-**C2a is not a rendering qualification.** The EI ChartSpec records display profile `atm-display/energy-institute-tes-linear` version `0-unqualified` as an explicit non-admission marker. No EI display projection is qualified, no Application/live chart intent is enabled, and no EI chart metadata is persisted to History. The next gates are C2b display projection, C2c atomic conversation-store v4, C2d pinned-source History reconstruction, and C2e application integration only after the prior gates pass. No release artifact is changed by native ChartSpec qualification.
+**C2a is not a rendering qualification.** The EI ChartSpec initially carried `0-unqualified`. C2b replaces that EI-only marker with qualified display profile version `1` after the separate projection gate passes. The change affects only EI v2 identity; no EI display values were persisted or used by an application route before qualification. No release artifact is changed by native ChartSpec qualification.
 
 
 The entry point consumes validated, owned or safely retained VerifiedSeries
@@ -24,6 +24,16 @@ objects, not identity strings or model-authored arrays. The first allowed
 profile is `atm-series/gistemp-complete-annual/1`. The model may express intent
 and select qualified references; it cannot supply numeric values, units, scale
 policy or axis domains.
+
+## C2b: deterministic Energy Institute TES display projection
+
+**Implementation under qualification; not a rendering or application integration gate.** The existing `atm-display/gistemp-linear/1` policy and its pinned reference output remain unchanged. Energy Institute uses the separate `atm-display/energy-institute-tes-linear/1` policy; EI v2 binds its policy ID and version into the ChartSpec identity, with version `1` reserved for this separately qualified profile.
+
+The source data remains the exact annual TES observations in EJ/year, physical-energy-content basis. The display-only conversion uses integer arithmetic and an explicit canonical-coefficient allowlist, accepts coefficient exponents `-7..0`, rounds half-up to micro-EJ/year, and rejects malformed coefficients, unsupported precision, overflow, negative values, or exact source values outside `0..1000` EJ/year. The source token, scientific coefficient/exponent, evidence support and exact extrema in ChartSpec are unchanged by projection. Quantized display micro-units must never replace source data or be used in calculations, transformations, SRA facts, export, or History.
+
+For the currently admitted 1965–2025 series, the display Y domain is rounded outward to a 100-EJ/year grid (currently 100..700), while X remains 1965..2025. Year-tick spacing is deterministic from bounded plot width: 15 years below 480 logical pixels, 10 years from 480 to under 720, and 5 years at 720 or more. Both axes stay under the 17-tick cap; valid plot dimensions are 320..8192 by 160..8192. Every point must remain finite and within the projected domain. The calculation is repeatable across both exact admitted snapshots; the projected coordinates coincide because the observed values coincide, while the source-qualified ChartSpec IDs remain distinct.
+
+The EI projection policy is tested separately for decimal precision/range/overflow, exact source-token preservation, source/support coverage, tick layout, normalized resize behavior, mutation detection, and fail-closed outputs. It is not routed to `chart_render.c`: that renderer remains explicitly restricted to the existing GISTEMP v1 contract. No EI live chart intent, application rendering, History schema or persisted chart is enabled by C2b. C2c must qualify the atomic conversation-store v4 migration and C2d must qualify pinned-source History reconstruction before C2e can wire the EI chart into the application.
 
 ## Initial admission rules
 

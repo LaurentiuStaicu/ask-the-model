@@ -210,6 +210,11 @@ gboolean atm_chart_render_new (const AtmChartSpec *spec, guint width, guint heig
         width > ATM_CHART_RENDER_MAX_SIZE || height > ATM_CHART_RENDER_MAX_SIZE ||
         scale < 1 || scale > 2)
         return reject (error, "Invalid chart canvas dimensions or output.");
+    /* The existing renderer and Data view are GISTEMP-specific. EI display
+     * projection is a separate native qualification gate and must not be
+     * mistaken for permission to render or persist an EI chart. */
+    if (atm_chart_spec_version (spec) != ATM_CHART_SPEC_VERSION_GISTEMP_V1)
+        return reject (error, "Chart renderer only admits the qualified GISTEMP v1 profile.");
     AtmChartRender *r = g_new0 (AtmChartRender, 1);
     if (!atm_chart_spec_rebuild (spec, &r->spec, error)) goto invalid;
     r->data = data_view (r->spec);
