@@ -248,6 +248,44 @@ qualified_with_missing_facts (AtmScientificArtifact *a)
     return q;
 }
 
+static AtmSraResult *
+qualified_with_missing_fact_numeric_payload (AtmScientificArtifact *a)
+{
+    AtmSraResult *q = atm_sra_result_new (ATM_SRA_ANSWERED);
+    GError *error = NULL;
+    AtmSraEstablishedFact *fact = atm_sra_established_fact_new (
+        "fact-missing-with-numeric-payload", "observation", "subject",
+        "attribute", "MISSING", "unit", "dimension",
+        "{\"calendar_year\":\"1881\",\"scenario\":\"baseline\","
+        "\"epistemic_status\":\"observed\",\"y_status\":\"MISSING\","
+        "\"missing_reason\":\"source_missing\","
+        "\"source_decimal\":\"1.0000\",\"coefficient\":\"1\","
+        "\"exponent\":\"0\",\"negative_zero\":false}");
+    g_assert_nonnull (fact);
+    g_assert_true (atm_sra_fact_add_support (fact, a->qualified_artifact_id, &error));
+    g_assert_no_error (error);
+    g_assert_true (atm_sra_result_add_fact (q, fact, &error));
+    g_assert_no_error (error);
+    g_assert_true (atm_sra_qualification_add_canonical_obligation (
+        q, "atm-sra/1", &error));
+    g_assert_no_error (error);
+    char *snapshot = g_strdup_printf ("ewd@0.1.0#%s", SHA);
+    g_assert_true (atm_sra_qualification_add_repository_snapshot (q, snapshot, &error));
+    g_free (snapshot);
+    g_assert_no_error (error);
+    g_assert_true (atm_sra_qualification_add_evidence_artifact (q, a, &error));
+    g_assert_no_error (error);
+    g_assert_true (atm_sra_qualification_add_semantic_profile (
+        q, "atm-profile/ewd/v1@1", &error));
+    g_assert_no_error (error);
+    g_assert_true (atm_sra_qualification_set_numeric_profile (
+        q, ATM_SERIES_CONTRACT_NUMERIC_PROFILE, &error));
+    g_assert_no_error (error);
+    g_assert_true (atm_sra_result_finalize (q, &error));
+    g_assert_no_error (error);
+    return q;
+}
+
 static AtmScientificArtifact *
 support_artifact_other (void)
 {
@@ -753,6 +791,30 @@ static void test_missing_point_must_match_sra_fact (void)
     g_assert_no_error (error);
     atm_series_contract_free (s);
 
+    atm_sra_result_free (q);
+    atm_scientific_artifact_free (a);
+}
+
+static void test_missing_fact_rejects_numeric_payload (void)
+{
+    AtmScientificArtifact *a = support_artifact ();
+    AtmSraResult *q = qualified_with_missing_fact_numeric_payload (a);
+    AtmSeriesContract *s = base ();
+    const char *support[] = { a->qualified_artifact_id };
+    GError *error = NULL;
+
+    /* The Y value says MISSING, but the same qualified fact's payload claims
+     * a numeric source token/coefficient. It must not authorize a missing point. */
+    g_assert_true (atm_series_contract_add_point (
+        s, "1881", ATM_SERIES_Y_MISSING, NULL, NULL, 0, FALSE,
+        FALSE, "source_missing", NULL, support, 1, &error));
+    g_assert_no_error (error);
+    g_assert_false (atm_series_contract_validate (s, q, &error));
+    g_assert_error (error, ATM_SERIES_CONTRACT_ERROR,
+                    ATM_SERIES_CONTRACT_ERROR_SHAPE);
+    g_clear_error (&error);
+
+    atm_series_contract_free (s);
     atm_sra_result_free (q);
     atm_scientific_artifact_free (a);
 }
@@ -1283,6 +1345,8 @@ int main (int argc, char **argv)
     g_test_add_func ("/series-contract/sra-numeric-profile",
                      test_sra_numeric_profile_must_match_contract);
     g_test_add_func ("/series-contract/missing-point-fact-binding", test_missing_point_must_match_sra_fact);
+    g_test_add_func ("/series-contract/missing-fact-numeric-payload",
+                     test_missing_fact_rejects_numeric_payload);
     g_test_add_func ("/series-contract/numeric-fact-no-missing-reason",
                      test_numeric_fact_rejects_missing_reason);
     g_test_add_func ("/series-contract/direct-epistemic-status-binding", test_epistemic_status_must_match_sra_fact);
