@@ -2865,6 +2865,59 @@ namespace AskTheModel {
             }
         }
 
+        private void qualify_live_energy_institute_request (
+            ConversationSession session
+        ) throws GLib.Error {
+            ConversationRepositoryPin? chart_pin = null;
+            for (uint i = 0; i < session.repository_count (); i++) {
+                ConversationRepositoryPin? pin = session.repository_pin_at (i);
+                if (pin == null) continue;
+                if (pin.repository_id == "ewd" ||
+                    pin.repository_id == "LaurentiuStaicu/empirical-world3-dynamics") {
+                    chart_pin = pin;
+                    break;
+                }
+            }
+            if (chart_pin == null) {
+                throw new GLib.IOError.FAILED (
+                    "Energy Institute charts require EWD to be selected for this conversation. " +
+                    "Select EWD in Repository Scope and retry."
+                );
+            }
+            RepositoryDescriptor? descriptor =
+                repository_descriptor_for_id (chart_pin.repository_id);
+            if (descriptor == null) {
+                throw new GLib.IOError.NOT_FOUND (
+                    "The pinned EWD repository required for the Energy Institute chart is unavailable."
+                );
+            }
+            string snapshot_path = RepositoryLifecycleService.snapshot_path (
+                descriptor, chart_pin.snapshot_sha
+            );
+            if (!GLib.FileUtils.test (snapshot_path, GLib.FileTest.IS_DIR)) {
+                throw new GLib.IOError.NOT_FOUND (
+                    "The pinned EWD snapshot required for the Energy Institute chart is unavailable."
+                );
+            }
+            ChartNative.Spec spec;
+            if (!ChartNative.reconstruct_live_energy_institute (
+                    snapshot_path, chart_pin.repository_id,
+                    chart_pin.snapshot_sha, "line", out spec
+                ) || spec == null) {
+                throw new GLib.IOError.INVALID_DATA (
+                    "The pinned Energy Institute source could not be re-qualified."
+                );
+            }
+            string? scientific_id = spec.series_scientific_id (0);
+            string? qualified_id = spec.series_qualified_id (0);
+            string? chart_spec_id = spec.id ();
+            if (scientific_id == null || qualified_id == null || chart_spec_id == null) {
+                throw new GLib.IOError.INVALID_DATA (
+                    "The qualified Energy Institute chart identities are unavailable."
+                );
+            }
+        }
+
         private Gtk.Widget[] build_live_chart_widgets (
             ConversationSession session,
             bool energy_institute,
@@ -2905,16 +2958,19 @@ namespace AskTheModel {
             }
 
             ChartNative.Spec spec;
-            bool reconstructed = energy_institute
-                ? ChartNative.reconstruct_live_energy_institute (
+            bool reconstructed = false;
+            if (energy_institute) {
+                reconstructed = ChartNative.reconstruct_live_energy_institute (
                     snapshot_path, chart_pin.repository_id,
                     chart_pin.snapshot_sha, "line", out spec
-                  )
-                : ChartNative.reconstruct_live_gistemp (
+                );
+            } else {
+                reconstructed = ChartNative.reconstruct_live_gistemp (
                     snapshot_path, chart_pin.repository_id,
                     chart_pin.repository_version, chart_pin.snapshot_sha,
                     out spec
-                  );
+                );
+            }
             if (!reconstructed || spec == null) {
                 throw new GLib.IOError.INVALID_DATA (
                     energy_institute
