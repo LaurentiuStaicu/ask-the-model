@@ -1,6 +1,6 @@
-# CHART-02: initial ChartSpec contract
-
 # CHART-02: source-qualified ChartSpec contracts
+
+*Historical design and initial v1 contract details follow; the current v1/v2 behavior is stated first.*
 
 **Current status (2026-10-13): GISTEMP v1 remains unchanged; Energy Institute v2 is integrated through C2a–C2e.** The application admits only the reviewed source-specific paths: `/chart gistemp` and `/chart energy-institute`, plus natural-language requests that unambiguously name one supported source and request a visualization. Live and History reconstruct from pinned source bytes; persisted recipes are not numeric authority. The model supplies neither scientific values nor units, axes, domains, transforms or chart metadata.
 
