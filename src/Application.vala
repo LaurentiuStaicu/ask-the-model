@@ -5043,25 +5043,6 @@ namespace AskTheModel {
                 );
         }
 
-        private ConversationPersistenceChart?[]
-        pres09_test_all_chart_recipes (
-            ConversationPersistenceSnapshot snapshot
-        ) {
-            ConversationPersistenceChart?[] result = {};
-            foreach (
-                ConversationPersistenceMessage message
-                in snapshot.messages
-            ) {
-                foreach (
-                    ConversationPersistenceChart chart
-                    in message.charts
-                ) {
-                    result += chart;
-                }
-            }
-            return result;
-        }
-
         private bool pres09_test_save_live_oracle (
             ChatTabState state
         ) {
