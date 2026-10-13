@@ -994,7 +994,9 @@ static AtmSeriesContract *base_kind (AtmSeriesXKind kind)
             "calendar_year",
         "time", "unit", "dimension",
         "empirical_observations", "baseline",
-        kind == ATM_SERIES_X_CALENDAR_YEAR ? "1880-2025" :
+        kind == ATM_SERIES_X_UTC_INSTANT
+             ? "2025-01-01T00:00:00Z..2027-12-31T23:59:59Z" :
+         kind == ATM_SERIES_X_CALENDAR_YEAR ? "1880-2025" :
             kind == ATM_SERIES_X_CALENDAR_QUARTER ? "2025-Q1..2025-Q4" :
             "scope", "observed",
         "ewd", "0.1.0", SHA, "data/series.csv", "fixture-series", "1", &error);
@@ -1034,6 +1036,57 @@ static void test_non_calendar_coordinates_bind_to_matching_sra_qualifier (void)
         atm_sra_result_free (q);
         atm_scientific_artifact_free (a);
     }
+}
+
+static void test_utc_instant_scope_must_enclose_points (void)
+{
+    const char *coordinate = "2026-01-01T00:00:00Z";
+    const char *invalid_scopes[] = {
+        "scope",
+        "2027-01-01T00:00:00Z..2028-01-01T00:00:00Z",
+        "2027-01-01T00:00:00Z..2025-01-01T00:00:00Z"
+    };
+    AtmScientificArtifact *a = support_artifact ();
+    AtmSraResult *q = qualified_with_single_coordinate_fact (
+        a, "utc_instant", coordinate);
+    const char *support[] = { a->qualified_artifact_id };
+
+    for (guint i = 0; i < G_N_ELEMENTS (invalid_scopes); i++) {
+        AtmSeriesContract *s = base_kind (ATM_SERIES_X_UTC_INSTANT);
+        GError *error = NULL;
+        g_assert_true (atm_series_contract_add_point (
+            s, coordinate, ATM_SERIES_Y_NUMERIC, "1.0000", "1", 0,
+            FALSE, FALSE, NULL, NULL, support, 1, &error));
+        g_assert_no_error (error);
+        g_free (s->time_scope);
+        s->time_scope = g_strdup (invalid_scopes[i]);
+
+        g_assert_false (atm_series_contract_validate (s, q, &error));
+        g_assert_error (error, ATM_SERIES_CONTRACT_ERROR,
+                        ATM_SERIES_CONTRACT_ERROR_SHAPE);
+        g_assert_nonnull (g_strstr_len (error->message, -1,
+            "UTC-instant time scope does not enclose the series points"));
+        g_clear_error (&error);
+        atm_series_contract_free (s);
+    }
+
+    /* Scope endpoints are inclusive. A single point may sit exactly at both
+     * bounds, but no coordinate may fall outside the declared range. */
+    AtmSeriesContract *at_boundary = base_kind (ATM_SERIES_X_UTC_INSTANT);
+    GError *error = NULL;
+    g_assert_true (atm_series_contract_add_point (
+        at_boundary, coordinate, ATM_SERIES_Y_NUMERIC, "1.0000", "1", 0,
+        FALSE, FALSE, NULL, NULL, support, 1, &error));
+    g_assert_no_error (error);
+    g_free (at_boundary->time_scope);
+    at_boundary->time_scope = g_strdup (
+        "2026-01-01T00:00:00Z..2026-01-01T00:00:00Z");
+    g_assert_true (atm_series_contract_validate (at_boundary, q, &error));
+    g_assert_no_error (error);
+
+    atm_series_contract_free (at_boundary);
+    atm_sra_result_free (q);
+    atm_scientific_artifact_free (a);
 }
 
 static void test_calendar_quarter_coordinates_are_ordered_and_identity_bound (void)
@@ -1298,6 +1351,7 @@ int main (int argc, char **argv)
     g_test_add_func ("/series-contract/artifact-snapshot-binding", test_sra_artifact_snapshot_must_be_qualified);
     g_test_add_func ("/series-contract/snapshot-binding", test_contract_snapshot_must_be_qualified);
     g_test_add_func ("/series-contract/non-calendar-coordinate-binding", test_non_calendar_coordinates_bind_to_matching_sra_qualifier);
+    g_test_add_func ("/series-contract/utc-time-scope", test_utc_instant_scope_must_enclose_points);
     g_test_add_func ("/series-contract/calendar-quarter-order-and-identity",
                      test_calendar_quarter_coordinates_are_ordered_and_identity_bound);
     g_test_add_func ("/series-contract/calendar-quarter-malformed",
