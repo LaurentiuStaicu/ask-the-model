@@ -398,7 +398,176 @@ create_v2_store (
 }
 
 static void
-test_v1_to_v3_migration (void)
+create_v3_store (
+    const char *path
+)
+{
+    GError *error = NULL;
+    GBytes *bytes = g_resources_lookup_data (
+        "/io/github/laurentiustaicu/ask_the_model/schemas/conversation-store-v3.sql",
+        G_RESOURCE_LOOKUP_FLAGS_NONE,
+        &error
+    );
+    g_assert_no_error (error);
+    g_assert_nonnull (bytes);
+    gsize size = 0;
+    const char *data = g_bytes_get_data (bytes, &size);
+    g_assert_nonnull (data);
+    g_assert_cmpuint (size, >, 0);
+
+    char *schema = g_strndup (data, size);
+    char *sql = g_strdup_printf (
+        "BEGIN IMMEDIATE;%s"
+        "PRAGMA application_id=%u;"
+        "PRAGMA user_version=3;"
+        "COMMIT;",
+        schema,
+        (guint) ATM_CONVERSATION_STORE_APPLICATION_ID
+    );
+    raw_exec (path, sql);
+    g_free (sql);
+    g_free (schema);
+    g_bytes_unref (bytes);
+}
+
+static void
+insert_v3_gistemp_chart_fixture (
+    const char *path
+)
+{
+    raw_exec (
+        path,
+        "PRAGMA foreign_keys=ON;"
+        "BEGIN IMMEDIATE;"
+        "INSERT INTO conversations("
+        "conversation_id,title,created_at_us,updated_at_us,"
+        "model_name,model_digest,repository_generation_id,archived,open_on_startup"
+        ") VALUES("
+        "'v3-chart-conv','V3 Chart',1,2,'model-a',NULL,7,1,0"
+        ");"
+        "INSERT INTO conversation_repositories("
+        "conversation_id,repository_id,repository_version,snapshot_sha"
+        ") VALUES("
+        "'v3-chart-conv','ewd','0.1.0',"
+        "'0123456789abcdef0123456789abcdef01234567'"
+        ");"
+        "INSERT INTO messages("
+        "message_id,conversation_id,sequence_no,turn_no,role,"
+        "provider_content,display_content,grounded,created_at_us"
+        ") VALUES("
+        "'v3-chart-user','v3-chart-conv',0,0,'user','q','q',0,1"
+        ");"
+        "INSERT INTO messages("
+        "message_id,conversation_id,sequence_no,turn_no,role,"
+        "provider_content,display_content,grounded,created_at_us"
+        ") VALUES("
+        "'v3-chart-assistant','v3-chart-conv',1,0,'assistant','a','a',1,2"
+        ");"
+        "INSERT INTO message_charts("
+        "message_id,ordinal,chart_schema,chart_spec_id,chart_kind,reconstruction_profile"
+        ") VALUES("
+        "'v3-chart-assistant',1,'atm-chart-spec/1',"
+        "'aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa',"
+        "'line','atm-chart-reconstruct/gistemp-complete-annual/1'"
+        ");"
+        "INSERT INTO chart_series("
+        "message_id,chart_ordinal,series_ordinal,series_profile,admission_profile,"
+        "scientific_id,qualified_id,repository_id,repository_version,snapshot_sha,source_path"
+        ") VALUES("
+        "'v3-chart-assistant',1,0,'atm-series/gistemp-complete-annual/1',"
+        "'atm-gistemp-pinned-admission/1',"
+        "'bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb',"
+        "'cccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccc',"
+        "'ewd','0.1.0','0123456789abcdef0123456789abcdef01234567',"
+        "'science/data/processed/nasa_gistemp_global_2026.csv'"
+        ");"
+        "COMMIT;"
+    );
+}
+
+static void
+test_v3_to_v4_migration_preserves_chart_rows (void)
+{
+    char *root = new_temp_root ("atm-conversation-v3-v4-XXXXXX");
+    char *path = store_path (root);
+    create_v3_store (path);
+    insert_v3_gistemp_chart_fixture (path);
+
+    AtmConversationStore *store = NULL;
+    GError *error = NULL;
+    g_assert_true (atm_conversation_store_open (path, &store, &error));
+    g_assert_no_error (error);
+    g_assert_cmpint (atm_conversation_store_schema_version (store), ==, 4);
+    g_assert_true (atm_conversation_store_validate (store, &error));
+    g_assert_no_error (error);
+    g_assert_cmpint (raw_int64 (path, "PRAGMA user_version;"), ==, 4);
+    g_assert_cmpint (raw_int64 (path,
+        "SELECT count(*) FROM message_charts WHERE chart_schema='atm-chart-spec/1' "
+        "AND chart_spec_id='aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa' "
+        "AND reconstruction_profile='atm-chart-reconstruct/gistemp-complete-annual/1';"), ==, 1);
+    g_assert_cmpint (raw_int64 (path,
+        "SELECT count(*) FROM chart_series WHERE series_profile='atm-series/gistemp-complete-annual/1' "
+        "AND admission_profile='atm-gistemp-pinned-admission/1' "
+        "AND scientific_id='bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb' "
+        "AND qualified_id='cccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccc';"), ==, 1);
+    g_assert_cmpint (raw_int64 (path,
+        "SELECT count(*) FROM pragma_foreign_key_check;"), ==, 0);
+
+    char *schema_id = raw_text (path,
+        "SELECT schema_id FROM installation WHERE singleton_id=1;");
+    g_assert_cmpstr (schema_id, ==, "atm-conversation-store/4");
+    g_free (schema_id);
+    atm_conversation_store_close (store);
+    g_free (path);
+    remove_tree_best_effort (root);
+    g_free (root);
+}
+
+static void
+test_v3_to_v4_migration_rollback (void)
+{
+    char *root = new_temp_root ("atm-conversation-v3-v4-rollback-XXXXXX");
+    char *path = store_path (root);
+    create_v3_store (path);
+    insert_v3_gistemp_chart_fixture (path);
+    /* Force failure late: this trigger name is created only after the migration
+     * has copied the chart rows, dropped the old chart tables, renamed the new
+     * tables and recreated the index. Because this trigger belongs to messages,
+     * dropping chart_series cannot remove the collision. The transaction must
+     * restore the original v3 tables and rows. */
+    raw_exec (path,
+        "CREATE TRIGGER chart_series_tuple_insert "
+        "BEFORE INSERT ON messages BEGIN SELECT 1; END;"
+    );
+
+    AtmConversationStore *store = NULL;
+    GError *error = NULL;
+    g_assert_false (atm_conversation_store_open (path, &store, &error));
+    g_assert_nonnull (error);
+    g_assert_null (store);
+    g_assert_nonnull (g_strstr_len (error->message, -1,
+        "chart_series_tuple_insert"));
+    g_clear_error (&error);
+
+    g_assert_cmpint (raw_int64 (path, "PRAGMA user_version;"), ==, 3);
+    char *schema_id = raw_text (path,
+        "SELECT schema_id FROM installation WHERE singleton_id=1;");
+    g_assert_cmpstr (schema_id, ==, "atm-conversation-store/3");
+    g_free (schema_id);
+    g_assert_cmpint (raw_int64 (path, "SELECT count(*) FROM message_charts;"), ==, 1);
+    g_assert_cmpint (raw_int64 (path, "SELECT count(*) FROM chart_series;"), ==, 1);
+    g_assert_cmpint (raw_int64 (path, "SELECT count(*) FROM pragma_foreign_key_check;"), ==, 0);
+    g_assert_cmpint (raw_int64 (path,
+        "SELECT count(*) FROM sqlite_schema WHERE type='trigger' "
+        "AND name='chart_series_tuple_insert' AND tbl_name='messages';"), ==, 1);
+
+    g_free (path);
+    remove_tree_best_effort (root);
+    g_free (root);
+}
+
+static void
+test_v1_to_v4_migration (void)
 {
     char *root = new_temp_root (
         "atm-conversation-migration-XXXXXX"
@@ -582,7 +751,7 @@ test_v1_to_v3_migration_rollback (void)
 }
 
 static void
-test_v2_to_v3_migration (void)
+test_v2_to_v4_migration (void)
 {
     char *root = new_temp_root ("atm-conversation-v2-v3-XXXXXX");
     char *path = store_path (root);
@@ -762,6 +931,7 @@ test_chart_recipe_semantics (void)
 
     raw_exec (
         path,
+        "PRAGMA ignore_check_constraints=ON;"
         "UPDATE chart_series SET source_path='README.md';"
     );
 
@@ -851,7 +1021,7 @@ test_newer_schema_rejected (void)
 
     raw_exec (
         path,
-        "PRAGMA user_version=4;"
+        "PRAGMA user_version=5;"
     );
 
     store = NULL;
@@ -2387,6 +2557,93 @@ test_chart_binding_write_load (void)
     );
     g_clear_error (&error);
 
+    /* The v4 allowlist admits the source-bound EI v2 tuple, but not cross-paired
+     * schema/reconstruction/series/admission profiles or unpinned snapshots. */
+    const char *ei_snapshot = "d9e249339663015f6d1c05752338a955bf64ad0b";
+    const char *ei_version =
+        "snapshot:d9e249339663015f6d1c05752338a955bf64ad0b";
+    AtmConversationRepositoryInput ei_repository = {
+        .repository_id = "ewd",
+        .repository_version = ei_version,
+        .snapshot_sha = ei_snapshot
+    };
+    char *ei_conversation_id = NULL;
+    g_assert_true (atm_conversation_store_create_conversation (
+        store, "EI Chart binding", 4, "model-a", NULL, 8,
+        &ei_repository, 1, &ei_conversation_id, &error));
+    g_assert_no_error (error);
+
+    AtmConversationCitationInput ei_citation = {
+        .label = "EI-S1",
+        .repository_id = "ewd",
+        .repository_version = ei_version,
+        .snapshot_sha = ei_snapshot,
+        .logical_source_id = "ei-primary-energy",
+        .source_path = "science/data/processed/energy_institute_global_2026.csv",
+        .locator = "rows 2-62",
+        .title = "Energy Institute global TES",
+        .excerpt = "Qualified annual total energy supply",
+        .immutable_permalink = NULL
+    };
+    gint64 ei_grounded_turn = -1;
+    g_assert_true (atm_conversation_store_commit_turn (
+        store, ei_conversation_id, "show TES", "answer [EI-S1]", "answer",
+        TRUE, 5, &ei_citation, 1, &ei_grounded_turn, &error));
+    g_assert_no_error (error);
+    g_assert_cmpint (ei_grounded_turn, ==, 0);
+
+    AtmConversationChartSeriesInput ei_series = {
+        .series_profile = "atm-series/energy-institute-tes-complete-annual/1",
+        .admission_profile = "atm-energy-institute-pinned-admission/3",
+        .scientific_id =
+            "dddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddd",
+        .qualified_id =
+            "eeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeee",
+        .repository_id = "ewd",
+        .repository_version = ei_version,
+        .snapshot_sha = ei_snapshot,
+        .source_path = "science/data/processed/energy_institute_global_2026.csv"
+    };
+    AtmConversationChartInput ei_chart = {
+        .ordinal = 1,
+        .chart_schema = "atm-chart-spec/2",
+        .chart_spec_id =
+            "ffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffff",
+        .chart_kind = "line",
+        .reconstruction_profile =
+            "atm-chart-reconstruct/energy-institute-tes-complete-annual/1",
+        .series = &ei_series,
+        .series_count = 1
+    };
+    g_assert_true (atm_conversation_store_attach_chart (
+        store, ei_conversation_id, ei_grounded_turn, &ei_chart, &error));
+    g_assert_no_error (error);
+
+    AtmConversationChartInput mixed_tuple = ei_chart;
+    mixed_tuple.ordinal = 2;
+    mixed_tuple.reconstruction_profile =
+        "atm-chart-reconstruct/gistemp-complete-annual/1";
+    g_assert_false (atm_conversation_store_attach_chart (
+        store, ei_conversation_id, ei_grounded_turn, &mixed_tuple, &error));
+    g_assert_error (error, ATM_CONVERSATION_STORE_ERROR,
+                    ATM_CONVERSATION_STORE_ERROR_ARGUMENT);
+    g_clear_error (&error);
+
+    AtmConversationChartSeriesInput unsupported_ei_snapshot = ei_series;
+    unsupported_ei_snapshot.snapshot_sha =
+        "1111111111111111111111111111111111111111";
+    unsupported_ei_snapshot.repository_version =
+        "snapshot:1111111111111111111111111111111111111111";
+    AtmConversationChartInput unsupported_snapshot_chart = ei_chart;
+    unsupported_snapshot_chart.ordinal = 2;
+    unsupported_snapshot_chart.series = &unsupported_ei_snapshot;
+    g_assert_false (atm_conversation_store_attach_chart (
+        store, ei_conversation_id, ei_grounded_turn,
+        &unsupported_snapshot_chart, &error));
+    g_assert_error (error, ATM_CONVERSATION_STORE_ERROR,
+                    ATM_CONVERSATION_STORE_ERROR_ARGUMENT);
+    g_clear_error (&error);
+
     gint64 ungrounded_turn = -1;
     g_assert_true (
         atm_conversation_store_commit_turn (
@@ -2497,6 +2754,36 @@ test_chart_binding_write_load (void)
 
     atm_conversation_snapshot_free (snapshot);
 
+    AtmConversationSnapshot *ei_snapshot_state = NULL;
+    g_assert_true (atm_conversation_store_load_snapshot (
+        store, ei_conversation_id, &ei_snapshot_state, &error));
+    g_assert_no_error (error);
+    g_assert_cmpuint (atm_conversation_snapshot_message_count (ei_snapshot_state), ==, 2);
+    g_assert_cmpuint (
+        atm_conversation_snapshot_message_chart_count_at (ei_snapshot_state, 1), ==, 1);
+    g_assert_cmpstr (
+        atm_conversation_snapshot_chart_schema_at (ei_snapshot_state, 1, 0),
+        ==, "atm-chart-spec/2");
+    g_assert_cmpstr (
+        atm_conversation_snapshot_chart_reconstruction_profile_at (ei_snapshot_state, 1, 0),
+        ==, ei_chart.reconstruction_profile);
+    g_assert_cmpstr (
+        atm_conversation_snapshot_chart_series_profile_at (ei_snapshot_state, 1, 0, 0),
+        ==, ei_series.series_profile);
+    g_assert_cmpstr (
+        atm_conversation_snapshot_chart_series_admission_profile_at (ei_snapshot_state, 1, 0, 0),
+        ==, ei_series.admission_profile);
+    g_assert_cmpstr (
+        atm_conversation_snapshot_chart_series_snapshot_sha_at (ei_snapshot_state, 1, 0, 0),
+        ==, ei_snapshot);
+    atm_conversation_snapshot_free (ei_snapshot_state);
+
+    g_assert_true (
+        atm_conversation_store_delete_conversation (
+            store, ei_conversation_id, &error
+        )
+    );
+    g_assert_no_error (error);
     g_assert_true (
         atm_conversation_store_delete_conversation (
             store, conversation_id, &error
@@ -2507,6 +2794,7 @@ test_chart_binding_write_load (void)
     g_assert_cmpint (raw_int64 (path, "SELECT count(*) FROM chart_series;"), ==, 0);
 
     atm_conversation_store_close (store);
+    g_free (ei_conversation_id);
     g_free (conversation_id);
     g_free (path);
     remove_tree_best_effort (root);
@@ -2752,20 +3040,28 @@ main (int argc, char **argv)
         test_bootstrap_and_reopen
     );
     g_test_add_func (
-        "/conversation-store/v1-to-v3-migration",
-        test_v1_to_v3_migration
+        "/conversation-store/v1-to-v4-migration",
+        test_v1_to_v4_migration
     );
     g_test_add_func (
         "/conversation-store/v1-to-v3-rollback",
         test_v1_to_v3_migration_rollback
     );
     g_test_add_func (
-        "/conversation-store/v2-to-v3-migration",
-        test_v2_to_v3_migration
+        "/conversation-store/v2-to-v4-migration",
+        test_v2_to_v4_migration
     );
     g_test_add_func (
         "/conversation-store/v2-to-v3-rollback",
         test_v2_to_v3_migration_rollback
+    );
+    g_test_add_func (
+        "/conversation-store/v3-to-v4-migration",
+        test_v3_to_v4_migration_preserves_chart_rows
+    );
+    g_test_add_func (
+        "/conversation-store/v3-to-v4-rollback",
+        test_v3_to_v4_migration_rollback
     );
     g_test_add_func (
         "/conversation-store/chart-recipe-semantics",

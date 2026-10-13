@@ -16,6 +16,8 @@ All notable public releases of Ask the Model are recorded here.
 - Add a dormant, source-specific native ChartSpec v2 constructor for the qualified Energy Institute TES series. Keep GISTEMP ChartSpec v1 identity serialization unchanged; bind EI v2 identity to its exact series/admission/snapshot identity and preserve exact source decimals through source-neutral point accessors. The EI display-profile marker remains explicitly unqualified, so this adds no projection, live chart route, History persistence or release change.
 - Add the separate `atm-display/energy-institute-tes-linear/1` native display policy for the exact EI TES ChartSpec v2: bounded integer-only decimal conversion to micro-EJ/year, outward 100-EJ/year Y ticks, width-bounded calendar ticks and finite in-domain coordinates under resize. This is display-only; exact source values/support remain unchanged and the existing renderer explicitly rejects EI v2. No application route, History persistence, or release artifact changes.
 
+- Add conversation-store v4 with an atomic v3-to-v4 migration and exact, discriminated chart tuple allowlists for the existing GISTEMP v1 and dormant Energy Institute v2 contracts. Preserve existing GISTEMP chart rows, reject EI cross-profile or unsupported-snapshot combinations, and roll back failed migration attempts. The store change adds no EI History reconstruction or app route and does not alter the immutable v0.6.3 release artifact.
+
 ## 0.6.3 - 2026-10-10
 
 Correct qualified live GISTEMP chart admission for the reviewed current EWD snapshot.

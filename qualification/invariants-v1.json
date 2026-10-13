@@ -784,6 +784,21 @@
         "meson:chart-render",
         "meson:chart-spec"
       ]
+    },
+    {
+      "id": "SCIENTIFIC-S1-008",
+      "category": "SCIENTIFIC",
+      "severity": "S1",
+      "lifecycle": "enforced",
+      "statement": "Conversation-store v4 must preserve existing v1 GISTEMP chart identities/rows and admit chart persistence only through the exact discriminated v1 GISTEMP or v2 Energy Institute TES tuple. EI persistence is limited to the two fully admitted EWD snapshots d9e249339663015f6d1c05752338a955bf64ad0b and dc710d8e604c0fff713a3acfdb18ab47a1a902bb, with series profile atm-series/energy-institute-tes-complete-annual/1, admission profile atm-energy-institute-pinned-admission/3, source path science/data/processed/energy_institute_global_2026.csv, and matching snapshot repository version. Unknown, mixed or cross-paired schema/reconstruction/series/admission tuples fail closed. The v3-to-v4 migration is transactional, preserves existing chart rows exactly, and rolls back wholly on failure; stored chart rows remain identity/provenance recipes, not point-value authority.",
+      "enforced_by": [
+        "src/conversation_store.c",
+        "data/schemas/conversation-store-v4.sql",
+        "data/schemas/conversation-store-v3-to-v4.sql"
+      ],
+      "tested_by": [
+        "meson:conversation-store"
+      ]
     }
   ]
 }
