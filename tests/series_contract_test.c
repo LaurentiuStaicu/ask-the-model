@@ -150,6 +150,53 @@ qualified_with_single_coordinate_fact (AtmScientificArtifact *a,
 }
 
 static AtmSraResult *
+qualified_with_calendar_quarter_facts (AtmScientificArtifact *a)
+{
+    AtmSraResult *q = atm_sra_result_new (ATM_SRA_ANSWERED);
+    GError *error = NULL;
+    AtmSraEstablishedFact *q1 = atm_sra_established_fact_new (
+        "quarter-2025-q1", "observation", "subject", "attribute",
+        "1e0", "unit", "dimension",
+        "{\"calendar_quarter\":\"2025-Q1\",\"scenario\":\"baseline\",\"epistemic_status\":\"observed\",\"y_status\":\"NUMERIC\"}");
+    AtmSraEstablishedFact *missing_q2 = atm_sra_established_fact_new (
+        "quarter-2025-q2-missing", "observation", "subject", "attribute",
+        "MISSING", "unit", "dimension",
+        "{\"calendar_quarter\":\"2025-Q2\",\"scenario\":\"baseline\",\"epistemic_status\":\"observed\",\"y_status\":\"MISSING\",\"missing_reason\":\"official_round_unavailable\"}");
+    AtmSraEstablishedFact *q3 = atm_sra_established_fact_new (
+        "quarter-2025-q3", "observation", "subject", "attribute",
+        "2e0", "unit", "dimension",
+        "{\"calendar_quarter\":\"2025-Q3\",\"scenario\":\"baseline\",\"epistemic_status\":\"observed\",\"y_status\":\"NUMERIC\"}");
+    AtmSraEstablishedFact *facts[] = { q1, missing_q2, q3 };
+    for (guint i = 0; i < G_N_ELEMENTS (facts); i++) {
+        g_assert_nonnull (facts[i]);
+        g_assert_true (atm_sra_fact_add_support (
+            facts[i], a->qualified_artifact_id, &error));
+        g_assert_no_error (error);
+        g_assert_true (atm_sra_result_add_fact (q, facts[i], &error));
+        g_assert_no_error (error);
+    }
+    g_assert_true (atm_sra_qualification_add_canonical_obligation (
+        q, "atm-sra/1", &error));
+    g_assert_no_error (error);
+    char *snapshot = g_strdup_printf ("ewd@0.1.0#%s", SHA);
+    g_assert_true (atm_sra_qualification_add_repository_snapshot (
+        q, snapshot, &error));
+    g_free (snapshot);
+    g_assert_no_error (error);
+    g_assert_true (atm_sra_qualification_add_evidence_artifact (q, a, &error));
+    g_assert_no_error (error);
+    g_assert_true (atm_sra_qualification_add_semantic_profile (
+        q, "atm-profile/ewd/v1@1", &error));
+    g_assert_no_error (error);
+    g_assert_true (atm_sra_qualification_set_numeric_profile (
+        q, ATM_SERIES_CONTRACT_NUMERIC_PROFILE, &error));
+    g_assert_no_error (error);
+    g_assert_true (atm_sra_result_finalize (q, &error));
+    g_assert_no_error (error);
+    return q;
+}
+
+static AtmSraResult *
 qualified_with_missing_facts (AtmScientificArtifact *a)
 {
     AtmSraResult *q = atm_sra_result_new (ATM_SRA_ANSWERED);
@@ -933,7 +980,8 @@ static AtmSeriesContract *base_kind (AtmSeriesXKind kind)
     AtmSeriesContract *s = atm_series_contract_new (
         kind, "subject", "attribute",
         kind == ATM_SERIES_X_UTC_INSTANT ? "UTC" :
-            kind == ATM_SERIES_X_EVENT_ORDINAL ? "event" : "calendar_year",
+            kind == ATM_SERIES_X_EVENT_ORDINAL ? "event" :
+            kind == ATM_SERIES_X_CALENDAR_QUARTER ? "calendar_quarter" : "calendar_year",
         "time", "unit", "dimension",
         "empirical_observations", "baseline",
         kind == ATM_SERIES_X_CALENDAR_YEAR ? "1880-2025" : "scope", "observed",
@@ -952,6 +1000,7 @@ static void test_non_calendar_coordinates_bind_to_matching_sra_qualifier (void)
     } cases[] = {
         { ATM_SERIES_X_UTC_INSTANT, "utc_instant", "2026-01-01T00:00:00Z" },
         { ATM_SERIES_X_EVENT_ORDINAL, "event_ordinal", "42" },
+        { ATM_SERIES_X_CALENDAR_QUARTER, "calendar_quarter", "2025-Q1" },
     };
 
     for (guint i = 0; i < G_N_ELEMENTS (cases); i++) {
@@ -974,6 +1023,82 @@ static void test_non_calendar_coordinates_bind_to_matching_sra_qualifier (void)
         atm_sra_result_free (q);
         atm_scientific_artifact_free (a);
     }
+}
+
+static void test_calendar_quarter_coordinate_and_missing_binding (void)
+{
+    AtmScientificArtifact *a = support_artifact ();
+    AtmSraResult *q = qualified_with_calendar_quarter_facts (a);
+    AtmSeriesContract *s = base_kind (ATM_SERIES_X_CALENDAR_QUARTER);
+    const char *support[] = { a->qualified_artifact_id };
+    GError *error = NULL;
+
+    g_assert_true (atm_series_contract_add_point (
+        s, "2025-Q1", ATM_SERIES_Y_NUMERIC, "1.0000", "1", 0, FALSE,
+        FALSE, NULL, NULL, support, 1, &error));
+    g_assert_no_error (error);
+    g_assert_true (atm_series_contract_add_point (
+        s, "2025-Q2", ATM_SERIES_Y_MISSING, NULL, NULL, 0, FALSE,
+        FALSE, "official_round_unavailable", NULL, support, 1, &error));
+    g_assert_no_error (error);
+    g_assert_true (atm_series_contract_add_point (
+        s, "2025-Q3", ATM_SERIES_Y_NUMERIC, "2.0000", "2", 0, FALSE,
+        FALSE, NULL, NULL, support, 1, &error));
+    g_assert_no_error (error);
+    /* The gap is a qualified MISSING point, but does not infer a break. */
+    g_assert_true (atm_series_contract_validate (s, q, &error));
+    g_assert_no_error (error);
+    g_assert_nonnull (atm_series_contract_scientific_id (s));
+    atm_series_contract_free (s);
+
+    const char *invalid[] = {
+        "0000-Q1", "2025-Q0", "2025-Q5", "25-Q1",
+        "2025-q1", "2025-Q01", "2025-Q1 "
+    };
+    s = base_kind (ATM_SERIES_X_CALENDAR_QUARTER);
+    for (guint i = 0; i < G_N_ELEMENTS (invalid); i++) {
+        g_assert_false (atm_series_contract_add_point (
+            s, invalid[i], ATM_SERIES_Y_MISSING, NULL, NULL, 0, FALSE,
+            FALSE, "source_missing", NULL, support, 1, &error));
+        g_assert_error (error, ATM_SERIES_CONTRACT_ERROR,
+                        ATM_SERIES_CONTRACT_ERROR_ARGUMENT);
+        g_clear_error (&error);
+    }
+    atm_series_contract_free (s);
+
+    /* A coordinate hole does not auto-sort, generate a MISSING point, or add a break. */
+    s = base_kind (ATM_SERIES_X_CALENDAR_QUARTER);
+    g_assert_true (atm_series_contract_add_point (
+        s, "2025-Q3", ATM_SERIES_Y_NUMERIC, "2.0000", "2", 0, FALSE,
+        FALSE, NULL, NULL, support, 1, &error));
+    g_assert_no_error (error);
+    g_assert_true (atm_series_contract_add_point (
+        s, "2025-Q1", ATM_SERIES_Y_NUMERIC, "1.0000", "1", 0, FALSE,
+        FALSE, NULL, NULL, support, 1, &error));
+    g_assert_no_error (error);
+    g_assert_false (atm_series_contract_validate (s, q, &error));
+    g_assert_error (error, ATM_SERIES_CONTRACT_ERROR,
+                    ATM_SERIES_CONTRACT_ERROR_ORDER);
+    g_clear_error (&error);
+    atm_series_contract_free (s);
+
+    s = base_kind (ATM_SERIES_X_CALENDAR_QUARTER);
+    g_assert_true (atm_series_contract_add_point (
+        s, "2025-Q1", ATM_SERIES_Y_NUMERIC, "1.0000", "1", 0, FALSE,
+        FALSE, NULL, NULL, support, 1, &error));
+    g_assert_no_error (error);
+    g_assert_true (atm_series_contract_add_point (
+        s, "2025-Q1", ATM_SERIES_Y_NUMERIC, "1.0000", "1", 0, FALSE,
+        FALSE, NULL, NULL, support, 1, &error));
+    g_assert_no_error (error);
+    g_assert_false (atm_series_contract_validate (s, q, &error));
+    g_assert_error (error, ATM_SERIES_CONTRACT_ERROR,
+                    ATM_SERIES_CONTRACT_ERROR_ORDER);
+    g_clear_error (&error);
+    atm_series_contract_free (s);
+
+    atm_sra_result_free (q);
+    atm_scientific_artifact_free (a);
 }
 
 static void test_metadata_bounds_rechecked_after_mutation (void)
@@ -1095,6 +1220,7 @@ int main (int argc, char **argv)
     g_test_add_func ("/series-contract/artifact-snapshot-binding", test_sra_artifact_snapshot_must_be_qualified);
     g_test_add_func ("/series-contract/snapshot-binding", test_contract_snapshot_must_be_qualified);
     g_test_add_func ("/series-contract/non-calendar-coordinate-binding", test_non_calendar_coordinates_bind_to_matching_sra_qualifier);
+    g_test_add_func ("/series-contract/calendar-quarter", test_calendar_quarter_coordinate_and_missing_binding);
     g_test_add_func ("/series-contract/metadata-bounds-after-mutation", test_metadata_bounds_rechecked_after_mutation);
     g_test_add_func ("/series-contract/calendar-year-negative-zero", test_calendar_year_negative_zero_rejected);
     g_test_add_func ("/series-contract/utc-calendar", test_invalid_utc_calendar_rejected);
