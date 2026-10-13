@@ -1,0 +1,240 @@
+{
+  "registry_version": "0.1",
+  "frozen_on": "2026-09-22",
+  "purpose": "Repository-wide coverage registry for every CSV under data/processed. It binds each processed artifact to immutable repository content identity, a declared provenance class and existing semantic/provenance authorities, while preserving explicit distinctions between canonical/current, partial/diagnostic and legacy reconciled artifacts.",
+  "processed_root": "data/processed",
+  "file_count": 13,
+  "rules": {
+    "every_processed_csv_must_be_registered": true,
+    "every_registered_csv_must_exist": true,
+    "git_blob_identity_must_match": true,
+    "required_provenance_columns_must_exist": true,
+    "every_authority_path_must_exist": true,
+    "sidecar_provenance_must_be_explicit_when_declared": true,
+    "declared_sidecar_must_bind_exact_processed_artifact": true,
+    "assessment_embedded_entries_must_be_referenced_by_an_authority": true,
+    "source_vintage_anchors_must_exist_when_declared": true,
+    "historical_legacy_inputs_may_remain_if_successor_reconciliation_is_explicit": true,
+    "inventory_does_not_upgrade_data_quality_or_model_status": true,
+    "inventory_does_not_authorize_live_refetch": true,
+    "inventory_does_not_authorize_estimation_or_behavioural_activation": true
+  },
+  "allowed_provenance_classes": [
+    "SIDECAR_JSON",
+    "ASSESSMENT_EMBEDDED",
+    "ASSESSMENT_PLUS_SOURCE_VINTAGE",
+    "LEGACY_RECONCILED_BY_SUCCESSOR"
+  ],
+  "entries": [
+    {
+      "path": "data/processed/bnr_bls_realised_rounds.csv",
+      "git_blob_sha1": "146d43794a5b284596c38af04279bed1859d72dc",
+      "provenance_class": "ASSESSMENT_EMBEDDED",
+      "required_columns": [
+        "source_id",
+        "source_kind"
+      ],
+      "authorities": [
+        "model/calibration_validation/bnr_bls_canonical_panel_promotion_review.json",
+        "model/calibration_validation/bnr_bls_cross_round_mapping_audit.json"
+      ],
+      "role": "Canonical realised-round BNR Bank Lending Survey panel with one explicit remaining 2025-Q2 gap.",
+      "scientific_boundary": "Promotion review freezes exact candidate identity and prohibits interpolation, forward-fill, estimation and behavioural activation."
+    },
+    {
+      "path": "data/processed/fiscal_capb_structural_primary_first_historical_spring.csv",
+      "git_blob_sha1": "2e339d0c17da7621e4beaca79489e443080cee41",
+      "provenance_class": "ASSESSMENT_EMBEDDED",
+      "required_columns": [
+        "first_spring_release_id",
+        "release_date",
+        "information_status"
+      ],
+      "authorities": [
+        "model/calibration_validation/fiscal_capb_pre2022_source_probe_assessment_2026_09_20.json",
+        "model/calibration_validation/fiscal_capb_raw_source_preservation_assessment_2026_09_20.json"
+      ],
+      "role": "One-observation-per-year first-Spring historical structural-primary real-time chain.",
+      "scientific_boundary": "Series is a measurement/source artifact only; mechanism remains deferred and no weaker validation design or backfill is authorized."
+    },
+    {
+      "path": "data/processed/government_debt_average_interest_rate_mof_2014_2023.csv",
+      "git_blob_sha1": "3fdc6bf07355cd2605a6d01aa3fa388d11bac74c",
+      "provenance_class": "SIDECAR_JSON",
+      "provenance_sidecar": "data/provenance/government_debt_average_interest_rate_mof_2014_2023.json",
+      "required_columns": [
+        "source_id",
+        "definition_status"
+      ],
+      "authorities": [
+        "model/dynamics/government_effective_interest_rate_reference_assessment.json"
+      ],
+      "role": "Canonical annual Ministry of Finance government-debt portfolio average-interest-rate reference series.",
+      "scientific_boundary": "Observed reference target only; not a same-year cash rate, Maastricht apparent cost, market yield or repricing parameter."
+    },
+    {
+      "path": "data/processed/government_debt_average_interest_rate_mof_2019_2023.csv",
+      "git_blob_sha1": "489aa7945c504ccb2de67423b96973e97c84d5c4",
+      "provenance_class": "LEGACY_RECONCILED_BY_SUCCESSOR",
+      "required_columns": [
+        "source_document",
+        "definition_status"
+      ],
+      "authorities": [
+        "data/provenance/government_debt_average_interest_rate_mof_2014_2023.json",
+        "model/dynamics/government_effective_interest_rate_reference_assessment.json"
+      ],
+      "role": "Retained legacy overlap input for the government portfolio-cost series.",
+      "scientific_boundary": "All 2019-2023 values are required to match the canonical 2014-2023 successor exactly; this file is historical evidence, not the current canonical target."
+    },
+    {
+      "path": "data/processed/government_debt_refinancing_mof_2013_2024.csv",
+      "git_blob_sha1": "bd2496077c6b760cc991be6171ede98dc7cdd81d",
+      "provenance_class": "SIDECAR_JSON",
+      "provenance_sidecar": "data/provenance/government_debt_refinancing_mof_2013_2024.json",
+      "required_columns": [
+        "observation_status",
+        "source_id"
+      ],
+      "authorities": [
+        "model/dynamics/government_refinancing_need_promotion_assessment.json",
+        "model/dynamics/government_refinancing_need_reference_assessment.json"
+      ],
+      "role": "Canonical annual Ministry government-debt principal-repayment/refinancing reference series.",
+      "scientific_boundary": "Observed reference quantity only; it is not gross financing need, pre-financing or the behavioural repricing share."
+    },
+    {
+      "path": "data/processed/government_debt_refinancing_mof_2017_2023.csv",
+      "git_blob_sha1": "e2da598438c57a80707ed69a4406fe5a245cb78a",
+      "provenance_class": "LEGACY_RECONCILED_BY_SUCCESSOR",
+      "provenance_sidecar": "data/provenance/government_debt_refinancing_mof_2017_2023.json",
+      "required_columns": [
+        "observation_status",
+        "source_id"
+      ],
+      "authorities": [
+        "model/dynamics/government_refinancing_need_reference_assessment.json"
+      ],
+      "role": "Retained predecessor partial refinancing/GFN evidence.",
+      "scientific_boundary": "Historical evidence retained after promotion to the 2013-2024 canonical series; mixed shorter history may not replace successor revision rules."
+    },
+    {
+      "path": "data/processed/government_debt_risk_snapshots_mof_2023_2024.csv",
+      "git_blob_sha1": "92df15bc79e8c306c87d118cbc14b076de6f837e",
+      "provenance_class": "ASSESSMENT_EMBEDDED",
+      "required_columns": [
+        "source"
+      ],
+      "authorities": [
+        "data/provenance/government_repricing_ledger.json",
+        "model/calibration_validation/government_repricing_ledger_assessment.json",
+        "model/dynamics/government_refinancing_need_reference_assessment.json"
+      ],
+      "role": "Ministry debt maturity/refixing risk snapshots retained as diagnostic controls.",
+      "scientific_boundary": "Maturity and refixing indicators remain distinct and are not converted into realised repricing principal or behavioural parameters."
+    },
+    {
+      "path": "data/processed/government_repricing_ledger.csv",
+      "git_blob_sha1": "2ae3fe0e5fea2f8090cd89c522180af8b62a5c06",
+      "provenance_class": "SIDECAR_JSON",
+      "provenance_sidecar": "data/provenance/government_repricing_ledger.json",
+      "required_columns": [
+        "source_id",
+        "source_url",
+        "provenance_status",
+        "synthetic_allocation",
+        "limitation"
+      ],
+      "authorities": [
+        "model/calibration_validation/government_repricing_ledger_contract.json",
+        "model/calibration_validation/government_repricing_ledger_assessment.json"
+      ],
+      "role": "Observed instrument-terms subset used to test government repricing-ledger completeness.",
+      "scientific_boundary": "Ledger fails completeness before estimation; missing outstanding/repriced principal and matched old/new rates may not be synthesized."
+    },
+    {
+      "path": "data/processed/mof_announced_RON_primary_reference_auction_partial_2025_events.csv",
+      "git_blob_sha1": "e4b1840bf364f4b17ba04256c5a4a1c417aa52d2",
+      "provenance_class": "ASSESSMENT_PLUS_SOURCE_VINTAGE",
+      "required_columns": [
+        "source_id",
+        "source_url",
+        "source_version_role",
+        "materialisation_role"
+      ],
+      "authorities": [
+        "model/dynamics/mof_announced_RON_primary_reference_auction_partial_2025_assessment.json"
+      ],
+      "source_vintage_anchors": [
+        "data/source_vintages/mof-announced-ron-primary-reference-auction-full-2025-vintage-2026-09-20/source_vintage_manifest.json"
+      ],
+      "role": "Partial exact event-level competitive RON primary reference-auction candidate for 2025.",
+      "scientific_boundary": "Missing source rows are not inferred and canonical promotion remains blocked."
+    },
+    {
+      "path": "data/processed/mof_announced_RON_primary_reference_auction_partial_2025_monthly.csv",
+      "git_blob_sha1": "5cdd9bc9e5d9a1841e6b67b33ac11784e51c3656",
+      "provenance_class": "ASSESSMENT_PLUS_SOURCE_VINTAGE",
+      "required_columns": [
+        "monthly_value_source_id",
+        "status"
+      ],
+      "authorities": [
+        "model/dynamics/mof_announced_RON_primary_reference_auction_partial_2025_assessment.json"
+      ],
+      "source_vintage_anchors": [
+        "data/source_vintages/mof-announced-ron-primary-reference-auction-full-2025-vintage-2026-09-20/source_vintage_manifest.json"
+      ],
+      "role": "Monthly aggregation of the partial exact competitive RON primary reference-auction candidate.",
+      "scientific_boundary": "Only exact final monthly values are retained; unavailable months are not zero and do not authorize promotion."
+    },
+    {
+      "path": "data/processed/mof_announced_RON_primary_supply_Q1_2025_events.csv",
+      "git_blob_sha1": "69b1e57b0bb80696c9cba7a235b60edc62e9ddfd",
+      "provenance_class": "ASSESSMENT_PLUS_SOURCE_VINTAGE",
+      "required_columns": [
+        "source_id",
+        "source_url",
+        "within_pilot_cutoff"
+      ],
+      "authorities": [
+        "model/dynamics/mof_announced_RON_primary_supply_reference_mode_pilot_Q1_2025.json"
+      ],
+      "source_vintage_anchors": [
+        "data/source_vintages/mof-announced-ron-primary-supply-pilot-2026-09-20/source_vintage_manifest.json"
+      ],
+      "role": "Frozen Q1 2025 event-level announced RON supply pilot.",
+      "scientific_boundary": "Legacy combined competitive-plus-fixed-SSON definition is retained only for its frozen Q1 pilot and is not promoted as a full-year stable reference mode."
+    },
+    {
+      "path": "data/processed/mof_announced_RON_primary_supply_Q1_2025_monthly.csv",
+      "git_blob_sha1": "0dacb2aa70e2b4bd0bceec69e7244e0f71862479",
+      "provenance_class": "ASSESSMENT_PLUS_SOURCE_VINTAGE",
+      "required_columns": [
+        "status"
+      ],
+      "authorities": [
+        "model/dynamics/mof_announced_RON_primary_supply_reference_mode_pilot_Q1_2025.json"
+      ],
+      "source_vintage_anchors": [
+        "data/source_vintages/mof-announced-ron-primary-supply-pilot-2026-09-20/source_vintage_manifest.json"
+      ],
+      "role": "Frozen completed-month aggregation of the Q1 announced RON supply pilot.",
+      "scientific_boundary": "Forward events are not shifted into completed months and the pilot does not resolve the generic supply-pressure node."
+    },
+    {
+      "path": "data/processed/monetary_pass_through_bnr_2024_2025.csv",
+      "git_blob_sha1": "275493d8dd773848f964ca74477bdbe08fc194f6",
+      "provenance_class": "LEGACY_RECONCILED_BY_SUCCESSOR",
+      "provenance_sidecar": "data/provenance/monetary_pass_through_bnr_2024_2025.json",
+      "required_columns": [
+        "data_role"
+      ],
+      "authorities": [
+        "model/calibration_validation/monetary_pass_through_legacy_processed_dataset_assessment_2026_09_22.json"
+      ],
+      "role": "Retained 13-month pre-recovery monetary pass-through diagnostic; superseded as a current validation input by the pinned Validation Recovery repository inputs under data/raw/validation_recovery.",
+      "scientific_boundary": "Historical diagnostic evidence only. Its total-NFC/total-household targets and 2024-01..2025-01 role split are not the current Validation Recovery household-housing/NFC-up-to-1y inputs or holdout boundary."
+    }
+  ]
+}
