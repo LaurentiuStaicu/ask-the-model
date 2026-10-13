@@ -1,6 +1,6 @@
 # CHART-01: source audit and VerifiedSeries boundary
 
-**Status updated 2026-10-13:** the two source-specific complete-annual chart routes, GISTEMP v1 and Energy Institute TES v2, are integrated in `main` via PRs #439–#443; PRES-09 live-to-History GTK Application E2E is integrated via #447. This document preserves CHART-01's native VerifiedSeries design and qualification history, not the full current application-capability ledger. The native generic series contract specifies `NUMERIC`/`MISSING` and provenance-bound breaks, but real source adapters for missing observations, discontinuities, event/categorical series and derived series remain unqualified in #343. The immutable v0.6.3 release remains unchanged.
+**Status updated 2026-10-13:** the GISTEMP v1 and Energy Institute TES v2 complete-annual `VerifiedSeries` and chart routes are integrated through PRs #435 and #439–#443; PRES-09 live-to-History GTK Application E2E is integrated via #447. PR #454 separately integrates a source-bound BNR BLS C01 calendar-quarter adapter that creates generic `AtmSeriesContract` from the five-file pinned RMD panel plus finalized SRA, with 11 numeric observations and one source-authorized `MISSING` at 2025-Q2. It remains native/test-only: it is not the legacy `AtmVerifiedSeries`, and it enables no BNR chart route. This document preserves the native `VerifiedSeries` qualification boundary, not the full application-capability ledger. General missing/discontinuity/event/categorical/derived adapters remain unqualified in #343 beyond that one bounded absence case. The immutable v0.6.3 release remains unchanged.
 
 ## First pinned source
 
@@ -321,7 +321,7 @@ chart gates are not claimed by this complete-source implementation.
 
 ## Complete-annual qualification closeout (historical gate record)
 
-At the time of this closeout, the scope was one admitted complete-annual GISTEMP profile; the downstream ChartSpec/renderer/History gates were still future work. Those gates have since been integrated through PRs #439–#443, and the bounded live-to-History UI path passed PRES-09 in PR #447. This qualification record still does not close broader #343 requirements or qualify other repositories, vintages, events, missing observations or derived numeric series.
+At the time of this closeout, the scope was one admitted complete-annual GISTEMP profile; the downstream ChartSpec/renderer/History gates were still future work. Those gates have since been integrated through PRs #439–#443, and the bounded live-to-History UI path passed PRES-09 in PR #447. This GISTEMP qualification record still does not close broader #343 requirements or qualify other repositories, vintages, events, missing observations or derived numeric series. PR #454 separately qualifies the bounded BNR C01 generic SeriesContract with exactly one source-authorized `MISSING` quarter; it does not widen this GISTEMP profile or establish generic missing-data semantics.
 
 | Requirement | Evidence and scope |
 | --- | --- |
@@ -333,7 +333,7 @@ At the time of this closeout, the scope was one admitted complete-annual GISTEMP
 | Scientific/provenance separation | Changed mathematical value changes both IDs; equal-value source spelling or support changes qualification only |
 | Ownership and limits | Owned source bytes and data, fixed complete-source counts, checked byte/token/support ceilings |
 | Missing/discontinuity boundary | First, last and all-MISSING cases reject; no zero filling, interpolation or joined gaps |
-| Generic missing/event/derived data | Not qualified; remains open in #343 and cannot enter this profile |
+| Generic missing/event/derived data | A separate BNR C01 generic SeriesContract covers only its exact source-authorized 2025-Q2 `MISSING`; broader missing/discontinuity/event/derived adapters remain unqualified in #343 and cannot enter this complete-annual profile |
 | Runtime chart display | GISTEMP v1 and EI TES v2 routes are integrated via PRs #439–#443; general missing/event/derived series remain outside the qualified runtime |
 
 The closeout fault-injection helper is compiled only with
