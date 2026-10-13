@@ -2,7 +2,7 @@
 
 ## Scope
 
-This audit documents the source-bound Energy Institute candidate and the approved, pinned-snapshot SRA qualification integrated on `main` through PR #423. It does not create a `VerifiedSeries`, `ChartSpec`, runtime chart path, persistence state, or model-output authority.
+This document records the Energy Institute source audit and the bounded F0-19 Evidence/SRA qualification integrated through PR #423; it does not, by itself, grant downstream chart authority. Those later gates were separately implemented in PR #435 (source-specific VerifiedSeries), #439 (ChartSpec v2), #440 (display projection), #441 (conversation-store v4), #442 (History reconstruction) and #443 (live/History application integration). The approved claim remains faithful reconstruction of admitted EWD processed bytes, not independent reproduction of the Energy Institute raw-to-processed pipeline.
 
 The audited source is the exact EWD snapshot:
 
@@ -28,7 +28,7 @@ The admission policy change under qualification adds a second explicitly pinned 
 
 The EI CSV, provenance JSON and the complete `ei_primary_energy` registry row are unchanged between `d9e249…` and `dc710d…`. The manifest and registry as full files are different because the wider EWD snapshot changed. The second bundle is therefore qualified as its own exact input set: its semantic fact content remains the same, but its SRA qualified identity and support identities must differ because repository snapshot and complete source-binding bytes differ. Matching observation files alone is insufficient for admission.
 
-Until this profile-v3 change is merged and its CI passes, the main-branch admission remains the original `d9e249…` bundle. Neither bundle grants raw-to-processed reproduction or downstream chart authority.
+Profile v3 is integrated through PR #438. Main admits exactly these two complete four-file bundles: `d9e249339663015f6d1c05752338a955bf64ad0b` and `dc710d8e604c0fff713a3acfdb18ab47a1a902bb`, with distinct pinned manifest/registry bytes per snapshot. Cross-snapshot mixes and unknown snapshots are rejected. Neither bundle grants raw-to-processed reproduction.
 
 The source provenance identifies the authority as **Energy Institute**, dataset **Statistical Review of World Energy 2026**, geography **Total World**, coverage **1965–2025**, and the original input file as `Statistical Review of World Energy Narrow format.csv`.
 
@@ -91,7 +91,7 @@ This source is sufficiently specified for a source-audit slice but is **not yet 
 
 The approved source-bound SRA path now enforces the pinned four-file admission, bounded CSV parsing, 61 consecutive annual observations, exact decimal preservation, source locators and source-bound Evidence for all four inputs plus every point. The generic SRA is reconstructed and validated against the pinned evidence; each of the 61 facts binds its five support artifacts and deterministic qualification envelope. Registered tests cover source-byte mutation, malformed/nonconsecutive rows, all-point qualification, exact endpoint values, semantic metadata, anomaly preservation, finalized-result mutation and the NULL-obligation negative control.
 
-No existing GISTEMP profile is widened by this audit. The Energy Institute source uses the versioned TES semantic profile `atm-profile/ewd-energy-institute-tes-physical-content/v2`. F0-19's scope decision is integrated on `main` via PR #423 for the bounded claim of reconstructing the pinned EWD processed snapshot, not independently reproducing Energy Institute's raw-to-processed pipeline. The active canonical obligation is `atm-energy-institute-ewd-tes-pinned-snapshot-reconstruction/1`. This authorizes the source-bound Evidence/SRA reconstruction only; it does not promote Energy Institute to `VerifiedSeries` or authorize a chart route. Source-bound series-profile admission and downstream chart/persistence gates remain separate.
+No existing GISTEMP profile is widened by this audit. The Energy Institute source uses the versioned TES semantic profile `atm-profile/ewd-energy-institute-tes-physical-content/v2`. F0-19's scope decision is integrated on `main` via PR #423 for the bounded claim of reconstructing the pinned EWD processed snapshot, not independently reproducing Energy Institute's raw-to-processed pipeline. The active canonical obligation is `atm-energy-institute-ewd-tes-pinned-snapshot-reconstruction/1`. This F0-19 decision itself authorizes only source-bound Evidence/SRA reconstruction; it did not promote Energy Institute to `VerifiedSeries` or authorize a chart route on its own. Subsequent separate gates have since been integrated: PR #435 qualifies the source-specific TES series; #439/#440 qualify ChartSpec v2 and projection; #441/#442 integrate durable schema-v4 recipes and native History reconstruction; #443 connects the live and History routes. This separation remains intentional, and no downstream step expands the bounded claim to raw-to-processed reproduction.
 
 The accepted decision, semantic-precedence rule, proof boundary and future requirements for any raw-to-processed claim are recorded in [`CHART01_ENERGY_INSTITUTE_F0-19_QUALIFICATION_PROPOSAL.md`](CHART01_ENERGY_INSTITUTE_F0-19_QUALIFICATION_PROPOSAL.md).
 
