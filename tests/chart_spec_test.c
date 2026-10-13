@@ -202,7 +202,10 @@ test_ei_v2_source_bound_identity_and_generic_accessors (void)
     g_assert_cmpstr (atm_chart_spec_id (line), ==, atm_chart_spec_id (again));
     g_assert_cmpstr (atm_chart_spec_id (line), !=, atm_chart_spec_id (scatter));
     g_assert_cmpstr (atm_chart_spec_id (line), !=, atm_chart_spec_id (old_line));
-    g_assert_cmpstr (atm_chart_spec_series_scientific_id (line, 0), ==,
+    /* AtmSeriesContract includes point-support IDs in its scientific
+     * serialization. The two snapshots have equivalent SRA fact content,
+     * but snapshot-bound support makes these full series identities distinct. */
+    g_assert_cmpstr (atm_chart_spec_series_scientific_id (line, 0), !=,
                      atm_chart_spec_series_scientific_id (old_line, 0));
     g_assert_cmpstr (atm_chart_spec_series_qualified_id (line, 0), !=,
                      atm_chart_spec_series_qualified_id (old_line, 0));
