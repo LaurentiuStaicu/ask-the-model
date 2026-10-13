@@ -6,7 +6,7 @@
 
 The published release tag points to commit `26ae12e4ee17cc4ed5dfd3e16a5b27fd277bc6a9`. Its immutable `AskTheModel.flatpak` asset is 481,016 bytes with SHA-256 `ffa3457c673201665adaf565fcfb7a9c55e0be627e7458e3c059b8b0247a6958`. See the [published v0.6.3 release](https://github.com/LaurentiuStaicu/ask-the-model/releases/tag/v0.6.3).
 
-**Development baseline checked 2026-10-13, after PR #440 merged:** `main` is at `8ba5d646de4623b477e68789f6a2b4f1d6900e9f`, 185 commits ahead of the immutable v0.6.3 release tag and zero commits behind it. Post-release development commits are not contents of the published v0.6.3 Flatpak.
+**Development baseline checked 2026-10-13, after PR #440 merged:** the C2b source-code merge commit is `8ba5d646de4623b477e68789f6a2b4f1d6900e9f`, 185 commits ahead of the immutable v0.6.3 release tag and zero commits behind it at merge time. Subsequent commits in this status pass synchronize documentation only. Post-release development commits are not contents of the published v0.6.3 Flatpak.
 
 PR #433 integrated fail-closed managed-export reconciliation before startup cleanup. PR #435 qualified the dormant native `AtmEnergyInstituteVerifiedSeries` source → Evidence → finalized SRA → series chain. PR #436 added the versioned EI ChartSpec/History design proposal. PR #438 closed C2-0 by versioning Energy Institute admission as `atm-energy-institute-pinned-admission/3` and allowing only two exact four-file EWD bundles: `d9e249…` and the current `dc710d8e604c0fff713a3acfdb18ab47a1a902bb`; mixed bundles and unknown snapshots fail closed.
 
