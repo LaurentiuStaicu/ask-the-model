@@ -410,6 +410,8 @@ gboolean atm_chart_spec_point (const AtmChartSpec *s, guint series_index,
         if (!contract_year (p, &year)) return FALSE;
         out->order = p->order;
         out->calendar_year = year;
+        /* Admission pins a complete annual EI CSV whose data begin on row 2. */
+        out->source_row = point_index + 2u;
         out->y_status = p->y_status == ATM_SERIES_Y_NUMERIC
             ? ATM_CHART_POINT_NUMERIC : ATM_CHART_POINT_MISSING;
         out->source_decimal = p->source_decimal;
@@ -426,6 +428,7 @@ gboolean atm_chart_spec_point (const AtmChartSpec *s, guint series_index,
         if (p == NULL) return FALSE;
         out->order = p->order;
         out->calendar_year = p->calendar_year;
+        out->source_row = p->source_row;
         out->y_status = p->y_status == ATM_VERIFIED_Y_NUMERIC
             ? ATM_CHART_POINT_NUMERIC : ATM_CHART_POINT_MISSING;
         out->source_decimal = p->source_decimal;
@@ -472,6 +475,36 @@ const char *atm_chart_spec_series_profile (const AtmChartSpec *s)
     if (s->version == ATM_CHART_SPEC_VERSION_ENERGY_INSTITUTE_V2)
         return atm_energy_institute_verified_series_contract (s->ei_series)->profile_id;
     return ATM_VERIFIED_SERIES_PROFILE;
+}
+
+const char *atm_chart_spec_series_snapshot_sha (const AtmChartSpec *s, guint i)
+{
+    if (s == NULL || i >= s->count) return NULL;
+    if (s->version == ATM_CHART_SPEC_VERSION_ENERGY_INSTITUTE_V2)
+        return atm_energy_institute_verified_series_contract (s->ei_series)->snapshot_sha;
+    if (s->version == ATM_CHART_SPEC_VERSION_GISTEMP_V1)
+        return atm_verified_series_snapshot_sha (s->series[i]);
+    return NULL;
+}
+
+const char *atm_chart_spec_series_source_path (const AtmChartSpec *s, guint i)
+{
+    if (s == NULL || i >= s->count) return NULL;
+    if (s->version == ATM_CHART_SPEC_VERSION_ENERGY_INSTITUTE_V2)
+        return atm_energy_institute_verified_series_contract (s->ei_series)->source_path;
+    if (s->version == ATM_CHART_SPEC_VERSION_GISTEMP_V1)
+        return atm_verified_series_source_path (s->series[i]);
+    return NULL;
+}
+
+const char *atm_chart_spec_series_repository_id (const AtmChartSpec *s, guint i)
+{
+    if (s == NULL || i >= s->count) return NULL;
+    if (s->version == ATM_CHART_SPEC_VERSION_ENERGY_INSTITUTE_V2)
+        return atm_energy_institute_verified_series_contract (s->ei_series)->repository_id;
+    if (s->version == ATM_CHART_SPEC_VERSION_GISTEMP_V1)
+        return "ewd";
+    return NULL;
 }
 
 gboolean atm_chart_spec_rebuild (const AtmChartSpec *s, AtmChartSpec **out, GError **error)
