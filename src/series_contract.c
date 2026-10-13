@@ -458,7 +458,7 @@ point_matches_established_fact (const AtmSeriesContract *s,
      * observation payload. If that token is present, bind it as well as the
      * normalized numeric value; otherwise equivalent spellings such as
      * 0.0000 and -0.0000 could be swapped while the SRA value stays 0e0. */
-    gboolean source_decimal_matches = TRUE;
+    gboolean numeric_payload_matches = TRUE;
     if (p->y_status == ATM_SERIES_Y_NUMERIC) {
         gboolean has_source_decimal =
             json_object_has_member (object, "source_decimal");
@@ -469,13 +469,53 @@ point_matches_established_fact (const AtmSeriesContract *s,
          * numeric value; source-specific adapters separately reconstruct and
          * verify their admitted source token. */
         if (!has_source_decimal && p->negative_zero) {
-            source_decimal_matches = FALSE;
+            numeric_payload_matches = FALSE;
         } else if (has_source_decimal) {
             JsonNode *node = json_object_get_member (object, "source_decimal");
-            source_decimal_matches =
+            numeric_payload_matches =
                 JSON_NODE_HOLDS_VALUE (node) &&
                 json_node_get_value_type (node) == G_TYPE_STRING &&
                 g_strcmp0 (json_node_get_string (node), p->source_decimal) == 0;
+        }
+
+        /* Source-bound SRA facts preserve these normalized numeric fields in
+         * their observation payload. When present, they must agree with the
+         * same point whose normalized value is being authorized. */
+        if (numeric_payload_matches &&
+            json_object_has_member (object, "coefficient")) {
+            JsonNode *node = json_object_get_member (object, "coefficient");
+            numeric_payload_matches =
+                JSON_NODE_HOLDS_VALUE (node) &&
+                json_node_get_value_type (node) == G_TYPE_STRING &&
+                g_strcmp0 (json_node_get_string (node), p->coefficient) == 0;
+        }
+        if (numeric_payload_matches &&
+            json_object_has_member (object, "exponent")) {
+            JsonNode *node = json_object_get_member (object, "exponent");
+            char *expected_exponent = g_strdup_printf (
+                "%" G_GINT64_FORMAT, p->exponent);
+            numeric_payload_matches =
+                JSON_NODE_HOLDS_VALUE (node) &&
+                json_node_get_value_type (node) == G_TYPE_STRING &&
+                g_strcmp0 (json_node_get_string (node), expected_exponent) == 0;
+            g_free (expected_exponent);
+        }
+        if (numeric_payload_matches &&
+            json_object_has_member (object, "numeric_profile")) {
+            JsonNode *node = json_object_get_member (object, "numeric_profile");
+            numeric_payload_matches =
+                JSON_NODE_HOLDS_VALUE (node) &&
+                json_node_get_value_type (node) == G_TYPE_STRING &&
+                g_strcmp0 (json_node_get_string (node),
+                           ATM_SERIES_CONTRACT_NUMERIC_PROFILE) == 0;
+        }
+        if (numeric_payload_matches &&
+            json_object_has_member (object, "negative_zero")) {
+            JsonNode *node = json_object_get_member (object, "negative_zero");
+            numeric_payload_matches =
+                JSON_NODE_HOLDS_VALUE (node) &&
+                json_node_get_value_type (node) == G_TYPE_BOOLEAN &&
+                json_node_get_boolean (node) == p->negative_zero;
         }
     }
 
@@ -563,7 +603,7 @@ point_matches_established_fact (const AtmSeriesContract *s,
         bounded (s->scenario, ATM_SERIES_CONTRACT_MAX_TEXT) &&
         g_strcmp0 (scenario, s->scenario) == 0 &&
         g_strcmp0 (epistemic_status, s->epistemic_status) == 0 &&
-        status_matches && reason_matches && source_decimal_matches &&
+        status_matches && reason_matches && numeric_payload_matches &&
         fact_break_before == p->break_before &&
         g_strcmp0 (break_reason, p->break_reason) == 0;
     g_object_unref (parser);
