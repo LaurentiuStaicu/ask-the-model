@@ -145,9 +145,9 @@ static gint compare_contract_points (const AtmSeriesContractPoint *a,
                                      const AtmSeriesContractPoint *b)
 {
     AtmVerifiedPoint left = {0}, right = {0};
-    left.coefficient = a->coefficient;
+    left.coefficient = (char *) a->coefficient;
     left.exponent = a->exponent;
-    right.coefficient = b->coefficient;
+    right.coefficient = (char *) b->coefficient;
     right.exponent = b->exponent;
     return compare (&left, &right);
 }
