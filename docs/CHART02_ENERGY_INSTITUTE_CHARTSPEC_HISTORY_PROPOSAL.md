@@ -1,6 +1,6 @@
 # CHART-02 Energy Institute chart and History v2 proposal
 
-**Status: design proposal only, 2026-10-12. No renderer, application route, persistence migration, or release change is authorized by this document.** CHART-01 Gate B has qualified a dormant source-bound Energy Institute series candidate. The remaining gap is the versioned, downstream chart/History contract.
+**Status: staged design and implementation record, updated 2026-10-13. C2c's conversation-store v4 is integrated; the C2d native History reconstruction candidate is under review. No application History route, renderer, or release change is authorized by this document.** CHART-01 Gate B qualified a dormant source-bound Energy Institute series candidate; this record tracks the versioned chart/History contract and its gated implementation.
 
 ## Findings confirmed on main
 
@@ -48,6 +48,10 @@ Do not route EI values through `atm-display/gistemp-linear/1`. Introduce a separ
 - deterministic behavior for unsupported values and fallback rendering without corrupting the complete exact Data view.
 
 This is presentation policy only. It must not claim that rounded pixel values are source values, affect SRA facts, change the stored exact decimals or authorize transformations to net energy, EROI, fossil share or World3 stocks. Missing/discontinuity semantics remain a separate CHART-01 gate; EI v1 profile accepts its complete numeric source only and does not silently interpolate or connect unknown gaps.
+
+## Current contract note
+
+The initial design recommendation above recorded the then-qualified EI admission profile `/2` for the `d9e249…` snapshot and explicitly withheld `dc710d…`. That proposal was superseded before C2c integration: the merged v4 contract uses `atm-energy-institute-pinned-admission/3` and admits exactly the two complete four-file bundles listed below. The earlier `/2` statement is historical design context, not the current persistence or C2d contract.
 
 ## C2c integrated into main — atomic conversation-store v4
 
@@ -111,7 +115,7 @@ metadata and an unsupported snapshot.
 This is a native reconstruction candidate only. It does not dispatch application
 History rows to the new entry point, add a live EI intent, persist point values,
 change GTK/rendering, or enable C2e. The branch now includes the v4 persistence
-boundary from `main`; C2d still requires technical review before merge. All five
-required workflows passed on exact head `cb14e88432ba254e9c12c4d11d30b877fade8a5e`
-(CHART-01 native/ASan+UBSan, CHART-03 GTK, CHART-04 resize, Invariant Registry,
-and Flatpak). These checks qualify this head's CI, not the code review or C2e.
+boundary from `main`; C2d still requires technical review before merge. The prior
+code head `cb14e88432ba254e9c12c4d11d30b877fade8a5e` passed all five required
+workflows, but those results do not qualify later commits. The current PR head must
+pass all five workflows on its exact commit before merge; C2e remains gated.
