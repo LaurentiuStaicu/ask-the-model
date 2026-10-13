@@ -1,5 +1,6 @@
 #pragma once
 #include "verified_series.h"
+#include "energy_institute_verified_series.h"
 #include <glib.h>
 G_BEGIN_DECLS
 
@@ -8,8 +9,6 @@ G_BEGIN_DECLS
 #define ATM_CHART_SPEC_MAX_SERIES 4
 #define ATM_CHART_SPEC_V2_EI_DISPLAY_PROFILE "atm-display/energy-institute-tes-linear"
 #define ATM_CHART_SPEC_V2_EI_DISPLAY_PROFILE_VERSION "0-unqualified"
-
-typedef struct AtmEnergyInstituteVerifiedSeries AtmEnergyInstituteVerifiedSeries;
 
 /* STEP and BAR are reserved, not admitted by either current profile. */
 typedef enum { ATM_CHART_LINE = 1, ATM_CHART_SCATTER, ATM_CHART_STEP, ATM_CHART_BAR } AtmChartKind;
