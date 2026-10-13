@@ -1,0 +1,68 @@
+name: PRES-09 GTK Application E2E
+
+on:
+  pull_request:
+    paths:
+      - 'src/Application.vala'
+      - 'src/StartupQualificationService.vala'
+      - 'src/OllamaProvider.vala'
+      - 'src/ConversationPersistenceStore.vala'
+      - 'src/RepositoryLifecycleService.vala'
+      - 'src/ConversationGrounding.vala'
+      - 'src/ConversationSession.vala'
+      - 'src/chart_*'
+      - 'src/ChartNative.vapi'
+      - 'src/ChartIntent.vala'
+      - 'tests/pres09_gtk_application_e2e_test.vala'
+      - 'tests/fixtures/chart01/**'
+      - 'meson.build'
+      - '.github/workflows/pres09-gtk-application-e2e.yml'
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  qualify:
+    runs-on: ubuntu-24.04
+    timeout-minutes: 20
+    steps:
+      - uses: actions/checkout@v4
+      - name: Install GTK Application test dependencies
+        run: |
+          set -euo pipefail
+          sudo apt-get update
+          sudo apt-get install -y --no-install-recommends \
+            meson \
+            ninja-build \
+            valac \
+            pkg-config \
+            xvfb \
+            xauth \
+            dbus-x11 \
+            libgtk-4-dev \
+            libgranite-7-dev \
+            libsoup-3.0-dev \
+            libjson-glib-dev \
+            libsqlite3-dev \
+            libarchive-dev \
+            libyaml-dev
+      - name: Compile test-only GTK Application
+        run: |
+          set -euo pipefail
+          meson setup build --buildtype=debug
+          ninja -C build pres09-gtk-application-e2e-test
+      - name: Run live, process-relaunch History, and tampered-source E2E
+        env:
+          ATM_CHART01_FIXTURE: tests/fixtures/chart01
+          GTK_A11Y: none
+          GTK_IM_MODULE: gtk-im-context-simple
+          GDK_BACKEND: x11
+          GSK_RENDERER: cairo
+          G_DEBUG: fatal-warnings
+          LIBGL_ALWAYS_SOFTWARE: '1'
+          NO_AT_BRIDGE: '1'
+        run: |
+          set -euo pipefail
+          xvfb-run -a -s '-screen 0 1360x900x24' \
+            dbus-run-session -- ./build/pres09-gtk-application-e2e-test
