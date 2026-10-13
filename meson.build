@@ -2752,6 +2752,23 @@ test('bnr-bls-panel', bnr_bls_panel_test,
   env: {'ATM_BNR_BLS_FIXTURE': meson.current_source_dir() /
     'tests/fixtures/chart01/rmd-bnr-bls'})
 
+# CHART-01 BNR BLS C01: source-bound SRA with an explicitly supported MISSING
+# fact. The admitted five-file panel, eleven numeric observations and one
+# authorized absence are still native/test-only; no series or app caller.
+bnr_bls_sra_test = executable(
+  'bnr-bls-sra-test',
+  ['src/bnr_bls_sra.c', 'src/bnr_bls_panel.c',
+   'src/scientific_canonical.c', 'src/scientific_artifact.c',
+   'src/scientific_result.c', 'src/scientific_operation.c',
+   'src/scientific_derivation.c', 'tests/bnr_bls_sra_test.c'],
+  include_directories: include_directories('src'),
+  dependencies: [glib_dep, json_glib_dep],
+  install: false
+)
+test('bnr-bls-sra', bnr_bls_sra_test,
+  env: {'ATM_BNR_BLS_FIXTURE': meson.current_source_dir() /
+    'tests/fixtures/chart01/rmd-bnr-bls'})
+
 # CHART-01 M1c1: source-bound artifacts; still no application caller.
 gistemp_evidence_test = executable(
   'gistemp-evidence-test',
