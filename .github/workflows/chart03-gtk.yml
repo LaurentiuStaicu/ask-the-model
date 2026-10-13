@@ -42,7 +42,11 @@ jobs:
           set -euo pipefail
           sources=(src/chart_view.c src/chart_render.c src/chart_projection.c src/chart_spec.c
             src/verified_series.c src/gistemp_sra.c src/gistemp_evidence.c src/gistemp_admission.c
-            src/annual_series_candidate.c src/scientific_canonical.c src/scientific_artifact.c
+            src/annual_series_candidate.c src/energy_institute_verified_series.c
+            src/energy_institute_admission.c src/energy_institute_candidate.c
+            src/series_contract.c src/series_evidence.c src/series_evidence_adapters.c
+            src/series_sra.c src/series_adapter.c
+            src/scientific_canonical.c src/scientific_artifact.c
             src/scientific_result.c src/scientific_operation.c src/scientific_derivation.c tests/chart_fixture.c)
           cc -std=c11 -Wall -Wextra -Werror -g -O1 -fsanitize=undefined \
             -DATM_CHART_VIEW_TESTING -Isrc -Itests \
