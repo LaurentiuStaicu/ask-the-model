@@ -2,30 +2,32 @@
 
 **Status: staged design and implementation record, updated 2026-10-13. C2c's conversation-store v4 is integrated; the C2d native History reconstruction candidate is under review. No application History route, renderer, or release change is authorized by this document.** CHART-01 Gate B qualified a dormant source-bound Energy Institute series candidate; this record tracks the versioned chart/History contract and its gated implementation.
 
-## Findings confirmed on main
+## Initial baseline findings (historical)
 
-1. `AtmEnergyInstituteVerifiedSeries` is now a source-specific opaque wrapper over an independently revalidated `AtmSeriesContract`. It reconstructs the pinned EWD processed snapshot, the 65-artifact Evidence collection, the finalized SRA and the 61-point series. It is not connected to chart construction or presentation.
-2. `src/chart_spec.h` accepts only `AtmVerifiedSeries`; `src/chart_spec.c` owns that GISTEMP-specific type and fixes the identity to `atm-chart-spec/1`, identity domain `atm.chart-spec.v1`, and the GISTEMP series profile. Existing chart identity fixtures and persisted History rely on these IDs.
-3. `src/chart_projection.c` consumes `AtmVerifiedPoint` and implements `atm-display/gistemp-linear/1`: exact-decimal conversion is limited to exponents -4 through 0 and the fixed display tick policy is quarter-degree temperature increments. EI source values use more precise source decimals (for example `149.6960972`) and the physical unit is `exajoules/year`; passing them through the current GISTEMP display conversion would fail closed and the quarter-degree scale is scientifically inappropriate.
-4. `src/chart_history_reconstruct.c` exposes GISTEMP-only live/History reconstruction functions with an exact source path, admission profile, repository snapshot allowlist and reconstruction profile. The current code reconstructs GISTEMP from pinned source bytes and compares identities; it does not trust stored plotted points.
-5. Conversation store v3 and its migration explicitly allow only `atm-chart-spec/1`, `atm-chart-reconstruct/gistemp-complete-annual/1`, `atm-series/gistemp-complete-annual/1`, `atm-gistemp-pinned-admission/1` and the GISTEMP source path. The runtime validator in `src/conversation_store.c` independently hard-codes the same single-source tuple. These are real allowlist barriers, not merely UI limitations. Supporting a second chart contract therefore requires a qualified store migration; changing only Vala metadata would fail closed at persistence.
+The following notes record the initial CHART-02 baseline, before C2a–C2d were implemented. They explain the original design decisions; they are not a description of the current implementation. Completed and pending gates are tracked below.
+
+1. At the initial baseline, `AtmEnergyInstituteVerifiedSeries` was a source-specific opaque wrapper over an independently revalidated `AtmSeriesContract`. It reconstructed the pinned EWD processed snapshot, the 65-artifact Evidence collection, finalized SRA and 61-point series, but was not then connected to ChartSpec construction or presentation. C2a later introduced the source-bound ChartSpec v2 constructor.
+2. At that baseline, `src/chart_spec.h` accepted only `AtmVerifiedSeries`, and `src/chart_spec.c` fixed chart identity to `atm-chart-spec/1`, domain `atm.chart-spec.v1`, and the GISTEMP series profile. Existing chart identity fixtures and persisted History relied on those IDs; C2a preserved v1 while adding a separate v2 contract.
+3. The GISTEMP path in `src/chart_projection.c` implements `atm-display/gistemp-linear/1`: exact-decimal conversion is limited to exponents -4 through 0 and its fixed tick policy uses quarter-degree temperature increments. EI source values use more precise decimals (for example `149.6960972`) and `exajoules/year`, so reusing that GISTEMP projection would fail closed or apply an inappropriate scale. C2b therefore qualified a separate EI display profile.
+4. At the initial baseline, `src/chart_history_reconstruct.c` exposed only GISTEMP live/History reconstruction functions, with an exact source path, admission profile, repository snapshot allowlist and reconstruction profile. C2d adds a separate native EI reconstruction entry point, documented below; application History dispatch remains out of scope.
+5. At the initial baseline, conversation store v3 and its migration allowed only `atm-chart-spec/1`, `atm-chart-reconstruct/gistemp-complete-annual/1`, `atm-series/gistemp-complete-annual/1`, `atm-gistemp-pinned-admission/1` and the GISTEMP source path. Those were real allowlist barriers. C2c subsequently integrated the qualified schema-v4 migration and discriminated validator; changing only Vala metadata would still fail closed.
 
 6. The two EWD snapshot candidates are distinct four-file bundles. The initial C2-0 review correctly found that the EI CSV and provenance share Git blob IDs across snapshots `d9e249339663015f6d1c05752338a955bf64ad0b` and `dc710d8e604c0fff713a3acfdb18ab47a1a902bb`, while `science/data/input_manifest.json` and `science/data/registry.csv` differ. C2c subsequently qualified both complete bundles under admission profile `/3`, with separate SHA-256 pins for all four files per snapshot. The current policy accepts those two exact bundles, not arbitrary combinations; C2d reconstruction rechecks the full bundle.
 
-## Decision recommended
+## Decision and current contract
 
 **Keep the published GISTEMP chart contract byte-for-byte stable and introduce a separately versioned EI chart contract.** Do not widen v1's identity serialization, overwrite the pinned GISTEMP identity fixture, reinterpret temperature display rules, or make arbitrary `AtmSeriesContract` values chart-admissible.
 
-The proposed contract permits only this reviewed source/profile pair initially:
+The current contract permits only these reviewed source/profile tuples:
 
 - Existing GISTEMP v1: `atm-chart-spec/1` + `atm-chart-reconstruct/gistemp-complete-annual/1` + `atm-series/gistemp-complete-annual/1` + `atm-gistemp-pinned-admission/1`. It retains every current identity, source allowlist, UI behavior and History reconstruction rule.
 - EI v2 current contract: `atm-chart-spec/2` + `atm-chart-reconstruct/energy-institute-tes-complete-annual/1` + `atm-series/energy-institute-tes-complete-annual/1` + `atm-energy-institute-pinned-admission/3`. The v4 store allowlist and admission policy support exactly snapshots `d9e249339663015f6d1c05752338a955bf64ad0b` and `dc710d8e604c0fff713a3acfdb18ab47a1a902bb`, each pinned to its own complete four-file SHA-256 bundle and qualified series identity. EI v2 binds the TES / Physical Energy Content interpretation and finalized SRA qualification; it does not assert upstream raw-to-processed reproduction.
 
 These are an exact allowlist of compatible tuples, not freely combinable metadata. Unknown combinations, schema versions, sources, profiles, series counts and reconstruction handlers must fail closed. The initial EI chart is one series; multi-series composition is not part of this gate.
 
-## ChartSpec and shared point-access design
+## ChartSpec and shared point-access contract (C2a)
 
-Maintain the current `atm_chart_spec_new()` behavior for legacy GISTEMP callers and persisted `atm-chart-spec/1` objects. Add an explicit, source-bound EI v2 constructor that accepts `AtmEnergyInstituteVerifiedSeries`, not a caller-authored contract or point array.
+C2a preserves the existing `atm_chart_spec_new()` behavior for legacy GISTEMP callers and persisted `atm-chart-spec/1` objects, while adding an explicit, source-bound EI v2 constructor that accepts `AtmEnergyInstituteVerifiedSeries`, not a caller-authored contract or point array.
 
 A tagged opaque `AtmChartSpec` may carry the GISTEMP-v1 or EI-v2 source owner internally. Both paths expose read-only source-neutral chart accessors for X, canonical Y coefficient/exponent, point status, and exact qualified-series identity. Existing GISTEMP accessors may remain as compatibility APIs for v1, but the generic projection path must not cast an EI object to `AtmVerifiedSeries`. Construction must independently rebuild the appropriate source series before it owns the inputs, and validation must reconstruct the expected spec and compare all fields and IDs.
 
@@ -37,9 +39,9 @@ Identity rules:
 
 The chart type remains deny-by-default. The source-specific EI constructor is the only production route to an EI-v2 spec in this first slice; the dormant generic contract constructor is not a chart admission API.
 
-## Separate Energy Institute display qualification
+## Separate Energy Institute display contract (C2b)
 
-Do not route EI values through `atm-display/gistemp-linear/1`. Introduce a separate display profile only after a deterministic conversion and axis policy is reviewed. It must specify, in bounded integer/canonical-decimal terms:
+C2b keeps EI values out of `atm-display/gistemp-linear/1` and qualifies a separate display profile. The profile specifies, in bounded integer/canonical-decimal terms:
 
 - accepted decimal exponents and magnitude/overflow limits for this exact TES series profile;
 - a deterministic display-only quantization/conversion rule adequate for source tokens whose canonical exponents extend beyond -4;
