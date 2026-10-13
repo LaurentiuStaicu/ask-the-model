@@ -368,13 +368,15 @@ test_mutated_missing_support_is_rejected (void)
     g_ptr_array_index (gap->support, 0u) = g_strdup (unauthorized_support);
 
     g_assert_false (atm_bnr_bls_series_contract_validate (series, &error));
-    g_assert_nonnull (error);
+    g_assert_error (error, ATM_BNR_BLS_SERIES_CONTRACT_ERROR,
+                    (gint) ATM_BNR_BLS_SERIES_CONTRACT_ERROR_IDENTITY);
     g_clear_error (&error);
 
     AtmBnrBlsSeriesContract *rebuilt = NULL;
     g_assert_false (atm_bnr_bls_series_contract_rebuild (
         series, &rebuilt, &error));
-    g_assert_nonnull (error);
+    g_assert_error (error, ATM_BNR_BLS_SERIES_CONTRACT_ERROR,
+                    (gint) ATM_BNR_BLS_SERIES_CONTRACT_ERROR_IDENTITY);
     g_assert_null (rebuilt);
     g_clear_error (&error);
 
@@ -443,7 +445,8 @@ test_missing_fact_without_source_authority_is_rejected (void)
 
     g_assert_false (atm_bnr_bls_series_contract_from_sra (
         panel, sra, &series, &error));
-    g_assert_nonnull (error);
+    g_assert_error (error, ATM_BNR_BLS_SRA_ERROR,
+                    (gint) ATM_BNR_BLS_SRA_ERROR_IDENTITY);
     g_assert_null (series);
     g_clear_error (&error);
 
