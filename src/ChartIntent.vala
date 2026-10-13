@@ -75,6 +75,13 @@ namespace AskTheModel {
                 );
             }
 
+            /* A malformed slash command must not fall through to natural
+             * language detection merely because it contains a source name. */
+            if (trimmed.down ().has_prefix (gistemp_prefix) ||
+                trimmed.down ().has_prefix (ei_prefix)) {
+                return new ChartIntent (false, false, prompt);
+            }
+
             bool asks_for_chart = contains_any (
                 normalized,
                 {
