@@ -503,6 +503,44 @@ point_matches_established_fact (const AtmSeriesContract *s,
             return FALSE;
         }
     }
+    /* MISSING cannot be paired with a fact whose qualified observation
+     * payload still claims a numeric token/value. Check the source payload as
+     * well as the contract point's NULL/zero representation. Generic source
+     * schemas may omit these fields or spell absent nullable values as null. */
+    if (p->y_status == ATM_SERIES_Y_MISSING) {
+        const char *numeric_text_fields[] = { "source_decimal", "coefficient" };
+        for (guint i = 0; i < G_N_ELEMENTS (numeric_text_fields); i++) {
+            const char *name = numeric_text_fields[i];
+            if (json_object_has_member (object, name) &&
+                !JSON_NODE_HOLDS_NULL (json_object_get_member (object, name))) {
+                g_object_unref (parser);
+                return FALSE;
+            }
+        }
+        if (json_object_has_member (object, "exponent")) {
+            JsonNode *node = json_object_get_member (object, "exponent");
+            gboolean zero_or_null = JSON_NODE_HOLDS_NULL (node);
+            if (JSON_NODE_HOLDS_VALUE (node) &&
+                json_node_get_value_type (node) == G_TYPE_STRING)
+                zero_or_null = g_strcmp0 (json_node_get_string (node), "0") == 0;
+            if (!zero_or_null) {
+                g_object_unref (parser);
+                return FALSE;
+            }
+        }
+        if (json_object_has_member (object, "negative_zero")) {
+            JsonNode *node = json_object_get_member (object, "negative_zero");
+            gboolean false_or_null = JSON_NODE_HOLDS_NULL (node);
+            if (JSON_NODE_HOLDS_VALUE (node) &&
+                json_node_get_value_type (node) == G_TYPE_BOOLEAN)
+                false_or_null = !json_node_get_boolean (node);
+            if (!false_or_null) {
+                g_object_unref (parser);
+                return FALSE;
+            }
+        }
+    }
+
     /* Discontinuity is scientific metadata too. A caller cannot add or erase
      * a break unless that exact point fact carries the same assertion. */
     if (json_object_has_member (object, "break_before")) {
