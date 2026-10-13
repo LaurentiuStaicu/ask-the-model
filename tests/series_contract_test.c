@@ -159,11 +159,16 @@ qualified_with_single_source_decimal_fact (
 {
     AtmSraResult *q = atm_sra_result_new (ATM_SRA_ANSWERED);
     GError *error = NULL;
-    char *qualifiers = g_strdup_printf (
-        "{\"%s\":\"%s\",\"scenario\":\"baseline\","
-        "\"epistemic_status\":\"observed\",\"y_status\":\"NUMERIC\","
-        "\"source_decimal\":\"%s\"}",
-        coordinate_key, coordinate_value, source_decimal);
+    char *qualifiers = source_decimal == NULL
+        ? g_strdup_printf (
+            "{\"%s\":\"%s\",\"scenario\":\"baseline\","
+            "\"epistemic_status\":\"observed\",\"y_status\":\"NUMERIC\"}",
+            coordinate_key, coordinate_value)
+        : g_strdup_printf (
+            "{\"%s\":\"%s\",\"scenario\":\"baseline\","
+            "\"epistemic_status\":\"observed\",\"y_status\":\"NUMERIC\","
+            "\"source_decimal\":\"%s\"}",
+            coordinate_key, coordinate_value, source_decimal);
     AtmSraEstablishedFact *fact = atm_sra_established_fact_new (
         "source-decimal-fact", "observation", "subject", "attribute",
         "0e0", "unit", "dimension", qualifiers);
@@ -509,6 +514,22 @@ static void test_numeric_source_decimal_must_match_qualified_fact (void)
     AtmSeriesContract *s = base ();
     g_assert_true (atm_series_contract_add_point (
         s, "1882", ATM_SERIES_Y_NUMERIC, "-0.0000", "0", 0, TRUE,
+        FALSE, NULL, NULL, support, 1, &error));
+    g_assert_no_error (error);
+    g_assert_false (atm_series_contract_validate (s, q, &error));
+    g_assert_error (error, ATM_SERIES_CONTRACT_ERROR,
+                    ATM_SERIES_CONTRACT_ERROR_SHAPE);
+    g_clear_error (&error);
+    atm_series_contract_free (s);
+    atm_sra_result_free (q);
+
+    /* A normalized zero without a qualified original token cannot prove
+     * whether the source was +0 or -0. */
+    q = qualified_with_single_source_decimal_fact (
+        a, "calendar_year", "1882", NULL);
+    s = base ();
+    g_assert_true (atm_series_contract_add_point (
+        s, "1882", ATM_SERIES_Y_NUMERIC, "0.0000", "0", 0, FALSE,
         FALSE, NULL, NULL, support, 1, &error));
     g_assert_no_error (error);
     g_assert_false (atm_series_contract_validate (s, q, &error));
