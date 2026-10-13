@@ -263,7 +263,7 @@ VerifiedSeries remain subsequent work; an SRA identity is not silently reused
 as a chart-series identity.
 
 
-## M1c4 general VerifiedSeries contract
+## M1c4 generic SeriesContract
 
 The generic native `AtmSeriesContract` uses the `atm-series-contract/1` schema and a separate identity namespace from the source-specific legacy `atm-verified-series/1` implemented by `verified_series.h/.c`. It is a semantic container/validator, not a source adapter and not chart authority. The generic contract currently supports four X kinds: integer calendar year, canonical UTC instant (`YYYY-MM-DDTHH:MM:SSZ` with real calendar/time fields), non-negative event ordinal representable as an unsigned 64-bit integer, and canonical calendar quarter (`YYYY-Qn`, with a four-digit nonzero year and quarter 1–4). X values are strictly increasing; duplicate X values reject and no automatic sorting occurs. During fact binding, the SRA qualifier key is coordinate-specific: `calendar_year`, `utc_instant`, `event_ordinal`, or `calendar_quarter`, respectively; its string value must equal the contract point's X value. The calendar-quarter path is used by the separately source-qualified BNR C01 adapter in native/tests only; it does not widen the legacy GISTEMP profile or enable a BNR chart route.
 
