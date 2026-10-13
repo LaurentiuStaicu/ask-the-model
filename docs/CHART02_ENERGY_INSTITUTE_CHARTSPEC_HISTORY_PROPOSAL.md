@@ -63,7 +63,7 @@ The v4 fresh schema and v3-to-v4 migration allow exactly two chart tuples: GISTE
 
 The migration stages and copies only `message_charts` and `chart_series`, then swaps the tables and upgrades the installation marker inside one `BEGIN IMMEDIATE` transaction. Every existing GISTEMP row is copied verbatim; SQLite foreign-key and semantic validation run before commit. Failure rolls the transaction back to schema v3. New stores start directly at v4; v1/v2 stores first use the existing separately atomic migrations to v3 and then migrate v3 to v4. v1/v2/v3 schema fixtures remain available for migration tests.
 
-C2c stores identity/provenance recipes only. It does not verify source truth at write time, add EI point values to SQLite, or enable EI History reconstruction. C2d remains responsible for rebuilding the source → Evidence → SRA → VerifiedSeries → ChartSpec v2 chain from the conversation's pinned snapshot and comparing every persisted field; C2e remains gated behind C2d.
+C2c stores identity/provenance recipes only. It does not verify source truth at write time, add EI point values to SQLite, or enable EI History reconstruction. C2d now provides that native reconstruction and is integrated into `main`; C2e remains a separate application-integration gate for live intent, rendering, durable recipe attachment and History dispatch.
 
 ## History and durable persistence — implementation status
 
