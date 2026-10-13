@@ -36,6 +36,9 @@ namespace AskTheModel {
         public string? restored_read_only_reason = null;
         public bool archived = false;
         public bool follow_next_assistant = false;
+#if ATM_PRES09_TEST
+        public Gtk.Widget[] pres09_test_chart_widgets = {};
+#endif
 
         public ChatTabState (
             Gtk.Box page,
@@ -138,12 +141,34 @@ namespace AskTheModel {
         private bool durable_restore_attempted = false;
         private bool restored_qualification_running = false;
         private bool restored_qualification_pending = false;
+#if ATM_PRES09_TEST
+        public signal void pres09_test_finished (bool success, string detail);
+        private string pres09_test_phase = "";
+        private uint pres09_test_poll_source = 0;
+        private uint pres09_test_ticks = 0;
+        private bool pres09_test_scan_started = false;
+        private bool pres09_test_request_started = false;
+        private uint pres09_test_live_turn = 0;
+        private bool pres09_test_history_open_requested = false;
+        private bool pres09_test_history_open_clicked = false;
+        private bool pres09_test_open_completed = false;
+        private string pres09_test_failure = "";
+        private Gtk.Window? pres09_test_history_window = null;
+        private ChatTabState? pres09_test_state = null;
+#endif
 
         public Application () {
+#if ATM_PRES09_TEST
+            Object (
+                application_id: APP_ID,
+                flags: ApplicationFlags.NON_UNIQUE
+            );
+#else
             Object (
                 application_id: APP_ID,
                 flags: ApplicationFlags.DEFAULT_FLAGS
             );
+#endif
 
             repository_lifecycle.set_optimization_policy (
                 optimization_policy
@@ -173,12 +198,16 @@ namespace AskTheModel {
                 );
             }
 
+#if !ATM_PRES09_TEST
             granite_settings = Granite.Settings.get_default ();
+#endif
             gtk_settings = Gtk.Settings.get_default ();
 
+#if !ATM_PRES09_TEST
             granite_settings.notify["prefers-color-scheme"].connect (() => {
                 apply_system_style ();
             });
+#endif
 
             apply_system_style ();
 
@@ -1303,6 +1332,9 @@ namespace AskTheModel {
                 default_height = 420
             };
             history_window.add_css_class ("atm-window");
+#if ATM_PRES09_TEST
+            pres09_test_history_window = history_window;
+#endif
             if (system_prefers_dark ()) {
                 history_window.add_css_class ("atm-dark");
             }
@@ -2182,8 +2214,13 @@ namespace AskTheModel {
         }
 
         private bool system_prefers_dark () {
+#if ATM_PRES09_TEST
+            /* Keep the UI deterministic without the optional Accounts D-Bus service. */
+            return false;
+#else
             return granite_settings.prefers_color_scheme ==
                 Granite.Settings.ColorScheme.DARK;
+#endif
         }
 
         private void apply_system_style () {
@@ -3203,6 +3240,13 @@ namespace AskTheModel {
                 source_buttons,
                 chart_widgets
             );
+#if ATM_PRES09_TEST
+            if (chart_widgets != null) {
+                foreach (Gtk.Widget chart_widget in chart_widgets) {
+                    state.pres09_test_chart_widgets += chart_widget;
+                }
+            }
+#endif
         }
 
         private string normalize_conversation_title (
@@ -4838,9 +4882,750 @@ namespace AskTheModel {
             }
         }
 
+
+#if ATM_PRES09_TEST
+        private string pres09_test_home_path (string leaf) {
+            return GLib.Path.build_filename (
+                GLib.Environment.get_home_dir (),
+                leaf
+            );
+        }
+
+        private void pres09_test_finish (bool success, string detail) {
+            if (pres09_test_poll_source != 0) {
+                GLib.Source.remove (pres09_test_poll_source);
+                pres09_test_poll_source = 0;
+            }
+
+            stdout.printf (
+                "PRES09-GTK: %s: %s\n",
+                success ? "PASS" : "FAIL",
+                detail
+            );
+            pres09_test_finished (success, detail);
+        }
+
+        public void pres09_test_begin (string phase) {
+            pres09_test_phase = phase;
+            pres09_test_ticks = 0;
+            pres09_test_scan_started = false;
+            pres09_test_request_started = false;
+            pres09_test_live_turn = 0;
+            pres09_test_history_open_requested = false;
+            pres09_test_history_open_clicked = false;
+            pres09_test_open_completed = false;
+            pres09_test_failure = "";
+            pres09_test_poll_source = GLib.Timeout.add (
+                50,
+                pres09_test_step
+            );
+        }
+
+        private bool pres09_test_write_file (
+            string leaf,
+            string value
+        ) {
+            try {
+                GLib.FileUtils.set_contents (
+                    pres09_test_home_path (leaf),
+                    value
+                );
+                return true;
+            } catch (GLib.Error error) {
+                pres09_test_failure = error.message;
+                return false;
+            }
+        }
+
+        private string? pres09_test_read_file (
+            string leaf
+        ) {
+            string value;
+            size_t length;
+
+            try {
+                if (!GLib.FileUtils.get_contents (
+                        pres09_test_home_path (leaf),
+                        out value,
+                        out length
+                    )) {
+                    return null;
+                }
+            } catch (GLib.Error error) {
+                return null;
+            }
+
+            return value;
+        }
+
+        private bool pres09_test_select_ewd (
+            ChatTabState state
+        ) {
+            uint index = 0;
+            foreach (
+                RepositoryDescriptor descriptor
+                in RepositoryCatalog.all ()
+            ) {
+                bool selected = descriptor.id == "ewd";
+                repository_selection.set_selected (
+                    descriptor.id,
+                    selected
+                );
+
+                if (index < repository_check_buttons.length) {
+                    repository_check_buttons[index].active =
+                        selected;
+                }
+                index++;
+            }
+
+            state.repository_ids = { "ewd" };
+            state.model_name = ollama_provider.model_name;
+            state.model_digest = ollama_provider.model_digest;
+            update_repository_selector_label ();
+
+            return state.model_name != null &&
+                state.model_name.strip ().length > 0;
+        }
+
+        private bool pres09_test_record_view (
+            string prefix,
+            ChartNative.View view,
+            uint expected_rows,
+            string first_year,
+            string last_year
+        ) {
+            if (view.row_count () != expected_rows) {
+                pres09_test_failure = "%s row count was %u, expected %u".printf (
+                    prefix,
+                    view.row_count (),
+                    expected_rows
+                );
+                return false;
+            }
+
+            string data = view.data () ?? "";
+            if (!data.contains (first_year) ||
+                !data.contains (last_year)) {
+                pres09_test_failure = "%s exact data view omitted an endpoint year".printf (
+                    prefix
+                );
+                return false;
+            }
+
+            if (!view.select_row (0)) {
+                pres09_test_failure = "%s first Data row could not be selected".printf (
+                    prefix
+                );
+                return false;
+            }
+            string first_provenance = view.provenance () ?? "";
+
+            if (!view.select_row (expected_rows - 1)) {
+                pres09_test_failure = "%s final Data row could not be selected".printf (
+                    prefix
+                );
+                return false;
+            }
+            string last_provenance = view.provenance () ?? "";
+
+            if (first_provenance.length == 0 ||
+                last_provenance.length == 0 ||
+                first_provenance == last_provenance) {
+                pres09_test_failure = "%s selected-row provenance was missing or not row-specific".printf (
+                    prefix
+                );
+                return false;
+            }
+
+            return pres09_test_write_file (
+                    "pres09-%s-data.tsv".printf (prefix),
+                    data
+                ) &&
+                pres09_test_write_file (
+                    "pres09-%s-first-provenance.txt".printf (prefix),
+                    first_provenance
+                ) &&
+                pres09_test_write_file (
+                    "pres09-%s-last-provenance.txt".printf (prefix),
+                    last_provenance
+                );
+        }
+
+        private bool pres09_test_save_live_oracle (
+            ChatTabState state
+        ) {
+            if (conversation_store == null ||
+                state.persistent_id == null) {
+                pres09_test_failure = "Live chart turn has no durable conversation identity";
+                return false;
+            }
+
+            ConversationPersistenceSnapshot snapshot;
+            try {
+                snapshot = conversation_store.load_snapshot (
+                    state.persistent_id
+                );
+            } catch (GLib.Error error) {
+                pres09_test_failure = "Could not load live conversation recipe: %s".printf (
+                    error.message
+                );
+                return false;
+            }
+
+            ConversationPersistenceChart? ei = null;
+            ConversationPersistenceChart? gistemp = null;
+            foreach (
+                ConversationPersistenceMessage message
+                in snapshot.messages
+            ) {
+                foreach (
+                    ConversationPersistenceChart chart
+                    in message.charts
+                ) {
+                    if (chart.chart_schema == "atm-chart-spec/2") {
+                        ei = chart;
+                    } else if (chart.chart_schema == "atm-chart-spec/1") {
+                        gistemp = chart;
+                    }
+                }
+            }
+
+            if (ei == null || gistemp == null ||
+                ei.series.length != 1 ||
+                gistemp.series.length != 1 ||
+                ei.series[0].series_profile !=
+                    "atm-series/energy-institute-tes-complete-annual/1" ||
+                ei.series[0].admission_profile !=
+                    "atm-energy-institute-pinned-admission/3" ||
+                ei.series[0].snapshot_sha !=
+                    "dc710d8e604c0fff713a3acfdb18ab47a1a902bb" ||
+                ei.series[0].source_path !=
+                    "science/data/processed/energy_institute_global_2026.csv" ||
+                gistemp.series[0].series_profile !=
+                    "atm-series/gistemp-complete-annual/1" ||
+                gistemp.series[0].source_path !=
+                    "science/data/processed/nasa_gistemp_global_2026.csv") {
+                pres09_test_failure = "Durable live recipes did not contain the source-qualified EI v2 and preserved GISTEMP v1 contracts";
+                return false;
+            }
+
+            if (!pres09_test_write_file (
+                    "pres09-conversation-id",
+                    state.persistent_id
+                ) ||
+                !pres09_test_write_file (
+                    "pres09-ei-chart-id",
+                    ei.chart_spec_id
+                ) ||
+                !pres09_test_write_file (
+                    "pres09-gistemp-chart-id",
+                    gistemp.chart_spec_id
+                )) {
+                return false;
+            }
+
+            return true;
+        }
+
+        private Gtk.Button? pres09_test_find_button (
+            Gtk.Widget? root,
+            string label
+        ) {
+            if (root == null) {
+                return null;
+            }
+
+            Gtk.Button? button = root as Gtk.Button;
+            if (button != null &&
+                button.label == label) {
+                return button;
+            }
+
+            Gtk.Widget? child = root.get_first_child ();
+            while (child != null) {
+                Gtk.Button? found = pres09_test_find_button (
+                    child,
+                    label
+                );
+                if (found != null) {
+                    return found;
+                }
+                child = child.get_next_sibling ();
+            }
+
+            return null;
+        }
+
+        private bool pres09_test_compare_file (
+            string leaf,
+            string actual
+        ) {
+            string? expected = pres09_test_read_file (leaf);
+            if (expected == null || expected != actual) {
+                pres09_test_failure = "Restored %s differs from the live baseline".printf (
+                    leaf
+                );
+                return false;
+            }
+            return true;
+        }
+
+        private bool pres09_test_check_valid_restore (
+            ChatTabState state
+        ) {
+            string? conversation_id =
+                pres09_test_read_file ("pres09-conversation-id");
+            string? expected_ei_id =
+                pres09_test_read_file ("pres09-ei-chart-id");
+            string? expected_gistemp_id =
+                pres09_test_read_file ("pres09-gistemp-chart-id");
+
+            if (conversation_id == null ||
+                expected_ei_id == null ||
+                expected_gistemp_id == null ||
+                state.persistent_id != conversation_id ||
+                !state.archived) {
+                pres09_test_failure = "History did not restore the expected archived conversation";
+                return false;
+            }
+
+            if (state.pres09_test_chart_widgets.length != 2) {
+                pres09_test_failure = "History rendered %u chart widgets, expected EI and GISTEMP".printf (
+                    state.pres09_test_chart_widgets.length
+                );
+                return false;
+            }
+
+            ChartNative.View? ei_view =
+                state.pres09_test_chart_widgets[0] as ChartNative.View;
+            ChartNative.View? gistemp_view =
+                state.pres09_test_chart_widgets[1] as ChartNative.View;
+
+            if (ei_view == null || gistemp_view == null) {
+                pres09_test_failure = "History did not reconstruct both charts as qualified Chart/Data widgets";
+                return false;
+            }
+
+            ConversationPersistenceSnapshot snapshot;
+            try {
+                snapshot = conversation_store.load_snapshot (
+                    conversation_id
+                );
+            } catch (GLib.Error error) {
+                pres09_test_failure = "History snapshot could not be loaded: %s".printf (
+                    error.message
+                );
+                return false;
+            }
+
+            ConversationPersistenceChart? ei = null;
+            ConversationPersistenceChart? gistemp = null;
+            foreach (
+                ConversationPersistenceMessage message
+                in snapshot.messages
+            ) {
+                foreach (
+                    ConversationPersistenceChart chart
+                    in message.charts
+                ) {
+                    if (chart.chart_schema == "atm-chart-spec/2") {
+                        ei = chart;
+                    } else if (chart.chart_schema == "atm-chart-spec/1") {
+                        gistemp = chart;
+                    }
+                }
+            }
+
+            if (ei == null || gistemp == null ||
+                ei.chart_spec_id != expected_ei_id ||
+                gistemp.chart_spec_id != expected_gistemp_id) {
+                pres09_test_failure = "History recipe identity differs from the identities saved from the live turns";
+                return false;
+            }
+
+            string ei_data = ei_view.data () ?? "";
+            string gistemp_data = gistemp_view.data () ?? "";
+            if (!pres09_test_compare_file (
+                    "pres09-ei-data.tsv",
+                    ei_data
+                ) ||
+                !pres09_test_compare_file (
+                    "pres09-gistemp-data.tsv",
+                    gistemp_data
+                )) {
+                return false;
+            }
+
+            if (!ei_view.select_row (0) ||
+                !pres09_test_compare_file (
+                    "pres09-ei-first-provenance.txt",
+                    ei_view.provenance () ?? ""
+                ) ||
+                !ei_view.select_row (ei_view.row_count () - 1) ||
+                !pres09_test_compare_file (
+                    "pres09-ei-last-provenance.txt",
+                    ei_view.provenance () ?? ""
+                ) ||
+                !gistemp_view.select_row (0) ||
+                !pres09_test_compare_file (
+                    "pres09-gistemp-first-provenance.txt",
+                    gistemp_view.provenance () ?? ""
+                ) ||
+                !gistemp_view.select_row (gistemp_view.row_count () - 1) ||
+                !pres09_test_compare_file (
+                    "pres09-gistemp-last-provenance.txt",
+                    gistemp_view.provenance () ?? ""
+                )) {
+                return false;
+            }
+
+            return true;
+        }
+
+        private bool pres09_test_check_invalid_restore (
+            ChatTabState state
+        ) {
+            if (state.pres09_test_chart_widgets.length == 0) {
+                pres09_test_failure = "Tampered History contained no visible fail-closed chart status";
+                return false;
+            }
+
+            uint view_count = 0;
+            uint unavailable_count = 0;
+            foreach (
+                Gtk.Widget widget
+                in state.pres09_test_chart_widgets
+            ) {
+                if (widget is ChartNative.View) {
+                    view_count++;
+                }
+
+                Gtk.Label? label = widget as Gtk.Label;
+                if (label != null &&
+                    label.label.has_prefix ("Chart unavailable:")) {
+                    unavailable_count++;
+                }
+            }
+
+            if (view_count != 0 || unavailable_count == 0) {
+                pres09_test_failure = "A tampered chart source produced a renderable view instead of Chart unavailable";
+                return false;
+            }
+
+            return true;
+        }
+
+        private bool pres09_test_step_live () {
+            if (startup_qualification_failed) {
+                pres09_test_finish (
+                    false,
+                    "Startup qualification failed: %s".printf (
+                        startup_qualification_detail ?? "unknown reason"
+                    )
+                );
+                return false;
+            }
+
+            if (active_chat == null) {
+                create_chat_tab ();
+            }
+            ChatTabState? state = active_chat;
+            if (state == null) {
+                pres09_test_finish (false, "Application did not create a live chat tab");
+                return false;
+            }
+            pres09_test_state = state;
+
+            if (!pres09_test_request_started) {
+                if (!pres09_test_select_ewd (state)) {
+                    pres09_test_finish (false, "Could not select EWD or the deterministic provider model");
+                    return false;
+                }
+                pres09_test_request_started = true;
+                state.prompt.buffer.text =
+                    "/chart energy-institute Show the global TES trend.";
+                state.send_button.clicked ();
+                return true;
+            }
+
+            if (generation_active || state.generating) {
+                return true;
+            }
+
+            if (pres09_test_live_turn == 0) {
+                if (state.pres09_test_chart_widgets.length != 1) {
+                    pres09_test_finish (
+                        false,
+                        "The live Energy Institute request produced %u chart widgets".printf (
+                            state.pres09_test_chart_widgets.length
+                        )
+                    );
+                    return false;
+                }
+
+                ChartNative.View? view =
+                    state.pres09_test_chart_widgets[0] as ChartNative.View;
+                if (view == null ||
+                    !pres09_test_record_view (
+                        "ei",
+                        view,
+                        61,
+                        "1965",
+                        "2025"
+                    )) {
+                    pres09_test_finish (
+                        false,
+                        pres09_test_failure.length > 0
+                            ? pres09_test_failure
+                            : "Live Energy Institute Chart/Data view is unavailable"
+                    );
+                    return false;
+                }
+
+                pres09_test_live_turn = 1;
+                state.prompt.buffer.text =
+                    "/chart gistemp Show the global temperature anomaly trend.";
+                state.send_button.clicked ();
+                return true;
+            }
+
+            if (state.pres09_test_chart_widgets.length != 2) {
+                pres09_test_finish (
+                    false,
+                    "Live GISTEMP regression produced %u chart widgets, expected two total".printf (
+                        state.pres09_test_chart_widgets.length
+                    )
+                );
+                return false;
+            }
+
+            ChartNative.View? gistemp_view =
+                state.pres09_test_chart_widgets[1] as ChartNative.View;
+            if (gistemp_view == null ||
+                !pres09_test_record_view (
+                    "gistemp",
+                    gistemp_view,
+                    146,
+                    "1880",
+                    "2025"
+                ) ||
+                !pres09_test_save_live_oracle (state)) {
+                pres09_test_finish (
+                    false,
+                    pres09_test_failure.length > 0
+                        ? pres09_test_failure
+                        : "Live GISTEMP Chart/Data view or durable chart recipes are unavailable"
+                );
+                return false;
+            }
+
+            string? conversation_id = state.persistent_id;
+            state.lifecycle_button.clicked ();
+
+            if (conversation_id == null ||
+                conversation_store == null) {
+                pres09_test_finish (false, "Archive control did not retain a durable conversation id");
+                return false;
+            }
+
+            try {
+                ConversationPersistenceSnapshot snapshot =
+                    conversation_store.load_snapshot (conversation_id);
+                if (!snapshot.archived) {
+                    pres09_test_finish (false, "Archive control did not persist archived=true");
+                    return false;
+                }
+            } catch (GLib.Error error) {
+                pres09_test_finish (
+                    false,
+                    "Could not verify archived conversation: %s".printf (
+                        error.message
+                    )
+                );
+                return false;
+            }
+
+            pres09_test_finish (
+                true,
+                "real composer/send -> EI v2 and GISTEMP v1 views -> Archive persisted both recipes"
+            );
+            return false;
+        }
+
+        private bool pres09_test_step_history () {
+            if (startup_qualification_failed) {
+                pres09_test_finish (
+                    false,
+                    "Startup qualification failed before valid History restoration: %s".printf (
+                        startup_qualification_detail ?? "unknown reason"
+                    )
+                );
+                return false;
+            }
+
+            if (!pres09_test_history_open_requested) {
+                if (history_button == null ||
+                    !history_button.sensitive) {
+                    return true;
+                }
+                pres09_test_history_open_requested = true;
+                history_button.clicked ();
+                return true;
+            }
+
+            if (!pres09_test_history_open_clicked) {
+                Gtk.Button? open_button =
+                    pres09_test_find_button (
+                        pres09_test_history_window,
+                        "Open"
+                    );
+                if (open_button == null) {
+                    return true;
+                }
+
+                pres09_test_history_open_clicked = true;
+                open_button.clicked ();
+                return true;
+            }
+
+            string? conversation_id =
+                pres09_test_read_file ("pres09-conversation-id");
+            if (conversation_id == null ||
+                active_chat == null ||
+                active_chat.persistent_id != conversation_id) {
+                return true;
+            }
+
+            pres09_test_state = active_chat;
+
+            if (active_chat.restored_view_only ||
+                restored_qualification_running) {
+                return true;
+            }
+
+            if (!pres09_test_check_valid_restore (active_chat)) {
+                pres09_test_finish (false, pres09_test_failure);
+                return false;
+            }
+
+            pres09_test_finish (
+                true,
+                "separate app process reopened archived History and reconstructed source-qualified EI v2 plus GISTEMP v1"
+            );
+            return false;
+        }
+
+        private bool pres09_test_step_history_invalid () {
+            if (!pres09_test_history_open_requested) {
+                if (history_button == null ||
+                    !history_button.sensitive) {
+                    return true;
+                }
+                pres09_test_history_open_requested = true;
+                history_button.clicked ();
+                return true;
+            }
+
+            if (!pres09_test_history_open_clicked) {
+                Gtk.Button? open_button =
+                    pres09_test_find_button (
+                        pres09_test_history_window,
+                        "Open"
+                    );
+                if (open_button == null) {
+                    return true;
+                }
+
+                pres09_test_history_open_clicked = true;
+                open_button.clicked ();
+                return true;
+            }
+
+            string? conversation_id =
+                pres09_test_read_file ("pres09-conversation-id");
+            if (conversation_id == null ||
+                active_chat == null ||
+                active_chat.persistent_id != conversation_id) {
+                return true;
+            }
+
+            pres09_test_state = active_chat;
+
+            if (!pres09_test_check_invalid_restore (active_chat)) {
+                pres09_test_finish (false, pres09_test_failure);
+                return false;
+            }
+
+            pres09_test_finish (
+                true,
+                "tampered source manifest rendered Chart unavailable and no Chart/Data view"
+            );
+            return false;
+        }
+
+        private bool pres09_test_step () {
+            pres09_test_ticks++;
+            if (pres09_test_ticks > 2400) {
+                pres09_test_finish (
+                    false,
+                    "timed out waiting for application E2E phase '%s'".printf (
+                        pres09_test_phase
+                    )
+                );
+                return false;
+            }
+
+            if (startup_qualification_running) {
+                return true;
+            }
+
+            if (conversation_store == null) {
+                if (startup_qualification_failed) {
+                    pres09_test_finish (
+                        false,
+                        "Conversation persistence did not initialize after startup qualification"
+                    );
+                    return false;
+                }
+                return true;
+            }
+
+            if (!pres09_test_scan_started) {
+                pres09_test_scan_started = true;
+                refresh_local_models.begin ();
+                return true;
+            }
+
+            if (!ollama_provider.is_ready ()) {
+                return true;
+            }
+
+            if (pres09_test_phase == "live") {
+                return pres09_test_step_live ();
+            }
+            if (pres09_test_phase == "history") {
+                return pres09_test_step_history ();
+            }
+            if (pres09_test_phase == "history-invalid") {
+                return pres09_test_step_history_invalid ();
+            }
+
+            pres09_test_finish (
+                false,
+                "unknown test phase '%s'".printf (
+                    pres09_test_phase
+                )
+            );
+            return false;
+        }
+#endif
+
+        #if !ATM_PRES09_TEST
         public static int main (string[] args) {
             configure_renderer_fallback ();
             return new Application ().run (args);
         }
+        #endif
     }
 }

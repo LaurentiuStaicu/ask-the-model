@@ -1,4 +1,23 @@
 namespace AskTheModel.ControlStateNative {
+#if ATM_PRES09_TEST
+    [CCode (
+        cname = "atm_control_state_open",
+        cheader_filename = "control_state.h"
+    )]
+    public static extern bool open_for_test (
+        string path,
+        out void* store
+    ) throws GLib.Error;
+
+    [CCode (
+        cname = "atm_control_state_close",
+        cheader_filename = "control_state.h"
+    )]
+    public static extern void close_for_test (
+        void* store
+    );
+#endif
+
     [CCode (
         cname = "atm_control_state_active_generation_id",
         cheader_filename = "control_state.h"
