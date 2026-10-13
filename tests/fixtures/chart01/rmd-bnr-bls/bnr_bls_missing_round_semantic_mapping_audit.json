@@ -1,0 +1,287 @@
+{
+  "audit_version": "0.1",
+  "phase": "BNR BLS Missing-Round — Semantic Coordinate and Round-Identity Review",
+  "status": "PASS_MISSING_ROUND_SEMANTIC_COORDINATE_MAPPING_WITH_EXPLICIT_ROUND_IDENTITY_BRIDGES",
+  "mapping_authority": "model/calibration_validation/bnr_bls_cross_round_mapping_contract.json",
+  "extraction_vintage": "data/source_vintages/bnr-bls-missing-round-cell-extraction-vintage-2026-09-19",
+  "results": [
+    {
+      "source_id": "bls_2023_aug",
+      "target_quarter": "2023-Q2",
+      "round_identity": {
+        "authority": "OFFICIAL_BNR_PUBLICATION_QUARTER",
+        "raw_workbook_header": "31/03/2023",
+        "workbook_header_status": "STALE_RELATIVE_TO_OFFICIAL_PUBLICATION_QUARTER",
+        "resolved_quarter": "2023-Q2",
+        "official_publication": {
+          "url": "https://www.bnr.ro/files/d/Pubs_ro/SondajCreditare/BLS%20august%202023_RO.pdf",
+          "title": "Sondaj privind creditarea companiilor nefinanciare și a populației",
+          "declared_period": "Trimestrul II 2023",
+          "publication_month": "August 2023"
+        },
+        "silent_date_normalisation_performed": false
+      },
+      "row": {
+        "quarter": "2023-Q2",
+        "source_id": "bls_2023_aug",
+        "source_kind": "retained_legacy_xls_semantic_coordinate_review",
+        "nfc_credit_standards": 15.54,
+        "nfc_loan_demand": 16.49,
+        "household_mortgage_credit_standards": -4.28,
+        "household_consumer_credit_standards": 3.64,
+        "household_mortgage_loan_demand": -23.36,
+        "household_consumer_loan_demand": 50.76
+      },
+      "observable_validations": {
+        "nfc_credit_standards": {
+          "question_id": "C01",
+          "question_cell": "A2",
+          "metric_label_cell": "B13",
+          "metric_label": "Net percentage",
+          "value_cell": "C13",
+          "value": 15.54,
+          "sign_convention": "positive = net tightening; negative = net easing"
+        },
+        "nfc_loan_demand": {
+          "question_id": "C05",
+          "question_cell": "A225",
+          "metric_label_cell": "B235",
+          "metric_label": "Net percentage",
+          "value_cell": "C235",
+          "value": 16.49,
+          "sign_convention": "positive = net increase in demand; negative = net decrease"
+        },
+        "household_mortgage_credit_standards": {
+          "question_id": "P01",
+          "question_cell": "A2",
+          "metric_label_cell": "B12",
+          "metric_label": "Net percentage",
+          "value_cell": "C12",
+          "value": -4.28,
+          "sign_convention": "positive = net tightening; negative = net easing"
+        },
+        "household_consumer_credit_standards": {
+          "question_id": "P01",
+          "question_cell": "A2",
+          "metric_label_cell": "B12",
+          "metric_label": "Net percentage",
+          "value_cell": "D12",
+          "value": 3.64,
+          "sign_convention": "positive = net tightening; negative = net easing"
+        },
+        "household_mortgage_loan_demand": {
+          "question_id": "P06",
+          "question_cell": "A90",
+          "metric_label_cell": "B99",
+          "metric_label": "Net percentage",
+          "value_cell": "C99",
+          "value": -23.36,
+          "sign_convention": "positive = net increase in demand; negative = net decrease"
+        },
+        "household_consumer_loan_demand": {
+          "question_id": "P13",
+          "question_cell": "A293",
+          "metric_label_cell": "B303",
+          "metric_label": "Net percentage",
+          "value_cell": "C303",
+          "value": 50.76,
+          "sign_convention": "positive = net increase in demand; negative = net decrease"
+        }
+      },
+      "all_six_observables_passed": true,
+      "dsti_boundary_markers_verified": true
+    },
+    {
+      "source_id": "bls_2023_nov",
+      "target_quarter": "2023-Q3",
+      "round_identity": {
+        "authority": "WORKBOOK_COMPANIES_A1",
+        "raw_workbook_header": "30/09/2023",
+        "resolved_quarter": "2023-Q3",
+        "official_publication": null
+      },
+      "row": {
+        "quarter": "2023-Q3",
+        "source_id": "bls_2023_nov",
+        "source_kind": "retained_legacy_xls_semantic_coordinate_review",
+        "nfc_credit_standards": 0.0,
+        "nfc_loan_demand": -29.52,
+        "household_mortgage_credit_standards": -38.15,
+        "household_consumer_credit_standards": 1.36,
+        "household_mortgage_loan_demand": 34.62,
+        "household_consumer_loan_demand": 27.04
+      },
+      "observable_validations": {
+        "nfc_credit_standards": {
+          "question_id": "C01",
+          "question_cell": "A2",
+          "metric_label_cell": "B13",
+          "metric_label": "Net percentage",
+          "value_cell": "C13",
+          "value": 0.0,
+          "sign_convention": "positive = net tightening; negative = net easing"
+        },
+        "nfc_loan_demand": {
+          "question_id": "C05",
+          "question_cell": "A225",
+          "metric_label_cell": "B235",
+          "metric_label": "Net percentage",
+          "value_cell": "C235",
+          "value": -29.52,
+          "sign_convention": "positive = net increase in demand; negative = net decrease"
+        },
+        "household_mortgage_credit_standards": {
+          "question_id": "P01",
+          "question_cell": "A2",
+          "metric_label_cell": "B12",
+          "metric_label": "Net percentage",
+          "value_cell": "C12",
+          "value": -38.15,
+          "sign_convention": "positive = net tightening; negative = net easing"
+        },
+        "household_consumer_credit_standards": {
+          "question_id": "P01",
+          "question_cell": "A2",
+          "metric_label_cell": "B12",
+          "metric_label": "Net percentage",
+          "value_cell": "D12",
+          "value": 1.36,
+          "sign_convention": "positive = net tightening; negative = net easing"
+        },
+        "household_mortgage_loan_demand": {
+          "question_id": "P06",
+          "question_cell": "A90",
+          "metric_label_cell": "B99",
+          "metric_label": "Net percentage",
+          "value_cell": "C99",
+          "value": 34.62,
+          "sign_convention": "positive = net increase in demand; negative = net decrease"
+        },
+        "household_consumer_loan_demand": {
+          "question_id": "P13",
+          "question_cell": "A293",
+          "metric_label_cell": "B303",
+          "metric_label": "Net percentage",
+          "value_cell": "C303",
+          "value": 27.04,
+          "sign_convention": "positive = net increase in demand; negative = net decrease"
+        }
+      },
+      "all_six_observables_passed": true,
+      "dsti_boundary_markers_verified": true
+    },
+    {
+      "source_id": "bls_2024_aug",
+      "target_quarter": "2024-Q2",
+      "round_identity": {
+        "authority": "OFFICIAL_BNR_PUBLICATION_QUARTER",
+        "raw_workbook_header": "31/06/2024",
+        "workbook_header_status": "INVALID_CALENDAR_DATE_BUT_QUARTER_IDENTIFIED_BY_OFFICIAL_PUBLICATION",
+        "resolved_quarter": "2024-Q2",
+        "official_publication": {
+          "url": "https://www.bnr.ro/files/d/Pubs_ro/SondajCreditare/BLS%20august%202024_RO.pdf",
+          "title": "Sondaj privind creditarea companiilor nefinanciare și a populației",
+          "declared_period": "Trimestrul II 2024",
+          "publication_month": "August 2024"
+        },
+        "silent_date_normalisation_performed": false
+      },
+      "row": {
+        "quarter": "2024-Q2",
+        "source_id": "bls_2024_aug",
+        "source_kind": "retained_legacy_xls_semantic_coordinate_review",
+        "nfc_credit_standards": 0.0,
+        "nfc_loan_demand": 20.36,
+        "household_mortgage_credit_standards": 12.89,
+        "household_consumer_credit_standards": -14.16,
+        "household_mortgage_loan_demand": 13.34,
+        "household_consumer_loan_demand": 70.06
+      },
+      "observable_validations": {
+        "nfc_credit_standards": {
+          "question_id": "C01",
+          "question_cell": "A2",
+          "metric_label_cell": "B13",
+          "metric_label": "Net percentage",
+          "value_cell": "C13",
+          "value": 0.0,
+          "sign_convention": "positive = net tightening; negative = net easing"
+        },
+        "nfc_loan_demand": {
+          "question_id": "C05",
+          "question_cell": "A225",
+          "metric_label_cell": "B235",
+          "metric_label": "Net percentage",
+          "value_cell": "C235",
+          "value": 20.36,
+          "sign_convention": "positive = net increase in demand; negative = net decrease"
+        },
+        "household_mortgage_credit_standards": {
+          "question_id": "P01",
+          "question_cell": "A2",
+          "metric_label_cell": "B12",
+          "metric_label": "Net percentage",
+          "value_cell": "C12",
+          "value": 12.89,
+          "sign_convention": "positive = net tightening; negative = net easing"
+        },
+        "household_consumer_credit_standards": {
+          "question_id": "P01",
+          "question_cell": "A2",
+          "metric_label_cell": "B12",
+          "metric_label": "Net percentage",
+          "value_cell": "D12",
+          "value": -14.16,
+          "sign_convention": "positive = net tightening; negative = net easing"
+        },
+        "household_mortgage_loan_demand": {
+          "question_id": "P06",
+          "question_cell": "A90",
+          "metric_label_cell": "B99",
+          "metric_label": "Net percentage",
+          "value_cell": "C99",
+          "value": 13.34,
+          "sign_convention": "positive = net increase in demand; negative = net decrease"
+        },
+        "household_consumer_loan_demand": {
+          "question_id": "P13",
+          "question_cell": "A293",
+          "metric_label_cell": "B303",
+          "metric_label": "Net percentage",
+          "value_cell": "C303",
+          "value": 70.06,
+          "sign_convention": "positive = net increase in demand; negative = net decrease"
+        }
+      },
+      "all_six_observables_passed": true,
+      "dsti_boundary_markers_verified": true
+    }
+  ],
+  "passed_rounds": [
+    "2023-Q2",
+    "2023-Q3",
+    "2024-Q2"
+  ],
+  "canonical_panel_modified": false,
+  "interpolation_performed": false,
+  "synthetic_quarters_created": false,
+  "parameter_estimation_performed": false,
+  "model_selection_performed": false,
+  "holdout_opened": false,
+  "system_dynamics_activation": false,
+  "behavioural_closure_change": false,
+  "hard_rules": {
+    "no_canonical_panel_mutation": true,
+    "no_interpolation": true,
+    "no_synthetic_quarter_creation": true,
+    "no_parameter_estimation": true,
+    "no_model_selection": true,
+    "no_lag_selection": true,
+    "no_holdout_opening": true,
+    "no_causal_claim": true,
+    "no_dsti_level_claim": true,
+    "no_system_dynamics_activation": true,
+    "no_behavioural_closure_change": true
+  },
+  "pass_effect": "THREE_MISSING_BLS_ROUNDS_READY_FOR_EXPLICIT_CANONICAL_PANEL_REGENERATION_REVIEW_ONLY"
+}
