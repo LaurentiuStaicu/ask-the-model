@@ -1,0 +1,632 @@
+{
+  "audit_version": "0.1",
+  "phase": "BNR BLS — Cross-Round Semantic Mapping and Realised-Round Panel",
+  "status": "PASS_BLS_MULTI_ROUND_MAPPING_WITH_SINGLE_EXPLICIT_GAP",
+  "observed_round_count": 11,
+  "first_observed_quarter": "2022-Q4",
+  "last_observed_quarter": "2025-Q3",
+  "expected_quarter_count_between_bounds": 12,
+  "coverage_fraction": 0.9166666666666666,
+  "observed_quarters": [
+    "2022-Q4",
+    "2023-Q1",
+    "2023-Q2",
+    "2023-Q3",
+    "2023-Q4",
+    "2024-Q1",
+    "2024-Q2",
+    "2024-Q3",
+    "2024-Q4",
+    "2025-Q1",
+    "2025-Q3"
+  ],
+  "missing_quarters": [
+    "2025-Q2"
+  ],
+  "legacy_round_validations": {
+    "bls_2023_feb": {
+      "round_date_authority": {
+        "sheet": "companies",
+        "cell": "A1",
+        "value": "31/12/2022",
+        "household_header_diagnostics": {
+          "A1": null,
+          "B1": "31/12/2022"
+        },
+        "household_header_date_consistency_required": false
+      },
+      "nfc_credit_standards": {
+        "question_id": "C01",
+        "question_cell": "A2",
+        "net_percentage_cell": "C13",
+        "metric_label": "Sold conjunctural"
+      },
+      "nfc_loan_demand": {
+        "question_id": "C05",
+        "question_cell": "A225",
+        "net_percentage_cell": "C235",
+        "metric_label": "Sold conjunctural"
+      },
+      "household_mortgage_credit_standards": {
+        "question_id": "P01",
+        "question_cell": "A2",
+        "net_percentage_cell": "C12",
+        "metric_label": "Sold conjunctural"
+      },
+      "household_consumer_credit_standards": {
+        "question_id": "P01",
+        "question_cell": "A2",
+        "net_percentage_cell": "D12",
+        "metric_label": "Sold conjunctural"
+      },
+      "household_mortgage_loan_demand": {
+        "question_id": "P06",
+        "question_cell": "A90",
+        "net_percentage_cell": "C99",
+        "metric_label": "Sold conjunctural"
+      },
+      "household_consumer_loan_demand": {
+        "question_id": "P13",
+        "question_cell": "A293",
+        "net_percentage_cell": "C303",
+        "metric_label": "Sold conjunctural"
+      }
+    },
+    "bls_2023_may": {
+      "round_date_authority": {
+        "sheet": "companies",
+        "cell": "A1",
+        "value": "31/03/2023",
+        "household_header_diagnostics": {
+          "A1": "31/12/2022",
+          "B1": null
+        },
+        "household_header_date_consistency_required": false
+      },
+      "nfc_credit_standards": {
+        "question_id": "C01",
+        "question_cell": "A2",
+        "net_percentage_cell": "C13",
+        "metric_label": "Net percentage"
+      },
+      "nfc_loan_demand": {
+        "question_id": "C05",
+        "question_cell": "A225",
+        "net_percentage_cell": "C235",
+        "metric_label": "Net percentage"
+      },
+      "household_mortgage_credit_standards": {
+        "question_id": "P01",
+        "question_cell": "A2",
+        "net_percentage_cell": "C12",
+        "metric_label": "Net percentage"
+      },
+      "household_consumer_credit_standards": {
+        "question_id": "P01",
+        "question_cell": "A2",
+        "net_percentage_cell": "D12",
+        "metric_label": "Net percentage"
+      },
+      "household_mortgage_loan_demand": {
+        "question_id": "P06",
+        "question_cell": "A90",
+        "net_percentage_cell": "C99",
+        "metric_label": "Net percentage"
+      },
+      "household_consumer_loan_demand": {
+        "question_id": "P13",
+        "question_cell": "A293",
+        "net_percentage_cell": "C303",
+        "metric_label": "Net percentage"
+      }
+    },
+    "bls_2024_feb": {
+      "round_date_authority": {
+        "sheet": "companies",
+        "cell": "A1",
+        "value": "31/12/2023",
+        "household_header_diagnostics": {
+          "A1": "31/12/2023",
+          "B1": null
+        },
+        "household_header_date_consistency_required": false
+      },
+      "nfc_credit_standards": {
+        "question_id": "C01",
+        "question_cell": "A2",
+        "net_percentage_cell": "C13",
+        "metric_label": "Net percentage"
+      },
+      "nfc_loan_demand": {
+        "question_id": "C05",
+        "question_cell": "A225",
+        "net_percentage_cell": "C235",
+        "metric_label": "Net percentage"
+      },
+      "household_mortgage_credit_standards": {
+        "question_id": "P01",
+        "question_cell": "A2",
+        "net_percentage_cell": "C12",
+        "metric_label": "Net percentage"
+      },
+      "household_consumer_credit_standards": {
+        "question_id": "P01",
+        "question_cell": "A2",
+        "net_percentage_cell": "D12",
+        "metric_label": "Net percentage"
+      },
+      "household_mortgage_loan_demand": {
+        "question_id": "P06",
+        "question_cell": "A90",
+        "net_percentage_cell": "C99",
+        "metric_label": "Net percentage"
+      },
+      "household_consumer_loan_demand": {
+        "question_id": "P13",
+        "question_cell": "A293",
+        "net_percentage_cell": "C303",
+        "metric_label": "Net percentage"
+      }
+    },
+    "bls_2024_may": {
+      "round_date_authority": {
+        "sheet": "companies",
+        "cell": "A1",
+        "value": "31/03/2024",
+        "household_header_diagnostics": {
+          "A1": "31/03/2024",
+          "B1": null
+        },
+        "household_header_date_consistency_required": false
+      },
+      "nfc_credit_standards": {
+        "question_id": "C01",
+        "question_cell": "A2",
+        "net_percentage_cell": "C13",
+        "metric_label": "Net percentage"
+      },
+      "nfc_loan_demand": {
+        "question_id": "C05",
+        "question_cell": "A225",
+        "net_percentage_cell": "C235",
+        "metric_label": "Net percentage"
+      },
+      "household_mortgage_credit_standards": {
+        "question_id": "P01",
+        "question_cell": "A2",
+        "net_percentage_cell": "C12",
+        "metric_label": "Net percentage"
+      },
+      "household_consumer_credit_standards": {
+        "question_id": "P01",
+        "question_cell": "A2",
+        "net_percentage_cell": "D12",
+        "metric_label": "Net percentage"
+      },
+      "household_mortgage_loan_demand": {
+        "question_id": "P06",
+        "question_cell": "A90",
+        "net_percentage_cell": "C99",
+        "metric_label": "Net percentage"
+      },
+      "household_consumer_loan_demand": {
+        "question_id": "P13",
+        "question_cell": "A293",
+        "net_percentage_cell": "C303",
+        "metric_label": "Net percentage"
+      }
+    },
+    "bls_2024_nov": {
+      "round_date_authority": {
+        "sheet": "companies",
+        "cell": "A1",
+        "value": "30/09/2024",
+        "household_header_diagnostics": {
+          "A1": "30/09/2024",
+          "B1": null
+        },
+        "household_header_date_consistency_required": false
+      },
+      "nfc_credit_standards": {
+        "question_id": "C01",
+        "question_cell": "A2",
+        "net_percentage_cell": "C13",
+        "metric_label": "Net percentage"
+      },
+      "nfc_loan_demand": {
+        "question_id": "C05",
+        "question_cell": "A225",
+        "net_percentage_cell": "C235",
+        "metric_label": "Net percentage"
+      },
+      "household_mortgage_credit_standards": {
+        "question_id": "P01",
+        "question_cell": "A2",
+        "net_percentage_cell": "C12",
+        "metric_label": "Net percentage"
+      },
+      "household_consumer_credit_standards": {
+        "question_id": "P01",
+        "question_cell": "A2",
+        "net_percentage_cell": "D12",
+        "metric_label": "Net percentage"
+      },
+      "household_mortgage_loan_demand": {
+        "question_id": "P06",
+        "question_cell": "A90",
+        "net_percentage_cell": "C99",
+        "metric_label": "Net percentage"
+      },
+      "household_consumer_loan_demand": {
+        "question_id": "P13",
+        "question_cell": "A293",
+        "net_percentage_cell": "C303",
+        "metric_label": "Net percentage"
+      }
+    },
+    "bls_2025_feb": {
+      "round_date_authority": {
+        "sheet": "companies",
+        "cell": "A1",
+        "value": "31/12/2024",
+        "household_header_diagnostics": {
+          "A1": "31/12/2024",
+          "B1": null
+        },
+        "household_header_date_consistency_required": false
+      },
+      "nfc_credit_standards": {
+        "question_id": "C01",
+        "question_cell": "A2",
+        "net_percentage_cell": "C13",
+        "metric_label": "Sold conjunctural"
+      },
+      "nfc_loan_demand": {
+        "question_id": "C05",
+        "question_cell": "A225",
+        "net_percentage_cell": "C235",
+        "metric_label": "Sold conjunctural"
+      },
+      "household_mortgage_credit_standards": {
+        "question_id": "P01",
+        "question_cell": "A2",
+        "net_percentage_cell": "C12",
+        "metric_label": "Sold conjunctural"
+      },
+      "household_consumer_credit_standards": {
+        "question_id": "P01",
+        "question_cell": "A2",
+        "net_percentage_cell": "D12",
+        "metric_label": "Sold conjunctural"
+      },
+      "household_mortgage_loan_demand": {
+        "question_id": "P06",
+        "question_cell": "A90",
+        "net_percentage_cell": "C99",
+        "metric_label": "Sold conjunctural"
+      },
+      "household_consumer_loan_demand": {
+        "question_id": "P13",
+        "question_cell": "A293",
+        "net_percentage_cell": "C303",
+        "metric_label": "Sold conjunctural"
+      }
+    },
+    "bls_2025_nov": {
+      "round_date_authority": {
+        "sheet": "companies",
+        "cell": "A1",
+        "value": "30/09/2025",
+        "household_header_diagnostics": {
+          "A1": "30/09/2025",
+          "B1": null
+        },
+        "household_header_date_consistency_required": false
+      },
+      "nfc_credit_standards": {
+        "question_id": "C01",
+        "question_cell": "A2",
+        "net_percentage_cell": "C13",
+        "metric_label": "Sold conjunctural"
+      },
+      "nfc_loan_demand": {
+        "question_id": "C05",
+        "question_cell": "A225",
+        "net_percentage_cell": "C235",
+        "metric_label": "Sold conjunctural"
+      },
+      "household_mortgage_credit_standards": {
+        "question_id": "P01",
+        "question_cell": "A2",
+        "net_percentage_cell": "C12",
+        "metric_label": "Sold conjunctural"
+      },
+      "household_consumer_credit_standards": {
+        "question_id": "P01",
+        "question_cell": "A2",
+        "net_percentage_cell": "D12",
+        "metric_label": "Sold conjunctural"
+      },
+      "household_mortgage_loan_demand": {
+        "question_id": "P06",
+        "question_cell": "A90",
+        "net_percentage_cell": "C99",
+        "metric_label": "Sold conjunctural"
+      },
+      "household_consumer_loan_demand": {
+        "question_id": "P13",
+        "question_cell": "A293",
+        "net_percentage_cell": "C303",
+        "metric_label": "Sold conjunctural"
+      }
+    }
+  },
+  "may_2025_source_review": "model/calibration_validation/bnr_bls_may2025_xlsx_layout_review.json",
+  "dsti_boundary": {
+    "legacy_question_ids": [
+      "P0303",
+      "P1103"
+    ],
+    "status": "EXCLUDED_FROM_BORROWER_DSTI_LEVEL_PANEL",
+    "reason": "These are BLS lending-term change questions whose outputs are response distributions/net percentages, not borrower DSTI levels."
+  },
+  "interpolation_performed": false,
+  "synthetic_quarters_created": false,
+  "parameter_estimation_performed": false,
+  "model_selection_performed": false,
+  "system_dynamics_activation": false,
+  "behavioural_closure_change": false,
+  "hard_rules": {
+    "no_nfc_household_signal_aggregation": true,
+    "no_parameter_estimation": true,
+    "no_model_selection": true,
+    "no_lag_selection": true,
+    "no_holdout_opening": true,
+    "no_causal_claim": true,
+    "no_dsti_level_claim": true,
+    "no_system_dynamics_activation": true,
+    "no_behavioural_closure_change": true
+  },
+  "recovered_missing_round_validations": {
+    "semantic_review": "model/calibration_validation/bnr_bls_missing_round_semantic_mapping_audit.json",
+    "semantic_review_sha256": "679ef4f2e401d27ebb9eadadc20a603b4ce57e9296c9fd9bc695a0999b515b8c",
+    "rounds": {
+      "2023-Q2": {
+        "source_id": "bls_2023_aug",
+        "round_identity": {
+          "authority": "OFFICIAL_BNR_PUBLICATION_QUARTER",
+          "raw_workbook_header": "31/03/2023",
+          "workbook_header_status": "STALE_RELATIVE_TO_OFFICIAL_PUBLICATION_QUARTER",
+          "resolved_quarter": "2023-Q2",
+          "official_publication": {
+            "url": "https://www.bnr.ro/files/d/Pubs_ro/SondajCreditare/BLS%20august%202023_RO.pdf",
+            "title": "Sondaj privind creditarea companiilor nefinanciare și a populației",
+            "declared_period": "Trimestrul II 2023",
+            "publication_month": "August 2023"
+          },
+          "silent_date_normalisation_performed": false
+        },
+        "observable_validations": {
+          "nfc_credit_standards": {
+            "question_id": "C01",
+            "question_cell": "A2",
+            "metric_label_cell": "B13",
+            "metric_label": "Net percentage",
+            "value_cell": "C13",
+            "value": 15.54,
+            "sign_convention": "positive = net tightening; negative = net easing"
+          },
+          "nfc_loan_demand": {
+            "question_id": "C05",
+            "question_cell": "A225",
+            "metric_label_cell": "B235",
+            "metric_label": "Net percentage",
+            "value_cell": "C235",
+            "value": 16.49,
+            "sign_convention": "positive = net increase in demand; negative = net decrease"
+          },
+          "household_mortgage_credit_standards": {
+            "question_id": "P01",
+            "question_cell": "A2",
+            "metric_label_cell": "B12",
+            "metric_label": "Net percentage",
+            "value_cell": "C12",
+            "value": -4.28,
+            "sign_convention": "positive = net tightening; negative = net easing"
+          },
+          "household_consumer_credit_standards": {
+            "question_id": "P01",
+            "question_cell": "A2",
+            "metric_label_cell": "B12",
+            "metric_label": "Net percentage",
+            "value_cell": "D12",
+            "value": 3.64,
+            "sign_convention": "positive = net tightening; negative = net easing"
+          },
+          "household_mortgage_loan_demand": {
+            "question_id": "P06",
+            "question_cell": "A90",
+            "metric_label_cell": "B99",
+            "metric_label": "Net percentage",
+            "value_cell": "C99",
+            "value": -23.36,
+            "sign_convention": "positive = net increase in demand; negative = net decrease"
+          },
+          "household_consumer_loan_demand": {
+            "question_id": "P13",
+            "question_cell": "A293",
+            "metric_label_cell": "B303",
+            "metric_label": "Net percentage",
+            "value_cell": "C303",
+            "value": 50.76,
+            "sign_convention": "positive = net increase in demand; negative = net decrease"
+          }
+        },
+        "all_six_observables_passed": true,
+        "dsti_boundary_markers_verified": true
+      },
+      "2023-Q3": {
+        "source_id": "bls_2023_nov",
+        "round_identity": {
+          "authority": "WORKBOOK_COMPANIES_A1",
+          "raw_workbook_header": "30/09/2023",
+          "resolved_quarter": "2023-Q3",
+          "official_publication": null
+        },
+        "observable_validations": {
+          "nfc_credit_standards": {
+            "question_id": "C01",
+            "question_cell": "A2",
+            "metric_label_cell": "B13",
+            "metric_label": "Net percentage",
+            "value_cell": "C13",
+            "value": 0,
+            "sign_convention": "positive = net tightening; negative = net easing"
+          },
+          "nfc_loan_demand": {
+            "question_id": "C05",
+            "question_cell": "A225",
+            "metric_label_cell": "B235",
+            "metric_label": "Net percentage",
+            "value_cell": "C235",
+            "value": -29.52,
+            "sign_convention": "positive = net increase in demand; negative = net decrease"
+          },
+          "household_mortgage_credit_standards": {
+            "question_id": "P01",
+            "question_cell": "A2",
+            "metric_label_cell": "B12",
+            "metric_label": "Net percentage",
+            "value_cell": "C12",
+            "value": -38.15,
+            "sign_convention": "positive = net tightening; negative = net easing"
+          },
+          "household_consumer_credit_standards": {
+            "question_id": "P01",
+            "question_cell": "A2",
+            "metric_label_cell": "B12",
+            "metric_label": "Net percentage",
+            "value_cell": "D12",
+            "value": 1.36,
+            "sign_convention": "positive = net tightening; negative = net easing"
+          },
+          "household_mortgage_loan_demand": {
+            "question_id": "P06",
+            "question_cell": "A90",
+            "metric_label_cell": "B99",
+            "metric_label": "Net percentage",
+            "value_cell": "C99",
+            "value": 34.62,
+            "sign_convention": "positive = net increase in demand; negative = net decrease"
+          },
+          "household_consumer_loan_demand": {
+            "question_id": "P13",
+            "question_cell": "A293",
+            "metric_label_cell": "B303",
+            "metric_label": "Net percentage",
+            "value_cell": "C303",
+            "value": 27.04,
+            "sign_convention": "positive = net increase in demand; negative = net decrease"
+          }
+        },
+        "all_six_observables_passed": true,
+        "dsti_boundary_markers_verified": true
+      },
+      "2024-Q2": {
+        "source_id": "bls_2024_aug",
+        "round_identity": {
+          "authority": "OFFICIAL_BNR_PUBLICATION_QUARTER",
+          "raw_workbook_header": "31/06/2024",
+          "workbook_header_status": "INVALID_CALENDAR_DATE_BUT_QUARTER_IDENTIFIED_BY_OFFICIAL_PUBLICATION",
+          "resolved_quarter": "2024-Q2",
+          "official_publication": {
+            "url": "https://www.bnr.ro/files/d/Pubs_ro/SondajCreditare/BLS%20august%202024_RO.pdf",
+            "title": "Sondaj privind creditarea companiilor nefinanciare și a populației",
+            "declared_period": "Trimestrul II 2024",
+            "publication_month": "August 2024"
+          },
+          "silent_date_normalisation_performed": false
+        },
+        "observable_validations": {
+          "nfc_credit_standards": {
+            "question_id": "C01",
+            "question_cell": "A2",
+            "metric_label_cell": "B13",
+            "metric_label": "Net percentage",
+            "value_cell": "C13",
+            "value": 0,
+            "sign_convention": "positive = net tightening; negative = net easing"
+          },
+          "nfc_loan_demand": {
+            "question_id": "C05",
+            "question_cell": "A225",
+            "metric_label_cell": "B235",
+            "metric_label": "Net percentage",
+            "value_cell": "C235",
+            "value": 20.36,
+            "sign_convention": "positive = net increase in demand; negative = net decrease"
+          },
+          "household_mortgage_credit_standards": {
+            "question_id": "P01",
+            "question_cell": "A2",
+            "metric_label_cell": "B12",
+            "metric_label": "Net percentage",
+            "value_cell": "C12",
+            "value": 12.89,
+            "sign_convention": "positive = net tightening; negative = net easing"
+          },
+          "household_consumer_credit_standards": {
+            "question_id": "P01",
+            "question_cell": "A2",
+            "metric_label_cell": "B12",
+            "metric_label": "Net percentage",
+            "value_cell": "D12",
+            "value": -14.16,
+            "sign_convention": "positive = net tightening; negative = net easing"
+          },
+          "household_mortgage_loan_demand": {
+            "question_id": "P06",
+            "question_cell": "A90",
+            "metric_label_cell": "B99",
+            "metric_label": "Net percentage",
+            "value_cell": "C99",
+            "value": 13.34,
+            "sign_convention": "positive = net increase in demand; negative = net decrease"
+          },
+          "household_consumer_loan_demand": {
+            "question_id": "P13",
+            "question_cell": "A293",
+            "metric_label_cell": "B303",
+            "metric_label": "Net percentage",
+            "value_cell": "C303",
+            "value": 70.06,
+            "sign_convention": "positive = net increase in demand; negative = net decrease"
+          }
+        },
+        "all_six_observables_passed": true,
+        "dsti_boundary_markers_verified": true
+      }
+    }
+  },
+  "canonical_panel_promotion": {
+    "review": "model/calibration_validation/bnr_bls_canonical_panel_promotion_review.json",
+    "source_candidate_contract": "model/calibration_validation/bnr_bls_panel_regeneration_candidate_contract.json",
+    "source_workflow_run_id": 35452800689,
+    "source_job_id": 105922778809,
+    "source_artifact_id": 10587302658,
+    "source_artifact_name": "bnr-bls-panel-regeneration-candidate-dc31e691f781a45fb6e81b59bb6e9fb20664469d",
+    "source_artifact_zip_sha256": "4d415a330e7eed17694ef51c6184db43a5fe980fbfea9e6342c275eb79743d26",
+    "candidate_panel_sha256": "c5dad2c9577431e9765bc02b166e8d5a2b4c4b4c8e761fbb5bbce50f4e6498ff",
+    "candidate_audit_sha256": "5a8a5166c6c1edc82020c61ec7c47dccc43084b1ef5249de6c6d7fe2510445c5",
+    "previous_canonical_panel_sha256": "d27492f35f932b55cc119ee576a0a1598c892c7db8555fe29026d11507e28a5c",
+    "promoted_canonical_panel_sha256": "c5dad2c9577431e9765bc02b166e8d5a2b4c4b4c8e761fbb5bbce50f4e6498ff",
+    "promoted_rounds": [
+      "2023-Q2",
+      "2023-Q3",
+      "2024-Q2"
+    ],
+    "remaining_gap": "2025-Q2",
+    "parameter_estimation_authorized": false,
+    "behavioural_closure_change": false
+  }
+}

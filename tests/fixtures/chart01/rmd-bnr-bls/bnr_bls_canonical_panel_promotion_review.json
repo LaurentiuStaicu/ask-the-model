@@ -1,0 +1,101 @@
+{
+  "review_version": "0.1",
+  "reviewed_on": "2026-09-19",
+  "mechanism_id": "aggregate_bank_credit_response",
+  "phase": "BNR BLS Canonical Realised-Round Panel Promotion Review",
+  "source_candidate_contract": "model/calibration_validation/bnr_bls_panel_regeneration_candidate_contract.json",
+  "source_semantic_review": "model/calibration_validation/bnr_bls_missing_round_semantic_mapping_audit.json",
+  "source_workflow": ".github/workflows/bnr-bls-panel-regeneration-candidate.yml",
+  "source_workflow_run_id": 35452800689,
+  "source_job_id": 105922778809,
+  "source_head_branch": "audit/scientific-integrity-2026-09-18",
+  "source_head_sha": "81cc60c37237a693fe64ecb847e9f1b72c9031a4",
+  "source_artifact_id": 10587302658,
+  "source_artifact_name": "bnr-bls-panel-regeneration-candidate-dc31e691f781a45fb6e81b59bb6e9fb20664469d",
+  "source_artifact_zip_sha256": "4d415a330e7eed17694ef51c6184db43a5fe980fbfea9e6342c275eb79743d26",
+  "expected_candidate_files": [
+    {
+      "path": "bnr_bls_realised_rounds_candidate.csv",
+      "bytes": 1366,
+      "sha256": "c5dad2c9577431e9765bc02b166e8d5a2b4c4b4c8e761fbb5bbce50f4e6498ff"
+    },
+    {
+      "path": "bnr_bls_panel_regeneration_candidate_audit.json",
+      "bytes": 4297,
+      "sha256": "5a8a5166c6c1edc82020c61ec7c47dccc43084b1ef5249de6c6d7fe2510445c5"
+    }
+  ],
+  "expected_pre_promotion": {
+    "canonical_panel": "data/processed/bnr_bls_realised_rounds.csv",
+    "canonical_panel_sha256": "d27492f35f932b55cc119ee576a0a1598c892c7db8555fe29026d11507e28a5c",
+    "observed_round_count": 8,
+    "missing_quarters": [
+      "2023-Q2",
+      "2023-Q3",
+      "2024-Q2",
+      "2025-Q2"
+    ]
+  },
+  "approved_post_promotion": {
+    "canonical_panel_sha256": "c5dad2c9577431e9765bc02b166e8d5a2b4c4b4c8e761fbb5bbce50f4e6498ff",
+    "observed_round_count": 11,
+    "expected_quarter_count_between_bounds": 12,
+    "coverage_fraction": 0.9166666666666666,
+    "observed_quarters": [
+      "2022-Q4",
+      "2023-Q1",
+      "2023-Q2",
+      "2023-Q3",
+      "2023-Q4",
+      "2024-Q1",
+      "2024-Q2",
+      "2024-Q3",
+      "2024-Q4",
+      "2025-Q1",
+      "2025-Q3"
+    ],
+    "missing_quarters": [
+      "2025-Q2"
+    ],
+    "blank_reference_date_quarters": [
+      "2023-Q2",
+      "2024-Q2"
+    ],
+    "reason_for_blank_reference_dates": "Official BNR publication quarter is authoritative where workbook day-level headers are stale or invalid; no synthetic quarter-end date is created."
+  },
+  "review_result": "APPROVED_FOR_CANONICAL_PANEL_PROMOTION_WITH_SINGLE_EXPLICIT_GAP",
+  "promotion_effect": {
+    "canonical_panel_replacement_authorized": true,
+    "canonical_mapping_audit_update_authorized": true,
+    "exact_candidate_bytes_required": true,
+    "interpolation_authorized": false,
+    "forward_fill_authorized": false,
+    "synthetic_reference_date_authorized": false,
+    "parameter_estimation_authorized": false,
+    "model_selection_authorized": false,
+    "lag_selection_authorized": false,
+    "holdout_opening_authorized": false,
+    "system_dynamics_activation": false,
+    "behavioural_closure_change": false
+  },
+  "remaining_blockers": [
+    "2025-Q2 remains the only missing canonical BLS round; its exact official workbook URL/bytes are not retained.",
+    "Publication-rounded 2025-Q2 values may corroborate but may not overwrite the canonical panel.",
+    "The CBD2-to-BNR prudential population/consolidation bridge remains unresolved.",
+    "The aggregate credit reduced form still mixes demand and supply; source promotion alone does not authorize estimation."
+  ],
+  "hard_rules": {
+    "no_interpolation": true,
+    "no_forward_fill": true,
+    "no_synthetic_quarter_creation": true,
+    "no_synthetic_reference_date": true,
+    "no_nfc_household_signal_aggregation": true,
+    "no_parameter_estimation": true,
+    "no_model_selection": true,
+    "no_lag_selection": true,
+    "no_holdout_opening": true,
+    "no_causal_claim": true,
+    "no_system_dynamics_activation": true,
+    "no_behavioural_closure_change": true
+  }
+}
