@@ -6,7 +6,7 @@
 
 The application supports the explicit `/chart gistemp <grounded question>` and `/chart energy-institute <grounded question>` commands, plus natural-language visualization requests only when they identify exactly one supported source. Each route resolves eligible grounding against the selected pinned EWD snapshot, re-runs the source-specific admission and ChartSpec reconstruction, and then creates the source-specific GTK Chart/Data view. The saved conversation contains a reconstruction recipe, never authoritative numeric points; History re-reads the same pinned bundle and fails closed on source/profile/identity mismatches. The model does not author chart values, units, axes, domains or source metadata.
 
-C2e is integrated through PR #443. Native/ASan/UBSan, GTK, resize, persistence, invariant-registry and Flatpak workflows all passed on its exact candidate head; post-merge Flatpak and Invariant checks passed too. However, there is no dedicated end-to-end GTK Application test that drives an EI request through archiving, close/reopen and restored History presentation. Component/native tests qualify their own layers and must not be represented as that full UI test.
+C2e is integrated through PR #443, and the separate PRES-09 GTK Application E2E is integrated through PR #447. All 12 workflows passed on the exact E2E candidate head `f4c5c879fed905556bd7bc77c67c4a93735770b6`. The E2E executes actual application composer/send and Save to History handlers, opens the archived conversation in a separate process, compares the EI/GISTEMP chart identity, exact Data and row provenance, and verifies that a tampered source is unavailable rather than rendered. This qualifies the bounded automated UI route; component/native tests still qualify their own layers, and the E2E makes no pixel-diff, screen-reader, localization or manual visual-review claim.
 
 ## Contract and scientific boundary
 
@@ -67,7 +67,7 @@ original files as a preview artifact. Neither transport is application code.
 Visual inspection of these exact native PNGs is required before accepting the
 prototype's layout. User visual review precedes application activation.
 
-The component is integrated into the application for the source-specific GISTEMP v1 and Energy Institute v2 paths. C2c's conversation-store v4, C2d's source-bound EI History reconstruction and C2e's application dispatch are integrated. The end-to-end GTK Application test for a live EI request followed by archive/close/reopen and restored History presentation remains unqualified. The original prototype's statements about separate downstream gates are historical; general missing/discontinuity/event semantics, generic multi-series comparison, and other scientific adapters remain in CHART-01's qualification ledger.
+The component is integrated into the application for the source-specific GISTEMP v1 and Energy Institute v2 paths. C2c's conversation-store v4, C2d's source-bound EI History reconstruction and C2e's application dispatch are integrated; PRES-09's live-to-History GTK Application scenario is now end-to-end-qualified by PR #447. The original prototype's statements about separate downstream gates are historical. General missing/discontinuity/event semantics, generic multi-series comparison, and other scientific adapters remain in CHART-01's qualification ledger.
 
 Primary implementation references:
 - https://www.cairographics.org/manual/cairo-Image-Surfaces.html
