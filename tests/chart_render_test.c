@@ -93,12 +93,51 @@ ei_specification_for_renderer_test (void)
 }
 
 static void
-test_ei_projection_does_not_enable_renderer (void)
+test_ei_projection_renders_exact_data_and_resizes (void)
 {
     AtmChartSpec *spec = ei_specification_for_renderer_test ();
     AtmChartRender *rendered = NULL;
-    g_assert_false (atm_chart_render_new (spec, 860, 500, 1, &rendered, NULL));
-    g_assert_null (rendered);
+    GError *error = NULL;
+    g_assert_true (atm_chart_render_new (spec, 860, 500, 1, &rendered, &error));
+    g_assert_no_error (error);
+    g_assert_nonnull (rendered);
+    g_assert_nonnull (atm_chart_render_surface (rendered));
+
+    const char *data = atm_chart_render_data (rendered);
+    g_assert_nonnull (data);
+    g_assert_nonnull (strstr (data, "# Energy Institute global total energy supply"));
+    g_assert_nonnull (strstr (data, "# unit\\texajoules/year"));
+    g_assert_nonnull (strstr (data, "# source_snapshot\\tdc710d8e604c0fff713a3acfdb18ab47a1a902bb"));
+    g_assert_nonnull (strstr (data, "# source_path\\tscience/data/processed/energy_institute_global_2026.csv"));
+    g_assert_nonnull (strstr (data, "1965"));
+    g_assert_nonnull (strstr (data, "2025"));
+    g_assert_null (strstr (data, "GISTEMP global annual temperature anomaly"));
+
+    char **lines = g_strsplit (data, "\\n", -1);
+    guint rows = 0;
+    for (guint i = 0; lines[i] != NULL; i++) {
+        if (lines[i][0] == '\\0' || lines[i][0] == '#' ||
+            g_str_has_prefix (lines[i], "series\\t"))
+            continue;
+        rows++;
+    }
+    g_assert_cmpuint (rows, ==, 61u);
+    g_strfreev (lines);
+
+    char *before = g_strdup (data);
+    g_assert_true (atm_chart_render_resize (rendered, 700, 400, 1, &error));
+    g_assert_no_error (error);
+    g_assert_cmpstr (atm_chart_render_data (rendered), ==, before);
+
+    cairo_surface_t *valid_surface = atm_chart_render_surface (rendered);
+    g_assert_false (atm_chart_render_resize (rendered, 120, 100, 1, &error));
+    g_assert_nonnull (error);
+    g_clear_error (&error);
+    g_assert_true (atm_chart_render_surface (rendered) == valid_surface);
+    g_assert_cmpstr (atm_chart_render_data (rendered), ==, before);
+
+    g_free (before);
+    atm_chart_render_free (rendered);
     atm_chart_spec_free (spec);
 }
 
@@ -286,7 +325,7 @@ int main (int argc, char **argv)
     g_test_add_func ("/chart-render/scatter-scale", test_scatter_scale);
     g_test_add_func ("/chart-render/resize-transactional", test_resize_transactional);
     g_test_add_func ("/chart-render/fallback-arguments", test_fallback_arguments);
-    g_test_add_func ("/chart-render/ei-projection-not-renderable", test_ei_projection_does_not_enable_renderer);
+    g_test_add_func ("/chart-render/ei-exact-data-resize", test_ei_projection_renders_exact_data_and_resizes);
     int result = g_test_run ();
     /* Release process-wide Cairo/Fontconfig test caches after every object is
      * destroyed, so leak checking remains enabled without suppressions. */
