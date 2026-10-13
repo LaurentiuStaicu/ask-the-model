@@ -271,18 +271,20 @@ private static int run_orchestrator (
 
         string app_commit = string.nfill (64, 'a');
         string runtime_commit = string.nfill (64, 'b');
+        string app_extension_commit = string.nfill (64, 'c');
+        string runtime_extension_commit = string.nfill (64, 'd');
         string flatpak_text =
             "[Application]\n" +
             "name=io.github.laurentiustaicu.ask_the_model\n" +
             "runtime=runtime/io.elementary.Platform/x86_64/8\n\n" +
             "[Instance]\n" +
             "app-commit=%s\n".printf (app_commit) +
-            "app-extensions=org.freedesktop.Platform.Locale/x86_64/24.08\n" +
+            "app-extensions=org.example.Locale=%s;\n".printf (app_extension_commit) +
             "branch=master\n" +
             "arch=x86_64\n" +
             "flatpak-version=1.14.0\n" +
             "runtime-commit=%s\n".printf (runtime_commit) +
-            "runtime-extensions=org.freedesktop.Platform.GL.default/x86_64/24.08\n";
+            "runtime-extensions=org.example.Runtime=%s;\n".printf (runtime_extension_commit);
         FileUtils.set_contents (flatpak_info, flatpak_text);
 
         string seal;
