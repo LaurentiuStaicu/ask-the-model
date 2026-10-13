@@ -1,6 +1,6 @@
 # CHART-05: qualified History chart reconstruction
 
-**Current status (2026-10-13):** saved chart recipes are reconstructed from their admitted source snapshots. GISTEMP uses schema v1; Energy Institute uses schema v2 via the C2d/C2e implementation integrated in PRs #442 and #443. Stored numeric points, projected coordinates and pixel/layout state are never chart authority.
+**Current status (2026-10-13):** saved chart recipes are reconstructed from their admitted source snapshots. GISTEMP uses schema v1; Energy Institute uses schema v2 via PRs #442/#443. PRES-09's GTK Application live-to-History qualification is integrated via PR #447. Stored numeric points, projected coordinates and pixel/layout state are never chart authority.
 
 ## Reconstruction authority
 
@@ -46,4 +46,6 @@ The Chart/Data view is a Presentation child, not transcript/provider history and
 
 Qualification includes the native History reconstruction tests for both admitted EI snapshots, identity/tamper rejection, conversation-store attachment/semantic validation, GTK Data/provenance tests, resize tests, ASan/UBSan, Invariant Registry and Flatpak. The exact C2e candidate head `a82003b78042b129797f6f2851c79e3de282ee5b` passed all nine workflows; post-merge Flatpak and Invariant checks also passed for PR #443.
 
-**Remaining release-readiness gap:** there is no dedicated end-to-end GTK Application test that drives a user-issued Energy Institute chart request through archive, close/reopen and restored History presentation. The native reconstruction and component tests are evidence for their own layers, not a substitute for that integrated UI test. Do not mark that UI path end-to-end-qualified or publish a new release on the basis of the current gates alone.
+**PRES-09 end-to-end status:** the missing GTK Application gate is now qualified by PR #447. The test drives the actual live EI v2 and GISTEMP v1 composer/send paths, invokes Save to History, reopens the archived conversation in a separate process, compares reconstructed ChartSpec identities, exact Data and selected-row provenance, and verifies fail-closed behavior after source-manifest tampering. All 12 exact-head workflow runs passed on candidate `f4c5c879fed905556bd7bc77c67c4a93735770b6`.
+
+This does not imply new-release approval or broader chart semantics. The immutable v0.6.3 artifact remains unchanged. General missing/discontinuity/event semantics, multi-series composition, arbitrary adapters and independent Energy Institute raw-to-processed reproduction remain outside the qualified path; the wider CHART-01 issue #343 stays open.
