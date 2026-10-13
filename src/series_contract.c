@@ -33,7 +33,7 @@ series_metadata_valid (const AtmSeriesContract *s)
 {
     return s != NULL &&
         s->x_kind >= ATM_SERIES_X_CALENDAR_YEAR &&
-        s->x_kind <= ATM_SERIES_X_EVENT_ORDINAL &&
+        s->x_kind <= ATM_SERIES_X_CALENDAR_QUARTER &&
         bounded (s->subject, ATM_SERIES_CONTRACT_MAX_TEXT) &&
         bounded (s->attribute, ATM_SERIES_CONTRACT_MAX_TEXT) &&
         bounded (s->x_unit, ATM_SERIES_CONTRACT_MAX_TEXT) &&
@@ -127,7 +127,7 @@ atm_series_contract_new (
     const char *profile_version,
     GError **error)
 {
-    if (x_kind < ATM_SERIES_X_CALENDAR_YEAR || x_kind > ATM_SERIES_X_EVENT_ORDINAL ||
+    if (x_kind < ATM_SERIES_X_CALENDAR_YEAR || x_kind > ATM_SERIES_X_CALENDAR_QUARTER ||
         !bounded (subject, ATM_SERIES_CONTRACT_MAX_TEXT) ||
         !bounded (attribute, ATM_SERIES_CONTRACT_MAX_TEXT) ||
         !bounded (x_unit, ATM_SERIES_CONTRACT_MAX_TEXT) ||
@@ -187,6 +187,16 @@ x_valid (AtmSeriesXKind kind, const char *x)
         g_free (canonical);
         g_date_time_unref (dt);
         return matches;
+    }
+    if (kind == ATM_SERIES_X_CALENDAR_QUARTER) {
+        /* Calendar quarters are periods, not UTC instants: YYYY-Q1 through
+         * YYYY-Q4. Keep exactly one canonical spelling and exclude year 0000. */
+        if (strlen (x) != 7 || x[4] != '-' || x[5] != 'Q' ||
+            x[6] < '1' || x[6] > '4')
+            return FALSE;
+        for (guint i = 0; i < 4; i++)
+            if (!g_ascii_isdigit (x[i])) return FALSE;
+        return g_ascii_strtoull (x, NULL, 10) > 0;
     }
     if (kind == ATM_SERIES_X_EVENT_ORDINAL) {
         if (x[0] == '0' && x[1] != '\0') return FALSE;
@@ -308,7 +318,8 @@ build_scientific_json (const AtmSeriesContract *s, char **out, GError **error)
     text_member (b, "schema", ATM_SERIES_CONTRACT_SCHEMA);
     text_member (b, "x_kind",
         s->x_kind == ATM_SERIES_X_CALENDAR_YEAR ? "calendar_year" :
-        s->x_kind == ATM_SERIES_X_UTC_INSTANT ? "utc_instant" : "event_ordinal");
+        s->x_kind == ATM_SERIES_X_UTC_INSTANT ? "utc_instant" :
+        s->x_kind == ATM_SERIES_X_EVENT_ORDINAL ? "event_ordinal" : "calendar_quarter");
     text_member (b, "subject", s->subject);
     text_member (b, "attribute", s->attribute);
     text_member (b, "x_unit", s->x_unit);
@@ -449,7 +460,8 @@ point_matches_established_fact (const AtmSeriesContract *s,
     const char *x_member =
         s->x_kind == ATM_SERIES_X_CALENDAR_YEAR ? "calendar_year" :
         s->x_kind == ATM_SERIES_X_UTC_INSTANT ? "utc_instant" :
-        s->x_kind == ATM_SERIES_X_EVENT_ORDINAL ? "event_ordinal" : NULL;
+        s->x_kind == ATM_SERIES_X_EVENT_ORDINAL ? "event_ordinal" :
+        s->x_kind == ATM_SERIES_X_CALENDAR_QUARTER ? "calendar_quarter" : NULL;
     if (x_member != NULL && json_object_has_member (object, x_member)) {
         JsonNode *node = json_object_get_member (object, x_member);
         if (JSON_NODE_HOLDS_VALUE (node) &&
@@ -584,6 +596,14 @@ compare_x (AtmSeriesXKind kind, const char *a, const char *b)
         guint64 bi = g_ascii_strtoull (b, NULL, 10);
         return ai < bi ? -1 : ai > bi ? 1 : 0;
     }
+    if (kind == ATM_SERIES_X_CALENDAR_QUARTER) {
+        /* x_valid() has already constrained YYYY-Qn before comparison. */
+        guint64 ay = g_ascii_strtoull (a, NULL, 10);
+        guint64 by = g_ascii_strtoull (b, NULL, 10);
+        guint64 aq = ay * 4u + (guint64) (a[6] - '1');
+        guint64 bq = by * 4u + (guint64) (b[6] - '1');
+        return aq < bq ? -1 : aq > bq ? 1 : 0;
+    }
     return strcmp (a, b);
 }
 
@@ -686,12 +706,17 @@ atm_series_contract_validate (AtmSeriesContract *s, const AtmSraResult *q, GErro
         return fail (error, ATM_SERIES_CONTRACT_ERROR_SHAPE, "UTC-instant X requires UTC unit.");
     if (s->x_kind == ATM_SERIES_X_EVENT_ORDINAL && g_strcmp0 (s->x_unit, "event") != 0)
         return fail (error, ATM_SERIES_CONTRACT_ERROR_SHAPE, "Event ordinal X requires event unit.");
+    if (s->x_kind == ATM_SERIES_X_CALENDAR_QUARTER &&
+        g_strcmp0 (s->x_unit, "calendar_quarter") != 0)
+        return fail (error, ATM_SERIES_CONTRACT_ERROR_SHAPE,
+                     "Calendar-quarter X requires calendar_quarter unit.");
     /* X kind constrains coordinate dimension as well as its display unit.
-     * Calendar years and UTC instants are temporal coordinates; don't allow
-     * a valid annual SRA fact to be relabelled as mass, length, or another
-     * unrelated dimension at the generic contract boundary. */
+     * Calendar years, quarters and UTC instants are temporal coordinates;
+     * don't allow a valid SRA fact to be relabelled as mass, length, or
+     * another unrelated dimension at the generic contract boundary. */
     if ((s->x_kind == ATM_SERIES_X_CALENDAR_YEAR ||
-         s->x_kind == ATM_SERIES_X_UTC_INSTANT) &&
+         s->x_kind == ATM_SERIES_X_UTC_INSTANT ||
+         s->x_kind == ATM_SERIES_X_CALENDAR_QUARTER) &&
         g_strcmp0 (s->x_dimension, "time") != 0)
         return fail (error, ATM_SERIES_CONTRACT_ERROR_SHAPE,
                      "Temporal X requires time dimension.");
