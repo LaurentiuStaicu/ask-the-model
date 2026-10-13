@@ -11,7 +11,6 @@
 #define BNR_EPISTEMIC_STATUS "empirical"
 #define BNR_SERIES_SEMANTICS "empirical_quarterly_observations"
 #define BNR_TIME_SCOPE "2022-Q4..2025-Q3"
-#define BNR_SOURCE_CSV "data/processed/bnr_bls_realised_rounds.csv"
 
 static const char *const quarters[] = {
     "2022-Q4", "2023-Q1", "2023-Q2", "2023-Q3",
