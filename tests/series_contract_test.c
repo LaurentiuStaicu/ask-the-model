@@ -249,18 +249,20 @@ qualified_with_missing_facts (AtmScientificArtifact *a)
 }
 
 static AtmSraResult *
-qualified_with_missing_fact_numeric_payload (AtmScientificArtifact *a)
+qualified_with_missing_fact_numeric_payload (AtmScientificArtifact *a,
+                                             const char *numeric_fields)
 {
     AtmSraResult *q = atm_sra_result_new (ATM_SRA_ANSWERED);
     GError *error = NULL;
-    AtmSraEstablishedFact *fact = atm_sra_established_fact_new (
-        "fact-missing-with-numeric-payload", "observation", "subject",
-        "attribute", "MISSING", "unit", "dimension",
+    char *qualifiers = g_strdup_printf (
         "{\"calendar_year\":\"1881\",\"scenario\":\"baseline\","
         "\"epistemic_status\":\"observed\",\"y_status\":\"MISSING\","
-        "\"missing_reason\":\"source_missing\","
-        "\"source_decimal\":\"1.0000\",\"coefficient\":\"1\","
-        "\"exponent\":\"0\",\"negative_zero\":false}");
+        "\"missing_reason\":\"source_missing\"%s}",
+        numeric_fields);
+    AtmSraEstablishedFact *fact = atm_sra_established_fact_new (
+        "fact-missing-with-numeric-payload", "observation", "subject",
+        "attribute", "MISSING", "unit", "dimension", qualifiers);
+    g_free (qualifiers);
     g_assert_nonnull (fact);
     g_assert_true (atm_sra_fact_add_support (fact, a->qualified_artifact_id, &error));
     g_assert_no_error (error);
@@ -798,24 +800,35 @@ static void test_missing_point_must_match_sra_fact (void)
 static void test_missing_fact_rejects_numeric_payload (void)
 {
     AtmScientificArtifact *a = support_artifact ();
-    AtmSraResult *q = qualified_with_missing_fact_numeric_payload (a);
-    AtmSeriesContract *s = base ();
     const char *support[] = { a->qualified_artifact_id };
-    GError *error = NULL;
+    const char *invalid_fields[] = {
+        ",\"source_decimal\":\"1.0000\"",
+        ",\"coefficient\":\"1\"",
+        ",\"exponent\":\"1\"",
+        ",\"negative_zero\":true"
+    };
 
-    /* The Y value says MISSING, but the same qualified fact's payload claims
-     * a numeric source token/coefficient. It must not authorize a missing point. */
-    g_assert_true (atm_series_contract_add_point (
-        s, "1881", ATM_SERIES_Y_MISSING, NULL, NULL, 0, FALSE,
-        FALSE, "source_missing", NULL, support, 1, &error));
-    g_assert_no_error (error);
-    g_assert_false (atm_series_contract_validate (s, q, &error));
-    g_assert_error (error, ATM_SERIES_CONTRACT_ERROR,
-                    ATM_SERIES_CONTRACT_ERROR_SHAPE);
-    g_clear_error (&error);
+    /* Isolate each forbidden numeric claim so each fail-closed branch is
+     * exercised independently, rather than only rejecting the first field. */
+    for (guint i = 0; i < G_N_ELEMENTS (invalid_fields); i++) {
+        AtmSraResult *q =
+            qualified_with_missing_fact_numeric_payload (a, invalid_fields[i]);
+        AtmSeriesContract *s = base ();
+        GError *error = NULL;
 
-    atm_series_contract_free (s);
-    atm_sra_result_free (q);
+        g_assert_true (atm_series_contract_add_point (
+            s, "1881", ATM_SERIES_Y_MISSING, NULL, NULL, 0, FALSE,
+            FALSE, "source_missing", NULL, support, 1, &error));
+        g_assert_no_error (error);
+        g_assert_false (atm_series_contract_validate (s, q, &error));
+        g_assert_error (error, ATM_SERIES_CONTRACT_ERROR,
+                        ATM_SERIES_CONTRACT_ERROR_SHAPE);
+        g_clear_error (&error);
+
+        atm_series_contract_free (s);
+        atm_sra_result_free (q);
+    }
+
     atm_scientific_artifact_free (a);
 }
 
