@@ -757,7 +757,7 @@
       "category": "SCIENTIFIC",
       "severity": "S1",
       "lifecycle": "enforced",
-      "statement": "ChartSpec v1 must retain its existing GISTEMP identity serialization and IDs. Energy Institute ChartSpec v2 may be constructed only from the opaque source-specific Energy Institute VerifiedSeries that independently reconstructs an exactly admitted four-file snapshot and finalized SRA. Its separate v2 identity must bind the EI series scientific/qualified identities, profile, admission, snapshot, source path, semantics, exact decimal extents and kind; generic point accessors preserve exact source decimals and support IDs. The EI display profile remains explicitly unqualified, and this native contract alone must not enable projection, application intent, rendering or History persistence.",
+      "statement": "ChartSpec v1 must retain its existing GISTEMP identity serialization and IDs. Energy Institute ChartSpec v2 may be constructed only from the opaque source-specific Energy Institute VerifiedSeries that independently reconstructs an exactly admitted four-file snapshot and finalized SRA. Its separate v2 identity must bind the EI series scientific/qualified identities, profile, admission, snapshot, source path, semantics, exact decimal extents, kind and the qualified display profile ID/version. A deterministic EI TES display projection may quantize only to bounded display coordinates under atm-display/energy-institute-tes-linear/1; exact source decimals and support IDs remain unchanged. Neither the projection nor native ChartSpec v2 authorizes the existing GISTEMP renderer, an application chart intent, or History persistence.",
       "enforced_by": [
         "src/chart_spec.c",
         "src/energy_institute_verified_series.c",
@@ -766,6 +766,23 @@
       "tested_by": [
         "meson:chart-spec",
         "meson:energy-institute-verified-series"
+      ]
+    },
+    {
+      "id": "SCIENTIFIC-S1-007",
+      "category": "SCIENTIFIC",
+      "severity": "S1",
+      "lifecycle": "enforced",
+      "statement": "The Energy Institute TES display projection may be produced only from a reconstructed atm-chart-spec/2 for the exact source-specific 61-point annual TES series and the separate atm-display/energy-institute-tes-linear/1 policy. Display conversion uses bounded integer arithmetic with an explicit exponent/range allowlist and deterministic rounding to micro-EJ/year, axis domains aligned to 100 EJ/year ticks and capped calendar-year ticks; unsupported precision, malformed coefficients, gaps, altered support, overflow or out-of-range values fail closed. Projected coordinates/ticks are display approximations, never scientific values: the owned ChartSpec keeps exact source decimals and five support IDs per point. GISTEMP projection v1 remains unchanged, and EI projection does not enable the GISTEMP renderer, a live application route, History or persistence.",
+      "enforced_by": [
+        "src/chart_projection.c",
+        "src/chart_spec.c",
+        "src/chart_render.c"
+      ],
+      "tested_by": [
+        "meson:chart-projection",
+        "meson:chart-render",
+        "meson:chart-spec"
       ]
     }
   ]
