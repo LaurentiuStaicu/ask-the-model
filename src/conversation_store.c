@@ -3677,7 +3677,7 @@ atm_conversation_store_attach_chart (
             "AND ("
             " (?5='atm-chart-spec/1' AND repository_version=?3) OR "
             " (?5='atm-chart-spec/2' AND ?3=('snapshot:' || ?4))"
-            ");
+            ");",
             &statement,
             error
         )) {

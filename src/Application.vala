@@ -3535,16 +3535,25 @@ namespace AskTheModel {
                     );
                 }
 
-                if (source_chart_requested &&
+                if (chart_intent.gistemp_requested &&
                     !repository_id_in (state.repository_ids, "ewd") &&
                     !repository_id_in (
                         state.repository_ids,
                         "LaurentiuStaicu/empirical-world3-dynamics"
                     )) {
                     throw new GLib.IOError.FAILED (
-                        (chart_intent.energy_institute_requested
-                            ? "Energy Institute charts require EWD to be selected for this conversation. "
-                            : "GISTEMP charts require EWD to be selected for this conversation. ") +
+                        "GISTEMP charts require EWD to be selected for this conversation. " +
+                        "Select EWD in Repository Scope and retry."
+                    );
+                }
+                if (chart_intent.energy_institute_requested &&
+                    !repository_id_in (state.repository_ids, "ewd") &&
+                    !repository_id_in (
+                        state.repository_ids,
+                        "LaurentiuStaicu/empirical-world3-dynamics"
+                    )) {
+                    throw new GLib.IOError.FAILED (
+                        "Energy Institute charts require EWD to be selected for this conversation. " +
                         "Select EWD in Repository Scope and retry."
                     );
                 }
