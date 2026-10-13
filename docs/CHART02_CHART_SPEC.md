@@ -6,6 +6,17 @@ Current application behavior accepts only an explicit `/chart gistemp <grounded 
 
 The implementation-stage notes below preserve the original design and qualification history; statements that there was no application caller describe those earlier stages, not the current branch.
 
+## C2a: separate native Energy Institute ChartSpec v2
+
+The native ChartSpec API now keeps the legacy GISTEMP v1 path and identity serializer separate from an EI v2 constructor. GISTEMP v1 continues to use schema `atm-chart-spec/1`, domain `atm.chart-spec.v1`, the same ordered qualified-series IDs and the same existing ownership/reconstruction checks. The new EI entry point accepts only `AtmEnergyInstituteVerifiedSeries`; it does not accept a generic `AtmSeriesContract`, point arrays, arbitrary unit metadata or identity strings.
+
+EI v2 is a single-series, calendar-year TES contract only. Before owning input, the constructor independently rebuilds the typed source series, and therefore rechecks one of the two exact v3 EI source bundles and its source → Evidence → finalized SRA → series chain. Its new `atm-chart-spec/2` identity is separately namespaced and binds the kind, scientific/qualified series identities, profile and admission versions, repository snapshot, source path, semantic fields, exact-decimal extents, ordered series identity and point count. The qualified series ID binds the source-specific SRA identity and point support; ChartSpec does not treat stored points or source labels as authority.
+
+The new source-neutral point view exposes calendar year, status, exact source-decimal token, canonical coefficient/exponent, discontinuity flag and borrowed support IDs for either admitted current source. EI uses EJ/year and energy-flow-rate dimension; it never passes through the GISTEMP temperature display conversion. Tests cover both admitted EI snapshots: the reconstructed SRA scientific fact content remains equivalent, but the generic series serialization includes each point's snapshot-qualified support IDs, so both series identities and the ChartSpec identities differ. Cross-snapshot mixes remain rejected by source admission.
+
+**C2a is not a rendering qualification.** The EI ChartSpec records display profile `atm-display/energy-institute-tes-linear` version `0-unqualified` as an explicit non-admission marker. No EI display projection is qualified, no Application/live chart intent is enabled, and no EI chart metadata is persisted to History. The next gates are C2b display projection, C2c atomic conversation-store v4, C2d pinned-source History reconstruction, and C2e application integration only after the prior gates pass. No release artifact is changed by native ChartSpec qualification.
+
+
 The entry point consumes validated, owned or safely retained VerifiedSeries
 objects, not identity strings or model-authored arrays. The first allowed
 profile is `atm-series/gistemp-complete-annual/1`. The model may express intent

@@ -1,25 +1,78 @@
 #pragma once
 #include "verified_series.h"
+#include "energy_institute_verified_series.h"
+#include <glib.h>
 G_BEGIN_DECLS
+
 #define ATM_CHART_SPEC_SCHEMA "atm-chart-spec/1"
+#define ATM_CHART_SPEC_V2_SCHEMA "atm-chart-spec/2"
 #define ATM_CHART_SPEC_MAX_SERIES 4
-/* STEP and BAR are reserved, not admitted by this profile. */
+#define ATM_CHART_SPEC_V2_EI_DISPLAY_PROFILE "atm-display/energy-institute-tes-linear"
+#define ATM_CHART_SPEC_V2_EI_DISPLAY_PROFILE_VERSION "0-unqualified"
+
+/* STEP and BAR are reserved, not admitted by either current profile. */
 typedef enum { ATM_CHART_LINE = 1, ATM_CHART_SCATTER, ATM_CHART_STEP, ATM_CHART_BAR } AtmChartKind;
+typedef enum {
+    ATM_CHART_SPEC_VERSION_GISTEMP_V1 = 1,
+    ATM_CHART_SPEC_VERSION_ENERGY_INSTITUTE_V2 = 2
+} AtmChartSpecVersion;
+typedef enum {
+    ATM_CHART_POINT_NUMERIC = 1,
+    ATM_CHART_POINT_MISSING = 2
+} AtmChartPointStatus;
+
 typedef struct AtmChartSpec AtmChartSpec;
-/* Only complete GISTEMP VerifiedSeries currently exist. Inputs are validated
- * before rebuilding owned copies. *out must be NULL; failure preserves it.
- * Axes are linear, missing policy GAP, extents exact and data-derived.
- * No caller-provided unit, scale, values, or domain is accepted. */
+
+/* Borrowed source-neutral view of one point. String and support pointers remain
+ * valid until the owning ChartSpec is destroyed. Current admitted profiles use
+ * calendar-year X coordinates; a future X kind requires a separately reviewed
+ * accessor contract rather than implicit conversion. */
+typedef struct {
+    guint order;
+    guint calendar_year;
+    AtmChartPointStatus y_status;
+    const char *source_decimal;
+    const char *coefficient;
+    gint64 exponent;
+    gboolean break_before;
+    const GPtrArray *support;
+} AtmChartPointView;
+
+/* Legacy GISTEMP v1 constructor. Its identity serialization and domain remain
+ * unchanged so existing chart IDs and History rows stay byte-for-byte stable. */
 gboolean atm_chart_spec_new (AtmChartKind kind, const AtmVerifiedSeries *const *series,
     gsize count, AtmChartSpec **out, GError **error);
+
+/* Source-specific Energy Institute v2 constructor. Accepts only the opaque,
+ * independently reconstructing EI series object; never caller-supplied points
+ * or a generic AtmSeriesContract. It is native/dormant and does not authorize
+ * display projection, application intent, rendering or History persistence. */
+gboolean atm_chart_spec_new_energy_institute_v2 (
+    AtmChartKind kind,
+    const AtmEnergyInstituteVerifiedSeries *series,
+    AtmChartSpec **out,
+    GError **error);
+
 gboolean atm_chart_spec_validate (const AtmChartSpec *spec, GError **error);
 /* Reject altered materializations before reconstructing owned inputs. */
 gboolean atm_chart_spec_rebuild (const AtmChartSpec *spec, AtmChartSpec **out, GError **error);
 void atm_chart_spec_free (AtmChartSpec *spec);
-/* All returned pointers are borrowed read-only, valid until destruction. */
+
+/* Generic identity/accessors. Pointers are borrowed read-only. */
+AtmChartSpecVersion atm_chart_spec_version (const AtmChartSpec *spec);
+const char *atm_chart_spec_schema (const AtmChartSpec *spec);
 const char *atm_chart_spec_id (const AtmChartSpec *spec);
 AtmChartKind atm_chart_spec_kind (const AtmChartSpec *spec);
 guint atm_chart_spec_count (const AtmChartSpec *spec);
+guint atm_chart_spec_point_count (const AtmChartSpec *spec, guint series_index);
+gboolean atm_chart_spec_point (const AtmChartSpec *spec, guint series_index,
+    guint point_index, AtmChartPointView *out);
+const char *atm_chart_spec_x_unit (const AtmChartSpec *spec);
+const char *atm_chart_spec_x_dimension (const AtmChartSpec *spec);
+const char *atm_chart_spec_y_unit (const AtmChartSpec *spec);
+const char *atm_chart_spec_y_dimension (const AtmChartSpec *spec);
+const char *atm_chart_spec_series_profile (const AtmChartSpec *spec);
+
 const AtmVerifiedSeries *atm_chart_spec_series (const AtmChartSpec *spec, guint index);
 const char *atm_chart_spec_series_scientific_id (const AtmChartSpec *spec, guint index);
 const char *atm_chart_spec_series_qualified_id (const AtmChartSpec *spec, guint index);
