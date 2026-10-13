@@ -527,6 +527,109 @@ cleanup:
     return ok;
 }
 
+
+/* Live EI reconstruction uses the immutable conversation snapshot SHA as source
+ * identity. CITATION.cff's release version remains the conversation pin; it is
+ * not substituted for the ChartSpec v2 source version. */
+gboolean
+atm_chart_live_reconstruct_energy_institute (
+    const char *snapshot_path,
+    const char *repository_id,
+    const char *snapshot_sha,
+    const char *chart_kind,
+    AtmChartSpec **out,
+    GError **error
+)
+{
+    static const char *expected_repository =
+        "LaurentiuStaicu/empirical-world3-dynamics";
+    static const char *expected_repository_key = "ewd";
+    static const char *expected_snapshot_initial =
+        "d9e249339663015f6d1c05752338a955bf64ad0b";
+    static const char *expected_snapshot_current =
+        "dc710d8e604c0fff713a3acfdb18ab47a1a902bb";
+    static const char *source_paths[ATM_EI_SOURCE_COUNT] = {
+        "science/data/processed/energy_institute_global_2026.csv",
+        "science/data/processed/energy_institute_global_2026.provenance.json",
+        "science/data/input_manifest.json",
+        "science/data/registry.csv"
+    };
+    GBytes *sources[ATM_EI_SOURCE_COUNT] = { NULL, NULL, NULL, NULL };
+    AtmEnergyInstituteAdmission *admission = NULL;
+    AtmEnergyInstituteVerifiedSeries *series = NULL;
+    AtmChartSpec *spec = NULL;
+    AtmChartKind kind;
+    const char *admission_repository = NULL;
+    char *expected_version = NULL;
+    gboolean ok = FALSE;
+
+    g_return_val_if_fail (out != NULL && *out == NULL, FALSE);
+    if (snapshot_path == NULL || repository_id == NULL ||
+        snapshot_sha == NULL || chart_kind == NULL ||
+        (g_strcmp0 (repository_id, expected_repository_key) != 0 &&
+         g_strcmp0 (repository_id, expected_repository) != 0) ||
+        (g_strcmp0 (snapshot_sha, expected_snapshot_initial) != 0 &&
+         g_strcmp0 (snapshot_sha, expected_snapshot_current) != 0)) {
+        return reject (error,
+            "Live Energy Institute chart request is not bound to an admitted EWD snapshot.");
+    }
+
+    if (!chart_kind_from_text (chart_kind, &kind, error))
+        return FALSE;
+    admission_repository =
+        g_strcmp0 (repository_id, expected_repository_key) == 0
+            ? expected_repository
+            : repository_id;
+    expected_version = g_strconcat ("snapshot:", snapshot_sha, NULL);
+
+    for (guint i = 0; i < ATM_EI_SOURCE_COUNT; i++) {
+        if (!read_source (snapshot_path, source_paths[i], &sources[i], error))
+            goto cleanup;
+    }
+    if (!atm_energy_institute_admission_new (
+            admission_repository, snapshot_sha, sources, &admission, error))
+        goto cleanup;
+    if (!atm_energy_institute_verified_series_from_admission (
+            admission, &series, error))
+        goto cleanup;
+
+    const AtmSeriesContract *contract =
+        atm_energy_institute_verified_series_contract (series);
+    if (g_strcmp0 (atm_energy_institute_admission_repository (admission),
+                   expected_repository) != 0 ||
+        g_strcmp0 (atm_energy_institute_admission_snapshot (admission),
+                   snapshot_sha) != 0 ||
+        atm_energy_institute_verified_series_count (series) != 61 ||
+        contract == NULL ||
+        g_strcmp0 (contract->repository_version, expected_version) != 0) {
+        reject (error,
+            "Live Energy Institute series does not match the pinned snapshot identity.");
+        goto cleanup;
+    }
+
+    if (!atm_chart_spec_new_energy_institute_v2 (kind, series, &spec, error))
+        goto cleanup;
+    if (atm_chart_spec_version (spec) != ATM_CHART_SPEC_VERSION_ENERGY_INSTITUTE_V2 ||
+        atm_chart_spec_point_count (spec, 0) != 61 ||
+        g_strcmp0 (atm_chart_spec_series_snapshot_sha (spec, 0), snapshot_sha) != 0) {
+        reject (error, "Live Energy Institute ChartSpec does not match the pinned source.");
+        goto cleanup;
+    }
+
+    *out = spec;
+    spec = NULL;
+    ok = TRUE;
+
+cleanup:
+    g_free (expected_version);
+    atm_chart_spec_free (spec);
+    atm_energy_institute_verified_series_free (series);
+    atm_energy_institute_admission_free (admission);
+    for (guint i = 0; i < ATM_EI_SOURCE_COUNT; i++)
+        g_clear_pointer (&sources[i], g_bytes_unref);
+    return ok;
+}
+
 gboolean
 atm_chart_live_reconstruct_gistemp (
     const char *snapshot_path,
