@@ -170,6 +170,26 @@ executable(
   install: true
 )
 
+repository_store_oracle = executable(
+  'repository-store-oracle',
+  'tests/repository_store_oracle.c',
+  dependencies: [
+    glib_dep,
+    json_glib_dep,
+    sqlite_dep,
+    yaml_dep
+  ],
+  install: false
+)
+
+test(
+  'repository-store-oracle-core',
+  repository_store_oracle,
+  args: [
+    '--self-test'
+  ]
+)
+
 pres09_application_sources = [
     'src/Application.vala',
     'src/presentation_document.c',
@@ -283,8 +303,6 @@ pres09_application_sources = [
     resources
 ]
 
-
-
 # This target recompiles the same production GTK Application with seams that
 # exist only in this test binary. It is excluded from normal/default builds.
 pres09_gtk_application_e2e_test = executable(
@@ -311,27 +329,6 @@ pres09_gtk_application_e2e_test = executable(
   ],
   install: false,
   build_by_default: false
-)
-
-
-repository_store_oracle = executable(
-  'repository-store-oracle',
-  'tests/repository_store_oracle.c',
-  dependencies: [
-    glib_dep,
-    json_glib_dep,
-    sqlite_dep,
-    yaml_dep
-  ],
-  install: false
-)
-
-test(
-  'repository-store-oracle-core',
-  repository_store_oracle,
-  args: [
-    '--self-test'
-  ]
 )
 
 repository_platform_probe = executable(
