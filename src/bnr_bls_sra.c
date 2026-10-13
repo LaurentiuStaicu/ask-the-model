@@ -354,18 +354,22 @@ build_result (
         if (!atm_sra_qualification_add_evidence_artifact (result, point_artifacts[i], error))
             goto out;
 
+        char *value = g_strdup_printf (
+            "%se%" G_GINT64_FORMAT,
+            point.coefficient,
+            point.exponent
+        );
         AtmSraEstablishedFact *fact = atm_sra_established_fact_new (
             point_artifacts[i]->logical_source_id,
             "rmd.bnr_bls_c01_observation",
             BNR_SUBJECT,
             BNR_ATTRIBUTE,
-            g_strdup_printf ("%se%" G_GINT64_FORMAT, point.coefficient, point.exponent),
+            value,
             BNR_UNIT,
             BNR_DIMENSION,
             point_artifacts[i]->payload
         );
-        /* atm_sra_established_fact_new takes copies; the temporary value is
-         * intentionally created above as an owned expression, so free it here. */
+        g_free (value);
         if (fact == NULL) {
             reject (error, ATM_BNR_BLS_SRA_ERROR_IDENTITY, "Cannot construct an admitted BNR numeric fact.");
             goto out;
