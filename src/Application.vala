@@ -198,12 +198,16 @@ namespace AskTheModel {
                 );
             }
 
+#if !ATM_PRES09_TEST
             granite_settings = Granite.Settings.get_default ();
+#endif
             gtk_settings = Gtk.Settings.get_default ();
 
+#if !ATM_PRES09_TEST
             granite_settings.notify["prefers-color-scheme"].connect (() => {
                 apply_system_style ();
             });
+#endif
 
             apply_system_style ();
 
@@ -2210,8 +2214,13 @@ namespace AskTheModel {
         }
 
         private bool system_prefers_dark () {
+#if ATM_PRES09_TEST
+            /* Keep the UI deterministic without the optional Accounts D-Bus service. */
+            return false;
+#else
             return granite_settings.prefers_color_scheme ==
                 Granite.Settings.ColorScheme.DARK;
+#endif
         }
 
         private void apply_system_style () {
