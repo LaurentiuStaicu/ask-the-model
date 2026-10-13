@@ -1,6 +1,6 @@
 # CHART-02 Energy Institute chart and History v2 proposal
 
-**Status: staged design and implementation record, updated 2026-10-13. C2c's conversation-store v4 is integrated; the C2d native History reconstruction candidate is under review. No application History route, renderer, or release change is authorized by this document.** CHART-01 Gate B qualified a dormant source-bound Energy Institute series candidate; this record tracks the versioned chart/History contract and its gated implementation.
+**Status: implementation record, updated 2026-10-13. C2c conversation-store v4 and C2d native EI History reconstruction are integrated into `main`; C2e application integration is under development in a separate branch/PR. This stage adds source-bound live intent, rendering/Data view, durable chart recipe and History reconstruction, but does not change the release/version.** CHART-01 Gate B qualified a dormant source-bound Energy Institute series candidate; this record tracks the versioned chart/History contract and its gated implementation.
 
 ## Initial baseline findings (historical)
 
@@ -92,32 +92,46 @@ Do not add a user-facing EI chart intent or live/History renderer caller in C2d.
 - **C2a — native ChartSpec v2: integrated as a dormant native contract.** The source-bound constructor and identity tests exist; no EI renderer is enabled.
 - **C2b — EI display profile: integrated as a dormant native contract.** The bounded display conversion/axis behavior is covered by existing native, sanitizer and resize checks; GISTEMP behavior remains separately qualified.
 - **C2c — conversation-store v4: integrated into `main` via PR #441.** Atomic migration, exact tuple allowlist and fail-closed compatibility are implemented.
-- **C2d — EI History reconstruction: implemented candidate, exact-head CI passed for code/test head `66791e3be921fa721357e2eebbc2c0f1f5304efd`.** Review and integration remain pending; no stored points are treated as authority.
-- **C2e — application integration: gated.** Live intent, GTK chart and History round trip remain out of scope until C2d is reviewed and merged.
+- **C2d — EI History reconstruction: integrated into `main` via PR #442**, merge commit `cd7351cc3d8de3f868e5a7ebb07233a9e5f8099a`. Exact-head CI passed on the pre-merge candidate; stored points remain non-authoritative.
+- **C2e — application integration: implementation candidate under review.** Adds `/chart energy-institute`, source-bound live reconstruction, EI-specific chart/Data presentation and a v2 History dispatch that re-runs C2d reconstruction. The application persists the true repository release version (`0.1.0` from `CITATION.cff`) on the conversation pin while the chart recipe separately uses `snapshot:<snapshot_sha>`. The C2e branch adds a conditional binding rule so v1 continues to match the repository release version and v2 must match the exact snapshot recipe. Exact-head CI and History/GTK/store tests remain the acceptance gate.
 
 Each gate has its own exact-head CI and acceptance evidence. None implies the others. No release is inferred from native-series qualification or from this proposal. The immutable v0.6.3 artifact remains unchanged.
 
 
-## C2d implementation candidate — native History reconstruction only
+## C2d integrated; C2e application integration candidate
 
-The branch `chart02/ei-history-reconstruction`, rebased onto `main` after
-C2c integration, adds a separate
-`atm_chart_history_reconstruct_energy_institute()` entry point and native
-regression coverage for both already admitted four-file snapshot fixtures.
-The entry point requires the stored v2 chart/schema, reconstruction, series and
-admission profiles; the exact `snapshot:<snapshot_sha>` repository version;
-the fixed EI processed CSV path; the source-derived scientific and qualified
-series IDs; and the rebuilt ChartSpec v2 ID. It rereads and re-admits all four
-source files before rebuilding the EI Evidence/SRA/series/ChartSpec chain.
-The test covers both `d9e249…` and `dc710d…` bundles, confirms that the
-two qualified identities remain distinct, and rejects forged/mixed recipe
-metadata and an unsupported snapshot.
+C2d was merged into `main` on 2026-10-13 via PR #442, merge commit
+`cd7351cc3d8de3f868e5a7ebb07233a9e5f8099a`. Its native History reconstruction
+re-reads and admits the complete four-file bundle, rebuilds Evidence/SRA/the
+61-point EI series/ChartSpec v2, and compares the result with persisted identities.
+C2d does not trust stored values and does not by itself enable the renderer.
 
-This is a native reconstruction candidate only. It does not dispatch application
-History rows to the new entry point, add a live EI intent, persist point values,
-change GTK/rendering, or enable C2e. The branch includes the v4 persistence
-boundary from `main`. All five required workflows passed on the exact code-and-test
-head `66791e3be921fa721357e2eebbc2c0f1f5304efd` (CHART-01 native/ASan+UBSan,
-CHART-03 GTK, CHART-04 resize, Invariant Registry and Flatpak). This documentation
-update changes the head and therefore needs its own exact-head CI; review/integration
-remains separate, and C2e remains gated.
+The current C2e candidate connects this contract to the application. It introduces
+an explicit `/chart energy-institute` intent and only admits natural-language
+requests when the query uniquely identifies either GISTEMP or Energy Institute.
+The live route reconstructs from the pinned EWD snapshot using the same source
+admission and ChartSpec v2 identity path as History. The EI renderer and Data view
+present the 1965–2025 TES series in exajoules/year under the Physical Energy
+Content interpretation; the exact source decimals, source rows, qualified series
+identity and support identities remain available in Data. Invalid resize attempts
+must retain the prior valid render and exact Data payload.
+
+### Repository release version versus chart snapshot version
+
+EWD's two EI-admitted `CITATION.cff` snapshots report repository release version
+`0.1.0`. That value remains on the durable conversation repository pin and its
+grounding citations. A ChartSpec v2 series row instead persists
+`repository_version=snapshot:<snapshot_sha>`, because its reconstruction
+recipe is bound to the immutable four-file SHA set. These are different
+identities and must not be collapsed into one string. The C2e store attachment
+and integrity validator therefore compare the release version for schema v1,
+but for schema v2 require the recipe's exact admitted snapshot SHA while still
+requiring the matching `ewd` repository pin. The store allowlist, snapshot
+admission, profile tuple and History reconstruction remain fail-closed.
+
+C2e acceptance requires the exact-head native/sanitizer, GTK, resize, invariant
+registry and Flatpak workflows to pass; tests additionally cover both accepted
+snapshot identities, exact Data/provenance rows, live-versus-History ChartSpec
+identity, repository-version separation, and refusal of malformed intent,
+unsupported snapshots, mutated bundles and invalid recipe metadata. C2e remains
+unreleased until this review and acceptance are complete.
