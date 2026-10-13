@@ -454,6 +454,20 @@ point_matches_established_fact (const AtmSeriesContract *s,
         return FALSE;
     }
     JsonObject *object = json_node_get_object (root);
+    /* Source adapters retain the original decimal token in the qualified
+     * observation payload. If that token is present, bind it as well as the
+     * normalized numeric value; otherwise equivalent spellings such as
+     * 0.0000 and -0.0000 could be swapped while the SRA value stays 0e0. */
+    gboolean source_decimal_matches = TRUE;
+    if (p->y_status == ATM_SERIES_Y_NUMERIC &&
+        json_object_has_member (object, "source_decimal")) {
+        JsonNode *node = json_object_get_member (object, "source_decimal");
+        source_decimal_matches =
+            JSON_NODE_HOLDS_VALUE (node) &&
+            json_node_get_value_type (node) == G_TYPE_STRING &&
+            g_strcmp0 (json_node_get_string (node), p->source_decimal) == 0;
+    }
+
     const char *x_value = NULL;
     const char *scenario = NULL;
     const char *epistemic_status = NULL;
@@ -538,7 +552,7 @@ point_matches_established_fact (const AtmSeriesContract *s,
         bounded (s->scenario, ATM_SERIES_CONTRACT_MAX_TEXT) &&
         g_strcmp0 (scenario, s->scenario) == 0 &&
         g_strcmp0 (epistemic_status, s->epistemic_status) == 0 &&
-        status_matches && reason_matches &&
+        status_matches && reason_matches && source_decimal_matches &&
         fact_break_before == p->break_before &&
         g_strcmp0 (break_reason, p->break_reason) == 0;
     g_object_unref (parser);
