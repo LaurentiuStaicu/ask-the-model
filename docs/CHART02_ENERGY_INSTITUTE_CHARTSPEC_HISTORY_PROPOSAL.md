@@ -91,3 +91,24 @@ Do not add a user-facing EI chart intent or new live/History renderer caller in 
 - **C2e — application integration:** live intent, GTK chart and History round trip only after C2a–C2d are green and reviewed.
 
 Each gate has its own exact-head CI and acceptance evidence. None implies the others. No release is inferred from native-series qualification or from this proposal. The immutable v0.6.3 artifact remains unchanged.
+
+
+## C2d implementation candidate — native History reconstruction only
+
+The stacked branch `chart02/ei-history-reconstruction` adds a separate
+`atm_chart_history_reconstruct_energy_institute()` entry point and native
+regression coverage for both already admitted four-file snapshot fixtures.
+The entry point requires the stored v2 chart/schema, reconstruction, series and
+admission profiles; the exact `snapshot:<snapshot_sha>` repository version;
+the fixed EI processed CSV path; the source-derived scientific and qualified
+series IDs; and the rebuilt ChartSpec v2 ID. It rereads and re-admits all four
+source files before rebuilding the EI Evidence/SRA/series/ChartSpec chain.
+The test covers both `d9e249…` and `dc710d…` bundles, confirms that the
+two qualified identities remain distinct, and rejects forged/mixed recipe
+metadata and an unsupported snapshot.
+
+This is a native reconstruction candidate only. It does not dispatch application
+History rows to the new entry point, add a live EI intent, persist point values,
+change GTK/rendering, or enable C2e. The branch is stacked on C2c and must not
+be integrated ahead of the v4 persistence boundary. The exact-head CHART-01
+native/ASan+UBSan and Flatpak/Meson workflows remain the acceptance gate.
