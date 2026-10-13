@@ -13,10 +13,13 @@ typedef struct { guint series_index, point_index; double x, y; } AtmChartProject
 typedef struct { double position; char label[32]; } AtmChartTick;
 typedef struct { double x_min, x_max, y_min, y_max; } AtmChartDisplayDomain;
 /* Width/height are plot-area logical dimensions, excluding labels/margins.
- * Complete pinned GISTEMP only. Fixed linear axes, 25-year / quarter-degree
- * ticks; at most 17 ticks per axis. No arbitrary values or domains are accepted.
+ * Admits only the exact GISTEMP v1 profile or the separate source-bound EI TES
+ * ChartSpec v2 profile. GISTEMP v1 retains its fixed 25-year / quarter-degree
+ * policy; EI v2 uses bounded integer micro-EJ/year conversion and 100-EJ/year
+ * ticks. At most 17 ticks per axis; no arbitrary values/domains are accepted.
  * Coordinates are display approximations, never scientific source values.
- * Owns a rebuilt ChartSpec; *out must be NULL, failure preserves it. */
+ * Owns a rebuilt ChartSpec; *out must be NULL, failure preserves it. This is
+ * not renderer, application intent, or History admission. */
 gboolean atm_chart_projection_new (const AtmChartSpec *spec, double width, double height,
     AtmChartProjection **out, GError **error);
 gboolean atm_chart_projection_validate (const AtmChartProjection *projection, GError **error);
