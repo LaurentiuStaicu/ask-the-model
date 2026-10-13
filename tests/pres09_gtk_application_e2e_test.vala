@@ -90,6 +90,11 @@ private static void copy_tree (
         FileInfo? child_info;
         while ((child_info = enumerator.next_file (null)) != null) {
             string name = child_info.get_name ();
+            /* A checked-out test repository contains .git metadata which is
+             * not part of the pinned scientific snapshot or its manifest. */
+            if (name == ".git") {
+                continue;
+            }
             copy_tree (
                 source.get_child (name),
                 destination.get_child (name)
@@ -260,10 +265,23 @@ private static int run_orchestrator (
         File.new_for_path (cache).make_directory_with_parents (null);
         File.new_for_path (config).make_directory_with_parents (null);
 
-        string source_snapshot = GLib.Path.build_filename (
-            fixture_env,
-            "ewd-current"
-        );
+        string? full_ewd_root =
+            Environment.get_variable ("ATM_PRES09_FULL_EWD_ROOT");
+        string source_snapshot;
+        if (full_ewd_root != null &&
+            full_ewd_root.strip ().length > 0) {
+            source_snapshot = GLib.Path.is_absolute (full_ewd_root)
+                ? full_ewd_root
+                : GLib.Path.build_filename (
+                    Environment.get_current_dir (),
+                    full_ewd_root
+                );
+        } else {
+            source_snapshot = GLib.Path.build_filename (
+                fixture_env,
+                "ewd-current"
+            );
+        }
         copy_tree (
             File.new_for_path (source_snapshot),
             File.new_for_path (snapshot_root)
