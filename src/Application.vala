@@ -2867,6 +2867,7 @@ namespace AskTheModel {
 
         private Gtk.Widget[] build_live_chart_widgets (
             ConversationSession session,
+            bool energy_institute,
             out ConversationPersistenceChart[] charts
         ) throws GLib.Error {
             Gtk.Widget[] widgets = {};
@@ -2874,91 +2875,91 @@ namespace AskTheModel {
 
             ConversationRepositoryPin? chart_pin = null;
             for (uint i = 0; i < session.repository_count (); i++) {
-                ConversationRepositoryPin? pin =
-                    session.repository_pin_at (i);
-                if (pin == null) {
-                    continue;
-                }
-
+                ConversationRepositoryPin? pin = session.repository_pin_at (i);
+                if (pin == null) continue;
                 if (pin.repository_id == "ewd" ||
-                    pin.repository_id ==
-                        "LaurentiuStaicu/empirical-world3-dynamics") {
+                    pin.repository_id == "LaurentiuStaicu/empirical-world3-dynamics") {
                     chart_pin = pin;
                     break;
                 }
             }
+            if (chart_pin == null) return widgets;
 
-            if (chart_pin == null) {
-                return widgets;
-            }
-
-            const string source_path =
-                "science/data/processed/nasa_gistemp_global_2026.csv";
+            string source_path = energy_institute
+                ? "science/data/processed/energy_institute_global_2026.csv"
+                : "science/data/processed/nasa_gistemp_global_2026.csv";
             RepositoryDescriptor? descriptor =
-                repository_descriptor_for_id (
-                    chart_pin.repository_id
-                );
+                repository_descriptor_for_id (chart_pin.repository_id);
             if (descriptor == null) {
                 throw new GLib.IOError.NOT_FOUND (
                     "Qualified chart repository is unavailable."
                 );
             }
-
             string snapshot_path = RepositoryLifecycleService.snapshot_path (
-                descriptor,
-                chart_pin.snapshot_sha
+                descriptor, chart_pin.snapshot_sha
             );
-
-            if (!GLib.FileUtils.test (
-                    snapshot_path,
-                    GLib.FileTest.IS_DIR
-                )) {
+            if (!GLib.FileUtils.test (snapshot_path, GLib.FileTest.IS_DIR)) {
                 throw new GLib.IOError.NOT_FOUND (
                     "Qualified chart repository snapshot is unavailable."
                 );
             }
 
             ChartNative.Spec spec;
-            if (!ChartNative.reconstruct_live_gistemp (
-                    snapshot_path,
-                    chart_pin.repository_id,
-                    chart_pin.repository_version,
-                    chart_pin.snapshot_sha,
+            bool reconstructed = energy_institute
+                ? ChartNative.reconstruct_live_energy_institute (
+                    snapshot_path, chart_pin.repository_id,
+                    chart_pin.snapshot_sha, "line", out spec
+                  )
+                : ChartNative.reconstruct_live_gistemp (
+                    snapshot_path, chart_pin.repository_id,
+                    chart_pin.repository_version, chart_pin.snapshot_sha,
                     out spec
-                ) || spec == null) {
+                  );
+            if (!reconstructed || spec == null) {
                 throw new GLib.IOError.INVALID_DATA (
-                    "Pinned GISTEMP source could not be re-qualified for chart presentation."
+                    energy_institute
+                        ? "Pinned Energy Institute source could not be re-qualified for chart presentation."
+                        : "Pinned GISTEMP source could not be re-qualified for chart presentation."
                 );
             }
 
             string? scientific_id = spec.series_scientific_id (0);
             string? qualified_id = spec.series_qualified_id (0);
             string? chart_spec_id = spec.id ();
-
-            if (scientific_id == null || qualified_id == null ||
-                chart_spec_id == null) {
+            if (scientific_id == null || qualified_id == null || chart_spec_id == null) {
                 throw new GLib.IOError.INVALID_DATA (
                     "Qualified chart identities are unavailable."
                 );
             }
 
+            string series_profile = energy_institute
+                ? "atm-series/energy-institute-tes-complete-annual/1"
+                : "atm-series/gistemp-complete-annual/1";
+            string admission_profile = energy_institute
+                ? "atm-energy-institute-pinned-admission/3"
+                : "atm-gistemp-pinned-admission/1";
+            string repository_version = energy_institute
+                ? "snapshot:" + chart_pin.snapshot_sha
+                : chart_pin.repository_version;
             var series = new ConversationPersistenceChartSeries (
-                "atm-series/gistemp-complete-annual/1",
-                "atm-gistemp-pinned-admission/1",
+                series_profile,
+                admission_profile,
                 scientific_id,
                 qualified_id,
                 chart_pin.repository_id,
-                chart_pin.repository_version,
+                repository_version,
                 chart_pin.snapshot_sha,
                 source_path
             );
             charts = {
                 new ConversationPersistenceChart (
                     1,
-                    "atm-chart-spec/1",
+                    energy_institute ? "atm-chart-spec/2" : "atm-chart-spec/1",
                     chart_spec_id,
                     "line",
-                    "atm-chart-reconstruct/gistemp-complete-annual/1",
+                    energy_institute
+                        ? "atm-chart-reconstruct/energy-institute-tes-complete-annual/1"
+                        : "atm-chart-reconstruct/gistemp-complete-annual/1",
                     { series }
                 )
             };
@@ -2966,10 +2967,11 @@ namespace AskTheModel {
             ChartNative.View view;
             if (!ChartNative.create (spec, out view)) {
                 throw new GLib.IOError.FAILED (
-                    "Qualified live chart could not be rendered."
+                    energy_institute
+                        ? "Qualified live Energy Institute chart could not be rendered."
+                        : "Qualified live GISTEMP chart could not be rendered."
                 );
             }
-
             view.add_css_class ("atm-history-chart");
             widgets += view;
             return widgets;
@@ -3009,9 +3011,13 @@ namespace AskTheModel {
 
                 foreach (ConversationPersistenceRepository pin
                          in snapshot.repositories) {
+                    bool ei_recipe = chart.chart_schema == "atm-chart-spec/2";
+                    bool version_matches = ei_recipe
+                        ? series.repository_version == "snapshot:" + series.snapshot_sha
+                        : pin.repository_version == series.repository_version;
                     if (pin.repository_id == series.repository_id &&
-                        pin.repository_version == series.repository_version &&
-                        pin.snapshot_sha == series.snapshot_sha) {
+                        pin.snapshot_sha == series.snapshot_sha &&
+                        version_matches) {
                         pin_matches = true;
                         break;
                     }
@@ -3049,7 +3055,9 @@ namespace AskTheModel {
                 }
 
                 ChartNative.Spec? spec = null;
-                if (!ChartNative.reconstruct_history_gistemp (
+                bool reconstructed = false;
+                if (chart.chart_schema == "atm-chart-spec/2") {
+                    reconstructed = ChartNative.reconstruct_history_energy_institute (
                         snapshot_path,
                         series.repository_id,
                         series.repository_version,
@@ -3064,7 +3072,30 @@ namespace AskTheModel {
                         series.qualified_id,
                         series.source_path,
                         out spec
-                    ) || spec == null) {
+                    );
+                } else if (chart.chart_schema == "atm-chart-spec/1") {
+                    reconstructed = ChartNative.reconstruct_history_gistemp (
+                        snapshot_path,
+                        series.repository_id,
+                        series.repository_version,
+                        series.snapshot_sha,
+                        chart.chart_schema,
+                        chart.chart_spec_id,
+                        chart.chart_kind,
+                        chart.reconstruction_profile,
+                        series.series_profile,
+                        series.admission_profile,
+                        series.scientific_id,
+                        series.qualified_id,
+                        series.source_path,
+                        out spec
+                    );
+                } else {
+                    throw new GLib.IOError.INVALID_DATA (
+                        "Persisted chart schema is not admitted."
+                    );
+                }
+                if (!reconstructed || spec == null) {
                     throw new GLib.IOError.INVALID_DATA (
                         "Pinned chart source could not be re-qualified."
                     );
@@ -3389,16 +3420,18 @@ namespace AskTheModel {
         ) {
             ChartIntent chart_intent =
                 ChartIntent.parse (prompt);
-            string effective_prompt =
-                chart_intent.gistemp_requested
-                    ? chart_intent.query
-                    : prompt;
+            bool source_chart_requested = chart_intent.gistemp_requested ||
+                chart_intent.energy_institute_requested;
+            string effective_prompt = source_chart_requested
+                ? chart_intent.query
+                : prompt;
 
-            if (chart_intent.gistemp_requested &&
-                effective_prompt.length == 0) {
+            if (source_chart_requested && effective_prompt.length == 0) {
                 append_transcript (
                     state.transcript,
-                    "Assistant: Use /chart gistemp followed by the grounded question you want to visualize."
+                    chart_intent.energy_institute_requested
+                        ? "Assistant: Use /chart energy-institute followed by the grounded question you want to visualize."
+                        : "Assistant: Use /chart gistemp followed by the grounded question you want to visualize."
                 );
                 return;
             }
@@ -3446,14 +3479,16 @@ namespace AskTheModel {
                     );
                 }
 
-                if (chart_intent.gistemp_requested &&
+                if (source_chart_requested &&
                     !repository_id_in (state.repository_ids, "ewd") &&
                     !repository_id_in (
                         state.repository_ids,
                         "LaurentiuStaicu/empirical-world3-dynamics"
                     )) {
                     throw new GLib.IOError.FAILED (
-                        "GISTEMP charts require EWD to be selected for this conversation. " +
+                        (chart_intent.energy_institute_requested
+                            ? "Energy Institute charts require EWD to be selected for this conversation. "
+                            : "GISTEMP charts require EWD to be selected for this conversation. ") +
                         "Select EWD in Repository Scope and retry."
                     );
                 }
@@ -3492,6 +3527,8 @@ namespace AskTheModel {
 
                 if (chart_intent.gistemp_requested) {
                     qualify_live_gistemp_request (state.session);
+                } else if (chart_intent.energy_institute_requested) {
+                    qualify_live_energy_institute_request (state.session);
                 }
 
                 bool needs_clarification;
@@ -3521,6 +3558,13 @@ namespace AskTheModel {
                         "Answer the user's grounded question briefly, avoid " +
                         "listing unsupported data points, and never invent " +
                         "data or chart configuration.";
+                } else if (chart_intent.energy_institute_requested) {
+                    grounded_system_instructions +=
+                        "\nThe application reconstructs the requested Energy Institute " +
+                        "Global Total Energy Supply chart from its complete admitted EWD " +
+                        "snapshot. The chart uses the Physical Energy Content interpretation " +
+                        "and reports exajoules per year. Do not invent values, chart metadata, " +
+                        "transformations or interpretations beyond the grounded evidence.";
                 }
 
                 if (cancellable.is_cancelled ()) {
@@ -3661,11 +3705,12 @@ namespace AskTheModel {
                         Gtk.Widget[] live_chart_widgets = {};
                         ConversationPersistenceChart[] live_charts = {};
 
-                        if (chart_intent.gistemp_requested) {
+                        if (source_chart_requested) {
                             try {
                                 live_chart_widgets =
                                     build_live_chart_widgets (
                                         state.session,
+                                        chart_intent.energy_institute_requested,
                                         out live_charts
                                     );
 
@@ -3702,11 +3747,12 @@ namespace AskTheModel {
                             citation_resolution,
                             live_chart_widgets
                         );
-                        if (chart_intent.gistemp_requested &&
+                        if (source_chart_requested &&
                             live_chart_widgets.length == 0) {
                             state.presentation.append_chart_status (
-                                "AtM could not render the qualified GISTEMP chart. " +
-                                "Check that EWD is selected and its pinned snapshot is available."
+                                chart_intent.energy_institute_requested
+                                    ? "AtM could not render the qualified Energy Institute chart. Check that EWD is selected and its pinned snapshot is available."
+                                    : "AtM could not render the qualified GISTEMP chart. Check that EWD is selected and its pinned snapshot is available."
                             );
                         }
                         assistant_stream_started = true;
