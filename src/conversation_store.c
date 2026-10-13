@@ -7,7 +7,9 @@
 #include <string.h>
 
 #define ATM_CONVERSATION_STORE_SCHEMA_RESOURCE \
-    "/io/github/laurentiustaicu/ask_the_model/schemas/conversation-store-v3.sql"
+    "/io/github/laurentiustaicu/ask_the_model/schemas/conversation-store-v4.sql"
+#define ATM_CONVERSATION_STORE_MIGRATION_V3_V4_RESOURCE \
+    "/io/github/laurentiustaicu/ask_the_model/schemas/conversation-store-v3-to-v4.sql"
 #define ATM_CONVERSATION_STORE_MIGRATION_V1_V2_RESOURCE \
     "/io/github/laurentiustaicu/ask_the_model/schemas/conversation-store-v1-to-v2.sql"
 #define ATM_CONVERSATION_STORE_MIGRATION_V2_V3_RESOURCE \
@@ -16,6 +18,8 @@
 #define ATM_CONVERSATION_STORE_SCHEMA_V1_VERSION 1
 #define ATM_CONVERSATION_STORE_SCHEMA_V2_ID "atm-conversation-store/2"
 #define ATM_CONVERSATION_STORE_SCHEMA_V2_VERSION 2
+#define ATM_CONVERSATION_STORE_SCHEMA_V3_ID "atm-conversation-store/3"
+#define ATM_CONVERSATION_STORE_SCHEMA_V3_VERSION 3
 
 struct AtmConversationStore {
     sqlite3 *db;
@@ -413,6 +417,20 @@ load_migration_v2_v3_sql (
     return load_sql_resource (
         ATM_CONVERSATION_STORE_MIGRATION_V2_V3_RESOURCE,
         "v2-to-v3 migration",
+        out_sql,
+        error
+    );
+}
+
+static gboolean
+load_migration_v3_v4_sql (
+    char **out_sql,
+    GError **error
+)
+{
+    return load_sql_resource (
+        ATM_CONVERSATION_STORE_MIGRATION_V3_V4_RESOURCE,
+        "v3-to-v4 migration",
         out_sql,
         error
     );
@@ -1121,6 +1139,7 @@ validate_chart_semantics (
 )
 {
     gint64 invalid_chart_message = 0;
+    gint64 invalid_chart_tuple = 0;
     gint64 invalid_chart_series_shape = 0;
     gint64 invalid_chart_provenance = 0;
 
@@ -1131,6 +1150,18 @@ validate_chart_semantics (
             "JOIN messages m ON m.message_id=c.message_id "
             "WHERE m.role!='assistant' OR m.grounded!=1;",
             &invalid_chart_message,
+            error
+        ) ||
+        !query_single_int64 (
+            db,
+            "SELECT count(*) FROM message_charts c "
+            "WHERE NOT ("
+            "(c.chart_schema='atm-chart-spec/1' AND "
+            " c.reconstruction_profile='atm-chart-reconstruct/gistemp-complete-annual/1') OR "
+            "(c.chart_schema='atm-chart-spec/2' AND "
+            " c.reconstruction_profile='atm-chart-reconstruct/energy-institute-tes-complete-annual/1')"
+            ");",
+            &invalid_chart_tuple,
             error
         ) ||
         !query_single_int64 (
@@ -1156,6 +1187,8 @@ validate_chart_semantics (
             "SELECT count(*) "
             "FROM chart_series s "
             "JOIN messages m ON m.message_id=s.message_id "
+            "JOIN message_charts c ON c.message_id=s.message_id "
+            "AND c.ordinal=s.chart_ordinal "
             "LEFT JOIN conversation_repositories r "
             "ON r.conversation_id=m.conversation_id "
             "AND r.repository_id=s.repository_id "
@@ -1163,8 +1196,22 @@ validate_chart_semantics (
             "AND r.snapshot_sha=s.snapshot_sha "
             "WHERE r.repository_id IS NULL "
             "OR s.repository_id!='ewd' "
-            "OR s.source_path!="
-            "'science/data/processed/nasa_gistemp_global_2026.csv';",
+            "OR NOT ("
+            "(c.chart_schema='atm-chart-spec/1' AND "
+            " c.reconstruction_profile='atm-chart-reconstruct/gistemp-complete-annual/1' AND "
+            " s.series_profile='atm-series/gistemp-complete-annual/1' AND "
+            " s.admission_profile='atm-gistemp-pinned-admission/1' AND "
+            " s.source_path='science/data/processed/nasa_gistemp_global_2026.csv') OR "
+            "(c.chart_schema='atm-chart-spec/2' AND "
+            " c.reconstruction_profile='atm-chart-reconstruct/energy-institute-tes-complete-annual/1' AND "
+            " s.series_profile='atm-series/energy-institute-tes-complete-annual/1' AND "
+            " s.admission_profile='atm-energy-institute-pinned-admission/3' AND "
+            " s.source_path='science/data/processed/energy_institute_global_2026.csv' AND "
+            " ((s.snapshot_sha='d9e249339663015f6d1c05752338a955bf64ad0b' AND "
+            "   s.repository_version='snapshot:d9e249339663015f6d1c05752338a955bf64ad0b') OR "
+            "  (s.snapshot_sha='dc710d8e604c0fff713a3acfdb18ab47a1a902bb' AND "
+            "   s.repository_version='snapshot:dc710d8e604c0fff713a3acfdb18ab47a1a902bb')))"
+            ");",
             &invalid_chart_provenance,
             error
         )) {
@@ -1172,6 +1219,7 @@ validate_chart_semantics (
     }
 
     if (invalid_chart_message != 0 ||
+        invalid_chart_tuple != 0 ||
         invalid_chart_series_shape != 0 ||
         invalid_chart_provenance != 0) {
         g_set_error (
@@ -1180,9 +1228,11 @@ validate_chart_semantics (
             ATM_CONVERSATION_STORE_ERROR_INTEGRITY,
             "Conversation-store chart semantic validation failed "
             "(message=%" G_GINT64_FORMAT
+            ", tuple=%" G_GINT64_FORMAT
             ", series=%" G_GINT64_FORMAT
             ", provenance=%" G_GINT64_FORMAT ").",
             invalid_chart_message,
+            invalid_chart_tuple,
             invalid_chart_series_shape,
             invalid_chart_provenance
         );
@@ -1300,23 +1350,48 @@ is_hex64 (
 
 static gboolean
 chart_series_input_is_valid (
-    const AtmConversationChartSeriesInput *series
+    const AtmConversationChartSeriesInput *series,
+    const char *chart_schema
 )
 {
-    return series != NULL &&
-        g_strcmp0 (series->series_profile,
-            "atm-series/gistemp-complete-annual/1") == 0 &&
-        g_strcmp0 (series->admission_profile,
-            "atm-gistemp-pinned-admission/1") == 0 &&
-        is_hex64 (series->scientific_id) &&
-        is_hex64 (series->qualified_id) &&
-        g_strcmp0 (series->repository_id, "ewd") == 0 &&
-        nonempty (series->repository_version) &&
-        is_sha40 (series->snapshot_sha) &&
-        g_strcmp0 (
-            series->source_path,
-            "science/data/processed/nasa_gistemp_global_2026.csv"
-        ) == 0;
+    if (series == NULL ||
+        !is_hex64 (series->scientific_id) ||
+        !is_hex64 (series->qualified_id) ||
+        g_strcmp0 (series->repository_id, "ewd") != 0 ||
+        !is_sha40 (series->snapshot_sha))
+        return FALSE;
+
+    if (g_strcmp0 (chart_schema, "atm-chart-spec/1") == 0) {
+        return
+            g_strcmp0 (series->series_profile,
+                "atm-series/gistemp-complete-annual/1") == 0 &&
+            g_strcmp0 (series->admission_profile,
+                "atm-gistemp-pinned-admission/1") == 0 &&
+            nonempty (series->repository_version) &&
+            g_strcmp0 (series->source_path,
+                "science/data/processed/nasa_gistemp_global_2026.csv") == 0;
+    }
+
+    if (g_strcmp0 (chart_schema, "atm-chart-spec/2") == 0) {
+        const char *snapshot = series->snapshot_sha;
+        gboolean admitted_snapshot =
+            g_strcmp0 (snapshot, "d9e249339663015f6d1c05752338a955bf64ad0b") == 0 ||
+            g_strcmp0 (snapshot, "dc710d8e604c0fff713a3acfdb18ab47a1a902bb") == 0;
+        char *expected_version = g_strconcat ("snapshot:", snapshot, NULL);
+        gboolean valid =
+            admitted_snapshot &&
+            g_strcmp0 (series->series_profile,
+                "atm-series/energy-institute-tes-complete-annual/1") == 0 &&
+            g_strcmp0 (series->admission_profile,
+                "atm-energy-institute-pinned-admission/3") == 0 &&
+            g_strcmp0 (series->repository_version, expected_version) == 0 &&
+            g_strcmp0 (series->source_path,
+                "science/data/processed/energy_institute_global_2026.csv") == 0;
+        g_free (expected_version);
+        return valid;
+    }
+
+    return FALSE;
 }
 
 static gboolean
@@ -1324,19 +1399,25 @@ chart_input_is_valid (
     const AtmConversationChartInput *chart
 )
 {
-    return chart != NULL &&
-        chart->ordinal >= 1 && chart->ordinal <= 4 &&
-        g_strcmp0 (chart->chart_schema, "atm-chart-spec/1") == 0 &&
-        is_hex64 (chart->chart_spec_id) &&
-        (g_strcmp0 (chart->chart_kind, "line") == 0 ||
-         g_strcmp0 (chart->chart_kind, "scatter") == 0) &&
-        g_strcmp0 (
-            chart->reconstruction_profile,
-            "atm-chart-reconstruct/gistemp-complete-annual/1"
-        ) == 0 &&
-        chart->series != NULL &&
-        chart->series_count == 1 &&
-        chart_series_input_is_valid (&chart->series[0]);
+    if (chart == NULL ||
+        chart->ordinal < 1 || chart->ordinal > 4 ||
+        !is_hex64 (chart->chart_spec_id) ||
+        (g_strcmp0 (chart->chart_kind, "line") != 0 &&
+         g_strcmp0 (chart->chart_kind, "scatter") != 0) ||
+        chart->series == NULL ||
+        chart->series_count != 1 ||
+        !chart_series_input_is_valid (&chart->series[0], chart->chart_schema))
+        return FALSE;
+
+    if (g_strcmp0 (chart->chart_schema, "atm-chart-spec/1") == 0)
+        return g_strcmp0 (chart->reconstruction_profile,
+            "atm-chart-reconstruct/gistemp-complete-annual/1") == 0;
+
+    if (g_strcmp0 (chart->chart_schema, "atm-chart-spec/2") == 0)
+        return g_strcmp0 (chart->reconstruction_profile,
+            "atm-chart-reconstruct/energy-institute-tes-complete-annual/1") == 0;
+
+    return FALSE;
 }
 
 gboolean
