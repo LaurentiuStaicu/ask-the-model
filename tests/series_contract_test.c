@@ -1122,14 +1122,15 @@ static void test_calendar_quarter_duplicate_and_reverse_rejected (void)
     for (guint i = 0; i < G_N_ELEMENTS (cases); i++) {
         AtmSeriesContract *s = base_kind (ATM_SERIES_X_CALENDAR_QUARTER);
         GError *error = NULL;
-        g_assert_true (atm_series_contract_add_point (
-            s, cases[i][0], ATM_SERIES_Y_NUMERIC, "1.0000", "1", 0,
-            FALSE, FALSE, NULL, NULL, support, 1, &error));
-        g_assert_no_error (error);
-        g_assert_true (atm_series_contract_add_point (
-            s, cases[i][1], ATM_SERIES_Y_NUMERIC, "2.0000", "2", 0,
-            FALSE, FALSE, NULL, NULL, support, 1, &error));
-        g_assert_no_error (error);
+        for (guint point = 0; point < 2; point++) {
+            gboolean is_q3 = g_strcmp0 (cases[i][point], "2025-Q3") == 0;
+            g_assert_true (atm_series_contract_add_point (
+                s, cases[i][point], ATM_SERIES_Y_NUMERIC,
+                is_q3 ? "2.0000" : "1.0000",
+                is_q3 ? "2" : "1", 0,
+                FALSE, FALSE, NULL, NULL, support, 1, &error));
+            g_assert_no_error (error);
+        }
         g_assert_false (atm_series_contract_validate (s, q, &error));
         g_assert_error (error, ATM_SERIES_CONTRACT_ERROR,
                         ATM_SERIES_CONTRACT_ERROR_ORDER);
