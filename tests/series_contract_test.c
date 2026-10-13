@@ -453,7 +453,7 @@ static void test_missing_and_break_are_explicit (void)
         TRUE, "source_missing", "measurement_gap", support, 1, &error));
     g_assert_no_error (error);
     g_assert_true (atm_series_contract_add_point (
-        s, "1882", ATM_SERIES_Y_NUMERIC, "-0.0000", "0", 0, TRUE,
+        s, "1882", ATM_SERIES_Y_NUMERIC, "0.0000", "0", 0, FALSE,
         FALSE, NULL, NULL, support, 1, &error));
     g_assert_no_error (error);
 
