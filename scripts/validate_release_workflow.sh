@@ -131,10 +131,10 @@ done
 # Artifact actions must remain pinned to immutable commit SHAs, but the guard
 # must not require one historical SHA forever: Dependabot updates the SHA when
 # a reviewed action release is bumped. Require the action identity, a full
-# 40-hex pin, and an explicit semantic-version comment for each publication
-# transfer action.
+# 40-hex pin, and an explicit version comment. Accept major-only labels (such
+# as the published upload-artifact "v4" label) as well as full x.y.z labels.
 for action in 'actions/upload-artifact' 'actions/download-artifact'; do
-  if ! grep -Eq "^[[:space:]]*uses: ${action}@[0-9a-f]{40}[[:space:]]+# v[0-9]+\.[0-9]+\.[0-9]+$" "$workflow"; then
+  if ! grep -Eq "^[[:space:]]*uses: \${action}@[0-9a-f]{40}[[:space:]]+# v[0-9]+(\.[0-9]+){0,2}$" "$workflow"; then
     printf 'Missing fully pinned, version-labelled artifact action: %s\n' "$action" >&2
     exit 1
   fi
