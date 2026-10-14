@@ -46,6 +46,7 @@ create_line="$(first_line 'github.rest.repos.createRelease({')"
 draft_line="$(first_line 'draft: true,')"
 post_create_tag_check_line="$(first_line 'const verifiedTagRef = await getTagRefOrNull();')"
 upload_line="$(first_line 'github.rest.repos.uploadReleaseAsset({')"
+pre_publish_tag_check_line="$(first_line 'const finalTagRef = await getTagRefOrNull();')"
 update_line="$(first_line 'github.rest.repos.updateRelease({')"
 publish_line="$(first_line 'draft: false,')"
 
@@ -53,9 +54,10 @@ if ! (( tag_preflight_line < create_line &&
         create_line < draft_line &&
         draft_line < post_create_tag_check_line &&
         post_create_tag_check_line < upload_line &&
-        upload_line < update_line &&
+        upload_line < pre_publish_tag_check_line &&
+        pre_publish_tag_check_line < update_line &&
         update_line < publish_line )); then
-  printf '%s\n' 'Tag preflight must precede draft creation; post-create tag verification must precede asset upload and publication.' >&2
+  printf '%s\n' 'Tag checks must precede draft creation, asset upload and final publication; no draft may publish after its tag drifts.' >&2
   printf 'lines: preflight=%s create=%s draft=%s post-create-check=%s upload=%s update=%s publish=%s\n' \
     "$tag_preflight_line" "$create_line" "$draft_line" "$post_create_tag_check_line" \
     "$upload_line" "$update_line" "$publish_line" >&2
@@ -70,7 +72,7 @@ required=(
   'classifyReleaseTagState({'
   "if (disposition === 'published-noop')"
   "if (disposition === 'repair-published')"
-  'assertReleaseTagMatchesCommit(verifiedTagRef, context.sha, tag)'
+  'assertReleaseTagMatchesCommit(verifiedTagRef, context.sha, tag)' \\\n  'assertReleaseTagMatchesCommit(finalTagRef, context.sha, tag)' \\\n  'if (error.status === 404)' \\\n  'throw error;'
   'Published GitHub Release'
   'only after all release assets were attached'
 )
