@@ -2,6 +2,8 @@
 #include "chart_fixture.h"
 #include "energy_institute_admission.h"
 #include "energy_institute_verified_series.h"
+#include "bnr_bls_verified_series.h"
+#include "bnr_bls_series_contract.h"
 #include <string.h>
 
 static void settle (void)
@@ -74,6 +76,111 @@ static AtmChartView *build_ei_view (void)
     g_assert_no_error (error);
     atm_chart_spec_free (spec);
     return view;
+}
+
+static AtmChartView *
+build_bnr_view (void)
+{
+    const char *root = g_getenv ("ATM_BNR_BLS_FIXTURE");
+    g_assert_nonnull (root);
+    const char *names[] = {
+        "bnr_bls_realised_rounds.csv",
+        "processed_data_inventory_registry.json",
+        "bnr_bls_canonical_panel_promotion_review.json",
+        "bnr_bls_cross_round_mapping_audit.json",
+        "bnr_bls_missing_round_semantic_mapping_audit.json"
+    };
+    GBytes *sources[ATM_BNR_BLS_SOURCE_COUNT] = {NULL};
+    for (guint i = 0; i < ATM_BNR_BLS_SOURCE_COUNT; i++) {
+        char *path = g_build_filename (root, names[i], NULL);
+        char *contents = NULL;
+        gsize length = 0;
+        GError *error = NULL;
+        g_assert_true (g_file_get_contents (path, &contents, &length, &error));
+        g_assert_no_error (error);
+        g_free (path);
+        sources[i] = g_bytes_new_take (contents, length);
+    }
+    AtmBnrBlsPanel *panel = NULL;
+    AtmBnrBlsSra *sra = NULL;
+    AtmBnrBlsSeriesContract *contract = NULL;
+    AtmBnrBlsVerifiedSeries *series = NULL;
+    AtmChartSpec *spec = NULL;
+    AtmChartView *view = NULL;
+    GError *error = NULL;
+    g_assert_true (atm_bnr_bls_panel_new (
+        ATM_BNR_BLS_UPSTREAM_REPOSITORY,
+        ATM_BNR_BLS_SNAPSHOT_SHA, sources, &panel, &error));
+    g_assert_no_error (error);
+    for (guint i = 0; i < ATM_BNR_BLS_SOURCE_COUNT; i++)
+        g_bytes_unref (sources[i]);
+    g_assert_true (atm_bnr_bls_sra_new (panel, &sra, &error));
+    g_assert_no_error (error);
+    g_assert_true (atm_bnr_bls_series_contract_from_sra (
+        panel, sra, &contract, &error));
+    g_assert_no_error (error);
+    g_assert_true (atm_bnr_bls_verified_series_from_contract (
+        contract, &series, &error));
+    g_assert_no_error (error);
+    g_assert_true (atm_chart_spec_new_bnr_bls_c01_v3 (
+        ATM_CHART_LINE, series, &spec, &error));
+    g_assert_no_error (error);
+    atm_bnr_bls_verified_series_free (series);
+    atm_bnr_bls_series_contract_free (contract);
+    atm_bnr_bls_sra_free (sra);
+    atm_bnr_bls_panel_free (panel);
+    g_assert_true (atm_chart_view_new (spec, &view, &error));
+    g_assert_no_error (error);
+    atm_chart_spec_free (spec);
+    return view;
+}
+
+static void
+test_bnr_quarterly_data_and_missing_provenance (void)
+{
+    AtmChartView *view = build_bnr_view ();
+    g_assert_false (g_object_is_floating (view));
+    g_assert_cmpuint (atm_chart_view_row_count (view), ==, 12u);
+    g_assert_cmpstr (atm_chart_view_visible_page (view), ==, "chart");
+    const char *data = atm_chart_view_data (view);
+    g_assert_nonnull (data);
+    g_assert_nonnull (strstr (data, "# source_snapshot\te43eb4e899f123d3b1aa0f6e20b7c8ed35434170"));
+    g_assert_nonnull (strstr (data, "0\t2022-Q4\tNUMERIC\t11.89"));
+    g_assert_nonnull (strstr (data, "0\t2025-Q2\tMISSING\t\t\t0\t0\t"));
+    g_assert_nonnull (strstr (data, "source_round_not_retained"));
+    g_assert_nonnull (strstr (data, "0\t2025-Q3\tNUMERIC\t9.46"));
+
+    g_assert_true (atm_chart_view_select_row (view, 0u));
+    char *provenance = atm_chart_view_provenance (view);
+    g_assert_nonnull (provenance);
+    g_assert_true (g_str_has_prefix (provenance, "Quarter: 2022-Q4\nStatus: NUMERIC"));
+    g_assert_nonnull (strstr (provenance, "Exact net percentage: 11.89%"));
+    g_assert_nonnull (strstr (provenance, "Physical source row: 2"));
+    g_assert_nonnull (strstr (provenance, ATM_BNR_BLS_SNAPSHOT_SHA));
+    g_free (provenance);
+
+    g_assert_true (atm_chart_view_select_row (view, 10u));
+    provenance = atm_chart_view_provenance (view);
+    g_assert_nonnull (provenance);
+    g_assert_true (g_str_has_prefix (provenance, "Quarter: 2025-Q2\nStatus: MISSING"));
+    g_assert_nonnull (strstr (provenance, "Reason: source_round_not_retained"));
+    g_assert_nonnull (strstr (provenance, "No numeric value is available; this is not zero."));
+    g_assert_nonnull (strstr (provenance, "Physical source row: none"));
+    g_assert_null (strstr (provenance, "Exact net percentage: 0%"));
+    g_free (provenance);
+
+    g_assert_true (atm_chart_view_select_row (view, 11u));
+    provenance = atm_chart_view_provenance (view);
+    g_assert_true (g_str_has_prefix (provenance, "Quarter: 2025-Q3\nStatus: NUMERIC"));
+    g_assert_nonnull (strstr (provenance, "Physical source row: 12"));
+    g_free (provenance);
+
+    atm_chart_view_show_data (view);
+    g_assert_cmpstr (atm_chart_view_visible_page (view), ==, "data");
+    atm_chart_view_show_chart (view);
+    g_assert_cmpstr (atm_chart_view_visible_page (view), ==, "chart");
+    g_assert_cmpstr (atm_chart_view_data (view), ==, data);
+    g_object_unref (view);
 }
 
 static void test_ei_data_lifetime (void)
@@ -267,6 +374,7 @@ int main (int argc, char **argv)
 {
     gtk_init (); g_test_init (&argc,&argv,NULL);
     g_test_add_func ("/chart-view/data-lifetime",test_data_lifetime);
+    g_test_add_func ("/chart-view/bnr-quarterly-data-missing",test_bnr_quarterly_data_and_missing_provenance);
     g_test_add_func ("/chart-view/ei-data-lifetime",test_ei_data_lifetime);
     g_test_add_func ("/chart-view/resize-coalescing",test_resize_coalescing);
     g_test_add_func ("/chart-view/transcript-anchor-minimum-viewport",test_transcript_anchor_minimum_viewport);
