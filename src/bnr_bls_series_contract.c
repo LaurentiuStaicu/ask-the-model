@@ -919,6 +919,46 @@ atm_bnr_bls_series_contract_point (
             : NULL;
 }
 
+
+guint
+atm_bnr_bls_series_contract_source_row (
+    const AtmBnrBlsSeriesContract *series,
+    guint index
+)
+{
+    if (series == NULL || series->panel == NULL ||
+        series->contract == NULL || series->contract->points == NULL ||
+        index >= series->contract->points->len)
+        return 0u;
+
+    const AtmSeriesContractPoint *requested =
+        g_ptr_array_index (series->contract->points, index);
+    if (requested == NULL || requested->y_status != ATM_SERIES_Y_NUMERIC)
+        return 0u;
+
+    guint observation_index = 0u;
+    for (guint i = 0u; i <= index; i++) {
+        const AtmSeriesContractPoint *point =
+            g_ptr_array_index (series->contract->points, i);
+        if (point == NULL)
+            return 0u;
+        if (point->y_status == ATM_SERIES_Y_MISSING)
+            continue;
+        if (point->y_status != ATM_SERIES_Y_NUMERIC)
+            return 0u;
+
+        AtmBnrBlsObservation observation = {0};
+        if (!atm_bnr_bls_panel_observation (
+                series->panel, observation_index, &observation) ||
+            g_strcmp0 (observation.quarter, point->x) != 0)
+            return 0u;
+        if (i == index)
+            return observation.source_row;
+        observation_index++;
+    }
+    return 0u;
+}
+
 const char *
 atm_bnr_bls_series_contract_scientific_id (
     const AtmBnrBlsSeriesContract *series
