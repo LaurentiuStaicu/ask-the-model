@@ -138,6 +138,20 @@ jobs:
 
             let release = releases.find((candidate) => candidate.tag_name === tag);
 
+            // Preserve the established immutable-release no-op path without
+            // making routine development publication depend on a tag-ref read.
+            if (
+              release &&
+              !release.draft &&
+              Array.isArray(release.assets) &&
+              release.assets.some((asset) => asset.name === assetName)
+            ) {
+              core.info(
+                `Published GitHub Release ${tag} already contains ${assetName}; leaving it unchanged.`
+              );
+              return;
+            }
+
             const {
               assertReleaseTagMatchesCommit,
               classifyReleaseTagState,
