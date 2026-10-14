@@ -5,7 +5,7 @@
 <h2 align="center">Ask the Model (AtM)</h2>
 
 <p align="center">
-  <a href="https://github.com/LaurentiuStaicu/ask-the-model/releases/latest"><img alt="Version: 0.7.0" src="https://img.shields.io/github/v/tag/LaurentiuStaicu/ask-the-model?sort=semver&style=flat-square&label=release&color=333333"></a>
+  <a href="https://github.com/LaurentiuStaicu/ask-the-model/releases/latest"><img alt="Version: 0.7.1" src="https://img.shields.io/github/v/tag/LaurentiuStaicu/ask-the-model?sort=semver&style=flat-square&label=release&color=333333"></a>
   <a href="LICENSE"><img alt="MIT License" src="https://img.shields.io/badge/license-MIT-707070?style=flat-square"></a>
   <a href="#supported-platform-and-compatibility"><img alt="Linux / Flatpak" src="https://img.shields.io/badge/platform-Linux%20%2F%20Flatpak-a0a0a0?style=flat-square"></a>
 </p>
@@ -32,7 +32,7 @@
 
 <small><strong>Ask the Model</strong> provides the interface and retrieval/provenance layer. A <strong>local provider</strong>, such as Ollama, loads and runs AI models. The <strong>AI model</strong> remains a separate artifact that must currently be downloaded and managed through the provider rather than AtM.</small>
 
-<small>Version 0.7.0 adds the source-qualified Energy Institute Total Energy Supply (TES) chart alongside the existing GISTEMP v1 path, preserving exact pinned-source provenance through saved History. It strengthens startup reconciliation for managed conversation exports and the generic native SeriesContract boundary. The release preserves established grounded-turn durability, fail-closed persistence, semantic presentation, accessible Sources and default-OFF repository optimizations. EWD, CBD and RMD remain authoritative for their code, data, assumptions, provenance and validation.</small>
+<small>Version 0.7.1 fixes two chart-presentation defects found during v0.7.0 acceptance: transcript-embedded Energy Institute charts now receive enough natural width, and chart-only GISTEMP/Energy Institute requests no longer substitute partial retrieval excerpts as year/value lists or pseudo-tables. Explicit requests for interpretation, annual values or tables remain grounded requests. The source-qualified GISTEMP v1 and Energy Institute TES v2 chart paths, pinned-source provenance through History, startup export reconciliation and native SeriesContract boundaries remain in place. EWD, CBD and RMD remain authoritative for their code, data, assumptions, provenance and validation.</small>
 
 ### Repository-grounded scientific-model chat
 
@@ -158,13 +158,13 @@ flatpak run io.github.laurentiustaicu.ask_the_model
 
 <small>A raw GGUF file does not become visible to AtM merely because it exists on disk; it must first be registered with a compatible provider. For model sources, GGUF import, parameter scales, quantization, context windows, starter examples, storage, CPU/GPU checks and Ollama management commands, see <a href="docs/MODEL_GUIDE.md">Choosing, installing and managing AI models</a>.</small>
 
-<small><strong>Model capability does not automatically become AtM capability.</strong> AtM v0.7.0 currently provides text chat and repository-grounded text retrieval, semantic transcript presentation and two source-qualified chart paths: GISTEMP v1 and Energy Institute TES v2. GISTEMP accepts explicit or clear natural-language requests; Energy Institute uses <code>/chart energy-institute</code>. Image input and tool-calling controls are not part of this release, and the default chat path requests <code>think: false</code>.</small>
+<small><strong>Model capability does not automatically become AtM capability.</strong> AtM v0.7.1 currently provides text chat and repository-grounded text retrieval, semantic transcript presentation and two source-qualified chart paths: GISTEMP v1 and Energy Institute TES v2. Chart-only requests receive concise responses; explicit interpretation, year-value and table requests remain grounded answers. GISTEMP accepts explicit or clear natural-language requests; Energy Institute uses <code>/chart energy-institute</code>. Image input and tool-calling controls are not part of this release, and the default chat path requests <code>think: false</code>.</small>
 
 <small>If a model is too slow, consumes too much memory or does not appear in AtM, use <a href="docs/TROUBLESHOOTING.md">Troubleshooting</a> for symptom-by-symptom checks rather than treating model size or download success as proof of compatibility.</small>
 
 ### Privacy and the local-provider boundary
 
-<small>AtM v0.7.0 connects only to loopback provider addresses on the same machine and sends prompt content when you activate <strong>Send</strong>. Working chats are not saved implicitly: only conversations explicitly sent to <strong>History</strong> persist across restarts, with managed JSON mirrors under <code>~/Ask the Model/Conversation Exports</code>. Repository-grounded evidence and chart data come from validated local snapshots; network access is used for explicit repository Refresh/Download/Update and for immutable GitHub links opened by the user.</small>
+<small>AtM v0.7.1 connects only to loopback provider addresses on the same machine and sends prompt content when you activate <strong>Send</strong>. Working chats are not saved implicitly: only conversations explicitly sent to <strong>History</strong> persist across restarts, with managed JSON mirrors under <code>~/Ask the Model/Conversation Exports</code>. Repository-grounded evidence and chart data come from validated local snapshots; network access is used for explicit repository Refresh/Download/Update and for immutable GitHub links opened by the user.</small>
 
 <small>A loopback connection does not by itself prove that every model is local. The external provider decides how a selected model is executed. Modern Ollama versions can also expose cloud features. If strict local-only operation is required, choose a locally installed model and configure the provider accordingly; Ollama documents a local-only mode using <code>OLLAMA_NO_CLOUD=1</code> or <code>disable_ollama_cloud</code> in its server configuration.</small>
 
@@ -205,7 +205,7 @@ flatpak run io.github.laurentiustaicu.ask_the_model
 - <small>offers a session-only Optimizations switch that starts OFF; qualified repository optimizations are opt-in and preserve the baseline path when OFF;</small>
 - <small>follows desktop light/dark appearance and runs as a GTK 4 / Granite Flatpak for the elementary OS 8 runtime.</small>
 
-### What v0.7.0 does not do
+### What v0.7.1 does not do
 
 - <small>download, import, move, update or delete AI model files through AtM;</small>
 - <small>install, start, stop or update the external provider through AtM;</small>

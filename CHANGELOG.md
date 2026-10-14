@@ -4,11 +4,26 @@ All notable public releases of Ask the Model are recorded here.
 
 ## Unreleased
 
-The entries below describe post-v0.7.0 development on `main`; they are not part of the immutable public v0.7.0 Flatpak artifact.
+The entries below describe post-v0.7.1 development on `main`; they are not part of the immutable public v0.7.1 Flatpak artifact.
 
 ### Native/test-only qualification work
 
 - Keep the bounded BNR BLS C01 `AtmSeriesContract` adapter limited to the exact five-file pinned RMD panel and finalized SRA. It preserves 11 numeric observations and one authority-qualified `MISSING` point at 2025-Q2, without synthesizing a CSV row or numeric value. It does not enable a BNR ChartSpec, renderer, Application route or History reconstruction; broader missing/discontinuity/event semantics remain unqualified in #343.
+
+## 0.7.1 - 2026-10-14
+
+Correct chart presentation after v0.7.0 acceptance.
+
+### Fixes
+
+- Give transcript-embedded chart widgets enough natural width for the qualified Energy Institute footer to render rather than falling back to “Chart needs more space.”
+- For chart-only GISTEMP and Energy Institute requests, return one concise deterministic summary rather than allowing partial retrieval excerpts to become misleading year/value lists or pseudo-tables.
+- Preserve grounded model answers when the prompt explicitly asks for interpretation, values, a year-specific answer or a table.
+
+### Verification
+
+- Maintainer confirmed both chart paths and chart-only responses render according to the acceptance criteria on elementary OS 8.
+- Exact PR-head CI passed all 13 workflows; the Flatpak/Meson suite passed 108/108 tests, including the registered `chart-intent` response regression.
 
 ## 0.7.0 - 2026-10-14
 
