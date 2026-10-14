@@ -84,43 +84,28 @@ namespace AskTheModel {
          * partial table when the native chart is absent, nor claim success if
          * the chart widget could not be constructed.
          */
-        public string chart_only_response (bool chart_rendered) {
+        public string chart_only_response () {
             if (!is_chart_only_request ()) {
                 return "";
             }
 
-            bool romanian = contains_any (
-                query.down (),
-                {
-                    "grafic", "arată", "arata", "generează", "genereaza",
-                    "creează", "creeaza", "afișează", "afiseaza",
-                    "temperatura globală", "temperatura globala",
-                    "furnizarea", "valorile", "în timp", "in timp"
-                }
-            );
+            bool romanian = contains_any (query.down (), {
+                "grafic", "arată", "arata", "generează", "genereaza",
+                "creează", "creeaza", "afișează", "afiseaza",
+                "temperatura globală", "temperatura globala",
+                "furnizarea", "valorile", "în timp", "in timp"
+            });
 
             if (energy_institute_requested) {
-                if (!chart_rendered) {
-                    return romanian
-                        ? "Graficul Energy Institute nu a putut fi generat în această solicitare. Consultă mesajul de stare de mai jos."
-                        : "I couldn't render the Energy Institute chart in this turn. See the status message below for the next step.";
-                }
                 return romanian
-                    ? "Iată graficul Energy Institute al furnizării totale globale de energie. Consultă fila Data pentru valorile anuale și proveniența surselor."
-                    : "Here is the Energy Institute global total energy supply chart. See the Data tab for the underlying annual values and source provenance.";
+                    ? "Graficul Energy Institute este prezentat separat în zona Chart/Data. Fila Data conține valorile anuale și proveniența surselor."
+                    : "The Energy Institute global total energy supply chart is handled separately in the native Chart/Data view. Data contains the annual values and source provenance.";
             }
-
             if (gistemp_requested) {
-                if (!chart_rendered) {
-                    return romanian
-                        ? "Graficul GISTEMP nu a putut fi generat în această solicitare. Consultă mesajul de stare de mai jos."
-                        : "I couldn't render the GISTEMP chart in this turn. See the status message below for the next step.";
-                }
                 return romanian
-                    ? "Iată graficul GISTEMP al anomaliilor temperaturii globale. Consultă fila Data pentru valorile și proveniența surselor."
-                    : "Here is the GISTEMP global temperature anomaly chart. See the Data tab for the underlying values and source provenance.";
+                    ? "Graficul GISTEMP al anomaliilor temperaturii globale este prezentat separat în zona Chart/Data. Fila Data conține valorile și proveniența surselor."
+                    : "The GISTEMP global temperature anomaly chart is handled separately in the native Chart/Data view. Data contains the underlying values and source provenance.";
             }
-
             return "";
         }
 
