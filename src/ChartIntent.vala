@@ -17,7 +17,7 @@ namespace AskTheModel {
         public string response_guidance () {
             if (energy_institute_requested) {
                 return
-                    "\\nThe application renders the requested qualified Energy Institute TES " +
+                    "\nThe application renders the requested qualified Energy Institute TES " +
                     "chart in its native Chart/Data widget. For a chart-only request, answer " +
                     "with at most one brief sentence confirming what the chart shows, optionally " +
                     "pointing to the Chart and Data tabs. Do not list individual years or values, " +
@@ -32,7 +32,7 @@ namespace AskTheModel {
             }
             if (gistemp_requested) {
                 return
-                    "\\nThe application renders the requested qualified GISTEMP chart in its " +
+                    "\nThe application renders the requested qualified GISTEMP chart in its " +
                     "native Chart/Data widget. For a chart-only request, answer with at most " +
                     "one brief sentence confirming what the chart shows, optionally pointing " +
                     "to the Chart and Data tabs. Do not list individual years or temperatures, " +
