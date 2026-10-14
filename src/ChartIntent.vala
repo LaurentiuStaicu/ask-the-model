@@ -17,24 +17,32 @@ namespace AskTheModel {
         public string response_guidance () {
             if (energy_institute_requested) {
                 return
-                    "\\nThe native Chart/Data widget displays the complete admitted " +
-                    "Energy Institute TES series. For a chart request, give a brief " +
-                    "one- or two-sentence introduction and direct the user to the Chart/Data " +
-                    "tabs for the full series and provenance. Do not reproduce a data table " +
-                    "or individual year values unless the user explicitly asks for them. " +
-                    "Never treat a partial repository evidence excerpt as the chart's complete " +
-                    "series, and never claim other years are unavailable merely because they " +
-                    "do not appear in an excerpt. Do not contradict the admitted chart's " +
-                    "time range, source interpretation, or units.";
+                    "\\nThe application renders the requested qualified Energy Institute TES " +
+                    "chart in its native Chart/Data widget. For a chart-only request, answer " +
+                    "with at most one brief sentence confirming what the chart shows, optionally " +
+                    "pointing to the Chart and Data tabs. Do not list individual years or values, " +
+                    "do not format partial observations as a table or pseudo-table, and do not " +
+                    "claim that the chart cannot be rendered or that more years are unavailable " +
+                    "because the model's retrieved evidence excerpt contains only a few rows. " +
+                    "The chart is generated separately from this prose using the complete " +
+                    "admitted series; the Data tab provides its values and provenance. Only " +
+                    "provide year-by-year values or a table when the user explicitly asks for " +
+                    "them. Never contradict the qualified chart's time range, interpretation, " +
+                    "or units.";
             }
             if (gistemp_requested) {
                 return
-                    "\\nThe native Chart/Data widget displays the qualified GISTEMP series. " +
-                    "For a chart request, give a brief one- or two-sentence introduction and " +
-                    "direct the user to the Chart/Data tabs for the full series and provenance. " +
-                    "Do not reproduce a data table or individual year values unless the user " +
-                    "explicitly asks for them. Do not infer that years are missing from partial " +
-                    "repository evidence excerpts or contradict the admitted chart's time range.";
+                    "\\nThe application renders the requested qualified GISTEMP chart in its " +
+                    "native Chart/Data widget. For a chart-only request, answer with at most " +
+                    "one brief sentence confirming what the chart shows, optionally pointing " +
+                    "to the Chart and Data tabs. Do not list individual years or temperatures, " +
+                    "do not format partial observations as a table or pseudo-table, and do not " +
+                    "claim that the chart cannot be rendered or that more years are unavailable " +
+                    "because the model's retrieved evidence excerpt contains only a few rows. " +
+                    "The chart is generated separately from this prose using the complete " +
+                    "qualified series; the Data tab provides its values and provenance. " +
+                    "Only provide year-by-year values or a table when the user explicitly asks " +
+                    "for them. Never contradict the qualified chart's scope or time range.";
             }
             return "";
         }
