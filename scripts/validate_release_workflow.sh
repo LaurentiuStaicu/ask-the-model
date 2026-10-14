@@ -41,27 +41,56 @@ first_line_after() {
   printf '%s\n' "$line"
 }
 
+tag_preflight_line="$(first_line 'let tagRef = await getTagRefOrNull();')"
 create_line="$(first_line 'github.rest.repos.createRelease({')"
 draft_line="$(first_line 'draft: true,')"
+pre_upload_tag_read_line="$(first_line 'const verifiedTagRef = await getTagRefOrNull();')"
+pre_upload_tag_assert_line="$(first_line 'assertReleaseTagMatchesCommit(verifiedTagRef, context.sha, tag);')"
+draft_asset_guard_line="$(first_line 'if (release.draft && existingAsset) {')"
+draft_asset_assert_line="$(first_line 'assertDraftAssetDigestMatches(')"
+upload_guard_line="$(first_line 'if (!existingAsset) {')"
 upload_line="$(first_line 'github.rest.repos.uploadReleaseAsset({')"
+draft_publish_guard_line="$(first_line 'if (release.draft) {')"
+pre_publish_tag_read_line="$(first_line 'const finalTagRef = await getTagRefOrNull();')"
+pre_publish_tag_assert_line="$(first_line 'assertReleaseTagMatchesCommit(finalTagRef, context.sha, tag);')"
 update_line="$(first_line 'github.rest.repos.updateRelease({')"
 publish_line="$(first_line 'draft: false,')"
 
-if ! (( create_line < draft_line &&
-        draft_line < upload_line &&
-        upload_line < update_line &&
+if ! (( tag_preflight_line < create_line &&
+        create_line < draft_line &&
+        draft_line < upload_guard_line &&
+        upload_guard_line < pre_upload_tag_read_line &&
+        pre_upload_tag_read_line < pre_upload_tag_assert_line &&
+        pre_upload_tag_assert_line < upload_line &&
+        draft_asset_guard_line < draft_asset_assert_line &&
+        draft_asset_assert_line < upload_guard_line &&
+        draft_asset_assert_line < draft_publish_guard_line &&
+        upload_line < draft_publish_guard_line &&
+        draft_publish_guard_line < pre_publish_tag_read_line &&
+        pre_publish_tag_read_line < pre_publish_tag_assert_line &&
+        pre_publish_tag_assert_line < update_line &&
         update_line < publish_line )); then
-  printf '%s\n'     'Release publication order must be create draft -> upload asset -> publish draft.' >&2
-  printf 'lines: create=%s draft=%s upload=%s update=%s publish=%s\n'     "$create_line" "$draft_line" "$upload_line" "$update_line" "$publish_line" >&2
+  printf '%s\n' 'The version tag must be rechecked inside every asset-upload branch (not only draft paths) and again before final draft publication.' >&2
+  printf 'lines: preflight=%s create=%s draft=%s upload-branch=%s pre-upload-read=%s pre-upload-assert=%s upload=%s pre-publish-read=%s pre-publish-assert=%s update=%s publish=%s\n' \
+    "$tag_preflight_line" "$create_line" "$draft_line" "$upload_guard_line" "$pre_upload_tag_read_line" "$pre_upload_tag_assert_line" \
+    "$upload_line" "$pre_publish_tag_read_line" "$pre_publish_tag_assert_line" "$update_line" "$publish_line" >&2
   exit 1
 fi
 
 required=(
   'github.paginate('
   'github.rest.repos.listReleases'
-  'release && release.draft'
-  'release.immutable'
-  'release.target_commitish !== context.sha'
+  'async function getTagRefOrNull()'
+  'const {'
+  'classifyReleaseTagState({'
+  "const crypto = require('crypto');"
+  'assertDraftAssetDigestMatches('
+  "if (disposition === 'published-noop')"
+  "if (disposition === 'repair-published')"
+  'assertReleaseTagMatchesCommit(verifiedTagRef, context.sha, tag)'
+  'assertReleaseTagMatchesCommit(finalTagRef, context.sha, tag)'
+  'if (error.status === 404)'
+  'throw error;'
   'Published GitHub Release'
   'only after all release assets were attached'
 )
@@ -117,8 +146,6 @@ if [[ "$(grep -Fc -- 'contents: write' "$workflow")" -ne 1 ]]; then
 fi
 
 least_privilege=(
-  'actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02'
-  'actions/download-artifact@3e5f45b2cfb9172054b4087a40e8e0b5a5461e7c'
   'name: atm-flatpak-publication'
   'include-hidden-files: true'
 )
@@ -130,4 +157,36 @@ for needle in "${least_privilege[@]}"; do
   fi
 done
 
-printf '%s\n' 'Release workflow contract OK: draft-first publication, source traceability and least-privilege verification/publication separation are enforced.'
+# Artifact actions must remain pinned to immutable commit SHAs, but the guard
+# must not require one historical SHA forever: Dependabot updates the SHA when
+# a reviewed action release is bumped. Require the action identity, a full
+# 40-hex pin, and an explicit version comment. Accept major-only labels (such
+# as the published upload-artifact "v4" label) as well as full x.y.z labels.
+for action in 'actions/upload-artifact' 'actions/download-artifact'; do
+  if ! grep -Eq "^[[:space:]]*uses: ${action}@[0-9a-f]{40}[[:space:]]+# v[0-9]+(\.[0-9]+){0,2}$" "$workflow"; then
+    printf 'Missing fully pinned, version-labelled artifact action: %s\n' "$action" >&2
+    exit 1
+  fi
+done
+
+guard_module="scripts/release_tag_guard.cjs"
+guard_tests="tests/release_tag_guard.test.cjs"
+[[ -f "$guard_module" ]] || { printf 'Missing release tag guard module: %s\n' "$guard_module" >&2; exit 1; }
+[[ -f "$guard_tests" ]] || { printf 'Missing release tag guard tests: %s\n' "$guard_tests" >&2; exit 1; }
+for needle in \
+  'function classifyReleaseTagState' \
+  'function assertDraftAssetDigestMatches' \
+  'if (!release)' \
+  'already exists without an associated GitHub Release' \
+  'release.target_commitish !== currentSha' \
+  'release.immutable' \
+  "tagRef.object.type !== 'commit'" \
+  'tagRef.object.sha !== currentSha' \
+  "return 'published-noop'"; do
+  if ! grep -Fq -- "$needle" "$guard_module"; then
+    printf 'Missing release tag-guard condition: %s\n' "$needle" >&2
+    exit 1
+  fi
+done
+
+printf '%s\n' 'Release workflow contract OK: tag preflight, draft-first publication, source traceability and least-privilege verification/publication separation are enforced.'
