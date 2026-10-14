@@ -91,6 +91,12 @@ int main () {
     );
     assert (!ei_table.is_chart_only_request ());
 
+    var gistemp_value_question = AskTheModel.ChartIntent.parse (
+        "/chart gistemp What was the temperature anomaly in 1880?"
+    );
+    assert (!gistemp_value_question.is_chart_only_request ());
+    assert (gistemp_value_question.chart_only_response () == "");
+
     string gistemp_guidance = requested.response_guidance ();
     assert (gistemp_guidance.contains ("native Chart/Data widget"));
     
