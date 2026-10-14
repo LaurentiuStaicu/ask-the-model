@@ -861,6 +861,21 @@ test(
   chat_request_builder_test
 )
 
+chart_intent_test = executable(
+  'chart-intent-test',
+  [
+    'src/ChartIntent.vala',
+    'tests/chart_intent_test.vala'
+  ],
+  dependencies: [glib_dep],
+  install: false
+)
+
+test(
+  'chart-intent',
+  chart_intent_test
+)
+
 optimization_policy_test = executable(
   'optimization-policy-test',
   [
