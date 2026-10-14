@@ -5,6 +5,7 @@ const assert = require('node:assert/strict');
 
 const {
   assertReleaseTagMatchesCommit,
+  assertDraftCanCreateMissingTag,
   assertDraftAssetDigestMatches,
   classifyReleaseTagState,
 } = require('../scripts/release_tag_guard.cjs');
@@ -66,15 +67,53 @@ test('pre-existing tag without a GitHub Release fails closed even if it points a
   );
 });
 
-test('draft release cannot resume if its tag ref is absent', () => {
-  assert.throws(
-    () => classifyReleaseTagState({
+test('empty draft at the exact workflow commit can resume by creating a direct tag', () => {
+  assert.equal(
+    classifyReleaseTagState({
       release: draftRelease(),
       tagRef: null,
       currentSha: SHA_A,
       assetName: ASSET,
     }),
-    /does not exist/
+    'resume-draft-create-tag'
+  );
+
+  assert.doesNotThrow(() => assertDraftCanCreateMissingTag(draftRelease(), SHA_A, TAG));
+});
+
+test('draft without a tag cannot create one when target differs from workflow commit', () => {
+  assert.throws(
+    () => classifyReleaseTagState({
+      release: draftRelease({ target_commitish: SHA_B }),
+      tagRef: null,
+      currentSha: SHA_A,
+      assetName: ASSET,
+    }),
+    /must target exact workflow commit/
+  );
+});
+
+test('draft without a tag cannot create one after any asset is attached', () => {
+  assert.throws(
+    () => assertDraftCanCreateMissingTag(
+      draftRelease({ assets: [{ name: ASSET }] }), SHA_A, TAG
+    ),
+    /must have no assets/
+  );
+});
+
+test('draft without a tag rejects non-draft and mismatched-tag release records', () => {
+  assert.throws(
+    () => assertDraftCanCreateMissingTag(
+      publishedRelease(), SHA_A, TAG
+    ),
+    /Only the matching draft release/
+  );
+  assert.throws(
+    () => assertDraftCanCreateMissingTag(
+      draftRelease({ tag_name: 'v0.7.1' }), SHA_A, TAG
+    ),
+    /Only the matching draft release/
   );
 });
 

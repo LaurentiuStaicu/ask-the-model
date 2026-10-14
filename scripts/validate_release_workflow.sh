@@ -53,11 +53,18 @@ upload_line="$(first_line 'github.rest.repos.uploadReleaseAsset({')"
 draft_publish_guard_line="$(first_line 'if (release.draft) {')"
 pre_publish_tag_read_line="$(first_line 'const finalTagRef = await getTagRefOrNull();')"
 pre_publish_tag_assert_line="$(first_line 'assertReleaseTagMatchesCommit(finalTagRef, context.sha, tag);')"
-update_line="$(first_line 'github.rest.repos.updateRelease({')"
+retarget_compare_line="$(first_line 'comparison = (await github.rest.repos.compareCommits({')"
+retarget_ancestry_line="$(first_line 'comparison.merge_base_commit?.sha !== previousTarget')"
+retarget_update_line="$(first_line 'retargeted = await github.rest.repos.updateRelease({')"
+retarget_verify_line="$(first_line 'if (release.target_commitish !== context.sha) {')"
+update_line="$(first_line_after "$pre_publish_tag_assert_line" 'await github.rest.repos.updateRelease({')"
 publish_line="$(first_line 'draft: false,')"
 
 if ! (( tag_preflight_line < create_line &&
         create_line < draft_line &&
+        retarget_compare_line < retarget_ancestry_line &&
+        retarget_ancestry_line < retarget_update_line &&
+        retarget_update_line < retarget_verify_line &&
         draft_line < upload_guard_line &&
         upload_guard_line < pre_upload_tag_read_line &&
         pre_upload_tag_read_line < pre_upload_tag_assert_line &&
@@ -71,9 +78,9 @@ if ! (( tag_preflight_line < create_line &&
         pre_publish_tag_assert_line < update_line &&
         update_line < publish_line )); then
   printf '%s\n' 'The version tag must be rechecked inside every asset-upload branch (not only draft paths) and again before final draft publication.' >&2
-  printf 'lines: preflight=%s create=%s draft=%s upload-branch=%s pre-upload-read=%s pre-upload-assert=%s upload=%s pre-publish-read=%s pre-publish-assert=%s update=%s publish=%s\n' \
-    "$tag_preflight_line" "$create_line" "$draft_line" "$upload_guard_line" "$pre_upload_tag_read_line" "$pre_upload_tag_assert_line" \
-    "$upload_line" "$pre_publish_tag_read_line" "$pre_publish_tag_assert_line" "$update_line" "$publish_line" >&2
+  printf 'lines: preflight=%s create=%s draft=%s retarget-compare=%s retarget-ancestry=%s retarget-update=%s retarget-verify=%s upload-branch=%s pre-upload-read=%s pre-upload-assert=%s upload=%s pre-publish-read=%s pre-publish-assert=%s update=%s publish=%s\n' \
+    "$tag_preflight_line" "$create_line" "$draft_line" "$retarget_compare_line" "$retarget_ancestry_line" "$retarget_update_line" "$retarget_verify_line" \
+    "$upload_guard_line" "$pre_upload_tag_read_line" "$pre_upload_tag_assert_line" "$upload_line" "$pre_publish_tag_read_line" "$pre_publish_tag_assert_line" "$update_line" "$publish_line" >&2
   exit 1
 fi
 
@@ -83,6 +90,9 @@ required=(
   'async function getTagRefOrNull()'
   'const {'
   'classifyReleaseTagState({'
+  'assertDraftCanCreateMissingTag'
+  'github.rest.repos.compareCommits({'
+  'github.rest.git.createRef({'
   "const crypto = require('crypto');"
   'assertDraftAssetDigestMatches('
   "if (disposition === 'published-noop')"
