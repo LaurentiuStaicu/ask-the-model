@@ -229,6 +229,16 @@ atm_bnr_bls_verified_series_point (
         : NULL;
 }
 
+guint
+atm_bnr_bls_verified_series_source_row (
+    const AtmBnrBlsVerifiedSeries *series,
+    guint index)
+{
+    return series != NULL
+        ? atm_bnr_bls_series_contract_source_row (series->contract, index)
+        : 0u;
+}
+
 const char *
 atm_bnr_bls_verified_series_scientific_id (
     const AtmBnrBlsVerifiedSeries *series)
