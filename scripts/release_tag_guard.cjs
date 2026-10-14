@@ -25,12 +25,52 @@ function assertReleaseTagMatchesCommit(tagRef, currentSha, tag) {
 }
 
 
+
+function selectReleaseForVersion(releases, tag, releaseName) {
+  if (!Array.isArray(releases)) {
+    throw new Error('Release lookup must provide an array of GitHub Release records.');
+  }
+
+  const versioned = releases.find((candidate) => candidate && candidate.tag_name === tag);
+  if (versioned) {
+    return versioned;
+  }
+
+  const orphanDrafts = releases.filter((candidate) =>
+    candidate &&
+    candidate.draft === true &&
+    candidate.name === releaseName &&
+    /^untagged-[0-9a-f]{12,40}$/.test(candidate.tag_name || '')
+  );
+
+  if (orphanDrafts.length > 1) {
+    throw new Error(
+      `Multiple untagged draft releases match ${tag}; refusing ambiguous release recovery.`
+    );
+  }
+
+  return orphanDrafts[0];
+}
+
 function assertDraftCanCreateMissingTag(release, currentSha, tag) {
   if (!/^[0-9a-f]{40}$/.test(currentSha || '')) {
     throw new Error('Release tag preflight requires the exact 40-hex workflow commit SHA.');
   }
 
-  if (!release || !release.draft || release.tag_name !== tag) {
+  const tagNameIsExpected = Boolean(
+    release &&
+    (
+      release.tag_name === tag ||
+      /^untagged-[0-9a-f]{12,40}$/.test(release.tag_name || '')
+    )
+  );
+  const releaseNameIsExpected = Boolean(
+    release &&
+    typeof release.name === 'string' &&
+    release.name.startsWith(`${tag} — `)
+  );
+
+  if (!release || !release.draft || !tagNameIsExpected || !releaseNameIsExpected) {
     throw new Error(
       `Only the matching draft release can create missing tag ${tag}.`
     );
@@ -49,7 +89,7 @@ function assertDraftCanCreateMissingTag(release, currentSha, tag) {
   }
 }
 
-function classifyReleaseTagState({ release, tagRef, currentSha, assetName }) {
+function classifyReleaseTagState({ release, tagRef, currentSha, assetName, tag }) {
   if (!/^[0-9a-f]{40}$/.test(currentSha || '')) {
     throw new Error('Release tag preflight requires the exact 40-hex workflow commit SHA.');
   }
@@ -81,7 +121,7 @@ function classifyReleaseTagState({ release, tagRef, currentSha, assetName }) {
 
   if (release.draft) {
     if (!tagRef) {
-      assertDraftCanCreateMissingTag(release, currentSha, release.tag_name);
+      assertDraftCanCreateMissingTag(release, currentSha, tag || release.tag_name);
       return 'resume-draft-create-tag';
     }
     assertReleaseTagMatchesCommit(tagRef, currentSha, release.tag_name);
@@ -128,6 +168,7 @@ function assertDraftAssetDigestMatches(asset, expectedDigest, assetName) {
 }
 
 module.exports = {
+  selectReleaseForVersion,
   assertReleaseTagMatchesCommit,
   assertDraftCanCreateMissingTag,
   assertDraftAssetDigestMatches,

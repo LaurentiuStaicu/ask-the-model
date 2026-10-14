@@ -4,6 +4,7 @@ const test = require('node:test');
 const assert = require('node:assert/strict');
 
 const {
+  selectReleaseForVersion,
   assertReleaseTagMatchesCommit,
   assertDraftCanCreateMissingTag,
   assertDraftAssetDigestMatches,
@@ -25,6 +26,7 @@ function ref(sha, type = 'commit') {
 function draftRelease(overrides = {}) {
   return {
     tag_name: TAG,
+    name: `${TAG} — Two explicitly qualified scientific chart profiles`,
     draft: true,
     target_commitish: SHA_A,
     assets: [],
@@ -42,6 +44,36 @@ function publishedRelease(overrides = {}) {
     ...overrides,
   };
 }
+
+test('release selection prefers exact version tags and recovers an exact-name untagged draft', () => {
+  const exact = { tag_name: TAG, draft: true, name: `${TAG} — Candidate`, assets: [] };
+  const orphan = {
+    tag_name: 'untagged-e6352286fd54b472be12',
+    draft: true,
+    name: `${TAG} — Two explicitly qualified scientific chart profiles`,
+    target_commitish: SHA_A,
+    assets: [],
+  };
+  const notes = `${TAG} — Two explicitly qualified scientific chart profiles`;
+
+  assert.equal(selectReleaseForVersion([orphan], TAG, notes), orphan);
+  assert.equal(selectReleaseForVersion([orphan, exact], TAG, notes), exact);
+  assert.equal(selectReleaseForVersion([], TAG, notes), undefined);
+});
+
+test('release selection refuses multiple exact-name orphan drafts', () => {
+  const notes = `${TAG} — Two explicitly qualified scientific chart profiles`;
+  const orphan = {
+    tag_name: 'untagged-e6352286fd54b472be12',
+    draft: true,
+    name: notes,
+    assets: [],
+  };
+  assert.throws(
+    () => selectReleaseForVersion([orphan, { ...orphan, tag_name: 'untagged-abcdefabcdef1234567890' }], TAG, notes),
+    /Multiple untagged draft releases match/
+  );
+});
 
 test('new release is allowed only when the version tag is absent', () => {
   assert.equal(
@@ -67,18 +99,20 @@ test('pre-existing tag without a GitHub Release fails closed even if it points a
   );
 });
 
-test('empty draft at the exact workflow commit can resume by creating a direct tag', () => {
+test('empty exact-name draft with a GitHub untagged placeholder can resume by creating a direct tag', () => {
+  const orphan = draftRelease({ tag_name: 'untagged-e6352286fd54b472be12' });
   assert.equal(
     classifyReleaseTagState({
-      release: draftRelease(),
+      release: orphan,
       tagRef: null,
       currentSha: SHA_A,
       assetName: ASSET,
+      tag: TAG,
     }),
     'resume-draft-create-tag'
   );
 
-  assert.doesNotThrow(() => assertDraftCanCreateMissingTag(draftRelease(), SHA_A, TAG));
+  assert.doesNotThrow(() => assertDraftCanCreateMissingTag(orphan, SHA_A, TAG));
 });
 
 test('draft without a tag cannot create one when target differs from workflow commit', () => {
@@ -102,7 +136,7 @@ test('draft without a tag cannot create one after any asset is attached', () => 
   );
 });
 
-test('draft without a tag rejects non-draft and mismatched-tag release records', () => {
+test('draft without a tag rejects non-draft, wrong version, and wrong release title', () => {
   assert.throws(
     () => assertDraftCanCreateMissingTag(
       publishedRelease(), SHA_A, TAG
@@ -112,6 +146,12 @@ test('draft without a tag rejects non-draft and mismatched-tag release records',
   assert.throws(
     () => assertDraftCanCreateMissingTag(
       draftRelease({ tag_name: 'v0.7.1' }), SHA_A, TAG
+    ),
+    /Only the matching draft release/
+  );
+  assert.throws(
+    () => assertDraftCanCreateMissingTag(
+      draftRelease({ name: 'v0.7.1 — Unrelated release' }), SHA_A, TAG
     ),
     /Only the matching draft release/
   );

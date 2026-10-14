@@ -137,10 +137,22 @@ jobs:
               }
             );
 
-            let release = releases.find((candidate) => candidate.tag_name === tag);
+            const {
+              selectReleaseForVersion,
+              assertReleaseTagMatchesCommit,
+              assertDraftAssetDigestMatches,
+              classifyReleaseTagState,
+              assertDraftCanCreateMissingTag,
+            } = require('./scripts/release_tag_guard.cjs');
 
-            // Preserve the established immutable-release no-op path without
-            // making routine development publication depend on a tag-ref read.
+            let release;
+            try {
+              release = selectReleaseForVersion(releases, tag, releaseName);
+            } catch (error) {
+              core.setFailed(error.message);
+              return;
+            }
+
             if (
               release &&
               !release.draft &&
@@ -152,13 +164,17 @@ jobs:
               );
               return;
             }
-
-            const {
-              assertReleaseTagMatchesCommit,
-              assertDraftAssetDigestMatches,
-              classifyReleaseTagState,
-              assertDraftCanCreateMissingTag,
-            } = require('./scripts/release_tag_guard.cjs');
+            if (
+              release &&
+              !release.draft &&
+              Array.isArray(release.assets) &&
+              release.assets.some((asset) => asset.name === assetName)
+            ) {
+              core.info(
+                `Published GitHub Release ${tag} already contains ${assetName}; leaving it unchanged.`
+              );
+              return;
+            }
 
             async function getTagRefOrNull() {
               try {
@@ -256,6 +272,7 @@ jobs:
                 tagRef,
                 currentSha: context.sha,
                 assetName,
+                tag,
               });
             } catch (error) {
               core.setFailed(error.message);
