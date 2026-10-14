@@ -59,3 +59,4 @@ jobs:
           python3 tests/chart01_source_audit_test.py
           python3 scripts/validate_c1_gc_policy.py
           python3 scripts/validate_presentation_performance_evidence.py
+          node --test tests/release_tag_guard.test.cjs
