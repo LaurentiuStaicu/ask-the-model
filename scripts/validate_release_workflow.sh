@@ -134,7 +134,7 @@ done
 # 40-hex pin, and an explicit semantic-version comment for each publication
 # transfer action.
 for action in 'actions/upload-artifact' 'actions/download-artifact'; do
-  if ! grep -Eq "^[[:space:]]*uses: ${action}@[0-9a-f]{40}[[:space:]]+# v[0-9]+\\.[0-9]+\\.[0-9]+$" "$workflow"; then
+  if ! grep -Eq "^[[:space:]]*uses: ${action}@[0-9a-f]{40}[[:space:]]+# v[0-9]+\.[0-9]+\.[0-9]+$" "$workflow"; then
     printf 'Missing fully pinned, version-labelled artifact action: %s\n' "$action" >&2
     exit 1
   fi
