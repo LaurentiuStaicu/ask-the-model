@@ -86,9 +86,10 @@ namespace AskTheModel {
         }
 
         /*
-         * Chart-only replies are deterministic. The model must not produce a
-         * partial table when the native chart is absent, nor claim success if
-         * the chart widget could not be constructed.
+         * Chart-only replies are deterministic so short retrieval excerpts
+         * cannot replace the native chart with a partial table. Chart
+         * construction is qualified separately after the durable turn commit;
+         * the UI reports a chart status if the widget cannot be constructed.
          */
         public string chart_only_response () {
             if (!is_chart_only_request ()) {
