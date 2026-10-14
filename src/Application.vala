@@ -3662,10 +3662,7 @@ namespace AskTheModel {
                     grounded_system_instructions +=
                         "\nThe application handles the requested qualified " +
                         "GISTEMP chart from the complete pinned source. Do " +
-                        "not claim that you cannot render charts or infer that " +
-                        "years are missing from the retrieved evidence excerpts. " +
-                        "Answer the user's grounded question briefly, avoid " +
-                        "listing unsupported data points, and never invent " +
+                        "not claim that you cannot render charts or invent " +
                         "data or chart configuration.";
                 } else if (chart_intent.energy_institute_requested) {
                     grounded_system_instructions +=
@@ -3675,6 +3672,8 @@ namespace AskTheModel {
                         "and reports exajoules per year. Do not invent values, chart metadata, " +
                         "transformations or interpretations beyond the grounded evidence.";
                 }
+                grounded_system_instructions +=
+                    chart_intent.response_guidance ();
 
                 if (cancellable.is_cancelled ()) {
                     throw new GLib.IOError.CANCELLED (
