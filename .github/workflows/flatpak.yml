@@ -138,58 +138,56 @@ jobs:
 
             let release = releases.find((candidate) => candidate.tag_name === tag);
 
-            if (release && !release.draft) {
-              const existingAsset = release.assets.find(
-                (asset) => asset.name === assetName
-              );
+            const {
+              assertReleaseTagMatchesCommit,
+              classifyReleaseTagState,
+            } = require('./scripts/release_tag_guard.cjs');
 
-              if (existingAsset) {
-                core.info(
-                  `Published GitHub Release ${tag} already contains ${assetName}; leaving it unchanged.`
-                );
-                return;
+            async function getTagRefOrNull() {
+              try {
+                const response = await github.rest.git.getRef({
+                  owner: context.repo.owner,
+                  repo: context.repo.repo,
+                  ref: `tags/${tag}`,
+                });
+                return response.data;
+              } catch (error) {
+                if (error.status === 404) {
+                  return null;
+                }
+                throw error;
               }
+            }
 
-              const tagRef = await github.rest.git.getRef({
-                owner: context.repo.owner,
-                repo: context.repo.repo,
-                ref: `tags/${tag}`,
+            let tagRef = await getTagRefOrNull();
+            let disposition;
+            try {
+              disposition = classifyReleaseTagState({
+                release,
+                tagRef,
+                currentSha: context.sha,
+                assetName,
               });
+            } catch (error) {
+              core.setFailed(error.message);
+              return;
+            }
 
-              if (
-                tagRef.data.object.type !== 'commit' ||
-                tagRef.data.object.sha !== context.sha
-              ) {
-                core.setFailed(
-                  `Published release ${tag} is missing ${assetName}, but its tag does not point to this workflow commit.`
-                );
-                return;
-              }
+            if (disposition === 'published-noop') {
+              core.info(
+                `Published GitHub Release ${tag} already contains ${assetName}; leaving it unchanged.`
+              );
+              return;
+            }
 
-              if (release.immutable) {
-                core.setFailed(
-                  `Immutable release ${tag} is missing ${assetName}; refusing an impossible post-publication repair.`
-                );
-                return;
-              }
-
+            if (disposition === 'repair-published') {
               core.warning(
-                `Published mutable release ${tag} is missing ${assetName}; repairing the legacy release before immutable releases are enabled.`
+                `Published mutable release ${tag} is missing ${assetName}; repairing the legacy release only because its tag matches this workflow commit.`
               );
             }
 
-            if (release && release.draft) {
-              if (
-                release.target_commitish &&
-                release.target_commitish !== context.sha
-              ) {
-                core.setFailed(
-                  `Draft release ${tag} targets ${release.target_commitish}, not ${context.sha}.`
-                );
-                return;
-              }
-
-              core.info(`Resuming existing draft GitHub Release ${tag}.`);
+            if (disposition === 'resume-draft') {
+              core.info(`Resuming existing draft GitHub Release ${tag} after tag preflight.`);
             }
 
             if (!release) {
@@ -205,9 +203,27 @@ jobs:
               });
 
               release = response.data;
+              if (!release.draft) {
+                core.setFailed(
+                  `GitHub returned a non-draft release for ${tag}; refusing to attach or publish the verified bundle.`
+                );
+                return;
+              }
               core.info(
-                `Created draft GitHub Release ${tag}; assets will be attached before publication.`
+                `Created draft GitHub Release ${tag}; verifying the resulting tag before asset upload.`
               );
+            }
+
+            if (release.draft) {
+              // Repeat the read after draft creation/resumption and immediately
+              // before using the build artifact, so a changed tag fails closed.
+              const verifiedTagRef = await getTagRefOrNull();
+              try {
+                assertReleaseTagMatchesCommit(verifiedTagRef, context.sha, tag);
+              } catch (error) {
+                core.setFailed(error.message);
+                return;
+              }
             }
 
             let existingAsset = release.assets.find(
