@@ -2,11 +2,11 @@
 
 ## Release status
 
-**Current release: Ask the Model (AtM) v0.6.3 — released 2026-10-10. Immutable public release.** This release provides the qualified GISTEMP chart-admission and Vala ownership correction.
+**Current release: Ask the Model (AtM) v0.7.0 — released 2026-10-14. Immutable public release.** This release adds the source-qualified Energy Institute TES v2 chart and History reconstruction alongside GISTEMP v1, strengthens startup reconciliation for managed conversation exports, and tightens generic SeriesContract validation.
 
-The published release tag points to commit `26ae12e4ee17cc4ed5dfd3e16a5b27fd277bc6a9`. Its immutable `AskTheModel.flatpak` asset is 481,016 bytes with SHA-256 `ffa3457c673201665adaf565fcfb7a9c55e0be627e7458e3c059b8b0247a6958`. See the [published v0.6.3 release](https://github.com/LaurentiuStaicu/ask-the-model/releases/tag/v0.6.3).
+The verified release workflow publishes the immutable [v0.7.0 release](https://github.com/LaurentiuStaicu/ask-the-model/releases/tag/v0.7.0). Issue #463 records the exact release commit, Flatpak size and SHA-256 after publication. The historical v0.6.3 tag and bundle remain immutable and unchanged.
 
-**Development status checked 2026-10-13:** the published v0.6.3 release remains immutable and unchanged. The working `main` branch contains post-release development and is not represented by the v0.6.3 artifact.
+**Development status checked 2026-10-14:** the v0.7.0 release includes the source-qualified chart routes and startup/export reliability changes described below. The historical v0.6.3 tag and artifact remain immutable. Any additional acceptance fixes or broader chart support require a separately scoped later release; general CHART-01 qualification remains open in issue #343.
 
 ### Integrated development milestones
 
@@ -21,7 +21,13 @@ The published release tag points to commit `26ae12e4ee17cc4ed5dfd3e16a5b27fd277b
 
 ### Remaining qualification boundary
 
-PRES-09 is now qualified for the two admitted source-specific application routes: PR #447 passed all 12 exact-head workflows, including the real GTK Application E2E with composer/send, archive, separate-process History reconstruction and fail-closed tampered-source restoration. This closes that identified UI qualification gap; it does not turn the automated test into a pixel-diff, screen-reader, localization or manual visual-review claim. The bounded BNR C01 contract from PR #454 additionally qualifies exactly one source-authorized missing quarter (`2025-Q2`) at the generic `AtmSeriesContract` layer. It is not a generic missing-data permission, does not promote BNR to legacy `AtmVerifiedSeries`, and enables no BNR ChartSpec/renderer/Application/History route. The immutable `v0.6.3` tag and published Flatpak asset remain unchanged, and `meson.build` still reports version `0.6.3`. Arbitrary sources, multi-series comparison, general missing/discontinuity/event semantics and upstream EI raw-to-processed reproduction remain unqualified; issue #343 stays open for the broader CHART-01 contract and adapter work.
+PRES-09 is now qualified for the two admitted source-specific application routes: PR #447 passed all 12 exact-head workflows, including the real GTK Application E2E with composer/send, archive, separate-process History reconstruction and fail-closed tampered-source restoration. This closes that identified UI qualification gap; it does not turn the automated test into a pixel-diff, screen-reader, localization or manual visual-review claim. The bounded BNR C01 contract from PR #454 additionally qualifies exactly one source-authorized missing quarter (`2025-Q2`) at the generic `AtmSeriesContract` layer. It is not a generic missing-data permission, does not promote BNR to legacy `AtmVerifiedSeries`, and enables no BNR ChartSpec/renderer/Application/History route. The public v0.7.0 tag and Flatpak asset are immutable; the historical v0.6.3 release also remains unchanged. Arbitrary sources, multi-series comparison, general missing/discontinuity/event semantics and upstream EI raw-to-processed reproduction remain unqualified; issue #343 stays open for the broader CHART-01 contract and adapter work.
+
+### v0.7.0 release
+
+v0.7.0 adds the source-qualified Energy Institute TES v2 chart route alongside the existing GISTEMP v1 route. Saved recipes reconstruct chart/Data views from their exact pinned processed EWD source. Startup reconciliation retains recoverable unarchived conversation state when export reconciliation fails or remains uncertain, and generic SeriesContract validation binds scope and numeric payloads to authorized finalized SRA facts. These additions do not qualify independent Energy Institute raw-to-processed reproduction, BNR C01 application charting, arbitrary sources, generic multi-series/derived charts or broad missing/event/discontinuity semantics. Optimizations remain session-only and default OFF.
+
+Automated application-level acceptance and the metadata-bearing release workflow are the evidence basis for publication. A separate manual launch/visual review of the produced Flatpak on a physical elementary OS 8 installation was not performed; that remaining acceptance item is explicitly tracked in issue #463.
 
 ### v0.6.3 release
 

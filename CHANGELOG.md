@@ -4,17 +4,29 @@ All notable public releases of Ask the Model are recorded here.
 
 ## Unreleased
 
-The entries below describe development on `main`; they are not part of the immutable public v0.6.3 Flatpak artifact.
+The entries below describe post-v0.7.0 development on `main`; they are not part of the immutable public v0.7.0 Flatpak artifact.
 
-### Reliability correction
+### Native/test-only qualification work
 
-- Reconcile managed conversation JSON exports before startup cleanup. An unarchived SQLite row is removed only after the export path is confirmed absent or otherwise reconciled successfully; failed or unknown reconciliation keeps the row for a later retry instead of silently losing its recoverable state.
-- Keep retained unarchived working rows out of History. When the export obstruction is removed, the next successful reconciliation resumes normal cleanup.
+- Keep the bounded BNR BLS C01 `AtmSeriesContract` adapter limited to the exact five-file pinned RMD panel and finalized SRA. It preserves 11 numeric observations and one authority-qualified `MISSING` point at 2025-Q2, without synthesizing a CSV row or numeric value. It does not enable a BNR ChartSpec, renderer, Application route or History reconstruction; broader missing/discontinuity/event semantics remain unqualified in #343.
 
-### Scientific-source qualification
+## 0.7.0 - 2026-10-14
 
-- Integrate the source-qualified Energy Institute TES chart path on `main`. AtM admits exactly two reviewed four-file EWD snapshot bundles, keeps their snapshot-qualified identities distinct, exposes the single-series ChartSpec v2 and display projection, and reconstructs saved chart recipes from the pinned processed snapshot in History. The live `/chart energy-institute` route is integrated and the bounded GTK live-to-History flow passed exact-head E2E qualification. This proves faithful reconstruction of the admitted processed EWD snapshot, not independent reproduction of Energy Institute's raw-to-processed pipeline.
-- Add the bounded BNR BLS C01 native/test-only `AtmSeriesContract` adapter for the exact five-file pinned RMD panel and finalized SRA. It preserves 11 exact numeric observations and one authority-qualified `MISSING` point at 2025-Q2, without synthesizing a CSV row or numeric value. It does not enable a BNR ChartSpec, renderer, Application route, History reconstruction or release inclusion; broader missing/discontinuity/event semantics remain unqualified in #343.
+Two explicitly qualified scientific chart profiles, with source provenance preserved through History.
+
+### Changes
+
+- Add the source-qualified Energy Institute Total Energy Supply chart flow alongside the established GISTEMP chart. The Energy Institute path admits only reviewed four-file EWD snapshot bundles and uses the pinned processed snapshot; it does not independently reproduce the upstream raw-to-processed pipeline.
+- Preserve chart recipes in History and reconstruct chart/Data presentation from the exact pinned source and profile. Chart values and pixels are not persisted as independent scientific truth.
+- Reconcile managed conversation JSON exports before startup cleanup. If reconciliation fails or remains uncertain, retain the unarchived working SQLite row so recoverable state is not silently discarded; successful later reconciliation can resume normal cleanup.
+- Harden the generic native SeriesContract so canonical UTC-instant scopes enclose their ordered observations and numeric/source-token metadata remains consistent with authorized finalized SRA facts, including rejection of contradictory numeric payloads for a `MISSING` observation.
+
+### Scope and qualification boundaries
+
+- Application charting remains limited to GISTEMP v1 and Energy Institute TES v2. Unknown/mixed snapshots and modified source bytes fail closed.
+- BNR C01 remains native/test-only without an application chart route. M4 reduction remains dormant.
+- Arbitrary sources, model-authored numeric chart data, general multi-series/derived charts and generalized missing/event/discontinuity semantics are not introduced. Broader CHART-01 qualification remains open in #343.
+- Optimizations remain session-only and default OFF.
 
 ## 0.6.3 - 2026-10-10
 
