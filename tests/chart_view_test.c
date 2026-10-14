@@ -174,6 +174,54 @@ static void test_resize_coalescing (void)
     while (g_main_context_iteration (NULL, FALSE));
 }
 
+static GtkWidget *chart_drawing_area (AtmChartView *view)
+{
+    GtkWidget *stack_widget = gtk_widget_get_last_child (GTK_WIDGET (view));
+    g_assert_true (GTK_IS_STACK (stack_widget));
+    GtkWidget *chart_page = gtk_stack_get_child_by_name (
+        GTK_STACK (stack_widget), "chart");
+    g_assert_nonnull (chart_page);
+    GtkWidget *area = gtk_widget_get_last_child (chart_page);
+    g_assert_true (GTK_IS_DRAWING_AREA (area));
+    return area;
+}
+
+static void test_transcript_anchor_minimum_viewport (void)
+{
+    AtmChartView *view = build_ei_view ();
+    GtkWidget *transcript = gtk_text_view_new ();
+    gtk_text_view_set_wrap_mode (GTK_TEXT_VIEW (transcript), GTK_WRAP_WORD_CHAR);
+    GtkTextBuffer *buffer = gtk_text_view_get_buffer (GTK_TEXT_VIEW (transcript));
+    GtkTextIter end;
+    gtk_text_buffer_get_end_iter (buffer, &end);
+    GtkTextChildAnchor *anchor = gtk_text_buffer_create_child_anchor (buffer, &end);
+    gtk_text_view_add_child_at_anchor (GTK_TEXT_VIEW (transcript), GTK_WIDGET (view), anchor);
+
+    GtkWidget *scroller = gtk_scrolled_window_new ();
+    gtk_scrolled_window_set_policy (
+        GTK_SCROLLED_WINDOW (scroller), GTK_POLICY_NEVER, GTK_POLICY_AUTOMATIC);
+    gtk_scrolled_window_set_child (GTK_SCROLLED_WINDOW (scroller), transcript);
+    GtkWindow *window = GTK_WINDOW (gtk_window_new ());
+    gtk_window_set_title (window, "AtM chart transcript-anchor regression");
+    gtk_window_set_default_size (window, 1000, 760);
+    gtk_window_set_child (window, scroller);
+    gtk_window_present (window);
+    settle ();
+
+    GtkWidget *area = chart_drawing_area (view);
+    g_assert_cmpint (gtk_widget_get_width (area), >=, 480);
+    g_assert_cmpint (gtk_widget_get_height (area), >=, 348);
+
+    int render_width = 0, render_height = 0, render_scale = 0;
+    atm_chart_view_test_render_size (view, &render_width, &render_height, &render_scale);
+    g_assert_cmpint (render_width, >=, 480);
+    g_assert_cmpint (render_height, >=, 348);
+    g_assert_cmpint (render_scale, >=, 1);
+    gtk_window_destroy (window);
+    settle ();
+    g_object_unref (view);
+}
+
 static void test_keyboard_window (void)
 {
     if (!g_getenv ("ATM_CHART03_KEYBOARD")) { g_test_skip ("Real XTest keyboard exercised by dedicated GTK workflow."); return; }
@@ -221,6 +269,7 @@ int main (int argc, char **argv)
     g_test_add_func ("/chart-view/data-lifetime",test_data_lifetime);
     g_test_add_func ("/chart-view/ei-data-lifetime",test_ei_data_lifetime);
     g_test_add_func ("/chart-view/resize-coalescing",test_resize_coalescing);
+    g_test_add_func ("/chart-view/transcript-anchor-minimum-viewport",test_transcript_anchor_minimum_viewport);
     g_test_add_func ("/chart-view/keyboard-window",test_keyboard_window);
     g_test_add_func ("/chart-view/invalid",test_invalid);
     return g_test_run ();

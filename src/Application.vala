@@ -3662,10 +3662,7 @@ namespace AskTheModel {
                     grounded_system_instructions +=
                         "\nThe application handles the requested qualified " +
                         "GISTEMP chart from the complete pinned source. Do " +
-                        "not claim that you cannot render charts or infer that " +
-                        "years are missing from the retrieved evidence excerpts. " +
-                        "Answer the user's grounded question briefly, avoid " +
-                        "listing unsupported data points, and never invent " +
+                        "not claim that you cannot render charts or invent " +
                         "data or chart configuration.";
                 } else if (chart_intent.energy_institute_requested) {
                     grounded_system_instructions +=
@@ -3675,6 +3672,8 @@ namespace AskTheModel {
                         "and reports exajoules per year. Do not invent values, chart metadata, " +
                         "transformations or interpretations beyond the grounded evidence.";
                 }
+                grounded_system_instructions +=
+                    chart_intent.response_guidance ();
 
                 if (cancellable.is_cancelled ()) {
                     throw new GLib.IOError.CANCELLED (
@@ -3704,6 +3703,11 @@ namespace AskTheModel {
                             state.session.model_digest (),
                             cancellable
                         );
+
+                        if (source_chart_requested &&
+                            chart_intent.is_chart_only_request ()) {
+                            answer = chart_intent.chart_only_response ();
+                        }
 
                         CitationResolution citation_resolution =
                             state.session.resolve_turn_citations (
@@ -3822,26 +3826,28 @@ namespace AskTheModel {
                                         chart_intent.energy_institute_requested,
                                         out live_charts
                                     );
-
-                                if (live_charts.length > 0 &&
-                                    conversation_store != null &&
-                                    state.persistent_id != null) {
-                                    foreach (
-                                        ConversationPersistenceChart chart
-                                        in live_charts
-                                    ) {
-                                        conversation_store.attach_chart (
-                                            state.persistent_id,
-                                            committed_turn_no,
-                                            chart
-                                        );
-                                    }
-                                }
                             } catch (GLib.Error chart_error) {
                                 live_chart_widgets = {};
+                                live_charts = {};
                                 stderr.printf (
                                     "AtM: qualified live chart unavailable: %s\n",
                                     chart_error.message
+                                );
+                            }
+                        }
+
+
+                        if (live_charts.length > 0 &&
+                            conversation_store != null &&
+                            state.persistent_id != null) {
+                            foreach (
+                                ConversationPersistenceChart chart
+                                in live_charts
+                            ) {
+                                conversation_store.attach_chart (
+                                    state.persistent_id,
+                                    committed_turn_no,
+                                    chart
                                 );
                             }
                         }

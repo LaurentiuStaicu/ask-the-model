@@ -67,6 +67,59 @@ int main () {
     assert (ei_command.energy_institute_requested);
     assert (ei_command.query == "Show the global TES trend.");
 
+    string ei_guidance = ei_command.response_guidance ();
+    assert (ei_guidance.contains ("native Chart/Data widget"));
+    
+    assert (ei_guidance.contains ("pseudo-table"));
+    assert (ei_guidance.contains ("more years are unavailable"));
+    assert (ei_guidance.contains ("Only provide year-by-year values or a table"));
+    assert (ei_command.is_chart_only_request ());
+    string ei_response = ei_command.chart_only_response ();
+    assert (ei_response.contains ("Energy Institute global total energy supply chart"));
+    assert (ei_response.contains ("Data tab"));
+    assert (!ei_response.contains ("pseudo-table"));
+    assert (!ei_response.contains ("couldn't render"));
+
+    var ei_interpretation = AskTheModel.ChartIntent.parse (
+        "/chart energy-institute Explain the trend in the data."
+    );
+    assert (!ei_interpretation.is_chart_only_request ());
+    assert (ei_interpretation.chart_only_response () == "");
+
+    var ei_table = AskTheModel.ChartIntent.parse (
+        "/chart energy-institute Show the annual values in a table."
+    );
+    assert (!ei_table.is_chart_only_request ());
+
+    var gistemp_value_question = AskTheModel.ChartIntent.parse (
+        "/chart gistemp What was the temperature anomaly in 1880?"
+    );
+    assert (!gistemp_value_question.is_chart_only_request ());
+    assert (gistemp_value_question.chart_only_response () == "");
+
+    string gistemp_guidance = requested.response_guidance ();
+    assert (gistemp_guidance.contains ("native Chart/Data widget"));
+    
+    assert (gistemp_guidance.contains ("pseudo-table"));
+    assert (gistemp_guidance.contains ("more years are unavailable"));
+    assert (gistemp_guidance.contains ("Only provide year-by-year values or a table"));
+    assert (requested.is_chart_only_request ());
+    string gistemp_response = requested.chart_only_response ();
+    assert (gistemp_response.contains ("GISTEMP global temperature anomaly chart"));
+    assert (gistemp_response.contains ("Data tab"));
+    assert (!gistemp_response.contains ("pseudo-table"));
+    assert (!gistemp_response.contains ("couldn't render"));
+
+    var gistemp_interpretation = AskTheModel.ChartIntent.parse (
+        "/chart gistemp Explain what the temperature trend means."
+    );
+    assert (!gistemp_interpretation.is_chart_only_request ());
+    assert (gistemp_interpretation.chart_only_response () == "");
+
+    assert (natural_english.chart_only_response ().contains ("GISTEMP global temperature anomaly chart"));
+    assert (natural_romanian.chart_only_response ().contains ("Iată graficul GISTEMP"));
+    assert (ordinary.response_guidance () == "");
+
     var ei_upper = AskTheModel.ChartIntent.parse (
         "/CHART ENERGY-INSTITUTE Show the global TES trend."
     );
