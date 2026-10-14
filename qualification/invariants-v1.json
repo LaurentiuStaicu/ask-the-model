@@ -880,8 +880,7 @@
         "src/chart_spec.c"
       ],
       "tested_by": [
-        "meson:chart-view",
-        "workflow:CHART-03 GTK component"
+        "meson:chart-view"
       ]
     }
   ]
