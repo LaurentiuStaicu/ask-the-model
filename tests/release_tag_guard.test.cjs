@@ -5,6 +5,7 @@ const assert = require('node:assert/strict');
 
 const {
   assertReleaseTagMatchesCommit,
+  assertDraftAssetDigestMatches,
   classifyReleaseTagState,
 } = require('../scripts/release_tag_guard.cjs');
 
@@ -176,5 +177,49 @@ test('tag guard refuses a non-SHA workflow identity', () => {
   assert.throws(
     () => assertReleaseTagMatchesCommit(ref(SHA_A), 'main', TAG),
     /40-hex workflow commit SHA/
+  );
+});
+
+
+const DIGEST_A = 'sha256:' + 'a'.repeat(64);
+const DIGEST_B = 'sha256:' + 'b'.repeat(64);
+
+test('existing draft asset is reusable only when its SHA-256 matches the current verified build', () => {
+  assert.doesNotThrow(() => assertDraftAssetDigestMatches(
+    { name: ASSET, digest: DIGEST_A }, DIGEST_A, ASSET
+  ));
+  assert.throws(
+    () => assertDraftAssetDigestMatches(
+      { name: ASSET, digest: DIGEST_B }, DIGEST_A, ASSET
+    ),
+    /does not match the current verified build/
+  );
+});
+
+test('existing draft asset fails closed when its SHA-256 digest is absent or malformed', () => {
+  assert.throws(
+    () => assertDraftAssetDigestMatches({ name: ASSET }, DIGEST_A, ASSET),
+    /no verifiable SHA-256 digest/
+  );
+  assert.throws(
+    () => assertDraftAssetDigestMatches(
+      { name: ASSET, digest: 'sha256:NOT-A-DIGEST' }, DIGEST_A, ASSET
+    ),
+    /no verifiable SHA-256 digest/
+  );
+});
+
+test('draft asset digest guard rejects an invalid expected digest or different asset name', () => {
+  assert.throws(
+    () => assertDraftAssetDigestMatches(
+      { name: ASSET, digest: DIGEST_A }, 'unknown', ASSET
+    ),
+    /Expected release asset digest must be a canonical SHA-256 digest/
+  );
+  assert.throws(
+    () => assertDraftAssetDigestMatches(
+      { name: 'wrong.flatpak', digest: DIGEST_A }, DIGEST_A, ASSET
+    ),
+    /no verifiable SHA-256 digest/
   );
 });
