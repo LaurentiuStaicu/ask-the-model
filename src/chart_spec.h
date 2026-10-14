@@ -37,6 +37,7 @@ typedef struct {
     guint calendar_year;
     const char *calendar_quarter; /* Non-NULL only for the BNR C01 quarterly profile. */
     guint source_row;
+    const char *missing_reason; /* Borrowed; non-NULL only for a qualified MISSING point. */
     AtmChartPointStatus y_status;
     const char *source_decimal;
     const char *coefficient;
