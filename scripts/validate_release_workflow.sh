@@ -72,7 +72,10 @@ required=(
   'classifyReleaseTagState({'
   "if (disposition === 'published-noop')"
   "if (disposition === 'repair-published')"
-  'assertReleaseTagMatchesCommit(verifiedTagRef, context.sha, tag)' \\\n  'assertReleaseTagMatchesCommit(finalTagRef, context.sha, tag)' \\\n  'if (error.status === 404)' \\\n  'throw error;'
+  'assertReleaseTagMatchesCommit(verifiedTagRef, context.sha, tag)'
+  'assertReleaseTagMatchesCommit(finalTagRef, context.sha, tag)'
+  'if (error.status === 404)'
+  'throw error;'
   'Published GitHub Release'
   'only after all release assets were attached'
 )
