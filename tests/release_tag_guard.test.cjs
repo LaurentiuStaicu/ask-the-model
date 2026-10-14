@@ -175,6 +175,6 @@ test('immutable published release missing its asset cannot be repaired', () => {
 test('tag guard refuses a non-SHA workflow identity', () => {
   assert.throws(
     () => assertReleaseTagMatchesCommit(ref(SHA_A), 'main', TAG),
-    /does not exist|40-hex/
+    /40-hex workflow commit SHA/
   );
 });
