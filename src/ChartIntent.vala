@@ -9,6 +9,36 @@ namespace AskTheModel {
         public bool energy_institute_requested { get; private set; }
         public string query { get; private set; }
 
+        /*
+         * Chart data and provenance are rendered by the qualified native
+         * Chart/Data widget. The conversational answer must not substitute
+         * partial retrieval excerpts for that complete admitted series.
+         */
+        public string response_guidance () {
+            if (energy_institute_requested) {
+                return
+                    "\\nThe native Chart/Data widget displays the complete admitted " +
+                    "Energy Institute TES series. For a chart request, give a brief " +
+                    "one- or two-sentence introduction and direct the user to the Chart/Data " +
+                    "tabs for the full series and provenance. Do not reproduce a data table " +
+                    "or individual year values unless the user explicitly asks for them. " +
+                    "Never treat a partial repository evidence excerpt as the chart's complete " +
+                    "series, and never claim other years are unavailable merely because they " +
+                    "do not appear in an excerpt. Do not contradict the admitted chart's " +
+                    "time range, source interpretation, or units.";
+            }
+            if (gistemp_requested) {
+                return
+                    "\\nThe native Chart/Data widget displays the qualified GISTEMP series. " +
+                    "For a chart request, give a brief one- or two-sentence introduction and " +
+                    "direct the user to the Chart/Data tabs for the full series and provenance. " +
+                    "Do not reproduce a data table or individual year values unless the user " +
+                    "explicitly asks for them. Do not infer that years are missing from partial " +
+                    "repository evidence excerpts or contradict the admitted chart's time range.";
+            }
+            return "";
+        }
+
         private ChartIntent (
             bool gistemp_requested,
             bool energy_institute_requested,
