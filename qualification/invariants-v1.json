@@ -831,6 +831,24 @@
         "meson:bnr-bls-verified-series",
         "meson:chart-spec"
       ]
+    },
+    {
+      "id": "SCIENTIFIC-S1-011",
+      "category": "SCIENTIFIC",
+      "severity": "S1",
+      "lifecycle": "enforced",
+      "statement": "BNR BLS C01 display projection may be produced only from the reconstructed source-specific atm-chart-spec/3 for the pinned RMD snapshot and exact twelve-quarter C01 tuple. It uses an ordered ordinal X domain 0..11 and a bounded 0..20 percent Y display domain, and projects exactly eleven source-row-bound numeric observations. The authorized 2025-Q2 MISSING coordinate retains its ordinal and exact reason but has no numeric projected point or CSV row; the line renderer must not bridge the non-consecutive point indices. Existing GISTEMP and Energy Institute projection policies remain unchanged. This projection does not enable rendering, Application routing or History persistence.",
+      "enforced_by": [
+        "src/chart_projection.c",
+        "src/chart_spec.c",
+        "src/bnr_bls_verified_series.c",
+        "src/bnr_bls_series_contract.c"
+      ],
+      "tested_by": [
+        "meson:chart-projection",
+        "meson:chart-spec",
+        "meson:bnr-bls-verified-series"
+      ]
     }
   ]
 }
