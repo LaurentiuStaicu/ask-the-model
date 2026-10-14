@@ -148,7 +148,10 @@ test_bnr_v3_source_bound_quarters_and_missing (void)
         g_assert_cmpuint (point.order, ==, i);
         g_assert_cmpstr (point.calendar_quarter, ==, quarters[i]);
         g_assert_cmpuint (point.calendar_year, ==, 0u);
-        g_assert_cmpuint (point.source_row, ==, 0u);
+        if (i == 10u)
+            g_assert_cmpuint (point.source_row, ==, 0u);
+        else
+            g_assert_cmpuint (point.source_row, ==, i < 10u ? i + 2u : 12u);
         g_assert_false (point.break_before);
         g_assert_nonnull (point.support);
         g_assert_cmpuint (point.support->len, >, 0u);
