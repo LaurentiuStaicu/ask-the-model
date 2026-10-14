@@ -1,6 +1,10 @@
 'use strict';
 
 function assertReleaseTagMatchesCommit(tagRef, currentSha, tag) {
+  if (!/^[0-9a-f]{40}$/.test(currentSha || '')) {
+    throw new Error('Release tag preflight requires the exact 40-hex workflow commit SHA.');
+  }
+
   if (!tagRef || !tagRef.object) {
     throw new Error(
       `Tag ${tag} does not exist; refusing to attach or publish a release without a verified tag ref.`
