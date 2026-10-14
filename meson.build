@@ -2882,8 +2882,9 @@ chart_spec_test = executable(
   ['src/chart_spec.c', 'src/verified_series.c', 'src/gistemp_sra.c', 'src/gistemp_evidence.c',
    'src/gistemp_admission.c', 'src/annual_series_candidate.c',
    'src/energy_institute_verified_series.c', 'src/energy_institute_admission.c',
-   'src/energy_institute_candidate.c', 'src/series_contract.c',
-   'src/series_evidence.c', 'src/series_evidence_adapters.c',
+   'src/energy_institute_candidate.c', 'src/bnr_bls_verified_series.c',
+   'src/bnr_bls_series_contract.c', 'src/bnr_bls_sra.c', 'src/bnr_bls_panel.c',
+   'src/series_contract.c', 'src/series_evidence.c', 'src/series_evidence_adapters.c',
    'src/series_sra.c', 'src/series_adapter.c',
    'src/scientific_canonical.c', 'src/scientific_artifact.c',
    'src/scientific_result.c', 'src/scientific_operation.c',
@@ -2893,7 +2894,10 @@ chart_spec_test = executable(
   install: false
 )
 test('chart-spec', chart_spec_test,
-  env: {'ATM_CHART01_FIXTURE': meson.current_source_dir() / 'tests/fixtures/chart01'})
+  env: {
+    'ATM_CHART01_FIXTURE': meson.current_source_dir() / 'tests/fixtures/chart01',
+    'ATM_BNR_BLS_FIXTURE': meson.current_source_dir() / 'tests/fixtures/chart01/rmd-bnr-bls'
+  })
 
 # CHART-02: bounded display projection; still no application caller.
 chart_projection_test = executable(
