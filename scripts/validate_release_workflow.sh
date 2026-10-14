@@ -90,6 +90,7 @@ required=(
   'async function getTagRefOrNull()'
   'const {'
   'classifyReleaseTagState({'
+  'selectReleaseForVersion(releases, tag, releaseName)'
   'assertDraftCanCreateMissingTag'
   'github.rest.repos.compareCommits({'
   'github.rest.git.createRef({'
@@ -184,6 +185,9 @@ guard_tests="tests/release_tag_guard.test.cjs"
 [[ -f "$guard_module" ]] || { printf 'Missing release tag guard module: %s\n' "$guard_module" >&2; exit 1; }
 [[ -f "$guard_tests" ]] || { printf 'Missing release tag guard tests: %s\n' "$guard_tests" >&2; exit 1; }
 for needle in \
+  'function selectReleaseForVersion' \
+  'orphanDrafts.length > 1' \
+  'Multiple untagged draft releases match' \
   'function classifyReleaseTagState' \
   'function assertDraftAssetDigestMatches' \
   'if (!release)' \
