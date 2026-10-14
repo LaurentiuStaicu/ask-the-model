@@ -134,7 +134,7 @@ done
 # 40-hex pin, and an explicit version comment. Accept major-only labels (such
 # as the published upload-artifact "v4" label) as well as full x.y.z labels.
 for action in 'actions/upload-artifact' 'actions/download-artifact'; do
-  if ! grep -Eq "^[[:space:]]*uses: \${action}@[0-9a-f]{40}[[:space:]]+# v[0-9]+(\.[0-9]+){0,2}$" "$workflow"; then
+  if ! grep -Eq "^[[:space:]]*uses: ${action}@[0-9a-f]{40}[[:space:]]+# v[0-9]+(\.[0-9]+){0,2}$" "$workflow"; then
     printf 'Missing fully pinned, version-labelled artifact action: %s\n' "$action" >&2
     exit 1
   fi
