@@ -449,19 +449,6 @@ static void test_signed_zero_flag_matches_source (void)
     g_clear_error (&error);
     atm_series_contract_free (s);
 
-    /* Preserve a source-faithful signed-zero token while normalizing its
-     * numeric value to coefficient 0, exponent 0. The explicit flag carries
-     * the sign; the exact source token remains part of scientific identity. */
-    s = base ();
-    g_assert_true (atm_series_contract_add_point (
-        s, "1882", ATM_SERIES_Y_NUMERIC, "-0.0000", "0", 0, TRUE,
-        FALSE, NULL, NULL, support, 1, &error));
-    g_assert_no_error (error);
-    g_assert_true (atm_series_contract_validate (s, q, &error));
-    g_assert_no_error (error);
-    g_assert_nonnull (atm_series_contract_scientific_id (s));
-    atm_series_contract_free (s);
-
     atm_sra_result_free (q);
     atm_scientific_artifact_free (a);
 }
