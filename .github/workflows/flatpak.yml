@@ -228,9 +228,16 @@ jobs:
               );
             }
 
-            if (release.draft) {
-              // Repeat the read after draft creation/resumption and immediately
-              // before using the build artifact, so a changed tag fails closed.
+
+            let existingAsset = release.assets.find(
+              (asset) => asset.name === assetName
+            );
+
+            if (!existingAsset) {
+              // Revalidate on every asset-upload path, including the narrow
+              // repair of a mutable published release missing its asset.
+              // The early no-op path above protects published releases that
+              // already contain the bundle; this check closes the upload race.
               const verifiedTagRef = await getTagRefOrNull();
               try {
                 assertReleaseTagMatchesCommit(verifiedTagRef, context.sha, tag);
@@ -238,13 +245,7 @@ jobs:
                 core.setFailed(error.message);
                 return;
               }
-            }
 
-            let existingAsset = release.assets.find(
-              (asset) => asset.name === assetName
-            );
-
-            if (!existingAsset) {
               const data = fs.readFileSync(assetPath);
 
               await github.rest.repos.uploadReleaseAsset({
