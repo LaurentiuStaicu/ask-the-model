@@ -98,6 +98,17 @@ test_ei_projection_renders_exact_data_and_resizes (void)
     AtmChartSpec *spec = ei_specification_for_renderer_test ();
     AtmChartRender *rendered = NULL;
     GError *error = NULL;
+
+    /* The GTK-embedded viewport is 480x348 logical pixels. It must fit the
+     * complete EI chart, including its provenance footer, rather than silently
+     * degrading to the compact "Chart needs more space" fallback. */
+    g_assert_true (atm_chart_render_new (spec, 480, 348, 1, &rendered, &error));
+    g_assert_no_error (error);
+    g_assert_nonnull (rendered);
+    g_assert_false (atm_chart_render_is_fallback (rendered));
+    atm_chart_render_free (rendered);
+    rendered = NULL;
+
     g_assert_true (atm_chart_render_new (spec, 860, 500, 1, &rendered, &error));
     g_assert_no_error (error);
     g_assert_nonnull (rendered);
