@@ -3704,12 +3704,6 @@ namespace AskTheModel {
                             cancellable
                         );
 
-                        if (cancellable.is_cancelled ()) {
-                            throw new GLib.IOError.CANCELLED (
-                                "Generation was stopped."
-                            );
-                        }
-
                         /*
                          * Construct the native chart independently from the
                          * model's prose, before committing the durable turn.
