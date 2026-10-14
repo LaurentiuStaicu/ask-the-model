@@ -2802,6 +2802,23 @@ test('bnr-bls-series-contract', bnr_bls_series_contract_test,
   env: {'ATM_BNR_BLS_FIXTURE': meson.current_source_dir() /
     'tests/fixtures/chart01/rmd-bnr-bls'})
 
+# CHART-01: source-specific VerifiedSeries qualification for BNR BLS C01.
+# Still native/test-only; the application chart route is a later qualification gate.
+bnr_bls_verified_series_test = executable(
+  'bnr-bls-verified-series-test',
+  ['src/bnr_bls_verified_series.c', 'src/bnr_bls_series_contract.c',
+   'src/bnr_bls_sra.c', 'src/bnr_bls_panel.c', 'src/series_contract.c',
+   'src/scientific_canonical.c', 'src/scientific_artifact.c',
+   'src/scientific_result.c', 'src/scientific_operation.c',
+   'src/scientific_derivation.c', 'tests/bnr_bls_verified_series_test.c'],
+  include_directories: include_directories('src'),
+  dependencies: [glib_dep, json_glib_dep],
+  install: false
+)
+test('bnr-bls-verified-series', bnr_bls_verified_series_test,
+  env: {'ATM_BNR_BLS_FIXTURE': meson.current_source_dir() /
+    'tests/fixtures/chart01/rmd-bnr-bls'})
+
 # CHART-01 M1c1: source-bound artifacts; still no application caller.
 gistemp_evidence_test = executable(
   'gistemp-evidence-test',
