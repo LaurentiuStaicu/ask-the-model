@@ -594,6 +594,28 @@ const char *atm_chart_spec_series_qualified_id (const AtmChartSpec *s, guint i)
 }
 guint atm_chart_spec_x_min (const AtmChartSpec *s) { return s ? s->x_min : 0; }
 guint atm_chart_spec_x_max (const AtmChartSpec *s) { return s ? s->x_max : 0; }
+
+const char *atm_chart_spec_calendar_quarter_min (const AtmChartSpec *s)
+{
+    if (s == NULL || s->version != ATM_CHART_SPEC_VERSION_BNR_BLS_C01_V3)
+        return NULL;
+    const AtmSeriesContract *contract = atm_bnr_bls_series_contract_value (
+        atm_bnr_bls_verified_series_contract (s->bnr_series));
+    return contract != NULL && contract->points != NULL && contract->points->len == 12u
+        ? ((const AtmSeriesContractPoint *) g_ptr_array_index (contract->points, 0))->x
+        : NULL;
+}
+
+const char *atm_chart_spec_calendar_quarter_max (const AtmChartSpec *s)
+{
+    if (s == NULL || s->version != ATM_CHART_SPEC_VERSION_BNR_BLS_C01_V3)
+        return NULL;
+    const AtmSeriesContract *contract = atm_bnr_bls_series_contract_value (
+        atm_bnr_bls_verified_series_contract (s->bnr_series));
+    return contract != NULL && contract->points != NULL && contract->points->len == 12u
+        ? ((const AtmSeriesContractPoint *) g_ptr_array_index (contract->points, 11))->x
+        : NULL;
+}
 const AtmScientificDecimal *atm_chart_spec_y_min (const AtmChartSpec *s) { return s ? &s->y_min : NULL; }
 const AtmScientificDecimal *atm_chart_spec_y_max (const AtmChartSpec *s) { return s ? &s->y_max : NULL; }
 
