@@ -60,16 +60,22 @@ namespace AskTheModel {
                 {
                     "explain", "interpret", "analyze", "analyse", "compare",
                     "summarize", "summarise", "describe", "discuss", "why",
-                    "what does", "what do", "what can we learn", "tell me",
-                    "meaning", "implication", "insight", "evaluate", "assess",
+                    "what does", "what do", "what is", "what are", "what was",
+                    "what were", "what's", "what can we learn", "tell me",
+                    "does the", "do the", "is there", "are there", "was there",
+                    "were there", "how does", "how do", "when was", "when were",
+                    "where was", "which", "meaning", "implication", "insight",
+                    "evaluate", "assess",
                     "calculate", "table", "values", "value", "list", "give me",
                     "which year", "when did", "how much", "how has", "how did",
                     "what happened", "data say", "analysis", "explanation",
                     "explică", "explica", "interpretează", "interpreteaza",
                     "analizează", "analizeaza", "compară", "compara",
                     "rezumă", "rezuma", "descrie", "discută", "discuta",
-                    "de ce", "ce înseamnă", "ce inseamna", "ce ne spune",
-                    "ce putem învăța", "ce putem invata", "arată valorile",
+                    "de ce", "ce este", "ce sunt", "care este", "care sunt",
+                    "când", "cand", "cum", "ce înseamnă", "ce inseamna",
+                    "ce ne spune", "ce putem învăța", "ce putem invata",
+                    "arată valorile",
                     "arata valorile", "tabel", "valorile", "valoare",
                     "listează", "listeaza", "calculează", "calculeaza",
                     "care an", "în ce an", "in ce an", "cât", "cat",
@@ -98,13 +104,13 @@ namespace AskTheModel {
 
             if (energy_institute_requested) {
                 return romanian
-                    ? "Graficul Energy Institute este prezentat separat în zona Chart/Data. Fila Data conține valorile anuale și proveniența surselor."
-                    : "The Energy Institute global total energy supply chart is handled separately in the native Chart/Data view. Data contains the annual values and source provenance.";
+                    ? "Iată graficul Energy Institute al furnizării totale globale de energie. Consultă fila Data pentru valorile anuale și proveniența surselor."
+                    : "Here is the Energy Institute global total energy supply chart. See the Data tab for the underlying annual values and source provenance.";
             }
             if (gistemp_requested) {
                 return romanian
-                    ? "Graficul GISTEMP al anomaliilor temperaturii globale este prezentat separat în zona Chart/Data. Fila Data conține valorile și proveniența surselor."
-                    : "The GISTEMP global temperature anomaly chart is handled separately in the native Chart/Data view. Data contains the underlying values and source provenance.";
+                    ? "Iată graficul GISTEMP al anomaliilor temperaturii globale. Consultă fila Data pentru valorile și proveniența surselor."
+                    : "Here is the GISTEMP global temperature anomaly chart. See the Data tab for the underlying values and source provenance.";
             }
             return "";
         }
