@@ -17,33 +17,110 @@ namespace AskTheModel {
         public string response_guidance () {
             if (energy_institute_requested) {
                 return
-                    "\nThe application renders the requested qualified Energy Institute TES " +
-                    "chart in its native Chart/Data widget. For a chart-only request, answer " +
-                    "with at most one brief sentence confirming what the chart shows, optionally " +
-                    "pointing to the Chart and Data tabs. Do not list individual years or values, " +
-                    "do not format partial observations as a table or pseudo-table, and do not " +
-                    "claim that the chart cannot be rendered or that more years are unavailable " +
-                    "because the model's retrieved evidence excerpt contains only a few rows. " +
-                    "The chart is generated separately from this prose using the complete " +
-                    "admitted series; the Data tab provides its values and provenance. Only " +
-                    "provide year-by-year values or a table when the user explicitly asks for " +
-                    "them. Never contradict the qualified chart's time range, interpretation, " +
-                    "or units.";
+                    "\nThe application attempts to construct the qualified Energy Institute TES " +
+                    "chart separately in its native Chart/Data widget. The widget, not the " +
+                    "prose answer, presents the full admitted series and source provenance. " +
+                    "For a chart-only request, do not reproduce chart data in prose: do not " +
+                    "list individual years or values, and do not format partial observations " +
+                    "as a table or pseudo-table. Do not claim that the chart cannot be rendered " +
+                    "or that more years are unavailable based only on a short retrieved excerpt. " +
+                    "Only provide year-by-year values or a table when the user explicitly asks " +
+                    "for them. For additional interpretation requests, do not contradict the " +
+                    "qualified chart's time range, interpretation, or units.";
             }
             if (gistemp_requested) {
                 return
-                    "\nThe application renders the requested qualified GISTEMP chart in its " +
-                    "native Chart/Data widget. For a chart-only request, answer with at most " +
-                    "one brief sentence confirming what the chart shows, optionally pointing " +
-                    "to the Chart and Data tabs. Do not list individual years or temperatures, " +
-                    "do not format partial observations as a table or pseudo-table, and do not " +
-                    "claim that the chart cannot be rendered or that more years are unavailable " +
-                    "because the model's retrieved evidence excerpt contains only a few rows. " +
-                    "The chart is generated separately from this prose using the complete " +
-                    "qualified series; the Data tab provides its values and provenance. " +
+                    "\nThe application attempts to construct the qualified GISTEMP chart " +
+                    "separately in its native Chart/Data widget. The widget, not the prose " +
+                    "answer, presents the full admitted series and source provenance. For a " +
+                    "chart-only request, do not reproduce chart data in prose: do not list " +
+                    "individual years or temperatures, and do not format partial observations " +
+                    "as a table or pseudo-table. Do not claim that the chart cannot be rendered " +
+                    "or that more years are unavailable based only on a short retrieved excerpt. " +
                     "Only provide year-by-year values or a table when the user explicitly asks " +
-                    "for them. Never contradict the qualified chart's scope or time range.";
+                    "for them. For additional interpretation requests, do not contradict the " +
+                    "qualified chart's scope or time range.";
             }
+            return "";
+        }
+
+        /*
+         * A chart command can be accompanied by a substantive question. Only
+         * replace the model's prose when the request asks for a visualization
+         * without also asking for interpretation or a textual data extract.
+         */
+        public bool is_chart_only_request () {
+            string normalized = query.down ().strip ();
+            if (normalized.length == 0) {
+                return false;
+            }
+
+            return !contains_any (
+                normalized,
+                {
+                    "explain", "interpret", "analyze", "analyse", "compare",
+                    "summarize", "summarise", "describe", "discuss", "why",
+                    "what does", "what do", "what can we learn", "tell me",
+                    "meaning", "implication", "insight", "evaluate", "assess",
+                    "calculate", "table", "values", "value", "list", "give me",
+                    "which year", "when did", "how much", "how has", "how did",
+                    "what happened", "data say", "analysis", "explanation",
+                    "explică", "explica", "interpretează", "interpreteaza",
+                    "analizează", "analizeaza", "compară", "compara",
+                    "rezumă", "rezuma", "descrie", "discută", "discuta",
+                    "de ce", "ce înseamnă", "ce inseamna", "ce ne spune",
+                    "ce putem învăța", "ce putem invata", "arată valorile",
+                    "arata valorile", "tabel", "valorile", "valoare",
+                    "listează", "listeaza", "calculează", "calculeaza",
+                    "care an", "în ce an", "in ce an", "cât", "cat",
+                    "analiză", "analiza", "interpretare", "ce observăm",
+                    "ce observam", "ce s-a întâmplat", "ce s-a intamplat"
+                }
+            );
+        }
+
+        /*
+         * Chart-only replies are deterministic. The model must not produce a
+         * partial table when the native chart is absent, nor claim success if
+         * the chart widget could not be constructed.
+         */
+        public string chart_only_response (bool chart_rendered) {
+            if (!is_chart_only_request ()) {
+                return "";
+            }
+
+            bool romanian = contains_any (
+                query.down (),
+                {
+                    "grafic", "arată", "arata", "generează", "genereaza",
+                    "creează", "creeaza", "afișează", "afiseaza",
+                    "temperatura globală", "temperatura globala",
+                    "furnizarea", "valorile", "în timp", "in timp"
+                }
+            );
+
+            if (energy_institute_requested) {
+                if (!chart_rendered) {
+                    return romanian
+                        ? "Graficul Energy Institute nu a putut fi generat în această solicitare. Consultă mesajul de stare de mai jos."
+                        : "I couldn't render the Energy Institute chart in this turn. See the status message below for the next step.";
+                }
+                return romanian
+                    ? "Iată graficul Energy Institute al furnizării totale globale de energie. Consultă fila Data pentru valorile anuale și proveniența surselor."
+                    : "Here is the Energy Institute global total energy supply chart. See the Data tab for the underlying annual values and source provenance.";
+            }
+
+            if (gistemp_requested) {
+                if (!chart_rendered) {
+                    return romanian
+                        ? "Graficul GISTEMP nu a putut fi generat în această solicitare. Consultă mesajul de stare de mai jos."
+                        : "I couldn't render the GISTEMP chart in this turn. See the status message below for the next step.";
+                }
+                return romanian
+                    ? "Iată graficul GISTEMP al anomaliilor temperaturii globale. Consultă fila Data pentru valorile și proveniența surselor."
+                    : "Here is the GISTEMP global temperature anomaly chart. See the Data tab for the underlying values and source provenance.";
+            }
+
             return "";
         }
 
