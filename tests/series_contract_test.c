@@ -1014,7 +1014,8 @@ static void test_missing_fact_rejects_numeric_payload (void)
         ",\"source_decimal\":\"1.0000\"",
         ",\"coefficient\":\"1\"",
         ",\"exponent\":\"1\"",
-        ",\"negative_zero\":true"
+        ",\"negative_zero\":true",
+        ",\"numeric_profile\":\"exact_decimal_coefficient_exponent/1\""
     };
 
     /* Isolate each forbidden numeric claim so each fail-closed branch is
