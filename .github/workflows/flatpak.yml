@@ -270,6 +270,18 @@ jobs:
               return;
             }
 
+            if (release.draft) {
+              // Close the upload-time race as well: revalidate the actual tag
+              // immediately before turning the draft into a published release.
+              const finalTagRef = await getTagRefOrNull();
+              try {
+                assertReleaseTagMatchesCommit(finalTagRef, context.sha, tag);
+              } catch (error) {
+                core.setFailed(error.message);
+                return;
+              }
+            }
+
             await github.rest.repos.updateRelease({
               owner: context.repo.owner,
               repo: context.repo.repo,
