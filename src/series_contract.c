@@ -454,6 +454,71 @@ point_matches_established_fact (const AtmSeriesContract *s,
         return FALSE;
     }
     JsonObject *object = json_node_get_object (root);
+    /* Source adapters retain the original decimal token in the qualified
+     * observation payload. If that token is present, bind it as well as the
+     * normalized numeric value; otherwise equivalent spellings such as
+     * 0.0000 and -0.0000 could be swapped while the SRA value stays 0e0. */
+    gboolean numeric_payload_matches = TRUE;
+    if (p->y_status == ATM_SERIES_Y_NUMERIC) {
+        gboolean has_source_decimal =
+            json_object_has_member (object, "source_decimal");
+
+        /* A negative-zero claim needs source-token evidence: the normalized
+         * SRA value 0e0 cannot establish its sign. Do not reject ordinary zero
+         * observations whose generic fact schema carries only the canonical
+         * numeric value; source-specific adapters separately reconstruct and
+         * verify their admitted source token. */
+        if (!has_source_decimal && p->negative_zero) {
+            numeric_payload_matches = FALSE;
+        } else if (has_source_decimal) {
+            JsonNode *node = json_object_get_member (object, "source_decimal");
+            numeric_payload_matches =
+                JSON_NODE_HOLDS_VALUE (node) &&
+                json_node_get_value_type (node) == G_TYPE_STRING &&
+                g_strcmp0 (json_node_get_string (node), p->source_decimal) == 0;
+        }
+
+        /* Source-bound SRA facts preserve these normalized numeric fields in
+         * their observation payload. When present, they must agree with the
+         * same point whose normalized value is being authorized. */
+        if (numeric_payload_matches &&
+            json_object_has_member (object, "coefficient")) {
+            JsonNode *node = json_object_get_member (object, "coefficient");
+            numeric_payload_matches =
+                JSON_NODE_HOLDS_VALUE (node) &&
+                json_node_get_value_type (node) == G_TYPE_STRING &&
+                g_strcmp0 (json_node_get_string (node), p->coefficient) == 0;
+        }
+        if (numeric_payload_matches &&
+            json_object_has_member (object, "exponent")) {
+            JsonNode *node = json_object_get_member (object, "exponent");
+            char *expected_exponent = g_strdup_printf (
+                "%" G_GINT64_FORMAT, p->exponent);
+            numeric_payload_matches =
+                JSON_NODE_HOLDS_VALUE (node) &&
+                json_node_get_value_type (node) == G_TYPE_STRING &&
+                g_strcmp0 (json_node_get_string (node), expected_exponent) == 0;
+            g_free (expected_exponent);
+        }
+        if (numeric_payload_matches &&
+            json_object_has_member (object, "numeric_profile")) {
+            JsonNode *node = json_object_get_member (object, "numeric_profile");
+            numeric_payload_matches =
+                JSON_NODE_HOLDS_VALUE (node) &&
+                json_node_get_value_type (node) == G_TYPE_STRING &&
+                g_strcmp0 (json_node_get_string (node),
+                           ATM_SERIES_CONTRACT_NUMERIC_PROFILE) == 0;
+        }
+        if (numeric_payload_matches &&
+            json_object_has_member (object, "negative_zero")) {
+            JsonNode *node = json_object_get_member (object, "negative_zero");
+            numeric_payload_matches =
+                JSON_NODE_HOLDS_VALUE (node) &&
+                json_node_get_value_type (node) == G_TYPE_BOOLEAN &&
+                json_node_get_boolean (node) == p->negative_zero;
+        }
+    }
+
     const char *x_value = NULL;
     const char *scenario = NULL;
     const char *epistemic_status = NULL;
@@ -503,6 +568,53 @@ point_matches_established_fact (const AtmSeriesContract *s,
             return FALSE;
         }
     }
+    /* MISSING cannot be paired with a fact whose qualified observation
+     * payload still claims a numeric token/value. Check the source payload as
+     * well as the contract point's NULL/zero representation. Generic source
+     * schemas may omit these fields or spell absent nullable values as null. */
+    if (p->y_status == ATM_SERIES_Y_MISSING) {
+        const char *numeric_text_fields[] = { "source_decimal", "coefficient" };
+        for (guint i = 0; i < G_N_ELEMENTS (numeric_text_fields); i++) {
+            const char *name = numeric_text_fields[i];
+            if (json_object_has_member (object, name) &&
+                !JSON_NODE_HOLDS_NULL (json_object_get_member (object, name))) {
+                g_object_unref (parser);
+                return FALSE;
+            }
+        }
+        if (json_object_has_member (object, "exponent")) {
+            JsonNode *node = json_object_get_member (object, "exponent");
+            gboolean zero_or_null = JSON_NODE_HOLDS_NULL (node);
+            if (JSON_NODE_HOLDS_VALUE (node) &&
+                json_node_get_value_type (node) == G_TYPE_STRING)
+                zero_or_null = g_strcmp0 (json_node_get_string (node), "0") == 0;
+            if (!zero_or_null) {
+                g_object_unref (parser);
+                return FALSE;
+            }
+        }
+        if (json_object_has_member (object, "negative_zero")) {
+            JsonNode *node = json_object_get_member (object, "negative_zero");
+            gboolean false_or_null = JSON_NODE_HOLDS_NULL (node);
+            if (JSON_NODE_HOLDS_VALUE (node) &&
+                json_node_get_value_type (node) == G_TYPE_BOOLEAN)
+                false_or_null = !json_node_get_boolean (node);
+            if (!false_or_null) {
+                g_object_unref (parser);
+                return FALSE;
+            }
+        }
+        /* A per-fact numeric encoding profile belongs to a NUMERIC
+         * observation, not to an absence assertion. The qualification-level
+         * numeric profile remains part of the enclosing SRA envelope. */
+        if (json_object_has_member (object, "numeric_profile") &&
+            !JSON_NODE_HOLDS_NULL (
+                json_object_get_member (object, "numeric_profile"))) {
+            g_object_unref (parser);
+            return FALSE;
+        }
+    }
+
     /* Discontinuity is scientific metadata too. A caller cannot add or erase
      * a break unless that exact point fact carries the same assertion. */
     if (json_object_has_member (object, "break_before")) {
@@ -538,7 +650,7 @@ point_matches_established_fact (const AtmSeriesContract *s,
         bounded (s->scenario, ATM_SERIES_CONTRACT_MAX_TEXT) &&
         g_strcmp0 (scenario, s->scenario) == 0 &&
         g_strcmp0 (epistemic_status, s->epistemic_status) == 0 &&
-        status_matches && reason_matches &&
+        status_matches && reason_matches && numeric_payload_matches &&
         fact_break_before == p->break_before &&
         g_strcmp0 (break_reason, p->break_reason) == 0;
     g_object_unref (parser);
@@ -696,6 +808,38 @@ calendar_quarter_scope_encloses_points (const AtmSeriesContract *s)
     return encloses;
 }
 
+/* UTC instants use a canonical inclusive ISO-8601 UTC range. Fixed-width,
+ * canonical endpoints let lexical ordering match chronological ordering. */
+static gboolean
+utc_instant_scope_encloses_points (const AtmSeriesContract *s)
+{
+    if (s->x_kind != ATM_SERIES_X_UTC_INSTANT)
+        return TRUE;
+    if (!bounded (s->time_scope, ATM_SERIES_CONTRACT_MAX_TEXT) ||
+        strlen (s->time_scope) != 42 ||
+        s->time_scope[20] != '.' || s->time_scope[21] != '.' ||
+        s->points == NULL || s->points->len == 0)
+        return FALSE;
+
+    char *start = g_strndup (s->time_scope, 20);
+    const char *end = s->time_scope + 22;
+    const AtmSeriesContractPoint *first =
+        g_ptr_array_index (s->points, 0);
+    const AtmSeriesContractPoint *last =
+        g_ptr_array_index (s->points, s->points->len - 1);
+    gboolean valid = first != NULL && last != NULL &&
+        x_valid (ATM_SERIES_X_UTC_INSTANT, start) &&
+        x_valid (ATM_SERIES_X_UTC_INSTANT, end) &&
+        x_valid (ATM_SERIES_X_UTC_INSTANT, first->x) &&
+        x_valid (ATM_SERIES_X_UTC_INSTANT, last->x);
+    gboolean encloses = valid &&
+        compare_x (ATM_SERIES_X_UTC_INSTANT, start, end) <= 0 &&
+        compare_x (ATM_SERIES_X_UTC_INSTANT, start, first->x) <= 0 &&
+        compare_x (ATM_SERIES_X_UTC_INSTANT, end, last->x) >= 0;
+    g_free (start);
+    return encloses;
+}
+
 static gboolean
 contract_snapshot_is_qualified (const AtmSeriesContract *s, const AtmSraResult *q)
 {
@@ -820,6 +964,9 @@ atm_series_contract_validate (AtmSeriesContract *s, const AtmSraResult *q, GErro
     if (!calendar_year_scope_encloses_points (s))
         return fail (error, ATM_SERIES_CONTRACT_ERROR_SHAPE,
                      "Calendar-year time scope does not enclose the series points.");
+    if (!utc_instant_scope_encloses_points (s))
+        return fail (error, ATM_SERIES_CONTRACT_ERROR_SHAPE,
+                     "UTC-instant time scope does not enclose the series points.");
     if (!calendar_quarter_scope_encloses_points (s))
         return fail (error, ATM_SERIES_CONTRACT_ERROR_SHAPE,
                      "Calendar-quarter time scope does not enclose the series points.");
