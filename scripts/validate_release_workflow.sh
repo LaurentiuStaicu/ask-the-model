@@ -91,7 +91,6 @@ required=(
   'const {'
   'classifyReleaseTagState({'
   'selectReleaseForVersion(releases, tag, releaseName)'
-  'Multiple untagged draft releases match'
   'assertDraftCanCreateMissingTag'
   'github.rest.repos.compareCommits({'
   'github.rest.git.createRef({'
@@ -188,6 +187,7 @@ guard_tests="tests/release_tag_guard.test.cjs"
 for needle in \
   'function selectReleaseForVersion'
   'orphanDrafts.length > 1'
+  'Multiple untagged draft releases match'
   'function classifyReleaseTagState' \
   'function assertDraftAssetDigestMatches' \
   'if (!release)' \
