@@ -1329,6 +1329,7 @@ static void test_utc_instant_scope_must_enclose_points (void)
         "scope",
         "2026-02-30T00:00:00Z..2026-12-31T23:59:59Z",
         "2027-01-01T00:00:00Z..2028-01-01T00:00:00Z",
+        "2025-01-01T00:00:00Z..2025-12-31T23:59:59Z",
         "2027-01-01T00:00:00Z..2025-01-01T00:00:00Z"
     };
     AtmScientificArtifact *a = support_artifact ();
