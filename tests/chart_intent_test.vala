@@ -69,13 +69,17 @@ int main () {
 
     string ei_guidance = ei_command.response_guidance ();
     assert (ei_guidance.contains ("Chart/Data tabs"));
-    assert (ei_guidance.contains ("Do not reproduce a data table"));
-    assert (ei_guidance.contains ("partial repository evidence excerpt"));
-    assert (ei_guidance.contains ("Do not contradict the admitted chart's"));
+    assert (ei_guidance.contains ("at most one brief sentence"));
+    assert (ei_guidance.contains ("pseudo-table"));
+    assert (ei_guidance.contains ("more years are unavailable"));
+    assert (ei_guidance.contains ("Only provide year-by-year values or a table"));
 
     string gistemp_guidance = requested.response_guidance ();
     assert (gistemp_guidance.contains ("Chart/Data tabs"));
-    assert (gistemp_guidance.contains ("Do not reproduce a data table"));
+    assert (gistemp_guidance.contains ("at most one brief sentence"));
+    assert (gistemp_guidance.contains ("pseudo-table"));
+    assert (gistemp_guidance.contains ("more years are unavailable"));
+    assert (gistemp_guidance.contains ("Only provide year-by-year values or a table"));
 
     assert (ordinary.response_guidance () == "");
 
