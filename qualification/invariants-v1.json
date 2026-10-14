@@ -866,6 +866,23 @@
         "meson:chart-projection",
         "meson:chart-spec"
       ]
+    },
+    {
+      "id": "SCIENTIFIC-S1-013",
+      "category": "SCIENTIFIC",
+      "severity": "S1",
+      "lifecycle": "enforced",
+      "statement": "The GTK ChartView accepts the exact BNR C01 v3 Data view row shape only after the source-bound renderer admits the profile. It exposes all twelve quarter coordinates in source order, distinguishes NUMERIC from MISSING, and displays a missing-quarter provenance record with the authoritative reason and no numeric value or physical source row. Numeric values, exact decimal representation, physical source row, source snapshot/path, qualified series identity and support identities remain source-bound. This reusable GTK component qualification does not authorize Application intent dispatch or History persistence.",
+      "enforced_by": [
+        "src/chart_view.c",
+        "src/chart_render.c",
+        "src/chart_projection.c",
+        "src/chart_spec.c"
+      ],
+      "tested_by": [
+        "meson:chart-view",
+        "workflow:CHART-03 GTK component"
+      ]
     }
   ]
 }
