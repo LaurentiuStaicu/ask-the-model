@@ -44,8 +44,9 @@ first_line_after() {
 tag_preflight_line="$(first_line 'let tagRef = await getTagRefOrNull();')"
 create_line="$(first_line 'github.rest.repos.createRelease({')"
 draft_line="$(first_line 'draft: true,')"
-post_create_tag_read_line="$(first_line 'const verifiedTagRef = await getTagRefOrNull();')"
-post_create_tag_assert_line="$(first_line 'assertReleaseTagMatchesCommit(verifiedTagRef, context.sha, tag);')"
+pre_upload_tag_read_line="$(first_line 'const verifiedTagRef = await getTagRefOrNull();')"
+pre_upload_tag_assert_line="$(first_line 'assertReleaseTagMatchesCommit(verifiedTagRef, context.sha, tag);')"
+upload_guard_line="$(first_line 'if (!existingAsset) {')"
 upload_line="$(first_line 'github.rest.repos.uploadReleaseAsset({')"
 pre_publish_tag_read_line="$(first_line 'const finalTagRef = await getTagRefOrNull();')"
 pre_publish_tag_assert_line="$(first_line 'assertReleaseTagMatchesCommit(finalTagRef, context.sha, tag);')"
@@ -54,16 +55,17 @@ publish_line="$(first_line 'draft: false,')"
 
 if ! (( tag_preflight_line < create_line &&
         create_line < draft_line &&
-        draft_line < post_create_tag_read_line &&
-        post_create_tag_read_line < post_create_tag_assert_line &&
-        post_create_tag_assert_line < upload_line &&
+        draft_line < upload_guard_line &&
+        upload_guard_line < pre_upload_tag_read_line &&
+        pre_upload_tag_read_line < pre_upload_tag_assert_line &&
+        pre_upload_tag_assert_line < upload_line &&
         upload_line < pre_publish_tag_read_line &&
         pre_publish_tag_read_line < pre_publish_tag_assert_line &&
         pre_publish_tag_assert_line < update_line &&
         update_line < publish_line )); then
-  printf '%s\n' 'Tag-read and tag-assert operations must precede asset upload and final publication; no draft may publish after its tag drifts.' >&2
-  printf 'lines: preflight=%s create=%s draft=%s post-create-read=%s post-create-assert=%s upload=%s pre-publish-read=%s pre-publish-assert=%s update=%s publish=%s\n' \
-    "$tag_preflight_line" "$create_line" "$draft_line" "$post_create_tag_read_line" "$post_create_tag_assert_line" \
+  printf '%s\n' 'The version tag must be rechecked inside every asset-upload branch and again before final draft publication.' >&2
+  printf 'lines: preflight=%s create=%s draft=%s upload-branch=%s pre-upload-read=%s pre-upload-assert=%s upload=%s pre-publish-read=%s pre-publish-assert=%s update=%s publish=%s\n' \
+    "$tag_preflight_line" "$create_line" "$draft_line" "$upload_guard_line" "$pre_upload_tag_read_line" "$pre_upload_tag_assert_line" \
     "$upload_line" "$pre_publish_tag_read_line" "$pre_publish_tag_assert_line" "$update_line" "$publish_line" >&2
   exit 1
 fi
