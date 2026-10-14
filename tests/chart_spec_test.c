@@ -135,8 +135,8 @@ test_bnr_v3_source_bound_quarters_and_missing (void)
     g_assert_cmpuint (atm_chart_spec_x_max (line), ==, 11u);
     g_assert_cmpstr (atm_chart_spec_calendar_quarter_min (line), ==, "2022-Q4");
     g_assert_cmpstr (atm_chart_spec_calendar_quarter_max (line), ==, "2025-Q3");
-    g_assert_null (atm_chart_spec_calendar_quarter_min (scatter));
-    g_assert_null (atm_chart_spec_calendar_quarter_max (scatter));
+    g_assert_cmpstr (atm_chart_spec_calendar_quarter_min (scatter), ==, "2022-Q4");
+    g_assert_cmpstr (atm_chart_spec_calendar_quarter_max (scatter), ==, "2025-Q3");
     g_assert_cmpuint (atm_chart_spec_point_count (line, 0), ==, 12u);
     g_assert_cmpstr (atm_chart_spec_y_min (line)->coefficient, ==, "0");
     g_assert_cmpstr (atm_chart_spec_y_max (line)->coefficient, ==, "1634");
