@@ -604,6 +604,15 @@ point_matches_established_fact (const AtmSeriesContract *s,
                 return FALSE;
             }
         }
+        /* A per-fact numeric encoding profile belongs to a NUMERIC
+         * observation, not to an absence assertion. The qualification-level
+         * numeric profile remains part of the enclosing SRA envelope. */
+        if (json_object_has_member (object, "numeric_profile") &&
+            !JSON_NODE_HOLDS_NULL (
+                json_object_get_member (object, "numeric_profile"))) {
+            g_object_unref (parser);
+            return FALSE;
+        }
     }
 
     /* Discontinuity is scientific metadata too. A caller cannot add or erase
