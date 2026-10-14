@@ -117,8 +117,6 @@ if [[ "$(grep -Fc -- 'contents: write' "$workflow")" -ne 1 ]]; then
 fi
 
 least_privilege=(
-  'actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02'
-  'actions/download-artifact@3e5f45b2cfb9172054b4087a40e8e0b5a5461e7c'
   'name: atm-flatpak-publication'
   'include-hidden-files: true'
 )
@@ -126,6 +124,18 @@ least_privilege=(
 for needle in "${least_privilege[@]}"; do
   if ! grep -Fq -- "$needle" "$workflow"; then
     printf 'Missing Flatpak least-privilege publication guard: %s\n' "$needle" >&2
+    exit 1
+  fi
+done
+
+# Artifact actions must remain pinned to immutable commit SHAs, but the guard
+# must not require one historical SHA forever: Dependabot updates the SHA when
+# a reviewed action release is bumped. Require the action identity, a full
+# 40-hex pin, and an explicit semantic-version comment for each publication
+# transfer action.
+for action in 'actions/upload-artifact' 'actions/download-artifact'; do
+  if ! grep -Eq "^[[:space:]]*uses: ${action}@[0-9a-f]{40}[[:space:]]+# v[0-9]+\\.[0-9]+\\.[0-9]+$" "$workflow"; then
+    printf 'Missing fully pinned, version-labelled artifact action: %s\n' "$action" >&2
     exit 1
   fi
 done
