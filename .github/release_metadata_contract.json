@@ -9,10 +9,10 @@
     "policy": "Release version changes are deliberate. A minor release is appropriate when substantial backward-compatible user-facing functionality is added; patch releases are reserved for compatible corrections."
   },
   "current_public_release": {
-    "version": "0.6.3",
-    "date": "2026-10-10",
+    "version": "0.7.0",
+    "date": "2026-10-14",
     "version_bump_required_now": false,
-    "reason": "v0.6.3 is the next compatible correction release for the reviewed current EWD GISTEMP snapshot admission and chart getter ownership; publication is gated on CI."
+    "reason": "v0.7.0 adds the source-qualified Energy Institute TES chart alongside GISTEMP v1 and strengthens managed conversation-export reconciliation and native SeriesContract validation. Publication follows the final metadata-bearing CI and Flatpak gate."
   },
   "canonical_sources": {
     "version": "meson.build project() version",
@@ -69,12 +69,12 @@
     "saved_conversation_history": "v0.5.0 makes explicit Save to History the only user-visible conversation save transition; later lifecycle changes must preserve exact-context restore and fail-closed permanent deletion semantics unless deliberately redesigned and documented.",
     "presentation": "v0.6.0 qualifies semantic transcript presentation and accessible grounded Sources; future presentation changes must preserve provider/persistence content and citation provenance boundaries.",
     "optimizations": "v0.6.0 exposes the session-only Optimizations gate defaulting OFF; qualified ON policies remain bounded and individually evidenced, while OFF retains the established baseline.",
-    "charting": "v0.6.1 supports the qualified GISTEMP chart intent from the exact pinned EWD source, recognizes clear natural-language requests, and renders from the complete pinned source independently of retrieved evidence excerpts; no generic/model-authored chart values or arbitrary source adapters are implied."
+    "charting": "v0.7.0 supports only the explicitly qualified GISTEMP v1 and Energy Institute TES v2 chart paths from exact pinned EWD sources, with source-qualified History reconstruction; no generic/model-authored chart data or arbitrary source adapters are implied."
   },
   "release_candidate": {
-    "version": "0.6.3",
+    "version": null,
     "date": null,
-    "status": "unreleased",
-    "scope": "Future post-v0.6.2 work; release date remains deliberately unset until a release candidate is qualified."
+    "status": "unset",
+    "scope": "No 0.7.1 candidate is declared yet. Scope and release date will be set only after post-0.7.0 acceptance findings and priorities are reviewed."
   }
 }
