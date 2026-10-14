@@ -260,8 +260,9 @@ projection_bnr_fill (AtmChartProjection *p, GError **error)
             point.source_row != expected_row || point.missing_reason != NULL ||
             point.source_decimal == NULL || point.coefficient == NULL)
             return reject (error, "BNR projection requires source-row-bound numeric observations.");
-        if (point.exponent < -2 || point.exponent > 0 ||
-            !fixed (point.coefficient, point.exponent, &values[i], error))
+        if (point.exponent < -2 || point.exponent > 0)
+            return reject (error, "BNR percentage precision is outside the bounded display profile.");
+        if (!fixed (point.coefficient, point.exponent, &values[i], error))
             return FALSE;
         if (values[i] < 0 || values[i] > 200000)
             return reject (error, "BNR percentage is outside the bounded 0..20 display policy.");
