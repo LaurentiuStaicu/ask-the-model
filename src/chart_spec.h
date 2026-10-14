@@ -96,8 +96,12 @@ const char *atm_chart_spec_series_repository_id (const AtmChartSpec *spec, guint
 const AtmVerifiedSeries *atm_chart_spec_series (const AtmChartSpec *spec, guint index);
 const char *atm_chart_spec_series_scientific_id (const AtmChartSpec *spec, guint index);
 const char *atm_chart_spec_series_qualified_id (const AtmChartSpec *spec, guint index);
+/* Annual profiles expose numeric year extents. BNR v3 exposes ordinal
+ * x_min/x_max plus these authoritative quarter-label extents. */
 guint atm_chart_spec_x_min (const AtmChartSpec *spec);
 guint atm_chart_spec_x_max (const AtmChartSpec *spec);
+const char *atm_chart_spec_calendar_quarter_min (const AtmChartSpec *spec);
+const char *atm_chart_spec_calendar_quarter_max (const AtmChartSpec *spec);
 const AtmScientificDecimal *atm_chart_spec_y_min (const AtmChartSpec *spec);
 const AtmScientificDecimal *atm_chart_spec_y_max (const AtmChartSpec *spec);
 G_END_DECLS
