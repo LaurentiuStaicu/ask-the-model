@@ -67,6 +67,18 @@ int main () {
     assert (ei_command.energy_institute_requested);
     assert (ei_command.query == "Show the global TES trend.");
 
+    string ei_guidance = ei_command.response_guidance ();
+    assert (ei_guidance.contains ("Chart/Data tabs"));
+    assert (ei_guidance.contains ("Do not reproduce a data table"));
+    assert (ei_guidance.contains ("partial repository evidence excerpt"));
+    assert (ei_guidance.contains ("Do not contradict the admitted chart's"));
+
+    string gistemp_guidance = requested.response_guidance ();
+    assert (gistemp_guidance.contains ("Chart/Data tabs"));
+    assert (gistemp_guidance.contains ("Do not reproduce a data table"));
+
+    assert (ordinary.response_guidance () == "");
+
     var ei_upper = AskTheModel.ChartIntent.parse (
         "/CHART ENERGY-INSTITUTE Show the global TES trend."
     );
