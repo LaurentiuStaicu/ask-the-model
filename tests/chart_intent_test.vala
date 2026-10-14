@@ -74,15 +74,17 @@ int main () {
     assert (ei_guidance.contains ("more years are unavailable"));
     assert (ei_guidance.contains ("Only provide year-by-year values or a table"));
     assert (ei_command.is_chart_only_request ());
-    assert (ei_command.chart_only_response (true).contains ("Energy Institute global total energy supply chart"));
-    assert (!ei_command.chart_only_response (false).contains ("Here is the"));
-    assert (ei_command.chart_only_response (false).contains ("couldn't render"));
+    string ei_response = ei_command.chart_only_response ();
+    assert (ei_response.contains ("Energy Institute global total energy supply chart"));
+    assert (ei_response.contains ("native Chart/Data view"));
+    assert (!ei_response.contains ("pseudo-table"));
+    assert (!ei_response.contains ("couldn't render"));
 
     var ei_interpretation = AskTheModel.ChartIntent.parse (
         "/chart energy-institute Explain the trend in the data."
     );
     assert (!ei_interpretation.is_chart_only_request ());
-    assert (ei_interpretation.chart_only_response (true) == "");
+    assert (ei_interpretation.chart_only_response () == "");
 
     var ei_table = AskTheModel.ChartIntent.parse (
         "/chart energy-institute Show the annual values in a table."
@@ -96,18 +98,20 @@ int main () {
     assert (gistemp_guidance.contains ("more years are unavailable"));
     assert (gistemp_guidance.contains ("Only provide year-by-year values or a table"));
     assert (requested.is_chart_only_request ());
-    assert (requested.chart_only_response (true).contains ("GISTEMP global temperature anomaly chart"));
-    assert (!requested.chart_only_response (false).contains ("Here is the"));
-    assert (requested.chart_only_response (false).contains ("couldn't render"));
+    string gistemp_response = requested.chart_only_response ();
+    assert (gistemp_response.contains ("GISTEMP global temperature anomaly chart"));
+    assert (gistemp_response.contains ("native Chart/Data view"));
+    assert (!gistemp_response.contains ("pseudo-table"));
+    assert (!gistemp_response.contains ("couldn't render"));
 
     var gistemp_interpretation = AskTheModel.ChartIntent.parse (
         "/chart gistemp Explain what the temperature trend means."
     );
     assert (!gistemp_interpretation.is_chart_only_request ());
-    assert (gistemp_interpretation.chart_only_response (true) == "");
+    assert (gistemp_interpretation.chart_only_response () == "");
 
-    assert (natural_english.chart_only_response (true).contains ("GISTEMP global temperature anomaly chart"));
-    assert (natural_romanian.chart_only_response (true).contains ("Iată graficul GISTEMP"));
+    assert (natural_english.chart_only_response ().contains ("GISTEMP global temperature anomaly chart"));
+    assert (natural_romanian.chart_only_response ().contains ("Iată graficul GISTEMP"));
     assert (ordinary.response_guidance () == "");
 
     var ei_upper = AskTheModel.ChartIntent.parse (
