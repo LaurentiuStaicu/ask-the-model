@@ -68,8 +68,8 @@ required=(
   'async function getTagRefOrNull()'
   'const {'
   'classifyReleaseTagState({'
-  'if (disposition === \'published-noop\')'
-  'if (disposition === \'repair-published\')'
+  "if (disposition === 'published-noop')"
+  "if (disposition === 'repair-published')"
   'assertReleaseTagMatchesCommit(verifiedTagRef, context.sha, tag)'
   'Published GitHub Release'
   'only after all release assets were attached'
