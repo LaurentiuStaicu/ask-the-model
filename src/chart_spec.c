@@ -644,7 +644,8 @@ gboolean atm_chart_spec_point (const AtmChartSpec *s, guint series_index,
         if (p == NULL || p->x == NULL) return FALSE;
         out->order = p->order;
         out->calendar_quarter = p->x;
-        out->source_row = 0u; /* A missing quarter is an assertion, not a CSV row. */
+        out->source_row = atm_bnr_bls_verified_series_source_row (
+            s->bnr_series, point_index);
         out->y_status = p->y_status == ATM_SERIES_Y_NUMERIC
             ? ATM_CHART_POINT_NUMERIC : ATM_CHART_POINT_MISSING;
         out->source_decimal = p->source_decimal;
