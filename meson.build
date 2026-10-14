@@ -2972,7 +2972,10 @@ chart_render_test = executable(
   install: false
 )
 test('chart-render', chart_render_test,
-  env: {'ATM_CHART01_FIXTURE': meson.current_source_dir() / 'tests/fixtures/chart01'})
+  env: {
+    'ATM_CHART01_FIXTURE': meson.current_source_dir() / 'tests/fixtures/chart01',
+    'ATM_BNR_BLS_FIXTURE': meson.current_source_dir() / 'tests/fixtures/chart01/rmd-bnr-bls'
+  })
 
 # CHART-03: reusable GTK component and Vala ABI; deliberately test-only.
 chart_view_test = executable(
