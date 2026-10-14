@@ -20,11 +20,11 @@
       chat tabs and lets users explicitly save selected conversations to local History.
     </p>
     <p>
-      Version 0.7.0 adds a source-qualified Energy Institute Total Energy Supply chart
-      alongside the existing GISTEMP path, with saved chart recipes reconstructed from
-      their pinned processed EWD source. Startup conversation-export reconciliation and
-      native series-contract validation are also strengthened. Charting remains limited
-      to the two qualified profiles; generic charts and model-authored data are not enabled.
+      Version 0.7.1 fixes transcript-embedded chart sizing and chart-only response
+      presentation for the two qualified profiles, GISTEMP v1 and Energy Institute TES v2.
+      Chart-only requests no longer substitute partial retrieval excerpts as year/value
+      lists or pseudo-tables; explicit interpretation, values and table requests remain
+      grounded. The v0.7.0 source-qualified chart and History capabilities are preserved.
     </p>
     <p>
       AtM remains an interface and retrieval layer. The external provider owns
@@ -52,6 +52,15 @@
   </screenshots>
 
   <releases>
+    <release version="0.7.1" date="2026-10-14">
+      <description>
+        <p>
+          Fixed transcript-embedded chart sizing and chart-only response presentation
+          for the qualified GISTEMP v1 and Energy Institute TES v2 paths. Explicit
+          interpretation and year/value/table requests remain grounded answers.
+        </p>
+      </description>
+    </release>
     <release version="0.7.0" date="2026-10-14">
       <description>
         <p>
