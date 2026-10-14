@@ -76,7 +76,7 @@ int main () {
     assert (ei_command.is_chart_only_request ());
     string ei_response = ei_command.chart_only_response ();
     assert (ei_response.contains ("Energy Institute global total energy supply chart"));
-    assert (ei_response.contains ("native Chart/Data view"));
+    assert (ei_response.contains ("Data tab"));
     assert (!ei_response.contains ("pseudo-table"));
     assert (!ei_response.contains ("couldn't render"));
 
@@ -106,7 +106,7 @@ int main () {
     assert (requested.is_chart_only_request ());
     string gistemp_response = requested.chart_only_response ();
     assert (gistemp_response.contains ("GISTEMP global temperature anomaly chart"));
-    assert (gistemp_response.contains ("native Chart/Data view"));
+    assert (gistemp_response.contains ("Data tab"));
     assert (!gistemp_response.contains ("pseudo-table"));
     assert (!gistemp_response.contains ("couldn't render"));
 
