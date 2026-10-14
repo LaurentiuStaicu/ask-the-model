@@ -3704,6 +3704,46 @@ namespace AskTheModel {
                             cancellable
                         );
 
+                        if (cancellable.is_cancelled ()) {
+                            throw new GLib.IOError.CANCELLED (
+                                "Generation was stopped."
+                            );
+                        }
+
+                        /*
+                         * Construct the native chart independently from the
+                         * model's prose, before committing the durable turn.
+                         * This lets chart-only requests use a deterministic
+                         * response that reflects whether a chart was built.
+                         */
+                        Gtk.Widget[] live_chart_widgets = {};
+                        ConversationPersistenceChart[] live_charts = {};
+
+                        if (source_chart_requested) {
+                            try {
+                                live_chart_widgets =
+                                    build_live_chart_widgets (
+                                        state.session,
+                                        chart_intent.energy_institute_requested,
+                                        out live_charts
+                                    );
+                            } catch (GLib.Error chart_error) {
+                                live_chart_widgets = {};
+                                live_charts = {};
+                                stderr.printf (
+                                    "AtM: qualified live chart unavailable: %s\n",
+                                    chart_error.message
+                                );
+                            }
+                        }
+
+                        if (source_chart_requested &&
+                            chart_intent.is_chart_only_request ()) {
+                            answer = chart_intent.chart_only_response (
+                                live_chart_widgets.length > 0
+                            );
+                        }
+
                         CitationResolution citation_resolution =
                             state.session.resolve_turn_citations (
                                 answer
@@ -3810,37 +3850,17 @@ namespace AskTheModel {
 
                         grounded_turn_prepared = false;
 
-                        Gtk.Widget[] live_chart_widgets = {};
-                        ConversationPersistenceChart[] live_charts = {};
-
-                        if (source_chart_requested) {
-                            try {
-                                live_chart_widgets =
-                                    build_live_chart_widgets (
-                                        state.session,
-                                        chart_intent.energy_institute_requested,
-                                        out live_charts
-                                    );
-
-                                if (live_charts.length > 0 &&
-                                    conversation_store != null &&
-                                    state.persistent_id != null) {
-                                    foreach (
-                                        ConversationPersistenceChart chart
-                                        in live_charts
-                                    ) {
-                                        conversation_store.attach_chart (
-                                            state.persistent_id,
-                                            committed_turn_no,
-                                            chart
-                                        );
-                                    }
-                                }
-                            } catch (GLib.Error chart_error) {
-                                live_chart_widgets = {};
-                                stderr.printf (
-                                    "AtM: qualified live chart unavailable: %s\n",
-                                    chart_error.message
+                        if (live_charts.length > 0 &&
+                            conversation_store != null &&
+                            state.persistent_id != null) {
+                            foreach (
+                                ConversationPersistenceChart chart
+                                in live_charts
+                            ) {
+                                conversation_store.attach_chart (
+                                    state.persistent_id,
+                                    committed_turn_no,
+                                    chart
                                 );
                             }
                         }
