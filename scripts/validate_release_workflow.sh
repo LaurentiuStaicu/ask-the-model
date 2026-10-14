@@ -46,6 +46,8 @@ create_line="$(first_line 'github.rest.repos.createRelease({')"
 draft_line="$(first_line 'draft: true,')"
 pre_upload_tag_read_line="$(first_line 'const verifiedTagRef = await getTagRefOrNull();')"
 pre_upload_tag_assert_line="$(first_line 'assertReleaseTagMatchesCommit(verifiedTagRef, context.sha, tag);')"
+draft_asset_guard_line="$(first_line 'if (release.draft && existingAsset) {')"
+draft_asset_assert_line="$(first_line 'assertDraftAssetDigestMatches(')"
 upload_guard_line="$(first_line 'if (!existingAsset) {')"
 upload_line="$(first_line 'github.rest.repos.uploadReleaseAsset({')"
 draft_publish_guard_line="$(first_line 'if (release.draft) {')"
@@ -60,6 +62,9 @@ if ! (( tag_preflight_line < create_line &&
         upload_guard_line < pre_upload_tag_read_line &&
         pre_upload_tag_read_line < pre_upload_tag_assert_line &&
         pre_upload_tag_assert_line < upload_line &&
+        draft_asset_guard_line < draft_asset_assert_line &&
+        draft_asset_assert_line < upload_guard_line &&
+        draft_asset_assert_line < draft_publish_guard_line &&
         upload_line < draft_publish_guard_line &&
         draft_publish_guard_line < pre_publish_tag_read_line &&
         pre_publish_tag_read_line < pre_publish_tag_assert_line &&
@@ -78,6 +83,8 @@ required=(
   'async function getTagRefOrNull()'
   'const {'
   'classifyReleaseTagState({'
+  "const crypto = require('crypto');"
+  'assertDraftAssetDigestMatches('
   "if (disposition === 'published-noop')"
   "if (disposition === 'repair-published')"
   'assertReleaseTagMatchesCommit(verifiedTagRef, context.sha, tag)'
@@ -168,6 +175,7 @@ guard_tests="tests/release_tag_guard.test.cjs"
 [[ -f "$guard_tests" ]] || { printf 'Missing release tag guard tests: %s\n' "$guard_tests" >&2; exit 1; }
 for needle in \
   'function classifyReleaseTagState' \
+  'function assertDraftAssetDigestMatches' \
   'if (!release)' \
   'already exists without an associated GitHub Release' \
   'release.target_commitish !== currentSha' \
