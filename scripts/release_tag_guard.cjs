@@ -75,7 +75,31 @@ function classifyReleaseTagState({ release, tagRef, currentSha, assetName }) {
   return 'repair-published';
 }
 
+
+function assertDraftAssetDigestMatches(asset, expectedDigest, assetName) {
+  if (!/^sha256:[0-9a-f]{64}$/.test(expectedDigest || '')) {
+    throw new Error('Expected release asset digest must be a canonical SHA-256 digest.');
+  }
+
+  if (
+    !asset ||
+    asset.name !== assetName ||
+    !/^sha256:[0-9a-f]{64}$/.test(asset.digest || '')
+  ) {
+    throw new Error(
+      `Draft release asset ${assetName} has no verifiable SHA-256 digest; refusing to publish an unverifiable bundle. Remove the draft asset and rerun the workflow.`
+    );
+  }
+
+  if (asset.digest !== expectedDigest) {
+    throw new Error(
+      `Draft release asset ${assetName} digest does not match the current verified build; refusing publication. Remove the draft asset and rerun the workflow to upload the checked bundle.`
+    );
+  }
+}
+
 module.exports = {
   assertReleaseTagMatchesCommit,
+  assertDraftAssetDigestMatches,
   classifyReleaseTagState,
 };
