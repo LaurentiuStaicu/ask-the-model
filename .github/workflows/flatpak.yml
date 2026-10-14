@@ -97,6 +97,7 @@ jobs:
           github-token: ${{ secrets.GITHUB_TOKEN }}
           script: |
             const fs = require('fs');
+            const crypto = require('crypto');
 
             const meson = fs.readFileSync('meson.build', 'utf8');
             const match = meson.match(/version:\s*'([^']+)'/);
@@ -154,6 +155,7 @@ jobs:
 
             const {
               assertReleaseTagMatchesCommit,
+              assertDraftAssetDigestMatches,
               classifyReleaseTagState,
             } = require('./scripts/release_tag_guard.cjs');
 
@@ -232,6 +234,26 @@ jobs:
             let existingAsset = release.assets.find(
               (asset) => asset.name === assetName
             );
+
+            // Reuse an existing draft asset only when GitHub's recorded digest
+            // matches the exact bundle produced and tested by this workflow.
+            // A stale or unverifiable same-name asset must never be published.
+            if (release.draft && existingAsset) {
+              const expectedAssetDigest = 'sha256:' + crypto
+                .createHash('sha256')
+                .update(fs.readFileSync(assetPath))
+                .digest('hex');
+              try {
+                assertDraftAssetDigestMatches(
+                  existingAsset,
+                  expectedAssetDigest,
+                  assetName
+                );
+              } catch (error) {
+                core.setFailed(error.message);
+                return;
+              }
+            }
 
             if (!existingAsset) {
               // Revalidate on every asset-upload path, including the narrow
