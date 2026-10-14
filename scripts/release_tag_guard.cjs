@@ -24,6 +24,31 @@ function assertReleaseTagMatchesCommit(tagRef, currentSha, tag) {
   }
 }
 
+
+function assertDraftCanCreateMissingTag(release, currentSha, tag) {
+  if (!/^[0-9a-f]{40}$/.test(currentSha || '')) {
+    throw new Error('Release tag preflight requires the exact 40-hex workflow commit SHA.');
+  }
+
+  if (!release || !release.draft || release.tag_name !== tag) {
+    throw new Error(
+      `Only the matching draft release can create missing tag ${tag}.`
+    );
+  }
+
+  if (release.target_commitish !== currentSha) {
+    throw new Error(
+      `Draft release ${tag} must target exact workflow commit ${currentSha} before creating its missing tag.`
+    );
+  }
+
+  if (!Array.isArray(release.assets) || release.assets.length !== 0) {
+    throw new Error(
+      `Draft release ${tag} must have no assets before creating its missing tag.`
+    );
+  }
+}
+
 function classifyReleaseTagState({ release, tagRef, currentSha, assetName }) {
   if (!/^[0-9a-f]{40}$/.test(currentSha || '')) {
     throw new Error('Release tag preflight requires the exact 40-hex workflow commit SHA.');
@@ -55,6 +80,10 @@ function classifyReleaseTagState({ release, tagRef, currentSha, assetName }) {
   }
 
   if (release.draft) {
+    if (!tagRef) {
+      assertDraftCanCreateMissingTag(release, currentSha, release.tag_name);
+      return 'resume-draft-create-tag';
+    }
     assertReleaseTagMatchesCommit(tagRef, currentSha, release.tag_name);
     if (release.target_commitish && release.target_commitish !== currentSha) {
       throw new Error(
@@ -100,6 +129,7 @@ function assertDraftAssetDigestMatches(asset, expectedDigest, assetName) {
 
 module.exports = {
   assertReleaseTagMatchesCommit,
+  assertDraftCanCreateMissingTag,
   assertDraftAssetDigestMatches,
   classifyReleaseTagState,
 };

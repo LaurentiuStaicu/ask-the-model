@@ -83,6 +83,9 @@ required=(
   'async function getTagRefOrNull()'
   'const {'
   'classifyReleaseTagState({'
+  'assertDraftCanCreateMissingTag'
+  'github.rest.repos.compareCommits({'
+  'github.rest.git.createRef({'
   "const crypto = require('crypto');"
   'assertDraftAssetDigestMatches('
   "if (disposition === 'published-noop')"

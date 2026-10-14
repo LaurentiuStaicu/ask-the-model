@@ -157,6 +157,7 @@ jobs:
               assertReleaseTagMatchesCommit,
               assertDraftAssetDigestMatches,
               classifyReleaseTagState,
+              assertDraftCanCreateMissingTag,
             } = require('./scripts/release_tag_guard.cjs');
 
             async function getTagRefOrNull() {
@@ -176,6 +177,78 @@ jobs:
             }
 
             let tagRef = await getTagRefOrNull();
+
+            // A previous run may have left an empty draft release before it
+            // could create its version tag. Retarget that draft only when the
+            // old target is an exact commit ancestor of this push and no tag or
+            // asset exists; never retarget a published release or a populated draft.
+            if (release && release.draft && !tagRef && release.target_commitish !== context.sha) {
+              const previousTarget = release.target_commitish;
+              if (!Array.isArray(release.assets) || release.assets.length !== 0) {
+                core.setFailed(
+                  `Refusing to retarget draft release ${tag}: it is not empty and has no verified tag ref.`
+                );
+                return;
+              }
+              if (!/^[0-9a-f]{40}$/.test(previousTarget || '')) {
+                core.setFailed(
+                  `Refusing to retarget draft release ${tag}: previous target is not an exact commit SHA.`
+                );
+                return;
+              }
+
+              let comparison;
+              try {
+                comparison = (await github.rest.repos.compareCommits({
+                  owner: context.repo.owner,
+                  repo: context.repo.repo,
+                  base: previousTarget,
+                  head: context.sha,
+                })).data;
+              } catch (error) {
+                core.setFailed(
+                  `Could not verify ancestry for empty draft release ${tag}: ${error.message}`
+                );
+                return;
+              }
+
+              if (
+                comparison.status !== 'ahead' ||
+                comparison.base_commit?.sha !== previousTarget ||
+                comparison.merge_base_commit?.sha !== previousTarget
+              ) {
+                core.setFailed(
+                  `Refusing to retarget draft release ${tag}: previous target ${previousTarget} is not an ancestor of workflow commit ${context.sha}.`
+                );
+                return;
+              }
+
+              let retargeted;
+              try {
+                retargeted = await github.rest.repos.updateRelease({
+                  owner: context.repo.owner,
+                  repo: context.repo.repo,
+                  release_id: release.id,
+                  target_commitish: context.sha,
+                });
+              } catch (error) {
+                core.setFailed(
+                  `Could not retarget empty draft release ${tag}: ${error.message}`
+                );
+                return;
+              }
+              release = retargeted.data;
+              if (release.target_commitish !== context.sha) {
+                core.setFailed(
+                  `GitHub did not retarget draft release ${tag} to workflow commit ${context.sha}.`
+                );
+                return;
+              }
+              core.info(
+                `Retargeted empty draft release ${tag} after verifying that its previous target is an ancestor of this workflow commit.`
+              );
+            }
+
             let disposition;
             try {
               disposition = classifyReleaseTagState({
@@ -206,6 +279,12 @@ jobs:
               core.info(`Resuming existing draft GitHub Release ${tag} after tag preflight.`);
             }
 
+            if (disposition === 'resume-draft-create-tag') {
+              core.info(
+                `Resuming empty draft GitHub Release ${tag}; will create and verify its missing direct tag before uploading assets.`
+              );
+            }
+
             if (!release) {
               const response = await github.rest.repos.createRelease({
                 owner: context.repo.owner,
@@ -230,6 +309,49 @@ jobs:
               );
             }
 
+
+            // A draft release does not reliably materialize its git ref when
+            // createRelease is called with draft=true. Create the missing direct
+            // ref only after verifying that this is the empty draft for this exact
+            // workflow commit; then read the ref back and validate it before upload.
+            tagRef = await getTagRefOrNull();
+            if (!tagRef) {
+              try {
+                assertDraftCanCreateMissingTag(release, context.sha, tag);
+              } catch (error) {
+                core.setFailed(error.message);
+                return;
+              }
+
+              try {
+                await github.rest.git.createRef({
+                  owner: context.repo.owner,
+                  repo: context.repo.repo,
+                  ref: `refs/tags/${tag}`,
+                  sha: context.sha,
+                });
+              } catch (error) {
+                // A concurrent publisher can win the create-ref race. Read the
+                // actual ref back and accept it only if the strict verifier below
+                // proves it points directly at this exact workflow commit.
+                if (error.status !== 422) {
+                  core.setFailed(
+                    `Could not create direct tag ref for ${tag}: ${error.message}`
+                  );
+                  return;
+                }
+              }
+
+              tagRef = await getTagRefOrNull();
+            }
+
+            try {
+              assertReleaseTagMatchesCommit(tagRef, context.sha, tag);
+            } catch (error) {
+              core.setFailed(error.message);
+              return;
+            }
+            core.info(`Verified direct release tag ${tag} at workflow commit ${context.sha}.`);
 
             let existingAsset = release.assets.find(
               (asset) => asset.name === assetName
