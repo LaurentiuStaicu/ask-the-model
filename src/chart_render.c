@@ -268,17 +268,17 @@ static gboolean layout_fits_bnr (cairo_t *cr, const AtmChartProjection *p, guint
             return FALSE;
         previous_right = right;
     }
-    double previous_top = 1e9;
+    double previous_bottom = -1e9;
     for (guint i = 0; i < atm_chart_projection_y_tick_count (p); i++) {
         const AtmChartTick *tick = atm_chart_projection_y_tick (p, i);
         cairo_text_extents_t extent;
         cairo_text_extents (cr, tick->label, &extent);
         double baseline = 108.0 + tick->position + 4.0;
         double top = baseline + extent.y_bearing;
-        if (extent.width > 36.0 ||
-            baseline + extent.y_bearing + extent.height + 4.0 > previous_top)
+        double bottom = top + extent.height;
+        if (extent.width > 36.0 || top < previous_bottom + 4.0)
             return FALSE;
-        previous_top = top;
+        previous_bottom = bottom;
     }
     return fits (cr, "Net percentage, non-financial corporations", width - 32) &&
         fits (cr, "Source: RMD pinned BNR BLS C01", width - 32) &&
