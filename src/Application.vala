@@ -3704,38 +3704,9 @@ namespace AskTheModel {
                             cancellable
                         );
 
-                        /*
-                         * Construct the native chart independently from the
-                         * model's prose, before committing the durable turn.
-                         * This lets chart-only requests use a deterministic
-                         * response that reflects whether a chart was built.
-                         */
-                        Gtk.Widget[] live_chart_widgets = {};
-                        ConversationPersistenceChart[] live_charts = {};
-
-                        if (source_chart_requested) {
-                            try {
-                                live_chart_widgets =
-                                    build_live_chart_widgets (
-                                        state.session,
-                                        chart_intent.energy_institute_requested,
-                                        out live_charts
-                                    );
-                            } catch (GLib.Error chart_error) {
-                                live_chart_widgets = {};
-                                live_charts = {};
-                                stderr.printf (
-                                    "AtM: qualified live chart unavailable: %s\n",
-                                    chart_error.message
-                                );
-                            }
-                        }
-
                         if (source_chart_requested &&
                             chart_intent.is_chart_only_request ()) {
-                            answer = chart_intent.chart_only_response (
-                                live_chart_widgets.length > 0
-                            );
+                            answer = chart_intent.chart_only_response ();
                         }
 
                         CitationResolution citation_resolution =
@@ -3843,6 +3814,28 @@ namespace AskTheModel {
                         }
 
                         grounded_turn_prepared = false;
+
+                        Gtk.Widget[] live_chart_widgets = {};
+                        ConversationPersistenceChart[] live_charts = {};
+
+                        if (source_chart_requested) {
+                            try {
+                                live_chart_widgets =
+                                    build_live_chart_widgets (
+                                        state.session,
+                                        chart_intent.energy_institute_requested,
+                                        out live_charts
+                                    );
+                            } catch (GLib.Error chart_error) {
+                                live_chart_widgets = {};
+                                live_charts = {};
+                                stderr.printf (
+                                    "AtM: qualified live chart unavailable: %s\n",
+                                    chart_error.message
+                                );
+                            }
+                        }
+
 
                         if (live_charts.length > 0 &&
                             conversation_store != null &&
