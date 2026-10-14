@@ -41,27 +41,36 @@ first_line_after() {
   printf '%s\n' "$line"
 }
 
+tag_preflight_line="$(first_line 'let tagRef = await getTagRefOrNull();')"
 create_line="$(first_line 'github.rest.repos.createRelease({')"
 draft_line="$(first_line 'draft: true,')"
+post_create_tag_check_line="$(first_line 'const verifiedTagRef = await getTagRefOrNull();')"
 upload_line="$(first_line 'github.rest.repos.uploadReleaseAsset({')"
 update_line="$(first_line 'github.rest.repos.updateRelease({')"
 publish_line="$(first_line 'draft: false,')"
 
-if ! (( create_line < draft_line &&
-        draft_line < upload_line &&
+if ! (( tag_preflight_line < create_line &&
+        create_line < draft_line &&
+        draft_line < post_create_tag_check_line &&
+        post_create_tag_check_line < upload_line &&
         upload_line < update_line &&
         update_line < publish_line )); then
-  printf '%s\n'     'Release publication order must be create draft -> upload asset -> publish draft.' >&2
-  printf 'lines: create=%s draft=%s upload=%s update=%s publish=%s\n'     "$create_line" "$draft_line" "$upload_line" "$update_line" "$publish_line" >&2
+  printf '%s\n' 'Tag preflight must precede draft creation; post-create tag verification must precede asset upload and publication.' >&2
+  printf 'lines: preflight=%s create=%s draft=%s post-create-check=%s upload=%s update=%s publish=%s\n' \
+    "$tag_preflight_line" "$create_line" "$draft_line" "$post_create_tag_check_line" \
+    "$upload_line" "$update_line" "$publish_line" >&2
   exit 1
 fi
 
 required=(
   'github.paginate('
   'github.rest.repos.listReleases'
-  'release && release.draft'
-  'release.immutable'
-  'release.target_commitish !== context.sha'
+  'async function getTagRefOrNull()'
+  'const {'
+  'classifyReleaseTagState({'
+  'if (disposition === \'published-noop\')'
+  'if (disposition === \'repair-published\')'
+  'assertReleaseTagMatchesCommit(verifiedTagRef, context.sha, tag)'
   'Published GitHub Release'
   'only after all release assets were attached'
 )
@@ -140,4 +149,23 @@ for action in 'actions/upload-artifact' 'actions/download-artifact'; do
   fi
 done
 
-printf '%s\n' 'Release workflow contract OK: draft-first publication, source traceability and least-privilege verification/publication separation are enforced.'
+guard_module="scripts/release_tag_guard.cjs"
+guard_tests="tests/release_tag_guard.test.cjs"
+[[ -f "$guard_module" ]] || { printf 'Missing release tag guard module: %s\n' "$guard_module" >&2; exit 1; }
+[[ -f "$guard_tests" ]] || { printf 'Missing release tag guard tests: %s\n' "$guard_tests" >&2; exit 1; }
+for needle in \
+  'function classifyReleaseTagState' \
+  'if (!release)' \
+  'already exists without an associated GitHub Release' \
+  'release.target_commitish !== currentSha' \
+  'release.immutable' \
+  "tagRef.object.type !== 'commit'" \
+  'tagRef.object.sha !== currentSha' \
+  "return 'published-noop'"; do
+  if ! grep -Fq -- "$needle" "$guard_module"; then
+    printf 'Missing release tag-guard condition: %s\n' "$needle" >&2
+    exit 1
+  fi
+done
+
+printf '%s\n' 'Release workflow contract OK: tag preflight, draft-first publication, source traceability and least-privilege verification/publication separation are enforced.'
