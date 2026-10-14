@@ -160,10 +160,13 @@ test_bnr_v3_source_bound_quarters_and_missing (void)
             g_assert_null (point.source_decimal);
             g_assert_null (point.coefficient);
             g_assert_cmpint (point.exponent, ==, 0);
+            g_assert_cmpstr (point.missing_reason, ==,
+                             ATM_BNR_BLS_MISSING_REASON);
             g_assert_cmpuint (point.support->len, ==, ATM_BNR_BLS_SOURCE_COUNT);
         } else {
             g_assert_cmpint (point.y_status, ==, ATM_CHART_POINT_NUMERIC);
             g_assert_cmpstr (point.source_decimal, ==, values[i]);
+            g_assert_null (point.missing_reason);
             g_assert_nonnull (point.coefficient);
         }
     }
