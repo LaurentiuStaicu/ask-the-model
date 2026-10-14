@@ -167,13 +167,21 @@ test_bnr_v3_source_bound_quarters_and_missing (void)
     g_assert_true (atm_chart_spec_validate (line, &error));
     g_assert_no_error (error);
 
-    /* A forged absence reason invalidates the rebuilt semantic specification. */
+    /* A forged absence reason is rejected at the source-specific constructor. */
     AtmSeriesContract *mutable_contract = (AtmSeriesContract *)
         atm_bnr_bls_series_contract_value (
-            atm_bnr_bls_verified_series_contract (
-                (AtmBnrBlsVerifiedSeries *)
-                    atm_chart_spec_series (line, 0)));
-    (void) mutable_contract;
+            atm_bnr_bls_verified_series_contract (input));
+    AtmSeriesContractPoint *missing =
+        g_ptr_array_index (mutable_contract->points, 10u);
+    char *saved_reason = missing->missing_reason;
+    missing->missing_reason = "invented";
+    AtmChartSpec *rejected = NULL;
+    g_assert_false (atm_chart_spec_new_bnr_bls_c01_v3 (
+        ATM_CHART_LINE, input, &rejected, NULL));
+    g_assert_null (rejected);
+    missing->missing_reason = saved_reason;
+    g_assert_true (atm_chart_spec_validate (line, &error));
+    g_assert_no_error (error);
 
     atm_chart_spec_free (rebuilt);
     atm_chart_spec_free (scatter);
