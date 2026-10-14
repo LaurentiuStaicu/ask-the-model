@@ -867,7 +867,7 @@ chart_intent_test = executable(
     'src/ChartIntent.vala',
     'tests/chart_intent_test.vala'
   ],
-  dependencies: [glib_dep],
+  dependencies: [glib_dep, dependency('gobject-2.0')],
   install: false
 )
 
