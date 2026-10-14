@@ -646,6 +646,7 @@ gboolean atm_chart_spec_point (const AtmChartSpec *s, guint series_index,
         out->calendar_quarter = p->x;
         out->source_row = atm_bnr_bls_verified_series_source_row (
             s->bnr_series, point_index);
+        out->missing_reason = p->missing_reason;
         out->y_status = p->y_status == ATM_SERIES_Y_NUMERIC
             ? ATM_CHART_POINT_NUMERIC : ATM_CHART_POINT_MISSING;
         out->source_decimal = p->source_decimal;
@@ -666,6 +667,7 @@ gboolean atm_chart_spec_point (const AtmChartSpec *s, guint series_index,
         out->calendar_year = year;
         /* Admission pins a complete annual EI CSV whose data begin on row 2. */
         out->source_row = point_index + 2u;
+        out->missing_reason = p->missing_reason;
         out->y_status = p->y_status == ATM_SERIES_Y_NUMERIC
             ? ATM_CHART_POINT_NUMERIC : ATM_CHART_POINT_MISSING;
         out->source_decimal = p->source_decimal;
@@ -683,6 +685,7 @@ gboolean atm_chart_spec_point (const AtmChartSpec *s, guint series_index,
         out->order = p->order;
         out->calendar_year = p->calendar_year;
         out->source_row = p->source_row;
+        out->missing_reason = p->missing_reason;
         out->y_status = p->y_status == ATM_VERIFIED_Y_NUMERIC
             ? ATM_CHART_POINT_NUMERIC : ATM_CHART_POINT_MISSING;
         out->source_decimal = p->source_decimal;
