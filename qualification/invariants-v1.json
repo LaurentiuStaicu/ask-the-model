@@ -849,6 +849,23 @@
         "meson:chart-spec",
         "meson:bnr-bls-verified-series"
       ]
+    },
+    {
+      "id": "SCIENTIFIC-S1-012",
+      "category": "SCIENTIFIC",
+      "severity": "S1",
+      "lifecycle": "enforced",
+      "statement": "The BNR BLS C01 ChartSpec v3 renderer and Data view must retain all twelve ordered quarter coordinates, with exactly eleven numeric observations and a source-authorized 2025-Q2 MISSING entry containing no numeric payload or physical CSV row. The display projection omits that numeric point but retains its ordinal; LINE rendering must start a separate Cairo path across the non-consecutive point indices, and SCATTER rendering must not invent a missing marker. The Data view must retain the exact reason, qualified series identity, source snapshot/path, numeric source rows and support IDs. This headless native renderer qualification does not enable Application dispatch or History persistence.",
+      "enforced_by": [
+        "src/chart_render.c",
+        "src/chart_projection.c",
+        "src/chart_spec.c"
+      ],
+      "tested_by": [
+        "meson:chart-render",
+        "meson:chart-projection",
+        "meson:chart-spec"
+      ]
     }
   ]
 }
