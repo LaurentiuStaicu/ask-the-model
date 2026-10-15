@@ -53,7 +53,7 @@ body:
     id: snapshot
     attributes:
       label: Snapshot SHA (diagnostic, if available)
-      description: This is not normally shown in the user-facing source detail. Include it only if available from a diagnostic or repository audit. 
+      description: This is not normally shown in the user-facing source detail. Include it only if available from a diagnostic or repository audit.
       placeholder: "40-character Git SHA"
     validations:
       required: false
