@@ -201,6 +201,23 @@ namespace AskTheModel {
             );
         }
 
+        private static bool requests_derived_series (string normalized) {
+            return contains_any (
+                normalized,
+                {
+                    "standard deviation", "moving average", "moving-average",
+                    "forecast", "forecasting", "forecasted",
+                    "projection", "projected values",
+                    "correlation", "correlated",
+                    "abaterea standard", "abatere standard",
+                    "medie mobilă", "medie mobila",
+                    "prognoză", "prognoza",
+                    "proiecție", "proiectie",
+                    "corelație", "corelatie"
+                }
+            );
+        }
+
         private static bool names_other_chart_source (string normalized) {
             return contains_any (
                 normalized,
@@ -266,7 +283,8 @@ namespace AskTheModel {
                 string bnr_query = command_query (trimmed, bnr_prefix);
                 if (names_other_chart_source (bnr_query.down ()) ||
                     requests_comparison (bnr_query.down ()) ||
-                    requests_additional_series (bnr_query.down ())) {
+                    requests_additional_series (bnr_query.down ()) ||
+                    requests_derived_series (bnr_query.down ())) {
                     return new ChartIntent (false, false, false, prompt);
                 }
                 return new ChartIntent (
@@ -365,7 +383,8 @@ namespace AskTheModel {
             if (asks_for_chart && requests_visualization) {
                 if (names_bnr_bls_c01_series &&
                     (requests_comparison (normalized) ||
-                     requests_additional_series (normalized))) {
+                     requests_additional_series (normalized) ||
+                     requests_derived_series (normalized))) {
                     return new ChartIntent (false, false, false, prompt);
                 }
                 uint named_sources = (names_gistemp_series ? 1u : 0u) +
