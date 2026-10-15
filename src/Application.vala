@@ -2579,11 +2579,209 @@ namespace AskTheModel {
             ).strip ();
         }
 
+        private string qualified_source_profile (
+            CitationReference citation
+        ) {
+            bool ewd =
+                citation.repository_id == "ewd" ||
+                citation.repository_id ==
+                    "LaurentiuStaicu/empirical-world3-dynamics";
+            bool rmd =
+                citation.repository_id == "rmd" ||
+                citation.repository_id ==
+                    "LaurentiuStaicu/romanian-monetary-dynamics";
+
+            if (ewd &&
+                citation.source_path ==
+                    "science/data/processed/nasa_gistemp_global_2026.csv" &&
+                citation.snapshot_sha ==
+                    "d9e249339663015f6d1c05752338a955bf64ad0b") {
+                return "gistemp";
+            }
+            if (ewd &&
+                citation.source_path ==
+                    "science/data/processed/energy_institute_global_2026.csv" &&
+                citation.snapshot_sha ==
+                    "dc710d8e604c0fff713a3acfdb18ab47a1a902bb") {
+                return "energy-institute";
+            }
+            if (rmd &&
+                citation.source_path ==
+                    "data/processed/bnr_bls_realised_rounds.csv" &&
+                citation.snapshot_sha ==
+                    "e43eb4e899f123d3b1aa0f6e20b7c8ed35434170") {
+                return "bnr-bls-c01";
+            }
+
+            return "";
+        }
+
+        private string qualified_primary_source_url (
+            string profile
+        ) {
+            switch (profile) {
+            case "gistemp":
+                return "https://data.giss.nasa.gov/gistemp/data_v4.html";
+            case "energy-institute":
+                return "https://www.energyinst.org/statistical-review/resources-and-data-downloads";
+            case "bnr-bls-c01":
+                return "https://www.bnr.ro/en/12067-bank-lending-survey";
+            default:
+                return "";
+            }
+        }
+
+        private string qualified_primary_source_link_label (
+            string profile
+        ) {
+            switch (profile) {
+            case "gistemp":
+                return "Open NASA GISTEMP data";
+            case "energy-institute":
+                return "Open Energy Institute data";
+            case "bnr-bls-c01":
+                return "Open BNR survey";
+            default:
+                return "Open primary source";
+            }
+        }
+
+        private string qualified_primary_source_description (
+            string profile
+        ) {
+            switch (profile) {
+            case "gistemp":
+                return "NASA Goddard Institute for Space Studies (GISS), GISTEMP v4. The AtM citation points to a pinned processed repository extract, not NASA's original source file. This is the global annual Land-Ocean Temperature Index anomaly in degrees Celsius relative to the 1951-1980 mean; the pinned series covers 1880-2025, with data vintage 31 August 2026.";
+            case "energy-institute":
+                return "Energy Institute, Statistical Review of World Energy 2026. The AtM citation points to a pinned processed repository extract. Total primary energy supply is reported worldwide under the Physical Energy Content method in exajoules per year (EJ/year); it describes gross supply, not net energy or EROI.";
+            case "bnr-bls-c01":
+                return "National Bank of Romania, Bank Lending Survey (BLS). The AtM citation points to a pinned processed repository extraction. This is the quarterly net-percentage balance for credit standards on loans to non-financial corporations, not an interest rate: positive values indicate net tightening and negative values net easing.";
+            default:
+                return "";
+            }
+        }
+
+        private string qualified_source_display_title (
+            string profile
+        ) {
+            switch (profile) {
+            case "gistemp":
+                return "GISTEMP v4: global annual temperature anomaly";
+            case "energy-institute":
+                return "Statistical Review of World Energy 2026: total primary energy supply";
+            case "bnr-bls-c01":
+                return "Bank Lending Survey: credit standards for non-financial corporations";
+            default:
+                return "";
+            }
+        }
+
+        private string source_field_number (
+            string excerpt,
+            string field
+        ) {
+            try {
+                var regex = new GLib.Regex (
+                    "(?:^|[^A-Za-z0-9_])" + field +
+                    "\\s*[=:]\\s*([-+]?(?:[0-9]+(?:\\.[0-9]*)?|\\.[0-9]+))"
+                );
+                GLib.MatchInfo match_info;
+                if (regex.match (excerpt, 0, out match_info)) {
+                    return match_info.fetch (1).strip ();
+                }
+            } catch (GLib.Error error) {
+                /* Display formatting is non-authoritative; keep source qualification intact. */
+            }
+            return "";
+        }
+
+        private string source_field_quarter (
+            string excerpt
+        ) {
+            try {
+                var regex = new GLib.Regex (
+                    "(?:^|[^A-Za-z0-9_])quarter\\s*[=:]\\s*([0-9]{4}-Q[1-4])",
+                    GLib.RegexCompileFlags.CASELESS,
+                    0
+                );
+                GLib.MatchInfo match_info;
+                if (regex.match (excerpt, 0, out match_info)) {
+                    return match_info.fetch (1).strip ();
+                }
+            } catch (GLib.Error error) {
+                /* Display formatting is non-authoritative; keep source qualification intact. */
+            }
+            return "";
+        }
+
+        private string qualified_observation_display_text (
+            CitationReference citation,
+            string profile
+        ) {
+            string excerpt = citation.excerpt ?? "";
+            if (profile == "gistemp") {
+                string year = source_field_number (excerpt, "year");
+                string value = source_field_number (
+                    excerpt, "temperature_anomaly_c_1951_1980"
+                );
+                string display = "";
+                if (year.length > 0) {
+                    display += "Year: %s\n".printf (year);
+                }
+                if (value.length > 0) {
+                    display += "Global temperature anomaly: %s °C".printf (value);
+                } else {
+                    display += "Measure: global annual Land-Ocean Temperature Index anomaly (°C).";
+                }
+                display += "\nBaseline: 1951-1980 mean.";
+                return display;
+            }
+
+            if (profile == "energy-institute") {
+                string year = source_field_number (excerpt, "year");
+                string value = source_field_number (excerpt, "total_primary_energy_ej");
+                string display = "";
+                if (year.length > 0) {
+                    display += "Year: %s\n".printf (year);
+                }
+                if (value.length > 0) {
+                    display += "Global total primary energy supply: %s EJ/year".printf (value);
+                } else {
+                    display += "Measure: worldwide total primary energy supply.";
+                }
+                display += "\nMethod: Physical Energy Content.";
+                return display;
+            }
+
+            if (profile == "bnr-bls-c01") {
+                string quarter = source_field_quarter (excerpt);
+                string value = source_field_number (excerpt, "nfc_credit_standards");
+                string display = "";
+                if (quarter.length > 0) {
+                    display += "Quarter: %s\n".printf (quarter);
+                }
+                if (value.length > 0) {
+                    display += "Credit standards net percentage: %s%%".printf (value);
+                } else {
+                    display += "Measure: quarterly credit-standards net percentage.";
+                }
+                display += "\nPositive values indicate net tightening; negative values indicate net easing.";
+                return display;
+            }
+
+            return excerpt.strip ();
+        }
+
         private string source_excerpt_display_text (
             CitationReference citation
         ) {
             if (citation.excerpt == null) {
                 return "";
+            }
+
+            string profile = qualified_source_profile (citation);
+            if (profile.length > 0) {
+                return qualified_observation_display_text (citation, profile);
             }
 
             string excerpt =
@@ -2647,24 +2845,31 @@ namespace AskTheModel {
                         descriptor.display_name
                     )
                     : citation.repository_id;
+            string profile =
+                qualified_source_profile (citation);
 
-            var heading = new Gtk.Label (
-                "[%u] %s".printf (
-                    display_number,
-                    repository_name
-                )
-            ) {
-                halign = Gtk.Align.START,
-                xalign = 0.0f,
-                selectable = true
-            };
-            heading.add_css_class ("heading");
-            content.append (heading);
+            if (profile.length > 0) {
+                var heading = new Gtk.Label (
+                    "[%u] Source details".printf (display_number)
+                ) {
+                    halign = Gtk.Align.START,
+                    xalign = 0.0f,
+                    selectable = true
+                };
+                heading.add_css_class ("heading");
+                content.append (heading);
 
-            if (citation.title != null &&
-                citation.title.strip ().length > 0) {
-                var title = new Gtk.Label (
-                    citation.title
+                var original_heading = new Gtk.Label (
+                    "Original data source"
+                ) {
+                    halign = Gtk.Align.START,
+                    xalign = 0.0f
+                };
+                original_heading.add_css_class ("heading");
+                content.append (original_heading);
+
+                var original_description = new Gtk.Label (
+                    qualified_primary_source_description (profile)
                 ) {
                     halign = Gtk.Align.START,
                     xalign = 0.0f,
@@ -2672,25 +2877,107 @@ namespace AskTheModel {
                     wrap = true,
                     max_width_chars = 72
                 };
-                content.append (title);
-            }
+                content.append (original_description);
 
-            if (citation.excerpt != null &&
-                citation.excerpt.strip ().length > 0) {
-                string display_excerpt =
+                string primary_url =
+                    qualified_primary_source_url (profile);
+                if (primary_url.length > 0) {
+                    var primary_link = new Gtk.LinkButton.with_label (
+                        primary_url,
+                        qualified_primary_source_link_label (profile)
+                    ) {
+                        halign = Gtk.Align.START
+                    };
+                    primary_link.add_css_class ("atm-source-link");
+                    content.append (primary_link);
+                }
+
+                content.append (new Gtk.Separator (Gtk.Orientation.HORIZONTAL));
+
+                var repository_heading = new Gtk.Label (
+                    "Pinned repository evidence: %s".printf (
+                        repository_name
+                    )
+                ) {
+                    halign = Gtk.Align.START,
+                    xalign = 0.0f,
+                    wrap = true,
+                    selectable = true
+                };
+                repository_heading.add_css_class ("heading");
+                content.append (repository_heading);
+
+                var dataset_title = new Gtk.Label (
+                    qualified_source_display_title (profile)
+                ) {
+                    halign = Gtk.Align.START,
+                    xalign = 0.0f,
+                    wrap = true,
+                    selectable = true,
+                    max_width_chars = 72
+                };
+                content.append (dataset_title);
+
+                string observation_text =
                     source_excerpt_display_text (citation);
-
-                var excerpt = new Gtk.Label (
-                    display_excerpt
+                if (observation_text.length > 0) {
+                    var observation = new Gtk.Label (
+                        observation_text
+                    ) {
+                        halign = Gtk.Align.START,
+                        xalign = 0.0f,
+                        selectable = true,
+                        wrap = true,
+                        max_width_chars = 72
+                    };
+                    observation.add_css_class ("atm-source-excerpt");
+                    content.append (observation);
+                }
+            } else {
+                var heading = new Gtk.Label (
+                    "[%u] %s".printf (
+                        display_number,
+                        repository_name
+                    )
                 ) {
                     halign = Gtk.Align.START,
                     xalign = 0.0f,
-                    selectable = true,
-                    wrap = true,
-                    max_width_chars = 72
+                    selectable = true
                 };
-                excerpt.add_css_class ("atm-source-excerpt");
-                content.append (excerpt);
+                heading.add_css_class ("heading");
+                content.append (heading);
+
+                if (citation.title != null &&
+                    citation.title.strip ().length > 0) {
+                    var title = new Gtk.Label (
+                        citation.title
+                    ) {
+                        halign = Gtk.Align.START,
+                        xalign = 0.0f,
+                        selectable = true,
+                        wrap = true,
+                        max_width_chars = 72
+                    };
+                    content.append (title);
+                }
+
+                if (citation.excerpt != null &&
+                    citation.excerpt.strip ().length > 0) {
+                    string display_excerpt =
+                        source_excerpt_display_text (citation);
+
+                    var excerpt = new Gtk.Label (
+                        display_excerpt
+                    ) {
+                        halign = Gtk.Align.START,
+                        xalign = 0.0f,
+                        selectable = true,
+                        wrap = true,
+                        max_width_chars = 72
+                    };
+                    excerpt.add_css_class ("atm-source-excerpt");
+                    content.append (excerpt);
+                }
             }
 
             string? permalink =
@@ -2713,10 +3000,13 @@ namespace AskTheModel {
 
             if (permalink != null &&
                 permalink.strip ().length > 0) {
+                string link_label = profile.length > 0
+                    ? "Open pinned processed dataset"
+                    : "Open source";
                 var link =
                     new Gtk.LinkButton.with_label (
                         permalink,
-                        "Open source"
+                        link_label
                     ) {
                         halign = Gtk.Align.START
                     };
@@ -5160,6 +5450,160 @@ namespace AskTheModel {
                 );
         }
 
+        private void pres09_test_collect_source_detail_text (
+            Gtk.Widget widget,
+            GLib.StringBuilder text
+        ) {
+            if (widget is Gtk.Label) {
+                text.append (((Gtk.Label) widget).label);
+                text.append ("\n");
+            }
+            if (widget is Gtk.LinkButton) {
+                var link = (Gtk.LinkButton) widget;
+                text.append (link.label);
+                text.append ("\n");
+                text.append (link.uri);
+                text.append ("\n");
+            }
+
+            Gtk.Widget? child = widget.get_first_child ();
+            while (child != null) {
+                pres09_test_collect_source_detail_text (child, text);
+                child = child.get_next_sibling ();
+            }
+        }
+
+        private bool pres09_test_check_source_detail (
+            CitationReference citation,
+            string expected_source,
+            string expected_observation,
+            string primary_url,
+            string pinned_url,
+            string forbidden_field
+        ) {
+            Gtk.Widget widget =
+                build_source_detail_content (citation, 1);
+            var text = new GLib.StringBuilder ();
+            pres09_test_collect_source_detail_text (widget, text);
+            string rendered = text.str;
+
+            string[] expected = {
+                "Original data source",
+                "Pinned repository evidence",
+                expected_source,
+                expected_observation,
+                primary_url,
+                pinned_url,
+                "Open pinned processed dataset"
+            };
+            foreach (string marker in expected) {
+                if (!rendered.contains (marker)) {
+                    pres09_test_failure =
+                        "Qualified source detail omitted '%s': %s".printf (
+                            marker,
+                            rendered
+                        );
+                    return false;
+                }
+            }
+            if (forbidden_field.length > 0 &&
+                rendered.contains (forbidden_field)) {
+                pres09_test_failure =
+                    "Qualified source detail exposed CSV field '%s'".printf (
+                        forbidden_field
+                    );
+                return false;
+            }
+            if (rendered.contains ("Snapshot:") ||
+                rendered.contains ("Source ID:") ||
+                rendered.contains ("Canonical decimal:")) {
+                pres09_test_failure =
+                    "Qualified source detail exposed internal provenance";
+                return false;
+            }
+            return true;
+        }
+
+        private bool pres09_test_step_source_details () {
+            var gistemp = new CitationReference (
+                "[S1]",
+                "ewd",
+                "test",
+                "d9e249339663015f6d1c05752338a955bf64ad0b",
+                "nasa-gistemp-global-annual-temperature-anomalies",
+                "science/data/processed/nasa_gistemp_global_2026.csv",
+                "1880",
+                "nasa_gistemp_global_2026.csv",
+                "year=1880, temperature_anomaly_c_1951_1980=-0.1700",
+                "https://github.com/LaurentiuStaicu/empirical-world3-dynamics/blob/d9e249339663015f6d1c05752338a955bf64ad0b/science/data/processed/nasa_gistemp_global_2026.csv"
+            );
+            if (!pres09_test_check_source_detail (
+                    gistemp,
+                    "NASA Goddard Institute for Space Studies (GISS), GISTEMP v4",
+                    "Global temperature anomaly: -0.1700 °C",
+                    "https://data.giss.nasa.gov/gistemp/data_v4.html",
+                    "https://github.com/LaurentiuStaicu/empirical-world3-dynamics/blob/d9e249339663015f6d1c05752338a955bf64ad0b/science/data/processed/nasa_gistemp_global_2026.csv",
+                    "temperature_anomaly_c_1951_1980"
+                )) {
+                pres09_test_finish (false, pres09_test_failure);
+                return false;
+            }
+
+            var energy = new CitationReference (
+                "[S1]",
+                "ewd",
+                "test",
+                "dc710d8e604c0fff713a3acfdb18ab47a1a902bb",
+                "energy-institute-global-tes",
+                "science/data/processed/energy_institute_global_2026.csv",
+                "1965",
+                "energy_institute_global_2026.csv",
+                "year=1965, total_primary_energy_ej=149.6960972",
+                "https://github.com/LaurentiuStaicu/empirical-world3-dynamics/blob/dc710d8e604c0fff713a3acfdb18ab47a1a902bb/science/data/processed/energy_institute_global_2026.csv"
+            );
+            if (!pres09_test_check_source_detail (
+                    energy,
+                    "Energy Institute, Statistical Review of World Energy 2026",
+                    "Global total primary energy supply: 149.6960972 EJ/year",
+                    "https://www.energyinst.org/statistical-review/resources-and-data-downloads",
+                    "https://github.com/LaurentiuStaicu/empirical-world3-dynamics/blob/dc710d8e604c0fff713a3acfdb18ab47a1a902bb/science/data/processed/energy_institute_global_2026.csv",
+                    "total_primary_energy_ej"
+                )) {
+                pres09_test_finish (false, pres09_test_failure);
+                return false;
+            }
+
+            var bnr = new CitationReference (
+                "[S1]",
+                "rmd",
+                "test",
+                "e43eb4e899f123d3b1aa0f6e20b7c8ed35434170",
+                "bnr-bls-c01-credit-standards-net-percentage",
+                "data/processed/bnr_bls_realised_rounds.csv",
+                "2022-Q4",
+                "bnr_bls_realised_rounds.csv",
+                "quarter=2022-Q4, nfc_credit_standards=11.89",
+                "https://github.com/LaurentiuStaicu/romanian-monetary-dynamics/blob/e43eb4e899f123d3b1aa0f6e20b7c8ed35434170/data/processed/bnr_bls_realised_rounds.csv"
+            );
+            if (!pres09_test_check_source_detail (
+                    bnr,
+                    "National Bank of Romania, Bank Lending Survey (BLS)",
+                    "Credit standards net percentage: 11.89%",
+                    "https://www.bnr.ro/en/12067-bank-lending-survey",
+                    "https://github.com/LaurentiuStaicu/romanian-monetary-dynamics/blob/e43eb4e899f123d3b1aa0f6e20b7c8ed35434170/data/processed/bnr_bls_realised_rounds.csv",
+                    "nfc_credit_standards"
+                )) {
+                pres09_test_finish (false, pres09_test_failure);
+                return false;
+            }
+
+            pres09_test_finish (
+                true,
+                "GISTEMP, Energy Institute and BNR source-detail widgets expose original publisher, human-readable observation values and separate pinned-copy links without raw CSV fields or internal IDs"
+            );
+            return false;
+        }
+
         private bool pres09_test_save_live_oracle (
             ChatTabState state
         ) {
@@ -5650,7 +6094,7 @@ namespace AskTheModel {
             string bnr_missing_provenance = bnr_view.provenance () ?? "";
             if (!bnr_missing_provenance.contains ("No numeric value is available; this is not zero.") ||
                 !bnr_missing_provenance.contains ("Reason: The source round was not retained.") ||
-                !bnr_missing_provenance.contains ("Source: BNR BLS C01 credit-standards net percentage") ||
+                !bnr_missing_provenance.contains ("Primary source: National Bank of Romania, Bank Lending Survey (BLS)") ||
                 bnr_missing_provenance.contains ("source_round_not_retained") ||
                 bnr_missing_provenance.contains ("Physical source row:") ||
                 bnr_missing_provenance.contains ("Snapshot:") ||
@@ -5849,6 +6293,9 @@ namespace AskTheModel {
                 return true;
             }
 
+            if (pres09_test_phase == "source-details") {
+                return pres09_test_step_source_details ();
+            }
             if (pres09_test_phase == "live") {
                 return pres09_test_step_live ();
             }

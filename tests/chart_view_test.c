@@ -27,15 +27,31 @@ static GtkExpander *find_expander (GtkWidget *widget)
     return NULL;
 }
 
-static GtkLinkButton *find_link_button (GtkWidget *widget)
+static GtkLinkButton *find_link_button_with_uri (GtkWidget *widget, const char *uri)
 {
-    if (GTK_IS_LINK_BUTTON (widget))
+    if (GTK_IS_LINK_BUTTON (widget) &&
+        g_strcmp0 (gtk_link_button_get_uri (GTK_LINK_BUTTON (widget)), uri) == 0)
         return GTK_LINK_BUTTON (widget);
 
     for (GtkWidget *child = gtk_widget_get_first_child (widget);
          child != NULL;
          child = gtk_widget_get_next_sibling (child)) {
-        GtkLinkButton *found = find_link_button (child);
+        GtkLinkButton *found = find_link_button_with_uri (child, uri);
+        if (found != NULL)
+            return found;
+    }
+    return NULL;
+}
+static GtkLabel *find_label_containing (GtkWidget *widget, const char *needle)
+{
+    if (GTK_IS_LABEL (widget) &&
+        strstr (gtk_label_get_text (GTK_LABEL (widget)), needle) != NULL)
+        return GTK_LABEL (widget);
+
+    for (GtkWidget *child = gtk_widget_get_first_child (widget);
+         child != NULL;
+         child = gtk_widget_get_next_sibling (child)) {
+        GtkLabel *found = find_label_containing (child, needle);
         if (found != NULL)
             return found;
     }
@@ -180,12 +196,16 @@ build_bnr_view (void)
     return view;
 }
 
+static GtkWidget *chart_page_named (AtmChartView *view, const char *name);
+
 static void
 test_bnr_quarterly_data_and_missing_provenance (void)
 {
     AtmChartView *view = build_bnr_view ();
     g_assert_false (g_object_is_floating (view));
     g_assert_cmpuint (atm_chart_view_row_count (view), ==, 12u);
+    GtkWidget *chart_page = chart_page_named (view, "chart");
+    GtkWidget *data_page = chart_page_named (view, "data");
     GtkExpander *source_details = find_expander (GTK_WIDGET (view));
     g_assert_nonnull (source_details);
     g_assert_cmpstr (gtk_expander_get_label (source_details), ==, "Source details");
@@ -193,11 +213,19 @@ test_bnr_quarterly_data_and_missing_provenance (void)
     GtkColumnView *data_table = find_column_view (GTK_WIDGET (view));
     g_assert_nonnull (data_table);
     g_assert_cmpuint (g_list_model_get_n_items (gtk_column_view_get_columns (data_table)), ==, 3u);
-    GtkLinkButton *source_link = find_link_button (GTK_WIDGET (view));
-    g_assert_nonnull (source_link);
-    g_assert_cmpstr (gtk_link_button_get_uri (source_link), ==,
+    GtkLinkButton *primary_link = find_link_button_with_uri (
+        chart_page, "https://www.bnr.ro/en/12067-bank-lending-survey");
+    g_assert_nonnull (primary_link);
+    GtkLinkButton *source_link = find_link_button_with_uri (
+        chart_page,
         "https://github.com/LaurentiuStaicu/romanian-monetary-dynamics/blob/"
         "e43eb4e899f123d3b1aa0f6e20b7c8ed35434170/data/processed/bnr_bls_realised_rounds.csv");
+    g_assert_nonnull (source_link);
+    GtkLabel *source_summary = find_label_containing (
+        chart_page, "Primary source: National Bank of Romania");
+    g_assert_nonnull (source_summary);
+    g_assert_nonnull (strstr (gtk_label_get_text (source_summary),
+        "2025-Q2 is missing, not zero"));
     g_assert_cmpstr (atm_chart_view_visible_page (view), ==, "chart");
     const char *data = atm_chart_view_data (view);
     g_assert_nonnull (data);
@@ -210,9 +238,9 @@ test_bnr_quarterly_data_and_missing_provenance (void)
     g_assert_true (atm_chart_view_select_row (view, 0u));
     char *provenance = atm_chart_view_provenance (view);
     g_assert_nonnull (provenance);
-    g_assert_true (g_str_has_prefix (provenance, "Quarter: 2022-Q4\nNet percentage: 11.89%"));
-    g_assert_nonnull (strstr (provenance, "Source: BNR BLS C01 credit-standards net percentage"));
-    g_assert_nonnull (strstr (provenance, ATM_BNR_BLS_UPSTREAM_REPOSITORY));
+    g_assert_true (g_str_has_prefix (provenance, "Quarter: 2022-Q4\nCredit standards net percentage: 11.89%"));
+    g_assert_nonnull (strstr (provenance, "Primary source: National Bank of Romania, Bank Lending Survey (BLS)"));
+    g_assert_nonnull (strstr (provenance, "Pinned dataset: Romanian Monetary Dynamics"));
     g_assert_null (strstr (provenance, "Physical source row:"));
     g_assert_null (strstr (provenance, "Snapshot:"));
     g_assert_null (strstr (provenance, "Canonical decimal:"));
@@ -233,12 +261,18 @@ test_bnr_quarterly_data_and_missing_provenance (void)
 
     g_assert_true (atm_chart_view_select_row (view, 11u));
     provenance = atm_chart_view_provenance (view);
-    g_assert_true (g_str_has_prefix (provenance, "Quarter: 2025-Q3\nNet percentage: 9.46%"));
+    g_assert_true (g_str_has_prefix (provenance, "Quarter: 2025-Q3\nCredit standards net percentage: 9.46%"));
     g_assert_null (strstr (provenance, "Physical source row:"));
     g_free (provenance);
 
     atm_chart_view_show_data (view);
     g_assert_cmpstr (atm_chart_view_visible_page (view), ==, "data");
+    g_assert_nonnull (find_link_button_with_uri (
+        data_page, "https://www.bnr.ro/en/12067-bank-lending-survey"));
+    g_assert_nonnull (find_link_button_with_uri (
+        data_page,
+        "https://github.com/LaurentiuStaicu/romanian-monetary-dynamics/blob/"
+        "e43eb4e899f123d3b1aa0f6e20b7c8ed35434170/data/processed/bnr_bls_realised_rounds.csv"));
     atm_chart_view_show_chart (view);
     g_assert_cmpstr (atm_chart_view_visible_page (view), ==, "chart");
     g_assert_cmpstr (atm_chart_view_data (view), ==, data);
@@ -250,15 +284,27 @@ static void test_ei_data_lifetime (void)
     AtmChartView *view = build_ei_view ();
     g_assert_false (g_object_is_floating (view));
     g_assert_cmpuint (atm_chart_view_row_count (view), ==, 61u);
+    GtkWidget *chart_page = chart_page_named (view, "chart");
+    GtkWidget *data_page = chart_page_named (view, "data");
+    g_assert_cmpstr (atm_chart_view_visible_page (view), ==, "chart");
     GtkColumnView *data_table = find_column_view (GTK_WIDGET (view));
     g_assert_nonnull (data_table);
     g_assert_cmpuint (g_list_model_get_n_items (gtk_column_view_get_columns (data_table)), ==, 2u);
-    GtkLinkButton *source_link = find_link_button (GTK_WIDGET (view));
-    g_assert_nonnull (source_link);
-    g_assert_cmpstr (gtk_link_button_get_uri (source_link), ==,
+    GtkLinkButton *primary_link = find_link_button_with_uri (
+        chart_page,
+        "https://www.energyinst.org/statistical-review/resources-and-data-downloads");
+    g_assert_nonnull (primary_link);
+    GtkLinkButton *source_link = find_link_button_with_uri (
+        chart_page,
         "https://github.com/LaurentiuStaicu/empirical-world3-dynamics/blob/"
         "dc710d8e604c0fff713a3acfdb18ab47a1a902bb/"
         "science/data/processed/energy_institute_global_2026.csv");
+    g_assert_nonnull (source_link);
+    GtkLabel *source_summary = find_label_containing (
+        chart_page, "Primary source: Energy Institute, Statistical Review of World Energy 2026");
+    g_assert_nonnull (source_summary);
+    g_assert_nonnull (strstr (gtk_label_get_text (source_summary),
+        "gross supply, not net energy or EROI"));
     const char *data = atm_chart_view_data (view);
     g_assert_nonnull (data);
     g_assert_nonnull (strstr (data, "# unit\texajoules/year"));
@@ -268,9 +314,9 @@ static void test_ei_data_lifetime (void)
     g_assert_true (atm_chart_view_select_row (view, 0));
     char *provenance = atm_chart_view_provenance (view);
     g_assert_nonnull (provenance);
-    g_assert_true (g_str_has_prefix (provenance, "Year: 1965\nGlobal total energy supply: "));
+    g_assert_true (g_str_has_prefix (provenance, "Year: 1965\nGlobal total primary energy supply: "));
     g_assert_nonnull (strstr (provenance, "Method: Physical Energy Content"));
-    g_assert_nonnull (strstr (provenance, "Source: Energy Institute global total energy supply dataset"));
+    g_assert_nonnull (strstr (provenance, "Primary source: Energy Institute, Statistical Review of World Energy 2026"));
     g_assert_null (strstr (provenance, "Source row:"));
     g_assert_null (strstr (provenance, "Snapshot:"));
     g_assert_null (strstr (provenance, "Canonical decimal:"));
@@ -278,12 +324,20 @@ static void test_ei_data_lifetime (void)
 
     g_assert_true (atm_chart_view_select_row (view, 60));
     provenance = atm_chart_view_provenance (view);
-    g_assert_true (g_str_has_prefix (provenance, "Year: 2025\nGlobal total energy supply: "));
+    g_assert_true (g_str_has_prefix (provenance, "Year: 2025\nGlobal total primary energy supply: "));
     g_assert_null (strstr (provenance, "Source row:"));
     g_free (provenance);
 
     atm_chart_view_show_data (view);
     g_assert_cmpstr (atm_chart_view_visible_page (view), ==, "data");
+    g_assert_nonnull (find_link_button_with_uri (
+        data_page,
+        "https://www.energyinst.org/statistical-review/resources-and-data-downloads"));
+    g_assert_nonnull (find_link_button_with_uri (
+        data_page,
+        "https://github.com/LaurentiuStaicu/empirical-world3-dynamics/blob/"
+        "dc710d8e604c0fff713a3acfdb18ab47a1a902bb/"
+        "science/data/processed/energy_institute_global_2026.csv"));
     atm_chart_view_show_chart (view);
     g_assert_cmpstr (atm_chart_view_visible_page (view), ==, "chart");
     g_assert_cmpstr (atm_chart_view_data (view), ==, saved_data);
@@ -296,6 +350,23 @@ static void test_data_lifetime (void)
     AtmChartView *view = build_view ();
     g_assert_false (g_object_is_floating (view));
     g_assert_cmpuint (atm_chart_view_row_count (view), ==, 146);
+    GtkWidget *chart_page = chart_page_named (view, "chart");
+    GtkWidget *data_page = chart_page_named (view, "data");
+    g_assert_cmpstr (atm_chart_view_visible_page (view), ==, "chart");
+    GtkLinkButton *primary_link = find_link_button_with_uri (
+        chart_page, "https://data.giss.nasa.gov/gistemp/data_v4.html");
+    g_assert_nonnull (primary_link);
+    GtkLinkButton *pinned_link = find_link_button_with_uri (
+        chart_page,
+        "https://github.com/LaurentiuStaicu/empirical-world3-dynamics/blob/"
+        "d9e249339663015f6d1c05752338a955bf64ad0b/"
+        "science/data/processed/nasa_gistemp_global_2026.csv");
+    g_assert_nonnull (pinned_link);
+    GtkLabel *source_summary = find_label_containing (
+        chart_page, "Primary source: NASA Goddard Institute for Space Studies (GISS), GISTEMP v4");
+    g_assert_nonnull (source_summary);
+    g_assert_nonnull (strstr (gtk_label_get_text (source_summary),
+        "1951-1980 mean"));
     g_assert_cmpint (gtk_accessible_get_accessible_role (GTK_ACCESSIBLE (view)), ==, GTK_ACCESSIBLE_ROLE_GROUP);
     char *data = g_strdup (atm_chart_view_data (view));
     g_assert_nonnull (strstr (data, "1880\t-0.1700\t-17\t-2\t2\t"));
@@ -303,8 +374,8 @@ static void test_data_lifetime (void)
         g_assert_true (atm_chart_view_select_row (view, i));
         char *text = atm_chart_view_provenance (view), *year = g_strdup_printf ("Year: %u\n",1880+i);
         g_assert_true (g_str_has_prefix (text,year));
-        g_assert_nonnull (strstr (text, "Source: NASA GISTEMP global annual temperature anomalies"));
-        g_assert_nonnull (strstr (text, "Baseline: 1951-1980"));
+        g_assert_nonnull (strstr (text, "Primary source: NASA Goddard Institute for Space Studies (GISS), GISTEMP v4"));
+        g_assert_nonnull (strstr (text, "Baseline: 1951-1980 mean"));
         g_assert_null (strstr (text, "Support identities:"));
         g_assert_null (strstr (text, "Snapshot:"));
         g_assert_null (strstr (text, "Canonical decimal:"));
@@ -314,6 +385,13 @@ static void test_data_lifetime (void)
     g_assert_false (atm_chart_view_select_row (view, 146));
     g_assert_cmpuint (atm_chart_view_selected_row (view), ==, 145);
     atm_chart_view_show_data (view); g_assert_cmpstr (atm_chart_view_visible_page (view), ==, "data");
+    g_assert_nonnull (find_link_button_with_uri (
+        data_page, "https://data.giss.nasa.gov/gistemp/data_v4.html"));
+    g_assert_nonnull (find_link_button_with_uri (
+        data_page,
+        "https://github.com/LaurentiuStaicu/empirical-world3-dynamics/blob/"
+        "d9e249339663015f6d1c05752338a955bf64ad0b/"
+        "science/data/processed/nasa_gistemp_global_2026.csv"));
     atm_chart_view_show_chart (view); g_assert_cmpstr (atm_chart_view_visible_page (view), ==, "chart");
     g_assert_cmpstr (atm_chart_view_data (view), ==, data); g_free (data);
     gpointer weak = view; g_object_add_weak_pointer (G_OBJECT (view), &weak); g_object_unref (view); g_assert_null (weak);
@@ -360,14 +438,34 @@ static void test_resize_coalescing (void)
     while (g_main_context_iteration (NULL, FALSE));
 }
 
-static GtkWidget *chart_drawing_area (AtmChartView *view)
+static GtkWidget *find_drawing_area (GtkWidget *widget)
+{
+    if (GTK_IS_DRAWING_AREA (widget))
+        return widget;
+
+    for (GtkWidget *child = gtk_widget_get_first_child (widget);
+         child != NULL;
+         child = gtk_widget_get_next_sibling (child)) {
+        GtkWidget *found = find_drawing_area (child);
+        if (found != NULL)
+            return found;
+    }
+    return NULL;
+}
+
+static GtkWidget *chart_page_named (AtmChartView *view, const char *name)
 {
     GtkWidget *stack_widget = gtk_widget_get_last_child (GTK_WIDGET (view));
     g_assert_true (GTK_IS_STACK (stack_widget));
-    GtkWidget *chart_page = gtk_stack_get_child_by_name (
-        GTK_STACK (stack_widget), "chart");
-    g_assert_nonnull (chart_page);
-    GtkWidget *area = gtk_widget_get_last_child (chart_page);
+    GtkWidget *page = gtk_stack_get_child_by_name (
+        GTK_STACK (stack_widget), name);
+    g_assert_nonnull (page);
+    return page;
+}
+
+static GtkWidget *chart_drawing_area (AtmChartView *view)
+{
+    GtkWidget *area = find_drawing_area (chart_page_named (view, "chart"));
     g_assert_true (GTK_IS_DRAWING_AREA (area));
     return area;
 }
