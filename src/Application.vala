@@ -3029,17 +3029,29 @@ namespace AskTheModel {
             for (uint i = 0; i < session.repository_count (); i++) {
                 ConversationRepositoryPin? pin = session.repository_pin_at (i);
                 if (pin == null) continue;
-                if (pin.repository_id == "ewd" ||
-                    pin.repository_id == "LaurentiuStaicu/empirical-world3-dynamics") {
+                bool repository_matches = bnr_bls_c01
+                    ? (pin.repository_id == "rmd" ||
+                       pin.repository_id == "LaurentiuStaicu/romanian-monetary-dynamics")
+                    : (pin.repository_id == "ewd" ||
+                       pin.repository_id == "LaurentiuStaicu/empirical-world3-dynamics");
+                if (repository_matches) {
                     chart_pin = pin;
                     break;
                 }
             }
             if (chart_pin == null) return widgets;
+            if (bnr_bls_c01 &&
+                chart_pin.snapshot_sha != "e43eb4e899f123d3b1aa0f6e20b7c8ed35434170") {
+                throw new GLib.IOError.INVALID_DATA (
+                    "BNR BLS C01 charts require the exact qualified RMD snapshot."
+                );
+            }
 
-            string source_path = energy_institute
-                ? "science/data/processed/energy_institute_global_2026.csv"
-                : "science/data/processed/nasa_gistemp_global_2026.csv";
+            string source_path = bnr_bls_c01
+                ? "data/processed/bnr_bls_realised_rounds.csv"
+                : (energy_institute
+                    ? "science/data/processed/energy_institute_global_2026.csv"
+                    : "science/data/processed/nasa_gistemp_global_2026.csv");
             RepositoryDescriptor? descriptor =
                 repository_descriptor_for_id (chart_pin.repository_id);
             if (descriptor == null) {
@@ -3058,7 +3070,12 @@ namespace AskTheModel {
 
             ChartNative.Spec spec;
             bool reconstructed = false;
-            if (energy_institute) {
+            if (bnr_bls_c01) {
+                reconstructed = ChartNative.reconstruct_live_bnr_bls_c01 (
+                    snapshot_path, chart_pin.repository_id,
+                    chart_pin.snapshot_sha, "line", out spec
+                );
+            } else if (energy_institute) {
                 reconstructed = ChartNative.reconstruct_live_energy_institute (
                     snapshot_path, chart_pin.repository_id,
                     chart_pin.snapshot_sha, "line", out spec
@@ -3072,9 +3089,11 @@ namespace AskTheModel {
             }
             if (!reconstructed || spec == null) {
                 throw new GLib.IOError.INVALID_DATA (
-                    energy_institute
-                        ? "Pinned Energy Institute source could not be re-qualified for chart presentation."
-                        : "Pinned GISTEMP source could not be re-qualified for chart presentation."
+                    bnr_bls_c01
+                        ? "Pinned BNR BLS C01 source could not be re-qualified for chart presentation."
+                        : (energy_institute
+                            ? "Pinned Energy Institute source could not be re-qualified for chart presentation."
+                            : "Pinned GISTEMP source could not be re-qualified for chart presentation.")
                 );
             }
 
@@ -3087,13 +3106,17 @@ namespace AskTheModel {
                 );
             }
 
-            string series_profile = energy_institute
-                ? "atm-series/energy-institute-tes-complete-annual/1"
-                : "atm-series/gistemp-complete-annual/1";
-            string admission_profile = energy_institute
-                ? "atm-energy-institute-pinned-admission/3"
-                : "atm-gistemp-pinned-admission/1";
-            string repository_version = energy_institute
+            string series_profile = bnr_bls_c01
+                ? "atm-series/bnr-bls-c01-calendar-quarter/1"
+                : (energy_institute
+                    ? "atm-series/energy-institute-tes-complete-annual/1"
+                    : "atm-series/gistemp-complete-annual/1");
+            string admission_profile = bnr_bls_c01
+                ? "atm-bnr-bls-canonical-panel-admission/1"
+                : (energy_institute
+                    ? "atm-energy-institute-pinned-admission/3"
+                    : "atm-gistemp-pinned-admission/1");
+            string repository_version = (energy_institute || bnr_bls_c01)
                 ? "snapshot:" + chart_pin.snapshot_sha
                 : chart_pin.repository_version;
             var series = new ConversationPersistenceChartSeries (
@@ -3109,12 +3132,15 @@ namespace AskTheModel {
             charts = {
                 new ConversationPersistenceChart (
                     1,
-                    energy_institute ? "atm-chart-spec/2" : "atm-chart-spec/1",
+                    bnr_bls_c01 ? "atm-chart-spec/3" :
+                        (energy_institute ? "atm-chart-spec/2" : "atm-chart-spec/1"),
                     chart_spec_id,
                     "line",
-                    energy_institute
-                        ? "atm-chart-reconstruct/energy-institute-tes-complete-annual/1"
-                        : "atm-chart-reconstruct/gistemp-complete-annual/1",
+                    bnr_bls_c01
+                        ? "atm-chart-reconstruct/bnr-bls-c01-calendar-quarter/1"
+                        : (energy_institute
+                            ? "atm-chart-reconstruct/energy-institute-tes-complete-annual/1"
+                            : "atm-chart-reconstruct/gistemp-complete-annual/1"),
                     { series }
                 )
             };
@@ -3122,9 +3148,11 @@ namespace AskTheModel {
             ChartNative.View view;
             if (!ChartNative.create (spec, out view)) {
                 throw new GLib.IOError.FAILED (
-                    energy_institute
-                        ? "Qualified live Energy Institute chart could not be rendered."
-                        : "Qualified live GISTEMP chart could not be rendered."
+                    bnr_bls_c01
+                        ? "Qualified live BNR BLS C01 chart could not be rendered."
+                        : (energy_institute
+                            ? "Qualified live Energy Institute chart could not be rendered."
+                            : "Qualified live GISTEMP chart could not be rendered.")
                 );
             }
             view.add_css_class ("atm-history-chart");
