@@ -163,6 +163,39 @@ normalize_alias (const char *value)
 }
 
 static gboolean
+registered_entry_pointer (const AtmChartCatalogEntry *entry)
+{
+    for (gsize i = 0; i < G_N_ELEMENTS (entries); i++)
+        if (entry == &entries[i])
+            return TRUE;
+    return FALSE;
+}
+
+static gboolean
+safe_relative_source_path (const char *path)
+{
+    if (path == NULL || *path == '\\0' || path[0] == '/' ||
+        strchr (path, '\\\\') != NULL || strstr (path, "//") != NULL)
+        return FALSE;
+
+    const char *segment = path;
+    while (*segment != '\\0') {
+        const char *slash = strchr (segment, '/');
+        gsize length = slash != NULL
+            ? (gsize) (slash - segment)
+            : strlen (segment);
+        if (length == 0 ||
+            (length == 1 && segment[0] == '.') ||
+            (length == 2 && segment[0] == '.' && segment[1] == '.'))
+            return FALSE;
+        if (slash == NULL)
+            break;
+        segment = slash + 1;
+    }
+    return TRUE;
+}
+
+static gboolean
 valid_sha (const char *sha)
 {
     if (sha == NULL || strlen (sha) != 40)
@@ -224,7 +257,7 @@ atm_chart_catalog_find_alias (const char *alias, const AtmChartCatalogEntry **ou
 gboolean
 atm_chart_catalog_snapshot_admitted (const AtmChartCatalogEntry *entry, const char *snapshot_sha)
 {
-    if (entry == NULL || !valid_sha (snapshot_sha))
+    if (!registered_entry_pointer (entry) || !valid_sha (snapshot_sha))
         return FALSE;
     for (gsize i = 0; i < entry->snapshot_count; i++)
         if (g_strcmp0 (snapshot_sha, entry->snapshot_shas[i]) == 0)
@@ -379,13 +412,17 @@ atm_chart_catalog_validate (GError **error)
             e->allowed_chart_kinds == NULL || e->allowed_chart_kind_count == 0)
             return fail (error, ATM_CHART_CATALOG_ERROR_LIMIT, "Catalog collection count is outside its bound.");
 
-        if (e->source_path[0] == '/' || strstr(e->source_path, "..") != NULL ||
-            !g_str_has_prefix(e->publisher_url, "https://"))
+        if (!safe_relative_source_path (e->source_path) ||
+            !g_str_has_prefix (e->publisher_url, "https://"))
             return fail (error, ATM_CHART_CATALOG_ERROR_SHAPE, "Catalog contains unsafe source path or publisher URL.");
 
-        for (gsize j = 0; j < e->snapshot_count; j++)
-            if (!valid_sha(e->snapshot_shas[j]))
+        for (gsize j = 0; j < e->snapshot_count; j++) {
+            if (!valid_sha (e->snapshot_shas[j]))
                 return fail (error, ATM_CHART_CATALOG_ERROR_SOURCE_POLICY, "Catalog contains a non-canonical snapshot SHA.");
+            for (gsize k = j + 1; k < e->snapshot_count; k++)
+                if (g_strcmp0 (e->snapshot_shas[j], e->snapshot_shas[k]) == 0)
+                    return fail (error, ATM_CHART_CATALOG_ERROR_SOURCE_POLICY, "Catalog repeats an allowed source snapshot.");
+        }
 
         for (gsize j = 0; j < i; j++)
             if (g_strcmp0 (e->series_id, entries[j].series_id) == 0)
