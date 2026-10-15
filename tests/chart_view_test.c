@@ -146,7 +146,7 @@ test_bnr_quarterly_data_and_missing_provenance (void)
     g_assert_nonnull (data);
     g_assert_nonnull (strstr (data, "# source_snapshot\te43eb4e899f123d3b1aa0f6e20b7c8ed35434170"));
     g_assert_nonnull (strstr (data, "0\t2022-Q4\tNUMERIC\t11.89"));
-    g_assert_nonnull (strstr (data, "0\t2025-Q2\tMISSING\t\t\t0\t0\t"));
+    g_assert_nonnull (strstr (data, "0\t2025-Q2\tMISSING\t\t\t0\tnone\t"));
     g_assert_nonnull (strstr (data, "source_round_not_retained"));
     g_assert_nonnull (strstr (data, "0\t2025-Q3\tNUMERIC\t9.46"));
 
