@@ -108,6 +108,15 @@ test_snapshot_allowlists (void)
     g_assert_false (atm_chart_catalog_snapshot_admitted (bnr, "D9E249339663015F6D1C05752338A955BF64AD0B"));
     g_assert_false (atm_chart_catalog_snapshot_admitted (bnr, "not-a-snapshot"));
     g_assert_false (atm_chart_catalog_snapshot_admitted (NULL, rmd));
+
+    /* A caller-crafted descriptor must not expand the compiled-in allowlist. */
+    AtmChartCatalogEntry forged = *gistemp;
+    const char *forged_snapshot[] = {
+        "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa"
+    };
+    forged.snapshot_shas = forged_snapshot;
+    forged.snapshot_count = G_N_ELEMENTS (forged_snapshot);
+    g_assert_false (atm_chart_catalog_snapshot_admitted (&forged, forged_snapshot[0]));
 }
 
 static void
