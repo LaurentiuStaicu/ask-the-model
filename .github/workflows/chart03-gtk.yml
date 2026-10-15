@@ -35,6 +35,7 @@ jobs:
           GSK_RENDERER: cairo
           G_DEBUG: fatal-warnings
           ATM_CHART01_FIXTURE: tests/fixtures/chart01
+          ATM_BNR_BLS_FIXTURE: tests/fixtures/chart01/rmd-bnr-bls
           ATM_CHART03_KEYBOARD: '1'
           ATM_CHART03_GTK_OUTPUT: /tmp/chart03-gtk-preview
           UBSAN_OPTIONS: halt_on_error=1:print_stacktrace=1

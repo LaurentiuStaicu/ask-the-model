@@ -163,19 +163,69 @@ static void selection_changed (GObject *object, GParamSpec *pspec, gpointer data
     (void) object; (void) pspec;
     AtmChartView *self = data;
     GtkStringObject *row = GTK_STRING_OBJECT (gtk_single_selection_get_selected_item (self->selection));
-    if (!row) { gtk_text_buffer_set_text (self->provenance, "Select an observation to inspect its source.", -1); return; }
+    if (!row) {
+        gtk_text_buffer_set_text (self->provenance, "Select an observation to inspect its source.", -1);
+        return;
+    }
     char **c = g_strsplit (gtk_string_object_get_string (row), "\t", -1);
-    if (g_strv_length (c) < 8) {
+    const AtmChartSpec *spec = self->render != NULL
+        ? atm_chart_render_spec (self->render) : NULL;
+    gboolean is_bnr = spec != NULL &&
+        atm_chart_spec_version (spec) == ATM_CHART_SPEC_VERSION_BNR_BLS_C01_V3;
+    guint required = is_bnr ? 10u : 8u;
+    if (g_strv_length (c) != required) {
         g_strfreev (c);
         gtk_text_buffer_set_text (self->provenance, "Select an observation to inspect its source.", -1);
         return;
     }
+
     GString *text = g_string_new (NULL);
-    const AtmChartSpec *spec = self->render != NULL
-        ? atm_chart_render_spec (self->render) : NULL;
     gboolean is_ei = spec != NULL &&
         atm_chart_spec_version (spec) == ATM_CHART_SPEC_VERSION_ENERGY_INSTITUTE_V2;
-    if (is_ei) {
+    if (is_bnr) {
+        if (g_strcmp0 (c[2], "MISSING") == 0) {
+            if (g_strcmp0 (c[1], "2025-Q2") != 0 || c[3][0] != '\0' ||
+                c[4][0] != '\0' || g_strcmp0 (c[5], "0") != 0 ||
+                g_strcmp0 (c[6], "0") != 0 ||
+                g_strcmp0 (c[9], "source_round_not_retained") != 0) {
+                g_strfreev (c);
+                g_string_free (text, TRUE);
+                gtk_text_buffer_set_text (self->provenance, "The selected missing observation failed source validation.", -1);
+                return;
+            }
+            g_string_append_printf (text,
+                "Quarter: %s\nStatus: MISSING\nReason: %s\n"
+                "No numeric value is available; this is not zero.\n"
+                "Physical source row: none\nRepository: %s\nSnapshot: %s\n"
+                "Path: %s\nSemantic interpretation: BNR BLS C01 / credit standards net percentage\n"
+                "Qualified series: %s\nSupport identities:\n",
+                c[1], c[9], ATM_BNR_BLS_UPSTREAM_REPOSITORY,
+                atm_chart_spec_series_snapshot_sha (spec, 0),
+                atm_chart_spec_series_source_path (spec, 0), c[7]);
+        } else if (g_strcmp0 (c[2], "NUMERIC") == 0 &&
+                   c[3][0] != '\0' && c[4][0] != '\0' &&
+                   c[6][0] != '\0' && g_strcmp0 (c[9], "") == 0) {
+            g_string_append_printf (text,
+                "Quarter: %s\nStatus: NUMERIC\nExact net percentage: %s%%\n"
+                "Canonical decimal: %se%s\nPhysical source row: %s\n"
+                "Repository: %s\nSnapshot: %s\nPath: %s\n"
+                "Semantic interpretation: BNR BLS C01 / credit standards net percentage\n"
+                "Qualified series: %s\nSupport identities:\n",
+                c[1], c[3], c[4], c[5], c[6],
+                ATM_BNR_BLS_UPSTREAM_REPOSITORY,
+                atm_chart_spec_series_snapshot_sha (spec, 0),
+                atm_chart_spec_series_source_path (spec, 0), c[7]);
+        } else {
+            g_strfreev (c);
+            g_string_free (text, TRUE);
+            gtk_text_buffer_set_text (self->provenance, "The selected observation failed source validation.", -1);
+            return;
+        }
+        char **ids = g_strsplit (c[8], ";", -1);
+        for (guint i = 0; ids[i]; i++)
+            g_string_append_printf (text, "%s\n", ids[i]);
+        g_strfreev (ids);
+    } else if (is_ei) {
         g_string_append_printf (text,
             "Year: %s\nExact TES: %s exajoules/year (Physical Energy Content)\n"
             "Canonical decimal: %se%s\nSource row: %s\n"
@@ -186,17 +236,22 @@ static void selection_changed (GObject *object, GParamSpec *pspec, gpointer data
             c[1], c[2], c[3], c[4], c[5],
             atm_chart_spec_series_snapshot_sha (spec, 0),
             atm_chart_spec_series_source_path (spec, 0), c[6]);
+        char **ids = g_strsplit (c[7], ";", -1);
+        for (guint i = 0; ids[i]; i++) g_string_append_printf (text, "%s\n", ids[i]);
+        g_strfreev (ids);
     } else {
         g_string_append_printf (text, "Year: %s\nExact anomaly: %s deg C (1951-1980)\nCanonical decimal: %se%s\n"
             "Source row: %s\nRepository: LaurentiuStaicu/empirical-world3-dynamics\n"
             "Snapshot: d9e249339663015f6d1c05752338a955bf64ad0b\n"
             "Path: science/data/processed/nasa_gistemp_global_2026.csv\n"
             "Vintage: 2026-08-31\nQualified series: %s\nSupport identities:\n", c[1],c[2],c[3],c[4],c[5],c[6]);
+        char **ids = g_strsplit (c[7], ";", -1);
+        for (guint i = 0; ids[i]; i++) g_string_append_printf (text, "%s\n", ids[i]);
+        g_strfreev (ids);
     }
-    char **ids = g_strsplit (c[7], ";", -1);
-    for (guint i = 0; ids[i]; i++) g_string_append_printf (text, "%s\n", ids[i]);
     gtk_text_buffer_set_text (self->provenance, text->str, -1);
-    g_strfreev (ids); g_strfreev (c); g_string_free (text, TRUE);
+    g_strfreev (c);
+    g_string_free (text, TRUE);
 }
 void atm_chart_view_show_chart (AtmChartView *self)
 {
@@ -234,13 +289,20 @@ gboolean atm_chart_view_new (const AtmChartSpec *spec, AtmChartView **out, GErro
     char **lines = g_strsplit (self->data, "\n", -1);
     for (guint i = 0; lines[i]; i++) {
         if (!lines[i][0] || lines[i][0] == '#' || g_str_has_prefix (lines[i], "series\t")) continue;
-        char **cells = g_strsplit (lines[i], "\t", -1); gboolean valid = g_strv_length (cells) == 8;
+        const AtmChartSpec *spec_for_rows = atm_chart_render_spec (initial);
+        gboolean is_bnr_row = spec_for_rows != NULL &&
+            atm_chart_spec_version (spec_for_rows) == ATM_CHART_SPEC_VERSION_BNR_BLS_C01_V3;
+        char **cells = g_strsplit (lines[i], "\t", -1);
+        gboolean valid = g_strv_length (cells) == (is_bnr_row ? 10u : 8u);
         g_strfreev (cells);
         if (!valid) { g_strfreev (lines); g_object_unref (self); return reject (error, "Invalid exact Data view row."); }
         gtk_string_list_append (self->rows, lines[i]);
     }
     g_strfreev (lines);
-    gboolean is_ei = atm_chart_spec_version (atm_chart_render_spec (initial)) ==
+    const AtmChartSpec *initial_spec = atm_chart_render_spec (initial);
+    gboolean is_bnr = atm_chart_spec_version (initial_spec) ==
+        ATM_CHART_SPEC_VERSION_BNR_BLS_C01_V3;
+    gboolean is_ei = atm_chart_spec_version (initial_spec) ==
         ATM_CHART_SPEC_VERSION_ENERGY_INSTITUTE_V2;
     accessible (GTK_WIDGET (self), "Qualified scientific chart and exact data", "Alt+1 opens Chart. Alt+2 opens Data.");
     self->stack = GTK_STACK (gtk_stack_new ()); gtk_stack_set_transition_type (self->stack, GTK_STACK_TRANSITION_TYPE_NONE);
@@ -262,35 +324,49 @@ gboolean atm_chart_view_new (const AtmChartSpec *spec, AtmChartView **out, GErro
     gtk_widget_set_hexpand (GTK_WIDGET (self->area), TRUE); gtk_widget_set_vexpand (GTK_WIDGET (self->area), TRUE);
     gtk_widget_set_focusable (GTK_WIDGET (self->area), TRUE);
     accessible (GTK_WIDGET (self->area),
-        is_ei ? "Energy Institute global total energy supply chart"
-              : "Global annual temperature anomaly chart",
-        is_ei
-            ? "Exact TES observations and source provenance are in Data."
-            : "Exact observations and provenance are in Data.");
+        is_bnr ? "BNR BLS C01 credit standards chart" :
+            (is_ei ? "Energy Institute global total energy supply chart"
+                   : "Global annual temperature anomaly chart"),
+        is_bnr
+            ? "Quarterly net percentage observations. 2025-Q2 is missing, not zero; exact values and source provenance are in Data."
+            : (is_ei
+                ? "Exact TES observations and source provenance are in Data."
+                : "Exact observations and provenance are in Data."));
     gtk_drawing_area_set_draw_func (self->area, draw, self, NULL);
     g_signal_connect (self->area, "resize", G_CALLBACK (resize), self);
     g_signal_connect (self->area, "notify::scale-factor", G_CALLBACK (scale_changed), self);
     gtk_box_append (GTK_BOX (chart), GTK_WIDGET (self->area)); gtk_stack_add_titled (self->stack, chart, "chart", "Chart");
     GtkWidget *data = gtk_box_new (GTK_ORIENTATION_VERTICAL, 8);
-    GtkWidget *unit = gtk_label_new (is_ei
-        ? "Global total energy supply (EJ/year; Physical Energy Content). Exact source decimals."
-        : "Global annual anomaly (deg C), relative to 1951-1980. Exact source decimals.");
+    GtkWidget *unit = gtk_label_new (is_bnr
+        ? "BNR BLS C01 credit standards net percentage. 2025-Q2 is explicitly MISSING, not zero."
+        : (is_ei
+            ? "Global total energy supply (EJ/year; Physical Energy Content). Exact source decimals."
+            : "Global annual anomaly (deg C), relative to 1951-1980. Exact source decimals."));
     gtk_label_set_wrap (GTK_LABEL (unit), TRUE); gtk_label_set_xalign (GTK_LABEL (unit), 0);
     gtk_box_append (GTK_BOX (data), unit);
     self->selection = gtk_single_selection_new (G_LIST_MODEL (g_object_ref (self->rows)));
     self->table = GTK_COLUMN_VIEW (gtk_column_view_new (GTK_SELECTION_MODEL (g_object_ref (self->selection))));
     gtk_column_view_set_show_row_separators (self->table, TRUE); gtk_widget_add_css_class (GTK_WIDGET (self->table), "data-table");
-    accessible (GTK_WIDGET (self->table), "Exact annual observations", "Select a year with arrow keys to inspect its provenance. Source order is preserved.");
+    accessible (GTK_WIDGET (self->table),
+        is_bnr ? "Exact quarterly observations" : "Exact annual observations",
+        is_bnr
+            ? "Select a quarter with arrow keys to inspect exact source status and provenance. The qualified missing quarter has no numeric value or physical CSV row."
+            : "Select a year with arrow keys to inspect its provenance. Source order is preserved.");
     const char *titles[] = {
-        "Year", is_ei ? "TES (EJ/year)" : "Anomaly (deg C)", "Source row"
+        is_bnr ? "Quarter" : "Year",
+        is_bnr ? "Status" : (is_ei ? "TES (EJ/year)" : "Anomaly (deg C)"),
+        is_bnr ? "Net %" : "Source row",
+        "Source row"
     };
-    guint fields[] = {1,2,5};
-    for (guint i = 0; i < 3; i++) {
+    guint fields[] = {1,2, is_bnr ? 3u : 5u, 6u};
+    guint columns = is_bnr ? 4u : 3u;
+    for (guint i = 0; i < columns; i++) {
         GtkListItemFactory *factory = gtk_signal_list_item_factory_new ();
         g_signal_connect (factory, "setup", G_CALLBACK (cell_setup), NULL);
         g_signal_connect (factory, "bind", G_CALLBACK (cell_bind), GUINT_TO_POINTER (fields[i]));
         GtkColumnViewColumn *column = gtk_column_view_column_new (titles[i], factory);
-        gtk_column_view_column_set_expand (column, i == 1); gtk_column_view_append_column (self->table, column); g_object_unref (column);
+        gtk_column_view_column_set_expand (column, i == 1 || (is_bnr && i == 2));
+        gtk_column_view_append_column (self->table, column); g_object_unref (column);
     }
     GtkWidget *scroll = gtk_scrolled_window_new (); gtk_scrolled_window_set_child (GTK_SCROLLED_WINDOW (scroll), GTK_WIDGET (self->table));
     gtk_scrolled_window_set_min_content_height (GTK_SCROLLED_WINDOW (scroll), 180); gtk_widget_set_vexpand (scroll, TRUE);
