@@ -206,9 +206,10 @@ consistent (const AtmChartIntentProposal *p)
 
     switch (p->intent) {
     case ATM_CHART_INTENT_CHART:
+        /* The chart intent is reserved for a chart-only response. A chart
+         * accompanied by interpretation must use intent=interpretation. */
         return selected && line &&
-            (p->response_mode == ATM_CHART_INTENT_RESPONSE_CHART_ONLY ||
-             p->response_mode == ATM_CHART_INTENT_RESPONSE_CHART_WITH_INTERPRETATION);
+            p->response_mode == ATM_CHART_INTENT_RESPONSE_CHART_ONLY;
 
     case ATM_CHART_INTENT_INTERPRETATION:
         if (!selected)
