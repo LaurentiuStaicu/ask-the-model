@@ -431,6 +431,30 @@ create_v3_store (
 }
 
 static void
+create_v4_store (
+    const char *path
+)
+{
+    create_v3_store (path);
+    GError *error = NULL;
+    GBytes *bytes = g_resources_lookup_data (
+        "/io/github/laurentiustaicu/ask_the_model/schemas/conversation-store-v3-to-v4.sql",
+        G_RESOURCE_LOOKUP_FLAGS_NONE, &error);
+    g_assert_no_error (error);
+    g_assert_nonnull (bytes);
+    gsize size = 0;
+    const char *data = g_bytes_get_data (bytes, &size);
+    g_assert_nonnull (data);
+    char *migration = g_strndup (data, size);
+    char *sql = g_strdup_printf (
+        "BEGIN IMMEDIATE;%sPRAGMA user_version=4;COMMIT;", migration);
+    raw_exec (path, sql);
+    g_free (sql);
+    g_free (migration);
+    g_bytes_unref (bytes);
+}
+
+static void
 insert_v3_gistemp_chart_fixture (
     const char *path
 )
@@ -486,7 +510,7 @@ insert_v3_gistemp_chart_fixture (
 }
 
 static void
-test_v3_to_v4_migration_preserves_chart_rows (void)
+test_v3_to_v5_migration_preserves_chart_rows (void)
 {
     char *root = new_temp_root ("atm-conversation-v3-v4-XXXXXX");
     char *path = store_path (root);
@@ -497,10 +521,10 @@ test_v3_to_v4_migration_preserves_chart_rows (void)
     GError *error = NULL;
     g_assert_true (atm_conversation_store_open (path, &store, &error));
     g_assert_no_error (error);
-    g_assert_cmpint (atm_conversation_store_schema_version (store), ==, 4);
+    g_assert_cmpint (atm_conversation_store_schema_version (store), ==, ATM_CONVERSATION_STORE_SCHEMA_VERSION);
     g_assert_true (atm_conversation_store_validate (store, &error));
     g_assert_no_error (error);
-    g_assert_cmpint (raw_int64 (path, "PRAGMA user_version;"), ==, 4);
+    g_assert_cmpint (raw_int64 (path, "PRAGMA user_version;"), ==, ATM_CONVERSATION_STORE_SCHEMA_VERSION);
     g_assert_cmpint (raw_int64 (path,
         "SELECT count(*) FROM message_charts WHERE chart_schema='atm-chart-spec/1' "
         "AND chart_spec_id='aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa' "
@@ -515,7 +539,7 @@ test_v3_to_v4_migration_preserves_chart_rows (void)
 
     char *schema_id = raw_text (path,
         "SELECT schema_id FROM installation WHERE singleton_id=1;");
-    g_assert_cmpstr (schema_id, ==, "atm-conversation-store/4");
+    g_assert_cmpstr (schema_id, ==, ATM_CONVERSATION_STORE_SCHEMA_ID);
     g_free (schema_id);
     atm_conversation_store_close (store);
     g_free (path);
@@ -567,7 +591,7 @@ test_v3_to_v4_migration_rollback (void)
 }
 
 static void
-test_v1_to_v4_migration (void)
+test_v1_to_v5_migration (void)
 {
     char *root = new_temp_root (
         "atm-conversation-migration-XXXXXX"
@@ -751,7 +775,7 @@ test_v1_to_v3_migration_rollback (void)
 }
 
 static void
-test_v2_to_v4_migration (void)
+test_v2_to_v5_migration (void)
 {
     char *root = new_temp_root ("atm-conversation-v2-v3-XXXXXX");
     char *path = store_path (root);
@@ -3059,24 +3083,24 @@ main (int argc, char **argv)
         test_bootstrap_and_reopen
     );
     g_test_add_func (
-        "/conversation-store/v1-to-v4-migration",
-        test_v1_to_v4_migration
+        "/conversation-store/v1-to-v5-migration",
+        test_v1_to_v5_migration
     );
     g_test_add_func (
         "/conversation-store/v1-to-v3-rollback",
         test_v1_to_v3_migration_rollback
     );
     g_test_add_func (
-        "/conversation-store/v2-to-v4-migration",
-        test_v2_to_v4_migration
+        "/conversation-store/v2-to-v5-migration",
+        test_v2_to_v5_migration
     );
     g_test_add_func (
         "/conversation-store/v2-to-v3-rollback",
         test_v2_to_v3_migration_rollback
     );
     g_test_add_func (
-        "/conversation-store/v3-to-v4-migration",
-        test_v3_to_v4_migration_preserves_chart_rows
+        "/conversation-store/v3-to-v5-migration",
+        test_v3_to_v5_migration_preserves_chart_rows
     );
     g_test_add_func (
         "/conversation-store/v3-to-v4-rollback",
