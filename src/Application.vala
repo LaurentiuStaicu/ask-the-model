@@ -3630,7 +3630,8 @@ namespace AskTheModel {
             ChartIntent chart_intent =
                 ChartIntent.parse (prompt);
             bool source_chart_requested = chart_intent.gistemp_requested ||
-                chart_intent.energy_institute_requested;
+                chart_intent.energy_institute_requested ||
+                chart_intent.bnr_bls_c01_requested;
             string effective_prompt = source_chart_requested
                 ? chart_intent.query
                 : prompt;
@@ -3638,9 +3639,11 @@ namespace AskTheModel {
             if (source_chart_requested && effective_prompt.length == 0) {
                 append_transcript (
                     state.transcript,
-                    chart_intent.energy_institute_requested
-                        ? "Assistant: Use /chart energy-institute followed by the grounded question you want to visualize."
-                        : "Assistant: Use /chart gistemp followed by the grounded question you want to visualize."
+                    chart_intent.bnr_bls_c01_requested
+                        ? "Assistant: Use /chart bnr-bls-c01 followed by the grounded question you want to visualize."
+                        : (chart_intent.energy_institute_requested
+                            ? "Assistant: Use /chart energy-institute followed by the grounded question you want to visualize."
+                            : "Assistant: Use /chart gistemp followed by the grounded question you want to visualize.")
                 );
                 return;
             }
@@ -3710,6 +3713,17 @@ namespace AskTheModel {
                         "Select EWD in Repository Scope and retry."
                     );
                 }
+                if (chart_intent.bnr_bls_c01_requested &&
+                    !repository_id_in (state.repository_ids, "rmd") &&
+                    !repository_id_in (
+                        state.repository_ids,
+                        "LaurentiuStaicu/romanian-monetary-dynamics"
+                    )) {
+                    throw new GLib.IOError.FAILED (
+                        "BNR BLS C01 charts require RMD to be selected for this conversation. " +
+                        "Select RMD in Repository Scope and retry."
+                    );
+                }
 
                 if (!state.session.is_active ()) {
                     RepositoryDescriptor[] selected =
@@ -3747,6 +3761,8 @@ namespace AskTheModel {
                     qualify_live_gistemp_request (state.session);
                 } else if (chart_intent.energy_institute_requested) {
                     qualify_live_energy_institute_request (state.session);
+                } else if (chart_intent.bnr_bls_c01_requested) {
+                    qualify_live_bnr_bls_c01_request (state.session);
                 }
 
                 bool needs_clarification;
@@ -3780,6 +3796,14 @@ namespace AskTheModel {
                         "snapshot. The chart uses the Physical Energy Content interpretation " +
                         "and reports exajoules per year. Do not invent values, chart metadata, " +
                         "transformations or interpretations beyond the grounded evidence.";
+                } else if (chart_intent.bnr_bls_c01_requested) {
+                    grounded_system_instructions +=
+                        "\nThe application reconstructs the BNR BLS C01 quarterly credit " +
+                        "standards net-percentage chart from the exact pinned RMD source bundle. " +
+                        "It contains eleven numeric source observations across twelve quarter " +
+                        "coordinates; 2025-Q2 is source-qualified MISSING, not zero. Do not " +
+                        "impute, interpolate, fabricate values, or claim a continuous line over " +
+                        "the missing quarter.";
                 }
                 grounded_system_instructions +=
                     chart_intent.response_guidance ();
@@ -3933,6 +3957,7 @@ namespace AskTheModel {
                                     build_live_chart_widgets (
                                         state.session,
                                         chart_intent.energy_institute_requested,
+                                        chart_intent.bnr_bls_c01_requested,
                                         out live_charts
                                     );
                             } catch (GLib.Error chart_error) {
