@@ -5726,7 +5726,7 @@ namespace AskTheModel {
 
             pres09_test_finish (
                 true,
-                "real composer/send -> EI v2 and GISTEMP v1 views -> Archive persisted both recipes"
+                "real composer/send -> EI v2, GISTEMP v1 and BNR C01 v3 views -> Archive persisted all three recipes"
             );
             return false;
         }
@@ -5789,7 +5789,7 @@ namespace AskTheModel {
 
             pres09_test_finish (
                 true,
-                "separate app process reopened archived History and reconstructed source-qualified EI v2 plus GISTEMP v1"
+                "separate app process reopened archived History and reconstructed source-qualified EI v2, GISTEMP v1 and BNR C01 v3 with exact MISSING provenance"
             );
             return false;
         }
@@ -5837,7 +5837,7 @@ namespace AskTheModel {
 
             pres09_test_finish (
                 true,
-                "tampered source manifest rendered Chart unavailable and no Chart/Data view"
+                "tampered EWD and RMD source material rendered Chart unavailable and no Chart/Data view"
             );
             return false;
         }
