@@ -201,8 +201,9 @@ flatpak run io.github.laurentiustaicu.ask_the_model
 - <small>shows compact numbered citations with exact repository/version/SHA/source/locator provenance and immutable source links;</small>
 - <small>renders a GISTEMP v1 chart requested explicitly or in clear natural language only after revalidating its pinned EWD source, and reconstructs saved chart recipes from History;</small>
 - <small>renders the source-qualified Energy Institute TES v2 chart through <code>/chart energy-institute</code>, preserving pinned-source identity through History without claiming independent raw-to-processed reproduction;</small>
+- <small>renders the bounded BNR BLS C01 quarterly chart from the exact pinned RMD snapshot through <code>/chart bnr-bls-c01</code>, preserving all 12 quarter coordinates, the missing 2025-Q2 gap, Data <code>none</code> and recipe-based History reconstruction;</small>
 - <small>reconciles managed conversation JSON exports before startup cleanup, retaining unarchived working state when reconciliation fails or remains uncertain;</small>
-- <small>offers a session-only Optimizations switch that starts OFF; qualified repository optimizations are opt-in and preserve the baseline path when OFF;</small>
+- <small>offers a session-only Optimizations switch that starts OFF; optional qualified optimization paths are opt-in, while mandatory B0/B2 correctness coordination remains active in both OFF and ON modes;</small>
 - <small>follows desktop light/dark appearance and runs as a GTK 4 / Granite Flatpak for the elementary OS 8 runtime.</small>
 
 ### What v0.8.0 does not do
@@ -213,8 +214,8 @@ flatpak run io.github.laurentiustaicu.ask_the_model
 - <small>import saved-conversation JSON archives;</small>
 - <small>provide retention-policy or bulk History management;</small>
 - <small>accept arbitrary unreviewed repository origins beyond the fixed EWD/CBD/RMD catalog;</small>
-- <small>create generic charts, accept model-authored numeric data or chart configuration, or chart sources beyond the two qualified GISTEMP v1 and Energy Institute TES v2 profiles;</small>
-- <small>offer a BNR C01 application chart route or general multi-series, derived-series, missing/event/discontinuity chart semantics;</small>
+- <small>discover arbitrary chart sources, accept model-authored numeric data or chart configuration, or provide generic multi-series/derived-series charting;</small>
+- <small>generalize the bounded BNR C01 missing-quarter behavior to arbitrary missing/event/discontinuity series;</small>
 - <small>execute or simulate EWD, CBD or RMD;</small>
 - <small>autonomously modify scientific repositories;</small>
 - <small>turn generated text into an authoritative scientific-model result without repository-grounded provenance or actual model execution.</small>
