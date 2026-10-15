@@ -2,15 +2,15 @@ cff-version: 1.2.0
 message: "If you use Ask the Model, please cite this version."
 type: software
 title: "Ask the Model"
-version: 0.7.1
-date-released: 2026-10-14
+version: 0.8.0
+date-released: 2026-10-15
 authors:
   - family-names: "Staicu"
     given-names: "Laurentiu"
 repository-code: "https://github.com/LaurentiuStaicu/ask-the-model"
 url: "https://github.com/LaurentiuStaicu/ask-the-model"
 license: MIT
-abstract: "A local-first desktop interface for locally managed language models and repository-grounded exploration of scientific dynamical-model repositories. Ask the Model v0.7.1 fixes transcript-embedded chart sizing and chart-only prose that previously reproduced partial retrieval excerpts. It preserves the explicitly qualified GISTEMP v1 and Energy Institute TES v2 paths, source provenance through History, and the established grounded-turn durability and fail-closed persistence boundaries."
+abstract: "A local-first desktop interface for locally managed language models and repository-grounded exploration of scientific dynamical-model repositories. Ask the Model v0.8.0 adds the source-qualified BNR BLS C01 quarterly chart route alongside GISTEMP v1 and Energy Institute TES v2, with pinned-source provenance and History reconstruction. The bounded profile preserves the authorized missing 2025-Q2 observation without inventing a physical row or numeric value; generic arbitrary-source, multi-series and derived charting remain outside scope."
 keywords:
   - local AI
   - local-first
