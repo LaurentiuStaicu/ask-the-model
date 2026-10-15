@@ -250,7 +250,7 @@ int main () {
     assert (!bnr_command_compares_gdp.bnr_bls_c01_requested);
 
     var bnr_natural_comparison = AskTheModel.ChartIntent.parse (
-        "Generate a chart comparing credit standards with GDP."
+        "Generate a chart of credit standards against GDP."
     );
     assert (!bnr_natural_comparison.bnr_bls_c01_requested);
 
