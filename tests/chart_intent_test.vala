@@ -212,6 +212,11 @@ int main () {
     );
     assert (credit_standards_subject.bnr_bls_c01_requested);
 
+    var credit_standards_romanian_genitive = AskTheModel.ChartIntent.parse (
+        "Generează un grafic al standardelor de credit în timp."
+    );
+    assert (credit_standards_romanian_genitive.bnr_bls_c01_requested);
+
     var bnr_near_miss = AskTheModel.ChartIntent.parse (
         "/chart bnr-bls-c01-ish Show the series."
     );
