@@ -1,6 +1,6 @@
 # CHART-01 BNR BLS C01 VerifiedSeries
 
-Status: implemented in a review candidate as a native, test-only qualification layer. It is not an application chart route and does not authorize ChartSpec, display projection, rendering, History, or release claims.
+Status: the source-specific VerifiedSeries layer was integrated by PR #471 and is now used by the bounded BNR C01 route integrated through PRs #472–#479. This document describes only the qualification contract of that layer; it does not broaden source/profile admission or declare a public release.
 
 ## Admitted profile
 
@@ -20,7 +20,7 @@ The wrapper has no arbitrary point constructor and takes no caller-supplied iden
 
 The only admitted absence is 2025-Q2, with the source-authorized reason source_round_not_retained. Its y payload remains absent: no decimal or coefficient is permitted, and the five source authorities remain in its support. The wrapper rejects a different missing coordinate, a numeric payload attached to the missing point, unexpected missing values, breaks, out-of-order quarters, or changes to the source/profile tuple.
 
-This layer does not decide rendering policy. A later ChartSpec/display qualification must define the visual break across the absent quarter and keep the gap explicit in Data view and History.
+This layer does not decide rendering policy. The downstream ChartSpec, projection, gap-aware renderer, Data view and History layers are now integrated separately; they preserve the gap without authorizing interpolation or zero imputation.
 
 ## Tests and boundary
 
