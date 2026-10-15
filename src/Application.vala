@@ -5640,13 +5640,23 @@ namespace AskTheModel {
             string bnr_data = bnr_view.data () ?? "";
             if (!bnr_data.contains ("0\t2025-Q2\tMISSING\t\t\t0\tnone\t") ||
                 !bnr_data.contains ("source_round_not_retained") ||
-                !bnr_view.select_row (10) ||
-                !(bnr_view.provenance () ?? "").contains ("No numeric value is available; this is not zero.") ||
-                !(bnr_view.provenance () ?? "").contains ("source_round_not_retained") ||
-                !(bnr_view.provenance () ?? "").contains ("Physical source row: none") ||
+                !bnr_view.select_row (10)) {
+                pres09_test_finish (
+                    false,
+                    "BNR 2025-Q2 missing source contract was not preserved in the internal Data payload"
+                );
+                return false;
+            }
+            string bnr_missing_provenance = bnr_view.provenance () ?? "";
+            if (!bnr_missing_provenance.contains ("No numeric value is available; this is not zero.") ||
+                !bnr_missing_provenance.contains ("Reason: The source round was not retained.") ||
+                !bnr_missing_provenance.contains ("Source: BNR BLS C01 credit-standards net percentage") ||
+                bnr_missing_provenance.contains ("source_round_not_retained") ||
+                bnr_missing_provenance.contains ("Physical source row:") ||
+                bnr_missing_provenance.contains ("Snapshot:") ||
                 !pres09_test_write_file (
                     "pres09-bnr-c01-missing-provenance.txt",
-                    bnr_view.provenance () ?? ""
+                    bnr_missing_provenance
                 ) ||
                 !pres09_test_save_live_oracle (state)) {
                 pres09_test_finish (
