@@ -77,6 +77,8 @@ int main () {
     string ei_response = ei_command.chart_only_response ();
     assert (ei_response.contains ("Energy Institute global total energy supply chart"));
     assert (ei_response.contains ("Data tab"));
+    assert (ei_response.contains ("source details"));
+    assert (!ei_response.contains ("source provenance"));
     assert (!ei_response.contains ("pseudo-table"));
     assert (!ei_response.contains ("couldn't render"));
 
@@ -107,6 +109,8 @@ int main () {
     string gistemp_response = requested.chart_only_response ();
     assert (gistemp_response.contains ("GISTEMP global temperature anomaly chart"));
     assert (gistemp_response.contains ("Data tab"));
+    assert (gistemp_response.contains ("source details"));
+    assert (!gistemp_response.contains ("source provenance"));
     assert (!gistemp_response.contains ("pseudo-table"));
     assert (!gistemp_response.contains ("couldn't render"));
 
@@ -117,7 +121,10 @@ int main () {
     assert (gistemp_interpretation.chart_only_response () == "");
 
     assert (natural_english.chart_only_response ().contains ("GISTEMP global temperature anomaly chart"));
+    assert (natural_english.chart_only_response ().contains ("source details"));
+    assert (!natural_english.chart_only_response ().contains ("source provenance"));
     assert (natural_romanian.chart_only_response ().contains ("Iată graficul GISTEMP"));
+    assert (natural_romanian.chart_only_response ().contains ("detalii despre sursă"));
     assert (ordinary.response_guidance () == "");
 
     var ei_upper = AskTheModel.ChartIntent.parse (
@@ -131,6 +138,7 @@ int main () {
     );
     assert (!ei_romanian.gistemp_requested);
     assert (ei_romanian.energy_institute_requested);
+    assert (ei_romanian.chart_only_response ().contains ("detaliile sursei"));
 
     var ei_english = AskTheModel.ChartIntent.parse (
         "Show me an Energy Institute chart of global total energy supply using Physical Energy Content."
