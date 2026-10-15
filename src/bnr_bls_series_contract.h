@@ -70,6 +70,12 @@ const AtmSeriesContractPoint *atm_bnr_bls_series_contract_point (
     const AtmBnrBlsSeriesContract *series,
     guint index
 );
+/* Returns the physical source CSV row for numeric observations; returns zero
+ * for the qualified missing quarter or an invalid/unavailable mapping. */
+guint atm_bnr_bls_series_contract_source_row (
+    const AtmBnrBlsSeriesContract *series,
+    guint index
+);
 
 const char *atm_bnr_bls_series_contract_scientific_id (
     const AtmBnrBlsSeriesContract *series

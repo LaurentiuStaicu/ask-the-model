@@ -815,7 +815,22 @@
       "tested_by": [
         "meson:chart-history-reconstruct"
       ]
+    }    ,
+    {
+      "id": "SCIENTIFIC-S1-010",
+      "category": "SCIENTIFIC",
+      "severity": "S1",
+      "lifecycle": "enforced",
+      "statement": "BNR BLS C01 ChartSpec v3 may be constructed only from the source-specific VerifiedSeries reconstructed from the exact five-file RMD panel at snapshot e43eb4e899f123d3b1aa0f6e20b7c8ed35434170. Its independent identity binds the pinned source/profile tuple, calendar-quarter coordinate semantics, twelve ordered quarters, exact source-bound scientific and qualified series identities, and the authorized 2025-Q2 MISSING reason without numeric payload. Existing GISTEMP v1 and Energy Institute v2 identities remain unchanged. This native semantic specification does not enable quarterly display projection, rendering, Application routing or History persistence.",
+      "enforced_by": [
+        "src/bnr_bls_verified_series.c",
+        "src/bnr_bls_series_contract.c",
+        "src/chart_spec.c"
+      ],
+      "tested_by": [
+        "meson:bnr-bls-verified-series",
+        "meson:chart-spec"
+      ]
     }
-
   ]
 }

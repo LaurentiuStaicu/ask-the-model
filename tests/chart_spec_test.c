@@ -1,6 +1,8 @@
 #include "chart_spec.h"
 #include "energy_institute_verified_series.h"
 #include "energy_institute_admission.h"
+#include "bnr_bls_verified_series.h"
+#include "bnr_bls_series_contract.h"
 #include "series_contract.h"
 static AtmGistempAdmission *admit (void)
 {
@@ -34,6 +36,168 @@ static AtmVerifiedSeries *build (void)
     g_assert_no_error (error);
     atm_gistemp_admission_free (a);
     return s;
+}
+
+static AtmBnrBlsVerifiedSeries *
+build_bnr_verified_series (void)
+{
+    const char *root = g_getenv ("ATM_BNR_BLS_FIXTURE");
+    g_assert_nonnull (root);
+    const char *names[] = {
+        "bnr_bls_realised_rounds.csv",
+        "processed_data_inventory_registry.json",
+        "bnr_bls_canonical_panel_promotion_review.json",
+        "bnr_bls_cross_round_mapping_audit.json",
+        "bnr_bls_missing_round_semantic_mapping_audit.json"
+    };
+    GBytes *sources[ATM_BNR_BLS_SOURCE_COUNT] = {NULL};
+    for (guint i = 0; i < ATM_BNR_BLS_SOURCE_COUNT; i++) {
+        char *path = g_build_filename (root, names[i], NULL);
+        char *contents = NULL;
+        gsize length = 0;
+        GError *error = NULL;
+        g_assert_true (g_file_get_contents (path, &contents, &length, &error));
+        g_assert_no_error (error);
+        g_free (path);
+        sources[i] = g_bytes_new_take (contents, length);
+    }
+
+    AtmBnrBlsPanel *panel = NULL;
+    AtmBnrBlsSra *sra = NULL;
+    AtmBnrBlsSeriesContract *contract = NULL;
+    AtmBnrBlsVerifiedSeries *series = NULL;
+    GError *error = NULL;
+
+    g_assert_true (atm_bnr_bls_panel_new (
+        ATM_BNR_BLS_UPSTREAM_REPOSITORY,
+        ATM_BNR_BLS_SNAPSHOT_SHA, sources, &panel, &error));
+    g_assert_no_error (error);
+    for (guint i = 0; i < ATM_BNR_BLS_SOURCE_COUNT; i++)
+        g_bytes_unref (sources[i]);
+    g_assert_true (atm_bnr_bls_sra_new (panel, &sra, &error));
+    g_assert_no_error (error);
+    g_assert_true (atm_bnr_bls_series_contract_from_sra (
+        panel, sra, &contract, &error));
+    g_assert_no_error (error);
+    g_assert_true (atm_bnr_bls_verified_series_from_contract (
+        contract, &series, &error));
+    g_assert_no_error (error);
+
+    atm_bnr_bls_series_contract_free (contract);
+    atm_bnr_bls_sra_free (sra);
+    atm_bnr_bls_panel_free (panel);
+    return series;
+}
+
+static void
+test_bnr_v3_source_bound_quarters_and_missing (void)
+{
+    static const char *const quarters[] = {
+        "2022-Q4", "2023-Q1", "2023-Q2", "2023-Q3",
+        "2023-Q4", "2024-Q1", "2024-Q2", "2024-Q3",
+        "2024-Q4", "2025-Q1", "2025-Q2", "2025-Q3"
+    };
+    static const char *const values[] = {
+        "11.89", "16.34", "15.54", "0.0", "0.0", "0.0",
+        "0.0", "12.54", "12.08", "11.71", NULL, "9.46"
+    };
+
+    AtmBnrBlsVerifiedSeries *input = build_bnr_verified_series ();
+    AtmChartSpec *line = NULL, *again = NULL, *scatter = NULL, *rebuilt = NULL;
+    GError *error = NULL;
+    g_assert_true (atm_chart_spec_new_bnr_bls_c01_v3 (
+        ATM_CHART_LINE, input, &line, &error));
+    g_assert_no_error (error);
+    g_assert_true (atm_chart_spec_new_bnr_bls_c01_v3 (
+        ATM_CHART_LINE, input, &again, &error));
+    g_assert_no_error (error);
+    g_assert_true (atm_chart_spec_new_bnr_bls_c01_v3 (
+        ATM_CHART_SCATTER, input, &scatter, &error));
+    g_assert_no_error (error);
+
+    g_assert_cmpint (atm_chart_spec_version (line), ==,
+                     ATM_CHART_SPEC_VERSION_BNR_BLS_C01_V3);
+    g_assert_cmpstr (atm_chart_spec_schema (line), ==, ATM_CHART_SPEC_V3_SCHEMA);
+    g_assert_cmpstr (atm_chart_spec_x_unit (line), ==, "calendar_quarter");
+    g_assert_cmpstr (atm_chart_spec_x_dimension (line), ==, "time");
+    g_assert_cmpstr (atm_chart_spec_y_unit (line), ==, "percent");
+    g_assert_cmpstr (atm_chart_spec_y_dimension (line), ==, "survey_net_percentage");
+    g_assert_cmpstr (atm_chart_spec_series_profile (line), ==,
+                     ATM_BNR_BLS_VERIFIED_SERIES_PROFILE);
+    g_assert_cmpstr (atm_chart_spec_series_repository_id (line, 0), ==, "rmd");
+    g_assert_cmpstr (atm_chart_spec_series_snapshot_sha (line, 0), ==,
+                     ATM_BNR_BLS_SNAPSHOT_SHA);
+    g_assert_cmpstr (atm_chart_spec_series_source_path (line, 0), ==,
+                     "data/processed/bnr_bls_realised_rounds.csv");
+    g_assert_cmpstr (atm_chart_spec_id (line), ==, atm_chart_spec_id (again));
+    g_assert_cmpstr (atm_chart_spec_id (line), !=, atm_chart_spec_id (scatter));
+    g_assert_cmpuint (atm_chart_spec_x_min (line), ==, 0u);
+    g_assert_cmpuint (atm_chart_spec_x_max (line), ==, 11u);
+    g_assert_cmpstr (atm_chart_spec_calendar_quarter_min (line), ==, "2022-Q4");
+    g_assert_cmpstr (atm_chart_spec_calendar_quarter_max (line), ==, "2025-Q3");
+    g_assert_cmpstr (atm_chart_spec_calendar_quarter_min (scatter), ==, "2022-Q4");
+    g_assert_cmpstr (atm_chart_spec_calendar_quarter_max (scatter), ==, "2025-Q3");
+    g_assert_cmpuint (atm_chart_spec_point_count (line, 0), ==, 12u);
+    g_assert_cmpstr (atm_chart_spec_y_min (line)->coefficient, ==, "0");
+    g_assert_cmpstr (atm_chart_spec_y_max (line)->coefficient, ==, "1634");
+    g_assert_cmpint (atm_chart_spec_y_max (line)->exponent, ==, -2);
+
+    for (guint i = 0; i < G_N_ELEMENTS (quarters); i++) {
+        AtmChartPointView point = {0};
+        g_assert_true (atm_chart_spec_point (line, 0, i, &point));
+        g_assert_cmpuint (point.order, ==, i);
+        g_assert_cmpstr (point.calendar_quarter, ==, quarters[i]);
+        g_assert_cmpuint (point.calendar_year, ==, 0u);
+        if (i == 10u)
+            g_assert_cmpuint (point.source_row, ==, 0u);
+        else
+            g_assert_cmpuint (point.source_row, ==, i < 10u ? i + 2u : 12u);
+        g_assert_false (point.break_before);
+        g_assert_nonnull (point.support);
+        g_assert_cmpuint (point.support->len, >, 0u);
+        if (i == 10u) {
+            g_assert_cmpint (point.y_status, ==, ATM_CHART_POINT_MISSING);
+            g_assert_null (point.source_decimal);
+            g_assert_null (point.coefficient);
+            g_assert_cmpint (point.exponent, ==, 0);
+            g_assert_cmpstr (point.missing_reason, ==,
+                             ATM_BNR_BLS_MISSING_REASON);
+            g_assert_cmpuint (point.support->len, ==, ATM_BNR_BLS_SOURCE_COUNT);
+        } else {
+            g_assert_cmpint (point.y_status, ==, ATM_CHART_POINT_NUMERIC);
+            g_assert_cmpstr (point.source_decimal, ==, values[i]);
+            g_assert_null (point.missing_reason);
+            g_assert_nonnull (point.coefficient);
+        }
+    }
+
+    g_assert_true (atm_chart_spec_rebuild (line, &rebuilt, &error));
+    g_assert_no_error (error);
+    g_assert_cmpstr (atm_chart_spec_id (line), ==, atm_chart_spec_id (rebuilt));
+    g_assert_true (atm_chart_spec_validate (line, &error));
+    g_assert_no_error (error);
+
+    /* A forged absence reason is rejected at the source-specific constructor. */
+    AtmSeriesContract *mutable_contract = (AtmSeriesContract *)
+        atm_bnr_bls_series_contract_value (
+            atm_bnr_bls_verified_series_contract (input));
+    AtmSeriesContractPoint *missing =
+        g_ptr_array_index (mutable_contract->points, 10u);
+    char *saved_reason = missing->missing_reason;
+    missing->missing_reason = "invented";
+    AtmChartSpec *rejected = NULL;
+    g_assert_false (atm_chart_spec_new_bnr_bls_c01_v3 (
+        ATM_CHART_LINE, input, &rejected, NULL));
+    g_assert_null (rejected);
+    missing->missing_reason = saved_reason;
+    g_assert_true (atm_chart_spec_validate (line, &error));
+    g_assert_no_error (error);
+
+    atm_chart_spec_free (rebuilt);
+    atm_chart_spec_free (scatter);
+    atm_chart_spec_free (again);
+    atm_chart_spec_free (line);
+    atm_bnr_bls_verified_series_free (input);
 }
 
 static void test_extents_ownership (void)
@@ -327,6 +491,7 @@ int main (int argc, char **argv)
 {
     g_test_init (&argc, &argv, NULL);
     g_test_add_func ("/chart-spec/extents-ownership", test_extents_ownership);
+    g_test_add_func ("/chart-spec/bnr-v3-source-bound-quarter", test_bnr_v3_source_bound_quarters_and_missing);
     g_test_add_func ("/chart-spec/rejections", test_rejections);
     g_test_add_func ("/chart-spec/tampering", test_tampering);
     g_test_add_func ("/chart-spec/ei-v2-source-bound", test_ei_v2_source_bound_identity_and_generic_accessors);

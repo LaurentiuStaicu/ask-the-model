@@ -56,6 +56,12 @@ const AtmSeriesContractPoint *atm_bnr_bls_verified_series_point (
     const AtmBnrBlsVerifiedSeries *series,
     guint index
 );
+/* Numeric observations map to physical source CSV rows; the MISSING quarter
+ * and invalid indices return zero because no source data row exists. */
+guint atm_bnr_bls_verified_series_source_row (
+    const AtmBnrBlsVerifiedSeries *series,
+    guint index
+);
 const char *atm_bnr_bls_verified_series_scientific_id (
     const AtmBnrBlsVerifiedSeries *series
 );
