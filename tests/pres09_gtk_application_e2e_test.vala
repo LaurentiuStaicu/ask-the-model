@@ -5,6 +5,8 @@ namespace AskTheModel {
 
 private const string EI_SNAPSHOT_SHA =
     "dc710d8e604c0fff713a3acfdb18ab47a1a902bb";
+private const string BNR_SNAPSHOT_SHA =
+    "e43eb4e899f123d3b1aa0f6e20b7c8ed35434170";
 private const string TEST_MODEL = "test-model";
 private const string TEST_DIGEST = "test-digest";
 
@@ -250,6 +252,13 @@ private static int run_orchestrator (
         "snapshots",
         EI_SNAPSHOT_SHA
     );
+    string bnr_snapshot_root = GLib.Path.build_filename (
+        data_root,
+        "Repositories",
+        "rmd",
+        "snapshots",
+        BNR_SNAPSHOT_SHA
+    );
     string state_db = GLib.Path.build_filename (
         state,
         "control-state.sqlite3"
@@ -285,6 +294,24 @@ private static int run_orchestrator (
         copy_tree (
             File.new_for_path (source_snapshot),
             File.new_for_path (snapshot_root)
+        );
+
+        string? full_rmd_root =
+            Environment.get_variable ("ATM_PRES09_FULL_RMD_ROOT");
+        if (full_rmd_root == null || full_rmd_root.strip ().length == 0) {
+            stderr.printf ("ATM_PRES09_FULL_RMD_ROOT is required for the BNR C01 application E2E.\\n");
+            remove_tree_best_effort (File.new_for_path (root));
+            return 1;
+        }
+        string source_rmd_snapshot = GLib.Path.is_absolute (full_rmd_root)
+            ? full_rmd_root
+            : GLib.Path.build_filename (
+                Environment.get_current_dir (),
+                full_rmd_root
+            );
+        copy_tree (
+            File.new_for_path (source_rmd_snapshot),
+            File.new_for_path (bnr_snapshot_root)
         );
 
         string app_commit = string.nfill (64, 'a');
