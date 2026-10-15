@@ -69,10 +69,6 @@ def main() -> int:
         native_vapi,
         'cname = "atm_presentation_document_to_plain_text"',
         "Presentation Vala plain-text bridge",
-    )    require_marker(
-        native_vapi,
-        'cname = "atm_presentation_document_to_plain_text"',
-        "Presentation Vala plain-text bridge",
     )
     require_marker(
         native_tests,
