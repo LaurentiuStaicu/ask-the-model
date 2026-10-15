@@ -341,7 +341,20 @@ private static int run_orchestrator (
                 out file_count,
                 out total_bytes
             )) {
-            stderr.printf ("PRES-09 could not compute fixture snapshot seal.\n");
+            stderr.printf ("PRES-09 could not compute fixture EWD snapshot seal.\\n");
+            remove_tree_best_effort (File.new_for_path (root));
+            return 1;
+        }
+        string bnr_seal;
+        uint64 bnr_file_count;
+        uint64 bnr_total_bytes;
+        if (!RepositoryNative.compute_snapshot_seal (
+                bnr_snapshot_root,
+                out bnr_seal,
+                out bnr_file_count,
+                out bnr_total_bytes
+            )) {
+            stderr.printf ("PRES-09 could not compute fixture RMD snapshot seal.\\n");
             remove_tree_best_effort (File.new_for_path (root));
             return 1;
         }
@@ -367,7 +380,21 @@ private static int run_orchestrator (
                 seal,
                 out generation_id
             ) || generation_id <= 0) {
-            stderr.printf ("PRES-09 could not seed the pinned EWD Control DB generation.\n");
+            stderr.printf ("PRES-09 could not seed the pinned EWD Control DB generation.\\n");
+            remove_tree_best_effort (File.new_for_path (root));
+            return 1;
+        }
+        int64 rmd_generation_id = 0;
+        if (!ControlStateNative.set_current_values_guarded (
+                state_db,
+                generation_id,
+                "rmd",
+                BNR_SNAPSHOT_SHA,
+                "test-rmd-version",
+                bnr_seal,
+                out rmd_generation_id
+            ) || rmd_generation_id <= generation_id) {
+            stderr.printf ("PRES-09 could not seed the pinned RMD Control DB generation.\\n");
             remove_tree_best_effort (File.new_for_path (root));
             return 1;
         }
