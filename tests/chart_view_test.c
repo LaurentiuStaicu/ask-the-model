@@ -153,26 +153,31 @@ test_bnr_quarterly_data_and_missing_provenance (void)
     g_assert_true (atm_chart_view_select_row (view, 0u));
     char *provenance = atm_chart_view_provenance (view);
     g_assert_nonnull (provenance);
-    g_assert_true (g_str_has_prefix (provenance, "Quarter: 2022-Q4\nStatus: NUMERIC"));
-    g_assert_nonnull (strstr (provenance, "Exact net percentage: 11.89%"));
-    g_assert_nonnull (strstr (provenance, "Physical source row: 2"));
-    g_assert_nonnull (strstr (provenance, ATM_BNR_BLS_SNAPSHOT_SHA));
+    g_assert_true (g_str_has_prefix (provenance, "Quarter: 2022-Q4\nNet percentage: 11.89%"));
+    g_assert_nonnull (strstr (provenance, "Source: BNR BLS C01 credit-standards net percentage"));
+    g_assert_nonnull (strstr (provenance, ATM_BNR_BLS_UPSTREAM_REPOSITORY));
+    g_assert_null (strstr (provenance, "Physical source row:"));
+    g_assert_null (strstr (provenance, "Snapshot:"));
+    g_assert_null (strstr (provenance, "Canonical decimal:"));
+    g_assert_null (strstr (provenance, "Support identities:"));
     g_free (provenance);
 
     g_assert_true (atm_chart_view_select_row (view, 10u));
     provenance = atm_chart_view_provenance (view);
     g_assert_nonnull (provenance);
-    g_assert_true (g_str_has_prefix (provenance, "Quarter: 2025-Q2\nStatus: MISSING"));
-    g_assert_nonnull (strstr (provenance, "Reason: source_round_not_retained"));
+    g_assert_true (g_str_has_prefix (provenance, "Quarter: 2025-Q2\nStatus: Missing"));
+    g_assert_nonnull (strstr (provenance, "Reason: The source round was not retained."));
     g_assert_nonnull (strstr (provenance, "No numeric value is available; this is not zero."));
-    g_assert_nonnull (strstr (provenance, "Physical source row: none"));
+    g_assert_null (strstr (provenance, "source_round_not_retained"));
+    g_assert_null (strstr (provenance, "Physical source row:"));
     g_assert_null (strstr (provenance, "Exact net percentage: 0%"));
+    g_assert_null (strstr (provenance, "Snapshot:"));
     g_free (provenance);
 
     g_assert_true (atm_chart_view_select_row (view, 11u));
     provenance = atm_chart_view_provenance (view);
-    g_assert_true (g_str_has_prefix (provenance, "Quarter: 2025-Q3\nStatus: NUMERIC"));
-    g_assert_nonnull (strstr (provenance, "Physical source row: 12"));
+    g_assert_true (g_str_has_prefix (provenance, "Quarter: 2025-Q3\nNet percentage: 9.46%"));
+    g_assert_null (strstr (provenance, "Physical source row:"));
     g_free (provenance);
 
     atm_chart_view_show_data (view);
@@ -197,16 +202,18 @@ static void test_ei_data_lifetime (void)
     g_assert_true (atm_chart_view_select_row (view, 0));
     char *provenance = atm_chart_view_provenance (view);
     g_assert_nonnull (provenance);
-    g_assert_true (g_str_has_prefix (provenance, "Year: 1965\nExact TES: "));
-    g_assert_nonnull (strstr (provenance, "Physical Energy Content"));
-    g_assert_nonnull (strstr (provenance, "Source row: 2\n"));
-    g_assert_nonnull (strstr (provenance, "Snapshot: dc710d8e604c0fff713a3acfdb18ab47a1a902bb"));
+    g_assert_true (g_str_has_prefix (provenance, "Year: 1965\nGlobal total energy supply: "));
+    g_assert_nonnull (strstr (provenance, "Method: Physical Energy Content"));
+    g_assert_nonnull (strstr (provenance, "Source: Energy Institute global total energy supply dataset"));
+    g_assert_null (strstr (provenance, "Source row:"));
+    g_assert_null (strstr (provenance, "Snapshot:"));
+    g_assert_null (strstr (provenance, "Canonical decimal:"));
     g_free (provenance);
 
     g_assert_true (atm_chart_view_select_row (view, 60));
     provenance = atm_chart_view_provenance (view);
-    g_assert_true (g_str_has_prefix (provenance, "Year: 2025\nExact TES: "));
-    g_assert_nonnull (strstr (provenance, "Source row: 62\n"));
+    g_assert_true (g_str_has_prefix (provenance, "Year: 2025\nGlobal total energy supply: "));
+    g_assert_null (strstr (provenance, "Source row:"));
     g_free (provenance);
 
     atm_chart_view_show_data (view);
@@ -230,7 +237,13 @@ static void test_data_lifetime (void)
         g_assert_true (atm_chart_view_select_row (view, i));
         char *text = atm_chart_view_provenance (view), *year = g_strdup_printf ("Year: %u\n",1880+i);
         g_assert_true (g_str_has_prefix (text,year));
-        g_assert_nonnull (strstr (text, "Support identities:\n")); g_free (year); g_free (text);
+        g_assert_nonnull (strstr (text, "Source: NASA GISTEMP global annual temperature anomalies"));
+        g_assert_nonnull (strstr (text, "Baseline: 1951-1980"));
+        g_assert_null (strstr (text, "Support identities:"));
+        g_assert_null (strstr (text, "Snapshot:"));
+        g_assert_null (strstr (text, "Canonical decimal:"));
+        g_assert_null (strstr (text, "Source row:"));
+        g_free (year); g_free (text);
     }
     g_assert_false (atm_chart_view_select_row (view, 146));
     g_assert_cmpuint (atm_chart_view_selected_row (view), ==, 145);
