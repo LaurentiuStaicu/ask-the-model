@@ -5680,7 +5680,7 @@ namespace AskTheModel {
             if (!bnr_data.contains ("0\t2025-Q2\tMISSING\t\t\t0\t0\t") ||
                 !bnr_data.contains ("source_round_not_retained") ||
                 !bnr_view.select_row (10) ||
-                !(bnr_view.provenance () ?? "").contains ("MISSING, not zero") ||
+                !(bnr_view.provenance () ?? "").contains ("No numeric value is available; this is not zero.") ||
                 !(bnr_view.provenance () ?? "").contains ("source_round_not_retained") ||
                 !(bnr_view.provenance () ?? "").contains ("Physical source row: none") ||
                 !pres09_test_write_file (
