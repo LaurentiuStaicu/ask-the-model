@@ -252,7 +252,7 @@ static void chart_energy_institute (cairo_t *cr, const AtmChartSpec *spec,
     cairo_restore (cr);
     font (cr, 12, FALSE);
     label (cr, "Source: EWD pinned Energy Institute | Physical Energy Content", 16, height - 36, 0);
-    label (cr, "Exact values and provenance: Data view", 16, height - 16, 0);
+    label (cr, "Exact values and source details: Data view", 16, height - 16, 0);
 }
 
 
@@ -436,7 +436,7 @@ static void chart (cairo_t *cr, const AtmChartSpec *spec, const AtmChartProjecti
     cairo_restore (cr);
     font (cr, 12, FALSE);
     label (cr, "Source: EWD pinned GISTEMP | vintage 2026-08-31", 16, height - 36, 0);
-    label (cr, "Exact values and provenance: Data view", 16, height - 16, 0);
+    label (cr, "Exact values and source details: Data view", 16, height - 16, 0);
 }
 static gboolean prepare_viewport (const AtmChartSpec *spec, guint width, guint height, guint scale,
     AtmChartProjection **projection_out, cairo_surface_t **surface_out,
