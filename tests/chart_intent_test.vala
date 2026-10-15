@@ -259,5 +259,20 @@ int main () {
     );
     assert (!bnr_romanian_comparison.bnr_bls_c01_requested);
 
+    var bnr_natural_multi_series = AskTheModel.ChartIntent.parse (
+        "Generate a chart of credit standards and GDP."
+    );
+    assert (!bnr_natural_multi_series.bnr_bls_c01_requested);
+
+    var bnr_explicit_multi_series = AskTheModel.ChartIntent.parse (
+        "/chart bnr-bls-c01 Show this with GDP."
+    );
+    assert (!bnr_explicit_multi_series.bnr_bls_c01_requested);
+
+    var bnr_romanian_multi_series = AskTheModel.ChartIntent.parse (
+        "Generează un grafic al standardelor de credit și inflației."
+    );
+    assert (!bnr_romanian_multi_series.bnr_bls_c01_requested);
+
     return 0;
 }
