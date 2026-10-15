@@ -304,5 +304,10 @@ int main () {
     );
     assert (!bnr_romanian_derived.bnr_bls_c01_requested);
 
+    var bnr_romanian_definite_moving_average = AskTheModel.ChartIntent.parse (
+        "Generează un grafic cu media mobilă a standardelor de credit."
+    );
+    assert (!bnr_romanian_definite_moving_average.bnr_bls_c01_requested);
+
     return 0;
 }
