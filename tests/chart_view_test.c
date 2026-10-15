@@ -234,7 +234,7 @@ test_bnr_quarterly_data_and_missing_provenance (void)
     g_assert_true (atm_chart_view_select_row (view, 0u));
     char *provenance = atm_chart_view_provenance (view);
     g_assert_nonnull (provenance);
-    g_assert_true (g_str_has_prefix (provenance, "Quarter: 2022-Q4\nNet percentage: 11.89%"));
+    g_assert_true (g_str_has_prefix (provenance, "Quarter: 2022-Q4\nCredit standards net percentage: 11.89%"));
     g_assert_nonnull (strstr (provenance, "Primary source: National Bank of Romania, Bank Lending Survey (BLS)"));
     g_assert_nonnull (strstr (provenance, "Pinned dataset: Romanian Monetary Dynamics"));
     g_assert_null (strstr (provenance, "Physical source row:"));
@@ -257,7 +257,7 @@ test_bnr_quarterly_data_and_missing_provenance (void)
 
     g_assert_true (atm_chart_view_select_row (view, 11u));
     provenance = atm_chart_view_provenance (view);
-    g_assert_true (g_str_has_prefix (provenance, "Quarter: 2025-Q3\nNet percentage: 9.46%"));
+    g_assert_true (g_str_has_prefix (provenance, "Quarter: 2025-Q3\nCredit standards net percentage: 9.46%"));
     g_assert_null (strstr (provenance, "Physical source row:"));
     g_free (provenance);
 
@@ -301,7 +301,7 @@ static void test_ei_data_lifetime (void)
     g_assert_true (atm_chart_view_select_row (view, 0));
     char *provenance = atm_chart_view_provenance (view);
     g_assert_nonnull (provenance);
-    g_assert_true (g_str_has_prefix (provenance, "Year: 1965\nGlobal total energy supply: "));
+    g_assert_true (g_str_has_prefix (provenance, "Year: 1965\nGlobal total primary energy supply: "));
     g_assert_nonnull (strstr (provenance, "Method: Physical Energy Content"));
     g_assert_nonnull (strstr (provenance, "Primary source: Energy Institute, Statistical Review of World Energy 2026"));
     g_assert_null (strstr (provenance, "Source row:"));
@@ -311,7 +311,7 @@ static void test_ei_data_lifetime (void)
 
     g_assert_true (atm_chart_view_select_row (view, 60));
     provenance = atm_chart_view_provenance (view);
-    g_assert_true (g_str_has_prefix (provenance, "Year: 2025\nGlobal total energy supply: "));
+    g_assert_true (g_str_has_prefix (provenance, "Year: 2025\nGlobal total primary energy supply: "));
     g_assert_null (strstr (provenance, "Source row:"));
     g_free (provenance);
 
