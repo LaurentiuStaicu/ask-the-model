@@ -172,10 +172,16 @@ Grounded answers do not expose temporary model-facing labels such as `[S1]`. AtM
 
 After a successful grounded answer, the transcript shows only a compact line such as `Sources: [1] [2]`. Each numbered reference opens a transient source-detail window containing only user-relevant information:
 
-- readable repository, publisher or dataset name;
-- document/section/indicator title and a useful excerpt when available;
-- a direct immutable source link when it can be constructed safely;
-- date, period or version only when it helps identify or interpret the source.
+- clearly distinguish the original publisher/source from the immediate pinned repository copy or processed extract;
+- show a direct link to the original publisher and a separate immutable link to the exact pinned repository evidence when both are available;
+- provide a concise human-readable interpretation of known qualified observations, including units, reference baseline, method and material limitations;
+- avoid presenting CSV field keys (for example, \`temperature_anomaly_c_1951_1980\`) as though they were an explanation;
+- keep publisher/source attribution visible on the chart page itself, not only behind a switch to Data;
+- retain observation-specific details in Data, including the BNR 2025-Q2 missing-not-zero explanation;
+- show document/section/indicator titles and useful excerpts for other citations when available;
+- include period or vintage only when it helps identify or interpret the source.
+
+For the three explicitly qualified CSV profiles, translate fields using the source-qualified profile and exact pinned path/snapshot, not the model's free-form interpretation. GISTEMP must identify NASA GISS / GISTEMP v4 and explain the annual global temperature anomaly in °C relative to the 1951-1980 mean. Energy Institute data must identify the Statistical Review of World Energy 2026, the Physical Energy Content method, and EJ/year; do not imply gross supply observes net energy or EROI. BNR BLS C01 must identify the Bank Lending Survey measure as a quarterly net percentage for credit standards on loans to non-financial corporations, not an interest rate, and explain positive tightening / negative easing.
 
 Raw snapshot SHAs, internal source IDs, canonical numeric encodings, support identities and internal source paths/locators are not shown by default. These remain in the internal provenance and persistence contract for exact reconstruction, audit and fail-closed tamper detection. Diagnostic visibility may be designed separately if needed, but must not clutter the ordinary source view.
 

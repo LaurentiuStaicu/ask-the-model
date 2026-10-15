@@ -134,6 +134,24 @@ def main() -> int:
         "markdown_excerpt_to_display_text" not in application,
         "ad-hoc Markdown excerpt regex projector returned",
     )
+    source_profiles = block(
+        application,
+        "private string qualified_source_profile (",
+        "private string source_excerpt_display_text (",
+    )
+    for marker in (
+        'NASA Goddard Institute for Space Studies (GISS), GISTEMP v4',
+        "temperature_anomaly_c_1951_1980",
+        "total_primary_energy_ej",
+        "Physical Energy Content",
+        "nfc_credit_standards",
+        "Positive values indicate net tightening",
+        "https://data.giss.nasa.gov/gistemp/data_v4.html",
+        "https://www.energyinst.org/statistical-review/resources-and-data-downloads",
+        "https://www.bnr.ro/en/12067-bank-lending-survey",
+    ):
+        require_marker(source_profiles, marker, "Qualified publisher and field interpretation")
+
     excerpt = block(
         application,
         "private string source_excerpt_display_text (",
@@ -146,6 +164,8 @@ def main() -> int:
         "PresentationNative",
         ".to_plain_text (",
         "return excerpt;",
+        "qualified_source_profile (citation)",
+        "qualified_observation_display_text (citation, profile)",
     ):
         require_marker(excerpt, marker, "Source excerpt Presentation projection")
     require(
@@ -222,6 +242,10 @@ def main() -> int:
         "citation.title",
         "citation.excerpt",
         "source_excerpt_display_text (citation)",
+        "qualified_source_profile (citation)",
+        '"Original data source"',
+        '"Pinned repository evidence: %s"',
+        '"Open pinned processed dataset"',
         "citation.snapshot_sha",
         "citation.source_path",
         "citation.locator",
@@ -242,8 +266,8 @@ def main() -> int:
             f"Technical provenance leaks into ordinary source-detail UI: {marker}",
         )
     require(
-        details.count("Gtk.LinkButton.with_label (") == 1,
-        "Source detail acquired another active URL surface",
+        details.count("Gtk.LinkButton.with_label (") == 2,
+        "Qualified source details must distinguish primary-source and pinned-dataset links",
     )
 
     persistence = block(

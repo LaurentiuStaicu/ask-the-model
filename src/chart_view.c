@@ -57,6 +57,89 @@ static void atm_chart_view_init (AtmChartView *self)
     gtk_orientable_set_orientation (GTK_ORIENTABLE (self), GTK_ORIENTATION_VERTICAL);
     gtk_box_set_spacing (GTK_BOX (self), 8);
 }
+static const char *chart_source_profile (const AtmChartSpec *spec)
+{
+    if (spec == NULL)
+        return "gistemp";
+    guint version = atm_chart_spec_version (spec);
+    if (version == ATM_CHART_SPEC_VERSION_BNR_BLS_C01_V3)
+        return "bnr";
+    if (version == ATM_CHART_SPEC_VERSION_ENERGY_INSTITUTE_V2)
+        return "energy-institute";
+    return "gistemp";
+}
+static const char *chart_primary_source_url (const char *profile)
+{
+    if (g_strcmp0 (profile, "bnr") == 0)
+        return "https://www.bnr.ro/en/12067-bank-lending-survey";
+    if (g_strcmp0 (profile, "energy-institute") == 0)
+        return "https://www.energyinst.org/statistical-review/resources-and-data-downloads";
+    return "https://data.giss.nasa.gov/gistemp/data_v4.html";
+}
+static const char *chart_primary_source_label (const char *profile)
+{
+    if (g_strcmp0 (profile, "bnr") == 0)
+        return "Open BNR survey";
+    if (g_strcmp0 (profile, "energy-institute") == 0)
+        return "Open Energy Institute data";
+    return "Open NASA GISTEMP data";
+}
+static const char *chart_primary_source_summary (const char *profile)
+{
+    if (g_strcmp0 (profile, "bnr") == 0)
+        return "Primary source: National Bank of Romania, Bank Lending Survey (BLS). Quarterly net percentage for credit standards on loans to non-financial corporations; positive values indicate tightening and negative values easing. 2025-Q2 is missing, not zero.";
+    if (g_strcmp0 (profile, "energy-institute") == 0)
+        return "Primary source: Energy Institute, Statistical Review of World Energy 2026. Global total energy supply uses the Physical Energy Content method, in exajoules per year (EJ/year; 1965-2025). This is gross supply, not net energy or EROI.";
+    return "Primary source: NASA Goddard Institute for Space Studies (GISS), GISTEMP v4. Global annual Land-Ocean Temperature Index anomalies in degrees Celsius relative to the 1951-1980 mean (1880-2025; data vintage 31 August 2026).";
+}
+static char *chart_pinned_dataset_url (const AtmChartSpec *spec)
+{
+    if (spec == NULL)
+        return NULL;
+    const char *snapshot = atm_chart_spec_series_snapshot_sha (spec, 0);
+    const char *path = atm_chart_spec_series_source_path (spec, 0);
+    if (snapshot == NULL || snapshot[0] == '\0' || path == NULL || path[0] == '\0')
+        return NULL;
+    const char *repository =
+        g_strcmp0 (chart_source_profile (spec), "bnr") == 0
+            ? ATM_BNR_BLS_UPSTREAM_REPOSITORY
+            : "LaurentiuStaicu/empirical-world3-dynamics";
+    return g_strdup_printf ("https://github.com/%s/blob/%s/%s", repository, snapshot, path);
+}
+static void append_chart_source_attribution (GtkBox *container, const AtmChartSpec *spec)
+{
+    const char *profile = chart_source_profile (spec);
+    GtkWidget *summary = gtk_label_new (chart_primary_source_summary (profile));
+    gtk_label_set_wrap (GTK_LABEL (summary), TRUE);
+    gtk_label_set_xalign (GTK_LABEL (summary), 0);
+    gtk_widget_set_halign (summary, GTK_ALIGN_FILL);
+    gtk_widget_set_margin_start (summary, 8);
+    gtk_widget_set_margin_end (summary, 8);
+    gtk_widget_set_margin_top (summary, 4);
+    gtk_widget_add_css_class (summary, "atm-source-summary");
+    gtk_box_append (container, summary);
+
+    GtkWidget *links = gtk_box_new (GTK_ORIENTATION_HORIZONTAL, 12);
+    gtk_widget_set_margin_start (links, 8);
+    gtk_widget_set_margin_end (links, 8);
+    gtk_widget_set_margin_bottom (links, 6);
+    GtkWidget *primary = gtk_link_button_new_with_label (
+        chart_primary_source_url (profile), chart_primary_source_label (profile));
+    gtk_widget_set_halign (primary, GTK_ALIGN_START);
+    gtk_widget_add_css_class (primary, "atm-source-link");
+    gtk_box_append (GTK_BOX (links), primary);
+
+    char *pinned_url = chart_pinned_dataset_url (spec);
+    if (pinned_url != NULL) {
+        GtkWidget *pinned = gtk_link_button_new_with_label (
+            pinned_url, "Open pinned repository copy");
+        gtk_widget_set_halign (pinned, GTK_ALIGN_START);
+        gtk_widget_add_css_class (pinned, "atm-source-link");
+        gtk_box_append (GTK_BOX (links), pinned);
+        g_free (pinned_url);
+    }
+    gtk_box_append (container, links);
+}
 static void accessible (GtkWidget *widget, const char *label, const char *description)
 {
     gtk_accessible_update_property (GTK_ACCESSIBLE (widget), GTK_ACCESSIBLE_PROPERTY_LABEL, label,
@@ -199,17 +282,21 @@ static void selection_changed (GObject *object, GParamSpec *pspec, gpointer data
                 "Quarter: %s\nStatus: Missing\n"
                 "Reason: The source round was not retained.\n"
                 "No numeric value is available; this is not zero.\n"
-                "Source: BNR BLS C01 credit-standards net percentage\n"
-                "Repository: %s\n",
-                c[1], ATM_BNR_BLS_UPSTREAM_REPOSITORY);
+                "Primary source: National Bank of Romania, Bank Lending Survey (BLS)\n"
+                "Measure: Quarterly net percentage for credit standards on loans to non-financial corporations.\n"
+                "Positive values indicate net tightening; negative values indicate net easing.\n"
+                "Pinned dataset: Romanian Monetary Dynamics\n",
+                c[1]);
         } else if (g_strcmp0 (c[2], "NUMERIC") == 0 &&
                    c[3][0] != '\0' && c[4][0] != '\0' &&
                    c[6][0] != '\0' && g_strcmp0 (c[9], "") == 0) {
             g_string_append_printf (text,
-                "Quarter: %s\nNet percentage: %s%%\n"
-                "Source: BNR BLS C01 credit-standards net percentage\n"
-                "Repository: %s\n",
-                c[1], c[3], ATM_BNR_BLS_UPSTREAM_REPOSITORY);
+                "Quarter: %s\nCredit standards net percentage: %s%%\n"
+                "Primary source: National Bank of Romania, Bank Lending Survey (BLS)\n"
+                "Measure: Net percentage for credit standards on loans to non-financial corporations.\n"
+                "Positive values indicate net tightening; negative values indicate net easing.\n"
+                "Pinned dataset: Romanian Monetary Dynamics\n",
+                c[1], c[3]);
         } else {
             g_strfreev (c);
             g_string_free (text, TRUE);
@@ -218,17 +305,19 @@ static void selection_changed (GObject *object, GParamSpec *pspec, gpointer data
         }
     } else if (is_ei) {
         g_string_append_printf (text,
-            "Year: %s\nGlobal total energy supply: %s exajoules/year\n"
+            "Year: %s\nGlobal total primary energy supply: %s EJ/year\n"
             "Method: Physical Energy Content\n"
-            "Source: Energy Institute global total energy supply dataset\n"
-            "Repository: LaurentiuStaicu/empirical-world3-dynamics\n",
+            "Primary source: Energy Institute, Statistical Review of World Energy 2026\n"
+            "This is gross energy supply, not net energy or EROI.\n"
+            "Pinned dataset: Empirical World3 Dynamics\n",
             c[1], c[2]);
     } else {
         g_string_append_printf (text,
             "Year: %s\nGlobal temperature anomaly: %s deg C\n"
-            "Baseline: 1951-1980\n"
-            "Source: NASA GISTEMP global annual temperature anomalies\n"
-            "Dataset: LaurentiuStaicu/empirical-world3-dynamics\n"
+            "Baseline: 1951-1980 mean\n"
+            "Primary source: NASA Goddard Institute for Space Studies (GISS), GISTEMP v4\n"
+            "Measure: Global annual Land-Ocean Temperature Index anomaly.\n"
+            "Pinned dataset: Empirical World3 Dynamics, processed extract\n"
             "Data vintage: 2026-08-31\n",
             c[1], c[2]);
     }
@@ -318,33 +407,11 @@ gboolean atm_chart_view_new (const AtmChartSpec *spec, AtmChartView **out, GErro
     gtk_drawing_area_set_draw_func (self->area, draw, self, NULL);
     g_signal_connect (self->area, "resize", G_CALLBACK (resize), self);
     g_signal_connect (self->area, "notify::scale-factor", G_CALLBACK (scale_changed), self);
-    gtk_box_append (GTK_BOX (chart), GTK_WIDGET (self->area)); gtk_stack_add_titled (self->stack, chart, "chart", "Chart");
+    gtk_box_append (GTK_BOX (chart), GTK_WIDGET (self->area));
+    append_chart_source_attribution (GTK_BOX (chart), initial_spec);
+    gtk_stack_add_titled (self->stack, chart, "chart", "Chart");
     GtkWidget *data = gtk_box_new (GTK_ORIENTATION_VERTICAL, 8);
-    GtkWidget *unit = gtk_label_new (is_bnr
-        ? "BNR BLS C01 credit standards net percentage. 2025-Q2 is missing, not zero."
-        : (is_ei
-            ? "Global total energy supply (EJ/year; Physical Energy Content)."
-            : "Global annual temperature anomaly (deg C), relative to 1951-1980."));
-    gtk_label_set_wrap (GTK_LABEL (unit), TRUE); gtk_label_set_xalign (GTK_LABEL (unit), 0);
-    gtk_box_append (GTK_BOX (data), unit);
-
-    const char *source_repository = is_bnr
-        ? ATM_BNR_BLS_UPSTREAM_REPOSITORY
-        : "LaurentiuStaicu/empirical-world3-dynamics";
-    const char *source_snapshot = atm_chart_spec_series_snapshot_sha (initial_spec, 0);
-    const char *source_path = atm_chart_spec_series_source_path (initial_spec, 0);
-    if (source_snapshot != NULL && source_snapshot[0] != '\0' &&
-        source_path != NULL && source_path[0] != '\0') {
-        char *source_url = g_strdup_printf (
-            "https://github.com/%s/blob/%s/%s",
-            source_repository, source_snapshot, source_path);
-        GtkWidget *source_link = gtk_link_button_new_with_label (
-            source_url, "Open source dataset");
-        gtk_widget_set_halign (source_link, GTK_ALIGN_START);
-        gtk_widget_add_css_class (source_link, "atm-source-link");
-        gtk_box_append (GTK_BOX (data), source_link);
-        g_free (source_url);
-    }
+    append_chart_source_attribution (GTK_BOX (data), initial_spec);
 
     self->selection = gtk_single_selection_new (G_LIST_MODEL (g_object_ref (self->rows)));
     self->table = GTK_COLUMN_VIEW (gtk_column_view_new (GTK_SELECTION_MODEL (g_object_ref (self->selection))));
