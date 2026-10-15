@@ -1,6 +1,6 @@
 # CHART-03 BNR BLS C01 quarterly renderer and Data view
 
-Status: headless Cairo renderer qualification in a review candidate. The application intent route and History are still not enabled.
+Status: the gap-aware Cairo renderer and GTK Data view were integrated by PRs #474–#475 and are used by the bounded BNR C01 Application/History route on development `main`. This is unreleased development capability; the public v0.7.1 artifact is unchanged.
 
 ## Rendering policy
 
@@ -12,10 +12,10 @@ The bounded chart labels the quantity as a net percentage for non-financial corp
 
 The renderer's TSV contains all twelve calendar quarters, with separate status, source decimal, canonical coefficient/exponent, source row, qualified series ID, support IDs, and missing reason columns.
 
-Numeric quarters are bound to the physical rows of the pinned RMD CSV. The 2025-Q2 row is retained as a Data view entry with status MISSING, empty numeric payload, exponent zero, source row zero (no physical row), five-file source support, and reason source_round_not_retained. The table does not fabricate a CSV row or silently replace the absence with zero.
+Numeric quarters are bound to the physical rows of the pinned RMD CSV. The 2025-Q2 row is retained as a Data view entry with status MISSING, empty numeric payload, exponent zero, no physical source row, five-file source support, and reason source_round_not_retained. The internal zero sentinel is not shown as a physical row: the Data table displays `none`. The table does not fabricate a CSV row or silently replace the absence with zero.
 
 ## Qualification boundary
 
 Native Cairo tests assert that the 480×348 embedded logical viewport does not fall back, the exact TSV has twelve quarterly entries, the source snapshot/path and row identities are preserved, and the line-path midpoint across the missing quarter stays unpainted. Scatter mode also has eleven markers and no invented missing marker.
 
-This does not add the user's Application chart intent, conversation-store v5, History reconstruction allowlist, imported conversation behavior or M4. The GTK component is still called only by native tests for this profile; the app must not dispatch BNR C01 to it until a later integration gate is qualified.
+The renderer and GTK Data-view components are now wired into the source-pinned Application route and schema-v5 History reconstruction by PRs #476–#479. Their integration remains limited to this exact C01 profile; it does not authorize imported-conversation expansion, arbitrary sources, generalized gap semantics or M4.
