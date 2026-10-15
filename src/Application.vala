@@ -5348,18 +5348,21 @@ namespace AskTheModel {
                 pres09_test_read_file ("pres09-ei-chart-id");
             string? expected_gistemp_id =
                 pres09_test_read_file ("pres09-gistemp-chart-id");
+            string? expected_bnr_id =
+                pres09_test_read_file ("pres09-bnr-chart-id");
 
             if (conversation_id == null ||
                 expected_ei_id == null ||
                 expected_gistemp_id == null ||
+                expected_bnr_id == null ||
                 state.persistent_id != conversation_id ||
                 !state.archived) {
                 pres09_test_failure = "History did not restore the expected archived conversation";
                 return false;
             }
 
-            if (state.pres09_test_chart_widgets.length != 2) {
-                pres09_test_failure = "History rendered %u chart widgets, expected EI and GISTEMP".printf (
+            if (state.pres09_test_chart_widgets.length != 3) {
+                pres09_test_failure = "History rendered %u chart widgets, expected EI, GISTEMP and BNR C01".printf (
                     state.pres09_test_chart_widgets.length
                 );
                 return false;
@@ -5369,9 +5372,11 @@ namespace AskTheModel {
                 state.pres09_test_chart_widgets[0] as ChartNative.View;
             ChartNative.View? gistemp_view =
                 state.pres09_test_chart_widgets[1] as ChartNative.View;
+            ChartNative.View? bnr_view =
+                state.pres09_test_chart_widgets[2] as ChartNative.View;
 
-            if (ei_view == null || gistemp_view == null) {
-                pres09_test_failure = "History did not reconstruct both charts as qualified Chart/Data widgets";
+            if (ei_view == null || gistemp_view == null || bnr_view == null) {
+                pres09_test_failure = "History did not reconstruct all three charts as qualified Chart/Data widgets";
                 return false;
             }
 
@@ -5389,6 +5394,7 @@ namespace AskTheModel {
 
             ConversationPersistenceChart? ei = null;
             ConversationPersistenceChart? gistemp = null;
+            ConversationPersistenceChart? bnr = null;
             foreach (
                 ConversationPersistenceMessage message
                 in snapshot.messages
@@ -5401,19 +5407,31 @@ namespace AskTheModel {
                         ei = chart;
                     } else if (chart.chart_schema == "atm-chart-spec/1") {
                         gistemp = chart;
+                    } else if (chart.chart_schema == "atm-chart-spec/3") {
+                        bnr = chart;
                     }
                 }
             }
 
-            if (ei == null || gistemp == null ||
+            if (ei == null || gistemp == null || bnr == null ||
                 ei.chart_spec_id != expected_ei_id ||
-                gistemp.chart_spec_id != expected_gistemp_id) {
-                pres09_test_failure = "History recipe identity differs from the identities saved from the live turns";
+                gistemp.chart_spec_id != expected_gistemp_id ||
+                bnr.chart_spec_id != expected_bnr_id ||
+                bnr.reconstruction_profile !=
+                    "atm-chart-reconstruct/bnr-bls-c01-calendar-quarter/1" ||
+                bnr.series.length != 1 ||
+                bnr.series[0].repository_id != "rmd" ||
+                bnr.series[0].snapshot_sha !=
+                    "e43eb4e899f123d3b1aa0f6e20b7c8ed35434170" ||
+                bnr.series[0].source_path !=
+                    "data/processed/bnr_bls_realised_rounds.csv") {
+                pres09_test_failure = "History recipe identity differs from the three qualified live chart recipes";
                 return false;
             }
 
             string ei_data = ei_view.data () ?? "";
             string gistemp_data = gistemp_view.data () ?? "";
+            string bnr_data = bnr_view.data () ?? "";
             if (!pres09_test_compare_file (
                     "pres09-ei-data.tsv",
                     ei_data
@@ -5421,6 +5439,10 @@ namespace AskTheModel {
                 !pres09_test_compare_file (
                     "pres09-gistemp-data.tsv",
                     gistemp_data
+                ) ||
+                !pres09_test_compare_file (
+                    "pres09-bnr-c01-data.tsv",
+                    bnr_data
                 )) {
                 return false;
             }
@@ -5444,6 +5466,21 @@ namespace AskTheModel {
                 !pres09_test_compare_file (
                     "pres09-gistemp-last-provenance.txt",
                     gistemp_view.provenance () ?? ""
+                ) ||
+                !bnr_view.select_row (0) ||
+                !pres09_test_compare_file (
+                    "pres09-bnr-c01-first-provenance.txt",
+                    bnr_view.provenance () ?? ""
+                ) ||
+                !bnr_view.select_row (10) ||
+                !pres09_test_compare_file (
+                    "pres09-bnr-c01-missing-provenance.txt",
+                    bnr_view.provenance () ?? ""
+                ) ||
+                !bnr_view.select_row (bnr_view.row_count () - 1) ||
+                !pres09_test_compare_file (
+                    "pres09-bnr-c01-last-provenance.txt",
+                    bnr_view.provenance () ?? ""
                 )) {
                 return false;
             }
