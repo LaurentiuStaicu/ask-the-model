@@ -42,6 +42,14 @@ namespace AskTheModel.ChartNative {
         string chart_kind,
         out Spec spec
     ) throws GLib.Error;
+    [CCode (cname = "atm_chart_live_reconstruct_bnr_bls_c01")]
+    public static bool reconstruct_live_bnr_bls_c01 (
+        string snapshot_path,
+        string repository_id,
+        string snapshot_sha,
+        string chart_kind,
+        out Spec spec
+    ) throws GLib.Error;
     [CCode (cname = "atm_chart_history_reconstruct_gistemp")]
     public static bool reconstruct_history_gistemp (
         string snapshot_path,
@@ -61,6 +69,23 @@ namespace AskTheModel.ChartNative {
     ) throws GLib.Error;
     [CCode (cname = "atm_chart_history_reconstruct_energy_institute")]
     public static bool reconstruct_history_energy_institute (
+        string snapshot_path,
+        string repository_id,
+        string repository_version,
+        string snapshot_sha,
+        string chart_schema,
+        string chart_spec_id,
+        string chart_kind,
+        string reconstruction_profile,
+        string series_profile,
+        string admission_profile,
+        string scientific_id,
+        string qualified_id,
+        string source_path,
+        out Spec spec
+    ) throws GLib.Error;
+    [CCode (cname = "atm_chart_history_reconstruct_bnr_bls_c01")]
+    public static bool reconstruct_history_bnr_bls_c01 (
         string snapshot_path,
         string repository_id,
         string repository_version,
