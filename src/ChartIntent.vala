@@ -18,7 +18,7 @@ namespace AskTheModel {
         public string response_guidance () {
             if (bnr_bls_c01_requested) {
                 return
-                    "\\nThe application attempts to construct the qualified BNR BLS C01 quarterly " +
+                    "\nThe application attempts to construct the qualified BNR BLS C01 quarterly " +
                     "credit-standards net-percentage chart from its pinned RMD snapshot. The " +
                     "Chart/Data widget presents the complete qualified quarter sequence, exact " +
                     "values and provenance. The 2025-Q2 observation is explicitly MISSING, not " +
