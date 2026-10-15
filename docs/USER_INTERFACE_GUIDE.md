@@ -48,6 +48,8 @@ The status LCD provides the explicit textual state cue with a compact `OPT OFF` 
 
 Changing the switch affects subsequent operations. An operation already in progress keeps the optimization mode captured when it started rather than changing behavior halfway through.
 
+The B0 global repository-authority mutation lease and the B2 shared generation lease for positive-generation repository-grounded reads are mandatory correctness coordination, not optional optimization features. Both remain active in OFF and ON modes so processes using different switch states still coordinate safely. The switch gates the optional qualified optimization paths, not these two correctness safeguards.
+
 ### Download / Update
 
 The repository action button downloads a repository that is not installed, updates one whose exact remote SHA differs from the current local snapshot, or repairs a locally integrity-invalid snapshot. A same-SHA integrity repair still requires a fresh exact-SHA download before the invalid local directory is quarantined and replaced.
@@ -63,9 +65,9 @@ The update path is fail-closed:
 
 A failed update leaves the last valid snapshot available. When repairing a locally invalid same-SHA snapshot, AtM preserves the invalid directory under a diagnostic quarantine name rather than silently rewriting it in place.
 
-When **Optimizations ON** is active, Download/Update also uses a nonblocking cross-process repository mutation lease. If another AtM process is already changing repository authority, the operation stops before repository staging is touched and reports that another Ask the Model instance is currently updating repository state. Ordinary repository reads and grounding do not wait for this global mutation lease.
+Every Download/Update operation uses the nonblocking cross-process B0 repository-authority mutation lease, regardless of the Optimizations switch state. If another AtM process is already changing repository authority, the operation stops before repository staging is touched and reports that another Ask the Model instance is currently updating repository state. Ordinary repository reads and grounding do not wait for this global mutation lease.
 
-With **Optimizations OFF**, optional optimization paths are not activated and the established baseline runtime behavior remains in effect.
+With **Optimizations OFF**, optional optimization paths are not activated and the established baseline runtime behavior remains in effect, apart from the mandatory B0/B2 correctness coordination described above.
 
 ## Status LCD
 

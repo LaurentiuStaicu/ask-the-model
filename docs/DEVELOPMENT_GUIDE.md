@@ -193,7 +193,7 @@ The application always constructs this policy disabled. The header switch may en
 
 Runtime optimization code must receive/snapshot this policy through explicit program interfaces. It must not read GTK widget state directly and must not invent independent per-feature toggles. Each operation snapshots the mode at entry so a user change cannot partially alter an in-flight mutation or retrieval operation.
 
-When the gate is OFF, runtime behavior must remain on the established baseline path. Test/measurement infrastructure such as OPT-A0, C0-M1 and D0 is not gated because it does not change ordinary application behavior.
+When the gate is OFF, optional optimization behavior must remain on the established baseline path. Two coordination mechanisms are explicit correctness exceptions and remain active in both OFF and ON modes: the global B0 repository-authority mutation lease for Download/Update, and the B2 shared generation lease held by each positive-generation repository-grounded read. Cross-mode participation is required for safe interaction between OFF/ON processes and for any future generation reclamation; it does not authorize destructive GC. The optional A1, B1, C0, C1 and D1 runtime paths remain behind the optimization gate. Test/measurement infrastructure such as OPT-A0, C0-M1 and D0 is not gated because it does not change ordinary application behavior.
 
 ### C0-M1 capacity measurement
 
