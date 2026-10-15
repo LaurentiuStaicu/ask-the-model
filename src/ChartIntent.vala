@@ -173,6 +173,34 @@ namespace AskTheModel {
             );
         }
 
+        private static bool requests_additional_series (string normalized) {
+            return contains_any (
+                normalized,
+                {
+                    " and gdp", "gdp and ", " with gdp", "gdp with ",
+                    " and gross domestic product",
+                    "gross domestic product and ",
+                    " with gross domestic product",
+                    "gross domestic product with ",
+                    " and pib", "pib and ", " with pib", "pib with ",
+                    " and unemployment", "unemployment and ",
+                    " with unemployment", "unemployment with ",
+                    " and inflation", "inflation and ",
+                    " with inflation", "inflation with ",
+                    " and non-performing loans", "non-performing loans and ",
+                    " with non-performing loans", "non-performing loans with ",
+                    " și pib", " si pib", " cu pib",
+                    "pib și ", "pib si ", "pib cu ",
+                    " și inflație", " si inflatie", " cu inflație", " cu inflatie",
+                    "inflație și ", "inflatie si ", "inflație cu ", "inflatie cu ",
+                    " și șomaj", " si somaj", " cu șomaj", " cu somaj",
+                    "șomaj și ", "somaj si ", "șomaj cu ", "somaj cu ",
+                    " și creditele neperformante",
+                    " cu creditele neperformante"
+                }
+            );
+        }
+
         private static bool names_other_chart_source (string normalized) {
             return contains_any (
                 normalized,
@@ -237,7 +265,8 @@ namespace AskTheModel {
             if (command_matches (trimmed, bnr_prefix)) {
                 string bnr_query = command_query (trimmed, bnr_prefix);
                 if (names_other_chart_source (bnr_query.down ()) ||
-                    requests_comparison (bnr_query.down ())) {
+                    requests_comparison (bnr_query.down ()) ||
+                    requests_additional_series (bnr_query.down ())) {
                     return new ChartIntent (false, false, false, prompt);
                 }
                 return new ChartIntent (
@@ -334,7 +363,9 @@ namespace AskTheModel {
                 names_bnr_series_id || names_credit_standards;
 
             if (asks_for_chart && requests_visualization) {
-                if (names_bnr_bls_c01_series && requests_comparison (normalized)) {
+                if (names_bnr_bls_c01_series &&
+                    (requests_comparison (normalized) ||
+                     requests_additional_series (normalized))) {
                     return new ChartIntent (false, false, false, prompt);
                 }
                 uint named_sources = (names_gistemp_series ? 1u : 0u) +
