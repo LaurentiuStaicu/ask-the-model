@@ -5596,6 +5596,7 @@ namespace AskTheModel {
             }
 
             if (pres09_test_live_turn == 1) {
+                if (pres09_test_live_turn == 1) {
                 if (state.pres09_test_chart_widgets.length != 2) {
                     pres09_test_finish (
                         false,
@@ -5629,7 +5630,7 @@ namespace AskTheModel {
                 if (!pres09_test_select_ewd (state, true)) {
                     pres09_test_finish (
                         false,
-                        "Could not add RMD scope or retain the deterministic provider model"
+                        "Could not select both EWD and RMD or retain the deterministic provider model"
                     );
                     return false;
                 }
@@ -5640,13 +5641,16 @@ namespace AskTheModel {
             }
 
             if (pres09_test_live_turn != 2) {
-                pres09_test_finish (false, "PRES-09 reached an unexpected live-chart step");
+                pres09_test_finish (
+                    false,
+                    "PRES-09 reached an unexpected live chart step"
+                );
                 return false;
             }
             if (state.pres09_test_chart_widgets.length != 3) {
                 pres09_test_finish (
                     false,
-                    "Live BNR C01 request produced %u chart widgets, expected three total".printf (
+                    "Live BNR BLS C01 request produced %u chart widgets, expected three total".printf (
                         state.pres09_test_chart_widgets.length
                     )
                 );
@@ -5673,7 +5677,7 @@ namespace AskTheModel {
             }
 
             string bnr_data = bnr_view.data () ?? "";
-            if (!bnr_data.contains ("0\t2025-Q2\tMISSING\t\t\t0\t0\t") ||
+            if (!bnr_data.contains ("0\\t2025-Q2\\tMISSING\\t\\t\\t0\\t0\\t") ||
                 !bnr_data.contains ("source_round_not_retained") ||
                 !bnr_view.select_row (10) ||
                 !(bnr_view.provenance () ?? "").contains ("MISSING, not zero") ||
