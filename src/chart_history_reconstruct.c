@@ -672,8 +672,8 @@ atm_chart_history_reconstruct_bnr_bls_c01 (
                    ATM_BNR_BLS_VERIFIED_SERIES_PROFILE) == 0 &&
         g_strcmp0 (admission_profile,
                    ATM_BNR_BLS_PROFILE) == 0 &&
-        g_strcmp0 (scientific_id, "") != 0 &&
-        g_strcmp0 (qualified_id, "") != 0 &&
+        scientific_id != NULL && scientific_id[0] != '\0' &&
+        qualified_id != NULL && qualified_id[0] != '\0' &&
         g_strcmp0 (source_path,
                    "data/processed/bnr_bls_realised_rounds.csv") == 0;
     g_free (expected_version);
@@ -688,7 +688,7 @@ atm_chart_history_reconstruct_bnr_bls_c01 (
 
     if (g_strcmp0 (atm_chart_spec_schema (spec), chart_schema) != 0 ||
         g_strcmp0 (atm_chart_spec_id (spec), chart_spec_id) != 0 ||
-        g_strcmp0 (atm_chart_spec_series_profile (spec, 0), series_profile) != 0 ||
+        g_strcmp0 (atm_chart_spec_series_profile (spec), series_profile) != 0 ||
         g_strcmp0 (atm_chart_spec_series_scientific_id (spec, 0), scientific_id) != 0 ||
         g_strcmp0 (atm_chart_spec_series_qualified_id (spec, 0), qualified_id) != 0 ||
         g_strcmp0 (atm_chart_spec_series_snapshot_sha (spec, 0), snapshot_sha) != 0 ||
