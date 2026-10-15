@@ -178,25 +178,35 @@ namespace AskTheModel {
                 normalized,
                 {
                     " and gdp", "gdp and ", " with gdp", "gdp with ",
+                    ", gdp", ",gdp", "gdp,", 
                     " and gross domestic product",
                     "gross domestic product and ",
                     " with gross domestic product",
                     "gross domestic product with ",
+                    ", gross domestic product", "gross domestic product,",
                     " and pib", "pib and ", " with pib", "pib with ",
+                    ", pib", ",pib", "pib,",
                     " and unemployment", "unemployment and ",
                     " with unemployment", "unemployment with ",
+                    ", unemployment", "unemployment,",
                     " and inflation", "inflation and ",
                     " with inflation", "inflation with ",
+                    ", inflation", "inflation,",
                     " and non-performing loans", "non-performing loans and ",
                     " with non-performing loans", "non-performing loans with ",
-                    " și pib", " si pib", " cu pib",
+                    ", non-performing loans", "non-performing loans,",
+                    " și pib", " si pib", " cu pib", ", pib", "pib,",
                     "pib și ", "pib si ", "pib cu ",
                     " și inflație", " si inflatie", " cu inflație", " cu inflatie",
+                    ", inflație", ", inflatie", "inflației", "inflatiei",
                     "inflație și ", "inflatie si ", "inflație cu ", "inflatie cu ",
                     " și șomaj", " si somaj", " cu șomaj", " cu somaj",
+                    ", șomaj", ", somaj", "șomaj,", "somaj,",
                     "șomaj și ", "somaj si ", "șomaj cu ", "somaj cu ",
                     " și creditele neperformante",
-                    " cu creditele neperformante"
+                    " cu creditele neperformante",
+                    ", creditele neperformante",
+                    "creditelor neperformante"
                 }
             );
         }
