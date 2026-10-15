@@ -1,6 +1,8 @@
 # CHART-01: source audit and VerifiedSeries boundary
 
-**Status updated 2026-10-13:** the GISTEMP v1 and Energy Institute TES v2 complete-annual `VerifiedSeries` and chart routes are integrated through PRs #435 and #439–#443; PRES-09 live-to-History GTK Application E2E is integrated via #447. PR #454 separately integrates a source-bound BNR BLS C01 calendar-quarter adapter that creates generic `AtmSeriesContract` from the five-file pinned RMD panel plus finalized SRA, with 11 numeric observations and one source-authorized `MISSING` at 2025-Q2. It remains native/test-only: it is not the legacy `AtmVerifiedSeries`, and it enables no BNR chart route. This document preserves the native `VerifiedSeries` qualification boundary, not the full application-capability ledger. General missing/discontinuity/event/categorical/derived adapters remain unqualified in #343 beyond that one bounded absence case. The immutable v0.6.3 release remains unchanged.
+**Current status updated 2026-10-15:** GISTEMP v1, Energy Institute TES v2, and the bounded BNR BLS C01 calendar-quarter chart route are integrated into development `main`. PRs #471–#479 added the BNR source-specific VerifiedSeries, ChartSpec v3, gap-aware renderer/Data view, schema-v5 recipe-only History reconstruction and `/chart bnr-bls-c01` route from the exact pinned RMD snapshot `e43eb4e899f123d3b1aa0f6e20b7c8ed35434170`. It preserves 12 quarterly coordinates, 11 numeric observations and one source-authorized `MISSING` at 2025-Q2. The missing quarter has no numeric payload and no physical CSV row; it is not zero and the renderer must not bridge the gap.
+
+This document describes CHART-01 source/series qualification, not general eligibility. BNR’s one qualified missing point does not qualify arbitrary missing observations, discontinuities, event/categorical data, or derived series. The immutable public v0.7.1 release does not contain the BNR route; v0.8.0 remains unpublished. The generic catalog/intent contract in draft PR #487 is a proposal only; no generic Application route is implemented by that document.
 
 The generic native `atm-series-contract/1` is separate from the legacy
 `atm-verified-series/1`. For UTC-instant coordinates, its `time_scope` must
@@ -347,7 +349,7 @@ At the time of this closeout, the scope was one admitted complete-annual GISTEMP
 | Ownership and limits | Owned source bytes and data, fixed complete-source counts, checked byte/token/support ceilings |
 | Missing/discontinuity boundary | First, last and all-MISSING cases reject; no zero filling, interpolation or joined gaps |
 | Generic missing/event/derived data | A separate BNR C01 generic SeriesContract covers only its exact source-authorized 2025-Q2 `MISSING`; broader missing/discontinuity/event/derived adapters remain unqualified in #343 and cannot enter this complete-annual profile |
-| Runtime chart display | GISTEMP v1 and EI TES v2 routes are integrated via PRs #439–#443; general missing/event/derived series remain outside the qualified runtime |
+| Runtime chart display | GISTEMP v1, EI TES v2 and bounded BNR C01 v3 routes are integrated; BNR authorizes only its exact 2025-Q2 `MISSING` case. General missing/event/derived series remain outside the qualified runtime |
 
 The closeout fault-injection helper is compiled only with
 `ATM_VERIFIED_SERIES_TESTING`, only in the VerifiedSeries test target, and has no
