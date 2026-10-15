@@ -634,6 +634,7 @@ test_v4_to_v5_migration_rollback (void)
     create_v4_store (path);
     insert_v3_gistemp_chart_fixture (path);
     raw_exec (path,
+        "DROP TRIGGER chart_series_tuple_insert;"
         "CREATE TRIGGER chart_series_tuple_insert "
         "BEFORE INSERT ON messages BEGIN SELECT 1; END;");
 
@@ -1118,7 +1119,7 @@ test_newer_schema_rejected (void)
 
     raw_exec (
         path,
-        "PRAGMA user_version=5;"
+        "PRAGMA user_version=6;"
     );
 
     store = NULL;
