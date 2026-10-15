@@ -7,6 +7,7 @@ namespace AskTheModel {
     public class ChartIntent : Object {
         public bool gistemp_requested { get; private set; }
         public bool energy_institute_requested { get; private set; }
+        public bool bnr_bls_c01_requested { get; private set; }
         public string query { get; private set; }
 
         /*
@@ -15,6 +16,17 @@ namespace AskTheModel {
          * partial retrieval excerpts for that complete admitted series.
          */
         public string response_guidance () {
+            if (bnr_bls_c01_requested) {
+                return
+                    "\\nThe application attempts to construct the qualified BNR BLS C01 quarterly " +
+                    "credit-standards net-percentage chart from its pinned RMD snapshot. The " +
+                    "Chart/Data widget presents the complete qualified quarter sequence, exact " +
+                    "values and provenance. The 2025-Q2 observation is explicitly MISSING, not " +
+                    "zero; do not impute it, invent values, or join a line across that gap. " +
+                    "For chart-only requests, do not substitute partial retrieval excerpts for " +
+                    "the native chart or present them as a pseudo-table. Only give individual " +
+                    "values or a table when explicitly requested.";
+            }
             if (energy_institute_requested) {
                 return
                     "\nThe application attempts to construct the qualified Energy Institute TES " +
@@ -100,9 +112,15 @@ namespace AskTheModel {
                 "grafic", "arată", "arata", "generează", "genereaza",
                 "creează", "creeaza", "afișează", "afiseaza",
                 "temperatura globală", "temperatura globala",
-                "furnizarea", "valorile", "în timp", "in timp"
+                "furnizarea", "valorile", "în timp", "in timp",
+                "bnr", "bls", "credit", "standarde de credit"
             });
 
+            if (bnr_bls_c01_requested) {
+                return romanian
+                    ? "Iată graficul trimestrial BNR BLS C01 pentru procentul net privind standardele de credit. Consultă fila Data pentru valorile exacte și proveniența surselor; 2025-Q2 este MISSING, nu zero."
+                    : "Here is the BNR BLS C01 quarterly credit-standards net-percentage chart. See Data for exact values and source provenance; 2025-Q2 is MISSING, not zero.";
+            }
             if (energy_institute_requested) {
                 return romanian
                     ? "Iată graficul Energy Institute al furnizării totale globale de energie. Consultă fila Data pentru valorile anuale și proveniența surselor."
@@ -119,11 +137,13 @@ namespace AskTheModel {
         private ChartIntent (
             bool gistemp_requested,
             bool energy_institute_requested,
+            bool bnr_bls_c01_requested,
             string query
         ) {
             Object ();
             this.gistemp_requested = gistemp_requested;
             this.energy_institute_requested = energy_institute_requested;
+            this.bnr_bls_c01_requested = bnr_bls_c01_requested;
             this.query = query;
         }
 
@@ -166,27 +186,33 @@ namespace AskTheModel {
             string normalized = prompt.down ();
             const string gistemp_prefix = "/chart gistemp";
             const string ei_prefix = "/chart energy-institute";
+            const string bnr_prefix = "/chart bnr-bls-c01";
 
             if (command_matches (trimmed, gistemp_prefix)) {
                 return new ChartIntent (
-                    true,
-                    false,
+                    true, false, false,
                     command_query (trimmed, gistemp_prefix)
                 );
             }
             if (command_matches (trimmed, ei_prefix)) {
                 return new ChartIntent (
-                    false,
-                    true,
+                    false, true, false,
                     command_query (trimmed, ei_prefix)
+                );
+            }
+            if (command_matches (trimmed, bnr_prefix)) {
+                return new ChartIntent (
+                    false, false, true,
+                    command_query (trimmed, bnr_prefix)
                 );
             }
 
             /* A malformed slash command must not fall through to natural
              * language detection merely because it contains a source name. */
             if (trimmed.down ().has_prefix (gistemp_prefix) ||
-                trimmed.down ().has_prefix (ei_prefix)) {
-                return new ChartIntent (false, false, prompt);
+                trimmed.down ().has_prefix (ei_prefix) ||
+                trimmed.down ().has_prefix (bnr_prefix)) {
+                return new ChartIntent (false, false, false, prompt);
             }
 
             bool asks_for_chart = contains_any (
@@ -245,16 +271,31 @@ namespace AskTheModel {
                 }
             );
 
-            if (asks_for_chart && requests_visualization) {
-                if (names_gistemp_series && !names_energy_institute_series) {
-                    return new ChartIntent (true, false, prompt);
+            bool names_bnr_bls_c01_series = contains_any (
+                normalized,
+                {
+                    "bnr bls c01", "bnr-bls-c01", "bls c01",
+                    "credit standards", "credit standard",
+                    "net percentage", "net percentages",
+                    "standarde de credit", "standardele de credit",
+                    "procent net", "procente nete"
                 }
-                if (names_energy_institute_series && !names_gistemp_series) {
-                    return new ChartIntent (false, true, prompt);
+            );
+
+            if (asks_for_chart && requests_visualization) {
+                guint named_sources = (names_gistemp_series ? 1u : 0u) +
+                    (names_energy_institute_series ? 1u : 0u) +
+                    (names_bnr_bls_c01_series ? 1u : 0u);
+                if (named_sources == 1u) {
+                    if (names_gistemp_series)
+                        return new ChartIntent (true, false, false, prompt);
+                    if (names_energy_institute_series)
+                        return new ChartIntent (false, true, false, prompt);
+                    return new ChartIntent (false, false, true, prompt);
                 }
             }
 
-            return new ChartIntent (false, false, prompt);
+            return new ChartIntent (false, false, false, prompt);
         }
     }
 }
