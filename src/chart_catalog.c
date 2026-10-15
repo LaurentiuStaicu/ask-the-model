@@ -174,12 +174,12 @@ registered_entry_pointer (const AtmChartCatalogEntry *entry)
 static gboolean
 safe_relative_source_path (const char *path)
 {
-    if (path == NULL || *path == '\\0' || path[0] == '/' ||
-        strchr (path, '\\\\') != NULL || strstr (path, "//") != NULL)
+    if (path == NULL || path[0] == 0 || path[0] == '/' ||
+        strchr (path, (char) 92) != NULL || strstr (path, "//") != NULL)
         return FALSE;
 
     const char *segment = path;
-    while (*segment != '\\0') {
+    while (*segment != 0) {
         const char *slash = strchr (segment, '/');
         gsize length = slash != NULL
             ? (gsize) (slash - segment)
