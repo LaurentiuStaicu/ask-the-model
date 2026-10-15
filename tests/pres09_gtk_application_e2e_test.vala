@@ -425,6 +425,7 @@ private static int run_orchestrator (
     Environment.set_variable ("G_DEBUG", "fatal-warnings", true);
 
     string[] phases = {
+        "source-details",
         "live",
         "history",
         "history-invalid"
