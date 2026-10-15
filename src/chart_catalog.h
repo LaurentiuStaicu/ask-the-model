@@ -89,6 +89,13 @@ typedef struct {
     const char *observation_meaning;
     const char *reference_period;
     const char *geography;
+    const char *coverage_start;
+    const char *coverage_end;
+    guint coordinate_count;
+    guint numeric_observation_count;
+    const char *scenario;
+    const char *epistemic_status;
+    const char *source_vintage;
 
     AtmChartCatalogMissingPolicy missing_policy;
     const char *missing_coordinate;
