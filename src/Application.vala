@@ -5543,8 +5543,8 @@ namespace AskTheModel {
             pres09_test_state = state;
 
             if (!pres09_test_request_started) {
-                if (!pres09_test_select_ewd (state)) {
-                    pres09_test_finish (false, "Could not select EWD or the deterministic provider model");
+                if (!pres09_test_select_ewd (state, true)) {
+                    pres09_test_finish (false, "Could not select EWD and RMD or the deterministic provider model");
                     return false;
                 }
                 pres09_test_request_started = true;
