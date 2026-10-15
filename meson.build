@@ -902,6 +902,24 @@ test(
   chart_catalog_test
 )
 
+# CHART-06b: strict bounded intent-schema validation; deliberately no app caller.
+chart_intent_schema_test = executable(
+  'chart-intent-schema-test',
+  [
+    'src/chart_catalog.c',
+    'src/chart_intent_schema.c',
+    'tests/chart_intent_schema_test.c'
+  ],
+  include_directories: include_directories('src'),
+  dependencies: [glib_dep, json_glib_dep],
+  install: false
+)
+
+test(
+  'chart-intent-schema',
+  chart_intent_schema_test
+)
+
 optimization_policy_test = executable(
   'optimization-policy-test',
   [
