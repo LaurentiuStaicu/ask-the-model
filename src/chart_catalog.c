@@ -57,7 +57,7 @@ static const AtmChartCatalogEntry entries[] = {
         .display_profile_id = "atm-display/gistemp-linear", .display_profile_version = "1",
         .publisher_name = "NASA GISS / GISTEMP v4",
         .publisher_url = "https://data.giss.nasa.gov/gistemp/data_v4.html",
-        .pinned_artifact_description = "Processed GISTEMP CSV in the exact pinned EWD snapshot.",
+        .pinned_artifact_description = "Pinned processed GISTEMP CSV in the exact EWD snapshot.",
         .reconstruction_scope = "Reconstructs the pinned processed snapshot; does not independently reproduce NASA's processing."
     },
     {
