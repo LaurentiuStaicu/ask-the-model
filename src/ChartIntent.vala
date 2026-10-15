@@ -174,38 +174,21 @@ namespace AskTheModel {
         }
 
         private static bool requests_additional_series (string normalized) {
+            /*
+             * This profile is single-series only. Conservatively reject any
+             * request naming another common macro/credit indicator, regardless
+             * of conjunction or punctuation, rather than try to infer whether
+             * a comma, "alongside", or another phrasing implies comparison.
+             */
             return contains_any (
                 normalized,
                 {
-                    " and gdp", "gdp and ", " with gdp", "gdp with ",
-                    ", gdp", ",gdp", "gdp,", 
-                    " and gross domestic product",
-                    "gross domestic product and ",
-                    " with gross domestic product",
-                    "gross domestic product with ",
-                    ", gross domestic product", "gross domestic product,",
-                    " and pib", "pib and ", " with pib", "pib with ",
-                    ", pib", ",pib", "pib,",
-                    " and unemployment", "unemployment and ",
-                    " with unemployment", "unemployment with ",
-                    ", unemployment", "unemployment,",
-                    " and inflation", "inflation and ",
-                    " with inflation", "inflation with ",
-                    ", inflation", "inflation,",
-                    " and non-performing loans", "non-performing loans and ",
-                    " with non-performing loans", "non-performing loans with ",
-                    ", non-performing loans", "non-performing loans,",
-                    " și pib", " si pib", " cu pib", ", pib", "pib,",
-                    "pib și ", "pib si ", "pib cu ",
-                    " și inflație", " si inflatie", " cu inflație", " cu inflatie",
-                    ", inflație", ", inflatie", "inflației", "inflatiei",
-                    "inflație și ", "inflatie si ", "inflație cu ", "inflatie cu ",
-                    " și șomaj", " si somaj", " cu șomaj", " cu somaj",
-                    ", șomaj", ", somaj", "șomaj,", "somaj,",
-                    "șomaj și ", "somaj si ", "șomaj cu ", "somaj cu ",
-                    " și creditele neperformante",
-                    " cu creditele neperformante",
-                    ", creditele neperformante",
+                    "gdp", "gross domestic product", "pib",
+                    "unemployment",
+                    "inflation", "inflație", "inflatie",
+                    "șomaj", "somaj",
+                    "non-performing loan",
+                    "creditele neperformante",
                     "creditelor neperformante"
                 }
             );
