@@ -197,6 +197,123 @@ projection_ei_fill (AtmChartProjection *p, GError **error)
     return TRUE;
 }
 
+
+static gboolean
+projection_bnr_fill (AtmChartProjection *p, GError **error)
+{
+    static const char *const quarters[] = {
+        "2022-Q4", "2023-Q1", "2023-Q2", "2023-Q3",
+        "2023-Q4", "2024-Q1", "2024-Q2", "2024-Q3",
+        "2024-Q4", "2025-Q1", "2025-Q2", "2025-Q3"
+    };
+    static const guint x_indices[] = {0u, 2u, 4u, 6u, 8u, 11u};
+    static const char *const x_labels[] = {
+        "Q4 2022", "Q2 2023", "Q4 2023",
+        "Q2 2024", "Q4 2024", "Q3 2025"
+    };
+    const AtmChartSpec *spec = p->spec;
+
+    if (atm_chart_spec_version (spec) != ATM_CHART_SPEC_VERSION_BNR_BLS_C01_V3 ||
+        atm_chart_spec_count (spec) != 1u ||
+        (atm_chart_spec_kind (spec) != ATM_CHART_LINE &&
+         atm_chart_spec_kind (spec) != ATM_CHART_SCATTER) ||
+        g_strcmp0 (atm_chart_spec_schema (spec), ATM_CHART_SPEC_V3_SCHEMA) != 0 ||
+        g_strcmp0 (atm_chart_spec_series_profile (spec),
+                   ATM_BNR_BLS_VERIFIED_SERIES_PROFILE) != 0 ||
+        g_strcmp0 (atm_chart_spec_series_repository_id (spec, 0), "rmd") != 0 ||
+        g_strcmp0 (atm_chart_spec_series_snapshot_sha (spec, 0),
+                   ATM_BNR_BLS_SNAPSHOT_SHA) != 0 ||
+        g_strcmp0 (atm_chart_spec_x_unit (spec), "calendar_quarter") != 0 ||
+        g_strcmp0 (atm_chart_spec_x_dimension (spec), "time") != 0 ||
+        g_strcmp0 (atm_chart_spec_y_unit (spec), "percent") != 0 ||
+        g_strcmp0 (atm_chart_spec_y_dimension (spec), "survey_net_percentage") != 0 ||
+        atm_chart_spec_x_min (spec) != 0u ||
+        atm_chart_spec_x_max (spec) != 11u ||
+        g_strcmp0 (atm_chart_spec_calendar_quarter_min (spec), "2022-Q4") != 0 ||
+        g_strcmp0 (atm_chart_spec_calendar_quarter_max (spec), "2025-Q3") != 0 ||
+        atm_chart_spec_point_count (spec, 0) != G_N_ELEMENTS (quarters))
+        return reject (error, "BNR projection only admits the exact quarterly C01 ChartSpec v3 profile.");
+
+    gint64 values[G_N_ELEMENTS (quarters)] = {0};
+    gint64 minimum = G_MAXINT64, maximum = G_MININT64;
+    for (guint i = 0; i < G_N_ELEMENTS (quarters); i++) {
+        AtmChartPointView point = {0};
+        if (!atm_chart_spec_point (spec, 0, i, &point) ||
+            point.order != i ||
+            g_strcmp0 (point.calendar_quarter, quarters[i]) != 0 ||
+            point.calendar_year != 0u || point.break_before ||
+            point.support == NULL || point.support->len == 0u)
+            return reject (error, "BNR projection rejects altered quarter order, breaks, or missing support.");
+
+        if (i == 10u) {
+            if (point.y_status != ATM_CHART_POINT_MISSING ||
+                point.source_row != 0u || point.source_decimal != NULL ||
+                point.coefficient != NULL || point.exponent != 0 ||
+                g_strcmp0 (point.missing_reason, ATM_BNR_BLS_MISSING_REASON) != 0 ||
+                point.support->len != ATM_BNR_BLS_SOURCE_COUNT)
+                return reject (error, "BNR projection rejects a changed or numerically populated 2025-Q2 absence.");
+            continue;
+        }
+
+        guint expected_row = i < 10u ? i + 2u : 12u;
+        if (point.y_status != ATM_CHART_POINT_NUMERIC ||
+            point.source_row != expected_row || point.missing_reason != NULL ||
+            point.source_decimal == NULL || point.coefficient == NULL)
+            return reject (error, "BNR projection requires source-row-bound numeric observations.");
+        if (point.exponent < -2 || point.exponent > 0)
+            return reject (error, "BNR percentage precision is outside the bounded display profile.");
+        if (!fixed (point.coefficient, point.exponent, &values[i], error))
+            return FALSE;
+        if (values[i] < 0 || values[i] > 200000)
+            return reject (error, "BNR percentage is outside the bounded 0..20 display policy.");
+        minimum = MIN (minimum, values[i]);
+        maximum = MAX (maximum, values[i]);
+    }
+
+    if (minimum != 0 || maximum <= minimum || maximum > 200000)
+        return reject (error, "BNR projection has empty or unsupported C01 display extents.");
+
+    p->policy_id = ATM_CHART_PROJECTION_BNR_POLICY;
+    p->domain.x_min = 0.0;
+    p->domain.x_max = 11.0;
+    p->domain.y_min = 0.0;
+    p->domain.y_max = 20.0;
+
+    for (guint i = 0; i < G_N_ELEMENTS (x_indices); i++) {
+        AtmChartTick *tick = &p->x_ticks[p->nx++];
+        tick->position = (double) x_indices[i] / 11.0 * p->width;
+        g_strlcpy (tick->label, x_labels[i], sizeof tick->label);
+    }
+    for (gint tick_value = 20; tick_value >= 0; tick_value -= 5) {
+        AtmChartTick *tick = &p->y_ticks[p->ny++];
+        tick->position = (double) (20 - tick_value) / 20.0 * p->height;
+        g_snprintf (tick->label, sizeof tick->label, "%d", tick_value);
+    }
+
+    for (guint i = 0; i < G_N_ELEMENTS (quarters); i++) {
+        AtmChartPointView source = {0};
+        if (!atm_chart_spec_point (spec, 0, i, &source))
+            return reject (error, "BNR projection lost a validated source quarter.");
+        if (source.y_status == ATM_CHART_POINT_MISSING)
+            continue;
+        if (p->count >= MAX_POINTS)
+            return reject (error, "Too many projected BNR points.");
+        AtmChartProjectedPoint *point = &p->points[p->count++];
+        point->series_index = 0u;
+        point->point_index = i;
+        point->x = (double) i / 11.0 * p->width;
+        point->y = (double) (200000 - values[i]) / 200000.0 * p->height;
+        if (!isfinite (point->x) || !isfinite (point->y) ||
+            point->x < 0.0 || point->x > p->width ||
+            point->y < 0.0 || point->y > p->height)
+            return reject (error, "BNR projected point is outside its bounded display domain.");
+    }
+
+    if (p->count != 11u || p->nx != 6u || p->ny != 5u)
+        return reject (error, "BNR projection does not retain the exact expected coordinate coverage.");
+    return TRUE;
+}
+
 static gboolean projection_new (const AtmChartSpec *spec, gboolean rebuild,
     double width, double height, AtmChartProjection **out, GError **error)
 {
@@ -215,6 +332,11 @@ static gboolean projection_new (const AtmChartSpec *spec, gboolean rebuild,
     if (atm_chart_spec_version (p->spec) == ATM_CHART_SPEC_VERSION_ENERGY_INSTITUTE_V2) {
         p->policy_id = ATM_CHART_PROJECTION_EI_POLICY;
         if (!projection_ei_fill (p, error)) goto invalid;
+        *out = p;
+        return TRUE;
+    }
+    if (atm_chart_spec_version (p->spec) == ATM_CHART_SPEC_VERSION_BNR_BLS_C01_V3) {
+        if (!projection_bnr_fill (p, error)) goto invalid;
         *out = p;
         return TRUE;
     }

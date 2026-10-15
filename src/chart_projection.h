@@ -3,6 +3,7 @@
 G_BEGIN_DECLS
 #define ATM_CHART_PROJECTION_POLICY "atm-display/gistemp-linear/1"
 #define ATM_CHART_PROJECTION_EI_POLICY "atm-display/energy-institute-tes-linear/1"
+#define ATM_CHART_PROJECTION_BNR_POLICY "atm-display/bnr-bls-c01-quarterly-gap/1"
 #define ATM_CHART_PROJECTION_MAX_TICKS 17
 #define ATM_CHART_PROJECTION_MIN_WIDTH 320
 #define ATM_CHART_PROJECTION_MIN_HEIGHT 160
@@ -16,7 +17,9 @@ typedef struct { double x_min, x_max, y_min, y_max; } AtmChartDisplayDomain;
  * Admits only the exact GISTEMP v1 profile or the separate source-bound EI TES
  * ChartSpec v2 profile. GISTEMP v1 retains its fixed 25-year / quarter-degree
  * policy; EI v2 uses bounded integer micro-EJ/year conversion and 100-EJ/year
- * ticks. At most 17 ticks per axis; no arbitrary values/domains are accepted.
+ * ticks; BNR C01 v3 uses 12 quarter ordinals, a bounded 0..20 percent display
+ * domain, and preserves the one authorized gap by omitting its numeric point.
+ * At most 17 ticks per axis; no arbitrary values/domains are accepted.
  * Coordinates are display approximations, never scientific source values.
  * Owns a rebuilt ChartSpec; *out must be NULL, failure preserves it. This is
  * not renderer, application intent, or History admission. */

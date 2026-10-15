@@ -2927,7 +2927,10 @@ chart_projection_test = executable(
   install: false
 )
 test('chart-projection', chart_projection_test,
-  env: {'ATM_CHART01_FIXTURE': meson.current_source_dir() / 'tests/fixtures/chart01'})
+  env: {
+    'ATM_CHART01_FIXTURE': meson.current_source_dir() / 'tests/fixtures/chart01',
+    'ATM_BNR_BLS_FIXTURE': meson.current_source_dir() / 'tests/fixtures/chart01/rmd-bnr-bls'
+  })
 
 # CHART-04: dormant M4 projected-geometry selector; no renderer caller.
 chart_m4_test = executable(

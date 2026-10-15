@@ -2,6 +2,8 @@
 #include "chart_projection_internal.h"
 #include "energy_institute_verified_series.h"
 #include "energy_institute_admission.h"
+#include "bnr_bls_verified_series.h"
+#include "bnr_bls_series_contract.h"
 #include <json-glib/json-glib.h>
 #include <math.h>
 #include <string.h>
@@ -101,6 +103,155 @@ ei_specification (AtmChartKind kind, const char *snapshot)
     atm_energy_institute_verified_series_free (series);
     atm_energy_institute_admission_free (admission);
     return spec;
+}
+
+static AtmBnrBlsVerifiedSeries *
+build_bnr_verified_series (void)
+{
+    const char *root = g_getenv ("ATM_BNR_BLS_FIXTURE");
+    g_assert_nonnull (root);
+    const char *names[] = {
+        "bnr_bls_realised_rounds.csv",
+        "processed_data_inventory_registry.json",
+        "bnr_bls_canonical_panel_promotion_review.json",
+        "bnr_bls_cross_round_mapping_audit.json",
+        "bnr_bls_missing_round_semantic_mapping_audit.json"
+    };
+    GBytes *sources[ATM_BNR_BLS_SOURCE_COUNT] = {NULL};
+    for (guint i = 0; i < ATM_BNR_BLS_SOURCE_COUNT; i++) {
+        char *path = g_build_filename (root, names[i], NULL);
+        char *contents = NULL;
+        gsize length = 0;
+        GError *error = NULL;
+        g_assert_true (g_file_get_contents (path, &contents, &length, &error));
+        g_assert_no_error (error);
+        g_free (path);
+        sources[i] = g_bytes_new_take (contents, length);
+    }
+
+    AtmBnrBlsPanel *panel = NULL;
+    AtmBnrBlsSra *sra = NULL;
+    AtmBnrBlsSeriesContract *contract = NULL;
+    AtmBnrBlsVerifiedSeries *series = NULL;
+    GError *error = NULL;
+    g_assert_true (atm_bnr_bls_panel_new (
+        ATM_BNR_BLS_UPSTREAM_REPOSITORY,
+        ATM_BNR_BLS_SNAPSHOT_SHA, sources, &panel, &error));
+    g_assert_no_error (error);
+    for (guint i = 0; i < ATM_BNR_BLS_SOURCE_COUNT; i++)
+        g_bytes_unref (sources[i]);
+    g_assert_true (atm_bnr_bls_sra_new (panel, &sra, &error));
+    g_assert_no_error (error);
+    g_assert_true (atm_bnr_bls_series_contract_from_sra (
+        panel, sra, &contract, &error));
+    g_assert_no_error (error);
+    g_assert_true (atm_bnr_bls_verified_series_from_contract (
+        contract, &series, &error));
+    g_assert_no_error (error);
+    atm_bnr_bls_series_contract_free (contract);
+    atm_bnr_bls_sra_free (sra);
+    atm_bnr_bls_panel_free (panel);
+    return series;
+}
+
+static AtmChartSpec *
+bnr_specification (AtmChartKind kind)
+{
+    AtmBnrBlsVerifiedSeries *series = build_bnr_verified_series ();
+    AtmChartSpec *spec = NULL;
+    GError *error = NULL;
+    g_assert_true (atm_chart_spec_new_bnr_bls_c01_v3 (kind, series, &spec, &error));
+    g_assert_no_error (error);
+    atm_bnr_bls_verified_series_free (series);
+    return spec;
+}
+
+static void
+test_bnr_quarterly_gap_policy (void)
+{
+    static const guint expected_indices[] = {0u, 1u, 2u, 3u, 4u, 5u, 6u, 7u, 8u, 9u, 11u};
+    static const char *const expected_x_labels[] = {
+        "Q4 2022", "Q2 2023", "Q4 2023", "Q2 2024", "Q4 2024", "Q3 2025"
+    };
+    static const char *const expected_y_labels[] = {"20", "15", "10", "5", "0"};
+
+    AtmChartSpec *spec = bnr_specification (ATM_CHART_LINE);
+    AtmChartProjection *projection = NULL;
+    GError *error = NULL;
+    g_assert_true (atm_chart_projection_new (spec, 360.0, 200.0, &projection, &error));
+    g_assert_no_error (error);
+    g_assert_nonnull (projection);
+    g_assert_true (atm_chart_projection_validate (projection, &error));
+    g_assert_no_error (error);
+    g_assert_cmpstr (atm_chart_projection_policy (projection), ==,
+                     ATM_CHART_PROJECTION_BNR_POLICY);
+    const AtmChartDisplayDomain *domain = atm_chart_projection_domain (projection);
+    g_assert_nonnull (domain);
+    g_assert_cmpfloat (domain->x_min, ==, 0.0);
+    g_assert_cmpfloat (domain->x_max, ==, 11.0);
+    g_assert_cmpfloat (domain->y_min, ==, 0.0);
+    g_assert_cmpfloat (domain->y_max, ==, 20.0);
+    g_assert_cmpuint (atm_chart_projection_count (projection), ==,
+                      G_N_ELEMENTS (expected_indices));
+    g_assert_cmpuint (atm_chart_projection_x_tick_count (projection), ==,
+                      G_N_ELEMENTS (expected_x_labels));
+    g_assert_cmpuint (atm_chart_projection_y_tick_count (projection), ==,
+                      G_N_ELEMENTS (expected_y_labels));
+
+    for (guint i = 0; i < G_N_ELEMENTS (expected_indices); i++) {
+        const AtmChartProjectedPoint *point = atm_chart_projection_point (projection, i);
+        g_assert_nonnull (point);
+        g_assert_cmpuint (point->series_index, ==, 0u);
+        g_assert_cmpuint (point->point_index, ==, expected_indices[i]);
+        g_assert_true (isfinite (point->x) && isfinite (point->y));
+        g_assert_cmpfloat_with_epsilon (point->x,
+            (double) expected_indices[i] / 11.0 * 360.0, 1e-12);
+        g_assert_cmpfloat (point->x, >=, 0.0);
+        g_assert_cmpfloat (point->x, <=, 360.0);
+        g_assert_cmpfloat (point->y, >=, 0.0);
+        g_assert_cmpfloat (point->y, <=, 200.0);
+        g_assert_cmpuint (point->point_index, !=, 10u);
+    }
+
+    for (guint i = 0; i < G_N_ELEMENTS (expected_x_labels); i++) {
+        const AtmChartTick *tick = atm_chart_projection_x_tick (projection, i);
+        g_assert_nonnull (tick);
+        g_assert_cmpstr (tick->label, ==, expected_x_labels[i]);
+    }
+    for (guint i = 0; i < G_N_ELEMENTS (expected_y_labels); i++) {
+        const AtmChartTick *tick = atm_chart_projection_y_tick (projection, i);
+        g_assert_nonnull (tick);
+        g_assert_cmpstr (tick->label, ==, expected_y_labels[i]);
+    }
+
+    const AtmChartProjectedPoint *before_gap = atm_chart_projection_point (projection, 9u);
+    const AtmChartProjectedPoint *after_gap = atm_chart_projection_point (projection, 10u);
+    g_assert_cmpuint (before_gap->point_index, ==, 9u);
+    g_assert_cmpuint (after_gap->point_index, ==, 11u);
+    g_assert_cmpfloat_with_epsilon (after_gap->x - before_gap->x,
+                                    2.0 * 360.0 / 11.0, 1e-12);
+
+    AtmChartProjectedPoint *mutable_point =
+        (AtmChartProjectedPoint *) atm_chart_projection_point (projection, 10u);
+    guint saved_index = mutable_point->point_index;
+    mutable_point->point_index = 10u;
+    g_assert_false (atm_chart_projection_validate (projection, NULL));
+    mutable_point->point_index = saved_index;
+    g_assert_true (atm_chart_projection_validate (projection, &error));
+    g_assert_no_error (error);
+
+    AtmChartSpec *scatter_spec = bnr_specification (ATM_CHART_SCATTER);
+    AtmChartProjection *scatter = NULL;
+    g_assert_true (atm_chart_projection_new (scatter_spec, 360.0, 200.0, &scatter, &error));
+    g_assert_no_error (error);
+    g_assert_cmpuint (atm_chart_projection_count (scatter), ==, 11u);
+    g_assert_true (atm_chart_projection_validate (scatter, &error));
+    g_assert_no_error (error);
+
+    atm_chart_projection_free (scatter);
+    atm_chart_spec_free (scatter_spec);
+    atm_chart_projection_free (projection);
+    atm_chart_spec_free (spec);
 }
 
 static void
@@ -394,6 +545,7 @@ int main (int argc, char **argv)
     g_test_add_func ("/chart-projection/resize", test_resize);
     g_test_add_func ("/chart-projection/rejections", test_rejections);
     g_test_add_func ("/chart-projection/tampering", test_tampering);
+    g_test_add_func ("/chart-projection/bnr-quarterly-gap-policy", test_bnr_quarterly_gap_policy);
     g_test_add_func ("/chart-projection/ei-decimal-conversion", test_ei_decimal_conversion);
     g_test_add_func ("/chart-projection/ei-policy-resize", test_ei_projection_both_snapshots_and_resize);
     g_test_add_func ("/chart-projection/ei-tampering", test_ei_projection_tampering);
