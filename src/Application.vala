@@ -5596,7 +5596,6 @@ namespace AskTheModel {
             }
 
             if (pres09_test_live_turn == 1) {
-                if (pres09_test_live_turn == 1) {
                 if (state.pres09_test_chart_widgets.length != 2) {
                     pres09_test_finish (
                         false,
