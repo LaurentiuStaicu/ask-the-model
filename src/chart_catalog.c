@@ -52,6 +52,10 @@ static const AtmChartCatalogEntry entries[] = {
         .series_semantics = "empirical_annual_observations",
         .observation_meaning = "Global annual land-ocean temperature anomaly in Celsius relative to 1951-1980.",
         .reference_period = "1951-1980", .geography = "Global",
+        .coverage_start = "1880", .coverage_end = "2025",
+        .coordinate_count = 146, .numeric_observation_count = 146,
+        .scenario = "not_applicable", .epistemic_status = "empirical",
+        .source_vintage = "2026-08-31",
         .missing_policy = ATM_CHART_CATALOG_MISSING_REJECT,
         .allowed_chart_kinds = line_kind, .allowed_chart_kind_count = 1,
         .display_profile_id = "atm-display/gistemp-linear", .display_profile_version = "1",
@@ -84,7 +88,12 @@ static const AtmChartCatalogEntry entries[] = {
         .y_unit = "exajoules/year", .y_dimension = "energy_flow_rate",
         .series_semantics = "empirical_annual_observations",
         .observation_meaning = "Global total energy supply in exajoules/year, Physical Energy Content method.",
-        .geography = "Total World", .missing_policy = ATM_CHART_CATALOG_MISSING_REJECT,
+        .geography = "Total World",
+        .coverage_start = "1965", .coverage_end = "2025",
+        .coordinate_count = 61, .numeric_observation_count = 61,
+        .scenario = "not_applicable", .epistemic_status = "empirical",
+        .source_vintage = "Statistical Review of World Energy 2026",
+        .missing_policy = ATM_CHART_CATALOG_MISSING_REJECT,
         .allowed_chart_kinds = line_kind, .allowed_chart_kind_count = 1,
         .display_profile_id = "atm-display/energy-institute-tes-linear", .display_profile_version = "1",
         .publisher_name = "Energy Institute, Statistical Review of World Energy 2026",
@@ -117,6 +126,10 @@ static const AtmChartCatalogEntry entries[] = {
         .series_semantics = "empirical_quarterly_observations",
         .observation_meaning = "Positive net percentages indicate tightening; negative values indicate easing.",
         .geography = "Romania",
+        .coverage_start = "2022-Q4", .coverage_end = "2025-Q3",
+        .coordinate_count = 12, .numeric_observation_count = 11,
+        .scenario = "not_applicable", .epistemic_status = "empirical",
+        .source_vintage = "Pinned RMD BLS C01 source bundle",
         .missing_policy = ATM_CHART_CATALOG_MISSING_BOUNDED_PROFILE,
         .missing_coordinate = "2025-Q2", .missing_reason = "source_round_not_retained",
         .allowed_chart_kinds = line_kind, .allowed_chart_kind_count = 1,
@@ -294,6 +307,10 @@ policy_matches (const AtmChartCatalogEntry *e, GError **error)
             !IS(e->y_dimension,"temperature_difference") ||
             !IS(e->series_semantics,"empirical_annual_observations") ||
             !IS(e->reference_period,"1951-1980") || !IS(e->geography,"Global") ||
+            !IS(e->coverage_start,"1880") || !IS(e->coverage_end,"2025") ||
+            e->coordinate_count != 146 || e->numeric_observation_count != 146 ||
+            !IS(e->scenario,"not_applicable") || !IS(e->epistemic_status,"empirical") ||
+            !IS(e->source_vintage,"2026-08-31") ||
             !IS(e->display_profile_id,"atm-display/gistemp-linear") ||
             !IS(e->display_profile_version,"1") ||
             !IS(e->publisher_name,"NASA GISS / GISTEMP v4") ||
@@ -328,6 +345,10 @@ policy_matches (const AtmChartCatalogEntry *e, GError **error)
             !IS(e->y_unit,"exajoules/year") || !IS(e->y_dimension,"energy_flow_rate") ||
             !IS(e->series_semantics,"empirical_annual_observations") ||
             !IS(e->geography,"Total World") ||
+            !IS(e->coverage_start,"1965") || !IS(e->coverage_end,"2025") ||
+            e->coordinate_count != 61 || e->numeric_observation_count != 61 ||
+            !IS(e->scenario,"not_applicable") || !IS(e->epistemic_status,"empirical") ||
+            !IS(e->source_vintage,"Statistical Review of World Energy 2026") ||
             !IS(e->display_profile_id,"atm-display/energy-institute-tes-linear") ||
             !IS(e->display_profile_version,"1") ||
             !IS(e->publisher_name,"Energy Institute, Statistical Review of World Energy 2026") ||
@@ -362,6 +383,10 @@ policy_matches (const AtmChartCatalogEntry *e, GError **error)
             !IS(e->y_unit,"percent") || !IS(e->y_dimension,"survey_net_percentage") ||
             !IS(e->series_semantics,"empirical_quarterly_observations") ||
             !IS(e->geography,"Romania") ||
+            !IS(e->coverage_start,"2022-Q4") || !IS(e->coverage_end,"2025-Q3") ||
+            e->coordinate_count != 12 || e->numeric_observation_count != 11 ||
+            !IS(e->scenario,"not_applicable") || !IS(e->epistemic_status,"empirical") ||
+            !IS(e->source_vintage,"Pinned RMD BLS C01 source bundle") ||
             !IS(e->missing_coordinate,"2025-Q2") ||
             !IS(e->missing_reason,"source_round_not_retained") ||
             !IS(e->display_profile_id,"atm-display/bnr-bls-c01-quarterly-gap") ||
@@ -396,6 +421,8 @@ atm_chart_catalog_validate (GError **error)
             e->source_path, e->x_coordinate_semantics, e->x_frequency, e->x_unit,
             e->x_dimension, e->subject, e->attribute, e->y_unit, e->y_dimension,
             e->series_semantics, e->observation_meaning, e->geography,
+            e->coverage_start, e->coverage_end, e->scenario, e->epistemic_status,
+            e->source_vintage,
             e->display_profile_id, e->display_profile_version, e->publisher_name,
             e->publisher_url, e->pinned_artifact_description, e->reconstruction_scope
         };
@@ -449,6 +476,18 @@ atm_chart_catalog_validate (GError **error)
             }
             g_free(a);
         }
+        if (e->coordinate_count == 0 ||
+            e->numeric_observation_count > e->coordinate_count ||
+            e->numeric_observation_count == 0 ||
+            (e->missing_policy == ATM_CHART_CATALOG_MISSING_REJECT &&
+             (e->numeric_observation_count != e->coordinate_count ||
+              e->missing_coordinate != NULL || e->missing_reason != NULL)) ||
+            (e->missing_policy == ATM_CHART_CATALOG_MISSING_BOUNDED_PROFILE &&
+             (e->coordinate_count != e->numeric_observation_count + 1 ||
+              e->missing_coordinate == NULL || e->missing_reason == NULL)))
+            return fail (error, ATM_CHART_CATALOG_ERROR_SEMANTICS,
+                         "Catalog coverage counts conflict with its missing-value policy.");
+
         if (!policy_matches(e, error)) return FALSE;
     }
     return TRUE;
