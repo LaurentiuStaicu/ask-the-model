@@ -3194,8 +3194,10 @@ namespace AskTheModel {
 
                 foreach (ConversationPersistenceRepository pin
                          in snapshot.repositories) {
-                    bool ei_recipe = chart.chart_schema == "atm-chart-spec/2";
-                    bool version_matches = ei_recipe
+                    bool source_snapshot_recipe =
+                        chart.chart_schema == "atm-chart-spec/2" ||
+                        chart.chart_schema == "atm-chart-spec/3";
+                    bool version_matches = source_snapshot_recipe
                         ? series.repository_version == "snapshot:" + series.snapshot_sha
                         : pin.repository_version == series.repository_version;
                     if (pin.repository_id == series.repository_id &&
@@ -3239,7 +3241,24 @@ namespace AskTheModel {
 
                 ChartNative.Spec? spec = null;
                 bool reconstructed = false;
-                if (chart.chart_schema == "atm-chart-spec/2") {
+                if (chart.chart_schema == "atm-chart-spec/3") {
+                    reconstructed = ChartNative.reconstruct_history_bnr_bls_c01 (
+                        snapshot_path,
+                        series.repository_id,
+                        series.repository_version,
+                        series.snapshot_sha,
+                        chart.chart_schema,
+                        chart.chart_spec_id,
+                        chart.chart_kind,
+                        chart.reconstruction_profile,
+                        series.series_profile,
+                        series.admission_profile,
+                        series.scientific_id,
+                        series.qualified_id,
+                        series.source_path,
+                        out spec
+                    );
+                } else if (chart.chart_schema == "atm-chart-spec/2") {
                     reconstructed = ChartNative.reconstruct_history_energy_institute (
                         snapshot_path,
                         series.repository_id,
