@@ -799,7 +799,7 @@
       "tested_by": [
         "meson:conversation-store"
       ]
-    }, 
+    },
     {
       "id": "SCIENTIFIC-S1-009",
       "category": "SCIENTIFIC",
@@ -815,7 +815,7 @@
       "tested_by": [
         "meson:chart-history-reconstruct"
       ]
-    }    ,
+    },
     {
       "id": "SCIENTIFIC-S1-010",
       "category": "SCIENTIFIC",
@@ -881,6 +881,23 @@
       ],
       "tested_by": [
         "meson:chart-view"
+      ]
+    },
+    {
+      "id": "SCIENTIFIC-S1-014",
+      "category": "SCIENTIFIC",
+      "severity": "S1",
+      "lifecycle": "enforced",
+      "statement": "Conversation-store schema v5 persists only the source-bound BNR BLS C01 ChartSpec v3 reconstruction recipe, never numeric point or raster state. The v4-to-v5 migration preserves existing GISTEMP/Energy Institute recipes transactionally and rolls back completely on failure. History accepts the BNR tuple only at the pinned RMD snapshot, reconstructs the five-file panel/finalized SRA/SeriesContract/VerifiedSeries/ChartSpec chain and rejects missing, altered, or identity-mismatched source material. The 2025-Q2 MISSING assertion remains explicit and is never imputed as zero.",
+      "enforced_by": [
+        "src/conversation_store.c",
+        "data/schemas/conversation-store-v5.sql",
+        "data/schemas/conversation-store-v4-to-v5.sql",
+        "src/chart_history_reconstruct.c"
+      ],
+      "tested_by": [
+        "meson:conversation-store",
+        "meson:chart-history-reconstruct"
       ]
     }
   ]
