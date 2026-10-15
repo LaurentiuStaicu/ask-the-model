@@ -4,6 +4,7 @@
 #include "verified_series_contract.h"
 #include "energy_institute_admission.h"
 #include "energy_institute_verified_series.h"
+#include "bnr_bls_verified_series.h"
 #include <gio/gio.h>
 #include <string.h>
 
@@ -525,6 +526,181 @@ cleanup:
     for (guint i = 0; i < ATM_EI_SOURCE_COUNT; i++)
         g_clear_pointer (&sources[i], g_bytes_unref);
     return ok;
+}
+
+
+
+gboolean
+atm_chart_live_reconstruct_bnr_bls_c01 (
+    const char *snapshot_path,
+    const char *repository_id,
+    const char *snapshot_sha,
+    const char *chart_kind,
+    AtmChartSpec **out,
+    GError **error
+)
+{
+    static const char *expected_repository =
+        ATM_BNR_BLS_UPSTREAM_REPOSITORY;
+    static const char *expected_repository_key = "rmd";
+    static const char *expected_snapshot =
+        ATM_BNR_BLS_SNAPSHOT_SHA;
+    static const char *source_paths[ATM_BNR_BLS_SOURCE_COUNT] = {
+        "data/processed/bnr_bls_realised_rounds.csv",
+        "data/provenance/processed_data_inventory_registry.json",
+        "model/calibration_validation/bnr_bls_canonical_panel_promotion_review.json",
+        "model/calibration_validation/bnr_bls_cross_round_mapping_audit.json",
+        "model/calibration_validation/bnr_bls_missing_round_semantic_mapping_audit.json"
+    };
+    GBytes *sources[ATM_BNR_BLS_SOURCE_COUNT] = {NULL};
+    AtmBnrBlsPanel *panel = NULL;
+    AtmBnrBlsSra *sra = NULL;
+    AtmBnrBlsSeriesContract *contract = NULL;
+    AtmBnrBlsVerifiedSeries *series = NULL;
+    AtmChartSpec *spec = NULL;
+    AtmChartKind kind;
+    const char *admission_repository = NULL;
+    gboolean ok = FALSE;
+
+    g_return_val_if_fail (out != NULL && *out == NULL, FALSE);
+    if (snapshot_path == NULL || repository_id == NULL ||
+        snapshot_sha == NULL || chart_kind == NULL ||
+        (g_strcmp0 (repository_id, expected_repository_key) != 0 &&
+         g_strcmp0 (repository_id, expected_repository) != 0) ||
+        g_strcmp0 (snapshot_sha, expected_snapshot) != 0)
+        return reject (error,
+            "Live BNR BLS C01 chart request is not bound to the admitted RMD snapshot.");
+
+    if (!chart_kind_from_text (chart_kind, &kind, error))
+        return FALSE;
+    admission_repository =
+        g_strcmp0 (repository_id, expected_repository_key) == 0
+            ? expected_repository : repository_id;
+
+    for (guint i = 0; i < ATM_BNR_BLS_SOURCE_COUNT; i++) {
+        if (!read_source (snapshot_path, source_paths[i], &sources[i], error))
+            goto cleanup;
+    }
+    if (!atm_bnr_bls_panel_new (
+            admission_repository, expected_snapshot, sources, &panel, error))
+        goto cleanup;
+    if (!atm_bnr_bls_sra_new (panel, &sra, error))
+        goto cleanup;
+    if (!atm_bnr_bls_series_contract_from_sra (
+            panel, sra, &contract, error))
+        goto cleanup;
+    if (!atm_bnr_bls_verified_series_from_contract (
+            contract, &series, error))
+        goto cleanup;
+
+    const AtmSeriesContract *generic =
+        atm_bnr_bls_series_contract_value (
+            atm_bnr_bls_verified_series_contract (series));
+    if (generic == NULL ||
+        atm_bnr_bls_panel_observation_count (panel) != 11u ||
+        atm_bnr_bls_verified_series_count (series) != 12u ||
+        g_strcmp0 (atm_bnr_bls_panel_repository (panel), expected_repository) != 0 ||
+        g_strcmp0 (atm_bnr_bls_panel_snapshot (panel), expected_snapshot) != 0 ||
+        g_strcmp0 (generic->repository_version,
+                   "snapshot:" ATM_BNR_BLS_SNAPSHOT_SHA) != 0 ||
+        g_strcmp0 (generic->source_path, source_paths[0]) != 0) {
+        reject (error,
+            "Live BNR BLS C01 series does not match the pinned source identity.");
+        goto cleanup;
+    }
+
+    if (!atm_chart_spec_new_bnr_bls_c01_v3 (kind, series, &spec, error))
+        goto cleanup;
+    if (atm_chart_spec_version (spec) != ATM_CHART_SPEC_VERSION_BNR_BLS_C01_V3 ||
+        atm_chart_spec_point_count (spec, 0) != 12u ||
+        g_strcmp0 (atm_chart_spec_series_snapshot_sha (spec, 0), expected_snapshot) != 0 ||
+        g_strcmp0 (atm_chart_spec_series_source_path (spec, 0), source_paths[0]) != 0) {
+        reject (error, "Live BNR BLS C01 ChartSpec does not match the pinned source.");
+        goto cleanup;
+    }
+
+    *out = spec;
+    spec = NULL;
+    ok = TRUE;
+
+cleanup:
+    atm_chart_spec_free (spec);
+    atm_bnr_bls_verified_series_free (series);
+    atm_bnr_bls_series_contract_free (contract);
+    atm_bnr_bls_sra_free (sra);
+    atm_bnr_bls_panel_free (panel);
+    for (guint i = 0; i < ATM_BNR_BLS_SOURCE_COUNT; i++)
+        g_clear_pointer (&sources[i], g_bytes_unref);
+    return ok;
+}
+
+gboolean
+atm_chart_history_reconstruct_bnr_bls_c01 (
+    const char *snapshot_path,
+    const char *repository_id,
+    const char *repository_version,
+    const char *snapshot_sha,
+    const char *chart_schema,
+    const char *chart_spec_id,
+    const char *chart_kind,
+    const char *reconstruction_profile,
+    const char *series_profile,
+    const char *admission_profile,
+    const char *scientific_id,
+    const char *qualified_id,
+    const char *source_path,
+    AtmChartSpec **out,
+    GError **error
+)
+{
+    const char *expected_repository = ATM_BNR_BLS_UPSTREAM_REPOSITORY;
+    const char *expected_key = "rmd";
+    const char *expected_snapshot = ATM_BNR_BLS_SNAPSHOT_SHA;
+    char *expected_version = g_strconcat ("snapshot:", expected_snapshot, NULL);
+    gboolean valid_input =
+        snapshot_path != NULL &&
+        (g_strcmp0 (repository_id, expected_key) == 0 ||
+         g_strcmp0 (repository_id, expected_repository) == 0) &&
+        g_strcmp0 (repository_version, expected_version) == 0 &&
+        g_strcmp0 (snapshot_sha, expected_snapshot) == 0 &&
+        g_strcmp0 (chart_schema, ATM_CHART_SPEC_V3_SCHEMA) == 0 &&
+        chart_spec_id != NULL && chart_spec_id[0] != '\0' &&
+        chart_kind != NULL &&
+        g_strcmp0 (reconstruction_profile,
+                   "atm-chart-reconstruct/bnr-bls-c01-calendar-quarter/1") == 0 &&
+        g_strcmp0 (series_profile,
+                   ATM_BNR_BLS_VERIFIED_SERIES_PROFILE) == 0 &&
+        g_strcmp0 (admission_profile,
+                   ATM_BNR_BLS_PROFILE) == 0 &&
+        g_strcmp0 (scientific_id, "") != 0 &&
+        g_strcmp0 (qualified_id, "") != 0 &&
+        g_strcmp0 (source_path,
+                   "data/processed/bnr_bls_realised_rounds.csv") == 0;
+    g_free (expected_version);
+    if (!valid_input)
+        return reject (error,
+            "Persisted BNR BLS C01 chart reconstruction recipe is not admitted.");
+
+    AtmChartSpec *spec = NULL;
+    if (!atm_chart_live_reconstruct_bnr_bls_c01 (
+            snapshot_path, repository_id, snapshot_sha, chart_kind, &spec, error))
+        return FALSE;
+
+    if (g_strcmp0 (atm_chart_spec_schema (spec), chart_schema) != 0 ||
+        g_strcmp0 (atm_chart_spec_id (spec), chart_spec_id) != 0 ||
+        g_strcmp0 (atm_chart_spec_series_profile (spec, 0), series_profile) != 0 ||
+        g_strcmp0 (atm_chart_spec_series_scientific_id (spec, 0), scientific_id) != 0 ||
+        g_strcmp0 (atm_chart_spec_series_qualified_id (spec, 0), qualified_id) != 0 ||
+        g_strcmp0 (atm_chart_spec_series_snapshot_sha (spec, 0), snapshot_sha) != 0 ||
+        g_strcmp0 (atm_chart_spec_series_source_path (spec, 0), source_path) != 0 ||
+        g_strcmp0 (atm_chart_spec_series_repository_id (spec, 0), "rmd") != 0) {
+        atm_chart_spec_free (spec);
+        return reject (error,
+            "Persisted BNR BLS C01 ChartSpec identity disagrees with rebuilt source.");
+    }
+
+    *out = spec;
+    return TRUE;
 }
 
 
