@@ -244,5 +244,20 @@ int main () {
     assert (!bnr_command_compares_energy.gistemp_requested);
     assert (!bnr_command_compares_energy.energy_institute_requested);
 
+    var bnr_command_compares_gdp = AskTheModel.ChartIntent.parse (
+        "/chart bnr-bls-c01 Compare with GDP."
+    );
+    assert (!bnr_command_compares_gdp.bnr_bls_c01_requested);
+
+    var bnr_natural_comparison = AskTheModel.ChartIntent.parse (
+        "Generate a chart comparing credit standards with GDP."
+    );
+    assert (!bnr_natural_comparison.bnr_bls_c01_requested);
+
+    var bnr_romanian_comparison = AskTheModel.ChartIntent.parse (
+        "Generează un grafic comparativ al standardelor de credit față de PIB."
+    );
+    assert (!bnr_romanian_comparison.bnr_bls_c01_requested);
+
     return 0;
 }
