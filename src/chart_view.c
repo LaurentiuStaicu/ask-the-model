@@ -358,7 +358,9 @@ gboolean atm_chart_view_new (const AtmChartSpec *spec, AtmChartView **out, GErro
     self->provenance = g_object_ref (gtk_text_view_get_buffer (GTK_TEXT_VIEW (detail)));
     GtkWidget *details_scroll = gtk_scrolled_window_new (); gtk_scrolled_window_set_child (GTK_SCROLLED_WINDOW (details_scroll), detail);
     gtk_scrolled_window_set_min_content_height (GTK_SCROLLED_WINDOW (details_scroll), 140);
-    GtkWidget *expander = gtk_expander_new ("Provenance of selected observation"); gtk_expander_set_child (GTK_EXPANDER (expander), details_scroll);
+    GtkWidget *expander = gtk_expander_new ("Source details");
+    gtk_expander_set_expanded (GTK_EXPANDER (expander), TRUE);
+    gtk_expander_set_child (GTK_EXPANDER (expander), details_scroll);
     gtk_box_append (GTK_BOX (data), expander); gtk_stack_add_titled (self->stack, data, "data", "Data");
     gtk_box_append (GTK_BOX (self), GTK_WIDGET (self->stack));
     g_signal_connect (self->selection, "notify::selected", G_CALLBACK (selection_changed), self);
