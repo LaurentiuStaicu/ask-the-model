@@ -29,7 +29,7 @@ Implemented and tested backend layers include:
 - deterministic multi-turn retrieval state with inherited repository intent/exact anchors, bounded effective follow-up queries and explicit clarification outcomes;
 - versioned R5 benchmark/run schemas, a reviewed frozen EWD/CBD/RMD corpus, a deterministic real-corpus runner, provisional metric gates and CI that now passes the fixed deterministic baseline.
 
-The v0.3.0 GTK application connects repository selection end-to-end to per-conversation grounded message generation. Each chat tab owns independent provider history and a `ConversationSession`; the first Send freezes repository snapshots plus AI-model identity for that tab, and subsequent grounded turns use the pinned retrieval scope. Temporary model labels are resolved before a grounded turn is committed, unknown labels fail closed, and user-visible compact source references open provenance details including repository/version, exact snapshot SHA, logical source ID, physical locator, evidence excerpt and immutable permalink when available. This is the released v0.3.0 capability boundary.
+The v0.3.0 GTK application connects repository selection end-to-end to per-conversation grounded message generation. Each chat tab owns independent provider history and a `ConversationSession`; the first Send freezes repository snapshots plus AI-model identity for that tab, and subsequent grounded turns use the pinned retrieval scope. Temporary model labels are resolved before a grounded turn is committed and unknown labels fail closed. The persisted provenance retains the exact repository/snapshot/source identity and immutable permalink needed for audit and reconstruction; the ordinary source-detail window shows readable source/repository names, title/context, excerpt and a usable source link when available, rather than exposing raw hashes and internal IDs by default. This paragraph describes the source/citation architecture introduced in v0.3.0; the current user-facing presentation rule is defined in docs/INTERFACE_DESIGN_REQUIREMENTS.md.
 
 ## Implemented logical components
 
@@ -168,7 +168,7 @@ The repository/snapshot freeze, transactional grounded-turn lifecycle and AI-mod
 
 Responsible for selecting retrieved evidence within a turn budget, recording exactly which repository sources were supplied to the AI, mapping temporary source labels to immutable provenance, and distinguishing retrieved source material from AI-generated interpretation.
 
-Current-turn grounding context, grounded Ollama request construction, temporary source-label resolution, persistent citation provenance and real-repository traceability are implemented and wired through the released v0.3.0 GTK path. User-visible references are intentionally compact; detailed provenance is disclosed on demand in a transient source-detail window rather than a permanent pane.
+Current-turn grounding context, grounded Ollama request construction, temporary source-label resolution, persistent citation provenance and real-repository traceability are implemented and wired through the released v0.3.0 GTK path. User-visible references are intentionally compact; on-demand details use a readable presentation, while exact snapshot pins, internal source identities and locators remain persisted internally for traceability and reconstruction.
 
 ### Conversation persistence service — released in v0.5.0
 
