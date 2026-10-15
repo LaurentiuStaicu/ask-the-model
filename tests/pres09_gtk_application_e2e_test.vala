@@ -390,7 +390,7 @@ private static int run_orchestrator (
                 generation_id,
                 "rmd",
                 BNR_SNAPSHOT_SHA,
-                "test-rmd-version",
+                "0.3.0",
                 bnr_seal,
                 out rmd_generation_id
             ) || rmd_generation_id <= generation_id) {
