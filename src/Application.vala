@@ -2955,9 +2955,71 @@ namespace AskTheModel {
             }
         }
 
+
+        private void qualify_live_bnr_bls_c01_request (
+            ConversationSession session
+        ) throws GLib.Error {
+            ConversationRepositoryPin? chart_pin = null;
+            for (uint i = 0; i < session.repository_count (); i++) {
+                ConversationRepositoryPin? pin = session.repository_pin_at (i);
+                if (pin == null) continue;
+                if (pin.repository_id == "rmd" ||
+                    pin.repository_id == "LaurentiuStaicu/romanian-monetary-dynamics") {
+                    chart_pin = pin;
+                    break;
+                }
+            }
+            if (chart_pin == null) {
+                throw new GLib.IOError.FAILED (
+                    "BNR BLS C01 charts require RMD to be selected for this conversation. " +
+                    "Select RMD in Repository Scope and retry."
+                );
+            }
+            if (chart_pin.snapshot_sha != "e43eb4e899f123d3b1aa0f6e20b7c8ed35434170") {
+                throw new GLib.IOError.INVALID_DATA (
+                    "BNR BLS C01 is qualified only for the pinned RMD snapshot " +
+                    "e43eb4e899f123d3b1aa0f6e20b7c8ed35434170."
+                );
+            }
+            RepositoryDescriptor? descriptor =
+                repository_descriptor_for_id (chart_pin.repository_id);
+            if (descriptor == null) {
+                throw new GLib.IOError.NOT_FOUND (
+                    "The pinned RMD repository required for the BNR BLS C01 chart is unavailable."
+                );
+            }
+            string snapshot_path = RepositoryLifecycleService.snapshot_path (
+                descriptor, chart_pin.snapshot_sha
+            );
+            if (!GLib.FileUtils.test (snapshot_path, GLib.FileTest.IS_DIR)) {
+                throw new GLib.IOError.NOT_FOUND (
+                    "The pinned RMD snapshot required for the BNR BLS C01 chart is unavailable."
+                );
+            }
+            ChartNative.Spec spec;
+            if (!ChartNative.reconstruct_live_bnr_bls_c01 (
+                    snapshot_path, chart_pin.repository_id,
+                    chart_pin.snapshot_sha, "line", out spec
+                ) || spec == null) {
+                throw new GLib.IOError.INVALID_DATA (
+                    "The pinned BNR BLS C01 source could not be re-qualified."
+                );
+            }
+            string? scientific_id = spec.series_scientific_id (0);
+            string? qualified_id = spec.series_qualified_id (0);
+            string? chart_spec_id = spec.id ();
+            if (scientific_id == null || qualified_id == null || chart_spec_id == null) {
+                throw new GLib.IOError.INVALID_DATA (
+                    "The qualified BNR BLS C01 chart identities are unavailable."
+                );
+            }
+        }
+
+
         private Gtk.Widget[] build_live_chart_widgets (
             ConversationSession session,
             bool energy_institute,
+            bool bnr_bls_c01,
             out ConversationPersistenceChart[] charts
         ) throws GLib.Error {
             Gtk.Widget[] widgets = {};
