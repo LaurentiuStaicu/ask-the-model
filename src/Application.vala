@@ -6094,7 +6094,7 @@ namespace AskTheModel {
             string bnr_missing_provenance = bnr_view.provenance () ?? "";
             if (!bnr_missing_provenance.contains ("No numeric value is available; this is not zero.") ||
                 !bnr_missing_provenance.contains ("Reason: The source round was not retained.") ||
-                !bnr_missing_provenance.contains ("Source: BNR BLS C01 credit-standards net percentage") ||
+                !bnr_missing_provenance.contains ("Primary source: National Bank of Romania, Bank Lending Survey (BLS)") ||
                 bnr_missing_provenance.contains ("source_round_not_retained") ||
                 bnr_missing_provenance.contains ("Physical source row:") ||
                 bnr_missing_provenance.contains ("Snapshot:") ||
