@@ -12,6 +12,21 @@ static void settle (void)
     do { while (g_main_context_iteration (NULL, FALSE)); g_usleep (1000); }
     while (g_get_monotonic_time () < deadline);
 }
+static GtkExpander *find_expander (GtkWidget *widget)
+{
+    if (GTK_IS_EXPANDER (widget))
+        return GTK_EXPANDER (widget);
+
+    for (GtkWidget *child = gtk_widget_get_first_child (widget);
+         child != NULL;
+         child = gtk_widget_get_next_sibling (child)) {
+        GtkExpander *found = find_expander (child);
+        if (found != NULL)
+            return found;
+    }
+    return NULL;
+}
+
 static void screenshot (GtkWindow *window, const char *name)
 {
     const char *directory = g_getenv ("ATM_CHART03_GTK_OUTPUT"); if (!directory) return;
@@ -141,6 +156,10 @@ test_bnr_quarterly_data_and_missing_provenance (void)
     AtmChartView *view = build_bnr_view ();
     g_assert_false (g_object_is_floating (view));
     g_assert_cmpuint (atm_chart_view_row_count (view), ==, 12u);
+    GtkExpander *source_details = find_expander (GTK_WIDGET (view));
+    g_assert_nonnull (source_details);
+    g_assert_cmpstr (gtk_expander_get_label (source_details), ==, "Source details");
+    g_assert_true (gtk_expander_get_expanded (source_details));
     g_assert_cmpstr (atm_chart_view_visible_page (view), ==, "chart");
     const char *data = atm_chart_view_data (view);
     g_assert_nonnull (data);
