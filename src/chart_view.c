@@ -186,7 +186,7 @@ static void selection_changed (GObject *object, GParamSpec *pspec, gpointer data
         if (g_strcmp0 (c[2], "MISSING") == 0) {
             if (g_strcmp0 (c[1], "2025-Q2") != 0 || c[3][0] != '\0' ||
                 c[4][0] != '\0' || g_strcmp0 (c[5], "0") != 0 ||
-                g_strcmp0 (c[6], "0") != 0 ||
+                g_strcmp0 (c[6], "none") != 0 ||
                 g_strcmp0 (c[9], "source_round_not_retained") != 0) {
                 g_strfreev (c);
                 g_string_free (text, TRUE);
