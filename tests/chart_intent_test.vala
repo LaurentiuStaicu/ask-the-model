@@ -289,6 +289,21 @@ int main () {
     );
     assert (!bnr_romanian_comma_pib.bnr_bls_c01_requested);
 
+    var bnr_semicolon_gdp = AskTheModel.ChartIntent.parse (
+        "Generate a chart of credit standards; GDP."
+    );
+    assert (!bnr_semicolon_gdp.bnr_bls_c01_requested);
+
+    var bnr_alongside_gdp = AskTheModel.ChartIntent.parse (
+        "Generate a chart of credit standards alongside GDP."
+    );
+    assert (!bnr_alongside_gdp.bnr_bls_c01_requested);
+
+    var bnr_romanian_semicolon_pib = AskTheModel.ChartIntent.parse (
+        "Generează un grafic al standardelor de credit; PIB."
+    );
+    assert (!bnr_romanian_semicolon_pib.bnr_bls_c01_requested);
+
     var bnr_natural_derived = AskTheModel.ChartIntent.parse (
         "Generate a chart of the standard deviation of credit standards."
     );
