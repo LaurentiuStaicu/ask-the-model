@@ -210,13 +210,12 @@ test_bootstrap_and_reopen (void)
     AtmConversationStore *store = NULL;
     GError *error = NULL;
 
-    g_assert_true (
-        atm_conversation_store_open (
-            path,
-            &store,
-            &error
-        )
-    );
+    gboolean opened = atm_conversation_store_open (
+        path, &store, &error);
+    if (!opened)
+        g_printerr ("conversation-store bootstrap diagnostic: %s\\n",
+                    error != NULL ? error->message : "no error detail");
+    g_assert_true (opened);
     g_assert_no_error (error);
     g_assert_nonnull (store);
     g_assert_cmpint (
@@ -431,6 +430,30 @@ create_v3_store (
 }
 
 static void
+create_v4_store (
+    const char *path
+)
+{
+    create_v3_store (path);
+    GError *error = NULL;
+    GBytes *bytes = g_resources_lookup_data (
+        "/io/github/laurentiustaicu/ask_the_model/schemas/conversation-store-v3-to-v4.sql",
+        G_RESOURCE_LOOKUP_FLAGS_NONE, &error);
+    g_assert_no_error (error);
+    g_assert_nonnull (bytes);
+    gsize size = 0;
+    const char *data = g_bytes_get_data (bytes, &size);
+    g_assert_nonnull (data);
+    char *migration = g_strndup (data, size);
+    char *sql = g_strdup_printf (
+        "BEGIN IMMEDIATE;%sPRAGMA user_version=4;COMMIT;", migration);
+    raw_exec (path, sql);
+    g_free (sql);
+    g_free (migration);
+    g_bytes_unref (bytes);
+}
+
+static void
 insert_v3_gistemp_chart_fixture (
     const char *path
 )
@@ -486,7 +509,7 @@ insert_v3_gistemp_chart_fixture (
 }
 
 static void
-test_v3_to_v4_migration_preserves_chart_rows (void)
+test_v3_to_v5_migration_preserves_chart_rows (void)
 {
     char *root = new_temp_root ("atm-conversation-v3-v4-XXXXXX");
     char *path = store_path (root);
@@ -497,10 +520,10 @@ test_v3_to_v4_migration_preserves_chart_rows (void)
     GError *error = NULL;
     g_assert_true (atm_conversation_store_open (path, &store, &error));
     g_assert_no_error (error);
-    g_assert_cmpint (atm_conversation_store_schema_version (store), ==, 4);
+    g_assert_cmpint (atm_conversation_store_schema_version (store), ==, ATM_CONVERSATION_STORE_SCHEMA_VERSION);
     g_assert_true (atm_conversation_store_validate (store, &error));
     g_assert_no_error (error);
-    g_assert_cmpint (raw_int64 (path, "PRAGMA user_version;"), ==, 4);
+    g_assert_cmpint (raw_int64 (path, "PRAGMA user_version;"), ==, ATM_CONVERSATION_STORE_SCHEMA_VERSION);
     g_assert_cmpint (raw_int64 (path,
         "SELECT count(*) FROM message_charts WHERE chart_schema='atm-chart-spec/1' "
         "AND chart_spec_id='aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa' "
@@ -515,7 +538,7 @@ test_v3_to_v4_migration_preserves_chart_rows (void)
 
     char *schema_id = raw_text (path,
         "SELECT schema_id FROM installation WHERE singleton_id=1;");
-    g_assert_cmpstr (schema_id, ==, "atm-conversation-store/4");
+    g_assert_cmpstr (schema_id, ==, ATM_CONVERSATION_STORE_SCHEMA_ID);
     g_free (schema_id);
     atm_conversation_store_close (store);
     g_free (path);
@@ -567,7 +590,82 @@ test_v3_to_v4_migration_rollback (void)
 }
 
 static void
-test_v1_to_v4_migration (void)
+test_v4_to_v5_migration_preserves_chart_rows (void)
+{
+    char *root = new_temp_root ("atm-conversation-v4-v5-XXXXXX");
+    char *path = store_path (root);
+    create_v4_store (path);
+    insert_v3_gistemp_chart_fixture (path);
+
+    AtmConversationStore *store = NULL;
+    GError *error = NULL;
+    g_assert_true (atm_conversation_store_open (path, &store, &error));
+    g_assert_no_error (error);
+    g_assert_nonnull (store);
+    g_assert_cmpint (atm_conversation_store_schema_version (store), ==,
+                     ATM_CONVERSATION_STORE_SCHEMA_VERSION);
+    g_assert_true (atm_conversation_store_validate (store, &error));
+    g_assert_no_error (error);
+    g_assert_cmpint (raw_int64 (path, "PRAGMA user_version;"), ==,
+                     ATM_CONVERSATION_STORE_SCHEMA_VERSION);
+    g_assert_cmpint (raw_int64 (path,
+        "SELECT count(*) FROM message_charts WHERE chart_schema='atm-chart-spec/1' "
+        "AND reconstruction_profile='atm-chart-reconstruct/gistemp-complete-annual/1';"), ==, 1);
+    g_assert_cmpint (raw_int64 (path,
+        "SELECT count(*) FROM chart_series WHERE series_profile='atm-series/gistemp-complete-annual/1';"),
+        ==, 1);
+    g_assert_cmpint (raw_int64 (path, "SELECT count(*) FROM pragma_foreign_key_check;"), ==, 0);
+    char *schema_id = raw_text (path,
+        "SELECT schema_id FROM installation WHERE singleton_id=1;");
+    g_assert_cmpstr (schema_id, ==, ATM_CONVERSATION_STORE_SCHEMA_ID);
+    g_free (schema_id);
+
+    atm_conversation_store_close (store);
+    g_free (path);
+    remove_tree_best_effort (root);
+    g_free (root);
+}
+
+static void
+test_v4_to_v5_migration_rollback (void)
+{
+    char *root = new_temp_root ("atm-conversation-v4-v5-rollback-XXXXXX");
+    char *path = store_path (root);
+    create_v4_store (path);
+    insert_v3_gistemp_chart_fixture (path);
+    raw_exec (path,
+        "DROP TRIGGER chart_series_tuple_insert;"
+        "CREATE TRIGGER chart_series_tuple_insert "
+        "BEFORE INSERT ON messages BEGIN SELECT 1; END;");
+
+    AtmConversationStore *store = NULL;
+    GError *error = NULL;
+    g_assert_false (atm_conversation_store_open (path, &store, &error));
+    g_assert_nonnull (error);
+    g_assert_null (store);
+    g_assert_nonnull (g_strstr_len (error->message, -1,
+        "chart_series_tuple_insert"));
+    g_clear_error (&error);
+
+    g_assert_cmpint (raw_int64 (path, "PRAGMA user_version;"), ==, 4);
+    char *schema_id = raw_text (path,
+        "SELECT schema_id FROM installation WHERE singleton_id=1;");
+    g_assert_cmpstr (schema_id, ==, "atm-conversation-store/4");
+    g_free (schema_id);
+    g_assert_cmpint (raw_int64 (path, "SELECT count(*) FROM message_charts;"), ==, 1);
+    g_assert_cmpint (raw_int64 (path, "SELECT count(*) FROM chart_series;"), ==, 1);
+    g_assert_cmpint (raw_int64 (path, "SELECT count(*) FROM pragma_foreign_key_check;"), ==, 0);
+    g_assert_cmpint (raw_int64 (path,
+        "SELECT count(*) FROM sqlite_schema WHERE type='trigger' "
+        "AND name='chart_series_tuple_insert' AND tbl_name='messages';"), ==, 1);
+
+    g_free (path);
+    remove_tree_best_effort (root);
+    g_free (root);
+}
+
+static void
+test_v1_to_v5_migration (void)
 {
     char *root = new_temp_root (
         "atm-conversation-migration-XXXXXX"
@@ -751,7 +849,7 @@ test_v1_to_v3_migration_rollback (void)
 }
 
 static void
-test_v2_to_v4_migration (void)
+test_v2_to_v5_migration (void)
 {
     char *root = new_temp_root ("atm-conversation-v2-v3-XXXXXX");
     char *path = store_path (root);
@@ -1021,7 +1119,7 @@ test_newer_schema_rejected (void)
 
     raw_exec (
         path,
-        "PRAGMA user_version=5;"
+        "PRAGMA user_version=6;"
     );
 
     store = NULL;
@@ -2424,6 +2522,121 @@ test_archive_delete_lifecycle (void)
 }
 
 static void
+test_bnr_chart_recipe_v5_persistence (void)
+{
+    char *root = new_temp_root ("atm-conversation-bnr-chart-v5-XXXXXX");
+    char *path = store_path (root);
+    AtmConversationStore *store = NULL;
+    GError *error = NULL;
+    const char *sha = "e43eb4e899f123d3b1aa0f6e20b7c8ed35434170";
+    char *version = g_strconcat ("snapshot:", sha, NULL);
+
+    g_assert_true (atm_conversation_store_open (path, &store, &error));
+    g_assert_no_error (error);
+    AtmConversationRepositoryInput repository = {
+        .repository_id = "rmd",
+        .repository_version = version,
+        .snapshot_sha = sha
+    };
+    char *conversation_id = NULL;
+    g_assert_true (atm_conversation_store_create_conversation (
+        store, "BNR BLS C01 chart", 1, "model-a", NULL, 1,
+        &repository, 1, &conversation_id, &error));
+    g_assert_no_error (error);
+
+    AtmConversationCitationInput citation = {
+        .label = "BNR-S1",
+        .repository_id = "rmd",
+        .repository_version = version,
+        .snapshot_sha = sha,
+        .logical_source_id = "bnr-bls-c01-credit-standards",
+        .source_path = "data/processed/bnr_bls_realised_rounds.csv",
+        .locator = "2022-Q4..2025-Q3",
+        .title = "BNR BLS C01 credit standards",
+        .excerpt = "Pinned quarterly source observations",
+        .immutable_permalink = NULL
+    };
+    gint64 turn = -1;
+    g_assert_true (atm_conversation_store_commit_turn (
+        store, conversation_id, "/chart bnr-bls-c01",
+        "qualified BNR chart", "qualified BNR chart", TRUE, 2,
+        &citation, 1, &turn, &error));
+    g_assert_no_error (error);
+    g_assert_cmpint (turn, ==, 0);
+
+    AtmConversationChartSeriesInput series = {
+        .series_profile = "atm-series/bnr-bls-c01-calendar-quarter/1",
+        .admission_profile = "atm-bnr-bls-canonical-panel-admission/1",
+        .scientific_id = "bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb",
+        .qualified_id = "cccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccc",
+        .repository_id = "rmd",
+        .repository_version = version,
+        .snapshot_sha = sha,
+        .source_path = "data/processed/bnr_bls_realised_rounds.csv"
+    };
+    AtmConversationChartInput chart = {
+        .ordinal = 1,
+        .chart_schema = "atm-chart-spec/3",
+        .chart_spec_id = "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+        .chart_kind = "line",
+        .reconstruction_profile = "atm-chart-reconstruct/bnr-bls-c01-calendar-quarter/1",
+        .series = &series,
+        .series_count = 1
+    };
+    g_assert_true (atm_conversation_store_attach_chart (
+        store, conversation_id, turn, &chart, &error));
+    g_assert_no_error (error);
+    g_assert_true (atm_conversation_store_validate (store, &error));
+    g_assert_no_error (error);
+
+    AtmConversationChartSeriesInput wrong = series;
+    wrong.snapshot_sha = "1111111111111111111111111111111111111111";
+    wrong.repository_version = "snapshot:1111111111111111111111111111111111111111";
+    AtmConversationChartInput bad_chart = chart;
+    bad_chart.ordinal = 2;
+    bad_chart.series = &wrong;
+    g_assert_false (atm_conversation_store_attach_chart (
+        store, conversation_id, turn, &bad_chart, &error));
+    g_assert_error (error, ATM_CONVERSATION_STORE_ERROR,
+                    ATM_CONVERSATION_STORE_ERROR_ARGUMENT);
+    g_clear_error (&error);
+
+    atm_conversation_store_close (store);
+    store = NULL;
+    g_assert_true (atm_conversation_store_open (path, &store, &error));
+    g_assert_no_error (error);
+    AtmConversationSnapshot *snapshot = NULL;
+    g_assert_true (atm_conversation_store_load_snapshot (
+        store, conversation_id, &snapshot, &error));
+    g_assert_no_error (error);
+    g_assert_cmpint (atm_conversation_store_schema_version (store), ==,
+                     ATM_CONVERSATION_STORE_SCHEMA_VERSION);
+    g_assert_cmpuint (atm_conversation_snapshot_message_chart_count_at (
+        snapshot, 1u), ==, 1u);
+    g_assert_cmpstr (atm_conversation_snapshot_chart_schema_at (
+        snapshot, 1u, 0u), ==, "atm-chart-spec/3");
+    g_assert_cmpstr (atm_conversation_snapshot_chart_reconstruction_profile_at (
+        snapshot, 1u, 0u), ==,
+        "atm-chart-reconstruct/bnr-bls-c01-calendar-quarter/1");
+    g_assert_cmpstr (atm_conversation_snapshot_chart_series_profile_at (
+        snapshot, 1u, 0u, 0u), ==, series.series_profile);
+    g_assert_cmpstr (atm_conversation_snapshot_chart_series_repository_id_at (
+        snapshot, 1u, 0u, 0u), ==, "rmd");
+    g_assert_cmpstr (atm_conversation_snapshot_chart_series_snapshot_sha_at (
+        snapshot, 1u, 0u, 0u), ==, sha);
+    g_assert_cmpstr (atm_conversation_snapshot_chart_series_source_path_at (
+        snapshot, 1u, 0u, 0u), ==, series.source_path);
+    atm_conversation_snapshot_free (snapshot);
+    atm_conversation_store_close (store);
+
+    g_free (conversation_id);
+    g_free (version);
+    g_free (path);
+    remove_tree_best_effort (root);
+    g_free (root);
+}
+
+static void
 test_chart_binding_write_load (void)
 {
     char *root = new_temp_root ("atm-conversation-chart-binding-XXXXXX");
@@ -2557,8 +2770,8 @@ test_chart_binding_write_load (void)
     );
     g_clear_error (&error);
 
-    /* The v4 allowlist admits the source-bound EI v2 tuple, but not cross-paired
-     * schema/reconstruction/series/admission profiles or unpinned snapshots. */
+    /* The schema-v5 allowlist admits the source-bound EI v2 tuple, but not
+     * cross-paired schema/reconstruction/series/admission profiles or unpinned snapshots. */
     const char *ei_snapshot = "d9e249339663015f6d1c05752338a955bf64ad0b";
     const char *ei_repository_version = "0.1.0";
     const char *ei_version =
@@ -3059,28 +3272,36 @@ main (int argc, char **argv)
         test_bootstrap_and_reopen
     );
     g_test_add_func (
-        "/conversation-store/v1-to-v4-migration",
-        test_v1_to_v4_migration
+        "/conversation-store/v1-to-v5-migration",
+        test_v1_to_v5_migration
     );
     g_test_add_func (
         "/conversation-store/v1-to-v3-rollback",
         test_v1_to_v3_migration_rollback
     );
     g_test_add_func (
-        "/conversation-store/v2-to-v4-migration",
-        test_v2_to_v4_migration
+        "/conversation-store/v2-to-v5-migration",
+        test_v2_to_v5_migration
     );
     g_test_add_func (
         "/conversation-store/v2-to-v3-rollback",
         test_v2_to_v3_migration_rollback
     );
     g_test_add_func (
-        "/conversation-store/v3-to-v4-migration",
-        test_v3_to_v4_migration_preserves_chart_rows
+        "/conversation-store/v3-to-v5-migration",
+        test_v3_to_v5_migration_preserves_chart_rows
     );
     g_test_add_func (
         "/conversation-store/v3-to-v4-rollback",
         test_v3_to_v4_migration_rollback
+    );
+    g_test_add_func (
+        "/conversation-store/v4-to-v5-migration",
+        test_v4_to_v5_migration_preserves_chart_rows
+    );
+    g_test_add_func (
+        "/conversation-store/v4-to-v5-rollback",
+        test_v4_to_v5_migration_rollback
     );
     g_test_add_func (
         "/conversation-store/chart-recipe-semantics",
@@ -3117,6 +3338,10 @@ main (int argc, char **argv)
     g_test_add_func (
         "/conversation-store/archive-delete-lifecycle",
         test_archive_delete_lifecycle
+    );
+    g_test_add_func (
+        "/conversation-store/bnr-chart-v5-persistence",
+        test_bnr_chart_recipe_v5_persistence
     );
     g_test_add_func (
         "/conversation-store/chart-binding-write-load",

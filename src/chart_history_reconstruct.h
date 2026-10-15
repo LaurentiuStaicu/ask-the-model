@@ -69,4 +69,34 @@ gboolean atm_chart_live_reconstruct_gistemp (
     GError **error
 );
 
+/* Reconstruct a persisted BNR BLS C01 ChartSpec v3 from the exact five-file
+ * pinned RMD source bundle. No numeric point or raster state is persisted. */
+gboolean atm_chart_history_reconstruct_bnr_bls_c01 (
+    const char *snapshot_path,
+    const char *repository_id,
+    const char *repository_version,
+    const char *snapshot_sha,
+    const char *chart_schema,
+    const char *chart_spec_id,
+    const char *chart_kind,
+    const char *reconstruction_profile,
+    const char *series_profile,
+    const char *admission_profile,
+    const char *scientific_id,
+    const char *qualified_id,
+    const char *source_path,
+    AtmChartSpec **out,
+    GError **error
+);
+
+/* Build a live BNR C01 spec only from the exact, pinned five-file RMD bundle. */
+gboolean atm_chart_live_reconstruct_bnr_bls_c01 (
+    const char *snapshot_path,
+    const char *repository_id,
+    const char *snapshot_sha,
+    const char *chart_kind,
+    AtmChartSpec **out,
+    GError **error
+);
+
 G_END_DECLS

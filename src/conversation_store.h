@@ -5,8 +5,8 @@
 G_BEGIN_DECLS
 
 #define ATM_CONVERSATION_STORE_APPLICATION_ID 0x41544331
-#define ATM_CONVERSATION_STORE_SCHEMA_VERSION 4
-#define ATM_CONVERSATION_STORE_SCHEMA_ID "atm-conversation-store/4"
+#define ATM_CONVERSATION_STORE_SCHEMA_VERSION 5
+#define ATM_CONVERSATION_STORE_SCHEMA_ID "atm-conversation-store/5"
 
 typedef enum {
     ATM_CONVERSATION_STORE_ERROR_ARGUMENT,
@@ -135,7 +135,7 @@ gboolean atm_conversation_store_attach_chart (
 );
 
 /* Value-wrapper for Vala/FFI callers. This does not broaden the admitted
- * persistence profile: v3 still accepts one qualified GISTEMP series only. */
+ * persistence profile beyond these explicitly qualified chart profiles. */
 gboolean atm_conversation_store_attach_chart_values (
     AtmConversationStore *store,
     const char *conversation_id,

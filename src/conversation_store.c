@@ -7,9 +7,11 @@
 #include <string.h>
 
 #define ATM_CONVERSATION_STORE_SCHEMA_RESOURCE \
-    "/io/github/laurentiustaicu/ask_the_model/schemas/conversation-store-v4.sql"
+    "/io/github/laurentiustaicu/ask_the_model/schemas/conversation-store-v5.sql"
 #define ATM_CONVERSATION_STORE_MIGRATION_V3_V4_RESOURCE \
     "/io/github/laurentiustaicu/ask_the_model/schemas/conversation-store-v3-to-v4.sql"
+#define ATM_CONVERSATION_STORE_MIGRATION_V4_V5_RESOURCE \
+    "/io/github/laurentiustaicu/ask_the_model/schemas/conversation-store-v4-to-v5.sql"
 #define ATM_CONVERSATION_STORE_MIGRATION_V1_V2_RESOURCE \
     "/io/github/laurentiustaicu/ask_the_model/schemas/conversation-store-v1-to-v2.sql"
 #define ATM_CONVERSATION_STORE_MIGRATION_V2_V3_RESOURCE \
@@ -20,6 +22,8 @@
 #define ATM_CONVERSATION_STORE_SCHEMA_V2_VERSION 2
 #define ATM_CONVERSATION_STORE_SCHEMA_V3_ID "atm-conversation-store/3"
 #define ATM_CONVERSATION_STORE_SCHEMA_V3_VERSION 3
+#define ATM_CONVERSATION_STORE_SCHEMA_V4_ID "atm-conversation-store/4"
+#define ATM_CONVERSATION_STORE_SCHEMA_V4_VERSION 4
 
 struct AtmConversationStore {
     sqlite3 *db;
@@ -431,6 +435,20 @@ load_migration_v3_v4_sql (
     return load_sql_resource (
         ATM_CONVERSATION_STORE_MIGRATION_V3_V4_RESOURCE,
         "v3-to-v4 migration",
+        out_sql,
+        error
+    );
+}
+
+static gboolean
+load_migration_v4_v5_sql (
+    char **out_sql,
+    GError **error
+)
+{
+    return load_sql_resource (
+        ATM_CONVERSATION_STORE_MIGRATION_V4_V5_RESOURCE,
+        "v4-to-v5 migration",
         out_sql,
         error
     );
@@ -1159,7 +1177,9 @@ validate_chart_semantics (
             "(c.chart_schema='atm-chart-spec/1' AND "
             " c.reconstruction_profile='atm-chart-reconstruct/gistemp-complete-annual/1') OR "
             "(c.chart_schema='atm-chart-spec/2' AND "
-            " c.reconstruction_profile='atm-chart-reconstruct/energy-institute-tes-complete-annual/1')"
+            " c.reconstruction_profile='atm-chart-reconstruct/energy-institute-tes-complete-annual/1') OR "
+            "(c.chart_schema='atm-chart-spec/3' AND "
+            " c.reconstruction_profile='atm-chart-reconstruct/bnr-bls-c01-calendar-quarter/1')"
             ");",
             &invalid_chart_tuple,
             error
@@ -1195,10 +1215,11 @@ validate_chart_semantics (
             "AND r.snapshot_sha=s.snapshot_sha "
             "AND ("
             " (c.chart_schema='atm-chart-spec/1' AND r.repository_version=s.repository_version) OR "
-            " (c.chart_schema='atm-chart-spec/2' AND s.repository_version='snapshot:' || s.snapshot_sha)"
+            " (c.chart_schema='atm-chart-spec/2' AND s.repository_version='snapshot:' || s.snapshot_sha) OR "
+            " (c.chart_schema='atm-chart-spec/3' AND s.repository_version='snapshot:' || s.snapshot_sha)"
             ") "
             "WHERE r.repository_id IS NULL "
-            "OR s.repository_id!='ewd' "
+            "OR s.repository_id NOT IN ('ewd','rmd') "
             "OR NOT ("
             "(c.chart_schema='atm-chart-spec/1' AND "
             " c.reconstruction_profile='atm-chart-reconstruct/gistemp-complete-annual/1' AND "
@@ -1214,6 +1235,14 @@ validate_chart_semantics (
             "   s.repository_version='snapshot:d9e249339663015f6d1c05752338a955bf64ad0b') OR "
             "  (s.snapshot_sha='dc710d8e604c0fff713a3acfdb18ab47a1a902bb' AND "
             "   s.repository_version='snapshot:dc710d8e604c0fff713a3acfdb18ab47a1a902bb')))"
+            " OR (c.chart_schema='atm-chart-spec/3' AND "
+            " c.reconstruction_profile='atm-chart-reconstruct/bnr-bls-c01-calendar-quarter/1' AND "
+            " s.series_profile='atm-series/bnr-bls-c01-calendar-quarter/1' AND "
+            " s.admission_profile='atm-bnr-bls-canonical-panel-admission/1' AND "
+            " s.repository_id='rmd' AND "
+            " s.source_path='data/processed/bnr_bls_realised_rounds.csv' AND "
+            " s.snapshot_sha='e43eb4e899f123d3b1aa0f6e20b7c8ed35434170' AND "
+            " s.repository_version='snapshot:e43eb4e899f123d3b1aa0f6e20b7c8ed35434170')"
             ");",
             &invalid_chart_provenance,
             error
@@ -1360,12 +1389,14 @@ chart_series_input_is_valid (
     if (series == NULL ||
         !is_hex64 (series->scientific_id) ||
         !is_hex64 (series->qualified_id) ||
-        g_strcmp0 (series->repository_id, "ewd") != 0 ||
+        (g_strcmp0 (series->repository_id, "ewd") != 0 &&
+         g_strcmp0 (series->repository_id, "rmd") != 0) ||
         !is_sha40 (series->snapshot_sha))
         return FALSE;
 
     if (g_strcmp0 (chart_schema, "atm-chart-spec/1") == 0) {
         return
+            g_strcmp0 (series->repository_id, "ewd") == 0 &&
             g_strcmp0 (series->series_profile,
                 "atm-series/gistemp-complete-annual/1") == 0 &&
             g_strcmp0 (series->admission_profile,
@@ -1383,6 +1414,7 @@ chart_series_input_is_valid (
         char *expected_version = g_strconcat ("snapshot:", snapshot, NULL);
         gboolean valid =
             admitted_snapshot &&
+            g_strcmp0 (series->repository_id, "ewd") == 0 &&
             g_strcmp0 (series->series_profile,
                 "atm-series/energy-institute-tes-complete-annual/1") == 0 &&
             g_strcmp0 (series->admission_profile,
@@ -1392,6 +1424,21 @@ chart_series_input_is_valid (
                 "science/data/processed/energy_institute_global_2026.csv") == 0;
         g_free (expected_version);
         return valid;
+    }
+
+    if (g_strcmp0 (chart_schema, "atm-chart-spec/3") == 0) {
+        return
+            g_strcmp0 (series->repository_id, "rmd") == 0 &&
+            g_strcmp0 (series->series_profile,
+                "atm-series/bnr-bls-c01-calendar-quarter/1") == 0 &&
+            g_strcmp0 (series->admission_profile,
+                "atm-bnr-bls-canonical-panel-admission/1") == 0 &&
+            g_strcmp0 (series->repository_version,
+                "snapshot:e43eb4e899f123d3b1aa0f6e20b7c8ed35434170") == 0 &&
+            g_strcmp0 (series->snapshot_sha,
+                "e43eb4e899f123d3b1aa0f6e20b7c8ed35434170") == 0 &&
+            g_strcmp0 (series->source_path,
+                "data/processed/bnr_bls_realised_rounds.csv") == 0;
     }
 
     return FALSE;
@@ -1419,6 +1466,10 @@ chart_input_is_valid (
     if (g_strcmp0 (chart->chart_schema, "atm-chart-spec/2") == 0)
         return g_strcmp0 (chart->reconstruction_profile,
             "atm-chart-reconstruct/energy-institute-tes-complete-annual/1") == 0;
+
+    if (g_strcmp0 (chart->chart_schema, "atm-chart-spec/3") == 0)
+        return g_strcmp0 (chart->reconstruction_profile,
+            "atm-chart-reconstruct/bnr-bls-c01-calendar-quarter/1") == 0;
 
     return FALSE;
 }
@@ -2600,6 +2651,52 @@ validate_v3_for_migration (
 }
 
 static gboolean
+validate_v4_for_migration (
+    sqlite3 *db,
+    GError **error
+)
+{
+    static const char *required_tables[] = {
+        "installation", "conversations", "conversation_repositories",
+        "messages", "citations", "message_charts", "chart_series"
+    };
+    gint64 application_id = 0;
+    gint64 user_version = 0;
+    for (gsize i = 0; i < G_N_ELEMENTS (required_tables); i++) {
+        if (!required_table_exists (db, required_tables[i], error))
+            return FALSE;
+    }
+    if (!query_single_int64 (db, "PRAGMA application_id;", &application_id, error) ||
+        !query_single_int64 (db, "PRAGMA user_version;", &user_version, error))
+        return FALSE;
+    if (application_id != (gint64) ATM_CONVERSATION_STORE_APPLICATION_ID ||
+        user_version != ATM_CONVERSATION_STORE_SCHEMA_V4_VERSION) {
+        g_set_error_literal (error, ATM_CONVERSATION_STORE_ERROR,
+            ATM_CONVERSATION_STORE_ERROR_SCHEMA,
+            "Conversation-store v4 identity/version is invalid for migration.");
+        return FALSE;
+    }
+    char *schema_id = NULL;
+    if (!query_single_text (db,
+            "SELECT schema_id FROM installation WHERE singleton_id=1;",
+            &schema_id, error))
+        return FALSE;
+    gboolean schema_ok =
+        g_strcmp0 (schema_id, ATM_CONVERSATION_STORE_SCHEMA_V4_ID) == 0;
+    g_free (schema_id);
+    if (!schema_ok) {
+        g_set_error_literal (error, ATM_CONVERSATION_STORE_ERROR,
+            ATM_CONVERSATION_STORE_ERROR_SCHEMA,
+            "Conversation-store v4 schema identity is invalid for migration.");
+        return FALSE;
+    }
+    return validate_integrity (db, error) &&
+        validate_base_semantics (db, error) &&
+        validate_chart_semantics (db, error);
+}
+
+
+static gboolean
 migrate_v1_to_v3 (
     AtmConversationStore *store,
     GError **error
@@ -2760,6 +2857,54 @@ migrate_v3_to_v4 (
         goto rollback;
 
     char *version_sql = g_strdup_printf ("PRAGMA user_version=%d;",
+        ATM_CONVERSATION_STORE_SCHEMA_V4_VERSION);
+    if (!exec_sql (store->db, version_sql, error)) {
+        g_free (version_sql);
+        goto rollback;
+    }
+    g_free (version_sql);
+
+    if (!validate_v4_for_migration (store->db, error))
+        goto rollback;
+    if (!exec_sql (store->db, "COMMIT;", error))
+        goto rollback;
+
+    ok = TRUE;
+rollback:
+    if (!ok)
+        sqlite3_exec (store->db, "ROLLBACK;", NULL, NULL, NULL);
+    g_free (migration_sql);
+    return ok;
+}
+
+static gboolean
+migrate_v4_to_v5 (
+    AtmConversationStore *store,
+    GError **error
+)
+{
+    if (store == NULL || store->db == NULL) {
+        g_set_error_literal (error, ATM_CONVERSATION_STORE_ERROR,
+            ATM_CONVERSATION_STORE_ERROR_ARGUMENT,
+            "Conversation-store schema migration requires an open store.");
+        return FALSE;
+    }
+    if (!validate_v4_for_migration (store->db, error))
+        return FALSE;
+
+    char *migration_sql = NULL;
+    if (!load_migration_v4_v5_sql (&migration_sql, error))
+        return FALSE;
+    if (!exec_sql (store->db, "BEGIN IMMEDIATE;", error)) {
+        g_free (migration_sql);
+        return FALSE;
+    }
+
+    gboolean ok = FALSE;
+    if (!exec_sql (store->db, migration_sql, error))
+        goto rollback;
+
+    char *version_sql = g_strdup_printf ("PRAGMA user_version=%d;",
         ATM_CONVERSATION_STORE_SCHEMA_VERSION);
     if (!exec_sql (store->db, version_sql, error)) {
         g_free (version_sql);
@@ -2779,6 +2924,7 @@ rollback:
     g_free (migration_sql);
     return ok;
 }
+
 
 gboolean
 atm_conversation_store_open (
@@ -2929,7 +3075,8 @@ atm_conversation_store_open (
             ATM_CONVERSATION_STORE_SCHEMA_V1_VERSION
     ) {
         if (!migrate_v1_to_v3 (store, error) ||
-            !migrate_v3_to_v4 (store, error)) {
+            !migrate_v3_to_v4 (store, error) ||
+            !migrate_v4_to_v5 (store, error)) {
             atm_conversation_store_close (store);
             return FALSE;
         }
@@ -2938,14 +3085,23 @@ atm_conversation_store_open (
             ATM_CONVERSATION_STORE_SCHEMA_V2_VERSION
     ) {
         if (!migrate_v2_to_v3 (store, error) ||
-            !migrate_v3_to_v4 (store, error)) {
+            !migrate_v3_to_v4 (store, error) ||
+            !migrate_v4_to_v5 (store, error)) {
             atm_conversation_store_close (store);
             return FALSE;
         }
     } else if (
         user_version == ATM_CONVERSATION_STORE_SCHEMA_V3_VERSION
     ) {
-        if (!migrate_v3_to_v4 (store, error)) {
+        if (!migrate_v3_to_v4 (store, error) ||
+            !migrate_v4_to_v5 (store, error)) {
+            atm_conversation_store_close (store);
+            return FALSE;
+        }
+    } else if (
+        user_version == ATM_CONVERSATION_STORE_SCHEMA_V4_VERSION
+    ) {
+        if (!migrate_v4_to_v5 (store, error)) {
             atm_conversation_store_close (store);
             return FALSE;
         }
@@ -3676,7 +3832,8 @@ atm_conversation_store_attach_chart (
             "AND snapshot_sha=?4 "
             "AND ("
             " (?5='atm-chart-spec/1' AND repository_version=?3) OR "
-            " (?5='atm-chart-spec/2' AND ?3=('snapshot:' || ?4))"
+            " (?5='atm-chart-spec/2' AND ?3=('snapshot:' || ?4)) OR "
+            " (?5='atm-chart-spec/3' AND ?3=('snapshot:' || ?4))"
             ");",
             &statement,
             error

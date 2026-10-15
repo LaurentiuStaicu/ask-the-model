@@ -3060,7 +3060,10 @@ chart_history_reconstruct_test = executable(
   install: false
 )
 test('chart-history-reconstruct', chart_history_reconstruct_test,
-  env: {'ATM_CHART01_FIXTURE': meson.current_source_dir() / 'tests/fixtures/chart01'})
+  env: {
+    'ATM_CHART01_FIXTURE': meson.current_source_dir() / 'tests/fixtures/chart01',
+    'ATM_BNR_BLS_FIXTURE': meson.current_source_dir() / 'tests/fixtures/chart01/rmd-bnr-bls'
+  })
 
 # PRES-09: durable chart recipe survives close/reopen and is re-qualified from the pinned source.
 pres09_chart_history_e2e_test = executable(

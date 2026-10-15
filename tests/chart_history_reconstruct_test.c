@@ -2,6 +2,7 @@
 #include "verified_series.h"
 #include "energy_institute_admission.h"
 #include "energy_institute_verified_series.h"
+#include "bnr_bls_verified_series.h"
 #include <glib.h>
 #include <glib/gstdio.h>
 
@@ -555,6 +556,168 @@ test_ei_history_reconstructs_pinned_snapshots (void)
     g_free (qualified_ids[1]);
 }
 
+
+static char *
+make_bnr_history_snapshot (void)
+{
+    static const char *fixture_names[ATM_BNR_BLS_SOURCE_COUNT] = {
+        "bnr_bls_realised_rounds.csv",
+        "processed_data_inventory_registry.json",
+        "bnr_bls_canonical_panel_promotion_review.json",
+        "bnr_bls_cross_round_mapping_audit.json",
+        "bnr_bls_missing_round_semantic_mapping_audit.json"
+    };
+    static const char *source_paths[ATM_BNR_BLS_SOURCE_COUNT] = {
+        "data/processed/bnr_bls_realised_rounds.csv",
+        "data/provenance/processed_data_inventory_registry.json",
+        "model/calibration_validation/bnr_bls_canonical_panel_promotion_review.json",
+        "model/calibration_validation/bnr_bls_cross_round_mapping_audit.json",
+        "model/calibration_validation/bnr_bls_missing_round_semantic_mapping_audit.json"
+    };
+    const char *root = g_getenv ("ATM_BNR_BLS_FIXTURE");
+    g_assert_nonnull (root);
+    GError *error = NULL;
+    char *snapshot = g_dir_make_tmp ("atm-bnr-history-XXXXXX", &error);
+    g_assert_no_error (error);
+    g_assert_nonnull (snapshot);
+
+    for (guint i = 0; i < ATM_BNR_BLS_SOURCE_COUNT; i++) {
+        char *source = g_build_filename (root, fixture_names[i], NULL);
+        char *contents = NULL;
+        gsize length = 0;
+        g_assert_true (g_file_get_contents (source, &contents, &length, &error));
+        g_assert_no_error (error);
+        char *destination = g_build_filename (snapshot, source_paths[i], NULL);
+        char *parent = g_path_get_dirname (destination);
+        g_assert_cmpint (g_mkdir_with_parents (parent, 0700), ==, 0);
+        g_assert_true (g_file_set_contents (destination, contents, (gssize) length, &error));
+        g_assert_no_error (error);
+        g_free (parent);
+        g_free (destination);
+        g_free (contents);
+        g_free (source);
+    }
+    return snapshot;
+}
+
+static void
+remove_bnr_history_snapshot (const char *snapshot)
+{
+    static const char *const paths[ATM_BNR_BLS_SOURCE_COUNT] = {
+        "data/processed/bnr_bls_realised_rounds.csv",
+        "data/provenance/processed_data_inventory_registry.json",
+        "model/calibration_validation/bnr_bls_canonical_panel_promotion_review.json",
+        "model/calibration_validation/bnr_bls_cross_round_mapping_audit.json",
+        "model/calibration_validation/bnr_bls_missing_round_semantic_mapping_audit.json"
+    };
+    for (guint i = 0; i < ATM_BNR_BLS_SOURCE_COUNT; i++) {
+        char *path = g_build_filename (snapshot, paths[i], NULL);
+        g_remove (path);
+        g_free (path);
+    }
+    char *path = g_build_filename (snapshot, "model", "calibration_validation", NULL);
+    g_rmdir (path); g_free (path);
+    path = g_build_filename (snapshot, "model", NULL); g_rmdir (path); g_free (path);
+    path = g_build_filename (snapshot, "data", "processed", NULL); g_rmdir (path); g_free (path);
+    path = g_build_filename (snapshot, "data", "provenance", NULL); g_rmdir (path); g_free (path);
+    path = g_build_filename (snapshot, "data", NULL); g_rmdir (path); g_free (path);
+    g_rmdir (snapshot);
+}
+
+static void
+test_bnr_c01_history_reconstructs_pinned_snapshot (void)
+{
+    char *snapshot = make_bnr_history_snapshot ();
+    const char *sha = ATM_BNR_BLS_SNAPSHOT_SHA;
+    char *version = g_strconcat ("snapshot:", sha, NULL);
+    AtmChartSpec *live = NULL;
+    AtmChartSpec *restored = NULL;
+    GError *error = NULL;
+
+    g_assert_true (atm_chart_live_reconstruct_bnr_bls_c01 (
+        snapshot, "rmd", sha, "LINE", &live, &error));
+    g_assert_no_error (error);
+    g_assert_nonnull (live);
+    g_assert_cmpint (atm_chart_spec_version (live), ==,
+                     ATM_CHART_SPEC_VERSION_BNR_BLS_C01_V3);
+    g_assert_cmpstr (atm_chart_spec_schema (live), ==, ATM_CHART_SPEC_V3_SCHEMA);
+    g_assert_cmpuint (atm_chart_spec_point_count (live, 0), ==, 12u);
+    g_assert_cmpstr (atm_chart_spec_series_profile (live), ==,
+                     ATM_BNR_BLS_VERIFIED_SERIES_PROFILE);
+    g_assert_cmpstr (atm_chart_spec_series_snapshot_sha (live, 0), ==, sha);
+    g_assert_cmpstr (atm_chart_spec_series_source_path (live, 0), ==,
+                     "data/processed/bnr_bls_realised_rounds.csv");
+
+    AtmChartPointView missing = {0};
+    g_assert_true (atm_chart_spec_point (live, 0, 10u, &missing));
+    g_assert_cmpstr (missing.calendar_quarter, ==, "2025-Q2");
+    g_assert_cmpint (missing.y_status, ==, ATM_CHART_POINT_MISSING);
+    g_assert_cmpstr (missing.missing_reason, ==, ATM_BNR_BLS_MISSING_REASON);
+    g_assert_null (missing.source_decimal);
+    g_assert_cmpuint (missing.source_row, ==, 0u);
+
+    g_assert_true (atm_chart_history_reconstruct_bnr_bls_c01 (
+        snapshot, "rmd", version, sha,
+        ATM_CHART_SPEC_V3_SCHEMA, atm_chart_spec_id (live), "line",
+        "atm-chart-reconstruct/bnr-bls-c01-calendar-quarter/1",
+        ATM_BNR_BLS_VERIFIED_SERIES_PROFILE, ATM_BNR_BLS_PROFILE,
+        atm_chart_spec_series_scientific_id (live, 0),
+        atm_chart_spec_series_qualified_id (live, 0),
+        "data/processed/bnr_bls_realised_rounds.csv",
+        &restored, &error));
+    g_assert_no_error (error);
+    g_assert_nonnull (restored);
+    g_assert_cmpstr (atm_chart_spec_id (restored), ==, atm_chart_spec_id (live));
+    g_assert_cmpstr (atm_chart_spec_series_scientific_id (restored, 0), ==,
+                     atm_chart_spec_series_scientific_id (live, 0));
+    g_assert_cmpstr (atm_chart_spec_series_qualified_id (restored, 0), ==,
+                     atm_chart_spec_series_qualified_id (live, 0));
+
+    AtmChartSpec *rejected = NULL;
+    g_assert_false (atm_chart_history_reconstruct_bnr_bls_c01 (
+        snapshot, "rmd", version, sha,
+        ATM_CHART_SPEC_V3_SCHEMA,
+        "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+        "line", "atm-chart-reconstruct/bnr-bls-c01-calendar-quarter/1",
+        ATM_BNR_BLS_VERIFIED_SERIES_PROFILE, ATM_BNR_BLS_PROFILE,
+        atm_chart_spec_series_scientific_id (live, 0),
+        atm_chart_spec_series_qualified_id (live, 0),
+        "data/processed/bnr_bls_realised_rounds.csv", &rejected, &error));
+    g_assert_error (error, ATM_SRA_ERROR, ATM_SRA_ERROR_IDENTITY);
+    g_assert_null (rejected);
+    g_clear_error (&error);
+
+    char *missing_file = g_build_filename (snapshot,
+        "model/calibration_validation/bnr_bls_cross_round_mapping_audit.json", NULL);
+    g_assert_cmpint (g_remove (missing_file), ==, 0);
+    g_assert_false (atm_chart_history_reconstruct_bnr_bls_c01 (
+        snapshot, "rmd", version, sha,
+        ATM_CHART_SPEC_V3_SCHEMA, atm_chart_spec_id (live), "line",
+        "atm-chart-reconstruct/bnr-bls-c01-calendar-quarter/1",
+        ATM_BNR_BLS_VERIFIED_SERIES_PROFILE, ATM_BNR_BLS_PROFILE,
+        atm_chart_spec_series_scientific_id (live, 0),
+        atm_chart_spec_series_qualified_id (live, 0),
+        "data/processed/bnr_bls_realised_rounds.csv", &rejected, &error));
+    g_assert_error (error, G_FILE_ERROR, G_FILE_ERROR_NOENT);
+    g_assert_null (rejected);
+    g_clear_error (&error);
+    atm_chart_spec_free (restored);
+    atm_chart_spec_free (live);
+    g_free (version);
+    /* Rebuild the deleted member so the deterministic cleanup owns the full tree. */
+    const char *fixture_root = g_getenv ("ATM_BNR_BLS_FIXTURE");
+    char *fixture = g_build_filename (fixture_root, "bnr_bls_cross_round_mapping_audit.json", NULL);
+    char *contents = NULL;
+    gsize length = 0;
+    g_assert_true (g_file_get_contents (fixture, &contents, &length, &error));
+    g_assert_no_error (error);
+    g_assert_true (g_file_set_contents (missing_file, contents, (gssize) length, &error));
+    g_assert_no_error (error);
+    g_free (contents); g_free (fixture); g_free (missing_file);
+    remove_bnr_history_snapshot (snapshot);
+    g_free (snapshot);
+}
+
 int
 main (int argc, char **argv)
 {
@@ -574,6 +737,10 @@ main (int argc, char **argv)
     g_test_add_func (
         "/chart/history-reconstruct/energy-institute-pinned-snapshots",
         test_ei_history_reconstructs_pinned_snapshots
+    );
+    g_test_add_func (
+        "/chart/history-reconstruct/bnr-c01-pinned-snapshot",
+        test_bnr_c01_history_reconstructs_pinned_snapshot
     );
     return g_test_run ();
 }
