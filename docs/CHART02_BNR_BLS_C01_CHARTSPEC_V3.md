@@ -1,6 +1,6 @@
 # CHART-02 BNR BLS C01 ChartSpec v3
 
-Status: native source-bound specification in a review candidate. This is not a display/rendering or application qualification.
+Status: the source-bound ChartSpec v3 layer was integrated by PR #472 and is consumed by the bounded BNR C01 renderer and application route on development `main`. This page isolates the specification contract and is not a release declaration.
 
 ## Scope and admission
 
@@ -33,4 +33,4 @@ No interpolation, zero imputation, smoothing, arbitrary gaps, generalized discon
 
 The source-specific constructor owns an independent reconstruction. Validation/rebuild recomputes the canonical identity and extents. Native tests cover source-bound identity stability, line/scatter identity separation, explicit quarter coordinates and extents, exact numeric source spellings, the one missing point and fail-closed tampering.
 
-This stage does not change the production chart renderer, GTK application route, Data view, conversation-store schema or History reconstruction allowlist. Projection/rendering and persistence are later gates; v0.8.0 is not authorized until those gates and final release acceptance pass.
+This ChartSpec component does not by itself implement the renderer, Data view, Application route or persistence. The separately qualified downstream layers are now integrated through PRs #473–#479. The route remains limited to the exact pinned C01 profile, and v0.8.0 is not a public release until final release and on-device acceptance gates pass.
