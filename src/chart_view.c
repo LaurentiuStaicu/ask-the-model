@@ -325,6 +325,25 @@ gboolean atm_chart_view_new (const AtmChartSpec *spec, AtmChartView **out, GErro
             : "Global annual anomaly (deg C), relative to 1951-1980. Exact source decimals."));
     gtk_label_set_wrap (GTK_LABEL (unit), TRUE); gtk_label_set_xalign (GTK_LABEL (unit), 0);
     gtk_box_append (GTK_BOX (data), unit);
+
+    const char *source_repository = is_bnr
+        ? ATM_BNR_BLS_UPSTREAM_REPOSITORY
+        : "LaurentiuStaicu/empirical-world3-dynamics";
+    const char *source_snapshot = atm_chart_spec_series_snapshot_sha (initial_spec, 0);
+    const char *source_path = atm_chart_spec_series_source_path (initial_spec, 0);
+    if (source_snapshot != NULL && source_snapshot[0] != '\0' &&
+        source_path != NULL && source_path[0] != '\0') {
+        char *source_url = g_strdup_printf (
+            "https://github.com/%s/blob/%s/%s",
+            source_repository, source_snapshot, source_path);
+        GtkWidget *source_link = gtk_link_button_new_with_label (
+            source_url, "Open source dataset");
+        gtk_widget_set_halign (source_link, GTK_ALIGN_START);
+        gtk_widget_add_css_class (source_link, "atm-source-link");
+        gtk_box_append (GTK_BOX (data), source_link);
+        g_free (source_url);
+    }
+
     self->selection = gtk_single_selection_new (G_LIST_MODEL (g_object_ref (self->rows)));
     self->table = GTK_COLUMN_VIEW (gtk_column_view_new (GTK_SELECTION_MODEL (g_object_ref (self->selection))));
     gtk_column_view_set_show_row_separators (self->table, TRUE); gtk_widget_add_css_class (GTK_WIDGET (self->table), "data-table");
