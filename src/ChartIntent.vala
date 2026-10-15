@@ -283,7 +283,7 @@ namespace AskTheModel {
             );
 
             if (asks_for_chart && requests_visualization) {
-                guint named_sources = (names_gistemp_series ? 1u : 0u) +
+                uint named_sources = (names_gistemp_series ? 1u : 0u) +
                     (names_energy_institute_series ? 1u : 0u) +
                     (names_bnr_bls_c01_series ? 1u : 0u);
                 if (named_sources == 1u) {
