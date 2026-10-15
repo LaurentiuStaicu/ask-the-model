@@ -1,6 +1,6 @@
 # CHART-02 BNR BLS C01 quarterly display projection
 
-Status: native projection policy in a review candidate. It is not yet called by Cairo rendering, Data view, Application intent handling, or History.
+Status: the bounded projection policy was integrated by PR #473 and is consumed by the gap-aware renderer and Application route on development `main`. This page documents only the projection layer; it does not declare the feature released.
 
 ## Admission
 
@@ -22,4 +22,4 @@ The missing quarter must remain source-authorized with reason source_round_not_r
 
 Native tests check the bounded display domain, exact tick policy, all 11 projected source indices, the two-quarter X separation around the gap, resizing-independent normalized coordinates via projection validation, and fail-closed projection tampering.
 
-This policy does not authorize arbitrary gaps, arbitrary source series, smoothing, interpolation, missing-value imputation, derived series, multi-series display, rendering, Data view, an Application route, or History persistence. M4 stays dormant.
+This projection policy remains specific to the pinned BNR C01 profile. The separately qualified renderer, Data view, Application route and History layers are integrated on development `main`; this does not authorize arbitrary sources, generalized missing/discontinuity semantics, smoothing, interpolation, derived or multi-series charts. M4 stays dormant.
