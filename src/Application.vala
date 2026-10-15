@@ -5221,6 +5221,7 @@ namespace AskTheModel {
 
             ConversationPersistenceChart? ei = null;
             ConversationPersistenceChart? gistemp = null;
+            ConversationPersistenceChart? bnr = null;
             foreach (
                 ConversationPersistenceMessage message
                 in snapshot.messages
@@ -5233,13 +5234,16 @@ namespace AskTheModel {
                         ei = chart;
                     } else if (chart.chart_schema == "atm-chart-spec/1") {
                         gistemp = chart;
+                    } else if (chart.chart_schema == "atm-chart-spec/3") {
+                        bnr = chart;
                     }
                 }
             }
 
-            if (ei == null || gistemp == null ||
+            if (ei == null || gistemp == null || bnr == null ||
                 ei.series.length != 1 ||
                 gistemp.series.length != 1 ||
+                bnr.series.length != 1 ||
                 ei.series[0].series_profile !=
                     "atm-series/energy-institute-tes-complete-annual/1" ||
                 ei.series[0].admission_profile !=
@@ -5251,8 +5255,22 @@ namespace AskTheModel {
                 gistemp.series[0].series_profile !=
                     "atm-series/gistemp-complete-annual/1" ||
                 gistemp.series[0].source_path !=
-                    "science/data/processed/nasa_gistemp_global_2026.csv") {
-                pres09_test_failure = "Durable live recipes did not contain the source-qualified EI v2 and preserved GISTEMP v1 contracts";
+                    "science/data/processed/nasa_gistemp_global_2026.csv" ||
+                bnr.chart_schema != "atm-chart-spec/3" ||
+                bnr.reconstruction_profile !=
+                    "atm-chart-reconstruct/bnr-bls-c01-calendar-quarter/1" ||
+                bnr.series[0].series_profile !=
+                    "atm-series/bnr-bls-c01-calendar-quarter/1" ||
+                bnr.series[0].admission_profile !=
+                    "atm-bnr-bls-canonical-panel-admission/1" ||
+                bnr.series[0].repository_id != "rmd" ||
+                bnr.series[0].repository_version !=
+                    "snapshot:e43eb4e899f123d3b1aa0f6e20b7c8ed35434170" ||
+                bnr.series[0].snapshot_sha !=
+                    "e43eb4e899f123d3b1aa0f6e20b7c8ed35434170" ||
+                bnr.series[0].source_path !=
+                    "data/processed/bnr_bls_realised_rounds.csv") {
+                pres09_test_failure = "Durable live recipes did not contain the qualified EI v2, GISTEMP v1 and BNR C01 v3 contracts";
                 return false;
             }
 
@@ -5267,6 +5285,10 @@ namespace AskTheModel {
                 !pres09_test_write_file (
                     "pres09-gistemp-chart-id",
                     gistemp.chart_spec_id
+                ) ||
+                !pres09_test_write_file (
+                    "pres09-bnr-chart-id",
+                    bnr.chart_spec_id
                 )) {
                 return false;
             }
