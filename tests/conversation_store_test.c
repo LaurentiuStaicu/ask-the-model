@@ -1119,7 +1119,7 @@ test_newer_schema_rejected (void)
 
     raw_exec (
         path,
-        "PRAGMA user_version=5;"
+        "PRAGMA user_version=6;"
     );
 
     store = NULL;
