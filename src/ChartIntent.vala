@@ -160,6 +160,27 @@ namespace AskTheModel {
             return false;
         }
 
+        private static bool names_other_chart_source (string normalized) {
+            return contains_any (
+                normalized,
+                {
+                    "gistemp",
+                    "temperatura globala",
+                    "temperatura globală",
+                    "temperaturii globale",
+                    "global temperature",
+                    "energy institute",
+                    "total energy supply",
+                    "global total energy supply",
+                    "physical energy content",
+                    "furnizarea totală de energie",
+                    "furnizarea totala de energie",
+                    "oferta totală de energie",
+                    "oferta totala de energie"
+                }
+            );
+        }
+
         private static bool command_matches (
             string trimmed,
             string prefix
@@ -201,9 +222,13 @@ namespace AskTheModel {
                 );
             }
             if (command_matches (trimmed, bnr_prefix)) {
+                string bnr_query = command_query (trimmed, bnr_prefix);
+                if (names_other_chart_source (bnr_query.down ())) {
+                    return new ChartIntent (false, false, false, prompt);
+                }
                 return new ChartIntent (
                     false, false, true,
-                    command_query (trimmed, bnr_prefix)
+                    bnr_query
                 );
             }
 
