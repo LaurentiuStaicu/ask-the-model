@@ -241,42 +241,104 @@ policy_matches (const AtmChartCatalogEntry *e, GError **error)
         return fail (error, ATM_CHART_CATALOG_ERROR_SEMANTICS, "Only the qualified line chart kind is catalogued.");
     if (e->adapter == ATM_CHART_CATALOG_ADAPTER_GISTEMP_V1) {
         if (!IS(e->series_id,"climate.gistemp.global-temperature-anomaly") ||
+            !IS(e->adapter_id,"gistemp-pinned-annual/1") ||
             !IS(e->series_profile_id,"atm-series/gistemp-complete-annual/1") ||
+            !IS(e->series_profile_version,"1") ||
             !IS(e->admission_profile_id,"atm-gistemp-pinned-admission/1") ||
+            !IS(e->admission_profile_version,"1") ||
+            !IS(e->reconstruction_profile_id,"atm-chart-reconstruct/gistemp-complete-annual/1") ||
             !IS(e->chart_spec_schema,"atm-chart-spec/1") ||
+            !IS(e->history_schema_version,"5") ||
+            !IS(e->repository_key,"ewd") ||
+            !IS(e->repository_full_name,"LaurentiuStaicu/empirical-world3-dynamics") ||
             !IS(e->source_path,"science/data/processed/nasa_gistemp_global_2026.csv") ||
+            !IS(e->x_coordinate_semantics,"calendar_year") ||
+            !IS(e->x_frequency,"annual") ||
+            !IS(e->x_unit,"calendar_year") || !IS(e->x_dimension,"time") ||
+            !IS(e->subject,"global_surface_temperature") ||
+            !IS(e->attribute,"annual_temperature_anomaly") ||
             !IS(e->y_unit,"degree_Celsius_anomaly") ||
-            !IS(e->reference_period,"1951-1980") ||
+            !IS(e->y_dimension,"temperature_difference") ||
+            !IS(e->series_semantics,"empirical_annual_observations") ||
+            !IS(e->reference_period,"1951-1980") || !IS(e->geography,"Global") ||
+            !IS(e->display_profile_id,"atm-display/gistemp-linear") ||
+            !IS(e->display_profile_version,"1") ||
+            !IS(e->publisher_name,"NASA GISS / GISTEMP v4") ||
+            !IS(e->publisher_url,"https://data.giss.nasa.gov/gistemp/data_v4.html") ||
             e->x_kind != ATM_CHART_CATALOG_X_CALENDAR_YEAR ||
             e->missing_policy != ATM_CHART_CATALOG_MISSING_REJECT ||
-            e->snapshot_count != 2)
+            e->missing_coordinate != NULL || e->missing_reason != NULL ||
+            e->snapshot_count != 2 ||
+            !atm_chart_catalog_snapshot_admitted(e,"d9e249339663015f6d1c05752338a955bf64ad0b") ||
+            !atm_chart_catalog_snapshot_admitted(e,"dc710d8e604c0fff713a3acfdb18ab47a1a902bb"))
             return fail(error, ATM_CHART_CATALOG_ERROR_SOURCE_POLICY, "GISTEMP catalog tuple differs from the reviewed adapter.");
         return TRUE;
     }
     if (e->adapter == ATM_CHART_CATALOG_ADAPTER_ENERGY_INSTITUTE_V2) {
         if (!IS(e->series_id,"energy.energy-institute.global-total-energy-supply") ||
+            !IS(e->adapter_id,"energy-institute-tes-pinned-annual/1") ||
             !IS(e->series_profile_id,"atm-series/energy-institute-tes-complete-annual/1") ||
+            !IS(e->series_profile_version,"1") ||
             !IS(e->admission_profile_id,"atm-energy-institute-pinned-admission/3") ||
+            !IS(e->admission_profile_version,"3") ||
+            !IS(e->reconstruction_profile_id,"atm-chart-reconstruct/energy-institute-tes-complete-annual/1") ||
             !IS(e->chart_spec_schema,"atm-chart-spec/2") ||
+            !IS(e->history_schema_version,"5") ||
+            !IS(e->repository_key,"ewd") ||
+            !IS(e->repository_full_name,"LaurentiuStaicu/empirical-world3-dynamics") ||
             !IS(e->source_path,"science/data/processed/energy_institute_global_2026.csv") ||
-            !IS(e->y_unit,"exajoules/year") || !IS(e->geography,"Total World") ||
+            !IS(e->x_coordinate_semantics,"calendar_year") ||
+            !IS(e->x_frequency,"annual") || !IS(e->x_unit,"year") ||
+            !IS(e->x_dimension,"time") ||
+            !IS(e->subject,"global_total_energy_supply") ||
+            !IS(e->attribute,"total_energy_supply") ||
+            !IS(e->y_unit,"exajoules/year") || !IS(e->y_dimension,"energy_flow_rate") ||
+            !IS(e->series_semantics,"empirical_annual_observations") ||
+            !IS(e->geography,"Total World") ||
+            !IS(e->display_profile_id,"atm-display/energy-institute-tes-linear") ||
+            !IS(e->display_profile_version,"1") ||
+            !IS(e->publisher_name,"Energy Institute, Statistical Review of World Energy 2026") ||
+            !IS(e->publisher_url,"https://www.energyinst.org/statistical-review/resources-and-data-downloads") ||
             e->x_kind != ATM_CHART_CATALOG_X_CALENDAR_YEAR ||
             e->missing_policy != ATM_CHART_CATALOG_MISSING_REJECT ||
-            e->snapshot_count != 2)
+            e->missing_coordinate != NULL || e->missing_reason != NULL ||
+            e->snapshot_count != 2 ||
+            !atm_chart_catalog_snapshot_admitted(e,"d9e249339663015f6d1c05752338a955bf64ad0b") ||
+            !atm_chart_catalog_snapshot_admitted(e,"dc710d8e604c0fff713a3acfdb18ab47a1a902bb"))
             return fail(error, ATM_CHART_CATALOG_ERROR_SOURCE_POLICY, "Energy Institute catalog tuple differs from the reviewed adapter.");
         return TRUE;
     }
     if (e->adapter == ATM_CHART_CATALOG_ADAPTER_BNR_BLS_C01_V3) {
         if (!IS(e->series_id,"banking.bnr.bls-c01.credit-standards-net-percentage") ||
+            !IS(e->adapter_id,"bnr-bls-c01-pinned-quarterly/1") ||
             !IS(e->series_profile_id,"atm-series/bnr-bls-c01-calendar-quarter/1") ||
+            !IS(e->series_profile_version,"1") ||
             !IS(e->admission_profile_id,"atm-bnr-bls-canonical-panel-admission/1") ||
+            !IS(e->admission_profile_version,"1") ||
+            !IS(e->reconstruction_profile_id,"atm-chart-reconstruct/bnr-bls-c01-calendar-quarter/1") ||
             !IS(e->chart_spec_schema,"atm-chart-spec/3") ||
+            !IS(e->history_schema_version,"5") ||
+            !IS(e->repository_key,"rmd") ||
+            !IS(e->repository_full_name,"LaurentiuStaicu/romanian-monetary-dynamics") ||
             !IS(e->source_path,"data/processed/bnr_bls_realised_rounds.csv") ||
+            !IS(e->x_coordinate_semantics,"calendar_quarter") ||
+            !IS(e->x_frequency,"quarterly") || !IS(e->x_unit,"calendar_quarter") ||
+            !IS(e->x_dimension,"time") ||
+            !IS(e->subject,"non_financial_corporations") ||
+            !IS(e->attribute,"nfc_credit_standards") ||
+            !IS(e->y_unit,"percent") || !IS(e->y_dimension,"survey_net_percentage") ||
+            !IS(e->series_semantics,"empirical_quarterly_observations") ||
+            !IS(e->geography,"Romania") ||
             !IS(e->missing_coordinate,"2025-Q2") ||
             !IS(e->missing_reason,"source_round_not_retained") ||
+            !IS(e->display_profile_id,"atm-display/bnr-bls-c01-quarterly-gap") ||
+            !IS(e->display_profile_version,"1") ||
+            !IS(e->publisher_name,"National Bank of Romania, Bank Lending Survey (BLS)") ||
+            !IS(e->publisher_url,"https://www.bnr.ro/en/12067-bank-lending-survey") ||
             e->x_kind != ATM_CHART_CATALOG_X_CALENDAR_QUARTER ||
             e->missing_policy != ATM_CHART_CATALOG_MISSING_BOUNDED_PROFILE ||
-            e->snapshot_count != 1)
+            e->snapshot_count != 1 ||
+            !atm_chart_catalog_snapshot_admitted(e,"e43eb4e899f123d3b1aa0f6e20b7c8ed35434170"))
             return fail(error, ATM_CHART_CATALOG_ERROR_SOURCE_POLICY, "BNR catalog tuple differs from the reviewed adapter.");
         return TRUE;
     }
@@ -331,7 +393,10 @@ atm_chart_catalog_validate (GError **error)
 
         for (gsize j = 0; j < e->alias_count; j++) {
             char *a = normalize_alias(e->aliases[j]);
-            if (a == NULL) return fail(error, ATM_CHART_CATALOG_ERROR_SHAPE, "Catalog contains an invalid alias.");
+            if (a == NULL || strlen(a) > ATM_CHART_CATALOG_MAX_TEXT_BYTES) {
+                g_free(a);
+                return fail(error, ATM_CHART_CATALOG_ERROR_SHAPE, "Catalog contains an invalid or oversized alias.");
+            }
             for (gsize k = 0; k < i + 1; k++) {
                 const AtmChartCatalogEntry *other = &entries[k];
                 gsize limit = k == i ? j : other->alias_count;
