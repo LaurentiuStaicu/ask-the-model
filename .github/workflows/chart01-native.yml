@@ -190,7 +190,8 @@ jobs:
             src/scientific_derivation.c tests/chart_render_test.c \
             $(pkg-config --cflags --libs glib-2.0 json-glib-1.0 cairo fontconfig) -lm \
             -o /tmp/chart-render-test
-          /tmp/chart-render-test
+          ATM_BNR_BLS_FIXTURE=tests/fixtures/chart01/rmd-bnr-bls \
+            /tmp/chart-render-test
           cc -std=c11 -Wall -Wextra -Werror -Isrc \
             $(pkg-config --cflags glib-2.0 json-glib-1.0) \
             -c src/verified_series.c -o /tmp/verified-series-production.o

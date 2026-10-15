@@ -1,6 +1,8 @@
 #include "chart_render.h"
 #include "energy_institute_verified_series.h"
 #include "energy_institute_admission.h"
+#include "bnr_bls_verified_series.h"
+#include "bnr_bls_series_contract.h"
 #include <fontconfig/fontconfig.h>
 #include <stdint.h>
 #include <string.h>
@@ -90,6 +92,126 @@ ei_specification_for_renderer_test (void)
     atm_energy_institute_verified_series_free (series);
     atm_energy_institute_admission_free (admission);
     return spec;
+}
+
+static AtmChartSpec *
+bnr_specification_for_renderer_test (AtmChartKind kind)
+{
+    const char *root = g_getenv ("ATM_BNR_BLS_FIXTURE");
+    g_assert_nonnull (root);
+    const char *names[] = {
+        "bnr_bls_realised_rounds.csv",
+        "processed_data_inventory_registry.json",
+        "bnr_bls_canonical_panel_promotion_review.json",
+        "bnr_bls_cross_round_mapping_audit.json",
+        "bnr_bls_missing_round_semantic_mapping_audit.json"
+    };
+    GBytes *sources[ATM_BNR_BLS_SOURCE_COUNT] = {NULL};
+    for (guint i = 0; i < ATM_BNR_BLS_SOURCE_COUNT; i++) {
+        char *path = g_build_filename (root, names[i], NULL);
+        char *contents = NULL;
+        gsize length = 0;
+        GError *error = NULL;
+        g_assert_true (g_file_get_contents (path, &contents, &length, &error));
+        g_assert_no_error (error);
+        g_free (path);
+        sources[i] = g_bytes_new_take (contents, length);
+    }
+    AtmBnrBlsPanel *panel = NULL;
+    AtmBnrBlsSra *sra = NULL;
+    AtmBnrBlsSeriesContract *contract = NULL;
+    AtmBnrBlsVerifiedSeries *series = NULL;
+    AtmChartSpec *spec = NULL;
+    GError *error = NULL;
+    g_assert_true (atm_bnr_bls_panel_new (
+        ATM_BNR_BLS_UPSTREAM_REPOSITORY,
+        ATM_BNR_BLS_SNAPSHOT_SHA, sources, &panel, &error));
+    g_assert_no_error (error);
+    for (guint i = 0; i < ATM_BNR_BLS_SOURCE_COUNT; i++)
+        g_bytes_unref (sources[i]);
+    g_assert_true (atm_bnr_bls_sra_new (panel, &sra, &error));
+    g_assert_no_error (error);
+    g_assert_true (atm_bnr_bls_series_contract_from_sra (
+        panel, sra, &contract, &error));
+    g_assert_no_error (error);
+    g_assert_true (atm_bnr_bls_verified_series_from_contract (
+        contract, &series, &error));
+    g_assert_no_error (error);
+    g_assert_true (atm_chart_spec_new_bnr_bls_c01_v3 (
+        kind, series, &spec, &error));
+    g_assert_no_error (error);
+    atm_bnr_bls_verified_series_free (series);
+    atm_bnr_bls_series_contract_free (contract);
+    atm_bnr_bls_sra_free (sra);
+    atm_bnr_bls_panel_free (panel);
+    return spec;
+}
+
+static gboolean
+pixel_is_black (const AtmChartRender *rendered, int x, int y)
+{
+    cairo_surface_t *surface = atm_chart_render_surface (rendered);
+    cairo_surface_flush (surface);
+    const unsigned char *bytes = cairo_image_surface_get_data (surface);
+    int stride = cairo_image_surface_get_stride (surface);
+    return ((const uint32_t *) (bytes + y * stride))[x] == 0xff000000u;
+}
+
+static void
+test_bnr_data_view_and_real_gap (void)
+{
+    AtmChartSpec *spec = bnr_specification_for_renderer_test (ATM_CHART_LINE);
+    AtmChartRender *rendered = NULL;
+    GError *error = NULL;
+    g_assert_true (atm_chart_render_new (spec, 480, 348, 1, &rendered, &error));
+    g_assert_no_error (error);
+    g_assert_nonnull (rendered);
+    g_assert_false (atm_chart_render_is_fallback (rendered));
+    g_assert_cmpint (atm_chart_spec_version (atm_chart_render_spec (rendered)), ==,
+                     ATM_CHART_SPEC_VERSION_BNR_BLS_C01_V3);
+
+    const char *data = atm_chart_render_data (rendered);
+    g_assert_nonnull (data);
+    g_assert_nonnull (strstr (data, "# BNR BLS C01 credit standards net percentage"));
+    g_assert_nonnull (strstr (data, "# unit\tpercent"));
+    g_assert_nonnull (strstr (data, "# source_snapshot\te43eb4e899f123d3b1aa0f6e20b7c8ed35434170"));
+    g_assert_nonnull (strstr (data, "# source_path\tdata/processed/bnr_bls_realised_rounds.csv"));
+    g_assert_nonnull (strstr (data, "series\tquarter\tstatus\tsource_decimal"));
+    g_assert_nonnull (strstr (data, "0\t2022-Q4\tNUMERIC\t11.89\t"));
+    g_assert_nonnull (strstr (data, "0\t2025-Q1\tNUMERIC\t11.71\t"));
+    g_assert_nonnull (strstr (data, "0\t2025-Q2\tMISSING\t\t\t0\t0\t"));
+    g_assert_nonnull (strstr (data, "\tsource_round_not_retained\n"));
+    g_assert_nonnull (strstr (data, "0\t2025-Q3\tNUMERIC\t9.46\t"));
+    g_assert_null (strstr (data, "0\t2025-Q2\tNUMERIC\t0"));
+
+    char **lines = g_strsplit (data, "\n", -1);
+    guint rows = 0u;
+    for (guint i = 0; lines[i] != NULL; i++)
+        if (g_str_has_prefix (lines[i], "0\t202"))
+            rows++;
+    g_assert_cmpuint (rows, ==, 12u);
+    g_strfreev (lines);
+
+    /* Q2 2025's X ordinal lies halfway between Q1 and Q3, but the line must
+     * have no segment across that midpoint. It is neither zero-imputed nor a
+     * missing-marker glyph, and it is not a CSV row. */
+    const int missing_x = (int) (84.0 + (10.0 / 11.0) * 368.0 + 0.5);
+    const int expected_bridge_y = (int) (108.0 +
+        ((20.0 - (11.71 + 9.46) / 2.0) / 20.0) * 160.0 + 0.5);
+    g_assert_false (pixel_is_black (rendered, missing_x, expected_bridge_y));
+
+    AtmChartSpec *scatter_spec = bnr_specification_for_renderer_test (ATM_CHART_SCATTER);
+    AtmChartRender *scatter = NULL;
+    g_assert_true (atm_chart_render_new (scatter_spec, 480, 348, 1, &scatter, &error));
+    g_assert_no_error (error);
+    g_assert_false (atm_chart_render_is_fallback (scatter));
+    g_assert_nonnull (strstr (atm_chart_render_data (scatter), "0\t2025-Q2\tMISSING"));
+    g_assert_false (pixel_is_black (scatter, missing_x, expected_bridge_y));
+
+    atm_chart_render_free (scatter);
+    atm_chart_spec_free (scatter_spec);
+    atm_chart_render_free (rendered);
+    atm_chart_spec_free (spec);
 }
 
 static void
@@ -336,6 +458,7 @@ int main (int argc, char **argv)
     g_test_add_func ("/chart-render/scatter-scale", test_scatter_scale);
     g_test_add_func ("/chart-render/resize-transactional", test_resize_transactional);
     g_test_add_func ("/chart-render/fallback-arguments", test_fallback_arguments);
+    g_test_add_func ("/chart-render/bnr-data-view-and-real-gap", test_bnr_data_view_and_real_gap);
     g_test_add_func ("/chart-render/ei-exact-data-resize", test_ei_projection_renders_exact_data_and_resizes);
     int result = g_test_run ();
     /* Release process-wide Cairo/Fontconfig test caches after every object is

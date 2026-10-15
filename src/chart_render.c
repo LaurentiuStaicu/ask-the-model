@@ -65,12 +65,76 @@ static char *ei_data_view (const AtmChartSpec *spec)
     return g_string_free (s, FALSE);
 }
 
+
+static char *bnr_data_view (const AtmChartSpec *spec)
+{
+    const char *snapshot = atm_chart_spec_series_snapshot_sha (spec, 0);
+    const char *path = atm_chart_spec_series_source_path (spec, 0);
+    const char *qualified_id = atm_chart_spec_series_qualified_id (spec, 0);
+    if (snapshot == NULL || path == NULL || qualified_id == NULL)
+        return NULL;
+
+    GString *s = g_string_new ("# BNR BLS C01 credit standards net percentage\n");
+    g_string_append_printf (s,
+        "# unit\tpercent\n# semantics\tnfc_credit_standards / survey_net_percentage\n"
+        "# chart_spec_id\t%s\n# source_repository\t%s\n"
+        "# source_snapshot\t%s\n# repository_version\tsnapshot:%s\n"
+        "# source_path\t%s\n# series_profile\t%s\n"
+        "# missing_policy\t2025-Q2=source_round_not_retained\n"
+        "series\tquarter\tstatus\tsource_decimal\tcoefficient\texponent\tsource_row\tqualified_series_id\tsupport_ids\tmissing_reason\n",
+        atm_chart_spec_id (spec), ATM_BNR_BLS_UPSTREAM_REPOSITORY,
+        snapshot, snapshot, path, atm_chart_spec_series_profile (spec));
+
+    for (guint i = 0; i < atm_chart_spec_point_count (spec, 0); i++) {
+        AtmChartPointView point = {0};
+        if (!atm_chart_spec_point (spec, 0, i, &point) ||
+            point.calendar_quarter == NULL || point.support == NULL ||
+            point.support->len == 0u || qualified_id == NULL) {
+            g_string_free (s, TRUE);
+            return NULL;
+        }
+
+        const char *status = point.y_status == ATM_CHART_POINT_NUMERIC
+            ? "NUMERIC" : "MISSING";
+        if (point.y_status == ATM_CHART_POINT_MISSING) {
+            if (i != 10u || point.source_row != 0u ||
+                point.source_decimal != NULL || point.coefficient != NULL ||
+                point.exponent != 0 ||
+                g_strcmp0 (point.missing_reason, ATM_BNR_BLS_MISSING_REASON) != 0 ||
+                point.support->len != ATM_BNR_BLS_SOURCE_COUNT) {
+                g_string_free (s, TRUE);
+                return NULL;
+            }
+        } else if (point.y_status != ATM_CHART_POINT_NUMERIC ||
+                   point.source_row == 0u || point.source_decimal == NULL ||
+                   point.coefficient == NULL || point.missing_reason != NULL) {
+            g_string_free (s, TRUE);
+            return NULL;
+        }
+
+        g_string_append_printf (s, "0\t%s\t%s\t%s\t%s\t%" G_GINT64_FORMAT "\t%u\t%s\t",
+            point.calendar_quarter, status,
+            point.source_decimal != NULL ? point.source_decimal : "",
+            point.coefficient != NULL ? point.coefficient : "",
+            point.exponent, point.source_row, qualified_id);
+        for (guint k = 0; k < point.support->len; k++) {
+            if (k) g_string_append_c (s, ';');
+            g_string_append (s, g_ptr_array_index (point.support, k));
+        }
+        g_string_append_printf (s, "\t%s\n",
+            point.missing_reason != NULL ? point.missing_reason : "");
+    }
+    return g_string_free (s, FALSE);
+}
+
 /* Closed, source-qualified ASCII metadata and exact source spelling. No model
  * strings enter the prototype. The future widget must use plain text cells. */
 static char *data_view (const AtmChartSpec *spec)
 {
     if (atm_chart_spec_version (spec) == ATM_CHART_SPEC_VERSION_ENERGY_INSTITUTE_V2)
         return ei_data_view (spec);
+    if (atm_chart_spec_version (spec) == ATM_CHART_SPEC_VERSION_BNR_BLS_C01_V3)
+        return bnr_data_view (spec);
     GString *s = g_string_new ("# GISTEMP global annual temperature anomaly\n");
     g_string_append_printf (s, "# unit\t%s\n# reference_period\t%s\n# chart_spec_id\t%s\n",
         atm_verified_series_unit (atm_chart_spec_series (spec, 0)),
@@ -187,6 +251,111 @@ static void chart_energy_institute (cairo_t *cr, const AtmChartSpec *spec,
     label (cr, "Exact values and provenance: Data view", 16, height - 16, 0);
 }
 
+
+static gboolean layout_fits_bnr (cairo_t *cr, const AtmChartProjection *p, guint width)
+{
+    double previous_right = -1.0;
+    font (cr, 12, FALSE);
+    for (guint i = 0; i < atm_chart_projection_x_tick_count (p); i++) {
+        const AtmChartTick *tick = atm_chart_projection_x_tick (p, i);
+        cairo_text_extents_t extent;
+        cairo_text_extents (cr, tick->label, &extent);
+        double center = 84.0 + tick->position;
+        double left = center - extent.width / 2.0;
+        double right = center + extent.width / 2.0;
+        if (left < 2.0 || right > width - 2.0 ||
+            (previous_right >= 0.0 && left < previous_right + 6.0))
+            return FALSE;
+        previous_right = right;
+    }
+    double previous_bottom = -1e9;
+    for (guint i = 0; i < atm_chart_projection_y_tick_count (p); i++) {
+        const AtmChartTick *tick = atm_chart_projection_y_tick (p, i);
+        cairo_text_extents_t extent;
+        cairo_text_extents (cr, tick->label, &extent);
+        double baseline = 108.0 + tick->position + 4.0;
+        double top = baseline + extent.y_bearing;
+        double bottom = top + extent.height;
+        if (extent.width > 36.0 || top < previous_bottom + 4.0)
+            return FALSE;
+        previous_bottom = bottom;
+    }
+    return fits (cr, "Net percentage, non-financial corporations", width - 32) &&
+        fits (cr, "Source: RMD pinned BNR BLS C01", width - 32) &&
+        fits (cr, "2025-Q2 MISSING | Exact data: Data view", width - 32);
+}
+
+static void chart_bnr (cairo_t *cr, const AtmChartSpec *spec,
+    const AtmChartProjection *projection, guint width, guint height)
+{
+    double left = 84.0, top = 108.0, plot_width = width - 112.0,
+           plot_height = height - 188.0;
+    font (cr, 14, TRUE);
+    label (cr, "BNR BLS C01 / CREDIT STANDARDS", 16, 26, 0);
+    font (cr, 12, FALSE);
+    label (cr, "Net percentage, non-financial corporations", 16, 47, 0);
+    const char *kind = atm_chart_spec_kind (spec) == ATM_CHART_LINE ? "LINE" : "SCATTER";
+    label (cr, "2022-Q4..2025-Q3 | 11 numeric + 1 MISSING | empirical", 16, 68, 0);
+    label (cr, kind, width - 16, 68, 1);
+    label (cr, "Net %", left, 96, 0);
+
+    double dash[] = {1.0, 5.0};
+    for (guint i = 0; i < atm_chart_projection_y_tick_count (projection); i++) {
+        const AtmChartTick *tick = atm_chart_projection_y_tick (projection, i);
+        double y = top + tick->position;
+        cairo_set_dash (cr, dash, 2, 0);
+        cairo_set_line_width (cr, 1.0);
+        cairo_move_to (cr, left, y);
+        cairo_line_to (cr, left + plot_width, y);
+        cairo_stroke (cr);
+        cairo_set_dash (cr, NULL, 0, 0);
+        label (cr, tick->label, left - 12, y + 4, 1);
+    }
+    cairo_rectangle (cr, left, top, plot_width, plot_height);
+    cairo_stroke (cr);
+    for (guint i = 0; i < atm_chart_projection_x_tick_count (projection); i++) {
+        const AtmChartTick *tick = atm_chart_projection_x_tick (projection, i);
+        double x = left + tick->position;
+        cairo_move_to (cr, x, top + plot_height);
+        cairo_line_to (cr, x, top + plot_height + 5);
+        cairo_stroke (cr);
+        label (cr, tick->label, x, top + plot_height + 22, 0.5);
+    }
+
+    cairo_save (cr);
+    cairo_rectangle (cr, left - 3, top - 3, plot_width + 6, plot_height + 6);
+    cairo_clip (cr);
+    cairo_set_line_width (cr, 1.5);
+    guint previous_index = G_MAXUINT;
+    gboolean path_started = FALSE;
+    for (guint i = 0; i < atm_chart_projection_count (projection); i++) {
+        const AtmChartProjectedPoint *point =
+            atm_chart_projection_point (projection, i);
+        double x = left + point->x, y = top + point->y;
+        if (atm_chart_spec_kind (spec) == ATM_CHART_SCATTER) {
+            cairo_rectangle (cr, x - 1.5, y - 1.5, 3.0, 3.0);
+            cairo_fill (cr);
+        } else if (!path_started) {
+            cairo_move_to (cr, x, y);
+            path_started = TRUE;
+        } else if (point->point_index != previous_index + 1u) {
+            /* Stroke the prior path and start a separate path: never bridge MISSING. */
+            cairo_stroke (cr);
+            cairo_move_to (cr, x, y);
+        } else {
+            cairo_line_to (cr, x, y);
+        }
+        previous_index = point->point_index;
+    }
+    if (atm_chart_spec_kind (spec) == ATM_CHART_LINE && path_started)
+        cairo_stroke (cr);
+    cairo_restore (cr);
+
+    font (cr, 12, FALSE);
+    label (cr, "Source: RMD pinned BNR BLS C01", 16, height - 36, 0);
+    label (cr, "2025-Q2 MISSING | Exact data: Data view", 16, height - 16, 0);
+}
+
 static gboolean layout_fits_ei (cairo_t *cr, const AtmChartProjection *p, guint width)
 {
     double previous_right = -1;
@@ -213,6 +382,10 @@ static gboolean layout_fits_ei (cairo_t *cr, const AtmChartProjection *p, guint 
 static void chart (cairo_t *cr, const AtmChartSpec *spec, const AtmChartProjection *p,
     guint width, guint height)
 {
+    if (atm_chart_spec_version (spec) == ATM_CHART_SPEC_VERSION_BNR_BLS_C01_V3) {
+        chart_bnr (cr, spec, p, width, height);
+        return;
+    }
     if (atm_chart_spec_version (spec) == ATM_CHART_SPEC_VERSION_ENERGY_INSTITUTE_V2) {
         chart_energy_institute (cr, spec, p, width, height);
         return;
@@ -286,6 +459,7 @@ static gboolean prepare_viewport (const AtmChartSpec *spec, guint width, guint h
     cairo_set_font_options (cr, options); cairo_font_options_destroy (options);
 
     gboolean is_ei = atm_chart_spec_version (spec) == ATM_CHART_SPEC_VERSION_ENERGY_INSTITUTE_V2;
+    gboolean is_bnr = atm_chart_spec_version (spec) == ATM_CHART_SPEC_VERSION_BNR_BLS_C01_V3;
     gboolean fallback = width < 432 || height < 348;
     AtmChartProjection *projection = NULL;
     if (!fallback) {
@@ -293,7 +467,13 @@ static gboolean prepare_viewport (const AtmChartSpec *spec, guint width, guint h
                 spec, width - 112, height - 188, &projection, error))
             goto invalid;
         font (cr, 14, TRUE);
-        if (is_ei) {
+        if (is_bnr) {
+            fallback = !fits (cr, "BNR BLS C01 / CREDIT STANDARDS", width - 32);
+            font (cr, 12, FALSE);
+            fallback = fallback ||
+                !fits (cr, "2022-Q4..2025-Q3 | 11 numeric + 1 MISSING | empirical", width - 32) ||
+                !layout_fits_bnr (cr, projection, width);
+        } else if (is_ei) {
             fallback = !fits (cr, "ENERGY INSTITUTE / GLOBAL TOTAL ENERGY SUPPLY", width - 32);
             font (cr, 12, FALSE);
             const char *kind = atm_chart_spec_kind (spec) == ATM_CHART_LINE ? "LINE" : "SCATTER";
@@ -311,7 +491,7 @@ static gboolean prepare_viewport (const AtmChartSpec *spec, guint width, guint h
     }
     if (fallback) {
         font (cr, 14, TRUE);
-        label (cr, is_ei ? "Energy Institute TES" : "GISTEMP", 16, 30, 0);
+        label (cr, is_bnr ? "BNR BLS C01" : (is_ei ? "Energy Institute TES" : "GISTEMP"), 16, 30, 0);
         font (cr, 12, FALSE); label (cr, "Chart needs more space.", 16, 60, 0);
         label (cr, "Exact values remain", 16, 86, 0);
         label (cr, "available in Data view.", 16, 104, 0);
@@ -348,8 +528,9 @@ gboolean atm_chart_render_new (const AtmChartSpec *spec, guint width, guint heig
     /* Both admitted source-specific chart profiles have independently qualified
      * projections; arbitrary ChartSpec versions remain fail-closed. */
     if (atm_chart_spec_version (spec) != ATM_CHART_SPEC_VERSION_GISTEMP_V1 &&
-        atm_chart_spec_version (spec) != ATM_CHART_SPEC_VERSION_ENERGY_INSTITUTE_V2)
-        return reject (error, "Chart renderer only admits qualified GISTEMP v1 or Energy Institute v2.");
+        atm_chart_spec_version (spec) != ATM_CHART_SPEC_VERSION_ENERGY_INSTITUTE_V2 &&
+        atm_chart_spec_version (spec) != ATM_CHART_SPEC_VERSION_BNR_BLS_C01_V3)
+        return reject (error, "Chart renderer only admits qualified GISTEMP v1, Energy Institute v2, or pinned BNR C01 v3.");
     AtmChartRender *r = g_new0 (AtmChartRender, 1);
     if (!atm_chart_spec_rebuild (spec, &r->spec, error)) goto invalid;
     r->data = data_view (r->spec);
