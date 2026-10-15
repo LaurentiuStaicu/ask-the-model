@@ -7,9 +7,11 @@
 #include <string.h>
 
 #define ATM_CONVERSATION_STORE_SCHEMA_RESOURCE \
-    "/io/github/laurentiustaicu/ask_the_model/schemas/conversation-store-v4.sql"
+    "/io/github/laurentiustaicu/ask_the_model/schemas/conversation-store-v5.sql"
 #define ATM_CONVERSATION_STORE_MIGRATION_V3_V4_RESOURCE \
     "/io/github/laurentiustaicu/ask_the_model/schemas/conversation-store-v3-to-v4.sql"
+#define ATM_CONVERSATION_STORE_MIGRATION_V4_V5_RESOURCE \
+    "/io/github/laurentiustaicu/ask_the_model/schemas/conversation-store-v4-to-v5.sql"
 #define ATM_CONVERSATION_STORE_MIGRATION_V1_V2_RESOURCE \
     "/io/github/laurentiustaicu/ask_the_model/schemas/conversation-store-v1-to-v2.sql"
 #define ATM_CONVERSATION_STORE_MIGRATION_V2_V3_RESOURCE \
@@ -20,6 +22,8 @@
 #define ATM_CONVERSATION_STORE_SCHEMA_V2_VERSION 2
 #define ATM_CONVERSATION_STORE_SCHEMA_V3_ID "atm-conversation-store/3"
 #define ATM_CONVERSATION_STORE_SCHEMA_V3_VERSION 3
+#define ATM_CONVERSATION_STORE_SCHEMA_V4_ID "atm-conversation-store/4"
+#define ATM_CONVERSATION_STORE_SCHEMA_V4_VERSION 4
 
 struct AtmConversationStore {
     sqlite3 *db;
@@ -431,6 +435,20 @@ load_migration_v3_v4_sql (
     return load_sql_resource (
         ATM_CONVERSATION_STORE_MIGRATION_V3_V4_RESOURCE,
         "v3-to-v4 migration",
+        out_sql,
+        error
+    );
+}
+
+static gboolean
+load_migration_v4_v5_sql (
+    char **out_sql,
+    GError **error
+)
+{
+    return load_sql_resource (
+        ATM_CONVERSATION_STORE_MIGRATION_V4_V5_RESOURCE,
+        "v4-to-v5 migration",
         out_sql,
         error
     );
@@ -1159,7 +1177,9 @@ validate_chart_semantics (
             "(c.chart_schema='atm-chart-spec/1' AND "
             " c.reconstruction_profile='atm-chart-reconstruct/gistemp-complete-annual/1') OR "
             "(c.chart_schema='atm-chart-spec/2' AND "
-            " c.reconstruction_profile='atm-chart-reconstruct/energy-institute-tes-complete-annual/1')"
+            " c.reconstruction_profile='atm-chart-reconstruct/energy-institute-tes-complete-annual/1') OR "
+            "(c.chart_schema='atm-chart-spec/3' AND "
+            " c.reconstruction_profile='atm-chart-reconstruct/bnr-bls-c01-calendar-quarter/1'))"
             ");",
             &invalid_chart_tuple,
             error
@@ -1195,10 +1215,11 @@ validate_chart_semantics (
             "AND r.snapshot_sha=s.snapshot_sha "
             "AND ("
             " (c.chart_schema='atm-chart-spec/1' AND r.repository_version=s.repository_version) OR "
-            " (c.chart_schema='atm-chart-spec/2' AND s.repository_version='snapshot:' || s.snapshot_sha)"
+            " (c.chart_schema='atm-chart-spec/2' AND s.repository_version='snapshot:' || s.snapshot_sha) OR "
+            " (c.chart_schema='atm-chart-spec/3' AND s.repository_version='snapshot:' || s.snapshot_sha)"
             ") "
             "WHERE r.repository_id IS NULL "
-            "OR s.repository_id!='ewd' "
+            "OR s.repository_id NOT IN ('ewd','rmd') "
             "OR NOT ("
             "(c.chart_schema='atm-chart-spec/1' AND "
             " c.reconstruction_profile='atm-chart-reconstruct/gistemp-complete-annual/1' AND "
@@ -1214,6 +1235,14 @@ validate_chart_semantics (
             "   s.repository_version='snapshot:d9e249339663015f6d1c05752338a955bf64ad0b') OR "
             "  (s.snapshot_sha='dc710d8e604c0fff713a3acfdb18ab47a1a902bb' AND "
             "   s.repository_version='snapshot:dc710d8e604c0fff713a3acfdb18ab47a1a902bb')))"
+            " OR (c.chart_schema='atm-chart-spec/3' AND "
+            " c.reconstruction_profile='atm-chart-reconstruct/bnr-bls-c01-calendar-quarter/1' AND "
+            " s.series_profile='atm-series/bnr-bls-c01-calendar-quarter/1' AND "
+            " s.admission_profile='atm-bnr-bls-canonical-panel-admission/1' AND "
+            " s.repository_id='rmd' AND "
+            " s.source_path='data/processed/bnr_bls_realised_rounds.csv' AND "
+            " s.snapshot_sha='e43eb4e899f123d3b1aa0f6e20b7c8ed35434170' AND "
+            " s.repository_version='snapshot:e43eb4e899f123d3b1aa0f6e20b7c8ed35434170')"
             ");",
             &invalid_chart_provenance,
             error
@@ -1360,12 +1389,14 @@ chart_series_input_is_valid (
     if (series == NULL ||
         !is_hex64 (series->scientific_id) ||
         !is_hex64 (series->qualified_id) ||
-        g_strcmp0 (series->repository_id, "ewd") != 0 ||
+        (g_strcmp0 (series->repository_id, "ewd") != 0 &&
+         g_strcmp0 (series->repository_id, "rmd") != 0) ||
         !is_sha40 (series->snapshot_sha))
         return FALSE;
 
     if (g_strcmp0 (chart_schema, "atm-chart-spec/1") == 0) {
         return
+            g_strcmp0 (series->repository_id, "ewd") == 0 &&
             g_strcmp0 (series->series_profile,
                 "atm-series/gistemp-complete-annual/1") == 0 &&
             g_strcmp0 (series->admission_profile,
@@ -1383,6 +1414,7 @@ chart_series_input_is_valid (
         char *expected_version = g_strconcat ("snapshot:", snapshot, NULL);
         gboolean valid =
             admitted_snapshot &&
+            g_strcmp0 (series->repository_id, "ewd") == 0 &&
             g_strcmp0 (series->series_profile,
                 "atm-series/energy-institute-tes-complete-annual/1") == 0 &&
             g_strcmp0 (series->admission_profile,
@@ -1392,6 +1424,21 @@ chart_series_input_is_valid (
                 "science/data/processed/energy_institute_global_2026.csv") == 0;
         g_free (expected_version);
         return valid;
+    }
+
+    if (g_strcmp0 (chart_schema, "atm-chart-spec/3") == 0) {
+        return
+            g_strcmp0 (series->repository_id, "rmd") == 0 &&
+            g_strcmp0 (series->series_profile,
+                "atm-series/bnr-bls-c01-calendar-quarter/1") == 0 &&
+            g_strcmp0 (series->admission_profile,
+                "atm-bnr-bls-canonical-panel-admission/1") == 0 &&
+            g_strcmp0 (series->repository_version,
+                "snapshot:e43eb4e899f123d3b1aa0f6e20b7c8ed35434170") == 0 &&
+            g_strcmp0 (series->snapshot_sha,
+                "e43eb4e899f123d3b1aa0f6e20b7c8ed35434170") == 0 &&
+            g_strcmp0 (series->source_path,
+                "data/processed/bnr_bls_realised_rounds.csv") == 0;
     }
 
     return FALSE;
@@ -1419,6 +1466,10 @@ chart_input_is_valid (
     if (g_strcmp0 (chart->chart_schema, "atm-chart-spec/2") == 0)
         return g_strcmp0 (chart->reconstruction_profile,
             "atm-chart-reconstruct/energy-institute-tes-complete-annual/1") == 0;
+
+    if (g_strcmp0 (chart->chart_schema, "atm-chart-spec/3") == 0)
+        return g_strcmp0 (chart->reconstruction_profile,
+            "atm-chart-reconstruct/bnr-bls-c01-calendar-quarter/1") == 0;
 
     return FALSE;
 }
