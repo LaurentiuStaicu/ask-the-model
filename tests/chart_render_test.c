@@ -179,7 +179,7 @@ test_bnr_data_view_and_real_gap (void)
     g_assert_nonnull (strstr (data, "series\tquarter\tstatus\tsource_decimal"));
     g_assert_nonnull (strstr (data, "0\t2022-Q4\tNUMERIC\t11.89\t"));
     g_assert_nonnull (strstr (data, "0\t2025-Q1\tNUMERIC\t11.71\t"));
-    g_assert_nonnull (strstr (data, "0\t2025-Q2\tMISSING\t\t\t0\t0\t"));
+    g_assert_nonnull (strstr (data, "0\t2025-Q2\tMISSING\t\t\t0\tnone\t"));
     g_assert_nonnull (strstr (data, "\tsource_round_not_retained\n"));
     g_assert_nonnull (strstr (data, "0\t2025-Q3\tNUMERIC\t9.46\t"));
     g_assert_null (strstr (data, "0\t2025-Q2\tNUMERIC\t0"));

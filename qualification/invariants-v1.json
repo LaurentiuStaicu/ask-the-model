@@ -872,7 +872,7 @@
       "category": "SCIENTIFIC",
       "severity": "S1",
       "lifecycle": "enforced",
-      "statement": "The GTK ChartView accepts the exact BNR C01 v3 Data view row shape only after the source-bound renderer admits the profile. It exposes all twelve quarter coordinates in source order, distinguishes NUMERIC from MISSING, and displays a missing-quarter provenance record with the authoritative reason and no numeric value or physical source row. Numeric values, exact decimal representation, physical source row, source snapshot/path, qualified series identity and support identities remain source-bound. This reusable GTK component qualification does not authorize Application intent dispatch or History persistence.",
+      "statement": "The GTK ChartView accepts the exact BNR C01 v3 Data view row shape only after the source-bound renderer admits the profile. It exposes all twelve quarter coordinates in source order, distinguishes NUMERIC from MISSING, and displays the authorized missing quarter with the authoritative reason, no numeric value, and an explicit `none` source-row display rather than exposing the internal zero sentinel as a physical row. Numeric values, exact decimal representation, physical source row, source snapshot/path, qualified series identity and support identities remain source-bound. This reusable GTK component qualification does not authorize Application intent dispatch or History persistence.",
       "enforced_by": [
         "src/chart_view.c",
         "src/chart_render.c",

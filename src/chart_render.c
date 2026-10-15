@@ -112,11 +112,15 @@ static char *bnr_data_view (const AtmChartSpec *spec)
             return NULL;
         }
 
-        g_string_append_printf (s, "0\t%s\t%s\t%s\t%s\t%" G_GINT64_FORMAT "\t%u\t%s\t",
+        char *source_row_text = point.y_status == ATM_CHART_POINT_MISSING
+            ? g_strdup ("none")
+            : g_strdup_printf ("%u", point.source_row);
+        g_string_append_printf (s, "0\t%s\t%s\t%s\t%s\t%" G_GINT64_FORMAT "\t%s\t%s\t",
             point.calendar_quarter, status,
             point.source_decimal != NULL ? point.source_decimal : "",
             point.coefficient != NULL ? point.coefficient : "",
-            point.exponent, point.source_row, qualified_id);
+            point.exponent, source_row_text, qualified_id);
+        g_free (source_row_text);
         for (guint k = 0; k < point.support->len; k++) {
             if (k) g_string_append_c (s, ';');
             g_string_append (s, g_ptr_array_index (point.support, k));
