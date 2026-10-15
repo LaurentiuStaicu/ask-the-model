@@ -6,6 +6,8 @@ on:
       - 'src/PresentationRenderer.vala'
       - 'src/PresentationNative.vapi'
       - 'src/Application.vala'
+      - 'src/ChartIntent.vala'
+      - 'tests/chart_intent_test.vala'
       - 'tests/presentation_renderer_test.vala'
       - 'tests/presentation_native_test.vala'
       - 'data/style.css'
@@ -62,7 +64,8 @@ jobs:
           set -euo pipefail
           ninja -C build \
             presentation-native-test \
-            presentation-renderer-test
+            presentation-renderer-test \
+            chart-intent-test
 
       - name: Run Presentation renderer qualification
         shell: bash
@@ -80,6 +83,12 @@ jobs:
         run: |
           set -euo pipefail
           ./build/presentation-native-test
+
+      - name: Run ChartIntent command qualification
+        shell: bash
+        run: |
+          set -euo pipefail
+          ./build/chart-intent-test
 
       - name: Validate PRES-06 interaction contract
         shell: bash

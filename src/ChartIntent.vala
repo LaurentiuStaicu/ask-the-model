@@ -160,6 +160,79 @@ namespace AskTheModel {
             return false;
         }
 
+        private static bool requests_comparison (string normalized) {
+            return contains_any (
+                normalized,
+                {
+                    "compare", "comparing", "comparison", "versus", " vs ", "vs.",
+                    "against", "relative to", "in relation to",
+                    "compară", "compara", "comparând", "comparand",
+                    "în comparație", "in comparatie", "în raport cu",
+                    "in raport cu", "față de", "fata de"
+                }
+            );
+        }
+
+        private static bool requests_additional_series (string normalized) {
+            /*
+             * This profile is single-series only. Conservatively reject any
+             * request naming another common macro/credit indicator, regardless
+             * of conjunction or punctuation, rather than try to infer whether
+             * a comma, "alongside", or another phrasing implies comparison.
+             */
+            return contains_any (
+                normalized,
+                {
+                    "gdp", "gross domestic product", "pib",
+                    "unemployment",
+                    "inflation", "inflație", "inflatie",
+                    "șomaj", "somaj",
+                    "non-performing loan",
+                    "creditele neperformante",
+                    "creditelor neperformante"
+                }
+            );
+        }
+
+        private static bool requests_derived_series (string normalized) {
+            return contains_any (
+                normalized,
+                {
+                    "standard deviation", "moving average", "moving-average",
+                    "forecast", "forecasting", "forecasted",
+                    "projection", "projected values",
+                    "correlation", "correlated",
+                    "abaterea standard", "abatere standard",
+                    "medie mobilă", "medie mobila",
+                    "media mobilă", "media mobila",
+                    "prognoză", "prognoza",
+                    "proiecție", "proiectie",
+                    "corelație", "corelatie"
+                }
+            );
+        }
+
+        private static bool names_other_chart_source (string normalized) {
+            return contains_any (
+                normalized,
+                {
+                    "gistemp",
+                    "temperatura globala",
+                    "temperatura globală",
+                    "temperaturii globale",
+                    "global temperature",
+                    "energy institute",
+                    "total energy supply",
+                    "global total energy supply",
+                    "physical energy content",
+                    "furnizarea totală de energie",
+                    "furnizarea totala de energie",
+                    "oferta totală de energie",
+                    "oferta totala de energie"
+                }
+            );
+        }
+
         private static bool command_matches (
             string trimmed,
             string prefix
@@ -201,9 +274,16 @@ namespace AskTheModel {
                 );
             }
             if (command_matches (trimmed, bnr_prefix)) {
+                string bnr_query = command_query (trimmed, bnr_prefix);
+                if (names_other_chart_source (bnr_query.down ()) ||
+                    requests_comparison (bnr_query.down ()) ||
+                    requests_additional_series (bnr_query.down ()) ||
+                    requests_derived_series (bnr_query.down ())) {
+                    return new ChartIntent (false, false, false, prompt);
+                }
                 return new ChartIntent (
                     false, false, true,
-                    command_query (trimmed, bnr_prefix)
+                    bnr_query
                 );
             }
 
@@ -271,18 +351,38 @@ namespace AskTheModel {
                 }
             );
 
-            bool names_bnr_bls_c01_series = contains_any (
+            /*
+             * Do not infer the BNR C01 profile from a generic measure name.
+             * "Net percentage" also describes unrelated indicators; admit
+             * natural-language requests only when they identify C01 directly
+             * or name the credit-standards subject. The exact source/profile
+             * is still independently requalified before a chart is shown.
+             */
+            bool names_bnr_series_id = contains_any (
                 normalized,
                 {
-                    "bnr bls c01", "bnr-bls-c01", "bls c01",
-                    "credit standards", "credit standard",
-                    "net percentage", "net percentages",
-                    "standarde de credit", "standardele de credit",
-                    "procent net", "procente nete"
+                    "bnr bls c01", "bnr-bls-c01", "bls c01"
                 }
             );
+            bool names_credit_standards = contains_any (
+                normalized,
+                {
+                    "credit standards",
+                    "standarde de credit",
+                    "standardele de credit",
+                    "standardelor de credit"
+                }
+            );
+            bool names_bnr_bls_c01_series =
+                names_bnr_series_id || names_credit_standards;
 
             if (asks_for_chart && requests_visualization) {
+                if (names_bnr_bls_c01_series &&
+                    (requests_comparison (normalized) ||
+                     requests_additional_series (normalized) ||
+                     requests_derived_series (normalized))) {
+                    return new ChartIntent (false, false, false, prompt);
+                }
                 uint named_sources = (names_gistemp_series ? 1u : 0u) +
                     (names_energy_institute_series ? 1u : 0u) +
                     (names_bnr_bls_c01_series ? 1u : 0u);

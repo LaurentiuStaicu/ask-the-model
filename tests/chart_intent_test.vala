@@ -190,6 +190,33 @@ int main () {
     assert (bnr_english.bnr_bls_c01_requested);
     assert (bnr_english.chart_only_response ().contains ("Here is the BNR BLS C01"));
 
+    var generic_net_percentage = AskTheModel.ChartIntent.parse (
+        "Generate a chart of the net percentage of non-performing loans."
+    );
+    assert (!generic_net_percentage.bnr_bls_c01_requested);
+    assert (!generic_net_percentage.gistemp_requested);
+    assert (!generic_net_percentage.energy_institute_requested);
+
+    var generic_romanian_net_percentage = AskTheModel.ChartIntent.parse (
+        "Generează un grafic al procentului net pentru creditele neperformante."
+    );
+    assert (!generic_romanian_net_percentage.bnr_bls_c01_requested);
+
+    var credit_standard_deviation = AskTheModel.ChartIntent.parse (
+        "Generate a chart of credit standard deviation."
+    );
+    assert (!credit_standard_deviation.bnr_bls_c01_requested);
+
+    var credit_standards_subject = AskTheModel.ChartIntent.parse (
+        "Generate a chart of credit standards over time."
+    );
+    assert (credit_standards_subject.bnr_bls_c01_requested);
+
+    var credit_standards_romanian_genitive = AskTheModel.ChartIntent.parse (
+        "Generează un grafic al standardelor de credit în timp."
+    );
+    assert (credit_standards_romanian_genitive.bnr_bls_c01_requested);
+
     var bnr_near_miss = AskTheModel.ChartIntent.parse (
         "/chart bnr-bls-c01-ish Show the series."
     );
@@ -207,6 +234,95 @@ int main () {
     );
     assert (!bnr_ambiguous.bnr_bls_c01_requested);
     assert (!bnr_ambiguous.energy_institute_requested);
+
+    var bnr_command_compares_gistemp = AskTheModel.ChartIntent.parse (
+        "/chart bnr-bls-c01 Compare this with GISTEMP global temperature."
+    );
+    assert (!bnr_command_compares_gistemp.bnr_bls_c01_requested);
+    assert (!bnr_command_compares_gistemp.gistemp_requested);
+    assert (!bnr_command_compares_gistemp.energy_institute_requested);
+
+    var bnr_command_compares_energy = AskTheModel.ChartIntent.parse (
+        "/chart bnr-bls-c01 Compare this with Energy Institute total energy supply."
+    );
+    assert (!bnr_command_compares_energy.bnr_bls_c01_requested);
+    assert (!bnr_command_compares_energy.gistemp_requested);
+    assert (!bnr_command_compares_energy.energy_institute_requested);
+
+    var bnr_command_compares_gdp = AskTheModel.ChartIntent.parse (
+        "/chart bnr-bls-c01 Compare with GDP."
+    );
+    assert (!bnr_command_compares_gdp.bnr_bls_c01_requested);
+
+    var bnr_natural_comparison = AskTheModel.ChartIntent.parse (
+        "Generate a chart of credit standards against GDP."
+    );
+    assert (!bnr_natural_comparison.bnr_bls_c01_requested);
+
+    var bnr_romanian_comparison = AskTheModel.ChartIntent.parse (
+        "Generează un grafic comparativ al standardelor de credit față de PIB."
+    );
+    assert (!bnr_romanian_comparison.bnr_bls_c01_requested);
+
+    var bnr_natural_multi_series = AskTheModel.ChartIntent.parse (
+        "Generate a chart of credit standards and GDP."
+    );
+    assert (!bnr_natural_multi_series.bnr_bls_c01_requested);
+
+    var bnr_explicit_multi_series = AskTheModel.ChartIntent.parse (
+        "/chart bnr-bls-c01 Show this with GDP."
+    );
+    assert (!bnr_explicit_multi_series.bnr_bls_c01_requested);
+
+    var bnr_romanian_multi_series = AskTheModel.ChartIntent.parse (
+        "Generează un grafic al standardelor de credit și inflației."
+    );
+    assert (!bnr_romanian_multi_series.bnr_bls_c01_requested);
+
+    var bnr_comma_gdp = AskTheModel.ChartIntent.parse (
+        "Generate a chart of credit standards, GDP."
+    );
+    assert (!bnr_comma_gdp.bnr_bls_c01_requested);
+
+    var bnr_romanian_comma_pib = AskTheModel.ChartIntent.parse (
+        "Generează un grafic al standardelor de credit, PIB."
+    );
+    assert (!bnr_romanian_comma_pib.bnr_bls_c01_requested);
+
+    var bnr_semicolon_gdp = AskTheModel.ChartIntent.parse (
+        "Generate a chart of credit standards; GDP."
+    );
+    assert (!bnr_semicolon_gdp.bnr_bls_c01_requested);
+
+    var bnr_alongside_gdp = AskTheModel.ChartIntent.parse (
+        "Generate a chart of credit standards alongside GDP."
+    );
+    assert (!bnr_alongside_gdp.bnr_bls_c01_requested);
+
+    var bnr_romanian_semicolon_pib = AskTheModel.ChartIntent.parse (
+        "Generează un grafic al standardelor de credit; PIB."
+    );
+    assert (!bnr_romanian_semicolon_pib.bnr_bls_c01_requested);
+
+    var bnr_natural_derived = AskTheModel.ChartIntent.parse (
+        "Generate a chart of the standard deviation of credit standards."
+    );
+    assert (!bnr_natural_derived.bnr_bls_c01_requested);
+
+    var bnr_explicit_derived = AskTheModel.ChartIntent.parse (
+        "/chart bnr-bls-c01 Use a moving average of the series."
+    );
+    assert (!bnr_explicit_derived.bnr_bls_c01_requested);
+
+    var bnr_romanian_derived = AskTheModel.ChartIntent.parse (
+        "Generează un grafic cu medie mobilă pentru standardele de credit."
+    );
+    assert (!bnr_romanian_derived.bnr_bls_c01_requested);
+
+    var bnr_romanian_definite_moving_average = AskTheModel.ChartIntent.parse (
+        "Generează un grafic cu media mobilă a standardelor de credit."
+    );
+    assert (!bnr_romanian_definite_moving_average.bnr_bls_c01_requested);
 
     return 0;
 }
