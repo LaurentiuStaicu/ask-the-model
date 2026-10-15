@@ -96,7 +96,7 @@ With Optimizations ON, the currently qualified runtime optimizations are:
 
 Capacity admission is deliberately conservative. Exact C0-M1 repository ID + SHA profiles may use their frozen allocated-byte evidence. A new/unknown SHA receives no inherited historical snapshot/index byte prediction because structural stress falsified that predictor as a conservative bound. Structural inode checks and the selected 128 KiB / four-inode Control DB publication headroom remain active. Only proven preflight insufficiency is surfaced as `NO SPACE`; post-admission storage failures retain the established fail-closed path.
 
-With Optimizations OFF, optional optimization paths are not activated and the established baseline repository behavior is retained.
+With Optimizations OFF, optional optimization paths are not activated and the established baseline repository behavior is retained, apart from mode-independent correctness coordination. The global B0 repository-authority mutation lease and B2 shared generation lease for positive-generation grounding remain active in both OFF and ON modes; they do not authorize destructive GC.
 
 
 ### Qualified chart presentation development
