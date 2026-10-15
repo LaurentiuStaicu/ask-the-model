@@ -326,7 +326,7 @@ atm_chart_catalog_validate (GError **error)
                 return fail (error, ATM_CHART_CATALOG_ERROR_SOURCE_POLICY, "Catalog contains a non-canonical snapshot SHA.");
 
         for (gsize j = 0; j < i; j++)
-            if (IS (e->series_id, entries[j].series_id))
+            if (g_strcmp0 (e->series_id, entries[j].series_id) == 0)
                 return fail (error, ATM_CHART_CATALOG_ERROR_DUPLICATE_ID, "Catalog repeats a stable series ID.");
 
         for (gsize j = 0; j < e->alias_count; j++) {
