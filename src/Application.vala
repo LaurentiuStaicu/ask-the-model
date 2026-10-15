@@ -5099,14 +5099,16 @@ namespace AskTheModel {
         }
 
         private bool pres09_test_select_ewd (
-            ChatTabState state
+            ChatTabState state,
+            bool include_rmd = false
         ) {
             uint index = 0;
             foreach (
                 RepositoryDescriptor descriptor
                 in RepositoryCatalog.all ()
             ) {
-                bool selected = descriptor.id == "ewd";
+                bool selected = descriptor.id == "ewd" ||
+                    (include_rmd && descriptor.id == "rmd");
                 repository_selection.set_selected (
                     descriptor.id,
                     selected
@@ -5119,7 +5121,11 @@ namespace AskTheModel {
                 index++;
             }
 
-            state.repository_ids = { "ewd" };
+            if (include_rmd) {
+                state.repository_ids = { "ewd", "rmd" };
+            } else {
+                state.repository_ids = { "ewd" };
+            }
             state.model_name = ollama_provider.model_name;
             state.model_digest = ollama_provider.model_digest;
             update_repository_selector_label ();
