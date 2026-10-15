@@ -132,6 +132,11 @@ test_source_semantics_and_provenance (void)
     g_assert_cmpstr (gistemp->subject, ==, "global_surface_temperature");
     g_assert_cmpstr (gistemp->attribute, ==, "annual_temperature_anomaly");
     g_assert_cmpstr (gistemp->reference_period, ==, "1951-1980");
+    g_assert_cmpstr (gistemp->coverage_start, ==, "1880");
+    g_assert_cmpstr (gistemp->coverage_end, ==, "2025");
+    g_assert_cmpuint (gistemp->coordinate_count, ==, 146);
+    g_assert_cmpuint (gistemp->numeric_observation_count, ==, 146);
+    g_assert_cmpstr (gistemp->epistemic_status, ==, "empirical");
     g_assert_cmpstr (gistemp->y_unit, ==, "degree_Celsius_anomaly");
     g_assert_cmpstr (gistemp->publisher_name, ==, "NASA GISS / GISTEMP v4");
     g_assert_true (g_str_has_prefix (gistemp->publisher_url, "https://"));
@@ -141,6 +146,10 @@ test_source_semantics_and_provenance (void)
     g_assert_cmpstr (ei->attribute, ==, "total_energy_supply");
     g_assert_cmpstr (ei->y_unit, ==, "exajoules/year");
     g_assert_cmpstr (ei->y_dimension, ==, "energy_flow_rate");
+    g_assert_cmpstr (ei->coverage_start, ==, "1965");
+    g_assert_cmpstr (ei->coverage_end, ==, "2025");
+    g_assert_cmpuint (ei->coordinate_count, ==, 61);
+    g_assert_cmpuint (ei->numeric_observation_count, ==, 61);
     g_assert_cmpstr (ei->publisher_name, ==,
                      "Energy Institute, Statistical Review of World Energy 2026");
     g_assert_nonnull (strstr (ei->observation_meaning, "Physical Energy Content"));
@@ -152,6 +161,10 @@ test_source_semantics_and_provenance (void)
     g_assert_cmpstr (bnr->y_dimension, ==, "survey_net_percentage");
     g_assert_cmpint (bnr->missing_policy, ==,
                      ATM_CHART_CATALOG_MISSING_BOUNDED_PROFILE);
+    g_assert_cmpstr (bnr->coverage_start, ==, "2022-Q4");
+    g_assert_cmpstr (bnr->coverage_end, ==, "2025-Q3");
+    g_assert_cmpuint (bnr->coordinate_count, ==, 12);
+    g_assert_cmpuint (bnr->numeric_observation_count, ==, 11);
     g_assert_cmpstr (bnr->missing_coordinate, ==, "2025-Q2");
     g_assert_cmpstr (bnr->missing_reason, ==, "source_round_not_retained");
     g_assert_cmpstr (bnr->publisher_name, ==,
