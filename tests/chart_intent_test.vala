@@ -150,5 +150,63 @@ int main () {
     assert (!ei_near_miss.gistemp_requested);
     assert (!ei_near_miss.energy_institute_requested);
 
+    var bnr_command = AskTheModel.ChartIntent.parse (
+        "/chart bnr-bls-c01 Show the quarterly credit standards net percentage trend."
+    );
+    assert (bnr_command.bnr_bls_c01_requested);
+    assert (!bnr_command.gistemp_requested);
+    assert (!bnr_command.energy_institute_requested);
+    assert (bnr_command.query ==
+        "Show the quarterly credit standards net percentage trend.");
+    assert (bnr_command.is_chart_only_request ());
+    string bnr_guidance = bnr_command.response_guidance ();
+    assert (bnr_guidance.contains ("pinned RMD snapshot"));
+    assert (bnr_guidance.contains ("2025-Q2"));
+    assert (bnr_guidance.contains ("MISSING, not zero"));
+    string bnr_response = bnr_command.chart_only_response ();
+    assert (bnr_response.contains ("BNR BLS C01 quarterly credit-standards"));
+    assert (bnr_response.contains ("MISSING, not zero"));
+    assert (bnr_response.contains ("Data"));
+
+    var bnr_upper = AskTheModel.ChartIntent.parse (
+        "/CHART BNR-BLS-C01 Show the series."
+    );
+    assert (bnr_upper.bnr_bls_c01_requested);
+    assert (bnr_upper.query == "Show the series.");
+
+    var bnr_empty = AskTheModel.ChartIntent.parse ("/chart bnr-bls-c01");
+    assert (bnr_empty.bnr_bls_c01_requested);
+    assert (bnr_empty.query == "");
+
+    var bnr_romanian = AskTheModel.ChartIntent.parse (
+        "Generează un grafic BNR BLS C01 al procentului net privind standardele de credit."
+    );
+    assert (bnr_romanian.bnr_bls_c01_requested);
+    assert (bnr_romanian.chart_only_response ().contains ("Iată graficul trimestrial BNR BLS C01"));
+
+    var bnr_english = AskTheModel.ChartIntent.parse (
+        "Generate a BNR BLS C01 chart of credit standards net percentage."
+    );
+    assert (bnr_english.bnr_bls_c01_requested);
+    assert (bnr_english.chart_only_response ().contains ("Here is the BNR BLS C01"));
+
+    var bnr_near_miss = AskTheModel.ChartIntent.parse (
+        "/chart bnr-bls-c01-ish Show the series."
+    );
+    assert (!bnr_near_miss.bnr_bls_c01_requested);
+
+    var bnr_interpretation = AskTheModel.ChartIntent.parse (
+        "/chart bnr-bls-c01 Explain what the quarterly trend means."
+    );
+    assert (bnr_interpretation.bnr_bls_c01_requested);
+    assert (!bnr_interpretation.is_chart_only_request ());
+    assert (bnr_interpretation.chart_only_response () == "");
+
+    var bnr_ambiguous = AskTheModel.ChartIntent.parse (
+        "Generate a chart comparing BNR BLS C01 credit standards with Energy Institute total energy supply."
+    );
+    assert (!bnr_ambiguous.bnr_bls_c01_requested);
+    assert (!bnr_ambiguous.energy_institute_requested);
+
     return 0;
 }
