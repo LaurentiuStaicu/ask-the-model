@@ -5,6 +5,8 @@ namespace AskTheModel {
 
 private const string EI_SNAPSHOT_SHA =
     "dc710d8e604c0fff713a3acfdb18ab47a1a902bb";
+private const string BNR_SNAPSHOT_SHA =
+    "e43eb4e899f123d3b1aa0f6e20b7c8ed35434170";
 private const string TEST_MODEL = "test-model";
 private const string TEST_DIGEST = "test-digest";
 
@@ -250,6 +252,13 @@ private static int run_orchestrator (
         "snapshots",
         EI_SNAPSHOT_SHA
     );
+    string bnr_snapshot_root = GLib.Path.build_filename (
+        data_root,
+        "Repositories",
+        "rmd",
+        "snapshots",
+        BNR_SNAPSHOT_SHA
+    );
     string state_db = GLib.Path.build_filename (
         state,
         "control-state.sqlite3"
@@ -287,6 +296,24 @@ private static int run_orchestrator (
             File.new_for_path (snapshot_root)
         );
 
+        string? full_rmd_root =
+            Environment.get_variable ("ATM_PRES09_FULL_RMD_ROOT");
+        if (full_rmd_root == null || full_rmd_root.strip ().length == 0) {
+            stderr.printf ("ATM_PRES09_FULL_RMD_ROOT is required for the BNR C01 application E2E.\\n");
+            remove_tree_best_effort (File.new_for_path (root));
+            return 1;
+        }
+        string source_rmd_snapshot = GLib.Path.is_absolute (full_rmd_root)
+            ? full_rmd_root
+            : GLib.Path.build_filename (
+                Environment.get_current_dir (),
+                full_rmd_root
+            );
+        copy_tree (
+            File.new_for_path (source_rmd_snapshot),
+            File.new_for_path (bnr_snapshot_root)
+        );
+
         string app_commit = string.nfill (64, 'a');
         string runtime_commit = string.nfill (64, 'b');
         string app_extension_commit = string.nfill (64, 'c');
@@ -314,7 +341,20 @@ private static int run_orchestrator (
                 out file_count,
                 out total_bytes
             )) {
-            stderr.printf ("PRES-09 could not compute fixture snapshot seal.\n");
+            stderr.printf ("PRES-09 could not compute fixture EWD snapshot seal.\\n");
+            remove_tree_best_effort (File.new_for_path (root));
+            return 1;
+        }
+        string bnr_seal;
+        uint64 bnr_file_count;
+        uint64 bnr_total_bytes;
+        if (!RepositoryNative.compute_snapshot_seal (
+                bnr_snapshot_root,
+                out bnr_seal,
+                out bnr_file_count,
+                out bnr_total_bytes
+            )) {
+            stderr.printf ("PRES-09 could not compute fixture RMD snapshot seal.\\n");
             remove_tree_best_effort (File.new_for_path (root));
             return 1;
         }
@@ -340,7 +380,21 @@ private static int run_orchestrator (
                 seal,
                 out generation_id
             ) || generation_id <= 0) {
-            stderr.printf ("PRES-09 could not seed the pinned EWD Control DB generation.\n");
+            stderr.printf ("PRES-09 could not seed the pinned EWD Control DB generation.\\n");
+            remove_tree_best_effort (File.new_for_path (root));
+            return 1;
+        }
+        int64 rmd_generation_id = 0;
+        if (!ControlStateNative.set_current_values_guarded (
+                state_db,
+                generation_id,
+                "rmd",
+                BNR_SNAPSHOT_SHA,
+                "0.3.0",
+                bnr_seal,
+                out rmd_generation_id
+            ) || rmd_generation_id <= generation_id) {
+            stderr.printf ("PRES-09 could not seed the pinned RMD Control DB generation.\\n");
             remove_tree_best_effort (File.new_for_path (root));
             return 1;
         }
@@ -450,11 +504,23 @@ private static int run_application_phase (
             "data",
             "input_manifest.json"
         );
+        string bnr_audit = GLib.Path.build_filename (
+            home,
+            "Ask the Model",
+            "Repositories",
+            "rmd",
+            "snapshots",
+            BNR_SNAPSHOT_SHA,
+            "model",
+            "calibration_validation",
+            "bnr_bls_cross_round_mapping_audit.json"
+        );
         try {
             File.new_for_path (manifest).delete (null);
+            File.new_for_path (bnr_audit).delete (null);
         } catch (GLib.Error error) {
             stderr.printf (
-                "PRES-09 could not tamper with the test manifest: %s\n",
+                "PRES-09 could not tamper with the EWD/RMD test sources: %s\n",
                 error.message
             );
             server.disconnect ();

@@ -26,6 +26,13 @@ jobs:
           ref: dc710d8e604c0fff713a3acfdb18ab47a1a902bb
           path: ewd-full
           fetch-depth: 1
+      - name: Checkout RMD at the admitted immutable BNR BLS C01 snapshot
+        uses: actions/checkout@v4
+        with:
+          repository: LaurentiuStaicu/romanian-monetary-dynamics
+          ref: e43eb4e899f123d3b1aa0f6e20b7c8ed35434170
+          path: rmd-full
+          fetch-depth: 1
       - name: Install GTK Application test dependencies
         run: |
           set -euo pipefail
@@ -54,6 +61,7 @@ jobs:
         env:
           ATM_CHART01_FIXTURE: tests/fixtures/chart01
           ATM_PRES09_FULL_EWD_ROOT: ewd-full
+          ATM_PRES09_FULL_RMD_ROOT: rmd-full
           GTK_A11Y: none
           GTK_IM_MODULE: gtk-im-context-simple
           GDK_BACKEND: x11
