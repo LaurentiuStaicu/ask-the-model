@@ -2651,6 +2651,52 @@ validate_v3_for_migration (
 }
 
 static gboolean
+validate_v4_for_migration (
+    sqlite3 *db,
+    GError **error
+)
+{
+    static const char *required_tables[] = {
+        "installation", "conversations", "conversation_repositories",
+        "messages", "citations", "message_charts", "chart_series"
+    };
+    gint64 application_id = 0;
+    gint64 user_version = 0;
+    for (gsize i = 0; i < G_N_ELEMENTS (required_tables); i++) {
+        if (!required_table_exists (db, required_tables[i], error))
+            return FALSE;
+    }
+    if (!query_single_int64 (db, "PRAGMA application_id;", &application_id, error) ||
+        !query_single_int64 (db, "PRAGMA user_version;", &user_version, error))
+        return FALSE;
+    if (application_id != (gint64) ATM_CONVERSATION_STORE_APPLICATION_ID ||
+        user_version != ATM_CONVERSATION_STORE_SCHEMA_V4_VERSION) {
+        g_set_error_literal (error, ATM_CONVERSATION_STORE_ERROR,
+            ATM_CONVERSATION_STORE_ERROR_SCHEMA,
+            "Conversation-store v4 identity/version is invalid for migration.");
+        return FALSE;
+    }
+    char *schema_id = NULL;
+    if (!query_single_text (db,
+            "SELECT schema_id FROM installation WHERE singleton_id=1;",
+            &schema_id, error))
+        return FALSE;
+    gboolean schema_ok =
+        g_strcmp0 (schema_id, ATM_CONVERSATION_STORE_SCHEMA_V4_ID) == 0;
+    g_free (schema_id);
+    if (!schema_ok) {
+        g_set_error_literal (error, ATM_CONVERSATION_STORE_ERROR,
+            ATM_CONVERSATION_STORE_ERROR_SCHEMA,
+            "Conversation-store v4 schema identity is invalid for migration.");
+        return FALSE;
+    }
+    return validate_integrity (db, error) &&
+        validate_base_semantics (db, error) &&
+        validate_chart_semantics (db, error);
+}
+
+
+static gboolean
 migrate_v1_to_v3 (
     AtmConversationStore *store,
     GError **error
@@ -2811,6 +2857,54 @@ migrate_v3_to_v4 (
         goto rollback;
 
     char *version_sql = g_strdup_printf ("PRAGMA user_version=%d;",
+        ATM_CONVERSATION_STORE_SCHEMA_V4_VERSION);
+    if (!exec_sql (store->db, version_sql, error)) {
+        g_free (version_sql);
+        goto rollback;
+    }
+    g_free (version_sql);
+
+    if (!validate_v4_for_migration (store->db, error))
+        goto rollback;
+    if (!exec_sql (store->db, "COMMIT;", error))
+        goto rollback;
+
+    ok = TRUE;
+rollback:
+    if (!ok)
+        sqlite3_exec (store->db, "ROLLBACK;", NULL, NULL, NULL);
+    g_free (migration_sql);
+    return ok;
+}
+
+static gboolean
+migrate_v4_to_v5 (
+    AtmConversationStore *store,
+    GError **error
+)
+{
+    if (store == NULL || store->db == NULL) {
+        g_set_error_literal (error, ATM_CONVERSATION_STORE_ERROR,
+            ATM_CONVERSATION_STORE_ERROR_ARGUMENT,
+            "Conversation-store schema migration requires an open store.");
+        return FALSE;
+    }
+    if (!validate_v4_for_migration (store->db, error))
+        return FALSE;
+
+    char *migration_sql = NULL;
+    if (!load_migration_v4_v5_sql (&migration_sql, error))
+        return FALSE;
+    if (!exec_sql (store->db, "BEGIN IMMEDIATE;", error)) {
+        g_free (migration_sql);
+        return FALSE;
+    }
+
+    gboolean ok = FALSE;
+    if (!exec_sql (store->db, migration_sql, error))
+        goto rollback;
+
+    char *version_sql = g_strdup_printf ("PRAGMA user_version=%d;",
         ATM_CONVERSATION_STORE_SCHEMA_VERSION);
     if (!exec_sql (store->db, version_sql, error)) {
         g_free (version_sql);
@@ -2830,6 +2924,7 @@ rollback:
     g_free (migration_sql);
     return ok;
 }
+
 
 gboolean
 atm_conversation_store_open (
@@ -2980,7 +3075,8 @@ atm_conversation_store_open (
             ATM_CONVERSATION_STORE_SCHEMA_V1_VERSION
     ) {
         if (!migrate_v1_to_v3 (store, error) ||
-            !migrate_v3_to_v4 (store, error)) {
+            !migrate_v3_to_v4 (store, error) ||
+            !migrate_v4_to_v5 (store, error)) {
             atm_conversation_store_close (store);
             return FALSE;
         }
@@ -2989,14 +3085,23 @@ atm_conversation_store_open (
             ATM_CONVERSATION_STORE_SCHEMA_V2_VERSION
     ) {
         if (!migrate_v2_to_v3 (store, error) ||
-            !migrate_v3_to_v4 (store, error)) {
+            !migrate_v3_to_v4 (store, error) ||
+            !migrate_v4_to_v5 (store, error)) {
             atm_conversation_store_close (store);
             return FALSE;
         }
     } else if (
         user_version == ATM_CONVERSATION_STORE_SCHEMA_V3_VERSION
     ) {
-        if (!migrate_v3_to_v4 (store, error)) {
+        if (!migrate_v3_to_v4 (store, error) ||
+            !migrate_v4_to_v5 (store, error)) {
+            atm_conversation_store_close (store);
+            return FALSE;
+        }
+    } else if (
+        user_version == ATM_CONVERSATION_STORE_SCHEMA_V4_VERSION
+    ) {
+        if (!migrate_v4_to_v5 (store, error)) {
             atm_conversation_store_close (store);
             return FALSE;
         }
