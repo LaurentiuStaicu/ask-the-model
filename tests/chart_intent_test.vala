@@ -274,5 +274,20 @@ int main () {
     );
     assert (!bnr_romanian_multi_series.bnr_bls_c01_requested);
 
+    var bnr_natural_derived = AskTheModel.ChartIntent.parse (
+        "Generate a chart of the standard deviation of credit standards."
+    );
+    assert (!bnr_natural_derived.bnr_bls_c01_requested);
+
+    var bnr_explicit_derived = AskTheModel.ChartIntent.parse (
+        "/chart bnr-bls-c01 Use a moving average of the series."
+    );
+    assert (!bnr_explicit_derived.bnr_bls_c01_requested);
+
+    var bnr_romanian_derived = AskTheModel.ChartIntent.parse (
+        "Generează un grafic cu medie mobilă pentru standardele de credit."
+    );
+    assert (!bnr_romanian_derived.bnr_bls_c01_requested);
+
     return 0;
 }
