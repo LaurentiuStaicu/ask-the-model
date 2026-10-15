@@ -202,7 +202,7 @@ static gboolean layout_fits (cairo_t *cr, const AtmChartProjection *p, guint wid
         previous_top = top;
     }
     return fits (cr, "Anomaly relative to 1951-1980 (deg C)", width - 32) &&
-        fits (cr, "Source: EWD pinned GISTEMP | vintage 2026-08-31", width - 32);
+        fits (cr, "Source: NASA GISTEMP | vintage 2026-08-31", width - 32);
 }
 
 static void chart_energy_institute (cairo_t *cr, const AtmChartSpec *spec,
@@ -251,7 +251,7 @@ static void chart_energy_institute (cairo_t *cr, const AtmChartSpec *spec,
     if (atm_chart_spec_kind (spec) == ATM_CHART_LINE) cairo_stroke (cr);
     cairo_restore (cr);
     font (cr, 12, FALSE);
-    label (cr, "Source: EWD pinned Energy Institute | Physical Energy Content", 16, height - 36, 0);
+    label (cr, "Source: Energy Institute | Physical Energy Content", 16, height - 36, 0);
     label (cr, "Exact values and source details: Data view", 16, height - 16, 0);
 }
 
@@ -285,8 +285,8 @@ static gboolean layout_fits_bnr (cairo_t *cr, const AtmChartProjection *p, guint
         previous_bottom = bottom;
     }
     return fits (cr, "Net percentage, non-financial corporations", width - 32) &&
-        fits (cr, "Source: RMD pinned BNR BLS C01", width - 32) &&
-        fits (cr, "2025-Q2 MISSING | Exact data: Data view", width - 32);
+        fits (cr, "Source: BNR BLS C01", width - 32) &&
+        fits (cr, "2025-Q2 missing, not zero | Data view", width - 32);
 }
 
 static void chart_bnr (cairo_t *cr, const AtmChartSpec *spec,
@@ -356,8 +356,8 @@ static void chart_bnr (cairo_t *cr, const AtmChartSpec *spec,
     cairo_restore (cr);
 
     font (cr, 12, FALSE);
-    label (cr, "Source: RMD pinned BNR BLS C01", 16, height - 36, 0);
-    label (cr, "2025-Q2 MISSING | Exact data: Data view", 16, height - 16, 0);
+    label (cr, "Source: BNR BLS C01", 16, height - 36, 0);
+    label (cr, "2025-Q2 missing, not zero | Data view", 16, height - 16, 0);
 }
 
 static gboolean layout_fits_ei (cairo_t *cr, const AtmChartProjection *p, guint width)
@@ -380,7 +380,7 @@ static gboolean layout_fits_ei (cairo_t *cr, const AtmChartProjection *p, guint 
         previous_top = baseline + e.y_bearing;
     }
     return fits (cr, "TES, Physical Energy Content (exajoules/year)", width - 32) &&
-        fits (cr, "Source: EWD pinned Energy Institute | Physical Energy Content", width - 32);
+        fits (cr, "Source: Energy Institute | Physical Energy Content", width - 32);
 }
 
 static void chart (cairo_t *cr, const AtmChartSpec *spec, const AtmChartProjection *p,
@@ -435,7 +435,7 @@ static void chart (cairo_t *cr, const AtmChartSpec *spec, const AtmChartProjecti
     if (atm_chart_spec_kind (spec) == ATM_CHART_LINE) cairo_stroke (cr);
     cairo_restore (cr);
     font (cr, 12, FALSE);
-    label (cr, "Source: EWD pinned GISTEMP | vintage 2026-08-31", 16, height - 36, 0);
+    label (cr, "Source: NASA GISTEMP | vintage 2026-08-31", 16, height - 36, 0);
     label (cr, "Exact values and source details: Data view", 16, height - 16, 0);
 }
 static gboolean prepare_viewport (const AtmChartSpec *spec, guint width, guint height, guint scale,
