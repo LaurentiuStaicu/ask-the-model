@@ -2716,7 +2716,7 @@ namespace AskTheModel {
                 var link =
                     new Gtk.LinkButton.with_label (
                         permalink,
-                        "Open immutable source"
+                        "Open source"
                     ) {
                         halign = Gtk.Align.START
                     };
