@@ -190,6 +190,28 @@ int main () {
     assert (bnr_english.bnr_bls_c01_requested);
     assert (bnr_english.chart_only_response ().contains ("Here is the BNR BLS C01"));
 
+    var generic_net_percentage = AskTheModel.ChartIntent.parse (
+        "Generate a chart of the net percentage of non-performing loans."
+    );
+    assert (!generic_net_percentage.bnr_bls_c01_requested);
+    assert (!generic_net_percentage.gistemp_requested);
+    assert (!generic_net_percentage.energy_institute_requested);
+
+    var generic_romanian_net_percentage = AskTheModel.ChartIntent.parse (
+        "Generează un grafic al procentului net pentru creditele neperformante."
+    );
+    assert (!generic_romanian_net_percentage.bnr_bls_c01_requested);
+
+    var credit_standard_deviation = AskTheModel.ChartIntent.parse (
+        "Generate a chart of credit standard deviation."
+    );
+    assert (!credit_standard_deviation.bnr_bls_c01_requested);
+
+    var credit_standards_subject = AskTheModel.ChartIntent.parse (
+        "Generate a chart of credit standards over time."
+    );
+    assert (credit_standards_subject.bnr_bls_c01_requested);
+
     var bnr_near_miss = AskTheModel.ChartIntent.parse (
         "/chart bnr-bls-c01-ish Show the series."
     );
