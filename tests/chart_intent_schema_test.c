@@ -79,10 +79,10 @@ test_valid_registered_chart_profiles (void)
         ATM_CHART_INTENT_RESPONSE_CHART_ONLY, ATM_CHART_INTENT_LANGUAGE_EN);
     g_free (gistemp);
 
-    gchar *energy = make_json (ATM_CHART_INTENT_SCHEMA_ID, "chart",
+    gchar *energy = make_json (ATM_CHART_INTENT_SCHEMA_ID, "interpretation",
         "\"energy.energy-institute.global-total-energy-supply\"", "\"line\"",
         "chart_with_interpretation", "en", NULL);
-    assert_valid (energy, ATM_CHART_INTENT_CHART,
+    assert_valid (energy, ATM_CHART_INTENT_INTERPRETATION,
         "energy.energy-institute.global-total-energy-supply", TRUE,
         ATM_CHART_INTENT_RESPONSE_CHART_WITH_INTERPRETATION,
         ATM_CHART_INTENT_LANGUAGE_EN);
@@ -264,6 +264,13 @@ test_inconsistent_combinations (void)
     assert_invalid (data_with_line, strlen (data_with_line),
         ATM_CHART_INTENT_SCHEMA_ERROR_INCONSISTENT);
     g_free (data_with_line);
+
+    gchar *chart_mislabeled = make_json (ATM_CHART_INTENT_SCHEMA_ID, "chart",
+        "\"climate.gistemp.global-temperature-anomaly\"", "\"line\"",
+        "chart_with_interpretation", "en", NULL);
+    assert_invalid (chart_mislabeled, strlen (chart_mislabeled),
+        ATM_CHART_INTENT_SCHEMA_ERROR_INCONSISTENT);
+    g_free (chart_mislabeled);
 }
 
 static void
