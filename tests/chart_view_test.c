@@ -12,6 +12,51 @@ static void settle (void)
     do { while (g_main_context_iteration (NULL, FALSE)); g_usleep (1000); }
     while (g_get_monotonic_time () < deadline);
 }
+static GtkExpander *find_expander (GtkWidget *widget)
+{
+    if (GTK_IS_EXPANDER (widget))
+        return GTK_EXPANDER (widget);
+
+    for (GtkWidget *child = gtk_widget_get_first_child (widget);
+         child != NULL;
+         child = gtk_widget_get_next_sibling (child)) {
+        GtkExpander *found = find_expander (child);
+        if (found != NULL)
+            return found;
+    }
+    return NULL;
+}
+
+static GtkLinkButton *find_link_button (GtkWidget *widget)
+{
+    if (GTK_IS_LINK_BUTTON (widget))
+        return GTK_LINK_BUTTON (widget);
+
+    for (GtkWidget *child = gtk_widget_get_first_child (widget);
+         child != NULL;
+         child = gtk_widget_get_next_sibling (child)) {
+        GtkLinkButton *found = find_link_button (child);
+        if (found != NULL)
+            return found;
+    }
+    return NULL;
+}
+
+static GtkColumnView *find_column_view (GtkWidget *widget)
+{
+    if (GTK_IS_COLUMN_VIEW (widget))
+        return GTK_COLUMN_VIEW (widget);
+
+    for (GtkWidget *child = gtk_widget_get_first_child (widget);
+         child != NULL;
+         child = gtk_widget_get_next_sibling (child)) {
+        GtkColumnView *found = find_column_view (child);
+        if (found != NULL)
+            return found;
+    }
+    return NULL;
+}
+
 static void screenshot (GtkWindow *window, const char *name)
 {
     const char *directory = g_getenv ("ATM_CHART03_GTK_OUTPUT"); if (!directory) return;
@@ -141,6 +186,18 @@ test_bnr_quarterly_data_and_missing_provenance (void)
     AtmChartView *view = build_bnr_view ();
     g_assert_false (g_object_is_floating (view));
     g_assert_cmpuint (atm_chart_view_row_count (view), ==, 12u);
+    GtkExpander *source_details = find_expander (GTK_WIDGET (view));
+    g_assert_nonnull (source_details);
+    g_assert_cmpstr (gtk_expander_get_label (source_details), ==, "Source details");
+    g_assert_true (gtk_expander_get_expanded (source_details));
+    GtkColumnView *data_table = find_column_view (GTK_WIDGET (view));
+    g_assert_nonnull (data_table);
+    g_assert_cmpuint (g_list_model_get_n_items (gtk_column_view_get_columns (data_table)), ==, 3u);
+    GtkLinkButton *source_link = find_link_button (GTK_WIDGET (view));
+    g_assert_nonnull (source_link);
+    g_assert_cmpstr (gtk_link_button_get_uri (source_link), ==,
+        "https://github.com/LaurentiuStaicu/romanian-monetary-dynamics/blob/"
+        "e43eb4e899f123d3b1aa0f6e20b7c8ed35434170/data/processed/bnr_bls_realised_rounds.csv");
     g_assert_cmpstr (atm_chart_view_visible_page (view), ==, "chart");
     const char *data = atm_chart_view_data (view);
     g_assert_nonnull (data);
@@ -153,26 +210,31 @@ test_bnr_quarterly_data_and_missing_provenance (void)
     g_assert_true (atm_chart_view_select_row (view, 0u));
     char *provenance = atm_chart_view_provenance (view);
     g_assert_nonnull (provenance);
-    g_assert_true (g_str_has_prefix (provenance, "Quarter: 2022-Q4\nStatus: NUMERIC"));
-    g_assert_nonnull (strstr (provenance, "Exact net percentage: 11.89%"));
-    g_assert_nonnull (strstr (provenance, "Physical source row: 2"));
-    g_assert_nonnull (strstr (provenance, ATM_BNR_BLS_SNAPSHOT_SHA));
+    g_assert_true (g_str_has_prefix (provenance, "Quarter: 2022-Q4\nNet percentage: 11.89%"));
+    g_assert_nonnull (strstr (provenance, "Source: BNR BLS C01 credit-standards net percentage"));
+    g_assert_nonnull (strstr (provenance, ATM_BNR_BLS_UPSTREAM_REPOSITORY));
+    g_assert_null (strstr (provenance, "Physical source row:"));
+    g_assert_null (strstr (provenance, "Snapshot:"));
+    g_assert_null (strstr (provenance, "Canonical decimal:"));
+    g_assert_null (strstr (provenance, "Support identities:"));
     g_free (provenance);
 
     g_assert_true (atm_chart_view_select_row (view, 10u));
     provenance = atm_chart_view_provenance (view);
     g_assert_nonnull (provenance);
-    g_assert_true (g_str_has_prefix (provenance, "Quarter: 2025-Q2\nStatus: MISSING"));
-    g_assert_nonnull (strstr (provenance, "Reason: source_round_not_retained"));
+    g_assert_true (g_str_has_prefix (provenance, "Quarter: 2025-Q2\nStatus: Missing"));
+    g_assert_nonnull (strstr (provenance, "Reason: The source round was not retained."));
     g_assert_nonnull (strstr (provenance, "No numeric value is available; this is not zero."));
-    g_assert_nonnull (strstr (provenance, "Physical source row: none"));
+    g_assert_null (strstr (provenance, "source_round_not_retained"));
+    g_assert_null (strstr (provenance, "Physical source row:"));
     g_assert_null (strstr (provenance, "Exact net percentage: 0%"));
+    g_assert_null (strstr (provenance, "Snapshot:"));
     g_free (provenance);
 
     g_assert_true (atm_chart_view_select_row (view, 11u));
     provenance = atm_chart_view_provenance (view);
-    g_assert_true (g_str_has_prefix (provenance, "Quarter: 2025-Q3\nStatus: NUMERIC"));
-    g_assert_nonnull (strstr (provenance, "Physical source row: 12"));
+    g_assert_true (g_str_has_prefix (provenance, "Quarter: 2025-Q3\nNet percentage: 9.46%"));
+    g_assert_null (strstr (provenance, "Physical source row:"));
     g_free (provenance);
 
     atm_chart_view_show_data (view);
@@ -188,6 +250,15 @@ static void test_ei_data_lifetime (void)
     AtmChartView *view = build_ei_view ();
     g_assert_false (g_object_is_floating (view));
     g_assert_cmpuint (atm_chart_view_row_count (view), ==, 61u);
+    GtkColumnView *data_table = find_column_view (GTK_WIDGET (view));
+    g_assert_nonnull (data_table);
+    g_assert_cmpuint (g_list_model_get_n_items (gtk_column_view_get_columns (data_table)), ==, 2u);
+    GtkLinkButton *source_link = find_link_button (GTK_WIDGET (view));
+    g_assert_nonnull (source_link);
+    g_assert_cmpstr (gtk_link_button_get_uri (source_link), ==,
+        "https://github.com/LaurentiuStaicu/empirical-world3-dynamics/blob/"
+        "dc710d8e604c0fff713a3acfdb18ab47a1a902bb/"
+        "science/data/processed/energy_institute_global_2026.csv");
     const char *data = atm_chart_view_data (view);
     g_assert_nonnull (data);
     g_assert_nonnull (strstr (data, "# unit\texajoules/year"));
@@ -197,16 +268,18 @@ static void test_ei_data_lifetime (void)
     g_assert_true (atm_chart_view_select_row (view, 0));
     char *provenance = atm_chart_view_provenance (view);
     g_assert_nonnull (provenance);
-    g_assert_true (g_str_has_prefix (provenance, "Year: 1965\nExact TES: "));
-    g_assert_nonnull (strstr (provenance, "Physical Energy Content"));
-    g_assert_nonnull (strstr (provenance, "Source row: 2\n"));
-    g_assert_nonnull (strstr (provenance, "Snapshot: dc710d8e604c0fff713a3acfdb18ab47a1a902bb"));
+    g_assert_true (g_str_has_prefix (provenance, "Year: 1965\nGlobal total energy supply: "));
+    g_assert_nonnull (strstr (provenance, "Method: Physical Energy Content"));
+    g_assert_nonnull (strstr (provenance, "Source: Energy Institute global total energy supply dataset"));
+    g_assert_null (strstr (provenance, "Source row:"));
+    g_assert_null (strstr (provenance, "Snapshot:"));
+    g_assert_null (strstr (provenance, "Canonical decimal:"));
     g_free (provenance);
 
     g_assert_true (atm_chart_view_select_row (view, 60));
     provenance = atm_chart_view_provenance (view);
-    g_assert_true (g_str_has_prefix (provenance, "Year: 2025\nExact TES: "));
-    g_assert_nonnull (strstr (provenance, "Source row: 62\n"));
+    g_assert_true (g_str_has_prefix (provenance, "Year: 2025\nGlobal total energy supply: "));
+    g_assert_null (strstr (provenance, "Source row:"));
     g_free (provenance);
 
     atm_chart_view_show_data (view);
@@ -230,7 +303,13 @@ static void test_data_lifetime (void)
         g_assert_true (atm_chart_view_select_row (view, i));
         char *text = atm_chart_view_provenance (view), *year = g_strdup_printf ("Year: %u\n",1880+i);
         g_assert_true (g_str_has_prefix (text,year));
-        g_assert_nonnull (strstr (text, "Support identities:\n")); g_free (year); g_free (text);
+        g_assert_nonnull (strstr (text, "Source: NASA GISTEMP global annual temperature anomalies"));
+        g_assert_nonnull (strstr (text, "Baseline: 1951-1980"));
+        g_assert_null (strstr (text, "Support identities:"));
+        g_assert_null (strstr (text, "Snapshot:"));
+        g_assert_null (strstr (text, "Canonical decimal:"));
+        g_assert_null (strstr (text, "Source row:"));
+        g_free (year); g_free (text);
     }
     g_assert_false (atm_chart_view_select_row (view, 146));
     g_assert_cmpuint (atm_chart_view_selected_row (view), ==, 145);

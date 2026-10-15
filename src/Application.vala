@@ -2649,10 +2649,9 @@ namespace AskTheModel {
                     : citation.repository_id;
 
             var heading = new Gtk.Label (
-                "[%u] %s · v%s".printf (
+                "[%u] %s".printf (
                     display_number,
-                    repository_name,
-                    citation.repository_version
+                    repository_name
                 )
             ) {
                 halign = Gtk.Align.START,
@@ -2661,45 +2660,6 @@ namespace AskTheModel {
             };
             heading.add_css_class ("heading");
             content.append (heading);
-
-            var source = new Gtk.Label (
-                "%s · %s".printf (
-                    citation.source_path,
-                    citation.locator
-                )
-            ) {
-                halign = Gtk.Align.START,
-                xalign = 0.0f,
-                selectable = true,
-                wrap = true,
-                max_width_chars = 72
-            };
-            source.add_css_class ("dim-label");
-            content.append (source);
-
-            var sha = new Gtk.Label (
-                "Snapshot: " + citation.snapshot_sha
-            ) {
-                halign = Gtk.Align.START,
-                xalign = 0.0f,
-                selectable = true,
-                wrap = true,
-                max_width_chars = 72
-            };
-            sha.add_css_class ("dim-label");
-            content.append (sha);
-
-            var logical_source = new Gtk.Label (
-                "Source ID: " + citation.logical_source_id
-            ) {
-                halign = Gtk.Align.START,
-                xalign = 0.0f,
-                selectable = true,
-                wrap = true,
-                max_width_chars = 72
-            };
-            logical_source.add_css_class ("dim-label");
-            content.append (logical_source);
 
             if (citation.title != null &&
                 citation.title.strip ().length > 0) {
@@ -2756,7 +2716,7 @@ namespace AskTheModel {
                 var link =
                     new Gtk.LinkButton.with_label (
                         permalink,
-                        "Open immutable source"
+                        "Open source"
                     ) {
                         halign = Gtk.Align.START
                     };
@@ -5680,13 +5640,23 @@ namespace AskTheModel {
             string bnr_data = bnr_view.data () ?? "";
             if (!bnr_data.contains ("0\t2025-Q2\tMISSING\t\t\t0\tnone\t") ||
                 !bnr_data.contains ("source_round_not_retained") ||
-                !bnr_view.select_row (10) ||
-                !(bnr_view.provenance () ?? "").contains ("No numeric value is available; this is not zero.") ||
-                !(bnr_view.provenance () ?? "").contains ("source_round_not_retained") ||
-                !(bnr_view.provenance () ?? "").contains ("Physical source row: none") ||
+                !bnr_view.select_row (10)) {
+                pres09_test_finish (
+                    false,
+                    "BNR 2025-Q2 missing source contract was not preserved in the internal Data payload"
+                );
+                return false;
+            }
+            string bnr_missing_provenance = bnr_view.provenance () ?? "";
+            if (!bnr_missing_provenance.contains ("No numeric value is available; this is not zero.") ||
+                !bnr_missing_provenance.contains ("Reason: The source round was not retained.") ||
+                !bnr_missing_provenance.contains ("Source: BNR BLS C01 credit-standards net percentage") ||
+                bnr_missing_provenance.contains ("source_round_not_retained") ||
+                bnr_missing_provenance.contains ("Physical source row:") ||
+                bnr_missing_provenance.contains ("Snapshot:") ||
                 !pres09_test_write_file (
                     "pres09-bnr-c01-missing-provenance.txt",
-                    bnr_view.provenance () ?? ""
+                    bnr_missing_provenance
                 ) ||
                 !pres09_test_save_live_oracle (state)) {
                 pres09_test_finish (

@@ -218,18 +218,29 @@ def main() -> int:
         "private void show_source_detail_window (",
     )
     for marker in (
-        "citation.repository_version",
+        "repository_name",
+        "citation.title",
+        "citation.excerpt",
+        "source_excerpt_display_text (citation)",
         "citation.snapshot_sha",
         "citation.source_path",
         "citation.locator",
-        "citation.logical_source_id",
-        "source_excerpt_display_text (citation)",
         "citation.immutable_permalink",
         "descriptor.immutable_file_permalink (",
         "Gtk.LinkButton.with_label (",
-        '"Open immutable source"',
+        '"Open source"',
     ):
-        require_marker(details, marker, "Source detail provenance")
+        require_marker(details, marker, "User-facing source details and immutable link")
+    for marker in (
+        '"Snapshot: "',
+        '"Source ID: "',
+        'citation.repository_version',
+        'citation.logical_source_id',
+    ):
+        require(
+            marker not in details,
+            f"Technical provenance leaks into ordinary source-detail UI: {marker}",
+        )
     require(
         details.count("Gtk.LinkButton.with_label (") == 1,
         "Source detail acquired another active URL surface",

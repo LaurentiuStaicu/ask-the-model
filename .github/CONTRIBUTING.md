@@ -67,7 +67,7 @@ For repository/retrieval changes, report the fixture or exact repository SHAs us
 
 For UI changes, describe the target GTK/elementary environment and verify both light/dark appearance where relevant.
 
-For citation/provenance changes, verify that the user-visible source still identifies repository, version, exact snapshot SHA and source locator.
+For citation/provenance changes, verify that ordinary user-visible details identify the readable source or repository, title/context, and an immutable source link when available. Show dates, versions and locators only when useful for interpretation. Keep exact snapshot SHAs, internal source IDs, source paths and support identities in the internal provenance/persistence contract; do not require them in the ordinary UI.
 
 ## Version and release changes
 

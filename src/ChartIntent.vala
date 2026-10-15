@@ -118,18 +118,18 @@ namespace AskTheModel {
 
             if (bnr_bls_c01_requested) {
                 return romanian
-                    ? "Iată graficul trimestrial BNR BLS C01 pentru procentul net privind standardele de credit. Consultă fila Data pentru valorile exacte și proveniența surselor; 2025-Q2 este MISSING, nu zero."
-                    : "Here is the BNR BLS C01 quarterly credit-standards net-percentage chart. See Data for exact values and source provenance; 2025-Q2 is MISSING, not zero.";
+                    ? "Iată graficul trimestrial BNR BLS C01 pentru procentul net privind standardele de credit. Consultă fila Data pentru valorile exacte și detaliile sursei; valoarea pentru 2025-Q2 lipsește, nu este zero."
+                    : "Here is the BNR BLS C01 quarterly credit-standards net-percentage chart. See Data for exact values and source details; 2025-Q2 is missing, not zero.";
             }
             if (energy_institute_requested) {
                 return romanian
-                    ? "Iată graficul Energy Institute al furnizării totale globale de energie. Consultă fila Data pentru valorile anuale și proveniența surselor."
-                    : "Here is the Energy Institute global total energy supply chart. See the Data tab for the underlying annual values and source provenance.";
+                    ? "Iată graficul Energy Institute al furnizării totale globale de energie. Consultă fila Data pentru valorile anuale și detaliile sursei."
+                    : "Here is the Energy Institute global total energy supply chart. See the Data tab for the annual values and source details.";
             }
             if (gistemp_requested) {
                 return romanian
-                    ? "Iată graficul GISTEMP al anomaliilor temperaturii globale. Consultă fila Data pentru valorile și proveniența surselor."
-                    : "Here is the GISTEMP global temperature anomaly chart. See the Data tab for the underlying values and source provenance.";
+                    ? "Iată graficul GISTEMP al anomaliilor temperaturii globale. Consultă fila Data pentru valori și detalii despre sursă."
+                    : "Here is the GISTEMP global temperature anomaly chart. See the Data tab for the values and source details.";
             }
             return "";
         }

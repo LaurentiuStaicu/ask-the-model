@@ -52,16 +52,16 @@ body:
   - type: input
     id: snapshot
     attributes:
-      label: Snapshot SHA
-      description: Exact SHA shown by AtM when available.
+      label: Snapshot SHA (diagnostic, if available)
+      description: This is not normally shown in the user-facing source detail. Include it only if available from a diagnostic or repository audit.
       placeholder: "40-character Git SHA"
     validations:
       required: false
   - type: input
     id: source
     attributes:
-      label: Source ID / locator
-      description: Include the Source ID and locator from the source-detail window when the issue involves evidence or citations.
+      label: Displayed source / context
+      description: Include the readable source title or repository name, the relevant excerpt, and the source link if available. Internal IDs are not required from the ordinary UI.
     validations:
       required: false
   - type: textarea

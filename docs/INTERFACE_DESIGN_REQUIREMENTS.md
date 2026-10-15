@@ -170,14 +170,14 @@ The closed AI-model and repository selector surfaces use the same neutral surfac
 
 Grounded answers do not expose temporary model-facing labels such as `[S1]`. AtM validates those labels against the current-turn evidence map before committing the turn.
 
-After a successful grounded answer, the transcript shows only a compact line such as `Sources: [1] [2]`. Each numbered reference opens a transient source-detail window containing:
+After a successful grounded answer, the transcript shows only a compact line such as `Sources: [1] [2]`. Each numbered reference opens a transient source-detail window containing only user-relevant information:
 
-- repository and repository version;
-- exact snapshot SHA;
-- logical source ID;
-- repository-relative source path and physical locator;
-- evidence title/excerpt when available;
-- immutable source permalink when it can be constructed safely.
+- readable repository, publisher or dataset name;
+- document/section/indicator title and a useful excerpt when available;
+- a direct immutable source link when it can be constructed safely;
+- date, period or version only when it helps identify or interpret the source.
+
+Raw snapshot SHAs, internal source IDs, canonical numeric encodings, support identities and internal source paths/locators are not shown by default. These remain in the internal provenance and persistence contract for exact reconstruction, audit and fail-closed tamper detection. Diagnostic visibility may be designed separately if needed, but must not clutter the ordinary source view.
 
 Provenance detail is on demand rather than permanently occupying a sidebar or secondary pane. The transient window is used because local GTK 4.14 smoke testing showed that a `GtkPopover` attached through a `GtkTextChildAnchor` did not receive a reliable allocation.
 
