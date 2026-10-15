@@ -210,13 +210,12 @@ test_bootstrap_and_reopen (void)
     AtmConversationStore *store = NULL;
     GError *error = NULL;
 
-    g_assert_true (
-        atm_conversation_store_open (
-            path,
-            &store,
-            &error
-        )
-    );
+    gboolean opened = atm_conversation_store_open (
+        path, &store, &error);
+    if (!opened)
+        g_printerr ("conversation-store bootstrap diagnostic: %s\\n",
+                    error != NULL ? error->message : "no error detail");
+    g_assert_true (opened);
     g_assert_no_error (error);
     g_assert_nonnull (store);
     g_assert_cmpint (
