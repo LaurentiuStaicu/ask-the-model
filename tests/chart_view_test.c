@@ -196,6 +196,8 @@ build_bnr_view (void)
     return view;
 }
 
+static GtkWidget *chart_page_named (AtmChartView *view, const char *name);
+
 static void
 test_bnr_quarterly_data_and_missing_provenance (void)
 {
