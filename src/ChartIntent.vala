@@ -165,8 +165,10 @@ namespace AskTheModel {
                 normalized,
                 {
                     "compare", "comparing", "comparison", "versus", " vs ", "vs.",
+                    "against", "relative to", "in relation to",
                     "compară", "compara", "comparând", "comparand",
-                    "în comparație", "in comparatie", "față de", "fata de"
+                    "în comparație", "in comparatie", "în raport cu",
+                    "in raport cu", "față de", "fata de"
                 }
             );
         }
