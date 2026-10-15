@@ -701,8 +701,6 @@ test_bnr_c01_history_reconstructs_pinned_snapshot (void)
     g_assert_error (error, G_FILE_ERROR, G_FILE_ERROR_NOENT);
     g_assert_null (rejected);
     g_clear_error (&error);
-    g_free (missing_file);
-
     atm_chart_spec_free (restored);
     atm_chart_spec_free (live);
     g_free (version);
@@ -715,7 +713,7 @@ test_bnr_c01_history_reconstructs_pinned_snapshot (void)
     g_assert_no_error (error);
     g_assert_true (g_file_set_contents (missing_file, contents, (gssize) length, &error));
     g_assert_no_error (error);
-    g_free (contents); g_free (fixture);
+    g_free (contents); g_free (fixture); g_free (missing_file);
     remove_bnr_history_snapshot (snapshot);
     g_free (snapshot);
 }
