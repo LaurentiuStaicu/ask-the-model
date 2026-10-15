@@ -4,7 +4,7 @@ Status: bounded user-facing route implemented in a review candidate. The exact-h
 
 ## Explicit entry points
 
-The application admits the command `/chart bnr-bls-c01` and unambiguous visualization requests that identify BNR BLS C01 directly or name the credit-standards subject. Generic measure terms such as “net percentage” alone do not identify this series and must not dispatch it. Comparative or multi-series requests, including recognized additional-indicator cues such as GDP/PIB, unemployment, or inflation, are left unqualified rather than silently rendering only C01. The route is source-specific, not a promise of general charts for RMD or arbitrary RMD datasets.
+The application admits the command `/chart bnr-bls-c01` and unambiguous visualization requests that identify BNR BLS C01 directly or name the credit-standards subject. Generic measure terms such as “net percentage” alone do not identify this series and must not dispatch it. Comparative or multi-series requests, including recognized additional-indicator cues such as GDP/PIB, unemployment, or inflation, are left unqualified rather than silently rendering only C01. Requests for derived profiles such as standard deviation, moving average, forecast/projection, or correlation are also unqualified; the route does not calculate derived series. The route is source-specific, not a promise of general charts for RMD or arbitrary RMD datasets.
 
 ## Source admission
 
