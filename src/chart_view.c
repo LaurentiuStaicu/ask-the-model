@@ -194,60 +194,41 @@ static void selection_changed (GObject *object, GParamSpec *pspec, gpointer data
                 return;
             }
             g_string_append_printf (text,
-                "Quarter: %s\nStatus: MISSING\nReason: %s\n"
+                "Quarter: %s\nStatus: Missing\n"
+                "Reason: The source round was not retained.\n"
                 "No numeric value is available; this is not zero.\n"
-                "Physical source row: none\nRepository: %s\nSnapshot: %s\n"
-                "Path: %s\nSemantic interpretation: BNR BLS C01 / credit standards net percentage\n"
-                "Qualified series: %s\nSupport identities:\n",
-                c[1], c[9], ATM_BNR_BLS_UPSTREAM_REPOSITORY,
-                atm_chart_spec_series_snapshot_sha (spec, 0),
-                atm_chart_spec_series_source_path (spec, 0), c[7]);
+                "Source: BNR BLS C01 credit-standards net percentage\n"
+                "Repository: %s\n",
+                c[1], ATM_BNR_BLS_UPSTREAM_REPOSITORY);
         } else if (g_strcmp0 (c[2], "NUMERIC") == 0 &&
                    c[3][0] != '\0' && c[4][0] != '\0' &&
                    c[6][0] != '\0' && g_strcmp0 (c[9], "") == 0) {
             g_string_append_printf (text,
-                "Quarter: %s\nStatus: NUMERIC\nExact net percentage: %s%%\n"
-                "Canonical decimal: %se%s\nPhysical source row: %s\n"
-                "Repository: %s\nSnapshot: %s\nPath: %s\n"
-                "Semantic interpretation: BNR BLS C01 / credit standards net percentage\n"
-                "Qualified series: %s\nSupport identities:\n",
-                c[1], c[3], c[4], c[5], c[6],
-                ATM_BNR_BLS_UPSTREAM_REPOSITORY,
-                atm_chart_spec_series_snapshot_sha (spec, 0),
-                atm_chart_spec_series_source_path (spec, 0), c[7]);
+                "Quarter: %s\nNet percentage: %s%%\n"
+                "Source: BNR BLS C01 credit-standards net percentage\n"
+                "Repository: %s\n",
+                c[1], c[3], ATM_BNR_BLS_UPSTREAM_REPOSITORY);
         } else {
             g_strfreev (c);
             g_string_free (text, TRUE);
             gtk_text_buffer_set_text (self->provenance, "The selected observation failed source validation.", -1);
             return;
         }
-        char **ids = g_strsplit (c[8], ";", -1);
-        for (guint i = 0; ids[i]; i++)
-            g_string_append_printf (text, "%s\n", ids[i]);
-        g_strfreev (ids);
     } else if (is_ei) {
         g_string_append_printf (text,
-            "Year: %s\nExact TES: %s exajoules/year (Physical Energy Content)\n"
-            "Canonical decimal: %se%s\nSource row: %s\n"
-            "Repository: LaurentiuStaicu/empirical-world3-dynamics\n"
-            "Snapshot: %s\nPath: %s\n"
-            "Semantic interpretation: Global Total Energy Supply / Physical Energy Content\n"
-            "Qualified series: %s\nSupport identities:\n",
-            c[1], c[2], c[3], c[4], c[5],
-            atm_chart_spec_series_snapshot_sha (spec, 0),
-            atm_chart_spec_series_source_path (spec, 0), c[6]);
-        char **ids = g_strsplit (c[7], ";", -1);
-        for (guint i = 0; ids[i]; i++) g_string_append_printf (text, "%s\n", ids[i]);
-        g_strfreev (ids);
+            "Year: %s\nGlobal total energy supply: %s exajoules/year\n"
+            "Method: Physical Energy Content\n"
+            "Source: Energy Institute global total energy supply dataset\n"
+            "Repository: LaurentiuStaicu/empirical-world3-dynamics\n",
+            c[1], c[2]);
     } else {
-        g_string_append_printf (text, "Year: %s\nExact anomaly: %s deg C (1951-1980)\nCanonical decimal: %se%s\n"
-            "Source row: %s\nRepository: LaurentiuStaicu/empirical-world3-dynamics\n"
-            "Snapshot: d9e249339663015f6d1c05752338a955bf64ad0b\n"
-            "Path: science/data/processed/nasa_gistemp_global_2026.csv\n"
-            "Vintage: 2026-08-31\nQualified series: %s\nSupport identities:\n", c[1],c[2],c[3],c[4],c[5],c[6]);
-        char **ids = g_strsplit (c[7], ";", -1);
-        for (guint i = 0; ids[i]; i++) g_string_append_printf (text, "%s\n", ids[i]);
-        g_strfreev (ids);
+        g_string_append_printf (text,
+            "Year: %s\nGlobal temperature anomaly: %s deg C\n"
+            "Baseline: 1951-1980\n"
+            "Source: NASA GISTEMP global annual temperature anomalies\n"
+            "Dataset: LaurentiuStaicu/empirical-world3-dynamics\n"
+            "Data vintage: 2026-08-31\n",
+            c[1], c[2]);
     }
     gtk_text_buffer_set_text (self->provenance, text->str, -1);
     g_strfreev (c);
@@ -355,11 +336,10 @@ gboolean atm_chart_view_new (const AtmChartSpec *spec, AtmChartView **out, GErro
     const char *titles[] = {
         is_bnr ? "Quarter" : "Year",
         is_bnr ? "Status" : (is_ei ? "TES (EJ/year)" : "Anomaly (deg C)"),
-        is_bnr ? "Net %" : "Source row",
-        "Source row"
+        "Net %"
     };
-    guint fields[] = {1,2, is_bnr ? 3u : 5u, 6u};
-    guint columns = is_bnr ? 4u : 3u;
+    guint fields[] = {1, 2, 3};
+    guint columns = is_bnr ? 3u : 2u;
     for (guint i = 0; i < columns; i++) {
         GtkListItemFactory *factory = gtk_signal_list_item_factory_new ();
         g_signal_connect (factory, "setup", G_CALLBACK (cell_setup), NULL);
@@ -374,7 +354,7 @@ gboolean atm_chart_view_new (const AtmChartSpec *spec, AtmChartView **out, GErro
     GtkWidget *detail = gtk_text_view_new (); gtk_text_view_set_editable (GTK_TEXT_VIEW (detail), FALSE);
     gtk_text_view_set_cursor_visible (GTK_TEXT_VIEW (detail), FALSE); gtk_text_view_set_monospace (GTK_TEXT_VIEW (detail), TRUE);
     gtk_text_view_set_wrap_mode (GTK_TEXT_VIEW (detail), GTK_WRAP_CHAR);
-    accessible (detail, "Selected observation provenance", "Exact value, source location and evidence support identities. Read-only text.");
+    accessible (detail, "Selected observation source details", "Observation value, source and relevant qualification notes. Read-only text.");
     self->provenance = g_object_ref (gtk_text_view_get_buffer (GTK_TEXT_VIEW (detail)));
     GtkWidget *details_scroll = gtk_scrolled_window_new (); gtk_scrolled_window_set_child (GTK_SCROLLED_WINDOW (details_scroll), detail);
     gtk_scrolled_window_set_min_content_height (GTK_SCROLLED_WINDOW (details_scroll), 140);
