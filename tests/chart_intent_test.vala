@@ -230,5 +230,19 @@ int main () {
     assert (!bnr_ambiguous.bnr_bls_c01_requested);
     assert (!bnr_ambiguous.energy_institute_requested);
 
+    var bnr_command_compares_gistemp = AskTheModel.ChartIntent.parse (
+        "/chart bnr-bls-c01 Compare this with GISTEMP global temperature."
+    );
+    assert (!bnr_command_compares_gistemp.bnr_bls_c01_requested);
+    assert (!bnr_command_compares_gistemp.gistemp_requested);
+    assert (!bnr_command_compares_gistemp.energy_institute_requested);
+
+    var bnr_command_compares_energy = AskTheModel.ChartIntent.parse (
+        "/chart bnr-bls-c01 Compare this with Energy Institute total energy supply."
+    );
+    assert (!bnr_command_compares_energy.bnr_bls_c01_requested);
+    assert (!bnr_command_compares_energy.gistemp_requested);
+    assert (!bnr_command_compares_energy.energy_institute_requested);
+
     return 0;
 }
