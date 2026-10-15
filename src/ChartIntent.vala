@@ -113,8 +113,7 @@ namespace AskTheModel {
                 "creează", "creeaza", "afișează", "afiseaza",
                 "temperatura globală", "temperatura globala",
                 "furnizarea", "valorile", "în timp", "in timp",
-                "standarde de credit", "standardele de credit", "procent net",
-                "bnr", "bls", "credit", "standarde de credit"
+                "standarde de credit", "standardele de credit", "procent net"
             });
 
             if (bnr_bls_c01_requested) {
