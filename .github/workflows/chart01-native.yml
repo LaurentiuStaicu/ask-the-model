@@ -357,7 +357,8 @@ jobs:
             src/scientific_derivation.c tests/chart_history_reconstruct_test.c \
             $(pkg-config --cflags --libs glib-2.0 gio-2.0 json-glib-1.0) -lm \
             -o /tmp/chart-history-reconstruct-test
-          /tmp/chart-history-reconstruct-test
+          ATM_BNR_BLS_FIXTURE=tests/fixtures/chart01/rmd-bnr-bls \
+            /tmp/chart-history-reconstruct-test
 
       - name: Publish bounded headless preview diagnostics
         run: python3 scripts/chart03_preview_log.py /tmp/chart03-preview
