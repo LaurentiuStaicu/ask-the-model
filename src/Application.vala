@@ -2649,10 +2649,9 @@ namespace AskTheModel {
                     : citation.repository_id;
 
             var heading = new Gtk.Label (
-                "[%u] %s · v%s".printf (
+                "[%u] %s".printf (
                     display_number,
-                    repository_name,
-                    citation.repository_version
+                    repository_name
                 )
             ) {
                 halign = Gtk.Align.START,
@@ -2661,45 +2660,6 @@ namespace AskTheModel {
             };
             heading.add_css_class ("heading");
             content.append (heading);
-
-            var source = new Gtk.Label (
-                "%s · %s".printf (
-                    citation.source_path,
-                    citation.locator
-                )
-            ) {
-                halign = Gtk.Align.START,
-                xalign = 0.0f,
-                selectable = true,
-                wrap = true,
-                max_width_chars = 72
-            };
-            source.add_css_class ("dim-label");
-            content.append (source);
-
-            var sha = new Gtk.Label (
-                "Snapshot: " + citation.snapshot_sha
-            ) {
-                halign = Gtk.Align.START,
-                xalign = 0.0f,
-                selectable = true,
-                wrap = true,
-                max_width_chars = 72
-            };
-            sha.add_css_class ("dim-label");
-            content.append (sha);
-
-            var logical_source = new Gtk.Label (
-                "Source ID: " + citation.logical_source_id
-            ) {
-                halign = Gtk.Align.START,
-                xalign = 0.0f,
-                selectable = true,
-                wrap = true,
-                max_width_chars = 72
-            };
-            logical_source.add_css_class ("dim-label");
-            content.append (logical_source);
 
             if (citation.title != null &&
                 citation.title.strip ().length > 0) {
