@@ -402,6 +402,21 @@ static void test_resize_coalescing (void)
     while (g_main_context_iteration (NULL, FALSE));
 }
 
+static GtkWidget *find_drawing_area (GtkWidget *widget)
+{
+    if (GTK_IS_DRAWING_AREA (widget))
+        return widget;
+
+    for (GtkWidget *child = gtk_widget_get_first_child (widget);
+         child != NULL;
+         child = gtk_widget_get_next_sibling (child)) {
+        GtkWidget *found = find_drawing_area (child);
+        if (found != NULL)
+            return found;
+    }
+    return NULL;
+}
+
 static GtkWidget *chart_drawing_area (AtmChartView *view)
 {
     GtkWidget *stack_widget = gtk_widget_get_last_child (GTK_WIDGET (view));
@@ -409,7 +424,7 @@ static GtkWidget *chart_drawing_area (AtmChartView *view)
     GtkWidget *chart_page = gtk_stack_get_child_by_name (
         GTK_STACK (stack_widget), "chart");
     g_assert_nonnull (chart_page);
-    GtkWidget *area = gtk_widget_get_last_child (chart_page);
+    GtkWidget *area = find_drawing_area (chart_page);
     g_assert_true (GTK_IS_DRAWING_AREA (area));
     return area;
 }
