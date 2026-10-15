@@ -374,7 +374,9 @@ namespace AskTheModel {
                 normalized,
                 {
                     "credit standards",
-                    "standarde de credit", "standardele de credit"
+                    "standarde de credit",
+                    "standardele de credit",
+                    "standardelor de credit"
                 }
             );
             bool names_bnr_bls_c01_series =
