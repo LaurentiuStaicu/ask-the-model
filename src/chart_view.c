@@ -152,10 +152,12 @@ static void cell_bind (GtkSignalListItemFactory *factory, GtkListItem *item, gpo
     const char *line = gtk_string_object_get_string (GTK_STRING_OBJECT (gtk_list_item_get_item (item)));
     char **cells = g_strsplit (line, "\t", -1);
     guint col = GPOINTER_TO_UINT (data);
-    gtk_label_set_text (
-        GTK_LABEL (gtk_list_item_get_child (item)),
-        col < g_strv_length (cells) ? cells[col] : ""
-    );
+    const char *value = col < g_strv_length (cells) ? cells[col] : "";
+    if (col == 2 && g_strcmp0 (value, "MISSING") == 0)
+        value = "Missing";
+    else if (col == 2 && g_strcmp0 (value, "NUMERIC") == 0)
+        value = "Available";
+    gtk_label_set_text (GTK_LABEL (gtk_list_item_get_child (item)), value);
     g_strfreev (cells);
 }
 static void selection_changed (GObject *object, GParamSpec *pspec, gpointer data)
@@ -309,20 +311,20 @@ gboolean atm_chart_view_new (const AtmChartSpec *spec, AtmChartView **out, GErro
             (is_ei ? "Energy Institute global total energy supply chart"
                    : "Global annual temperature anomaly chart"),
         is_bnr
-            ? "Quarterly net percentage observations. 2025-Q2 is missing, not zero; exact values and source provenance are in Data."
+            ? "Quarterly net percentage observations. 2025-Q2 is missing, not zero; source details are in Data."
             : (is_ei
-                ? "Exact TES observations and source provenance are in Data."
-                : "Exact observations and provenance are in Data."));
+                ? "Exact TES observations and source details are in Data."
+                : "Exact observations and source details are in Data."));
     gtk_drawing_area_set_draw_func (self->area, draw, self, NULL);
     g_signal_connect (self->area, "resize", G_CALLBACK (resize), self);
     g_signal_connect (self->area, "notify::scale-factor", G_CALLBACK (scale_changed), self);
     gtk_box_append (GTK_BOX (chart), GTK_WIDGET (self->area)); gtk_stack_add_titled (self->stack, chart, "chart", "Chart");
     GtkWidget *data = gtk_box_new (GTK_ORIENTATION_VERTICAL, 8);
     GtkWidget *unit = gtk_label_new (is_bnr
-        ? "BNR BLS C01 credit standards net percentage. 2025-Q2 is explicitly MISSING, not zero."
+        ? "BNR BLS C01 credit standards net percentage. 2025-Q2 is missing, not zero."
         : (is_ei
-            ? "Global total energy supply (EJ/year; Physical Energy Content). Exact source decimals."
-            : "Global annual anomaly (deg C), relative to 1951-1980. Exact source decimals."));
+            ? "Global total energy supply (EJ/year; Physical Energy Content)."
+            : "Global annual temperature anomaly (deg C), relative to 1951-1980."));
     gtk_label_set_wrap (GTK_LABEL (unit), TRUE); gtk_label_set_xalign (GTK_LABEL (unit), 0);
     gtk_box_append (GTK_BOX (data), unit);
 
@@ -348,10 +350,10 @@ gboolean atm_chart_view_new (const AtmChartSpec *spec, AtmChartView **out, GErro
     self->table = GTK_COLUMN_VIEW (gtk_column_view_new (GTK_SELECTION_MODEL (g_object_ref (self->selection))));
     gtk_column_view_set_show_row_separators (self->table, TRUE); gtk_widget_add_css_class (GTK_WIDGET (self->table), "data-table");
     accessible (GTK_WIDGET (self->table),
-        is_bnr ? "Exact quarterly observations" : "Exact annual observations",
+        is_bnr ? "Quarterly observations" : "Annual observations",
         is_bnr
-            ? "Select a quarter with arrow keys to inspect exact source status and provenance. The qualified missing quarter has no numeric value or physical CSV row."
-            : "Select a year with arrow keys to inspect its provenance. Source order is preserved.");
+            ? "Select a quarter with arrow keys to inspect its status and source details. The missing quarter has no numeric value."
+            : "Select a year with arrow keys to inspect its source details. Source order is preserved.");
     const char *titles[] = {
         is_bnr ? "Quarter" : "Year",
         is_bnr ? "Status" : (is_ei ? "TES (EJ/year)" : "Anomaly (deg C)"),
