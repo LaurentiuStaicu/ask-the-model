@@ -504,11 +504,23 @@ private static int run_application_phase (
             "data",
             "input_manifest.json"
         );
+        string bnr_audit = GLib.Path.build_filename (
+            home,
+            "Ask the Model",
+            "Repositories",
+            "rmd",
+            "snapshots",
+            BNR_SNAPSHOT_SHA,
+            "model",
+            "calibration_validation",
+            "bnr_bls_cross_round_mapping_audit.json"
+        );
         try {
             File.new_for_path (manifest).delete (null);
+            File.new_for_path (bnr_audit).delete (null);
         } catch (GLib.Error error) {
             stderr.printf (
-                "PRES-09 could not tamper with the test manifest: %s\n",
+                "PRES-09 could not tamper with the EWD/RMD test sources: %s\n",
                 error.message
             );
             server.disconnect ();
