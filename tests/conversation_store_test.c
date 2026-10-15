@@ -2522,6 +2522,121 @@ test_archive_delete_lifecycle (void)
 }
 
 static void
+test_bnr_chart_recipe_v5_persistence (void)
+{
+    char *root = new_temp_root ("atm-conversation-bnr-chart-v5-XXXXXX");
+    char *path = store_path (root);
+    AtmConversationStore *store = NULL;
+    GError *error = NULL;
+    const char *sha = "e43eb4e899f123d3b1aa0f6e20b7c8ed35434170";
+    char *version = g_strconcat ("snapshot:", sha, NULL);
+
+    g_assert_true (atm_conversation_store_open (path, &store, &error));
+    g_assert_no_error (error);
+    AtmConversationRepositoryInput repository = {
+        .repository_id = "rmd",
+        .repository_version = version,
+        .snapshot_sha = sha
+    };
+    char *conversation_id = NULL;
+    g_assert_true (atm_conversation_store_create_conversation (
+        store, "BNR BLS C01 chart", 1, "model-a", NULL, 1,
+        &repository, 1, &conversation_id, &error));
+    g_assert_no_error (error);
+
+    AtmConversationCitationInput citation = {
+        .label = "BNR-S1",
+        .repository_id = "rmd",
+        .repository_version = version,
+        .snapshot_sha = sha,
+        .logical_source_id = "bnr-bls-c01-credit-standards",
+        .source_path = "data/processed/bnr_bls_realised_rounds.csv",
+        .locator = "2022-Q4..2025-Q3",
+        .title = "BNR BLS C01 credit standards",
+        .excerpt = "Pinned quarterly source observations",
+        .immutable_permalink = NULL
+    };
+    gint64 turn = -1;
+    g_assert_true (atm_conversation_store_commit_turn (
+        store, conversation_id, "/chart bnr-bls-c01",
+        "qualified BNR chart", "qualified BNR chart", TRUE, 2,
+        &citation, 1, &turn, &error));
+    g_assert_no_error (error);
+    g_assert_cmpint (turn, ==, 0);
+
+    AtmConversationChartSeriesInput series = {
+        .series_profile = "atm-series/bnr-bls-c01-calendar-quarter/1",
+        .admission_profile = "atm-bnr-bls-canonical-panel-admission/1",
+        .scientific_id = "bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb",
+        .qualified_id = "cccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccc",
+        .repository_id = "rmd",
+        .repository_version = version,
+        .snapshot_sha = sha,
+        .source_path = "data/processed/bnr_bls_realised_rounds.csv"
+    };
+    AtmConversationChartInput chart = {
+        .ordinal = 1,
+        .chart_schema = "atm-chart-spec/3",
+        .chart_spec_id = "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+        .chart_kind = "line",
+        .reconstruction_profile = "atm-chart-reconstruct/bnr-bls-c01-calendar-quarter/1",
+        .series = &series,
+        .series_count = 1
+    };
+    g_assert_true (atm_conversation_store_attach_chart (
+        store, conversation_id, turn, &chart, &error));
+    g_assert_no_error (error);
+    g_assert_true (atm_conversation_store_validate (store, &error));
+    g_assert_no_error (error);
+
+    AtmConversationChartSeriesInput wrong = series;
+    wrong.snapshot_sha = "1111111111111111111111111111111111111111";
+    wrong.repository_version = "snapshot:1111111111111111111111111111111111111111";
+    AtmConversationChartInput bad_chart = chart;
+    bad_chart.ordinal = 2;
+    bad_chart.series = &wrong;
+    g_assert_false (atm_conversation_store_attach_chart (
+        store, conversation_id, turn, &bad_chart, &error));
+    g_assert_error (error, ATM_CONVERSATION_STORE_ERROR,
+                    ATM_CONVERSATION_STORE_ERROR_ARGUMENT);
+    g_clear_error (&error);
+
+    atm_conversation_store_close (store);
+    store = NULL;
+    g_assert_true (atm_conversation_store_open (path, &store, &error));
+    g_assert_no_error (error);
+    AtmConversationSnapshot *snapshot = NULL;
+    g_assert_true (atm_conversation_store_load_snapshot (
+        store, conversation_id, &snapshot, &error));
+    g_assert_no_error (error);
+    g_assert_cmpint (atm_conversation_store_schema_version (store), ==,
+                     ATM_CONVERSATION_STORE_SCHEMA_VERSION);
+    g_assert_cmpuint (atm_conversation_snapshot_message_chart_count_at (
+        snapshot, 1u), ==, 1u);
+    g_assert_cmpstr (atm_conversation_snapshot_chart_schema_at (
+        snapshot, 1u, 0u), ==, "atm-chart-spec/3");
+    g_assert_cmpstr (atm_conversation_snapshot_chart_reconstruction_profile_at (
+        snapshot, 1u, 0u), ==,
+        "atm-chart-reconstruct/bnr-bls-c01-calendar-quarter/1");
+    g_assert_cmpstr (atm_conversation_snapshot_chart_series_profile_at (
+        snapshot, 1u, 0u, 0u), ==, series.series_profile);
+    g_assert_cmpstr (atm_conversation_snapshot_chart_series_repository_id_at (
+        snapshot, 1u, 0u, 0u), ==, "rmd");
+    g_assert_cmpstr (atm_conversation_snapshot_chart_series_snapshot_sha_at (
+        snapshot, 1u, 0u, 0u), ==, sha);
+    g_assert_cmpstr (atm_conversation_snapshot_chart_series_source_path_at (
+        snapshot, 1u, 0u, 0u), ==, series.source_path);
+    atm_conversation_snapshot_free (snapshot);
+    atm_conversation_store_close (store);
+
+    g_free (conversation_id);
+    g_free (version);
+    g_free (path);
+    remove_tree_best_effort (root);
+    g_free (root);
+}
+
+static void
 test_chart_binding_write_load (void)
 {
     char *root = new_temp_root ("atm-conversation-chart-binding-XXXXXX");
@@ -2655,8 +2770,8 @@ test_chart_binding_write_load (void)
     );
     g_clear_error (&error);
 
-    /* The v4 allowlist admits the source-bound EI v2 tuple, but not cross-paired
-     * schema/reconstruction/series/admission profiles or unpinned snapshots. */
+    /* The schema-v5 allowlist admits the source-bound EI v2 tuple, but not
+     * cross-paired schema/reconstruction/series/admission profiles or unpinned snapshots. */
     const char *ei_snapshot = "d9e249339663015f6d1c05752338a955bf64ad0b";
     const char *ei_repository_version = "0.1.0";
     const char *ei_version =
@@ -3223,6 +3338,10 @@ main (int argc, char **argv)
     g_test_add_func (
         "/conversation-store/archive-delete-lifecycle",
         test_archive_delete_lifecycle
+    );
+    g_test_add_func (
+        "/conversation-store/bnr-chart-v5-persistence",
+        test_bnr_chart_recipe_v5_persistence
     );
     g_test_add_func (
         "/conversation-store/chart-binding-write-load",
