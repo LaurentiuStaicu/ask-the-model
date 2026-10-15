@@ -5677,7 +5677,7 @@ namespace AskTheModel {
             }
 
             string bnr_data = bnr_view.data () ?? "";
-            if (!bnr_data.contains ("0\\t2025-Q2\\tMISSING\\t\\t\\t0\\t0\\t") ||
+            if (!bnr_data.contains ("0\t2025-Q2\tMISSING\t\t\t0\t0\t") ||
                 !bnr_data.contains ("source_round_not_retained") ||
                 !bnr_view.select_row (10) ||
                 !(bnr_view.provenance () ?? "").contains ("MISSING, not zero") ||
