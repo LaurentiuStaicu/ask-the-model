@@ -16,7 +16,7 @@ The projector accepts only ChartSpec v3 for the source-specific BNR C01 profile 
 
 ## Gap contract
 
-The missing quarter must remain source-authorized with reason source_round_not_retained, no numeric payload, exponent zero, source row zero, and the five-file support set. Its X ordinal remains between 2025-Q1 and 2025-Q3. A later line renderer must start a new path after a non-consecutive point index instead of connecting through the missing quarter. Scatter rendering may show the numeric points, but must not invent a marker for the absence.
+The missing quarter must remain source-authorized with reason source_round_not_retained, no numeric payload, exponent zero, internal source-row sentinel zero, and the five-file support set. Its X ordinal remains between 2025-Q1 and 2025-Q3. The integrated line renderer starts a new path after the non-consecutive projected source indices 9 and 11 instead of connecting through the missing quarter. Scatter rendering shows only the eleven numeric points and does not invent a marker for the absence.
 
 ## Validation and non-scope
 
