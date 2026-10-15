@@ -5595,32 +5595,100 @@ namespace AskTheModel {
                 return true;
             }
 
-            if (state.pres09_test_chart_widgets.length != 2) {
+            if (pres09_test_live_turn == 1) {
+                if (state.pres09_test_chart_widgets.length != 2) {
+                    pres09_test_finish (
+                        false,
+                        "Live GISTEMP regression produced %u chart widgets, expected two total".printf (
+                            state.pres09_test_chart_widgets.length
+                        )
+                    );
+                    return false;
+                }
+
+                ChartNative.View? gistemp_view =
+                    state.pres09_test_chart_widgets[1] as ChartNative.View;
+                if (gistemp_view == null ||
+                    !pres09_test_record_view (
+                        "gistemp",
+                        gistemp_view,
+                        146,
+                        "1880",
+                        "2025"
+                    )) {
+                    pres09_test_finish (
+                        false,
+                        pres09_test_failure.length > 0
+                            ? pres09_test_failure
+                            : "Live GISTEMP Chart/Data view is unavailable"
+                    );
+                    return false;
+                }
+
+                pres09_test_live_turn = 2;
+                if (!pres09_test_select_ewd (state, true)) {
+                    pres09_test_finish (
+                        false,
+                        "Could not add RMD scope or retain the deterministic provider model"
+                    );
+                    return false;
+                }
+                state.prompt.buffer.text =
+                    "/chart bnr-bls-c01 Show the quarterly credit standards net percentage trend.";
+                state.send_button.clicked ();
+                return true;
+            }
+
+            if (pres09_test_live_turn != 2) {
+                pres09_test_finish (false, "PRES-09 reached an unexpected live-chart step");
+                return false;
+            }
+            if (state.pres09_test_chart_widgets.length != 3) {
                 pres09_test_finish (
                     false,
-                    "Live GISTEMP regression produced %u chart widgets, expected two total".printf (
+                    "Live BNR C01 request produced %u chart widgets, expected three total".printf (
                         state.pres09_test_chart_widgets.length
                     )
                 );
                 return false;
             }
 
-            ChartNative.View? gistemp_view =
-                state.pres09_test_chart_widgets[1] as ChartNative.View;
-            if (gistemp_view == null ||
+            ChartNative.View? bnr_view =
+                state.pres09_test_chart_widgets[2] as ChartNative.View;
+            if (bnr_view == null ||
                 !pres09_test_record_view (
-                    "gistemp",
-                    gistemp_view,
-                    146,
-                    "1880",
-                    "2025"
+                    "bnr-c01",
+                    bnr_view,
+                    12,
+                    "2022-Q4",
+                    "2025-Q3"
+                )) {
+                pres09_test_finish (
+                    false,
+                    pres09_test_failure.length > 0
+                        ? pres09_test_failure
+                        : "Live BNR BLS C01 Chart/Data view is unavailable"
+                );
+                return false;
+            }
+
+            string bnr_data = bnr_view.data () ?? "";
+            if (!bnr_data.contains ("0\\t2025-Q2\\tMISSING\\t\\t\\t0\\t0\\t") ||
+                !bnr_data.contains ("source_round_not_retained") ||
+                !bnr_view.select_row (10) ||
+                !(bnr_view.provenance () ?? "").contains ("MISSING, not zero") ||
+                !(bnr_view.provenance () ?? "").contains ("source_round_not_retained") ||
+                !(bnr_view.provenance () ?? "").contains ("Physical source row: none") ||
+                !pres09_test_write_file (
+                    "pres09-bnr-c01-missing-provenance.txt",
+                    bnr_view.provenance () ?? ""
                 ) ||
                 !pres09_test_save_live_oracle (state)) {
                 pres09_test_finish (
                     false,
                     pres09_test_failure.length > 0
                         ? pres09_test_failure
-                        : "Live GISTEMP Chart/Data view or durable chart recipes are unavailable"
+                        : "BNR 2025-Q2 MISSING was imputed, lost from Data, or not persisted"
                 );
                 return false;
             }
