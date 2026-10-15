@@ -3999,9 +3999,11 @@ namespace AskTheModel {
                         if (source_chart_requested &&
                             live_chart_widgets.length == 0) {
                             state.presentation.append_chart_status (
-                                chart_intent.energy_institute_requested
-                                    ? "AtM could not render the qualified Energy Institute chart. Check that EWD is selected and its pinned snapshot is available."
-                                    : "AtM could not render the qualified GISTEMP chart. Check that EWD is selected and its pinned snapshot is available."
+                                chart_intent.bnr_bls_c01_requested
+                                    ? "AtM could not render the qualified BNR BLS C01 chart. Check that RMD is selected and the exact pinned snapshot is available."
+                                    : (chart_intent.energy_institute_requested
+                                        ? "AtM could not render the qualified Energy Institute chart. Check that EWD is selected and its pinned snapshot is available."
+                                        : "AtM could not render the qualified GISTEMP chart. Check that EWD is selected and its pinned snapshot is available.")
                             );
                         }
                         assistant_stream_started = true;
