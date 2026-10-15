@@ -271,16 +271,28 @@ namespace AskTheModel {
                 }
             );
 
-            bool names_bnr_bls_c01_series = contains_any (
+            /*
+             * Do not infer the BNR C01 profile from a generic measure name.
+             * "Net percentage" also describes unrelated indicators; admit
+             * natural-language requests only when they identify C01 directly
+             * or name the credit-standards subject. The exact source/profile
+             * is still independently requalified before a chart is shown.
+             */
+            bool names_bnr_series_id = contains_any (
                 normalized,
                 {
-                    "bnr bls c01", "bnr-bls-c01", "bls c01",
-                    "credit standards", "credit standard",
-                    "net percentage", "net percentages",
-                    "standarde de credit", "standardele de credit",
-                    "procent net", "procente nete"
+                    "bnr bls c01", "bnr-bls-c01", "bls c01"
                 }
             );
+            bool names_credit_standards = contains_any (
+                normalized,
+                {
+                    "credit standards",
+                    "standarde de credit", "standardele de credit"
+                }
+            );
+            bool names_bnr_bls_c01_series =
+                names_bnr_series_id || names_credit_standards;
 
             if (asks_for_chart && requests_visualization) {
                 uint named_sources = (names_gistemp_series ? 1u : 0u) +
