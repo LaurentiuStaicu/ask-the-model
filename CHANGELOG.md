@@ -6,9 +6,14 @@ All notable public releases of Ask the Model are recorded here.
 
 The entries below describe post-v0.7.1 development on `main`; they are not part of the immutable public v0.7.1 Flatpak artifact.
 
-### Native/test-only qualification work
+### BNR BLS C01 source-specific chart route (integrated in development main; not released)
 
-- Keep the bounded BNR BLS C01 `AtmSeriesContract` adapter limited to the exact five-file pinned RMD panel and finalized SRA. It preserves 11 numeric observations and one authority-qualified `MISSING` point at 2025-Q2, without synthesizing a CSV row or numeric value. It does not enable a BNR ChartSpec, renderer, Application route or History reconstruction; broader missing/discontinuity/event semantics remain unqualified in #343.
+- Integrated PRs #471–#479 in dependency order. The final integration commit is `91093e7c96be56703052a3eb30565d1c84c351e5`. The public v0.7.1 artifact remains unchanged.
+- Adds the bounded `/chart bnr-bls-c01` route and narrowly admitted English/Romanian visualization requests. Natural-language routing rejects generic measure wording, recognized comparisons/additional-indicator cues and derived-series requests rather than silently drawing only C01.
+- The route admits only RMD snapshot `e43eb4e899f123d3b1aa0f6e20b7c8ed35434170`, the five-file source authority chain and ChartSpec v3. It preserves twelve quarter coordinates from 2022-Q4 through 2025-Q3, eleven numeric observations, and the authorized 2025-Q2 `MISSING` point with reason `source_round_not_retained`. No numeric value, fabricated physical source row, missing marker or line bridge is created; the Data display uses `none` for the missing physical row.
+- Conversation-store schema v5 persists only the reconstruction recipe and identity/provenance tuple. History rebuilds the chart from pinned RMD files and fails closed after source or identity tampering.
+- All exact-head workflow runs inspected for PRs #471–#479 completed successfully before merge, including native sanitizer, GTK/resize, History persistence, PRES-09 Application E2E, ChartIntent, Invariant Registry and Flatpak checks. This is pre-merge CI evidence; release qualification still requires the final metadata-bearing candidate and explicit on-device acceptance of that exact artifact.
+- The route is integrated development code, not a v0.7.1 capability or a v0.8.0 release declaration. Broader CHART-01 qualification remains open in issue #343. Arbitrary sources, multi-series charts, derived series and generalized missing/discontinuity/event semantics remain unqualified; M4 stays dormant and Optimizations remain session-only/default OFF.
 
 ## 0.7.1 - 2026-10-14
 
