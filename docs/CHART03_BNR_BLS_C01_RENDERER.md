@@ -10,9 +10,9 @@ The bounded chart labels the quantity as a net percentage for non-financial corp
 
 ## Data view
 
-The renderer's TSV contains all twelve calendar quarters, with separate status, source decimal, canonical coefficient/exponent, source row, qualified series ID, support IDs, and missing reason columns.
+The machine-readable renderer TSV contains all twelve calendar quarters, with separate status, source decimal, canonical coefficient/exponent, source row, qualified series ID, support IDs, and missing reason columns. These technical fields remain in the internal payload for validation and reconstruction; they are not all rendered as visible table columns.
 
-Numeric quarters are bound to the physical rows of the pinned RMD CSV. The 2025-Q2 row is retained as a Data view entry with status MISSING, empty numeric payload, exponent zero, no physical source row, five-file source support, and reason source_round_not_retained. The internal zero sentinel is not shown as a physical row: the Data table displays `none`. The table does not fabricate a CSV row or silently replace the absence with zero.
+Numeric quarters are bound to physical rows of the pinned RMD CSV. The 2025-Q2 coordinate is retained in the internal payload with status MISSING, empty numeric payload, exponent zero, no physical source row, five-file source support, and reason source_round_not_retained. The visible Data table shows the quarter and MISSING status without inventing a value or physical-row entry; the selected-observation details explain that the source round was not retained and this is not zero. The internal zero sentinel is never exposed as an observation.
 
 ## Qualification boundary
 
