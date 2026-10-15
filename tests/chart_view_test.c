@@ -27,6 +27,36 @@ static GtkExpander *find_expander (GtkWidget *widget)
     return NULL;
 }
 
+static GtkLinkButton *find_link_button (GtkWidget *widget)
+{
+    if (GTK_IS_LINK_BUTTON (widget))
+        return GTK_LINK_BUTTON (widget);
+
+    for (GtkWidget *child = gtk_widget_get_first_child (widget);
+         child != NULL;
+         child = gtk_widget_get_next_sibling (child)) {
+        GtkLinkButton *found = find_link_button (child);
+        if (found != NULL)
+            return found;
+    }
+    return NULL;
+}
+
+static GtkColumnView *find_column_view (GtkWidget *widget)
+{
+    if (GTK_IS_COLUMN_VIEW (widget))
+        return GTK_COLUMN_VIEW (widget);
+
+    for (GtkWidget *child = gtk_widget_get_first_child (widget);
+         child != NULL;
+         child = gtk_widget_get_next_sibling (child)) {
+        GtkColumnView *found = find_column_view (child);
+        if (found != NULL)
+            return found;
+    }
+    return NULL;
+}
+
 static void screenshot (GtkWindow *window, const char *name)
 {
     const char *directory = g_getenv ("ATM_CHART03_GTK_OUTPUT"); if (!directory) return;
@@ -160,6 +190,14 @@ test_bnr_quarterly_data_and_missing_provenance (void)
     g_assert_nonnull (source_details);
     g_assert_cmpstr (gtk_expander_get_label (source_details), ==, "Source details");
     g_assert_true (gtk_expander_get_expanded (source_details));
+    GtkColumnView *data_table = find_column_view (GTK_WIDGET (view));
+    g_assert_nonnull (data_table);
+    g_assert_cmpuint (g_list_model_get_n_items (gtk_column_view_get_columns (data_table)), ==, 3u);
+    GtkLinkButton *source_link = find_link_button (GTK_WIDGET (view));
+    g_assert_nonnull (source_link);
+    g_assert_cmpstr (gtk_link_button_get_uri (source_link), ==,
+        "https://github.com/LaurentiuStaicu/romanian-monetary-dynamics/blob/"
+        "e43eb4e899f123d3b1aa0f6e20b7c8ed35434170/data/processed/bnr_bls_realised_rounds.csv");
     g_assert_cmpstr (atm_chart_view_visible_page (view), ==, "chart");
     const char *data = atm_chart_view_data (view);
     g_assert_nonnull (data);
@@ -212,6 +250,15 @@ static void test_ei_data_lifetime (void)
     AtmChartView *view = build_ei_view ();
     g_assert_false (g_object_is_floating (view));
     g_assert_cmpuint (atm_chart_view_row_count (view), ==, 61u);
+    GtkColumnView *data_table = find_column_view (GTK_WIDGET (view));
+    g_assert_nonnull (data_table);
+    g_assert_cmpuint (g_list_model_get_n_items (gtk_column_view_get_columns (data_table)), ==, 2u);
+    GtkLinkButton *source_link = find_link_button (GTK_WIDGET (view));
+    g_assert_nonnull (source_link);
+    g_assert_cmpstr (gtk_link_button_get_uri (source_link), ==,
+        "https://github.com/LaurentiuStaicu/empirical-world3-dynamics/blob/"
+        "dc710d8e604c0fff713a3acfdb18ab47a1a902bb/"
+        "science/data/processed/energy_institute_global_2026.csv");
     const char *data = atm_chart_view_data (view);
     g_assert_nonnull (data);
     g_assert_nonnull (strstr (data, "# unit\texajoules/year"));
