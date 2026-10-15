@@ -160,6 +160,17 @@ namespace AskTheModel {
             return false;
         }
 
+        private static bool requests_comparison (string normalized) {
+            return contains_any (
+                normalized,
+                {
+                    "compare", "comparing", "comparison", "versus", " vs ", "vs.",
+                    "compară", "compara", "comparând", "comparand",
+                    "în comparație", "in comparatie", "față de", "fata de"
+                }
+            );
+        }
+
         private static bool names_other_chart_source (string normalized) {
             return contains_any (
                 normalized,
@@ -223,7 +234,8 @@ namespace AskTheModel {
             }
             if (command_matches (trimmed, bnr_prefix)) {
                 string bnr_query = command_query (trimmed, bnr_prefix);
-                if (names_other_chart_source (bnr_query.down ())) {
+                if (names_other_chart_source (bnr_query.down ()) ||
+                    requests_comparison (bnr_query.down ())) {
                     return new ChartIntent (false, false, false, prompt);
                 }
                 return new ChartIntent (
@@ -320,6 +332,9 @@ namespace AskTheModel {
                 names_bnr_series_id || names_credit_standards;
 
             if (asks_for_chart && requests_visualization) {
+                if (names_bnr_bls_c01_series && requests_comparison (normalized)) {
+                    return new ChartIntent (false, false, false, prompt);
+                }
                 uint named_sources = (names_gistemp_series ? 1u : 0u) +
                     (names_energy_institute_series ? 1u : 0u) +
                     (names_bnr_bls_c01_series ? 1u : 0u);
