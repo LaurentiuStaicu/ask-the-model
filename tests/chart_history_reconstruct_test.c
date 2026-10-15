@@ -705,7 +705,7 @@ test_bnr_c01_history_reconstructs_pinned_snapshot (void)
     atm_chart_spec_free (live);
     g_free (version);
     /* Rebuild the deleted member so the deterministic cleanup owns the full tree. */
-    char *fixture_root = g_getenv ("ATM_BNR_BLS_FIXTURE");
+    const char *fixture_root = g_getenv ("ATM_BNR_BLS_FIXTURE");
     char *fixture = g_build_filename (fixture_root, "bnr_bls_cross_round_mapping_audit.json", NULL);
     char *contents = NULL;
     gsize length = 0;
