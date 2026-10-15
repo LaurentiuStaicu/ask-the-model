@@ -49,9 +49,27 @@ def main() -> int:
     citation_tests = (
         ROOT / "tests" / "citation_labels_test.c"
     ).read_text(encoding="utf-8")
+    application_e2e = (
+        ROOT / "tests" / "pres09_gtk_application_e2e_test.vala"
+    ).read_text(encoding="utf-8")
     css = (ROOT / "data" / "style.css").read_text(encoding="utf-8")
 
+    for marker in (
+        '"source-details"',
+        '"live"',
+        '"history"',
+    ):
+        require_marker(
+            application_e2e,
+            marker,
+            "PRES-09 source detail E2E phase and existing phases",
+        )
+
     require_marker(
+        native_vapi,
+        'cname = "atm_presentation_document_to_plain_text"',
+        "Presentation Vala plain-text bridge",
+    )    require_marker(
         native_vapi,
         'cname = "atm_presentation_document_to_plain_text"',
         "Presentation Vala plain-text bridge",
