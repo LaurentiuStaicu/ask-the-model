@@ -1,6 +1,6 @@
 # CHART-05 BNR BLS C01 persisted recipe and History reconstruction
 
-Status: native persistence and History requalification implementation in a review candidate. This does not enable Application command dispatch.
+Status: schema-v5 persistence and source-requalified History reconstruction were integrated by PR #476; the bounded Application dispatch was added in #477 and its safety corrections in #478–#479. This is development `main` capability, not part of public v0.7.1.
 
 ## Conversation-store schema v5
 
@@ -29,6 +29,6 @@ History accepts only the exact v3 C01 recipe and rebuilds it from the five sourc
 
 The admission panel, finalized SRA, SeriesContract, source-specific VerifiedSeries and ChartSpec v3 identities are all rebuilt. Stored IDs must match the rebuilt scientific content ID, qualified series ID and chart identity. The qualified 2025-Q2 absence remains MISSING, with its exact reason and no numeric payload or physical source row. Missing or altered source files fail closed.
 
-## Scope not yet authorized
+## Component boundary and release status
 
-This native History gate does not by itself enable `/chart bnr-bls-c01`, GTK Application routing, the chart-only response policy, or end-to-end acceptance of the final Flatpak artifact. Those remain later application/release gates. Existing GISTEMP v1 and Energy Institute v2 reconstruction profiles remain unchanged.
+The History component alone does not authorize Application dispatch; the complete, separately qualified route is now integrated through PRs #471–#479 on development `main`. The public v0.7.1 artifact remains unchanged and does not include BNR C01 charting. Before v0.8.0 publication, the final metadata-bearing Flatpak must pass the release gate and receive explicit on-device acceptance. Existing GISTEMP v1 and Energy Institute v2 reconstruction profiles remain unchanged.
