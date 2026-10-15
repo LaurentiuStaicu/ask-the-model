@@ -221,6 +221,7 @@ namespace AskTheModel {
                     "correlation", "correlated",
                     "abaterea standard", "abatere standard",
                     "medie mobilă", "medie mobila",
+                    "media mobilă", "media mobila",
                     "prognoză", "prognoza",
                     "proiecție", "proiectie",
                     "corelație", "corelatie"
