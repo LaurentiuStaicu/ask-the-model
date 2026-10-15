@@ -1179,7 +1179,7 @@ validate_chart_semantics (
             "(c.chart_schema='atm-chart-spec/2' AND "
             " c.reconstruction_profile='atm-chart-reconstruct/energy-institute-tes-complete-annual/1') OR "
             "(c.chart_schema='atm-chart-spec/3' AND "
-            " c.reconstruction_profile='atm-chart-reconstruct/bnr-bls-c01-calendar-quarter/1'))"
+            " c.reconstruction_profile='atm-chart-reconstruct/bnr-bls-c01-calendar-quarter/1')"
             ");",
             &invalid_chart_tuple,
             error
