@@ -165,7 +165,8 @@ int main () {
     assert (bnr_guidance.contains ("MISSING, not zero"));
     string bnr_response = bnr_command.chart_only_response ();
     assert (bnr_response.contains ("BNR BLS C01 quarterly credit-standards"));
-    assert (bnr_response.contains ("MISSING, not zero"));
+    assert (bnr_response.contains ("missing, not zero"));
+    assert (bnr_response.contains ("source details"));
     assert (bnr_response.contains ("Data"));
 
     var bnr_upper = AskTheModel.ChartIntent.parse (
@@ -183,6 +184,8 @@ int main () {
     );
     assert (bnr_romanian.bnr_bls_c01_requested);
     assert (bnr_romanian.chart_only_response ().contains ("Iată graficul trimestrial BNR BLS C01"));
+    assert (bnr_romanian.chart_only_response ().contains ("valoarea pentru 2025-Q2 lipsește, nu este zero"));
+    assert (bnr_romanian.chart_only_response ().contains ("detaliile sursei"));
 
     var bnr_english = AskTheModel.ChartIntent.parse (
         "Generate a BNR BLS C01 chart of credit standards net percentage."
