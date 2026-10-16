@@ -94,14 +94,14 @@ int main () {
     assert (ei_guidance.contains ("pseudo-table"));
     assert (ei_guidance.contains ("Physical Energy Content"));
     assert (ei_guidance.contains ("gross supply"));
-    assert (ei_guidance.contains ("does not reproduce publisher"));
+    assert (ei_guidance.contains ("does not independently reproduce publisher"));
     assert (ei_guidance.contains ("only provide those details when explicitly requested"));
     assert (ei_command.is_chart_only_request ());
     string ei_response = ei_command.chart_only_response ();
     assert (ei_response.contains ("Global total energy supply (Energy Institute TES)"));
     assert (ei_response.contains ("qualified Chart/Data view"));
     assert (ei_response.contains ("source provenance"));
-    assert (ei_response.contains ("if construction fails"));
+    assert (ei_response.contains ("If chart construction fails"));
     assert (!ei_response.contains ("pseudo-table"));
     assert (!ei_response.contains ("couldn't render"));
 
@@ -134,7 +134,7 @@ int main () {
     assert (gistemp_response.contains ("Global surface temperature anomaly (GISTEMP)"));
     assert (gistemp_response.contains ("qualified Chart/Data view"));
     assert (gistemp_response.contains ("source provenance"));
-    assert (gistemp_response.contains ("if construction fails"));
+    assert (gistemp_response.contains ("If chart construction fails"));
     assert (!gistemp_response.contains ("pseudo-table"));
     assert (!gistemp_response.contains ("couldn't render"));
 
