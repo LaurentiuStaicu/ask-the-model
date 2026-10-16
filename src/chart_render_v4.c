@@ -327,6 +327,12 @@ atm_chart_render_v4_data (const AtmChartRenderV4 *render)
 }
 
 const char *
+atm_chart_render_v4_schema (const AtmChartRenderV4 *render)
+{
+    return render != NULL ? ATM_CHART_RENDER_V4_SCHEMA : NULL;
+}
+
+const char *
 atm_chart_render_v4_id (const AtmChartRenderV4 *render)
 {
     return render != NULL ? render->id : NULL;
