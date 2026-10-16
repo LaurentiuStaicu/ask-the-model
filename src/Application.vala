@@ -4021,19 +4021,30 @@ namespace AskTheModel {
                     ollama_provider.model_digest
                 );
 
-                if (selected_chart_series_id ==
-                    "climate.gistemp.global-temperature-anomaly") {
-                    qualify_live_gistemp_request (state.session);
-                } else if (selected_chart_series_id ==
-                    "energy.energy-institute.global-total-energy-supply") {
-                    qualify_live_energy_institute_request (state.session);
-                } else if (selected_chart_series_id ==
-                    "banking.bnr.bls-c01.credit-standards-net-percentage") {
-                    qualify_live_bnr_bls_c01_request (state.session);
-                } else if (source_chart_requested) {
-                    throw new GLib.IOError.NOT_SUPPORTED (
-                        "The selected chart series is not in the qualified live route."
-                    );
+                if (source_chart_requested) {
+                    string? selected_adapter_id =
+                        ChartNative.catalog_adapter_id_for_series (
+                            selected_chart_series_id
+                        );
+                    if (selected_adapter_id == null) {
+                        throw new GLib.IOError.NOT_SUPPORTED (
+                            "The selected chart series has no registered native adapter."
+                        );
+                    }
+
+                    if (selected_adapter_id == "gistemp-pinned-annual/1") {
+                        qualify_live_gistemp_request (state.session);
+                    } else if (selected_adapter_id ==
+                               "energy-institute-tes-pinned-annual/1") {
+                        qualify_live_energy_institute_request (state.session);
+                    } else if (selected_adapter_id ==
+                               "bnr-bls-c01-pinned-quarterly/1") {
+                        qualify_live_bnr_bls_c01_request (state.session);
+                    } else {
+                        throw new GLib.IOError.NOT_SUPPORTED (
+                            "The catalog-selected native adapter is not qualified for live chart routing."
+                        );
+                    }
                 }
 
                 bool needs_clarification;
