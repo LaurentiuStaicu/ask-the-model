@@ -6405,6 +6405,7 @@ namespace AskTheModel {
                  * must fail on catalog-bound Repository Scope before prepare_turn,
                  * model generation, durable conversation creation or widget creation.
                  */
+                state.locked = true;
                 state.repository_ids = {};
                 state.prompt.buffer.text = "/chart gistemp Show the trend.";
                 pres09_test_live_turn = 7;
