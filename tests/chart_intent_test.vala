@@ -56,6 +56,24 @@ int main () {
     );
     assert (!near_miss.gistemp_requested);
     assert (!near_miss.energy_institute_requested);
+    assert (near_miss.series_id == null);
+    assert (near_miss.intent == "unsupported");
+
+    var unknown_slash_selector = AskTheModel.ChartIntent.parse (
+        "/chart population"
+    );
+    assert (unknown_slash_selector.series_id == null);
+    assert (unknown_slash_selector.intent == "unsupported");
+
+    var unknown_slash_selector_with_verb = AskTheModel.ChartIntent.parse (
+        "/chart population generate a time trend"
+    );
+    assert (unknown_slash_selector_with_verb.series_id == null);
+    assert (unknown_slash_selector_with_verb.intent == "unsupported");
+
+    var bare_chart_command = AskTheModel.ChartIntent.parse ("/chart");
+    assert (bare_chart_command.series_id == null);
+    assert (bare_chart_command.intent == "unsupported");
 
     var empty = AskTheModel.ChartIntent.parse (
         "/chart gistemp"
