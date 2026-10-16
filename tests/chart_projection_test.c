@@ -593,8 +593,6 @@ test_v4_projection_all_catalog_profiles (void)
         "d9e249339663015f6d1c05752338a955bf64ad0b",
         "dc710d8e604c0fff713a3acfdb18ab47a1a902bb"
     };
-    const AtmChartProjectionV4 *unused = NULL;
-    (void) unused;
     for (guint i = 0; i < G_N_ELEMENTS (snapshots); i++) {
         AtmChartSpecV4 *ei_spec = v4_spec_from_source (
             "energy.energy-institute.global-total-energy-supply",
