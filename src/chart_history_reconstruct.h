@@ -1,5 +1,6 @@
 #pragma once
 #include "chart_spec.h"
+#include "chart_spec_v4.h"
 G_BEGIN_DECLS
 
 /* Reconstruct a persisted qualified GISTEMP chart from the pinned repository
@@ -96,6 +97,25 @@ gboolean atm_chart_live_reconstruct_bnr_bls_c01 (
     const char *snapshot_sha,
     const char *chart_kind,
     AtmChartSpec **out,
+    GError **error
+);
+
+
+/*
+ * Catalog-selected live reconstruction for CHART-06. The immutable catalog
+ * selects one closed source adapter from the series ID. The caller must first
+ * authorize the requested series against the conversation's repository scope
+ * and pass the actual pin identity; this function never accepts model-authored
+ * scientific metadata. History remains source-specific v1/v2/v3 until its
+ * separately qualified v4 persistence milestone.
+ */
+gboolean atm_chart_live_reconstruct_v4 (
+    const char *series_id,
+    const char *snapshot_path,
+    const char *repository_id,
+    const char *repository_version,
+    const char *snapshot_sha,
+    AtmChartSpecV4 **out,
     GError **error
 );
 
