@@ -142,6 +142,13 @@ char *atm_chart_catalog_match_request_series_id (
 );
 
 
+
+/* Unicode-aware whole-word/phrase matcher shared by deterministic intent gates. */
+gboolean atm_chart_catalog_text_has_phrase (
+    const char *text,
+    const char *phrase
+);
+
 /* Match a selected conversation repository ID to the catalog-owned repository binding. */
 gboolean atm_chart_catalog_repository_matches_series (
     const char *series_id,
