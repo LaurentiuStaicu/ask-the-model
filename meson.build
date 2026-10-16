@@ -51,6 +51,7 @@ executable(
     'src/chart_catalog.c',
     'src/chart_view.c',
     'src/chart_render.c',
+    'src/chart_render_v4.c',
     'src/chart_projection.c',
     'src/chart_projection_v4.c',
     'src/chart_spec.c',
@@ -208,6 +209,7 @@ pres09_application_sources = [
     'src/chart_catalog.c',
     'src/chart_view.c',
     'src/chart_render.c',
+    'src/chart_render_v4.c',
     'src/chart_projection.c',
     'src/chart_projection_v4.c',
     'src/chart_spec.c',
@@ -2995,7 +2997,7 @@ test('chart-m4-cairo', chart_m4_cairo_test)
 # CHART-03: dormant headless Cairo prototype; no application caller.
 chart_render_test = executable(
   'chart-render-test',
-  ['src/chart_render.c', 'src/chart_projection.c', 'src/chart_spec.c', 'src/verified_series.c', 'src/gistemp_sra.c', 'src/gistemp_evidence.c',
+  ['src/chart_render_v4.c', 'src/chart_render.c', 'src/chart_projection_v4.c', 'src/chart_projection.c', 'src/chart_spec_v4.c', 'src/chart_catalog.c', 'src/chart_spec.c', 'src/verified_series.c', 'src/gistemp_sra.c', 'src/gistemp_evidence.c',
    'src/gistemp_admission.c', 'src/annual_series_candidate.c',
    'src/scientific_canonical.c', 'src/scientific_artifact.c',
    'src/scientific_result.c', 'src/scientific_operation.c',
@@ -3011,7 +3013,10 @@ chart_render_test = executable(
   dependencies: [glib_dep, json_glib_dep, dependency('cairo'), dependency('fontconfig')],
   install: false
 )
+# ASan/UBSan plus the catalog-bound v4 parity tests can exceed Meson's default
+# 30-second test limit on the elementary Flatpak CI runner.
 test('chart-render', chart_render_test,
+  timeout: 90,
   env: {
     'ATM_CHART01_FIXTURE': meson.current_source_dir() / 'tests/fixtures/chart01',
     'ATM_BNR_BLS_FIXTURE': meson.current_source_dir() / 'tests/fixtures/chart01/rmd-bnr-bls'

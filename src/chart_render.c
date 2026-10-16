@@ -572,3 +572,5 @@ cairo_surface_t *atm_chart_render_surface (const AtmChartRender *r) { return r ?
 const char *atm_chart_render_data (const AtmChartRender *r) { return r ? r->data : NULL; }
 gboolean atm_chart_render_is_fallback (const AtmChartRender *r) { return r ? r->fallback : FALSE; }
 const AtmChartSpec *atm_chart_render_spec (const AtmChartRender *r) { return r ? r->spec : NULL; }
+
+const AtmChartProjection *atm_chart_render_projection (const AtmChartRender *r) { return r ? r->projection : NULL; }
