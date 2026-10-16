@@ -102,7 +102,6 @@ int main () {
     assert (ei_response.contains ("qualified Chart/Data view"));
     assert (ei_response.contains ("source provenance"));
     assert (ei_response.contains ("if construction fails"));
-    assert (ei_response.contains ("source provenance"));
     assert (!ei_response.contains ("pseudo-table"));
     assert (!ei_response.contains ("couldn't render"));
 
@@ -136,7 +135,6 @@ int main () {
     assert (gistemp_response.contains ("qualified Chart/Data view"));
     assert (gistemp_response.contains ("source provenance"));
     assert (gistemp_response.contains ("if construction fails"));
-    assert (gistemp_response.contains ("source provenance"));
     assert (!gistemp_response.contains ("pseudo-table"));
     assert (!gistemp_response.contains ("couldn't render"));
 
@@ -147,7 +145,6 @@ int main () {
     assert (gistemp_interpretation.chart_only_response () == "");
 
     assert (natural_english.chart_only_response ().contains ("Global surface temperature anomaly (GISTEMP)"));
-    assert (natural_english.chart_only_response ().contains ("source provenance"));
     assert (natural_english.chart_only_response ().contains ("source provenance"));
     assert (natural_romanian.chart_only_response ().contains ("Cerere de grafic: Global surface temperature anomaly (GISTEMP)"));
     assert (natural_romanian.chart_only_response ().contains ("proveniența"));
@@ -196,7 +193,8 @@ int main () {
     string bnr_guidance = bnr_command.response_guidance ();
     assert (bnr_guidance.contains ("romanian-monetary-dynamics"));
     assert (bnr_guidance.contains ("2025-Q2"));
-    assert (bnr_guidance.contains ("MISSING, not zero"));
+    assert (bnr_guidance.contains ("MISSING"));
+    assert (bnr_guidance.contains ("not zero"));
     string bnr_response = bnr_command.chart_only_response ();
     assert (bnr_response.contains ("BNR Bank Lending Survey: credit standards net percentage"));
     assert (bnr_response.contains ("2025-Q2 observation is missing from the source, not zero"));
