@@ -674,7 +674,9 @@ namespace AskTheModel {
         }
 
         private static bool is_time_period_only_subject (string subject) {
-            string normalized = subject.down ().strip ();
+            string normalized = subject.down ().strip ()
+                .replace ("–", "-")
+                .replace ("—", "-");
             if (normalized.length == 0) {
                 return false;
             }
@@ -685,8 +687,7 @@ namespace AskTheModel {
                 char character = normalized[i];
                 if (character >= '0' && character <= '9') {
                     has_digit = true;
-                } else if (character != '-' && character != '–' &&
-                           character != '—' && character != '/' &&
+                } else if (character != '-' && character != '/' &&
                            character != '.' && character != ',' &&
                            character != ':' && character != ' ' &&
                            character != '(' && character != ')') {
