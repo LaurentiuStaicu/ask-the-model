@@ -176,6 +176,18 @@ namespace AskTheModel {
             return false;
         }
 
+        private static bool contains_bounded_any (
+            string text,
+            string[] terms
+        ) {
+            foreach (string term in terms) {
+                if (ChartCatalog.text_has_phrase (text, term)) {
+                    return true;
+                }
+            }
+            return false;
+        }
+
         /*
          * These guards run before alias selection. A recognized catalog alias
          * is only an entity match; negated, hypothetical, quoted-language and
@@ -383,13 +395,13 @@ namespace AskTheModel {
                 );
             }
 
-            bool asks_for_chart = contains_any (
+            bool asks_for_chart = contains_bounded_any (
                 normalized,
                 {
                     "grafic", "chart", "graph", "plot", "diagram"
                 }
             );
-            bool requests_visualization = contains_any (
+            bool requests_visualization = contains_bounded_any (
                 normalized,
                 {
                     "arată", "arata", "generează", "genereaza",
