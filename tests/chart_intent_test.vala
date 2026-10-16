@@ -79,8 +79,11 @@ int main () {
     assert (ei_command.is_chart_only_request ());
     string ei_response = ei_command.chart_only_response ();
     assert (ei_response.contains ("Energy Institute global total energy supply chart"));
-    assert (ei_response.contains ("Data tab"));
+    assert (ei_response.contains ("qualified Data view"));
     assert (ei_response.contains ("source details"));
+    assert (ei_response.contains ("if construction fails"));
+    assert (gistemp_response.contains ("if construction fails"));
+    assert (bnr_response.contains ("If chart construction fails"));
     assert (!ei_response.contains ("source provenance"));
     assert (!ei_response.contains ("pseudo-table"));
     assert (!ei_response.contains ("couldn't render"));
@@ -126,7 +129,7 @@ int main () {
     assert (natural_english.chart_only_response ().contains ("GISTEMP global temperature anomaly chart"));
     assert (natural_english.chart_only_response ().contains ("source details"));
     assert (!natural_english.chart_only_response ().contains ("source provenance"));
-    assert (natural_romanian.chart_only_response ().contains ("Iată graficul GISTEMP"));
+    assert (natural_romanian.chart_only_response ().contains ("Cerere de grafic: GISTEMP"));
     assert (natural_romanian.chart_only_response ().contains ("detalii despre sursă"));
     assert (ordinary.response_guidance () == "");
 
@@ -194,7 +197,7 @@ int main () {
         "Generează un grafic BNR BLS C01 al procentului net privind standardele de credit."
     );
     assert (bnr_romanian.bnr_bls_c01_requested);
-    assert (bnr_romanian.chart_only_response ().contains ("Iată graficul trimestrial BNR BLS C01"));
+    assert (bnr_romanian.chart_only_response ().contains ("Cerere de grafic: BNR BLS C01 trimestrial"));
     assert (bnr_romanian.chart_only_response ().contains ("valoarea pentru 2025-Q2 lipsește, nu este zero"));
     assert (bnr_romanian.chart_only_response ().contains ("detaliile sursei"));
 
