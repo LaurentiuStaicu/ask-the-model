@@ -48,6 +48,7 @@ executable(
     'src/PresentationRenderer.vala',
     'src/ChartNative.vapi',
     'src/ChartIntent.vala',
+    'src/chart_catalog.c',
     'src/chart_view.c',
     'src/chart_render.c',
     'src/chart_projection.c',
@@ -202,6 +203,7 @@ pres09_application_sources = [
     'src/PresentationRenderer.vala',
     'src/ChartNative.vapi',
     'src/ChartIntent.vala',
+    'src/chart_catalog.c',
     'src/chart_view.c',
     'src/chart_render.c',
     'src/chart_projection.c',
@@ -882,6 +884,22 @@ chart_intent_test = executable(
 test(
   'chart-intent',
   chart_intent_test
+)
+
+chart_catalog_test = executable(
+  'chart-catalog-test',
+  [
+    'src/chart_catalog.c',
+    'tests/chart_catalog_test.c'
+  ],
+  include_directories: include_directories('src'),
+  dependencies: [glib_dep],
+  install: false
+)
+
+test(
+  'chart-catalog',
+  chart_catalog_test
 )
 
 optimization_policy_test = executable(
