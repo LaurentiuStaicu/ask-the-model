@@ -119,6 +119,30 @@ namespace AskTheModel {
                 : (is_chart_only_request () ? "chart_only" : "chart_and_text");
         }
 
+        /*
+         * Catalog-selected construction is the generic route. The booleans are
+         * retained as legacy compatibility accessors for existing callers and
+         * tests; the stable catalog ID is the routing authority.
+         */
+        private ChartIntent.for_catalog_series (
+            string series_id,
+            string query
+        ) {
+            Object ();
+            this.series_id = series_id;
+            this.gistemp_requested =
+                series_id == "climate.gistemp.global-temperature-anomaly";
+            this.energy_institute_requested =
+                series_id == "energy.energy-institute.global-total-energy-supply";
+            this.bnr_bls_c01_requested =
+                series_id == "banking.bnr.bls-c01.credit-standards-net-percentage";
+            this.query = query;
+            this.intent = "chart";
+            this.response_mode = is_chart_only_request ()
+                ? "chart_only"
+                : "chart_and_text";
+        }
+
         private static bool contains_any (
             string text,
             string[] terms
@@ -990,18 +1014,9 @@ namespace AskTheModel {
                     );
                 }
 
-                if (selected_series_id ==
-                    "climate.gistemp.global-temperature-anomaly") {
-                    return new ChartIntent (true, false, false, prompt);
-                }
-                if (selected_series_id ==
-                    "energy.energy-institute.global-total-energy-supply") {
-                    return new ChartIntent (false, true, false, prompt);
-                }
-                if (selected_series_id ==
-                    "banking.bnr.bls-c01.credit-standards-net-percentage") {
-                    return new ChartIntent (false, false, true, prompt);
-                }
+                return new ChartIntent.for_catalog_series (
+                    selected_series_id, prompt
+                );
             }
 
             return new ChartIntent (false, false, false, prompt);
