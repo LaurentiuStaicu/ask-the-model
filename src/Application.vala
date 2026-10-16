@@ -3317,7 +3317,7 @@ namespace AskTheModel {
                 );
             }
 
-            ChartNative.Spec? source_spec = spec_v4.source_spec ();
+            unowned ChartNative.Spec? source_spec = spec_v4.source_spec ();
             if (source_spec == null) {
                 throw new GLib.IOError.INVALID_DATA (
                     "Catalog-selected ChartSpec v4 has no qualified source ChartSpec."
