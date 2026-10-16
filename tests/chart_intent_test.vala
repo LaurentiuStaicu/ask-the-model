@@ -100,9 +100,9 @@ int main () {
     string ei_response = ei_command.chart_only_response ();
     assert (ei_response.contains ("Global total energy supply (Energy Institute TES)"));
     assert (ei_response.contains ("qualified Chart/Data view"));
-    assert (ei_response.contains ("source details"));
+    assert (ei_response.contains ("source provenance"));
     assert (ei_response.contains ("if construction fails"));
-    assert (!ei_response.contains ("source provenance"));
+    assert (ei_response.contains ("source provenance"));
     assert (!ei_response.contains ("pseudo-table"));
     assert (!ei_response.contains ("couldn't render"));
 
@@ -134,9 +134,9 @@ int main () {
     string gistemp_response = requested.chart_only_response ();
     assert (gistemp_response.contains ("Global surface temperature anomaly (GISTEMP)"));
     assert (gistemp_response.contains ("qualified Chart/Data view"));
-    assert (gistemp_response.contains ("source details"));
+    assert (gistemp_response.contains ("source provenance"));
     assert (gistemp_response.contains ("if construction fails"));
-    assert (!gistemp_response.contains ("source provenance"));
+    assert (gistemp_response.contains ("source provenance"));
     assert (!gistemp_response.contains ("pseudo-table"));
     assert (!gistemp_response.contains ("couldn't render"));
 
@@ -147,10 +147,10 @@ int main () {
     assert (gistemp_interpretation.chart_only_response () == "");
 
     assert (natural_english.chart_only_response ().contains ("Global surface temperature anomaly (GISTEMP)"));
-    assert (natural_english.chart_only_response ().contains ("source details"));
-    assert (!natural_english.chart_only_response ().contains ("source provenance"));
+    assert (natural_english.chart_only_response ().contains ("source provenance"));
+    assert (natural_english.chart_only_response ().contains ("source provenance"));
     assert (natural_romanian.chart_only_response ().contains ("Cerere de grafic: Global surface temperature anomaly (GISTEMP)"));
-    assert (natural_romanian.chart_only_response ().contains ("detaliile sursei"));
+    assert (natural_romanian.chart_only_response ().contains ("proveniența"));
     assert (ordinary.response_guidance () == "");
 
     var ei_upper = AskTheModel.ChartIntent.parse (
@@ -164,7 +164,7 @@ int main () {
     );
     assert (!ei_romanian.gistemp_requested);
     assert (ei_romanian.energy_institute_requested);
-    assert (ei_romanian.chart_only_response ().contains ("detaliile sursei"));
+    assert (ei_romanian.chart_only_response ().contains ("proveniența"));
 
     var ei_english = AskTheModel.ChartIntent.parse (
         "Show me an Energy Institute chart of global total energy supply using Physical Energy Content."
@@ -200,8 +200,8 @@ int main () {
     string bnr_response = bnr_command.chart_only_response ();
     assert (bnr_response.contains ("BNR Bank Lending Survey: credit standards net percentage"));
     assert (bnr_response.contains ("2025-Q2 observation is missing from the source, not zero"));
-    assert (bnr_response.contains ("source details"));
-    assert (bnr_response.contains ("Data"));
+    assert (bnr_response.contains ("source provenance"));
+    assert (bnr_response.contains ("Chart/Data"));
     assert (bnr_response.contains ("If chart construction fails"));
 
     var bnr_upper = AskTheModel.ChartIntent.parse (
@@ -220,7 +220,7 @@ int main () {
     assert (bnr_romanian.bnr_bls_c01_requested);
     assert (bnr_romanian.chart_only_response ().contains ("Cerere de grafic: BNR Bank Lending Survey: credit standards net percentage"));
     assert (bnr_romanian.chart_only_response ().contains ("2025-Q2 lipsește din sursă; este lipsă, nu zero"));
-    assert (bnr_romanian.chart_only_response ().contains ("detaliile sursei"));
+    assert (bnr_romanian.chart_only_response ().contains ("proveniența"));
 
     var bnr_english = AskTheModel.ChartIntent.parse (
         "Generate a BNR BLS C01 chart of credit standards net percentage."
