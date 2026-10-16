@@ -42,6 +42,11 @@ namespace AskTheModel.ChartNative {
         public unowned string? history_schema_version ();
     }
 
+    [CCode (cname = "atm_chart_catalog_adapter_id_for_series")]
+    public static unowned string? catalog_adapter_id_for_series (
+        string series_id
+    );
+
     [CCode (cname = "atm_chart_catalog_repository_matches_series")]
     public static bool catalog_repository_matches_series (
         string series_id,
