@@ -3348,6 +3348,7 @@ namespace AskTheModel {
             }
 
             if (source_snapshot_sha != chart_pin.snapshot_sha ||
+                source_repository_id != chart_pin.repository_id ||
                 !ChartNative.catalog_repository_matches_series (
                     series_id, source_repository_id)) {
                 throw new GLib.IOError.INVALID_DATA (
