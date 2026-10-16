@@ -4,11 +4,14 @@
 static const char *const gistemp_aliases[] = {
     "gistemp", "global temperature", "global surface temperature",
     "global temperature anomaly", "global temperature anomalies",
+    "gistemp global temperature anomaly", "gistemp global temperature anomalies",
     "temperature anomaly", "temperatura globala", "temperatura globală",
     "anomalia temperaturii globale", "anomalii ale temperaturii globale"
 };
 static const char *const ei_aliases[] = {
-    "energy-institute", "energy institute", "total energy supply", "global total energy supply", "tes",
+    "energy-institute", "energy institute", "total energy supply",
+    "global total energy supply", "energy institute global total energy supply",
+    "total energy supply tes", "tes",
     "furnizarea totala de energie", "furnizarea totală de energie",
     "furnizarea totală globală de energie"
 };
@@ -17,6 +20,9 @@ static const char *const bnr_aliases[] = {
     "quarterly credit standards", "net percentage for credit standards",
     "standardele de credit", "standarde de credit", "standardelor de credit",
     "procent net privind standardele de credit",
+    "procentului net privind standardele de credit",
+    "procentul net al standardelor de credit",
+    "bnr bls c01 al procentului net privind standardele de credit",
     "standardele de credit pentru companii"
 };
 static const char *const ewd_snapshots[] = {
