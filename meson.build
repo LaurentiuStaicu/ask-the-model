@@ -47,6 +47,7 @@ executable(
     'src/PresentationNative.vapi',
     'src/PresentationRenderer.vala',
     'src/ChartNative.vapi',
+    'src/ChartCatalog.vapi',
     'src/ChartIntent.vala',
     'src/chart_catalog.c',
     'src/chart_view.c',
@@ -205,6 +206,7 @@ pres09_application_sources = [
     'src/PresentationNative.vapi',
     'src/PresentationRenderer.vala',
     'src/ChartNative.vapi',
+    'src/ChartCatalog.vapi',
     'src/ChartIntent.vala',
     'src/chart_catalog.c',
     'src/chart_view.c',
@@ -880,9 +882,12 @@ test(
 chart_intent_test = executable(
   'chart-intent-test',
   [
+    'src/ChartCatalog.vapi',
     'src/ChartIntent.vala',
+    'src/chart_catalog.c',
     'tests/chart_intent_test.vala'
   ],
+  include_directories: include_directories('src'),
   dependencies: [glib_dep, dependency('gobject-2.0')],
   install: false
 )
