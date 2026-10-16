@@ -461,6 +461,15 @@ int main () {
     assert (existing_chart_interpretation_romanian.series_id == null);
     assert (existing_chart_interpretation_romanian.intent == "not_chart");
 
+    var chart_request_followed_by_interpretation =
+        AskTheModel.ChartIntent.parse (
+            "Generate a GISTEMP chart. What does the GISTEMP chart show?"
+        );
+    assert (chart_request_followed_by_interpretation.series_id ==
+        "climate.gistemp.global-temperature-anomaly");
+    assert (chart_request_followed_by_interpretation.intent == "chart");
+    assert (!chart_request_followed_by_interpretation.is_chart_only_request ());
+
     var short_alias_near_miss = AskTheModel.ChartIntent.parse (
         "Make a chart about the latest Tesla production figures."
     );
