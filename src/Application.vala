@@ -6366,21 +6366,60 @@ namespace AskTheModel {
                 transcript.index_of ("The chart request is ambiguous");
             int latest_unsupported_position =
                 transcript.last_index_of ("AtM cannot generate that chart");
-            if (pres09_test_live_turn != 3 ||
-                ambiguous_position < 0 ||
-                latest_unsupported_position <= ambiguous_position ||
+            if (pres09_test_live_turn == 3) {
+                if (ambiguous_position < 0 ||
+                    latest_unsupported_position <= ambiguous_position ||
+                    state.pres09_test_chart_widgets.length != 0 ||
+                    state.persistent_id != null) {
+                    pres09_test_finish (
+                        false,
+                        "Unknown explicit /chart selector fell through to normal chat instead of a fail-closed refusal"
+                    );
+                    return false;
+                }
+
+                state.prompt.buffer.text =
+                    "Generate a chart of diabetes prevalence using GISTEMP.";
+                pres09_test_live_turn = 4;
+                state.send_button.clicked ();
+                return true;
+            }
+
+            if (pres09_test_live_turn == 4) {
+                int latest_ambiguous_position =
+                    transcript.last_index_of ("The chart request is ambiguous");
+                if (latest_ambiguous_position <= latest_unsupported_position ||
+                    state.pres09_test_chart_widgets.length != 0 ||
+                    state.persistent_id != null) {
+                    pres09_test_finish (
+                        false,
+                        "A registered GISTEMP alias incorrectly authorized a diabetes-prevalence chart"
+                    );
+                    return false;
+                }
+
+                state.prompt.buffer.text =
+                    "Generate a pie chart of global temperature anomalies.";
+                pres09_test_live_turn = 5;
+                state.send_button.clicked ();
+                return true;
+            }
+
+            if (pres09_test_live_turn != 5 ||
+                transcript.last_index_of ("The chart request is ambiguous") <=
+                    transcript.last_index_of ("AtM cannot generate that chart") ||
                 state.pres09_test_chart_widgets.length != 0 ||
                 state.persistent_id != null) {
                 pres09_test_finish (
                     false,
-                    "Unknown explicit /chart selector fell through to normal chat instead of a fail-closed refusal"
+                    "A pie-chart request was routed into the line-only Chart/Data renderer instead of failing closed"
                 );
                 return false;
             }
 
             pres09_test_finish (
                 true,
-                "unsupported natural-language series, conflicting explicit /chart selection, and unknown /chart selector all returned clear refusals without model routing, persistence or Chart/Data widgets"
+                "unsupported population, conflicting explicit /chart selection, unknown /chart selector, unrelated diabetes prevalence with a registered GISTEMP alias, and unsupported pie-chart kind all failed closed without model routing, persistence or Chart/Data widgets"
             );
             return false;
         }
