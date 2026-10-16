@@ -38,7 +38,7 @@ static const AtmChartCatalogEntry entries[] = {
     {
         .series_id = "climate.gistemp.global-temperature-anomaly",
         .display_name = "Global surface temperature anomaly (GISTEMP)",
-        .description = "Annual global temperature anomaly relative to the 1951-1980 mean.",
+        .description = "Global annual land-ocean temperature anomaly in °C relative to the 1951–1980 mean.",
         .aliases = gistemp_aliases, .alias_count = G_N_ELEMENTS (gistemp_aliases),
         .adapter = ATM_CHART_CATALOG_ADAPTER_GISTEMP_V1,
         .adapter_id = "gistemp-pinned-annual/1",
@@ -75,7 +75,7 @@ static const AtmChartCatalogEntry entries[] = {
     {
         .series_id = "energy.energy-institute.global-total-energy-supply",
         .display_name = "Global total energy supply (Energy Institute TES)",
-        .description = "Global annual TES using the Physical Energy Content accounting method.",
+        .description = "Global total energy supply (TES) in EJ/year using the Physical Energy Content method. This is gross supply, not net energy or EROI.",
         .aliases = ei_aliases, .alias_count = G_N_ELEMENTS (ei_aliases),
         .adapter = ATM_CHART_CATALOG_ADAPTER_ENERGY_INSTITUTE_V2,
         .adapter_id = "energy-institute-tes-pinned-annual/1",
@@ -112,7 +112,7 @@ static const AtmChartCatalogEntry entries[] = {
     {
         .series_id = "banking.bnr.bls-c01.credit-standards-net-percentage",
         .display_name = "BNR Bank Lending Survey: credit standards net percentage",
-        .description = "Quarterly net percentage for credit standards on loans to non-financial corporations.",
+        .description = "Quarterly net percentage for credit standards on loans to non-financial corporations. Positive values indicate tightening; negative values indicate easing. The 2025-Q2 source round was not retained, so it is missing, not zero.",
         .aliases = bnr_aliases, .alias_count = G_N_ELEMENTS (bnr_aliases),
         .adapter = ATM_CHART_CATALOG_ADAPTER_BNR_BLS_C01_V3,
         .adapter_id = "bnr-bls-c01-pinned-quarterly/1",
