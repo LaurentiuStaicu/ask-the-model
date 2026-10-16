@@ -195,7 +195,7 @@ static void append_v4_source_attribution (GtkBox *container,
             entry->publisher_name != NULL ? entry->publisher_name : "Open publisher source");
         gtk_widget_set_halign (primary, GTK_ALIGN_START);
         gtk_widget_add_css_class (primary, "atm-source-link");
-        gtk_box_append (links, primary);
+        gtk_box_append (GTK_BOX (links), primary);
     }
 
     const char *snapshot = atm_chart_spec_series_snapshot_sha (source, 0);
@@ -208,7 +208,7 @@ static void append_v4_source_attribution (GtkBox *container,
             pinned_url, "Open pinned dataset used by AtM");
         gtk_widget_set_halign (pinned, GTK_ALIGN_START);
         gtk_widget_add_css_class (pinned, "atm-source-link");
-        gtk_box_append (links, pinned);
+        gtk_box_append (GTK_BOX (links), pinned);
         g_free (pinned_url);
     }
     gtk_box_append (container, links);
