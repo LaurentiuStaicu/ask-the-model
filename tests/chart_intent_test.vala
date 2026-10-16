@@ -92,11 +92,13 @@ int main () {
     assert (ei_guidance.contains ("native Chart/Data widget"));
     
     assert (ei_guidance.contains ("pseudo-table"));
-    assert (ei_guidance.contains ("more years are unavailable"));
-    assert (ei_guidance.contains ("Only provide year-by-year values or a table"));
+    assert (ei_guidance.contains ("Physical Energy Content"));
+    assert (ei_guidance.contains ("gross supply"));
+    assert (ei_guidance.contains ("does not reproduce publisher"));
+    assert (ei_guidance.contains ("only provide those details when explicitly requested"));
     assert (ei_command.is_chart_only_request ());
     string ei_response = ei_command.chart_only_response ();
-    assert (ei_response.contains ("Energy Institute global total energy supply chart"));
+    assert (ei_response.contains ("Global total energy supply (Energy Institute TES)"));
     assert (ei_response.contains ("qualified Chart/Data view"));
     assert (ei_response.contains ("source details"));
     assert (ei_response.contains ("if construction fails"));
@@ -125,11 +127,12 @@ int main () {
     assert (gistemp_guidance.contains ("native Chart/Data widget"));
     
     assert (gistemp_guidance.contains ("pseudo-table"));
-    assert (gistemp_guidance.contains ("more years are unavailable"));
-    assert (gistemp_guidance.contains ("Only provide year-by-year values or a table"));
+    assert (gistemp_guidance.contains ("Global annual land-ocean temperature anomaly"));
+    assert (gistemp_guidance.contains ("NASA's processing"));
+    assert (gistemp_guidance.contains ("only provide those details when explicitly requested"));
     assert (requested.is_chart_only_request ());
     string gistemp_response = requested.chart_only_response ();
-    assert (gistemp_response.contains ("GISTEMP global temperature anomaly chart"));
+    assert (gistemp_response.contains ("Global surface temperature anomaly (GISTEMP)"));
     assert (gistemp_response.contains ("qualified Chart/Data view"));
     assert (gistemp_response.contains ("source details"));
     assert (gistemp_response.contains ("if construction fails"));
@@ -143,10 +146,10 @@ int main () {
     assert (!gistemp_interpretation.is_chart_only_request ());
     assert (gistemp_interpretation.chart_only_response () == "");
 
-    assert (natural_english.chart_only_response ().contains ("GISTEMP global temperature anomaly chart"));
+    assert (natural_english.chart_only_response ().contains ("Global surface temperature anomaly (GISTEMP)"));
     assert (natural_english.chart_only_response ().contains ("source details"));
     assert (!natural_english.chart_only_response ().contains ("source provenance"));
-    assert (natural_romanian.chart_only_response ().contains ("Cerere de grafic: GISTEMP"));
+    assert (natural_romanian.chart_only_response ().contains ("Cerere de grafic: Global surface temperature anomaly (GISTEMP)"));
     assert (natural_romanian.chart_only_response ().contains ("detaliile sursei"));
     assert (ordinary.response_guidance () == "");
 
@@ -191,12 +194,12 @@ int main () {
         "Show the quarterly credit standards net percentage trend.");
     assert (bnr_command.is_chart_only_request ());
     string bnr_guidance = bnr_command.response_guidance ();
-    assert (bnr_guidance.contains ("pinned RMD snapshot"));
+    assert (bnr_guidance.contains ("romanian-monetary-dynamics"));
     assert (bnr_guidance.contains ("2025-Q2"));
     assert (bnr_guidance.contains ("MISSING, not zero"));
     string bnr_response = bnr_command.chart_only_response ();
-    assert (bnr_response.contains ("BNR BLS C01 quarterly credit-standards"));
-    assert (bnr_response.contains ("missing, not zero"));
+    assert (bnr_response.contains ("BNR Bank Lending Survey: credit standards net percentage"));
+    assert (bnr_response.contains ("2025-Q2 observation is missing from the source, not zero"));
     assert (bnr_response.contains ("source details"));
     assert (bnr_response.contains ("Data"));
     assert (bnr_response.contains ("If chart construction fails"));
@@ -215,15 +218,15 @@ int main () {
         "Generează un grafic BNR BLS C01 al procentului net privind standardele de credit."
     );
     assert (bnr_romanian.bnr_bls_c01_requested);
-    assert (bnr_romanian.chart_only_response ().contains ("Cerere de grafic: BNR BLS C01 trimestrial"));
-    assert (bnr_romanian.chart_only_response ().contains ("2025-Q2 lipsește, nu este zero"));
+    assert (bnr_romanian.chart_only_response ().contains ("Cerere de grafic: BNR Bank Lending Survey: credit standards net percentage"));
+    assert (bnr_romanian.chart_only_response ().contains ("2025-Q2 lipsește din sursă; este lipsă, nu zero"));
     assert (bnr_romanian.chart_only_response ().contains ("detaliile sursei"));
 
     var bnr_english = AskTheModel.ChartIntent.parse (
         "Generate a BNR BLS C01 chart of credit standards net percentage."
     );
     assert (bnr_english.bnr_bls_c01_requested);
-    assert (bnr_english.chart_only_response ().contains ("Requested chart: BNR BLS C01"));
+    assert (bnr_english.chart_only_response ().contains ("Requested chart: BNR Bank Lending Survey"));
 
     var generic_net_percentage = AskTheModel.ChartIntent.parse (
         "Generate a chart of the net percentage of non-performing loans."
