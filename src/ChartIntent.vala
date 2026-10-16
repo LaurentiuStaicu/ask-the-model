@@ -640,6 +640,39 @@ namespace AskTheModel {
                 exact_subject_matches_series (subject, selected_series_id);
         }
 
+        /*
+         * Explicit slash commands can carry a subject without repeating the
+         * word "chart" (for example, "/chart gistemp show the trend for malaria").
+         * Extract these scoped trend/evolution subjects too, so an unknown
+         * topic does not evade the grounding gate just because it is absent
+         * from the unsupported-variable term list.
+         */
+        private static string? extract_modifier_subject (string normalized) {
+            string[] markers = {
+                "trend for ", "trend of ", "evolution of ", "evolution for ",
+                "time series for ", "time series of ",
+                "tendința pentru ", "tendinta pentru ",
+                "tendința a ", "tendinta a ",
+                "evoluția pentru ", "evolutia pentru ",
+                "evoluția a ", "evolutia a "
+            };
+            int best_index = -1;
+            string best_marker = "";
+            foreach (string marker in markers) {
+                int index = normalized.index_of (marker);
+                if (index >= 0 && (best_index < 0 || index < best_index)) {
+                    best_index = index;
+                    best_marker = marker;
+                }
+            }
+            if (best_index < 0) {
+                return null;
+            }
+            return clean_chart_subject (
+                normalized.substring (best_index + best_marker.length)
+            );
+        }
+
         private static bool requests_derived_series (string normalized) {
             return contains_any (
                 normalized,
@@ -706,6 +739,15 @@ namespace AskTheModel {
                 extracted_subject.strip ().length > 0 &&
                 !request_subject_matches_series (
                     normalized, selected_series_id
+                )) {
+                return false;
+            }
+
+            string? modifier_subject = extract_modifier_subject (normalized);
+            if (modifier_subject != null &&
+                modifier_subject.strip ().length > 0 &&
+                !exact_subject_matches_series (
+                    modifier_subject, selected_series_id
                 )) {
                 return false;
             }
