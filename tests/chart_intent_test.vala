@@ -426,6 +426,29 @@ int main () {
     );
     assert (capability_specific.series_id == null);
 
+    var capability_singular = AskTheModel.ChartIntent.parse (
+        "Can you create a GISTEMP chart?"
+    );
+    assert (capability_singular.series_id == null);
+    assert (capability_singular.intent == "not_chart");
+
+    var capability_romanian_singular = AskTheModel.ChartIntent.parse (
+        "Poți genera un grafic GISTEMP?"
+    );
+    assert (capability_romanian_singular.series_id == null);
+    assert (capability_romanian_singular.intent == "not_chart");
+
+    var existing_chart_interpretation = AskTheModel.ChartIntent.parse (
+        "What does the GISTEMP chart show?"
+    );
+    assert (existing_chart_interpretation.series_id == null);
+    assert (existing_chart_interpretation.intent == "not_chart");
+
+    var existing_chart_interpretation_romanian =
+        AskTheModel.ChartIntent.parse ("Ce ne arată graficul GISTEMP?");
+    assert (existing_chart_interpretation_romanian.series_id == null);
+    assert (existing_chart_interpretation_romanian.intent == "not_chart");
+
     var short_alias_near_miss = AskTheModel.ChartIntent.parse (
         "Make a chart about the latest Tesla production figures."
     );
