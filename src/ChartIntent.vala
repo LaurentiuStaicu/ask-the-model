@@ -691,6 +691,25 @@ namespace AskTheModel {
                 return false;
             }
 
+            /*
+             * Explicit /chart commands select one series, but any additional
+             * non-empty chart-subject phrase must still agree with it. Do not
+             * rely only on a finite unsupported-variable blacklist: otherwise
+             * an explicit GISTEMP command with "plot malaria prevalence" could
+             * silently become a GISTEMP chart merely because malaria is not
+             * in that list. A generic modifier such as "show the trend" has
+             * no extracted subject and remains valid after a source command.
+             */
+            string? extracted_subject = extract_chart_subject (normalized);
+            if (!has_explicit_chart_subject_clause (normalized) &&
+                extracted_subject != null &&
+                extracted_subject.strip ().length > 0 &&
+                !request_subject_matches_series (
+                    normalized, selected_series_id
+                )) {
+                return false;
+            }
+
             return query_series_id == null ||
                 query_series_id == selected_series_id;
         }
