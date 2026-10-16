@@ -409,12 +409,15 @@ namespace AskTheModel {
                 return new ChartIntent (false, false, true, query);
             }
 
-            /* A malformed slash command must not fall through to natural
-             * language detection merely because it contains a source name. */
-            if (trimmed.down ().has_prefix (gistemp_prefix) ||
-                trimmed.down ().has_prefix (ei_prefix) ||
-                trimmed.down ().has_prefix (bnr_prefix)) {
-                return new ChartIntent (false, false, false, prompt);
+            /*
+             * Once the user invokes the reserved /chart command, an unknown
+             * selector or malformed source token must fail closed instead of
+             * falling through to ordinary model chat.
+             */
+            if (command_matches (trimmed, "/chart")) {
+                return new ChartIntent (
+                    false, false, false, prompt, "unsupported"
+                );
             }
 
             if (is_explicitly_negated_chart_request (normalized) ||
