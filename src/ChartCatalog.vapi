@@ -19,4 +19,14 @@ namespace AskTheModel.ChartCatalog {
         string request,
         out bool ambiguous
     );
+
+    [CCode (cname = "atm_chart_catalog_response_guidance")]
+    public static string? response_guidance (string series_id);
+
+    [CCode (cname = "atm_chart_catalog_chart_only_response")]
+    public static string? chart_only_response (
+        string series_id,
+        bool romanian
+    );
+
 }
