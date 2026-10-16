@@ -25,6 +25,8 @@ on:
       - 'src/chart_projection_internal.h'
       - 'tests/chart_projection_test.c'
       - 'src/chart_spec.*'
+      - 'src/chart_spec_v4.*'
+      - 'src/chart_catalog.*'
       - 'tests/chart_spec_test.c'
       - 'src/chart_history_reconstruct.*'
       - 'tests/chart_history_reconstruct_test.c'
@@ -140,7 +142,8 @@ jobs:
             src/series_adapter.c \
             src/scientific_canonical.c src/scientific_artifact.c \
             src/scientific_result.c src/scientific_operation.c \
-            src/scientific_derivation.c tests/chart_spec_test.c \
+            src/scientific_derivation.c src/chart_spec_v4.c src/chart_catalog.c \
+            tests/chart_spec_test.c \
             $(pkg-config --cflags --libs glib-2.0 json-glib-1.0) -lm \
             -o /tmp/chart-spec-test
           ATM_CHART01_FIXTURE=tests/fixtures/chart01 \
