@@ -426,6 +426,7 @@ private static int run_orchestrator (
 
     string[] phases = {
         "source-details",
+        "intent-rejection",
         "live",
         "history",
         "history-invalid"
