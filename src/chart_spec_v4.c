@@ -85,7 +85,7 @@ source_profile_matches (const AtmChartCatalogEntry *entry,
 {
     AtmChartSpecVersion version = atm_chart_spec_version (source);
     const char *schema = atm_chart_spec_schema (source);
-    const char *profile = atm_chart_spec_series_profile (source, 0);
+    const char *profile = atm_chart_spec_series_profile (source);
 
     switch (entry->adapter) {
     case ATM_CHART_CATALOG_ADAPTER_GISTEMP_V1:
@@ -360,7 +360,7 @@ build_id (const AtmChartCatalogEntry *entry,
     add_text (builder, "adapter_id", entry->adapter_id);
     add_text (builder, "catalog_series_profile_id", entry->series_profile_id);
     add_text (builder, "catalog_series_profile_version", entry->series_profile_version);
-    add_text (builder, "source_series_profile_id", atm_chart_spec_series_profile (source, 0));
+    add_text (builder, "source_series_profile_id", atm_chart_spec_series_profile (source));
     add_text (builder, "admission_profile_id", entry->admission_profile_id);
     add_text (builder, "admission_profile_version", entry->admission_profile_version);
     add_text (builder, "reconstruction_profile_id", entry->reconstruction_profile_id);
