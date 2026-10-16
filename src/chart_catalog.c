@@ -336,6 +336,20 @@ atm_chart_catalog_match_request_series_id (
     return found != NULL ? g_strdup (found->series_id) : NULL;
 }
 
+
+gboolean
+atm_chart_catalog_repository_matches_series (
+    const char *series_id,
+    const char *repository_id
+)
+{
+    const AtmChartCatalogEntry *entry =
+        atm_chart_catalog_find_id (series_id);
+    return entry != NULL && repository_id != NULL &&
+        (g_strcmp0 (repository_id, entry->repository_key) == 0 ||
+         g_strcmp0 (repository_id, entry->repository_full_name) == 0);
+}
+
 gboolean
 atm_chart_catalog_snapshot_admitted (const AtmChartCatalogEntry *entry, const char *snapshot_sha)
 {
