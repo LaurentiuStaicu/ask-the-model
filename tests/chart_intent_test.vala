@@ -427,16 +427,28 @@ int main () {
     assert (capability_specific.series_id == null);
 
     var capability_singular = AskTheModel.ChartIntent.parse (
-        "Can you create a GISTEMP chart?"
+        "Does this app support creating GISTEMP charts?"
     );
     assert (capability_singular.series_id == null);
     assert (capability_singular.intent == "not_chart");
 
     var capability_romanian_singular = AskTheModel.ChartIntent.parse (
-        "Poți genera un grafic GISTEMP?"
+        "Aplicația poate genera grafice GISTEMP?"
     );
     assert (capability_romanian_singular.series_id == null);
     assert (capability_romanian_singular.intent == "not_chart");
+
+    var polite_request_english = AskTheModel.ChartIntent.parse (
+        "Can you create a GISTEMP chart?"
+    );
+    assert (polite_request_english.series_id ==
+        "climate.gistemp.global-temperature-anomaly");
+
+    var polite_request_romanian = AskTheModel.ChartIntent.parse (
+        "Poți genera un grafic GISTEMP?"
+    );
+    assert (polite_request_romanian.series_id ==
+        "climate.gistemp.global-temperature-anomaly");
 
     var existing_chart_interpretation = AskTheModel.ChartIntent.parse (
         "What does the GISTEMP chart show?"
