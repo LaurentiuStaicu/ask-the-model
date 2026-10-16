@@ -6405,21 +6405,40 @@ namespace AskTheModel {
                 return true;
             }
 
-            if (pres09_test_live_turn != 5 ||
+            if (pres09_test_live_turn == 5) {
+                if (transcript.last_index_of ("The chart request is ambiguous") <=
+                        transcript.last_index_of ("AtM cannot generate that chart") ||
+                    state.pres09_test_chart_widgets.length != 0 ||
+                    state.persistent_id != null) {
+                    pres09_test_finish (
+                        false,
+                        "A pie-chart request was routed into the line-only Chart/Data renderer instead of failing closed"
+                    );
+                    return false;
+                }
+
+                state.prompt.buffer.text =
+                    "/chart gistemp Show a chart of diabetes prevalence using GISTEMP.";
+                pres09_test_live_turn = 6;
+                state.send_button.clicked ();
+                return true;
+            }
+
+            if (pres09_test_live_turn != 6 ||
                 transcript.last_index_of ("The chart request is ambiguous") <=
                     transcript.last_index_of ("AtM cannot generate that chart") ||
                 state.pres09_test_chart_widgets.length != 0 ||
                 state.persistent_id != null) {
                 pres09_test_finish (
                     false,
-                    "A pie-chart request was routed into the line-only Chart/Data renderer instead of failing closed"
+                    "An explicit /chart command accepted an unrelated chart subject merely because its registered series was mentioned"
                 );
                 return false;
             }
 
             pres09_test_finish (
                 true,
-                "unsupported population, conflicting explicit /chart selection, unknown /chart selector, unrelated diabetes prevalence with a registered GISTEMP alias, and unsupported pie-chart kind all failed closed without model routing, persistence or Chart/Data widgets"
+                "unsupported population, conflicting explicit /chart selection, unknown /chart selector, unrelated diabetes prevalence with a registered GISTEMP alias, unsupported pie-chart kind, and explicit /chart with an unrelated diabetes subject all failed closed without model routing, persistence or Chart/Data widgets"
             );
             return false;
         }
