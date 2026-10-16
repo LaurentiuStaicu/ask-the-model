@@ -586,30 +586,50 @@ namespace AskTheModel {
             });
         }
 
+        private static bool exact_subject_matches_series (
+            string subject,
+            string selected_series_id
+        ) {
+            if (subject.strip ().length == 0) {
+                return false;
+            }
+            bool ambiguous = false;
+            string? subject_series = ChartCatalog.match_exact_alias_series_id (
+                subject, out ambiguous
+            );
+            return !ambiguous && subject_series == selected_series_id;
+        }
+
         private static bool request_subject_matches_series (
             string normalized,
             string selected_series_id
         ) {
-            string? subject = extract_chart_subject (normalized);
-            if (subject != null && subject.strip ().length > 0) {
-                bool ambiguous = false;
-                string? subject_series =
-                    ChartCatalog.match_exact_alias_series_id (
-                        subject, out ambiguous
-                    );
-                return !ambiguous && subject_series == selected_series_id;
+            /*
+             * An explicit subject clause ("chart of diabetes prevalence using
+             * GISTEMP") takes priority and must match the catalog exactly. Do
+             * not fall back to the source mention in that case.
+             */
+            if (has_explicit_chart_subject_clause (normalized)) {
+                string? subject = extract_chart_subject (normalized);
+                return subject != null &&
+                    exact_subject_matches_series (subject, selected_series_id);
             }
 
+            /*
+             * If the source name is directly before the chart noun, use that
+             * first. This also handles a following interpretation sentence
+             * without letting "what does the chart show?" overwrite the
+             * original request's subject.
+             */
             string? prefix = extract_series_name_before_chart_noun (normalized);
-            if (prefix == null || prefix.strip ().length == 0) {
-                return false;
+            if (prefix != null &&
+                exact_subject_matches_series (prefix, selected_series_id)) {
+                return true;
             }
 
-            bool ambiguous = false;
-            string? prefix_series = ChartCatalog.match_exact_alias_series_id (
-                prefix, out ambiguous
-            );
-            return !ambiguous && prefix_series == selected_series_id;
+            string? subject = extract_chart_subject (normalized);
+            return subject != null &&
+                exact_subject_matches_series (subject, selected_series_id);
         }
 
         private static bool requests_derived_series (string normalized) {
