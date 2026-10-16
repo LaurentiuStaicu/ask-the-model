@@ -234,6 +234,40 @@ test_request_alias_phrase_boundaries (void)
     g_assert_null (atm_chart_catalog_match_request_series_id ("gistemp", NULL));
 }
 
+
+static void
+test_exact_chart_subject_alias_lookup (void)
+{
+    gboolean ambiguous = FALSE;
+    char *series_id = atm_chart_catalog_match_exact_alias_series_id (
+        "global temperature anomalies", &ambiguous);
+    g_assert_false (ambiguous);
+    g_assert_cmpstr (series_id, ==,
+                     "climate.gistemp.global-temperature-anomaly");
+    g_free (series_id);
+
+    series_id = atm_chart_catalog_match_exact_alias_series_id (
+        "diabetes prevalence", &ambiguous);
+    g_assert_false (ambiguous);
+    g_assert_null (series_id);
+
+    series_id = atm_chart_catalog_match_exact_alias_series_id (
+        "global temperature anomalies using GISTEMP", &ambiguous);
+    g_assert_false (ambiguous);
+    g_assert_null (series_id);
+
+    series_id = atm_chart_catalog_match_exact_alias_series_id (
+        "procentului net privind standardele de credit", &ambiguous);
+    g_assert_false (ambiguous);
+    g_assert_cmpstr (series_id, ==,
+                     "banking.bnr.bls-c01.credit-standards-net-percentage");
+    g_free (series_id);
+
+    g_assert_null (
+        atm_chart_catalog_match_exact_alias_series_id ("gistemp", NULL)
+    );
+}
+
 int
 main (int argc, char **argv)
 {
@@ -242,6 +276,7 @@ main (int argc, char **argv)
     g_test_add_func ("/chart-catalog/stable-ids", test_stable_ids_and_profiles);
     g_test_add_func ("/chart-catalog/aliases", test_alias_normalization);
     g_test_add_func ("/chart-catalog/request-phrase-boundaries", test_request_alias_phrase_boundaries);
+    g_test_add_func ("/chart-catalog/exact-subject-alias", test_exact_chart_subject_alias_lookup);
     g_test_add_func ("/chart-catalog/snapshot-allowlists", test_snapshot_allowlists);
     g_test_add_func ("/chart-catalog/source-semantics", test_source_semantics_and_provenance);
     g_test_add_func ("/chart-catalog/no-arbitrary-columns", test_catalog_does_not_promote_arbitrary_columns);
