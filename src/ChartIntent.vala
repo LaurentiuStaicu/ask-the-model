@@ -121,18 +121,18 @@ namespace AskTheModel {
 
             if (bnr_bls_c01_requested) {
                 return romanian
-                    ? "Iată graficul trimestrial BNR BLS C01 pentru procentul net privind standardele de credit. Consultă fila Data pentru valorile exacte și detaliile sursei; valoarea pentru 2025-Q2 lipsește, nu este zero."
-                    : "Here is the BNR BLS C01 quarterly credit-standards net-percentage chart. See Data for exact values and source details; 2025-Q2 is missing, not zero.";
+                    ? "Cerere de grafic: BNR BLS C01 trimestrial pentru procentul net al standardelor de credit. Consultă vizualizarea Data calificată pentru valorile exacte și detaliile sursei când este disponibilă; 2025-Q2 lipsește, nu este zero. Dacă graficul nu poate fi construit, AtM raportează separat problema și nu substituie valori."
+                    : "Requested chart: BNR BLS C01 quarterly credit-standards net-percentage chart. See the qualified Data view for exact values and source details when available; 2025-Q2 is missing, not zero. If chart construction fails, AtM reports that separately and does not substitute values.";
             }
             if (energy_institute_requested) {
                 return romanian
-                    ? "Iată graficul Energy Institute al furnizării totale globale de energie. Consultă fila Data pentru valorile anuale și detaliile sursei."
-                    : "Here is the Energy Institute global total energy supply chart. See the Data tab for the annual values and source details.";
+                    ? "Cerere de grafic: Energy Institute pentru furnizarea totală globală de energie. Valorile anuale exacte și detaliile sursei apar în vizualizarea Chart/Data calificată când este disponibilă; dacă aceasta nu poate fi construită, AtM raportează separat problema și nu substituie valori."
+                    : "Requested chart: Energy Institute global total energy supply chart. Exact annual values and source details appear in the qualified Chart/Data view when available; if construction fails, AtM reports that separately rather than substituting values.";
             }
             if (gistemp_requested) {
                 return romanian
-                    ? "Iată graficul GISTEMP al anomaliilor temperaturii globale. Consultă fila Data pentru valori și detalii despre sursă."
-                    : "Here is the GISTEMP global temperature anomaly chart. See the Data tab for the values and source details.";
+                    ? "Cerere de grafic: GISTEMP pentru anomaliile temperaturii globale. Valorile exacte și detaliile sursei apar în vizualizarea Chart/Data calificată când este disponibilă; dacă aceasta nu poate fi construită, AtM raportează separat problema și nu substituie valori."
+                    : "Requested chart: GISTEMP global temperature anomaly chart. Exact values and source details appear in the qualified Chart/Data view when available; if construction fails, AtM reports that separately rather than substituting values.";
             }
             return "";
         }
