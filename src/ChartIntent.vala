@@ -673,6 +673,61 @@ namespace AskTheModel {
             );
         }
 
+        private static string? extract_subject_before_modifier (string normalized) {
+            string[] markers = {
+                " trend", " evolution", " time series", " tendința",
+                " tendinta", " evoluția", " evolutia"
+            };
+            int best_index = -1;
+            foreach (string marker in markers) {
+                int index = normalized.index_of (marker);
+                if (index >= 0 && (best_index < 0 || index < best_index)) {
+                    best_index = index;
+                }
+            }
+            if (best_index < 0) {
+                return null;
+            }
+
+            string subject = normalized.substring (0, best_index).strip ();
+            string[] leading_commands = {
+                "show me ", "show ", "display ", "plot ", "generate a ",
+                "generate ", "create a ", "create ", "make a ", "make ",
+                "draw ", "visualize ", "visualise ", "arata-mi ",
+                "arată-mi ", "arata ", "arată ", "genereaza ",
+                "generează ", "creeaza ", "creează ", "afiseaza ",
+                "afișează ", "vizualizeaza ", "vizualizează "
+            };
+            gboolean changed = TRUE;
+            while (changed) {
+                changed = FALSE;
+                foreach (string prefix in leading_commands) {
+                    if (subject.has_prefix (prefix)) {
+                        subject = subject.substring (prefix.length).strip ();
+                        changed = TRUE;
+                        break;
+                    }
+                }
+                if (subject.has_prefix ("the ") ||
+                    subject.has_prefix ("a ") ||
+                    subject.has_prefix ("an ")) {
+                    int separator = subject.index_of (" ");
+                    subject = separator >= 0
+                        ? subject.substring (separator + 1).strip ()
+                        : "";
+                    changed = TRUE;
+                }
+            }
+
+            if (subject == "" || subject == "historical" ||
+                subject == "annual" || subject == "overall" ||
+                subject == "long-term" || subject == "yearly" ||
+                subject == "quarterly") {
+                return null;
+            }
+            return clean_chart_subject (subject);
+        }
+
         private static bool is_time_period_only_subject (string subject) {
             string normalized = subject.down ().strip ()
                 .replace ("–", "-")
@@ -769,6 +824,16 @@ namespace AskTheModel {
                 extracted_subject.strip ().length > 0 &&
                 !request_subject_matches_series (
                     normalized, selected_series_id
+                )) {
+                return false;
+            }
+
+            string? subject_before_modifier =
+                extract_subject_before_modifier (normalized);
+            if (subject_before_modifier != null &&
+                subject_before_modifier.strip ().length > 0 &&
+                !exact_subject_matches_series (
+                    subject_before_modifier, selected_series_id
                 )) {
                 return false;
             }
