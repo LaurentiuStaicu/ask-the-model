@@ -3891,7 +3891,17 @@ namespace AskTheModel {
                     ChartCatalog.text_has_phrase (prompt, "generează") ||
                     ChartCatalog.text_has_phrase (prompt, "genereaza") ||
                     ChartCatalog.text_has_phrase (prompt, "arată") ||
-                    ChartCatalog.text_has_phrase (prompt, "arata");
+                    ChartCatalog.text_has_phrase (prompt, "arata") ||
+                    ChartCatalog.text_has_phrase (prompt, "populație") ||
+                    ChartCatalog.text_has_phrase (prompt, "populatie") ||
+                    ChartCatalog.text_has_phrase (prompt, "temperatură") ||
+                    ChartCatalog.text_has_phrase (prompt, "temperatura") ||
+                    ChartCatalog.text_has_phrase (prompt, "inflație") ||
+                    ChartCatalog.text_has_phrase (prompt, "inflatie") ||
+                    ChartCatalog.text_has_phrase (prompt, "șomaj") ||
+                    ChartCatalog.text_has_phrase (prompt, "somaj") ||
+                    ChartCatalog.text_has_phrase (prompt, "furnizarea") ||
+                    ChartCatalog.text_has_phrase (prompt, "standardele de credit");
                 string rejection = chart_intent.intent == "unsupported"
                     ? (romanian_request
                         ? "AtM nu poate genera acest grafic: variabila cerută nu este în catalogul de serii grafice validate. Menționează GISTEMP, furnizarea totală de energie Energy Institute sau seria BNR BLS C01."
@@ -6334,19 +6344,43 @@ namespace AskTheModel {
                 return true;
             }
 
-            if (!transcript.contains (
-                    "The chart request is ambiguous") ||
-                state.pres09_test_chart_widgets.length != 0) {
+            if (pres09_test_live_turn == 2) {
+                if (!transcript.contains (
+                        "The chart request is ambiguous") ||
+                    state.pres09_test_chart_widgets.length != 0 ||
+                    state.persistent_id != null) {
+                    pres09_test_finish (
+                        false,
+                        "A conflicting explicit /chart request did not fail closed without a chart or persistent turn"
+                    );
+                    return false;
+                }
+
+                state.prompt.buffer.text = "/chart population";
+                pres09_test_live_turn = 3;
+                state.send_button.clicked ();
+                return true;
+            }
+
+            int ambiguous_position =
+                transcript.index_of ("The chart request is ambiguous");
+            int latest_unsupported_position =
+                transcript.last_index_of ("AtM cannot generate that chart");
+            if (pres09_test_live_turn != 3 ||
+                ambiguous_position < 0 ||
+                latest_unsupported_position <= ambiguous_position ||
+                state.pres09_test_chart_widgets.length != 0 ||
+                state.persistent_id != null) {
                 pres09_test_finish (
                     false,
-                    "A conflicting explicit /chart request did not fail closed without a chart"
+                    "Unknown explicit /chart selector fell through to normal chat instead of a fail-closed refusal"
                 );
                 return false;
             }
 
             pres09_test_finish (
                 true,
-                "unsupported natural-language series and a conflicting explicit chart command both returned clear refusal messages without model routing, persistence or Chart/Data widgets"
+                "unsupported natural-language series, conflicting explicit /chart selection, and unknown /chart selector all returned clear refusals without model routing, persistence or Chart/Data widgets"
             );
             return false;
         }
