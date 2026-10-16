@@ -378,6 +378,38 @@ namespace AskTheModel {
             );
         }
 
+        private static bool is_allowed_chart_subject_tail (string suffix) {
+            string normalized_suffix = suffix
+                .replace (".", "")
+                .replace (",", "")
+                .replace ("?", "")
+                .replace ("!", "")
+                .strip ();
+            string[] allowed_tails = {
+                "over time", "over the years", "across time", "by year",
+                "annually", "in the period", "relative to 1951-1980",
+                "from gistemp", "using gistemp", "with gistemp",
+                "from energy institute", "using energy institute",
+                "with energy institute", "using physical energy content",
+                "with physical energy content", "from bnr bls c01",
+                "using bnr bls c01",
+                "în timp", "in timp", "anual", "anuală", "anuala",
+                "from nasa giss", "using nasa giss",
+                "cu evoluția temperaturii globale în timp",
+                "cu evolutia temperaturii globale in timp",
+                "despre furnizarea totală de energie",
+                "despre furnizarea totala de energie",
+                "al procentului net privind standardele de credit",
+                "al procentului net al standardelor de credit"
+            };
+            foreach (string allowed in allowed_tails) {
+                if (normalized_suffix == allowed) {
+                    return true;
+                }
+            }
+            return false;
+        }
+
         private static string clean_chart_subject (string raw_subject) {
             string subject = raw_subject.strip ();
 
@@ -391,7 +423,7 @@ namespace AskTheModel {
                 " folosind ", " utilizând ", " utilizand ", " pe baza ",
                 " în timp", " in timp", " în perioada ", " in perioada ",
                 " pentru perioada ", " anual", " pe parcursul ",
-                " al ", " ale "
+                " al ", " ale ", " despre ", " cu "
             };
             int cutoff = -1;
             foreach (string marker in tail_markers) {
@@ -401,12 +433,21 @@ namespace AskTheModel {
                 }
             }
             if (cutoff >= 0) {
-                subject = subject.substring (0, cutoff).strip ();
+                string suffix = subject.substring (cutoff).strip ();
+                /*
+                 * Only discard a tail when it is a reviewed modifier or source
+                 * qualifier. Any extra concept after a tail (e.g. "over time
+                 * with diabetes prevalence") remains in the subject and fails
+                 * exact catalog-subject matching.
+                 */
+                if (is_allowed_chart_subject_tail (suffix)) {
+                    subject = subject.substring (0, cutoff).strip ();
+                }
             }
 
-            /* Parenthesized source abbreviations (e.g. TES) do not change the subject. */
+            /* Drop a parenthesized acronym only when it is the terminal suffix. */
             int parenthesis = subject.index_of (" (");
-            if (parenthesis >= 0) {
+            if (parenthesis >= 0 && subject.has_suffix (")")) {
                 subject = subject.substring (0, parenthesis).strip ();
             }
 
