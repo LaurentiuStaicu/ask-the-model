@@ -399,6 +399,14 @@ atm_chart_catalog_match_request_series_id (
 }
 
 
+const char *
+atm_chart_catalog_adapter_id_for_series (const char *series_id)
+{
+    const AtmChartCatalogEntry *entry =
+        atm_chart_catalog_find_id (series_id);
+    return entry != NULL ? entry->adapter_id : NULL;
+}
+
 gboolean
 atm_chart_catalog_repository_matches_series (
     const char *series_id,
