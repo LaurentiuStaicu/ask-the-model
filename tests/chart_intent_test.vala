@@ -428,5 +428,24 @@ int main () {
     assert (unsupported_alias.intent == "unsupported");
     assert (unsupported_alias.series_id == null);
 
+    /* A registered alias never overrides a different requested concept. */
+    var population_with_gistemp_alias = AskTheModel.ChartIntent.parse (
+        "Generate a GISTEMP chart of population over time."
+    );
+    assert (population_with_gistemp_alias.series_id == null);
+    assert (population_with_gistemp_alias.intent == "ambiguous");
+
+    var population_with_ei_alias = AskTheModel.ChartIntent.parse (
+        "Generate an Energy Institute chart of population over time."
+    );
+    assert (population_with_ei_alias.series_id == null);
+    assert (population_with_ei_alias.intent == "ambiguous");
+
+    var population_with_bnr_alias = AskTheModel.ChartIntent.parse (
+        "Generate a chart of BNR credit standards for population over time."
+    );
+    assert (population_with_bnr_alias.series_id == null);
+    assert (population_with_bnr_alias.intent == "ambiguous");
+
     return 0;
 }
