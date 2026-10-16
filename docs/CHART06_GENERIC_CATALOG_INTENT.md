@@ -20,6 +20,7 @@ This layer must also address the observed sparse-record problem. A source row co
 6. **Missing is never zero.** No implicit imputation, interpolation, extrapolation, row synthesis, smoothing or gap-bridging. Each adapter declares how blank source cells, authorized missing observations and discontinuities are interpreted. A source profile that rejects missing observations must keep rejecting them.
 7. **Source identity and scientific meaning are separate from display.** Display conversions and labels never overwrite the canonical source decimal or enter SRA facts. Chart/Data, and the recipe retained by History, must preserve the qualified source identity and point-level provenance.
 8. **Primary-source claims are explicit.** User-facing provenance must distinguish publisher/original source material from the pinned processed file actually reconstructed by AtM. A primary-source link does not prove AtM independently reproduced the publisher's raw-to-processed pipeline. If a chart uses a processed snapshot, the wording and evidence card must say so.
+9. **Alias matching and negation are part of authorization.** Normalize supported aliases, then match bounded phrases rather than arbitrary substrings; short/common aliases such as `tes` cannot match inside unrelated words. Weak or multiple matches fail closed. A mention of a series, a negated request, a hypothetical/quoted request, or a capability question is not a positive request to create a chart. The intent classifier must recognize supported English/Romanian positive chart forms and reject negated/non-request forms rather than relying only on co-occurring keywords.
 
 ## 3. Eligible-series catalog contract
 
@@ -92,6 +93,8 @@ Validation rules:
 - A proposal that selects a registered series for a different or unsupported concept must be rejected before source reconstruction or widget creation. For example, an unsupported `population over time` request must not become a GISTEMP/EI/BNR chart just because the model returns one of their IDs.
 - If the model cannot satisfy the schema or its selection cannot be grounded, an explicit slash command remains usable; the natural-language request must fail closed or ask for clarification rather than falling back to any eligible series.
 - English/Romanian aliases, explicit chart commands, source ambiguity, extra interpretation requests, unregistered concepts with a valid-but-unrelated proposed ID, and explicit table/year/value requests require deterministic regression cases. Intent accuracy must be evaluated on a frozen request set, not claimed from one successful prompt.
+- Use token/phrase-aware alias matching; test short/common aliases (including `tes`) against unrelated surrounding words and punctuation. Never select a series from a weak substring.
+- Negated/hypothetical EN/RO requests (for example, “do not generate a GISTEMP chart” and “nu genera un grafic GISTEMP”), quoted mentions and capability questions must not trigger a chart.
 
 Structured generation is a parsing aid only. It does not replace source qualification or authorization checks. The raw model response is not scientific evidence and must not be persisted as chart data.
 
@@ -137,6 +140,8 @@ A primary-source URL cannot be represented as proof of a pipeline audit. If sour
 - English and Romanian cases cover supported aliases, a single series, aliases shared by two candidates, requests for interpretation, explicit values/table requests, unsupported kinds and unsupported transformations.
 - False-positive tests send an unsupported concept (including `population over time`) with each valid catalog ID as the model proposal; every unrelated proposal must be rejected without constructing a chart.
 - A request mentioning a registered series without actually asking for a chart must not be converted to a chart-only response.
+- Token-boundary cases prove short aliases such as `tes` do not match inside unrelated words.
+- Negated, hypothetical, quoted and capability-only EN/RO prompts do not create charts.
 - Invalid/truncated/non-JSON provider output, schema mismatch, unknown keys/IDs and unavailable structured-output support fail safely.
 - No model-provided coordinates, values, units, axes, paths or provenance can enter ChartSpec or Data.
 - Chart-only responses are deterministic and do not contain partial retrieval tables, escaped/internal serialized intent or duplicate chart-format output.
