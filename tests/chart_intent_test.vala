@@ -575,6 +575,12 @@ int main () {
     assert (explicit_unknown_trend_subject.series_id == null);
     assert (explicit_unknown_trend_subject.intent == "ambiguous");
 
+    var explicit_unknown_subject_before_trend = AskTheModel.ChartIntent.parse (
+        "/chart gistemp Show malaria prevalence trend over time."
+    );
+    assert (explicit_unknown_subject_before_trend.series_id == null);
+    assert (explicit_unknown_subject_before_trend.intent == "ambiguous");
+
     var explicit_unknown_trend_subject_romanian = AskTheModel.ChartIntent.parse (
         "/chart gistemp Arată tendința pentru malarie în timp."
     );
