@@ -301,6 +301,204 @@ namespace AskTheModel {
             return false;
         }
 
+
+        private static bool requests_unsupported_chart_kind (string normalized) {
+            return contains_bounded_any (normalized, {
+                "pie chart", "pie charts", "pie diagram",
+                "bar chart", "bar charts", "bar graph", "bar graphs",
+                "scatter plot", "scatter plots", "scatter chart",
+                "histogram", "histograms", "box plot", "box plots",
+                "area chart", "area graph", "heatmap", "heat map",
+                "donut chart", "doughnut chart", "treemap",
+                "radar chart", "spider chart", "candlestick chart",
+                "waterfall chart", "stacked bar", "stacked area",
+                "circular chart", "circular diagram",
+                "grafic circular", "grafic cu bare", "grafic cu coloane",
+                "grafic de dispersie", "grafic dispersie",
+                "diagramă de dispersie", "diagrama de dispersie",
+                "diagramă circulară", "diagrama circulara",
+                "diagramă tip bară", "diagrama tip bara",
+                "histogramă", "histograma", "hartă tematică",
+                "harta tematica", "grafic în arie", "grafic in arie"
+            });
+        }
+
+        /*
+         * Extract the chart's grammatical subject, not just any eligible alias
+         * mentioned elsewhere in the sentence. Explicit "of/showing/for" phrases
+         * have priority over the looser "GISTEMP chart" form so that
+         * "chart of diabetes prevalence using GISTEMP" cannot route to GISTEMP.
+         */
+        private static string? extract_chart_subject (string normalized) {
+            string[] specific_markers = {
+                "chart of ", "graph of ", "plot of ", "diagram of ",
+                "chart for ", "graph for ", "plot for ",
+                "chart about ", "graph about ", "chart on ", "graph on ",
+                "chart showing ", "graph showing ", "plot showing ",
+                "chart depicting ", "graph depicting ",
+                "grafic al ", "graficul al ", "grafic pentru ",
+                "grafic despre ", "grafic privind ",
+                "diagramă a ", "diagrama a ",
+                "diagramă pentru ", "diagrama pentru "
+            };
+
+            int best_index = -1;
+            string best_marker = "";
+            foreach (string marker in specific_markers) {
+                int index = normalized.index_of (marker);
+                if (index >= 0 && (best_index < 0 || index < best_index)) {
+                    best_index = index;
+                    best_marker = marker;
+                }
+            }
+
+            if (best_index >= 0) {
+                return clean_chart_subject (
+                    normalized.substring (best_index + best_marker.length)
+                );
+            }
+
+            string[] generic_markers = {
+                "chart ", "graph ", "plot ", "diagram ", "grafic ",
+                "diagrama ", "diagramă "
+            };
+            foreach (string marker in generic_markers) {
+                int index = normalized.index_of (marker);
+                if (index >= 0 && (best_index < 0 || index < best_index)) {
+                    best_index = index;
+                    best_marker = marker;
+                }
+            }
+            if (best_index < 0) {
+                return null;
+            }
+
+            return clean_chart_subject (
+                normalized.substring (best_index + best_marker.length)
+            );
+        }
+
+        private static string clean_chart_subject (string raw_subject) {
+            string subject = raw_subject.strip ();
+
+            string[] tail_markers = {
+                " using ", " from ", " with ", " based on ", " based upon ",
+                " relative to ", " compared with ", " comparing ",
+                " over time", " over the years", " across time",
+                " by year", " annually", " for the period ",
+                " as a ", " as an ", " as ", " via ",
+                " in the period ", " for years ", " by year ",
+                " folosind ", " utilizând ", " utilizand ", " pe baza ",
+                " în timp", " in timp", " în perioada ", " in perioada ",
+                " pentru perioada ", " anual", " pe parcursul ",
+                " al ", " ale "
+            };
+            int cutoff = -1;
+            foreach (string marker in tail_markers) {
+                int index = subject.index_of (marker);
+                if (index >= 0 && (cutoff < 0 || index < cutoff)) {
+                    cutoff = index;
+                }
+            }
+            if (cutoff >= 0) {
+                subject = subject.substring (0, cutoff).strip ();
+            }
+
+            /* Parenthesized source abbreviations (e.g. TES) do not change the subject. */
+            int parenthesis = subject.index_of (" (");
+            if (parenthesis >= 0) {
+                subject = subject.substring (0, parenthesis).strip ();
+            }
+
+            subject = subject
+                .replace (".", "")
+                .replace (",", "")
+                .replace ("?", "")
+                .replace ("!", "")
+                .replace (":", "")
+                .strip ();
+
+            string[] leading_articles = {
+                "the ", "a ", "an ", "un ", "o ", "unui ", "unei "
+            };
+            foreach (string article in leading_articles) {
+                if (subject.has_prefix (article)) {
+                    subject = subject.substring (article.length).strip ();
+                    break;
+                }
+            }
+            return subject;
+        }
+
+        private static string? extract_series_name_before_chart_noun (
+            string normalized
+        ) {
+            string[] noun_markers = {
+                " chart", " graph", " plot", " diagram", " grafic",
+                " diagrama", " diagramă"
+            };
+            int first_index = -1;
+            foreach (string marker in noun_markers) {
+                int index = normalized.index_of (marker);
+                if (index >= 0 && (first_index < 0 || index < first_index)) {
+                    first_index = index;
+                }
+            }
+            if (first_index < 0) {
+                return null;
+            }
+
+            string prefix = normalized.substring (0, first_index).strip ();
+            string[] request_prefixes = {
+                "please generate a ", "please create a ", "please make a ",
+                "generate a ", "generate an ", "generate ",
+                "create a ", "create an ", "create ",
+                "make a ", "make an ", "make ",
+                "show me a ", "show me an ", "show a ", "show an ", "show ",
+                "draw a ", "draw an ", "draw ",
+                "please plot ", "plot a ", "plot an ", "plot ",
+                "generează un ", "genereaza un ", "generează o ",
+                "genereaza o ", "creează un ", "creeaza un ",
+                "creează o ", "creeaza o ", "arată-mi un ",
+                "arata-mi un ", "arată un ", "arata un ",
+                "desenează un ", "deseneaza un ", "afișează un ",
+                "afiseaza un "
+            };
+            foreach (string prefix_phrase in request_prefixes) {
+                if (prefix.has_prefix (prefix_phrase)) {
+                    prefix = prefix.substring (prefix_phrase.length).strip ();
+                    break;
+                }
+            }
+            return prefix;
+        }
+
+        private static bool request_subject_matches_series (
+            string normalized,
+            string selected_series_id
+        ) {
+            string? subject = extract_chart_subject (normalized);
+            if (subject != null && subject.strip ().length > 0) {
+                bool ambiguous = false;
+                string? subject_series =
+                    ChartCatalog.match_exact_alias_series_id (
+                        subject, out ambiguous
+                    );
+                return !ambiguous && subject_series == selected_series_id;
+            }
+
+            string? prefix = extract_series_name_before_chart_noun (normalized);
+            if (prefix == null || prefix.strip ().length == 0) {
+                return false;
+            }
+
+            bool ambiguous = false;
+            string? prefix_series = ChartCatalog.match_exact_alias_series_id (
+                prefix, out ambiguous
+            );
+            return !ambiguous && prefix_series == selected_series_id;
+        }
+
         private static bool requests_derived_series (string normalized) {
             return contains_any (
                 normalized,
@@ -333,7 +531,8 @@ namespace AskTheModel {
                 is_capability_only_chart_question (normalized) ||
                 requests_comparison (normalized) ||
                 requests_additional_series (normalized) ||
-                requests_derived_series (normalized)) {
+                requests_derived_series (normalized) ||
+                requests_unsupported_chart_kind (normalized)) {
                 return false;
             }
 
@@ -470,7 +669,11 @@ namespace AskTheModel {
                  */
                 if (requests_comparison (normalized) ||
                     requests_additional_series (normalized) ||
-                    requests_derived_series (normalized)) {
+                    requests_derived_series (normalized) ||
+                    requests_unsupported_chart_kind (normalized) ||
+                    !request_subject_matches_series (
+                        normalized, selected_series_id
+                    )) {
                     return new ChartIntent (
                         false, false, false, prompt, "ambiguous"
                     );
