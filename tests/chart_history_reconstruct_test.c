@@ -788,6 +788,7 @@ test_live_reconstruct_v4_catalog_dispatch (void)
     v4 = NULL;
     remove_bnr_history_snapshot (bnr);
     g_free (bnr);
+    ewd = fixture_snapshot_named ("ewd");
 
     /* A model-proposed/unknown selector is never allowed to pick a fallback. */
     g_assert_false (atm_chart_live_reconstruct_v4 (
@@ -797,7 +798,6 @@ test_live_reconstruct_v4_catalog_dispatch (void)
     g_clear_error (&error);
 
     /* A registered ID cannot override the conversation's different repository. */
-    ewd = fixture_snapshot_named ("ewd");
     g_assert_false (atm_chart_live_reconstruct_v4 (
         gistemp_id, ewd, "rmd", "2026-08-31", ewd_initial, &v4, &error));
     g_assert_error (error, ATM_SRA_ERROR, ATM_SRA_ERROR_IDENTITY);
