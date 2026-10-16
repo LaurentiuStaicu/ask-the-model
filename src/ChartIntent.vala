@@ -694,16 +694,12 @@ namespace AskTheModel {
                     break;
                 }
             }
-            if (has_digit && only_range_characters) {
-                return true;
-            }
-
-            return normalized.index_of ("year") >= 0 ||
-                normalized.index_of ("yeari") >= 0 ||
-                normalized.index_of ("quarter") >= 0 ||
-                normalized.index_of ("trimestr") >= 0 ||
-                normalized.index_of ("period") >= 0 ||
-                normalized.index_of ("perioad") >= 0;
+            /*
+             * Allow a bare numeric range such as 1880-2025 as a time
+             * modifier, but do not allow an unknown topic to be excused just
+             * because it also contains words like "year" or "period".
+             */
+            return has_digit && only_range_characters;
         }
 
         private static bool requests_derived_series (string normalized) {
