@@ -3094,7 +3094,8 @@ test('series-contract', series_contract_test)
 # CHART-05: reconstruct persisted chart recipes from the pinned History snapshot.
 chart_history_reconstruct_test = executable(
   'chart-history-reconstruct-test',
-  ['src/chart_history_reconstruct.c', 'src/chart_spec.c', 'src/verified_series.c',
+  ['src/chart_history_reconstruct.c', 'src/chart_spec_v4.c', 'src/chart_catalog.c',
+   'src/chart_spec.c', 'src/verified_series.c',
    'src/gistemp_sra.c', 'src/gistemp_evidence.c', 'src/gistemp_admission.c',
    'src/annual_series_candidate.c', 'src/series_contract.c', 'src/series_evidence.c',
    'src/series_evidence_adapters.c', 'src/series_sra.c', 'src/series_adapter.c',
