@@ -143,6 +143,15 @@ char *atm_chart_catalog_match_request_series_id (
 
 
 
+
+/* Exact normalized alias lookup for a parsed chart subject; unlike the free-form
+ * request matcher, this rejects extra unsupported subject words before/after
+ * the alias. */
+char *atm_chart_catalog_match_exact_alias_series_id (
+    const char *subject,
+    gboolean *out_ambiguous
+);
+
 /* Unicode-aware whole-word/phrase matcher shared by deterministic intent gates. */
 gboolean atm_chart_catalog_text_has_phrase (
     const char *text,
