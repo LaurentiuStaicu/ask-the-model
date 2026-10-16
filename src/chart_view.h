@@ -1,5 +1,6 @@
 #pragma once
 #include "chart_render.h"
+#include "chart_spec_v4.h"
 #include <gtk/gtk.h>
 G_BEGIN_DECLS
 #define ATM_TYPE_CHART_VIEW (atm_chart_view_get_type ())
