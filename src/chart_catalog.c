@@ -10,7 +10,8 @@ static const char *const gistemp_aliases[] = {
 };
 static const char *const ei_aliases[] = {
     "energy-institute", "energy institute", "total energy supply",
-    "global total energy supply", "energy institute global total energy supply",
+    "global total energy supply", "global tes",
+    "energy institute global total energy supply",
     "total energy supply tes", "tes",
     "furnizarea totala de energie", "furnizarea totală de energie",
     "furnizarea totală globală de energie"
