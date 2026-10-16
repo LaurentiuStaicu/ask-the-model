@@ -266,29 +266,28 @@ namespace AskTheModel {
 
         private static bool requests_additional_series (string normalized) {
             /*
-             * This profile is single-series only. Conservatively reject any
-             * request naming another common macro/credit indicator, regardless
-             * of conjunction or punctuation, rather than try to infer whether
-             * a comma, "alongside", or another phrasing implies comparison.
+             * The first route is single-series only. Use the catalog's
+             * normalized phrase boundary helper for unsupported indicators so
+             * short words never match inside unrelated text.
              */
-            return contains_any (
-                normalized,
-                {
-                    "gdp", "gross domestic product", "pib",
-                    "unemployment", "șomaj", "somaj",
-                    "inflation", "inflație", "inflatie",
-                    "population", "populație", "populatie", "populației",
-                    "populatiei", "gross domestic product", "gdp", "pib",
-                    "carbon dioxide", "co2", "emissions", "emisii",
-                    "renewable energy", "fossil fuel", "fossil fuels",
-                    "energie regenerabilă", "energie regenerabila",
-                    "combustibili fosili",
-                    "șomaj", "somaj",
-                    "non-performing loan",
-                    "creditele neperformante",
-                    "creditelor neperformante"
+            string[] unsupported_series_terms = {
+                "gdp", "gross domestic product", "pib",
+                "unemployment", "șomaj", "somaj",
+                "inflation", "inflație", "inflatie",
+                "population", "populație", "populatie",
+                "populației", "populatiei",
+                "carbon dioxide", "co2", "emissions", "emisii",
+                "renewable energy", "fossil fuel", "fossil fuels",
+                "energie regenerabilă", "energie regenerabila",
+                "combustibili fosili", "non-performing loan",
+                "creditele neperformante", "creditelor neperformante"
+            };
+            foreach (string term in unsupported_series_terms) {
+                if (ChartCatalog.text_has_phrase (normalized, term)) {
+                    return true;
                 }
-            );
+            }
+            return false;
         }
 
         private static bool requests_derived_series (string normalized) {
