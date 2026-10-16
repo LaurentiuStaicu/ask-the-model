@@ -119,4 +119,14 @@ gboolean atm_chart_live_reconstruct_v4 (
     GError **error
 );
 
+
+/* Wrap an already re-qualified v1/v2/v3 source spec for native v4 Chart/Data
+ * presentation without changing the persisted source-specific recipe schema. */
+gboolean atm_chart_wrap_qualified_spec_v4 (
+    const char *series_id,
+    const AtmChartSpec *qualified_source_spec,
+    AtmChartSpecV4 **out,
+    GError **error
+);
+
 G_END_DECLS
