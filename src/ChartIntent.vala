@@ -258,7 +258,8 @@ namespace AskTheModel {
                 "does atm support charting", "does atm support creating gistemp charts",
                 "can this app generate charts", "does this app generate charts",
                 "what chart types do you support", "which chart types do you support",
-                "what kinds of charts can you generate",
+                "what chart types can you create", "what charts can you create",
+                "which charts can you create", "what kinds of charts can you generate",
                 "how can i generate a chart", "how do i make a chart",
                 "how to generate a chart", "how to create a chart",
                 "poți genera grafice", "poti genera grafice",
@@ -749,7 +750,12 @@ namespace AskTheModel {
                     "creează", "creeaza", "desenează", "deseneaza",
                     "afișează", "afiseaza", "vizualizează", "vizualizeaza",
                     "show", "generate", "create", "draw", "make", "plot",
-                    "visualize", "visualise"
+                    "visualize", "visualise",
+                    "can you generate", "can you create", "can you make",
+                    "could you generate", "could you create", "could you make",
+                    "poți genera", "poti genera", "poți crea", "poti crea",
+                    "poți să generezi", "poti sa generezi",
+                    "poți să creezi", "poti sa creezi"
                 }
             );
 
