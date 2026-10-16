@@ -3883,6 +3883,26 @@ namespace AskTheModel {
         ) {
             ChartIntent chart_intent =
                 ChartIntent.parse (prompt);
+
+            if (chart_intent.intent == "unsupported" ||
+                chart_intent.intent == "ambiguous") {
+                bool romanian_request = ChartCatalog.text_has_phrase (
+                    prompt, "grafic") ||
+                    ChartCatalog.text_has_phrase (prompt, "generează") ||
+                    ChartCatalog.text_has_phrase (prompt, "genereaza") ||
+                    ChartCatalog.text_has_phrase (prompt, "arată") ||
+                    ChartCatalog.text_has_phrase (prompt, "arata");
+                string rejection = chart_intent.intent == "unsupported"
+                    ? (romanian_request
+                        ? "AtM nu poate genera acest grafic: variabila cerută nu este în catalogul de serii grafice validate. Menționează GISTEMP, furnizarea totală de energie Energy Institute sau seria BNR BLS C01."
+                        : "AtM cannot generate that chart: the requested variable is not in the catalog of qualified chart series. Name GISTEMP, Energy Institute total energy supply, or BNR BLS C01.")
+                    : (romanian_request
+                        ? "Cererea de grafic este ambiguă, combină mai multe serii sau cere o transformare nesuportată. Alege o singură serie validată pentru un grafic liniar."
+                        : "The chart request is ambiguous, combines multiple series, or asks for an unsupported transformation. Choose one qualified series for a line chart.");
+                append_transcript (state.transcript, "Assistant: " + rejection);
+                return;
+            }
+
             string selected_chart_series_id = chart_intent.series_id ?? "";
             bool source_chart_requested =
                 selected_chart_series_id.length > 0;
