@@ -434,6 +434,14 @@ namespace AskTheModel {
             string[] allowed_tails = {
                 "over time", "over the years", "across time", "by year",
                 "annually", "in the period", "relative to 1951-1980",
+                "what does the gistemp chart show",
+                "what does the energy institute chart show",
+                "what does the bnr bls c01 chart show",
+                "what does the chart show", "what does this chart show",
+                "explain what the chart shows", "tell me what the chart shows",
+                "ce ne arată graficul gistemp", "ce ne arata graficul gistemp",
+                "ce arată graficul gistemp", "ce arata graficul gistemp",
+                "explică ce arată graficul", "explica ce arata graficul",
                 "from gistemp", "using gistemp", "with gistemp",
                 "from energy institute", "using energy institute",
                 "with energy institute", "using physical energy content",
@@ -460,7 +468,7 @@ namespace AskTheModel {
             string subject = raw_subject.strip ();
 
             string[] tail_markers = {
-                " using ", " from ", " with ", " based on ", " based upon ",
+                ". ", " using ", " from ", " with ", " based on ", " based upon ",
                 " relative to ", " compared with ", " comparing ",
                 " over time", " over the years", " across time",
                 " by year", " annually", " for the period ",
