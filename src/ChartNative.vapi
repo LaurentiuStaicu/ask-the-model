@@ -54,6 +54,13 @@ namespace AskTheModel.ChartNative {
         out bool ambiguous
     );
 
+    [CCode (cname = "atm_chart_wrap_qualified_spec_v4")]
+    public static bool wrap_qualified_spec_v4 (
+        string series_id,
+        Spec qualified_source_spec,
+        out SpecV4 spec
+    ) throws GLib.Error;
+
     [CCode (cname = "atm_chart_live_reconstruct_v4")]
     public static bool reconstruct_live_v4 (
         string series_id,
