@@ -12,9 +12,10 @@ static const char *const ei_aliases[] = {
     "furnizarea totală globală de energie"
 };
 static const char *const bnr_aliases[] = {
-    "bnr-bls-c01", "credit standards net percentage",
+    "bnr-bls-c01", "credit standards", "credit standards net percentage",
     "quarterly credit standards", "net percentage for credit standards",
-    "standardele de credit", "procent net privind standardele de credit",
+    "standardele de credit", "standarde de credit",
+    "procent net privind standardele de credit",
     "standardele de credit pentru companii"
 };
 static const char *const ewd_snapshots[] = {
