@@ -719,6 +719,23 @@ namespace AskTheModel {
                 }
             }
 
+            string[] leading_scope_modifiers = {
+                "quarterly ", "annual ", "yearly ", "historical ",
+                "overall ", "long-term ", "trimestrial ",
+                "trimestrială ", "trimestriala ", "anual "
+            };
+            changed = true;
+            while (changed) {
+                changed = false;
+                foreach (string modifier in leading_scope_modifiers) {
+                    if (subject.has_prefix (modifier)) {
+                        subject = subject.substring (modifier.length).strip ();
+                        changed = true;
+                        break;
+                    }
+                }
+            }
+
             if (subject == "" || subject == "historical" ||
                 subject == "annual" || subject == "overall" ||
                 subject == "long-term" || subject == "yearly" ||
