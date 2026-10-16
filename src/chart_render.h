@@ -23,4 +23,6 @@ cairo_surface_t *atm_chart_render_surface (const AtmChartRender *render);
 const char *atm_chart_render_data (const AtmChartRender *render);
 gboolean atm_chart_render_is_fallback (const AtmChartRender *render);
 const AtmChartSpec *atm_chart_render_spec (const AtmChartRender *render);
+/* Borrowed, read-only projection used to paint the current viewport; NULL in a size fallback. */
+const AtmChartProjection *atm_chart_render_projection (const AtmChartRender *render);
 G_END_DECLS
