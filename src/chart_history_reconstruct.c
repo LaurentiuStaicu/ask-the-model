@@ -1,4 +1,6 @@
 #include "chart_history_reconstruct.h"
+#include "chart_catalog.h"
+#include "chart_spec_v4.h"
 #include "gistemp_admission.h"
 #include "verified_series.h"
 #include "verified_series_contract.h"
@@ -919,4 +921,108 @@ cleanup:
     for (guint i = 0; i < ATM_GISTEMP_SOURCE_COUNT; i++)
         g_clear_pointer (&sources[i], g_bytes_unref);
     return ok;
+}
+
+
+/*
+ * Catalog-selected live factory for the CHART-06 generic presentation path.
+ * The caller supplies only a registered series ID and the already-selected
+ * repository pin identity; the immutable catalog chooses the closed adapter.
+ * This remains separate from History persistence, which keeps its v1/v2/v3
+ * source-specific recipes until the CHART-06h migration gate is qualified.
+ */
+gboolean
+atm_chart_live_reconstruct_v4 (
+    const char *series_id,
+    const char *snapshot_path,
+    const char *repository_id,
+    const char *repository_version,
+    const char *snapshot_sha,
+    AtmChartSpecV4 **out,
+    GError **error
+)
+{
+    if (out == NULL || *out != NULL)
+        return reject (error,
+            "ChartSpec v4 output must be non-NULL and initially empty.");
+
+    if (series_id == NULL || series_id[0] == '\0' ||
+        snapshot_path == NULL || snapshot_path[0] == '\0' ||
+        repository_id == NULL || repository_id[0] == '\0' ||
+        snapshot_sha == NULL || snapshot_sha[0] == '\0')
+        return reject (error,
+            "Live ChartSpec v4 factory requires a complete series and pinned repository identity.");
+
+    if (!atm_chart_catalog_validate (error))
+        return FALSE;
+
+    const AtmChartCatalogEntry *entry =
+        atm_chart_catalog_find_id (series_id);
+    if (entry == NULL)
+        return reject (error,
+            "Live ChartSpec v4 series ID is not present in the compiled catalog.");
+
+    if (g_strcmp0 (repository_id, entry->repository_key) != 0 &&
+        g_strcmp0 (repository_id, entry->repository_full_name) != 0)
+        return reject (error,
+            "Selected repository does not match the catalog-bound series.");
+
+    if (!atm_chart_catalog_snapshot_admitted (entry, snapshot_sha))
+        return reject (error,
+            "Selected repository snapshot is not admitted for the catalog-bound series.");
+
+    AtmChartSpec *source_spec = NULL;
+    gboolean reconstructed = FALSE;
+
+    switch (entry->adapter) {
+    case ATM_CHART_CATALOG_ADAPTER_GISTEMP_V1:
+        if (repository_version == NULL || repository_version[0] == '\0')
+            return reject (error,
+                "GISTEMP reconstruction requires the selected repository version.");
+        reconstructed = atm_chart_live_reconstruct_gistemp (
+            snapshot_path, repository_id, repository_version,
+            snapshot_sha, &source_spec, error);
+        break;
+
+    case ATM_CHART_CATALOG_ADAPTER_ENERGY_INSTITUTE_V2:
+        reconstructed = atm_chart_live_reconstruct_energy_institute (
+            snapshot_path, repository_id, snapshot_sha, "line",
+            &source_spec, error);
+        break;
+
+    case ATM_CHART_CATALOG_ADAPTER_BNR_BLS_C01_V3:
+        reconstructed = atm_chart_live_reconstruct_bnr_bls_c01 (
+            snapshot_path, repository_id, snapshot_sha, "line",
+            &source_spec, error);
+        break;
+
+    default:
+        return reject (error,
+            "Catalog entry names an unsupported native chart adapter.");
+    }
+
+    if (!reconstructed || source_spec == NULL) {
+        atm_chart_spec_free (source_spec);
+        if (error != NULL && *error == NULL)
+            reject (error,
+                "Catalog-selected source adapter could not reconstruct the pinned series.");
+        return FALSE;
+    }
+
+    if (g_strcmp0 (atm_chart_spec_schema (source_spec),
+                   entry->chart_spec_schema) != 0) {
+        atm_chart_spec_free (source_spec);
+        return reject (error,
+            "Reconstructed source ChartSpec schema does not match the catalog adapter contract.");
+    }
+
+    AtmChartSpecV4 *spec_v4 = NULL;
+    if (!atm_chart_spec_v4_new (entry, source_spec, &spec_v4, error)) {
+        atm_chart_spec_free (source_spec);
+        return FALSE;
+    }
+
+    atm_chart_spec_free (source_spec);
+    *out = spec_v4;
+    return TRUE;
 }
