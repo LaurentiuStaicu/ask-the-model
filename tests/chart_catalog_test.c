@@ -290,6 +290,10 @@ test_catalog_response_prose_uses_registered_metadata (void)
             atm_chart_catalog_find_id (series_ids[i]);
         g_assert_nonnull (entry);
 
+        g_assert_cmpstr (
+            atm_chart_catalog_adapter_id_for_series (series_ids[i]), ==,
+            entry->adapter_id);
+
         char *guidance =
             atm_chart_catalog_response_guidance (series_ids[i]);
         char *english =
@@ -332,6 +336,7 @@ test_catalog_response_prose_uses_registered_metadata (void)
     g_free (bnr_english);
     g_free (bnr_romanian);
 
+    g_assert_null (atm_chart_catalog_adapter_id_for_series ("population"));
     g_assert_null (atm_chart_catalog_response_guidance ("population"));
     g_assert_null (atm_chart_catalog_chart_only_response ("population", FALSE));
 }
