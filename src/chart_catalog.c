@@ -637,3 +637,99 @@ atm_chart_catalog_validate (GError **error)
     }
     return TRUE;
 }
+
+
+
+char *
+atm_chart_catalog_response_guidance (const char *series_id)
+{
+    const AtmChartCatalogEntry *entry =
+        atm_chart_catalog_find_id (series_id);
+    if (entry == NULL)
+        return NULL;
+
+    char *missing_guidance = NULL;
+    if (entry->missing_policy == ATM_CHART_CATALOG_MISSING_BOUNDED_PROFILE) {
+        missing_guidance = g_strdup_printf (
+            "The observation at %s is source-authorized MISSING (%s), not zero. "
+            "Do not impute, interpolate, synthesize the point, or bridge a line across the gap.",
+            entry->missing_coordinate != NULL ? entry->missing_coordinate : "the declared coordinate",
+            entry->missing_reason != NULL ? entry->missing_reason : "the catalogued missing policy");
+    } else {
+        missing_guidance = g_strdup (
+            "The qualified source profile rejects missing observations. "
+            "Do not invent, impute, interpolate, or synthesize missing points.");
+    }
+
+    char *guidance = g_strdup_printf (
+        "\nThe application attempts to construct the qualified catalog series \"%s\" "
+        "from its exact admitted %s snapshot. Catalog description: %s. "
+        "X coordinates: %s, unit %s, coverage %s to %s. "
+        "Y unit: %s; observation meaning: %s. Reference period: %s. "
+        "%s The native Chart/Data widget, not prose, presents the complete qualified "
+        "series, exact values and source provenance. For a chart-only request, do not "
+        "reproduce individual values or years as a table or pseudo-table; only provide "
+        "those details when explicitly requested. Do not invent numeric values, axes, "
+        "units, transformations, missing-value semantics or unsupported interpretations. "
+        "Publisher/source: %s. Pinned processed artifact: %s. Reconstruction scope: %s. "
+        "Do not claim independent reproduction of the publisher's raw-to-processed pipeline "
+        "beyond that stated scope.",
+        entry->display_name,
+        entry->repository_full_name,
+        entry->description,
+        entry->x_frequency,
+        entry->x_unit,
+        entry->coverage_start,
+        entry->coverage_end,
+        entry->y_unit,
+        entry->observation_meaning,
+        entry->reference_period != NULL ? entry->reference_period : "not separately specified",
+        missing_guidance,
+        entry->publisher_name,
+        entry->pinned_artifact_description,
+        entry->reconstruction_scope);
+
+    g_free (missing_guidance);
+    return guidance;
+}
+
+char *
+atm_chart_catalog_chart_only_response (
+    const char *series_id,
+    gboolean romanian
+)
+{
+    const AtmChartCatalogEntry *entry =
+        atm_chart_catalog_find_id (series_id);
+    if (entry == NULL)
+        return NULL;
+
+    char *missing_note = NULL;
+    if (entry->missing_policy == ATM_CHART_CATALOG_MISSING_BOUNDED_PROFILE) {
+        missing_note = romanian
+            ? g_strdup_printf (" Observația %s lipsește din sursă; este lipsă, nu zero.",
+                entry->missing_coordinate != NULL ? entry->missing_coordinate : "declarată")
+            : g_strdup_printf (" The %s observation is missing from the source, not zero.",
+                entry->missing_coordinate != NULL ? entry->missing_coordinate : "declared");
+    } else {
+        missing_note = g_strdup ("");
+    }
+
+    char *response;
+    if (romanian) {
+        response = g_strdup_printf (
+            "Cerere de grafic: %s. Valorile exacte și proveniența apar în vizualizarea "
+            "Chart/Data calificată când este disponibilă.%s Dacă graficul nu poate fi "
+            "construit, AtM raportează separat problema și nu substituie valori.",
+            entry->display_name, missing_note);
+    } else {
+        response = g_strdup_printf (
+            "Requested chart: %s. Exact values and source provenance appear in the "
+            "qualified Chart/Data view when available.%s If chart construction fails, "
+            "AtM reports that separately rather than substituting values.",
+            entry->display_name, missing_note);
+    }
+
+    g_free (missing_note);
+    return response;
+}
