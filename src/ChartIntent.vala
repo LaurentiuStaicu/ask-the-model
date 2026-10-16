@@ -450,20 +450,6 @@ namespace AskTheModel {
             }
 
             return new ChartIntent (false, false, false, prompt);
-                }
-                uint named_sources = (names_gistemp_series ? 1u : 0u) +
-                    (names_energy_institute_series ? 1u : 0u) +
-                    (names_bnr_bls_c01_series ? 1u : 0u);
-                if (named_sources == 1u) {
-                    if (names_gistemp_series)
-                        return new ChartIntent (true, false, false, prompt);
-                    if (names_energy_institute_series)
-                        return new ChartIntent (false, true, false, prompt);
-                    return new ChartIntent (false, false, true, prompt);
-                }
-            }
-
-            return new ChartIntent (false, false, false, prompt);
         }
     }
 }
