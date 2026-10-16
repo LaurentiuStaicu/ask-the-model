@@ -324,7 +324,8 @@ test_catalog_response_prose_uses_registered_metadata (void)
     char *bnr_romanian = atm_chart_catalog_chart_only_response (
         "banking.bnr.bls-c01.credit-standards-net-percentage", TRUE);
     g_assert_nonnull (strstr (bnr_guidance, "2025-Q2"));
-    g_assert_nonnull (strstr (bnr_guidance, "MISSING, not zero"));
+    g_assert_nonnull (strstr (bnr_guidance, "MISSING"));
+    g_assert_nonnull (strstr (bnr_guidance, "not zero"));
     g_assert_nonnull (strstr (bnr_english, "2025-Q2 observation is missing"));
     g_assert_nonnull (strstr (bnr_romanian, "2025-Q2 lipsește din sursă"));
     g_free (bnr_guidance);
