@@ -314,7 +314,7 @@ test_catalog_response_prose_uses_registered_metadata (void)
         g_assert_nonnull (strstr (english, entry->display_name));
         g_assert_nonnull (strstr (english, "qualified Chart/Data view"));
         g_assert_nonnull (strstr (english, "If chart construction fails"));
-        g_assert_nonnull (strstr (romanian, entry->display_name));
+        g_assert_nonnull (strstr (romanian, entry->display_name_ro));
         g_assert_nonnull (strstr (romanian, "Cerere de grafic"));
         g_free (guidance);
         g_free (english);
