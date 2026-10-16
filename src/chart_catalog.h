@@ -158,6 +158,9 @@ gboolean atm_chart_catalog_text_has_phrase (
     const char *phrase
 );
 
+/* Return the closed native adapter selector associated with a registered series. */
+const char *atm_chart_catalog_adapter_id_for_series (const char *series_id);
+
 /* Match a selected conversation repository ID to the catalog-owned repository binding. */
 gboolean atm_chart_catalog_repository_matches_series (
     const char *series_id,
