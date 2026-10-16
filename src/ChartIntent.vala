@@ -522,6 +522,22 @@ namespace AskTheModel {
             return prefix;
         }
 
+        private static bool has_explicit_chart_subject_clause (
+            string normalized
+        ) {
+            return contains_bounded_any (normalized, {
+                "chart of ", "graph of ", "plot of ", "diagram of ",
+                "chart for ", "graph for ", "plot for ",
+                "chart about ", "graph about ", "chart on ", "graph on ",
+                "chart showing ", "graph showing ", "plot showing ",
+                "chart depicting ", "graph depicting ",
+                "grafic al ", "graficul al ", "grafic pentru ",
+                "grafic despre ", "grafic privind ",
+                "diagramă a ", "diagrama a ",
+                "diagramă pentru ", "diagrama pentru "
+            });
+        }
+
         private static bool request_subject_matches_series (
             string normalized,
             string selected_series_id
@@ -591,6 +607,14 @@ namespace AskTheModel {
             if (ambiguous) {
                 return false;
             }
+
+            if (has_explicit_chart_subject_clause (normalized) &&
+                !request_subject_matches_series (
+                    normalized, selected_series_id
+                )) {
+                return false;
+            }
+
             return query_series_id == null ||
                 query_series_id == selected_series_id;
         }
