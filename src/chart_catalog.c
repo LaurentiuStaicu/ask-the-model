@@ -2,12 +2,13 @@
 #include <string.h>
 
 static const char *const gistemp_aliases[] = {
-    "gistemp", "global temperature anomaly", "global temperature anomalies",
+    "gistemp", "global temperature", "global surface temperature",
+    "global temperature anomaly", "global temperature anomalies",
     "temperature anomaly", "temperatura globala", "temperatura globală",
     "anomalia temperaturii globale", "anomalii ale temperaturii globale"
 };
 static const char *const ei_aliases[] = {
-    "energy-institute", "total energy supply", "global total energy supply", "tes",
+    "energy-institute", "energy institute", "total energy supply", "global total energy supply", "tes",
     "furnizarea totala de energie", "furnizarea totală de energie",
     "furnizarea totală globală de energie"
 };
