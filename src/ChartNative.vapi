@@ -10,6 +10,16 @@ namespace AskTheModel.ChartNative {
         public unowned string? series_qualified_id (uint index);
         [CCode (cname = "atm_chart_spec_id")]
         public unowned string? id ();
+        [CCode (cname = "atm_chart_spec_schema")]
+        public unowned string? schema ();
+        [CCode (cname = "atm_chart_spec_series_profile")]
+        public unowned string? series_profile ();
+        [CCode (cname = "atm_chart_spec_series_snapshot_sha")]
+        public unowned string? series_snapshot_sha (uint index);
+        [CCode (cname = "atm_chart_spec_series_source_path")]
+        public unowned string? series_source_path (uint index);
+        [CCode (cname = "atm_chart_spec_series_repository_id")]
+        public unowned string? series_repository_id (uint index);
     }
 
     [Compact]
@@ -24,7 +34,23 @@ namespace AskTheModel.ChartNative {
         public unowned string? series_id ();
         [CCode (cname = "atm_chart_spec_v4_source_spec")]
         public unowned Spec? source_spec ();
+        [CCode (cname = "atm_chart_spec_v4_admission_profile_id")]
+        public unowned string? admission_profile_id ();
+        [CCode (cname = "atm_chart_spec_v4_reconstruction_profile_id")]
+        public unowned string? reconstruction_profile_id ();
+        [CCode (cname = "atm_chart_spec_v4_history_schema_version")]
+        public unowned string? history_schema_version ();
     }
+
+    [CCode (cname = "atm_chart_live_reconstruct_v4")]
+    public static bool reconstruct_live_v4 (
+        string series_id,
+        string snapshot_path,
+        string repository_id,
+        string? repository_version,
+        string snapshot_sha,
+        out SpecV4 spec
+    ) throws GLib.Error;
 
     [CCode (cname = "AtmChartView", lower_case_cprefix = "atm_chart_view_", type_id = "atm_chart_view_get_type ()")]
     public class View : Gtk.Box {
