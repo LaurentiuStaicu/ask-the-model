@@ -470,6 +470,15 @@ int main () {
     assert (chart_request_followed_by_interpretation.intent == "chart");
     assert (!chart_request_followed_by_interpretation.is_chart_only_request ());
 
+    var subject_clause_followed_by_interpretation =
+        AskTheModel.ChartIntent.parse (
+            "Generate a chart of global temperature anomalies. What does the GISTEMP chart show?"
+        );
+    assert (subject_clause_followed_by_interpretation.series_id ==
+        "climate.gistemp.global-temperature-anomaly");
+    assert (subject_clause_followed_by_interpretation.intent == "chart");
+    assert (!subject_clause_followed_by_interpretation.is_chart_only_request ());
+
     var short_alias_near_miss = AskTheModel.ChartIntent.parse (
         "Make a chart about the latest Tesla production figures."
     );
