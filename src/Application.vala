@@ -3268,8 +3268,7 @@ namespace AskTheModel {
 
         private Gtk.Widget[] build_live_chart_widgets (
             ConversationSession session,
-            bool energy_institute,
-            bool bnr_bls_c01,
+            string series_id,
             out ConversationPersistenceChart[] charts
         ) throws GLib.Error {
             Gtk.Widget[] widgets = {};
@@ -3279,29 +3278,14 @@ namespace AskTheModel {
             for (uint i = 0; i < session.repository_count (); i++) {
                 ConversationRepositoryPin? pin = session.repository_pin_at (i);
                 if (pin == null) continue;
-                bool repository_matches = bnr_bls_c01
-                    ? (pin.repository_id == "rmd" ||
-                       pin.repository_id == "LaurentiuStaicu/romanian-monetary-dynamics")
-                    : (pin.repository_id == "ewd" ||
-                       pin.repository_id == "LaurentiuStaicu/empirical-world3-dynamics");
-                if (repository_matches) {
+                if (ChartNative.catalog_repository_matches_series (
+                        series_id, pin.repository_id)) {
                     chart_pin = pin;
                     break;
                 }
             }
             if (chart_pin == null) return widgets;
-            if (bnr_bls_c01 &&
-                chart_pin.snapshot_sha != "e43eb4e899f123d3b1aa0f6e20b7c8ed35434170") {
-                throw new GLib.IOError.INVALID_DATA (
-                    "BNR BLS C01 charts require the exact qualified RMD snapshot."
-                );
-            }
 
-            string source_path = bnr_bls_c01
-                ? "data/processed/bnr_bls_realised_rounds.csv"
-                : (energy_institute
-                    ? "science/data/processed/energy_institute_global_2026.csv"
-                    : "science/data/processed/nasa_gistemp_global_2026.csv");
             RepositoryDescriptor? descriptor =
                 repository_descriptor_for_id (chart_pin.repository_id);
             if (descriptor == null) {
@@ -3318,57 +3302,67 @@ namespace AskTheModel {
                 );
             }
 
-            ChartNative.Spec spec;
-            bool reconstructed = false;
-            if (bnr_bls_c01) {
-                reconstructed = ChartNative.reconstruct_live_bnr_bls_c01 (
-                    snapshot_path, chart_pin.repository_id,
-                    chart_pin.snapshot_sha, "line", out spec
-                );
-            } else if (energy_institute) {
-                reconstructed = ChartNative.reconstruct_live_energy_institute (
-                    snapshot_path, chart_pin.repository_id,
-                    chart_pin.snapshot_sha, "line", out spec
-                );
-            } else {
-                reconstructed = ChartNative.reconstruct_live_gistemp (
-                    snapshot_path, chart_pin.repository_id,
-                    chart_pin.repository_version, chart_pin.snapshot_sha,
-                    out spec
-                );
-            }
-            if (!reconstructed || spec == null) {
+            ChartNative.SpecV4 spec_v4;
+            bool reconstructed = ChartNative.reconstruct_live_v4 (
+                series_id,
+                snapshot_path,
+                chart_pin.repository_id,
+                chart_pin.repository_version,
+                chart_pin.snapshot_sha,
+                out spec_v4
+            );
+            if (!reconstructed || spec_v4 == null) {
                 throw new GLib.IOError.INVALID_DATA (
-                    bnr_bls_c01
-                        ? "Pinned BNR BLS C01 source could not be re-qualified for chart presentation."
-                        : (energy_institute
-                            ? "Pinned Energy Institute source could not be re-qualified for chart presentation."
-                            : "Pinned GISTEMP source could not be re-qualified for chart presentation.")
+                    "The catalog-selected pinned source could not be re-qualified for ChartSpec v4 presentation."
                 );
             }
 
-            string? scientific_id = spec.series_scientific_id (0);
-            string? qualified_id = spec.series_qualified_id (0);
-            string? chart_spec_id = spec.id ();
-            if (scientific_id == null || qualified_id == null || chart_spec_id == null) {
+            ChartNative.Spec? source_spec = spec_v4.source_spec ();
+            if (source_spec == null) {
                 throw new GLib.IOError.INVALID_DATA (
-                    "Qualified chart identities are unavailable."
+                    "Catalog-selected ChartSpec v4 has no qualified source ChartSpec."
                 );
             }
 
-            string series_profile = bnr_bls_c01
-                ? "atm-series/bnr-bls-c01-calendar-quarter/1"
-                : (energy_institute
-                    ? "atm-series/energy-institute-tes-complete-annual/1"
-                    : "atm-series/gistemp-complete-annual/1");
-            string admission_profile = bnr_bls_c01
-                ? "atm-bnr-bls-canonical-panel-admission/1"
-                : (energy_institute
-                    ? "atm-energy-institute-pinned-admission/3"
-                    : "atm-gistemp-pinned-admission/1");
-            string repository_version = (energy_institute || bnr_bls_c01)
-                ? "snapshot:" + chart_pin.snapshot_sha
-                : chart_pin.repository_version;
+            string? series_profile = source_spec.series_profile ();
+            string? admission_profile = spec_v4.admission_profile_id ();
+            string? reconstruction_profile =
+                spec_v4.reconstruction_profile_id ();
+            string? scientific_id = source_spec.series_scientific_id (0);
+            string? qualified_id = source_spec.series_qualified_id (0);
+            string? chart_schema = source_spec.schema ();
+            string? chart_spec_id = source_spec.id ();
+            string? source_path = source_spec.series_source_path (0);
+            string? source_snapshot_sha = source_spec.series_snapshot_sha (0);
+            string? source_repository_id =
+                source_spec.series_repository_id (0);
+
+            if (series_profile == null || admission_profile == null ||
+                reconstruction_profile == null || scientific_id == null ||
+                qualified_id == null || chart_schema == null ||
+                chart_spec_id == null || source_path == null ||
+                source_snapshot_sha == null || source_repository_id == null) {
+                throw new GLib.IOError.INVALID_DATA (
+                    "Catalog-selected chart identities or pinned source metadata are unavailable."
+                );
+            }
+
+            if (source_snapshot_sha != chart_pin.snapshot_sha ||
+                !ChartNative.catalog_repository_matches_series (
+                    series_id, source_repository_id)) {
+                throw new GLib.IOError.INVALID_DATA (
+                    "Reconstructed source identity differs from the selected repository pin or catalog."
+                );
+            }
+
+            /*
+             * Keep the current source-specific History recipe contract intact.
+             * The v4 ID is for the live presentation wrapper only; persisted
+             * identity remains the exact underlying v1/v2/v3 ChartSpec.
+             */
+            string repository_version = chart_schema == "atm-chart-spec/1"
+                ? chart_pin.repository_version
+                : "snapshot:" + source_snapshot_sha;
             var series = new ConversationPersistenceChartSeries (
                 series_profile,
                 admission_profile,
@@ -3376,33 +3370,24 @@ namespace AskTheModel {
                 qualified_id,
                 chart_pin.repository_id,
                 repository_version,
-                chart_pin.snapshot_sha,
+                source_snapshot_sha,
                 source_path
             );
             charts = {
                 new ConversationPersistenceChart (
                     1,
-                    bnr_bls_c01 ? "atm-chart-spec/3" :
-                        (energy_institute ? "atm-chart-spec/2" : "atm-chart-spec/1"),
+                    chart_schema,
                     chart_spec_id,
                     "line",
-                    bnr_bls_c01
-                        ? "atm-chart-reconstruct/bnr-bls-c01-calendar-quarter/1"
-                        : (energy_institute
-                            ? "atm-chart-reconstruct/energy-institute-tes-complete-annual/1"
-                            : "atm-chart-reconstruct/gistemp-complete-annual/1"),
+                    reconstruction_profile,
                     { series }
                 )
             };
 
             ChartNative.View view;
-            if (!ChartNative.create (spec, out view)) {
+            if (!ChartNative.create_v4 (spec_v4, out view)) {
                 throw new GLib.IOError.FAILED (
-                    bnr_bls_c01
-                        ? "Qualified live BNR BLS C01 chart could not be rendered."
-                        : (energy_institute
-                            ? "Qualified live Energy Institute chart could not be rendered."
-                            : "Qualified live GISTEMP chart could not be rendered.")
+                    "Catalog-selected qualified ChartSpec v4 could not be rendered."
                 );
             }
             view.add_css_class ("atm-history-chart");
