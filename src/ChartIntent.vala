@@ -275,8 +275,14 @@ namespace AskTheModel {
                 normalized,
                 {
                     "gdp", "gross domestic product", "pib",
-                    "unemployment",
+                    "unemployment", "șomaj", "somaj",
                     "inflation", "inflație", "inflatie",
+                    "population", "populație", "populatie", "populației",
+                    "populatiei", "gross domestic product", "gdp", "pib",
+                    "carbon dioxide", "co2", "emissions", "emisii",
+                    "renewable energy", "fossil fuel", "fossil fuels",
+                    "energie regenerabilă", "energie regenerabila",
+                    "combustibili fosili",
                     "șomaj", "somaj",
                     "non-performing loan",
                     "creditele neperformante",
@@ -324,6 +330,34 @@ namespace AskTheModel {
             );
         }
 
+        private static bool command_query_is_compatible (
+            string query,
+            string selected_series_id
+        ) {
+            string normalized = query.down ();
+            if (query.strip ().length == 0) {
+                return true;
+            }
+            if (is_explicitly_negated_chart_request (normalized) ||
+                is_hypothetical_chart_request (normalized) ||
+                asks_about_quoted_instruction (normalized) ||
+                is_capability_only_chart_question (normalized) ||
+                requests_comparison (normalized) ||
+                requests_additional_series (normalized) ||
+                requests_derived_series (normalized)) {
+                return false;
+            }
+
+            bool ambiguous = false;
+            string? query_series_id =
+                ChartCatalog.match_request_series_id (query, out ambiguous);
+            if (ambiguous) {
+                return false;
+            }
+            return query_series_id == null ||
+                query_series_id == selected_series_id;
+        }
+
         private static bool command_matches (
             string trimmed,
             string prefix
@@ -353,29 +387,37 @@ namespace AskTheModel {
             const string bnr_prefix = "/chart bnr-bls-c01";
 
             if (command_matches (trimmed, gistemp_prefix)) {
-                return new ChartIntent (
-                    true, false, false,
-                    command_query (trimmed, gistemp_prefix)
-                );
+                string query = command_query (trimmed, gistemp_prefix);
+                if (!command_query_is_compatible (
+                        query,
+                        "climate.gistemp.global-temperature-anomaly")) {
+                    return new ChartIntent (
+                        false, false, false, prompt, "ambiguous"
+                    );
+                }
+                return new ChartIntent (true, false, false, query);
             }
             if (command_matches (trimmed, ei_prefix)) {
-                return new ChartIntent (
-                    false, true, false,
-                    command_query (trimmed, ei_prefix)
-                );
+                string query = command_query (trimmed, ei_prefix);
+                if (!command_query_is_compatible (
+                        query,
+                        "energy.energy-institute.global-total-energy-supply")) {
+                    return new ChartIntent (
+                        false, false, false, prompt, "ambiguous"
+                    );
+                }
+                return new ChartIntent (false, true, false, query);
             }
             if (command_matches (trimmed, bnr_prefix)) {
-                string bnr_query = command_query (trimmed, bnr_prefix);
-                if (names_other_chart_source (bnr_query.down ()) ||
-                    requests_comparison (bnr_query.down ()) ||
-                    requests_additional_series (bnr_query.down ()) ||
-                    requests_derived_series (bnr_query.down ())) {
-                    return new ChartIntent (false, false, false, prompt);
+                string query = command_query (trimmed, bnr_prefix);
+                if (!command_query_is_compatible (
+                        query,
+                        "banking.bnr.bls-c01.credit-standards-net-percentage")) {
+                    return new ChartIntent (
+                        false, false, false, prompt, "ambiguous"
+                    );
                 }
-                return new ChartIntent (
-                    false, false, true,
-                    bnr_query
-                );
+                return new ChartIntent (false, false, true, query);
             }
 
             /* A malformed slash command must not fall through to natural
@@ -425,7 +467,7 @@ namespace AskTheModel {
 
                 if (selected_series_id == null) {
                     return new ChartIntent (
-                        false, false, false, prompt, "not_chart"
+                        false, false, false, prompt, "unsupported"
                     );
                 }
 
