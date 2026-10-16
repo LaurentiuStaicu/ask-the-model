@@ -693,10 +693,14 @@ namespace AskTheModel {
             string[] leading_commands = {
                 "show me ", "show ", "display ", "plot ", "generate a ",
                 "generate ", "create a ", "create ", "make a ", "make ",
-                "draw ", "visualize ", "visualise ", "arata-mi ",
-                "arată-mi ", "arata ", "arată ", "genereaza ",
+                "draw ", "visualize ", "visualise ",
+                "explain what the ", "explain the ", "explain ",
+                "tell me what the ", "what does the ",
+                "arata-mi ", "arată-mi ", "arata ", "arată ", "genereaza ",
                 "generează ", "creeaza ", "creează ", "afiseaza ",
-                "afișează ", "vizualizeaza ", "vizualizează "
+                "afișează ", "vizualizeaza ", "vizualizează ",
+                "explică ce arată ", "explica ce arata ",
+                "explică ", "explica "
             };
             bool changed = true;
             while (changed) {
