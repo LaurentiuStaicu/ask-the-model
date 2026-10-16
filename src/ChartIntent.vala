@@ -673,6 +673,39 @@ namespace AskTheModel {
             );
         }
 
+        private static bool is_time_period_only_subject (string subject) {
+            string normalized = subject.down ().strip ();
+            if (normalized.length == 0) {
+                return false;
+            }
+
+            gboolean has_digit = false;
+            gboolean only_range_characters = true;
+            for (int i = 0; i < normalized.length; i++) {
+                char character = normalized[i];
+                if (character >= '0' && character <= '9') {
+                    has_digit = true;
+                } else if (character != '-' && character != '–' &&
+                           character != '—' && character != '/' &&
+                           character != '.' && character != ',' &&
+                           character != ':' && character != ' ' &&
+                           character != '(' && character != ')') {
+                    only_range_characters = false;
+                    break;
+                }
+            }
+            if (has_digit && only_range_characters) {
+                return true;
+            }
+
+            return normalized.index_of ("year") >= 0 ||
+                normalized.index_of ("yeari") >= 0 ||
+                normalized.index_of ("quarter") >= 0 ||
+                normalized.index_of ("trimestr") >= 0 ||
+                normalized.index_of ("period") >= 0 ||
+                normalized.index_of ("perioad") >= 0;
+        }
+
         private static bool requests_derived_series (string normalized) {
             return contains_any (
                 normalized,
@@ -746,6 +779,7 @@ namespace AskTheModel {
             string? modifier_subject = extract_modifier_subject (normalized);
             if (modifier_subject != null &&
                 modifier_subject.strip ().length > 0 &&
+                !is_time_period_only_subject (modifier_subject) &&
                 !exact_subject_matches_series (
                     modifier_subject, selected_series_id
                 )) {
