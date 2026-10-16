@@ -663,6 +663,18 @@ test_v4_rejects_unregistered_or_incompatible_specs (void)
     g_assert_error (error, ATM_CHART_SPEC_V4_ERROR, ATM_CHART_SPEC_V4_ERROR_ARGUMENT);
     g_clear_error (&error);
 
+    AtmChartSpecV4 *occupied = NULL;
+    g_assert_true (atm_chart_spec_v4_new (gistemp_entry, gistemp_line,
+                                           &occupied, &error));
+    g_assert_no_error (error);
+    AtmChartSpecV4 *saved_occupied = occupied;
+    g_assert_false (atm_chart_spec_v4_new (gistemp_entry, gistemp_line,
+                                            &occupied, &error));
+    g_assert_error (error, ATM_CHART_SPEC_V4_ERROR, ATM_CHART_SPEC_V4_ERROR_ARGUMENT);
+    g_clear_error (&error);
+    g_assert_true (occupied == saved_occupied);
+    atm_chart_spec_v4_free (occupied);
+
     g_assert_null (atm_chart_spec_v4_id (NULL));
     g_assert_null (atm_chart_spec_v4_series_id (NULL));
     g_assert_null (atm_chart_spec_v4_catalog_entry (NULL));
