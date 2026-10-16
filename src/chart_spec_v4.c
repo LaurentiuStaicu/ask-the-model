@@ -357,6 +357,7 @@ build_id (const AtmChartCatalogEntry *entry,
     add_text (builder, "catalog_version", ATM_CHART_CATALOG_VERSION);
     add_text (builder, "series_id", entry->series_id);
     add_text (builder, "display_name", entry->display_name);
+    add_text (builder, "description", entry->description);
     add_text (builder, "adapter_id", entry->adapter_id);
     add_text (builder, "catalog_series_profile_id", entry->series_profile_id);
     add_text (builder, "catalog_series_profile_version", entry->series_profile_version);
