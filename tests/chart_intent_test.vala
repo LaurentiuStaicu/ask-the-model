@@ -599,6 +599,18 @@ int main () {
     assert (explicit_time_range_modifier_romanian.series_id ==
         "climate.gistemp.global-temperature-anomaly");
 
+    var explicit_time_range_without_article = AskTheModel.ChartIntent.parse (
+        "/chart gistemp Show trend for 1880-2025."
+    );
+    assert (explicit_time_range_without_article.series_id ==
+        "climate.gistemp.global-temperature-anomaly");
+
+    var explicit_time_range_romanian_unaccented = AskTheModel.ChartIntent.parse (
+        "/chart gistemp Arata tendinta pentru 1880-2025."
+    );
+    assert (explicit_time_range_romanian_unaccented.series_id ==
+        "climate.gistemp.global-temperature-anomaly");
+
     var explicit_grounded_subject = AskTheModel.ChartIntent.parse (
         "/chart gistemp Show a chart of global temperature anomalies over time."
     );
