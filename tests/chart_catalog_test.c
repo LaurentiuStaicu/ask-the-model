@@ -247,6 +247,13 @@ test_exact_chart_subject_alias_lookup (void)
     g_free (series_id);
 
     series_id = atm_chart_catalog_match_exact_alias_series_id (
+        "global tes", &ambiguous);
+    g_assert_false (ambiguous);
+    g_assert_cmpstr (series_id, ==,
+                     "energy.energy-institute.global-total-energy-supply");
+    g_free (series_id);
+
+    series_id = atm_chart_catalog_match_exact_alias_series_id (
         "diabetes prevalence", &ambiguous);
     g_assert_false (ambiguous);
     g_assert_null (series_id);
