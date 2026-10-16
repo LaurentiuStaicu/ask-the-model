@@ -62,6 +62,9 @@ cairo_surface_t *atm_chart_render_v4_surface (
 const char *atm_chart_render_v4_data (
     const AtmChartRenderV4 *render
 );
+const char *atm_chart_render_v4_schema (
+    const AtmChartRenderV4 *render
+);
 const char *atm_chart_render_v4_id (
     const AtmChartRenderV4 *render
 );
