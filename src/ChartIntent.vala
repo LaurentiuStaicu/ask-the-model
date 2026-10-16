@@ -272,8 +272,8 @@ namespace AskTheModel {
              */
             string[] unsupported_series_terms = {
                 "gdp", "gross domestic product", "pib",
-                "unemployment", "șomaj", "somaj",
-                "inflation", "inflație", "inflatie",
+                "unemployment", "șomaj", "șomajului", "somaj", "somajului",
+                "inflation", "inflație", "inflației", "inflatie", "inflatiei",
                 "population", "populație", "populatie",
                 "populației", "populatiei",
                 "carbon dioxide", "co2", "emissions", "emisii",
@@ -304,27 +304,6 @@ namespace AskTheModel {
                     "prognoză", "prognoza",
                     "proiecție", "proiectie",
                     "corelație", "corelatie"
-                }
-            );
-        }
-
-        private static bool names_other_chart_source (string normalized) {
-            return contains_any (
-                normalized,
-                {
-                    "gistemp",
-                    "temperatura globala",
-                    "temperatura globală",
-                    "temperaturii globale",
-                    "global temperature",
-                    "energy institute",
-                    "total energy supply",
-                    "global total energy supply",
-                    "physical energy content",
-                    "furnizarea totală de energie",
-                    "furnizarea totala de energie",
-                    "oferta totală de energie",
-                    "oferta totala de energie"
                 }
             );
         }
