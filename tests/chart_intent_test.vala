@@ -335,5 +335,71 @@ int main () {
     );
     assert (!bnr_romanian_definite_moving_average.bnr_bls_c01_requested);
 
+
+    /* Generic series routing requires a catalog alias and a positive request. */
+    assert (natural_english.series_id ==
+        "climate.gistemp.global-temperature-anomaly");
+    assert (natural_english.intent == "chart");
+    assert (natural_english.response_mode == "chart_only");
+    assert (ei_english.series_id ==
+        "energy.energy-institute.global-total-energy-supply");
+    assert (bnr_english.series_id ==
+        "banking.bnr.bls-c01.credit-standards-net-percentage");
+
+    var negated_english = AskTheModel.ChartIntent.parse (
+        "Do not make a GISTEMP chart."
+    );
+    assert (negated_english.series_id == null);
+    assert (negated_english.intent == "not_chart");
+    assert (negated_english.response_mode == "none");
+
+    var negated_explicit_request = AskTheModel.ChartIntent.parse (
+        "I am not asking for a chart of GISTEMP."
+    );
+    assert (negated_explicit_request.series_id == null);
+
+    var negated_romanian = AskTheModel.ChartIntent.parse (
+        "Nu genera un grafic GISTEMP."
+    );
+    assert (negated_romanian.series_id == null);
+    assert (negated_romanian.intent == "not_chart");
+
+    var hypothetical_english = AskTheModel.ChartIntent.parse (
+        "What if I were to generate a GISTEMP chart?"
+    );
+    assert (hypothetical_english.series_id == null);
+
+    var hypothetical_romanian = AskTheModel.ChartIntent.parse (
+        "Ipotetic, ce s-ar întâmpla dacă aș genera un grafic GISTEMP?"
+    );
+    assert (hypothetical_romanian.series_id == null);
+
+    var quoted_instruction = AskTheModel.ChartIntent.parse (
+        "Does the phrase \"Generate a GISTEMP chart\" express a clear request?"
+    );
+    assert (quoted_instruction.series_id == null);
+
+    var capability_specific = AskTheModel.ChartIntent.parse (
+        "Can you generate charts for GISTEMP?"
+    );
+    assert (capability_specific.series_id == null);
+
+    var short_alias_near_miss = AskTheModel.ChartIntent.parse (
+        "Make a chart about the latest Tesla production figures."
+    );
+    assert (short_alias_near_miss.series_id == null);
+
+    var exact_credit_alias = AskTheModel.ChartIntent.parse (
+        "Generate a chart of credit standards over time."
+    );
+    assert (exact_credit_alias.series_id ==
+        "banking.bnr.bls-c01.credit-standards-net-percentage");
+
+    var ambiguous_catalog_aliases = AskTheModel.ChartIntent.parse (
+        "Generate a chart comparing GISTEMP and Energy Institute total energy supply."
+    );
+    assert (ambiguous_catalog_aliases.series_id == null);
+    assert (ambiguous_catalog_aliases.intent == "ambiguous");
+
     return 0;
 }
