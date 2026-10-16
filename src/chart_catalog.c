@@ -39,6 +39,7 @@ static const AtmChartCatalogEntry entries[] = {
     {
         .series_id = "climate.gistemp.global-temperature-anomaly",
         .display_name = "Global surface temperature anomaly (GISTEMP)",
+        .display_name_ro = "Anomalia globală a temperaturii de la suprafață (GISTEMP)",
         .description = "Global annual land-ocean temperature anomaly in °C relative to the 1951–1980 mean.",
         .aliases = gistemp_aliases, .alias_count = G_N_ELEMENTS (gistemp_aliases),
         .adapter = ATM_CHART_CATALOG_ADAPTER_GISTEMP_V1,
@@ -76,6 +77,7 @@ static const AtmChartCatalogEntry entries[] = {
     {
         .series_id = "energy.energy-institute.global-total-energy-supply",
         .display_name = "Global total energy supply (Energy Institute TES)",
+        .display_name_ro = "Furnizarea totală globală de energie (Energy Institute TES)",
         .description = "Global total energy supply (TES) in EJ/year using the Physical Energy Content method. This is gross supply, not net energy or EROI.",
         .aliases = ei_aliases, .alias_count = G_N_ELEMENTS (ei_aliases),
         .adapter = ATM_CHART_CATALOG_ADAPTER_ENERGY_INSTITUTE_V2,
@@ -113,6 +115,7 @@ static const AtmChartCatalogEntry entries[] = {
     {
         .series_id = "banking.bnr.bls-c01.credit-standards-net-percentage",
         .display_name = "BNR Bank Lending Survey: credit standards net percentage",
+        .display_name_ro = "Sondajul BNR privind creditarea: procentul net al standardelor de credit",
         .description = "Quarterly net percentage for credit standards on loans to non-financial corporations. Positive values indicate tightening; negative values indicate easing. The 2025-Q2 source round was not retained, so it is missing, not zero.",
         .aliases = bnr_aliases, .alias_count = G_N_ELEMENTS (bnr_aliases),
         .adapter = ATM_CHART_CATALOG_ADAPTER_BNR_BLS_C01_V3,
@@ -566,7 +569,7 @@ atm_chart_catalog_validate (GError **error)
     for (gsize i = 0; i < G_N_ELEMENTS (entries); i++) {
         const AtmChartCatalogEntry *e = &entries[i];
         const char *required[] = {
-            e->series_id, e->display_name, e->description, e->adapter_id,
+            e->series_id, e->display_name, e->display_name_ro, e->description, e->adapter_id,
             e->series_profile_id, e->series_profile_version,
             e->admission_profile_id, e->admission_profile_version,
             e->reconstruction_profile_id, e->chart_spec_schema,
@@ -729,7 +732,7 @@ atm_chart_catalog_chart_only_response (
             "Cerere de grafic: %s. Valorile exacte și proveniența apar în vizualizarea "
             "Chart/Data calificată când este disponibilă.%s Dacă graficul nu poate fi "
             "construit, AtM raportează separat problema și nu substituie valori.",
-            entry->display_name, missing_note);
+            entry->display_name_ro, missing_note);
     } else {
         response = g_strdup_printf (
             "Requested chart: %s. Exact values and source provenance appear in the "
