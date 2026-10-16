@@ -278,7 +278,7 @@ static void draw (GtkDrawingArea *area, cairo_t *cr, int width, int height, gpoi
     (void) area; (void) width; (void) height;
     AtmChartView *self = data;
     cairo_set_source_rgb (cr, 1, 1, 1); cairo_paint (cr);
-    if (self->render) {
+    if (self->render != NULL || self->render_v4 != NULL) {
         cairo_set_source_surface (cr, view_surface (self), 0, 0); cairo_paint (cr);
     }
 }
@@ -513,7 +513,7 @@ static gboolean key_pressed (GtkEventControllerKey *controller, guint key, guint
     if (key == GDK_KEY_2) { atm_chart_view_show_data (data); return TRUE; }
     return FALSE;
 }
-gboolean atm_chart_view_new_internal (const AtmChartSpec *spec,
+static gboolean atm_chart_view_new_internal (const AtmChartSpec *spec,
                                       const AtmChartSpecV4 *spec_v4,
                                       AtmChartView **out,
                                       GError **error)
