@@ -146,7 +146,7 @@ int main () {
 
     assert (natural_english.chart_only_response ().contains ("Global surface temperature anomaly (GISTEMP)"));
     assert (natural_english.chart_only_response ().contains ("source provenance"));
-    assert (natural_romanian.chart_only_response ().contains ("Cerere de grafic: Global surface temperature anomaly (GISTEMP)"));
+    assert (natural_romanian.chart_only_response ().contains ("Cerere de grafic: Anomalia globală a temperaturii de la suprafață (GISTEMP)"));
     assert (natural_romanian.chart_only_response ().contains ("proveniența"));
     assert (ordinary.response_guidance () == "");
 
@@ -216,7 +216,7 @@ int main () {
         "Generează un grafic BNR BLS C01 al procentului net privind standardele de credit."
     );
     assert (bnr_romanian.bnr_bls_c01_requested);
-    assert (bnr_romanian.chart_only_response ().contains ("Cerere de grafic: BNR Bank Lending Survey: credit standards net percentage"));
+    assert (bnr_romanian.chart_only_response ().contains ("Cerere de grafic: Sondajul BNR privind creditarea: procentul net al standardelor de credit"));
     assert (bnr_romanian.chart_only_response ().contains ("2025-Q2 lipsește din sursă; este lipsă, nu zero"));
     assert (bnr_romanian.chart_only_response ().contains ("proveniența"));
 
