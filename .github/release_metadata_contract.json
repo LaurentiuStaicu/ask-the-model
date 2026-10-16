@@ -11,8 +11,8 @@
   "current_public_release": {
     "version": "0.7.1",
     "date": "2026-10-14",
-    "version_bump_required_now": false,
-    "reason": "v0.7.1 is the scoped compatible correction after on-device v0.7.0 acceptance exposed two chart presentation defects: transcript viewport sizing and partial-evidence prose for chart-only requests. Publication follows exact-head metadata CI and the Flatpak gate."
+    "version_bump_required_now": true,
+    "reason": "A v0.8.0 minor-release candidate is prepared for the bounded source-qualified BNR BLS C01 quarterly chart route. The public v0.7.1 tag and bundle remain immutable; the candidate must pass exact-head metadata/Flatpak validation and manual acceptance of the exact Flatpak artifact on elementary OS 8 before a metadata-bearing main merge can trigger publication."
   },
   "canonical_sources": {
     "version": "meson.build project() version",
@@ -68,13 +68,13 @@
     "startup_integrity": "v0.4.0 introduced offline startup qualification and local snapshot-integrity verification; later releases must preserve the distinction between upstream Git revision identity and AtM local integrity seals.",
     "saved_conversation_history": "v0.5.0 makes explicit Save to History the only user-visible conversation save transition; later lifecycle changes must preserve exact-context restore and fail-closed permanent deletion semantics unless deliberately redesigned and documented.",
     "presentation": "v0.6.0 qualifies semantic transcript presentation and accessible grounded Sources; future presentation changes must preserve provider/persistence content and citation provenance boundaries.",
-    "optimizations": "v0.6.0 exposes the session-only Optimizations gate defaulting OFF; qualified ON policies remain bounded and individually evidenced, while OFF retains the established baseline.",
-    "charting": "v0.7.1 preserves the explicitly qualified GISTEMP v1 and Energy Institute TES v2 chart paths from exact pinned EWD sources, source-qualified History reconstruction and concise chart-only summaries. Explicit interpretation/value/table requests remain grounded; no generic/model-authored chart data or arbitrary source adapters are implied."
+    "optimizations": "The v0.6.0 Optimizations switch is session-only and defaults OFF. Optional qualified runtime paths remain individually bounded and switch-gated. B0 repository-authority mutation coordination and B2 positive-generation shared leases are mandatory correctness coordination and stay active in OFF and ON modes; this does not authorize destructive GC.",
+    "charting": "The v0.8.0 release adds the bounded, source-qualified BNR BLS C01 quarterly profile from the exact pinned RMD snapshot alongside GISTEMP v1 and Energy Institute TES v2. The BNR path preserves 12 quarter coordinates with 11 numeric observations and one explicit missing 2025-Q2 point; no physical row or numeric zero is invented, Data displays none, the renderer leaves the gap open, and History requalifies from the pinned recipe/source identity. Broader CHART-01 remains open: generic or arbitrary sources, multi-series/derived charts and generalized missing/event/discontinuity semantics are not implied; M4 remains dormant."
   },
   "release_candidate": {
-    "version": null,
-    "date": null,
-    "status": "unset",
-    "scope": "No subsequent release candidate is declared. Review new acceptance findings and roadmap priorities after v0.7.1 before selecting another release scope or date."
+    "version": "0.8.0",
+    "date": "2026-10-15",
+    "status": "pending_exact_artifact_on_device_acceptance",
+    "scope": "Add only the bounded source-qualified BNR BLS C01 quarterly route from the exact pinned RMD snapshot alongside unchanged GISTEMP v1 and Energy Institute TES v2. Preserve 12 quarter coordinates, 11 numeric observations, the authorized 2025-Q2 missing point with no physical row/value, Data none, gap-aware rendering and recipe-only History reconstruction. No generic charting or broader CHART-01 qualification is implied."
   }
 }

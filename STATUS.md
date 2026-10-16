@@ -2,11 +2,11 @@
 
 ## Release status
 
-**Current release: Ask the Model (AtM) v0.7.1 — released 2026-10-14. Immutable public release.** This patch corrects transcript-embedded chart sizing and replaces misleading partial-evidence prose for chart-only GISTEMP and Energy Institute requests with concise deterministic responses, while preserving grounded answers for explicit interpretation, year-value and table requests.
+**Current release: Ask the Model (AtM) v0.8.0 — planned release date: 2026-10-15. Release candidate only, not yet published.** This minor release adds the bounded source-qualified BNR BLS C01 quarterly chart route alongside GISTEMP v1 and Energy Institute TES v2. The previous v0.7.1 artifact remains immutable. Publication must wait for exact-artifact acceptance on elementary OS 8 and verification that the published v0.8.0 tag and asset digest match that accepted artifact.
 
-The verified release workflow publishes the immutable [v0.7.1 release](https://github.com/LaurentiuStaicu/ask-the-model/releases/tag/v0.7.1). Issue #463 records the chart acceptance findings and release provenance. The historical v0.7.0 and v0.6.3 tags and bundles remain immutable and unchanged.
+The verified release workflow published the immutable [v0.7.1 release](https://github.com/LaurentiuStaicu/ask-the-model/releases/tag/v0.7.1). Issue #463 records the chart acceptance findings and release provenance. The historical v0.7.0 and v0.6.3 tags and bundles remain immutable and unchanged.
 
-**Development status checked 2026-10-15:** v0.7.1 remains the latest immutable public release. Development `main` now additionally integrates the bounded, source-specific BNR BLS C01 quarterly ChartSpec v3, Data/renderer, schema-v5 History reconstruction and Application route through PRs #471–#479. This route is not part of the v0.7.1 artifact, and v0.8.0 has not been published. General CHART-01 qualification remains open in issue #343.
+**Development status checked 2026-10-15:** PRs #471–#479 integrate the bounded, source-specific BNR BLS C01 quarterly ChartSpec v3, Data/renderer, schema-v5 History reconstruction and Application route. The v0.8.0 candidate adds only this bounded route to the existing GISTEMP v1 and Energy Institute TES v2 profiles. It does not broaden CHART-01 to arbitrary sources, multi-series/derived charts or generalized missing/event/discontinuity semantics. General CHART-01 qualification remains open in issue #343.
 
 ### Integrated development milestones
 
@@ -23,7 +23,7 @@ The verified release workflow publishes the immutable [v0.7.1 release](https://g
 
 ### Remaining qualification boundary
 
-The public v0.7.1 artifact remains immutable and exposes only its two qualified chart routes: GISTEMP v1 and Energy Institute TES v2. Development `main` additionally contains the bounded BNR BLS C01 v3 route integrated by PRs #471–#479; that capability must not be attributed to the v0.7.1 download, and v0.8.0 is not yet published.
+The previously published v0.7.1 artifact remains immutable and exposes only its two qualified chart routes: GISTEMP v1 and Energy Institute TES v2. The bounded BNR BLS C01 v3 route is part of the v0.8.0 candidate only and must not be attributed to the v0.7.1 download. This candidate does not claim generic charting or close broader CHART-01 qualification.
 
 The BNR route admits only the exact pinned RMD snapshot `e43eb4e899f123d3b1aa0f6e20b7c8ed35434170` and one source-qualified quarterly profile. It keeps all twelve coordinates, with eleven numeric observations and a source-authorized `MISSING` at 2025-Q2. That quarter has no numeric payload and no physical CSV row; the GTK Data view displays `none` (not the internal zero sentinel), and the line renderer does not bridge the gap. History stores a reconstruction recipe and requalifies the pinned source; it does not store chart values, projected coordinates or pixels as independent scientific truth.
 

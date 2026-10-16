@@ -1,6 +1,6 @@
 # Dependencies and compatibility
 
-This document defines the compatibility contract for Ask the Model (AtM) v0.7.1.
+This document defines the compatibility contract for Ask the Model (AtM) v0.8.0.
 
 ## Supported application baseline
 
@@ -170,7 +170,7 @@ sudo apt install meson valac build-essential libgtk-4-dev libgranite-7-dev libso
 
 For a Flatpak **development build**, `flatpak-builder` and `io.elementary.Sdk//8` are also required. CI builds against that same elementary SDK baseline and runs the Meson test suite inside the Flatpak build environment.
 
-The SQLite/libarchive/libyaml platform probe verifies implementation prerequisites for the repository-aware layer and enforces that the only development filesystem grant is the dedicated `~/Ask the Model:create` path rather than Home/host access. The v0.7.1 release exposes the fixed EWD/CBD/RMD repository selector, lifecycle controls, deterministic retrieval and provenance UI. It supports the two explicitly qualified chart profiles, GISTEMP v1 and Energy Institute TES v2, with pinned-source History reconstruction, and fixes transcript chart sizing and chart-only response presentation without widening source eligibility. Test executables are not installed in the application bundle.
+The SQLite/libarchive/libyaml platform probe verifies implementation prerequisites for the repository-aware layer and enforces that the only development filesystem grant is the dedicated `~/Ask the Model:create` path rather than Home/host access. The v0.8.0 release exposes the fixed EWD/CBD/RMD repository selector, lifecycle controls, deterministic retrieval and provenance UI. It supports three source-qualified chart profiles: GISTEMP v1, Energy Institute TES v2 and the bounded BNR BLS C01 quarterly route from the exact pinned RMD snapshot. BNR preserves the authorized missing 2025-Q2 coordinate without inventing a physical row or numeric value; generalized missing/event/discontinuity semantics and arbitrary chart sources remain unqualified. Test executables are not installed in the application bundle.
 
 ## Privacy and network boundary
 
