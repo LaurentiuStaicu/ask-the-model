@@ -6387,21 +6387,47 @@ namespace AskTheModel {
                 return true;
             }
 
-            if (pres09_test_live_turn != 6 ||
-                transcript.last_index_of ("The chart request is ambiguous") <=
-                    transcript.last_index_of ("AtM cannot generate that chart") ||
+            if (pres09_test_live_turn == 6) {
+                if (transcript.last_index_of ("The chart request is ambiguous") <=
+                        transcript.last_index_of ("AtM cannot generate that chart") ||
+                    state.pres09_test_chart_widgets.length != 0 ||
+                    state.persistent_id != null) {
+                    pres09_test_finish (
+                        false,
+                        "An explicit /chart command accepted an unrelated chart subject merely because its registered series was mentioned"
+                    );
+                    return false;
+                }
+
+                /*
+                 * A registered chart series is not sufficient if its repository
+                 * has not been authorized in this conversation. This request
+                 * must fail on catalog-bound Repository Scope before prepare_turn,
+                 * model generation, durable conversation creation or widget creation.
+                 */
+                state.repository_ids = {};
+                state.prompt.buffer.text = "/chart gistemp Show the trend.";
+                pres09_test_live_turn = 7;
+                state.send_button.clicked ();
+                return true;
+            }
+
+            if (pres09_test_live_turn != 7 ||
+                !transcript.contains (
+                    "The repository bound to this qualified chart series is not included"
+                ) ||
                 state.pres09_test_chart_widgets.length != 0 ||
                 state.persistent_id != null) {
                 pres09_test_finish (
                     false,
-                    "An explicit /chart command accepted an unrelated chart subject merely because its registered series was mentioned"
+                    "A supported chart series without its catalog-bound repository in Repository Scope did not fail closed before model routing or persistence"
                 );
                 return false;
             }
 
             pres09_test_finish (
                 true,
-                "unsupported population, conflicting explicit /chart selection, unknown /chart selector, unrelated diabetes prevalence with a registered GISTEMP alias, unsupported pie-chart kind, and explicit /chart with an unrelated diabetes subject all failed closed without model routing, persistence or Chart/Data widgets"
+                "unsupported population, conflicting explicit /chart selection, unknown /chart selector, unrelated diabetes prevalence with a registered GISTEMP alias, unsupported pie-chart kind, unrelated explicit /chart subject, and a valid series outside Repository Scope all failed closed without model routing, persistence or Chart/Data widgets"
             );
             return false;
         }
