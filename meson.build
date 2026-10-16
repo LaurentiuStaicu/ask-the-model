@@ -3013,7 +3013,10 @@ chart_render_test = executable(
   dependencies: [glib_dep, json_glib_dep, dependency('cairo'), dependency('fontconfig')],
   install: false
 )
+# ASan/UBSan plus the catalog-bound v4 parity tests can exceed Meson's default
+# 30-second test limit on the elementary Flatpak CI runner.
 test('chart-render', chart_render_test,
+  timeout: 90,
   env: {
     'ATM_CHART01_FIXTURE': meson.current_source_dir() / 'tests/fixtures/chart01',
     'ATM_BNR_BLS_FIXTURE': meson.current_source_dir() / 'tests/fixtures/chart01/rmd-bnr-bls'
