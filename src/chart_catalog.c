@@ -267,6 +267,74 @@ atm_chart_catalog_find_alias (const char *alias, const AtmChartCatalogEntry **ou
     return ATM_CHART_CATALOG_LOOKUP_FOUND;
 }
 
+
+static gboolean
+word_character_at (const char *cursor)
+{
+    if (cursor == NULL || *cursor == '\0')
+        return FALSE;
+    gunichar character = g_utf8_get_char (cursor);
+    return g_unichar_isalnum (character) || character == '_';
+}
+
+static gboolean
+alias_occurs_as_phrase (const char *request, const char *alias)
+{
+    const char *cursor = request;
+    while ((cursor = strstr (cursor, alias)) != NULL) {
+        const char *after = cursor + strlen (alias);
+        const char *before = g_utf8_find_prev_char (request, cursor);
+        gboolean left_boundary = before == NULL ||
+            !word_character_at (before);
+        gboolean right_boundary = !word_character_at (after);
+        if (left_boundary && right_boundary)
+            return TRUE;
+        cursor = g_utf8_next_char (cursor);
+    }
+    return FALSE;
+}
+
+char *
+atm_chart_catalog_match_request_series_id (
+    const char *request,
+    gboolean *out_ambiguous
+)
+{
+    if (out_ambiguous == NULL)
+        return NULL;
+    *out_ambiguous = FALSE;
+
+    char *normalized_request = normalize_alias (request);
+    if (normalized_request == NULL)
+        return NULL;
+
+    const AtmChartCatalogEntry *found = NULL;
+    for (gsize i = 0; i < G_N_ELEMENTS (entries); i++) {
+        gboolean entry_matches = FALSE;
+        for (gsize j = 0; j < entries[i].alias_count; j++) {
+            char *alias = normalize_alias (entries[i].aliases[j]);
+            gboolean matches = alias != NULL &&
+                alias_occurs_as_phrase (normalized_request, alias);
+            g_free (alias);
+            if (matches) {
+                entry_matches = TRUE;
+                break;
+            }
+        }
+        if (!entry_matches)
+            continue;
+        if (found != NULL && found != &entries[i]) {
+            *out_ambiguous = TRUE;
+            g_free (normalized_request);
+            return NULL;
+        }
+        found = &entries[i];
+    }
+
+    g_free (normalized_request);
+    return found != NULL ? g_strdup (found->series_id) : NULL;
+}
+
 gboolean
 atm_chart_catalog_snapshot_admitted (const AtmChartCatalogEntry *entry, const char *snapshot_sha)
 {
