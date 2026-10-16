@@ -184,6 +184,56 @@ test_catalog_does_not_promote_arbitrary_columns (void)
     g_assert_null (entry ("food_production_index"));
 }
 
+
+static void
+test_request_alias_phrase_boundaries (void)
+{
+    gboolean ambiguous = FALSE;
+    char *series_id = atm_chart_catalog_match_request_series_id (
+        "Generate a chart of global temperature anomalies over time.",
+        &ambiguous);
+    g_assert_false (ambiguous);
+    g_assert_cmpstr (series_id, ==,
+                     "climate.gistemp.global-temperature-anomaly");
+    g_free (series_id);
+
+    series_id = atm_chart_catalog_match_request_series_id (
+        "Show a chart of total energy supply (TES).", &ambiguous);
+    g_assert_false (ambiguous);
+    g_assert_cmpstr (series_id, ==,
+                     "energy.energy-institute.global-total-energy-supply");
+    g_free (series_id);
+
+    series_id = atm_chart_catalog_match_request_series_id (
+        "Generate a chart of credit standards over time.", &ambiguous);
+    g_assert_false (ambiguous);
+    g_assert_cmpstr (series_id, ==,
+                     "banking.bnr.bls-c01.credit-standards-net-percentage");
+    g_free (series_id);
+
+    /* The short alias TES is a whole token, never a substring of another word. */
+    series_id = atm_chart_catalog_match_request_series_id (
+        "Generate a chart about the latest Tesla production data.", &ambiguous);
+    g_assert_false (ambiguous);
+    g_assert_null (series_id);
+
+    series_id = atm_chart_catalog_match_request_series_id (
+        "Show a chart of population over time.", &ambiguous);
+    g_assert_false (ambiguous);
+    g_assert_null (series_id);
+
+    series_id = atm_chart_catalog_match_request_series_id (
+        "Compare GISTEMP global temperature with Energy Institute total energy supply.",
+        &ambiguous);
+    g_assert_true (ambiguous);
+    g_assert_null (series_id);
+
+    series_id = atm_chart_catalog_match_request_series_id ("   ", &ambiguous);
+    g_assert_false (ambiguous);
+    g_assert_null (series_id);
+    g_assert_null (atm_chart_catalog_match_request_series_id ("gistemp", NULL));
+}
+
 int
 main (int argc, char **argv)
 {
@@ -191,6 +241,7 @@ main (int argc, char **argv)
     g_test_add_func ("/chart-catalog/validates", test_catalog_validates);
     g_test_add_func ("/chart-catalog/stable-ids", test_stable_ids_and_profiles);
     g_test_add_func ("/chart-catalog/aliases", test_alias_normalization);
+    g_test_add_func ("/chart-catalog/request-phrase-boundaries", test_request_alias_phrase_boundaries);
     g_test_add_func ("/chart-catalog/snapshot-allowlists", test_snapshot_allowlists);
     g_test_add_func ("/chart-catalog/source-semantics", test_source_semantics_and_provenance);
     g_test_add_func ("/chart-catalog/no-arbitrary-columns", test_catalog_does_not_promote_arbitrary_columns);
