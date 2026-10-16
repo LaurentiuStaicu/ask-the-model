@@ -65,24 +65,48 @@ def main() -> int:
         "grounded preparation",
     )
 
-    qualification_gate = marker(
-        send,
-        "qualify_live_gistemp_request (state.session);",
-        "GISTEMP pre-model qualification",
-    )
     preparation_gate = marker(
         send,
         "state.session.prepare_turn (",
         "grounded preparation",
     )
-    require(
-        qualification_gate < preparation_gate,
-        "GISTEMP source qualification must finish before grounded turn preparation and any model call",
-    )
-    marker(
+
+    # All source adapters remain explicit and independently qualified, but
+    # repository authorization is now catalog-selected rather than encoded
+    # as three source-specific Application branches.
+    for qualification in (
+        "qualify_live_gistemp_request (state.session);",
+        "qualify_live_energy_institute_request (state.session);",
+        "qualify_live_bnr_bls_c01_request (state.session);",
+    ):
+        qualification_gate = marker(
+            send,
+            qualification,
+            "catalog-selected native source qualification",
+        )
+        require(
+            qualification_gate < preparation_gate,
+            f"{qualification} must finish before grounded preparation and any model call",
+        )
+
+    scope_gate = marker(
         send,
-        'if (chart_intent.gistemp_requested &&\n                    !repository_id_in (state.repository_ids, "ewd")',
-        "GISTEMP repository-scope fail-closed gate",
+        "bool selected_repository_in_scope = false;",
+        "catalog-bound repository-scope gate",
+    )
+    scope_match = marker(
+        send,
+        "ChartNative.catalog_repository_matches_series (",
+        "catalog-bound repository-scope match",
+    )
+    scope_refusal = marker(
+        send,
+        "The repository bound to this qualified chart series is not included",
+        "catalog-bound repository-scope refusal",
+    )
+    require(
+        scope_gate < scope_match < scope_refusal < preparation_gate,
+        "catalog repository authorization must fail closed before grounded preparation or any model call",
     )
 
     required = [
