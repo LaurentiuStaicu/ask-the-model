@@ -83,7 +83,7 @@ static const AtmChartCatalogEntry entries[] = {
         .source_path = "science/data/processed/energy_institute_global_2026.csv",
         .x_kind = ATM_CHART_CATALOG_X_CALENDAR_YEAR,
         .x_coordinate_semantics = "calendar_year", .x_frequency = "annual",
-        .x_unit = "year", .x_dimension = "time",
+        .x_unit = "calendar_year", .x_dimension = "time",
         .subject = "global_total_energy_supply", .attribute = "total_energy_supply",
         .y_unit = "exajoules/year", .y_dimension = "energy_flow_rate",
         .series_semantics = "empirical_annual_observations",
@@ -338,7 +338,7 @@ policy_matches (const AtmChartCatalogEntry *e, GError **error)
             !IS(e->repository_full_name,"LaurentiuStaicu/empirical-world3-dynamics") ||
             !IS(e->source_path,"science/data/processed/energy_institute_global_2026.csv") ||
             !IS(e->x_coordinate_semantics,"calendar_year") ||
-            !IS(e->x_frequency,"annual") || !IS(e->x_unit,"year") ||
+            !IS(e->x_frequency,"annual") || !IS(e->x_unit,"calendar_year") ||
             !IS(e->x_dimension,"time") ||
             !IS(e->subject,"global_total_energy_supply") ||
             !IS(e->attribute,"total_energy_supply") ||
