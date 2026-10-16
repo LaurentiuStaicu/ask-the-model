@@ -3864,22 +3864,23 @@ namespace AskTheModel {
         ) {
             ChartIntent chart_intent =
                 ChartIntent.parse (prompt);
-            bool source_chart_requested = chart_intent.gistemp_requested ||
-                chart_intent.energy_institute_requested ||
-                chart_intent.bnr_bls_c01_requested;
+            string selected_chart_series_id = chart_intent.series_id ?? "";
+            bool source_chart_requested =
+                selected_chart_series_id.length > 0;
             string effective_prompt = source_chart_requested
                 ? chart_intent.query
                 : prompt;
 
             if (source_chart_requested && effective_prompt.length == 0) {
-                append_transcript (
-                    state.transcript,
-                    chart_intent.bnr_bls_c01_requested
-                        ? "Assistant: Use /chart bnr-bls-c01 followed by the grounded question you want to visualize."
-                        : (chart_intent.energy_institute_requested
-                            ? "Assistant: Use /chart energy-institute followed by the grounded question you want to visualize."
-                            : "Assistant: Use /chart gistemp followed by the grounded question you want to visualize.")
-                );
+                string command_hint =
+                    selected_chart_series_id ==
+                        "banking.bnr.bls-c01.credit-standards-net-percentage"
+                    ? "Assistant: Use /chart bnr-bls-c01 followed by the grounded question you want to visualize."
+                    : (selected_chart_series_id ==
+                        "energy.energy-institute.global-total-energy-supply"
+                        ? "Assistant: Use /chart energy-institute followed by the grounded question you want to visualize."
+                        : "Assistant: Use /chart gistemp followed by the grounded question you want to visualize.");
+                append_transcript (state.transcript, command_hint);
                 return;
             }
 
@@ -3992,12 +3993,19 @@ namespace AskTheModel {
                     ollama_provider.model_digest
                 );
 
-                if (chart_intent.gistemp_requested) {
+                if (selected_chart_series_id ==
+                    "climate.gistemp.global-temperature-anomaly") {
                     qualify_live_gistemp_request (state.session);
-                } else if (chart_intent.energy_institute_requested) {
+                } else if (selected_chart_series_id ==
+                    "energy.energy-institute.global-total-energy-supply") {
                     qualify_live_energy_institute_request (state.session);
-                } else if (chart_intent.bnr_bls_c01_requested) {
+                } else if (selected_chart_series_id ==
+                    "banking.bnr.bls-c01.credit-standards-net-percentage") {
                     qualify_live_bnr_bls_c01_request (state.session);
+                } else if (source_chart_requested) {
+                    throw new GLib.IOError.NOT_SUPPORTED (
+                        "The selected chart series is not in the qualified live route."
+                    );
                 }
 
                 bool needs_clarification;
@@ -4191,8 +4199,7 @@ namespace AskTheModel {
                                 live_chart_widgets =
                                     build_live_chart_widgets (
                                         state.session,
-                                        chart_intent.energy_institute_requested,
-                                        chart_intent.bnr_bls_c01_requested,
+                                        selected_chart_series_id,
                                         out live_charts
                                     );
                             } catch (GLib.Error chart_error) {
@@ -4234,9 +4241,11 @@ namespace AskTheModel {
                         if (source_chart_requested &&
                             live_chart_widgets.length == 0) {
                             state.presentation.append_chart_status (
-                                chart_intent.bnr_bls_c01_requested
+                                selected_chart_series_id ==
+                                    "banking.bnr.bls-c01.credit-standards-net-percentage"
                                     ? "AtM could not render the qualified BNR BLS C01 chart. Check that RMD is selected and the exact pinned snapshot is available."
-                                    : (chart_intent.energy_institute_requested
+                                    : (selected_chart_series_id ==
+                                        "energy.energy-institute.global-total-energy-supply"
                                         ? "AtM could not render the qualified Energy Institute chart. Check that EWD is selected and its pinned snapshot is available."
                                         : "AtM could not render the qualified GISTEMP chart. Check that EWD is selected and its pinned snapshot is available.")
                             );
