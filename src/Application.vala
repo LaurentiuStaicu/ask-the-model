@@ -3922,15 +3922,10 @@ namespace AskTheModel {
                 : prompt;
 
             if (source_chart_requested && effective_prompt.length == 0) {
-                string command_hint =
-                    selected_chart_series_id ==
-                        "banking.bnr.bls-c01.credit-standards-net-percentage"
-                    ? "Assistant: Use /chart bnr-bls-c01 followed by the grounded question you want to visualize."
-                    : (selected_chart_series_id ==
-                        "energy.energy-institute.global-total-energy-supply"
-                        ? "Assistant: Use /chart energy-institute followed by the grounded question you want to visualize."
-                        : "Assistant: Use /chart gistemp followed by the grounded question you want to visualize.");
-                append_transcript (state.transcript, command_hint);
+                append_transcript (
+                    state.transcript,
+                    "Assistant: Add a grounded question after this chart command so AtM can construct the selected qualified series."
+                );
                 return;
             }
 
@@ -3977,38 +3972,21 @@ namespace AskTheModel {
                     );
                 }
 
-                if (chart_intent.gistemp_requested &&
-                    !repository_id_in (state.repository_ids, "ewd") &&
-                    !repository_id_in (
-                        state.repository_ids,
-                        "LaurentiuStaicu/empirical-world3-dynamics"
-                    )) {
-                    throw new GLib.IOError.FAILED (
-                        "GISTEMP charts require EWD to be selected for this conversation. " +
-                        "Select EWD in Repository Scope and retry."
-                    );
-                }
-                if (chart_intent.energy_institute_requested &&
-                    !repository_id_in (state.repository_ids, "ewd") &&
-                    !repository_id_in (
-                        state.repository_ids,
-                        "LaurentiuStaicu/empirical-world3-dynamics"
-                    )) {
-                    throw new GLib.IOError.FAILED (
-                        "Energy Institute charts require EWD to be selected for this conversation. " +
-                        "Select EWD in Repository Scope and retry."
-                    );
-                }
-                if (chart_intent.bnr_bls_c01_requested &&
-                    !repository_id_in (state.repository_ids, "rmd") &&
-                    !repository_id_in (
-                        state.repository_ids,
-                        "LaurentiuStaicu/romanian-monetary-dynamics"
-                    )) {
-                    throw new GLib.IOError.FAILED (
-                        "BNR BLS C01 charts require RMD to be selected for this conversation. " +
-                        "Select RMD in Repository Scope and retry."
-                    );
+                if (source_chart_requested) {
+                    bool selected_repository_in_scope = false;
+                    foreach (string repository_id in state.repository_ids) {
+                        if (ChartNative.catalog_repository_matches_series (
+                                selected_chart_series_id, repository_id)) {
+                            selected_repository_in_scope = true;
+                            break;
+                        }
+                    }
+                    if (!selected_repository_in_scope) {
+                        throw new GLib.IOError.FAILED (
+                            "The repository bound to this qualified chart series is not included " +
+                            "in this conversation's Repository Scope. Add that catalog-bound repository and retry."
+                        );
+                    }
                 }
 
                 if (!state.session.is_active ()) {
@@ -4076,28 +4054,6 @@ namespace AskTheModel {
 
                 string grounded_system_instructions =
                     system_instructions ?? "";
-                if (chart_intent.gistemp_requested) {
-                    grounded_system_instructions +=
-                        "\nThe application handles the requested qualified " +
-                        "GISTEMP chart from the complete pinned source. Do " +
-                        "not claim that you cannot render charts or invent " +
-                        "data or chart configuration.";
-                } else if (chart_intent.energy_institute_requested) {
-                    grounded_system_instructions +=
-                        "\nThe application reconstructs the requested Energy Institute " +
-                        "Global Total Energy Supply chart from its complete admitted EWD " +
-                        "snapshot. The chart uses the Physical Energy Content interpretation " +
-                        "and reports exajoules per year. Do not invent values, chart metadata, " +
-                        "transformations or interpretations beyond the grounded evidence.";
-                } else if (chart_intent.bnr_bls_c01_requested) {
-                    grounded_system_instructions +=
-                        "\nThe application reconstructs the BNR BLS C01 quarterly credit " +
-                        "standards net-percentage chart from the exact pinned RMD source bundle. " +
-                        "It contains eleven numeric source observations across twelve quarter " +
-                        "coordinates; 2025-Q2 is source-qualified MISSING, not zero. Do not " +
-                        "impute, interpolate, fabricate values, or claim a continuous line over " +
-                        "the missing quarter.";
-                }
                 grounded_system_instructions +=
                     chart_intent.response_guidance ();
 
@@ -4291,13 +4247,8 @@ namespace AskTheModel {
                         if (source_chart_requested &&
                             live_chart_widgets.length == 0) {
                             state.presentation.append_chart_status (
-                                selected_chart_series_id ==
-                                    "banking.bnr.bls-c01.credit-standards-net-percentage"
-                                    ? "AtM could not render the qualified BNR BLS C01 chart. Check that RMD is selected and the exact pinned snapshot is available."
-                                    : (selected_chart_series_id ==
-                                        "energy.energy-institute.global-total-energy-supply"
-                                        ? "AtM could not render the qualified Energy Institute chart. Check that EWD is selected and its pinned snapshot is available."
-                                        : "AtM could not render the qualified GISTEMP chart. Check that EWD is selected and its pinned snapshot is available.")
+                                "AtM could not render the qualified catalog series. " +
+                                "Check that its catalog-bound repository and exact pinned snapshot are available."
                             );
                         }
                         assistant_stream_started = true;
