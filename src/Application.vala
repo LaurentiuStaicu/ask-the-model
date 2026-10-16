@@ -3907,8 +3907,8 @@ namespace AskTheModel {
                         ? "AtM nu poate genera acest grafic: variabila cerută nu este în catalogul de serii grafice validate. Menționează GISTEMP, furnizarea totală de energie Energy Institute sau seria BNR BLS C01."
                         : "AtM cannot generate that chart: the requested variable is not in the catalog of qualified chart series. Name GISTEMP, Energy Institute total energy supply, or BNR BLS C01.")
                     : (romanian_request
-                        ? "Cererea de grafic este ambiguă, combină mai multe serii sau cere o transformare nesuportată. Alege o singură serie validată pentru un grafic liniar."
-                        : "The chart request is ambiguous, combines multiple series, or asks for an unsupported transformation. Choose one qualified series for a line chart.");
+                        ? "Cererea de grafic este ambiguă, nu identifică subiectul unei serii validate sau cere un tip de grafic ori o transformare nesuportată. Alege o singură serie validată pentru un grafic liniar."
+                        : "The chart request is ambiguous, its subject is not a registered qualified series, or it asks for an unsupported chart type or transformation. Choose one qualified series for a supported line chart.");
                 append_transcript (state.transcript, "Assistant: " + rejection);
                 return;
             }
