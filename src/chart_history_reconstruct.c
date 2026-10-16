@@ -1026,3 +1026,36 @@ atm_chart_live_reconstruct_v4 (
     *out = spec_v4;
     return TRUE;
 }
+
+gboolean
+atm_chart_wrap_qualified_spec_v4 (
+    const char *series_id,
+    const AtmChartSpec *qualified_source_spec,
+    AtmChartSpecV4 **out,
+    GError **error
+)
+{
+    if (out == NULL || *out != NULL)
+        return reject (error,
+            "ChartSpec v4 wrapper output must be non-NULL and initially empty.");
+    if (series_id == NULL || series_id[0] == '\0' ||
+        qualified_source_spec == NULL)
+        return reject (error,
+            "ChartSpec v4 wrapper requires a registered series ID and qualified source spec.");
+
+    if (!atm_chart_catalog_validate (error))
+        return FALSE;
+    const AtmChartCatalogEntry *entry =
+        atm_chart_catalog_find_id (series_id);
+    if (entry == NULL)
+        return reject (error,
+            "ChartSpec v4 wrapper series ID is not present in the compiled catalog.");
+
+    if (g_strcmp0 (atm_chart_spec_schema (qualified_source_spec),
+                   entry->chart_spec_schema) != 0)
+        return reject (error,
+            "Qualified source spec schema does not match the catalog entry.");
+
+    return atm_chart_spec_v4_new (
+        entry, qualified_source_spec, out, error);
+}
