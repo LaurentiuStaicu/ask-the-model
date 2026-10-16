@@ -6289,6 +6289,68 @@ namespace AskTheModel {
             return false;
         }
 
+        private bool pres09_test_step_intent_rejection () {
+            if (active_chat == null) {
+                create_chat_tab ();
+            }
+            ChatTabState? state = active_chat;
+            if (state == null) {
+                pres09_test_finish (
+                    false,
+                    "Application did not create a chat tab for chart-intent rejection E2E"
+                );
+                return false;
+            }
+            pres09_test_state = state;
+
+            if (pres09_test_live_turn == 0) {
+                state.prompt.buffer.text =
+                    "Generate a chart of population over time.";
+                pres09_test_live_turn = 1;
+                state.send_button.clicked ();
+                return true;
+            }
+
+            if (generation_active || state.generating) {
+                return true;
+            }
+
+            string transcript = state.transcript.buffer.text;
+            if (pres09_test_live_turn == 1) {
+                if (!transcript.contains (
+                        "AtM cannot generate that chart") ||
+                    state.pres09_test_chart_widgets.length != 0) {
+                    pres09_test_finish (
+                        false,
+                        "Unsupported population request did not fail closed before provider invocation or chart creation"
+                    );
+                    return false;
+                }
+
+                state.prompt.buffer.text =
+                    "/chart gistemp Show population over time.";
+                pres09_test_live_turn = 2;
+                state.send_button.clicked ();
+                return true;
+            }
+
+            if (!transcript.contains (
+                    "The chart request is ambiguous") ||
+                state.pres09_test_chart_widgets.length != 0) {
+                pres09_test_finish (
+                    false,
+                    "A conflicting explicit /chart request did not fail closed without a chart"
+                );
+                return false;
+            }
+
+            pres09_test_finish (
+                true,
+                "unsupported natural-language series and a conflicting explicit chart command both returned clear refusal messages without model routing, persistence or Chart/Data widgets"
+            );
+            return false;
+        }
+
         private bool pres09_test_step () {
             pres09_test_ticks++;
             if (pres09_test_ticks > 2400) {
@@ -6328,6 +6390,9 @@ namespace AskTheModel {
 
             if (pres09_test_phase == "source-details") {
                 return pres09_test_step_source_details ();
+            }
+            if (pres09_test_phase == "intent-rejection") {
+                return pres09_test_step_intent_rejection ();
             }
             if (pres09_test_phase == "live") {
                 return pres09_test_step_live ();
