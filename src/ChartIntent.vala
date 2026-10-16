@@ -19,44 +19,10 @@ namespace AskTheModel {
          * partial retrieval excerpts for that complete admitted series.
          */
         public string response_guidance () {
-            if (bnr_bls_c01_requested) {
-                return
-                    "\nThe application attempts to construct the qualified BNR BLS C01 quarterly " +
-                    "credit-standards net-percentage chart from its pinned RMD snapshot. The " +
-                    "Chart/Data widget presents the complete qualified quarter sequence, exact " +
-                    "values and provenance. The 2025-Q2 observation is explicitly MISSING, not " +
-                    "zero; do not impute it, invent values, or join a line across that gap. " +
-                    "For chart-only requests, do not substitute partial retrieval excerpts for " +
-                    "the native chart or present them as a pseudo-table. Only give individual " +
-                    "values or a table when explicitly requested.";
+            if (series_id == null) {
+                return "";
             }
-            if (energy_institute_requested) {
-                return
-                    "\nThe application attempts to construct the qualified Energy Institute TES " +
-                    "chart separately in its native Chart/Data widget. The widget, not the " +
-                    "prose answer, presents the full admitted series and source provenance. " +
-                    "For a chart-only request, do not reproduce chart data in prose: do not " +
-                    "list individual years or values, and do not format partial observations " +
-                    "as a table or pseudo-table. Do not claim that the chart cannot be rendered " +
-                    "or that more years are unavailable based only on a short retrieved excerpt. " +
-                    "Only provide year-by-year values or a table when the user explicitly asks " +
-                    "for them. For additional interpretation requests, do not contradict the " +
-                    "qualified chart's time range, interpretation, or units.";
-            }
-            if (gistemp_requested) {
-                return
-                    "\nThe application attempts to construct the qualified GISTEMP chart " +
-                    "separately in its native Chart/Data widget. The widget, not the prose " +
-                    "answer, presents the full admitted series and source provenance. For a " +
-                    "chart-only request, do not reproduce chart data in prose: do not list " +
-                    "individual years or temperatures, and do not format partial observations " +
-                    "as a table or pseudo-table. Do not claim that the chart cannot be rendered " +
-                    "or that more years are unavailable based only on a short retrieved excerpt. " +
-                    "Only provide year-by-year values or a table when the user explicitly asks " +
-                    "for them. For additional interpretation requests, do not contradict the " +
-                    "qualified chart's scope or time range.";
-            }
-            return "";
+            return ChartCatalog.response_guidance (series_id) ?? "";
         }
 
         /*
@@ -107,34 +73,24 @@ namespace AskTheModel {
          * the UI reports a chart status if the widget cannot be constructed.
          */
         public string chart_only_response () {
-            if (!is_chart_only_request ()) {
+            if (!is_chart_only_request () || series_id == null) {
                 return "";
             }
 
+            /*
+             * User-facing text is composed from the same immutable catalog
+             * metadata as the native Chart/Data attribution. Do not maintain
+             * a separate source-specific prose branch here.
+             */
             bool romanian = contains_any (query.down (), {
                 "grafic", "arată", "arata", "generează", "genereaza",
                 "creează", "creeaza", "afișează", "afiseaza",
-                "temperatura globală", "temperatura globala",
-                "furnizarea", "valorile", "în timp", "in timp",
-                "standarde de credit", "standardele de credit", "procent net"
+                "vizualizează", "vizualizeaza", "în timp", "in timp",
+                "valorile", "detaliile sursei", "lipsește", "lipseste"
             });
-
-            if (bnr_bls_c01_requested) {
-                return romanian
-                    ? "Cerere de grafic: BNR BLS C01 trimestrial pentru procentul net al standardelor de credit. Consultă vizualizarea Data calificată pentru valorile exacte și detaliile sursei când este disponibilă; 2025-Q2 lipsește, nu este zero. Dacă graficul nu poate fi construit, AtM raportează separat problema și nu substituie valori."
-                    : "Requested chart: BNR BLS C01 quarterly credit-standards net-percentage chart. See the qualified Data view for exact values and source details when available; 2025-Q2 is missing, not zero. If chart construction fails, AtM reports that separately and does not substitute values.";
-            }
-            if (energy_institute_requested) {
-                return romanian
-                    ? "Cerere de grafic: Energy Institute pentru furnizarea totală globală de energie. Valorile anuale exacte și detaliile sursei apar în vizualizarea Chart/Data calificată când este disponibilă; dacă aceasta nu poate fi construită, AtM raportează separat problema și nu substituie valori."
-                    : "Requested chart: Energy Institute global total energy supply chart. Exact annual values and source details appear in the qualified Chart/Data view when available; if construction fails, AtM reports that separately rather than substituting values.";
-            }
-            if (gistemp_requested) {
-                return romanian
-                    ? "Cerere de grafic: GISTEMP pentru anomaliile temperaturii globale. Valorile exacte și detaliile sursei apar în vizualizarea Chart/Data calificată când este disponibilă; dacă aceasta nu poate fi construită, AtM raportează separat problema și nu substituie valori."
-                    : "Requested chart: GISTEMP global temperature anomaly chart. Exact values and source details appear in the qualified Chart/Data view when available; if construction fails, AtM reports that separately rather than substituting values.";
-            }
-            return "";
+            return ChartCatalog.chart_only_response (
+                series_id, romanian
+            ) ?? "";
         }
 
         private ChartIntent (
