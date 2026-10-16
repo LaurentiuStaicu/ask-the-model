@@ -443,6 +443,55 @@ int main () {
     assert (ambiguous_catalog_aliases.series_id == null);
     assert (ambiguous_catalog_aliases.intent == "ambiguous");
 
+    /* A catalog alias in a source/method clause does not ground the chart subject. */
+    var unrelated_subject_using_gistemp = AskTheModel.ChartIntent.parse (
+        "Generate a chart of diabetes prevalence using GISTEMP."
+    );
+    assert (unrelated_subject_using_gistemp.series_id == null);
+    assert (unrelated_subject_using_gistemp.intent == "ambiguous");
+
+    var unrelated_subject_using_ei = AskTheModel.ChartIntent.parse (
+        "Generate a chart of diabetes prevalence using Energy Institute."
+    );
+    assert (unrelated_subject_using_ei.series_id == null);
+    assert (unrelated_subject_using_ei.intent == "ambiguous");
+
+    var unrelated_subject_with_gistemp = AskTheModel.ChartIntent.parse (
+        "Generate a chart of global temperature anomalies over time with diabetes prevalence."
+    );
+    assert (unrelated_subject_with_gistemp.series_id == null);
+    assert (unrelated_subject_with_gistemp.intent == "ambiguous");
+
+    var directly_grounded_gistemp = AskTheModel.ChartIntent.parse (
+        "Generate a chart of GISTEMP global temperature anomaly."
+    );
+    assert (directly_grounded_gistemp.series_id ==
+        "climate.gistemp.global-temperature-anomaly");
+
+    var directly_grounded_ei = AskTheModel.ChartIntent.parse (
+        "Show a chart of total energy supply (TES)."
+    );
+    assert (directly_grounded_ei.series_id ==
+        "energy.energy-institute.global-total-energy-supply");
+
+    var unsupported_pie_chart = AskTheModel.ChartIntent.parse (
+        "Generate a pie chart of global temperature anomalies."
+    );
+    assert (unsupported_pie_chart.series_id == null);
+    assert (unsupported_pie_chart.intent == "ambiguous");
+
+    var unsupported_bar_chart = AskTheModel.ChartIntent.parse (
+        "Generate a bar chart of Energy Institute total energy supply."
+    );
+    assert (unsupported_bar_chart.series_id == null);
+    assert (unsupported_bar_chart.intent == "ambiguous");
+
+    var unsupported_explicit_chart_kind = AskTheModel.ChartIntent.parse (
+        "/chart gistemp Make a pie chart."
+    );
+    assert (unsupported_explicit_chart_kind.series_id == null);
+    assert (unsupported_explicit_chart_kind.intent == "ambiguous");
+
     var explicit_population_conflict = AskTheModel.ChartIntent.parse (
         "/chart gistemp Show population over time."
     );
