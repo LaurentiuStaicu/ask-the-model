@@ -164,6 +164,17 @@ gboolean atm_chart_catalog_repository_matches_series (
     const char *repository_id
 );
 
+
+/* Catalog-derived prose for the model prompt and chart-only UI. Returns a
+ * newly allocated string; NULL means that the series ID is not registered.
+ * These helpers expose only reviewed compiled-in metadata, never data values.
+ */
+char *atm_chart_catalog_response_guidance (const char *series_id);
+char *atm_chart_catalog_chart_only_response (
+    const char *series_id,
+    gboolean romanian
+);
+
 /* Exact 40-hex snapshot check against this entry's closed allowlist. */
 gboolean atm_chart_catalog_snapshot_admitted (
     const AtmChartCatalogEntry *entry,
