@@ -297,6 +297,42 @@ alias_occurs_as_phrase (const char *request, const char *alias)
 }
 
 
+
+char *
+atm_chart_catalog_match_exact_alias_series_id (
+    const char *subject,
+    gboolean *out_ambiguous
+)
+{
+    if (out_ambiguous == NULL)
+        return NULL;
+    *out_ambiguous = FALSE;
+
+    char *key = normalize_alias (subject);
+    if (key == NULL)
+        return NULL;
+
+    const AtmChartCatalogEntry *found = NULL;
+    for (gsize i = 0; i < G_N_ELEMENTS (entries); i++) {
+        for (gsize j = 0; j < entries[i].alias_count; j++) {
+            char *alias = normalize_alias (entries[i].aliases[j]);
+            gboolean matches = alias != NULL && g_strcmp0 (key, alias) == 0;
+            g_free (alias);
+            if (!matches)
+                continue;
+            if (found != NULL && found != &entries[i]) {
+                *out_ambiguous = TRUE;
+                g_free (key);
+                return NULL;
+            }
+            found = &entries[i];
+        }
+    }
+
+    g_free (key);
+    return found != NULL ? g_strdup (found->series_id) : NULL;
+}
+
 gboolean
 atm_chart_catalog_text_has_phrase (const char *text, const char *phrase)
 {
