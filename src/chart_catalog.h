@@ -128,6 +128,19 @@ AtmChartCatalogLookupResult atm_chart_catalog_find_alias (
     const AtmChartCatalogEntry **out_entry
 );
 
+
+/*
+ * Find one registered alias as a complete phrase in free-form request text.
+ * Returns a newly allocated stable series ID for one unique matching entry,
+ * NULL for no match/invalid text/ambiguity; *out_ambiguous distinguishes
+ * ambiguity from a normal no-match. This function does NOT establish that the
+ * request positively asks for a chart; callers must independently qualify it.
+ */
+char *atm_chart_catalog_match_request_series_id (
+    const char *request,
+    gboolean *out_ambiguous
+);
+
 /* Exact 40-hex snapshot check against this entry's closed allowlist. */
 gboolean atm_chart_catalog_snapshot_admitted (
     const AtmChartCatalogEntry *entry,
