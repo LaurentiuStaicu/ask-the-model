@@ -47,6 +47,9 @@ int main () {
     );
     assert (!generic_chart.gistemp_requested);
     assert (!generic_chart.energy_institute_requested);
+    assert (generic_chart.series_id == null);
+    assert (generic_chart.intent == "unsupported");
+    assert (generic_chart.response_mode == "none");
 
     var near_miss = AskTheModel.ChartIntent.parse (
         "/chart gistemp-ish Show the trend"
@@ -400,6 +403,30 @@ int main () {
     );
     assert (ambiguous_catalog_aliases.series_id == null);
     assert (ambiguous_catalog_aliases.intent == "ambiguous");
+
+    var explicit_population_conflict = AskTheModel.ChartIntent.parse (
+        "/chart gistemp Show population over time."
+    );
+    assert (explicit_population_conflict.series_id == null);
+    assert (explicit_population_conflict.intent == "ambiguous");
+
+    var explicit_cross_series_conflict = AskTheModel.ChartIntent.parse (
+        "/chart gistemp Compare global temperature with Energy Institute total energy supply."
+    );
+    assert (explicit_cross_series_conflict.series_id == null);
+    assert (explicit_cross_series_conflict.intent == "ambiguous");
+
+    var explicit_negation_conflict = AskTheModel.ChartIntent.parse (
+        "/chart gistemp Do not make a chart."
+    );
+    assert (explicit_negation_conflict.series_id == null);
+    assert (explicit_negation_conflict.intent == "ambiguous");
+
+    var unsupported_alias = AskTheModel.ChartIntent.parse (
+        "Generate a chart of population over time."
+    );
+    assert (unsupported_alias.intent == "unsupported");
+    assert (unsupported_alias.series_id == null);
 
     return 0;
 }
