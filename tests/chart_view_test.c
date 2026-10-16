@@ -87,13 +87,21 @@ static void screenshot (GtkWindow *window, const char *name)
     g_assert_true (gdk_texture_save_to_png (texture, path));
     g_free (path); g_object_unref (texture); gsk_render_node_unref (node); g_object_unref (paintable);
 }
-static AtmChartView *build_view (void)
+static AtmChartSpec *build_gistemp_spec (void)
 {
-    AtmChartSpec *spec = atm_chart_test_spec (ATM_CHART_LINE); AtmChartView *view = NULL;
-    g_assert_true (atm_chart_view_new (spec, &view, NULL)); atm_chart_spec_free (spec); return view;
+    return atm_chart_test_spec (ATM_CHART_LINE);
 }
 
-static AtmChartView *build_ei_view (void)
+static AtmChartView *build_view (void)
+{
+    AtmChartSpec *spec = build_gistemp_spec ();
+    AtmChartView *view = NULL;
+    g_assert_true (atm_chart_view_new (spec, &view, NULL));
+    atm_chart_spec_free (spec);
+    return view;
+}
+
+static AtmChartSpec *build_ei_spec (void)
 {
     const char *root = g_getenv ("ATM_CHART01_FIXTURE");
     const char *snapshot = "dc710d8e604c0fff713a3acfdb18ab47a1a902bb";
@@ -118,7 +126,6 @@ static AtmChartView *build_ei_view (void)
     AtmEnergyInstituteAdmission *admission = NULL;
     AtmEnergyInstituteVerifiedSeries *series = NULL;
     AtmChartSpec *spec = NULL;
-    AtmChartView *view = NULL;
     g_assert_true (atm_energy_institute_admission_new (
         "LaurentiuStaicu/empirical-world3-dynamics",
         snapshot, sources, &admission, &error));
@@ -133,14 +140,21 @@ static AtmChartView *build_ei_view (void)
     g_assert_no_error (error);
     atm_energy_institute_verified_series_free (series);
     atm_energy_institute_admission_free (admission);
+    return spec;
+}
+
+static AtmChartView *build_ei_view (void)
+{
+    AtmChartSpec *spec = build_ei_spec ();
+    AtmChartView *view = NULL;
+    GError *error = NULL;
     g_assert_true (atm_chart_view_new (spec, &view, &error));
     g_assert_no_error (error);
     atm_chart_spec_free (spec);
     return view;
 }
 
-static AtmChartView *
-build_bnr_view (void)
+static AtmChartSpec *build_bnr_spec (void)
 {
     const char *root = g_getenv ("ATM_BNR_BLS_FIXTURE");
     g_assert_nonnull (root);
@@ -167,7 +181,6 @@ build_bnr_view (void)
     AtmBnrBlsSeriesContract *contract = NULL;
     AtmBnrBlsVerifiedSeries *series = NULL;
     AtmChartSpec *spec = NULL;
-    AtmChartView *view = NULL;
     GError *error = NULL;
     g_assert_true (atm_bnr_bls_panel_new (
         ATM_BNR_BLS_UPSTREAM_REPOSITORY,
@@ -190,6 +203,14 @@ build_bnr_view (void)
     atm_bnr_bls_series_contract_free (contract);
     atm_bnr_bls_sra_free (sra);
     atm_bnr_bls_panel_free (panel);
+    return spec;
+}
+
+static AtmChartView *build_bnr_view (void)
+{
+    AtmChartSpec *spec = build_bnr_spec ();
+    AtmChartView *view = NULL;
+    GError *error = NULL;
     g_assert_true (atm_chart_view_new (spec, &view, &error));
     g_assert_no_error (error);
     atm_chart_spec_free (spec);
