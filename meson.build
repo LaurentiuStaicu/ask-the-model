@@ -3126,6 +3126,7 @@ test('chart-history-reconstruct', chart_history_reconstruct_test,
 pres09_chart_history_e2e_test = executable(
   'pres09-chart-history-e2e-test',
   ['src/conversation_store.c', 'src/chart_history_reconstruct.c',
+   'src/chart_spec_v4.c', 'src/chart_catalog.c',
    'src/chart_spec.c', 'src/verified_series.c',
    'src/gistemp_sra.c', 'src/gistemp_evidence.c',
    'src/gistemp_admission.c', 'src/annual_series_candidate.c',
