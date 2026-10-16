@@ -498,6 +498,19 @@ int main () {
     assert (explicit_population_conflict.series_id == null);
     assert (explicit_population_conflict.intent == "ambiguous");
 
+    var explicit_unrelated_alias_conflict = AskTheModel.ChartIntent.parse (
+        "/chart gistemp Show a chart of diabetes prevalence using GISTEMP."
+    );
+    assert (explicit_unrelated_alias_conflict.series_id == null);
+    assert (explicit_unrelated_alias_conflict.intent == "ambiguous");
+
+    var explicit_grounded_subject = AskTheModel.ChartIntent.parse (
+        "/chart gistemp Show a chart of global temperature anomalies over time."
+    );
+    assert (explicit_grounded_subject.series_id ==
+        "climate.gistemp.global-temperature-anomaly");
+
+
     var explicit_cross_series_conflict = AskTheModel.ChartIntent.parse (
         "/chart gistemp Compare global temperature with Energy Institute total energy supply."
     );
