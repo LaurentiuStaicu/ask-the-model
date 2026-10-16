@@ -740,7 +740,29 @@ namespace AskTheModel {
                 }
             }
 
-            if (subject == "" || subject == "historical" ||
+            /*
+             * A modifier clause can follow a command plus a determiner, e.g.
+             * "Show the trend for 1880-2025" or "Arată tendința pentru
+             * 1880-2025". The prefix before "trend/tendința" is not a
+             * chart subject in those cases. Let extract_modifier_subject()
+             * validate the actual tail: numeric ranges are allowed, while an
+             * unsupported topic such as "malaria" still fails closed there.
+             */
+            string[] empty_subject_residue = {
+                "", "the", "a", "an", "un", "o", "unui", "unei",
+                "show", "show me", "display", "plot", "generate", "create",
+                "make", "draw", "visualize", "visualise",
+                "arată", "arata", "arată-mi", "arata-mi",
+                "generează", "genereaza", "creează", "creeaza",
+                "desenează", "deseneaza", "afișează", "afiseaza",
+                "explică", "explica"
+            };
+            foreach (string residue in empty_subject_residue) {
+                if (subject == residue) {
+                    return null;
+                }
+            }
+            if (subject == "historical" ||
                 subject == "annual" || subject == "overall" ||
                 subject == "long-term" || subject == "yearly" ||
                 subject == "quarterly") {
