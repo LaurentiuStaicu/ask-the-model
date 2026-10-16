@@ -15,10 +15,11 @@ This layer must also address the observed sparse-record problem. A source row co
 1. **The catalog is an eligibility allowlist, not a data registry scraper.** Only explicitly reviewed entries whose deterministic adapters exist may be offered for charting. Numeric-looking columns, repository presence, a registry row, or a successful parse do not independently grant chart authority.
 2. **The adapter, not the LLM, constructs the series.** The adapter resolves the catalog entry to an exact repository identity and allowed snapshot policy, checks the complete required file bundle and digests, then re-derives Evidence/SRA/series semantics. Caller-provided identity strings are not proof.
 3. **The model proposes only a bounded intent.** It may select one registered `series_id`, request an allowed chart kind and distinguish chart-only from interpretation/data-extract requests. It cannot provide paths, repository identities, snapshot SHAs, numeric points, X/Y labels, units, dimensions, missing-value policy, axis domains, transformations or provenance claims.
-4. **Unknown and ambiguous requests fail closed.** An unregistered series does not silently fall through to a successful-looking generic chart or a pseudo-table. Multiple matching series require clarification. Unsupported kind/filter/transform requests are reported rather than silently ignored.
-5. **Missing is never zero.** No implicit imputation, interpolation, extrapolation, row synthesis, smoothing or gap-bridging. Each adapter declares how blank source cells, authorized missing observations and discontinuities are interpreted. A source profile that rejects missing observations must keep rejecting them.
-6. **Source identity and scientific meaning are separate from display.** Display conversions and labels never overwrite the canonical source decimal or enter SRA facts. Chart/Data, and the recipe retained by History, must preserve the qualified source identity and point-level provenance.
-7. **Primary-source claims are explicit.** User-facing provenance must distinguish publisher/original source material from the pinned processed file actually reconstructed by AtM. A primary-source link does not prove AtM independently reproduced the publisher's raw-to-processed pipeline. If a chart uses a processed snapshot, the wording and evidence card must say so.
+4. **Schema validation is not request grounding.** A syntactically valid proposal whose `series_id` is in the catalog proves only schema validity and catalog membership. It does not prove that the original user request is about that series or asks for a chart. The application must independently ground the selection in the original request using a reviewed deterministic command/alias match or a separately specified and qualified grounding gate. A model-proposed registered ID alone never authorizes rendering; a conflict, unsupported concept or unresolved ambiguity fails closed.
+5. **Unknown and ambiguous requests fail closed.** An unregistered series does not silently fall through to a successful-looking generic chart or a pseudo-table. Multiple matching series require clarification. Unsupported kind/filter/transform requests are reported rather than silently ignored.
+6. **Missing is never zero.** No implicit imputation, interpolation, extrapolation, row synthesis, smoothing or gap-bridging. Each adapter declares how blank source cells, authorized missing observations and discontinuities are interpreted. A source profile that rejects missing observations must keep rejecting them.
+7. **Source identity and scientific meaning are separate from display.** Display conversions and labels never overwrite the canonical source decimal or enter SRA facts. Chart/Data, and the recipe retained by History, must preserve the qualified source identity and point-level provenance.
+8. **Primary-source claims are explicit.** User-facing provenance must distinguish publisher/original source material from the pinned processed file actually reconstructed by AtM. A primary-source link does not prove AtM independently reproduced the publisher's raw-to-processed pipeline. If a chart uses a processed snapshot, the wording and evidence card must say so.
 
 ## 3. Eligible-series catalog contract
 
@@ -49,15 +50,16 @@ Catalog startup validation must reject duplicate IDs, ambiguous aliases without 
 
 An entry is selectable only when all stages pass:
 
-1. Catalog entry is present and internally consistent.
-2. The requested repository is in scope for this turn and its exact snapshot is admitted.
-3. The source adapter validates every required artifact and provenance/hash binding.
-4. The adapter constructs a qualified `AtmSeriesContract` (or a narrower typed qualified wrapper) from the finalized SRA/source facts and checks all X/Y semantics and point support.
-5. The resulting qualified series' profile, scope, units/dimensions, source identity and missing semantics match the catalog contract exactly.
-6. The new generic ChartSpec constructor validates that qualified result and the single allowed chart kind.
-7. The registered display profile can project the exact values within all limits.
-8. The native Chart/Data widget can render from the reconstructed spec; errors yield a clear unavailable status and never substitute model-authored values.
-9. If saved to History, the recipe records only identities/profile versions and pinned source provenance. Reopening must re-run stages 2–8 and compare reconstructed identities.
+1. The original user request unambiguously supports the requested chart and selected catalog series; a model-proposed ID alone is not evidence of grounding.
+2. Catalog entry is present and internally consistent.
+3. The requested repository is in scope for this turn and its exact snapshot is admitted.
+4. The source adapter validates every required artifact and provenance/hash binding.
+5. The adapter constructs a qualified `AtmSeriesContract` (or a narrower typed qualified wrapper) from the finalized SRA/source facts and checks all X/Y semantics and point support.
+6. The resulting qualified series' profile, scope, units/dimensions, source identity and missing semantics match the catalog contract exactly.
+7. The new generic ChartSpec constructor validates that qualified result and the single allowed chart kind.
+8. The registered display profile can project the exact values within all limits.
+9. The native Chart/Data widget can render from the reconstructed spec; errors yield a clear unavailable status and never substitute model-authored values.
+10. If saved to History, the recipe records only identities/profile versions and pinned source provenance. Reopening must re-run stages 3–9 and compare reconstructed identities.
 
 A failure at any stage prevents that chart from being displayed. Diagnostics should identify the failed eligibility stage without exposing internal identity strings as user-facing scientific claims.
 
@@ -86,9 +88,10 @@ Validation rules:
 - The only kind in the first generic slice is `line`. The catalog and validated application path must both authorize it.
 - `intent`, `response_mode` and `series_id` must be mutually consistent. An ambiguous/malformed/incompatible proposal cannot build a chart.
 - The parser rejects unknown keys, missing required keys, wrong types, invalid enum values and truncated/invalid JSON. It does not try to repair a malformed numeric/source payload because no such payload belongs in the schema.
-- After schema validation, application policy independently checks user request, repository scope, catalog membership, source qualification and chart-only versus interpretation/data-extract semantics.
-- If the model cannot satisfy the schema, an explicit slash command remains usable; an unrecognized natural-language request does not get an ungrounded chart fallback. The UI should say when no registered qualified series can be plotted.
-- English/Romanian aliases, explicit chart commands, source ambiguity, extra interpretation requests and explicit table/year/value requests require deterministic regression cases. Intent accuracy must be evaluated on a frozen request set, not claimed from one successful prompt.
+- After schema validation, application policy independently checks the original user request, series grounding, repository scope, catalog membership, source qualification and chart-only versus interpretation/data-extract semantics. Membership in the catalog does not prove relevance to the request.
+- A proposal that selects a registered series for a different or unsupported concept must be rejected before source reconstruction or widget creation. For example, an unsupported `population over time` request must not become a GISTEMP/EI/BNR chart just because the model returns one of their IDs.
+- If the model cannot satisfy the schema or its selection cannot be grounded, an explicit slash command remains usable; the natural-language request must fail closed or ask for clarification rather than falling back to any eligible series.
+- English/Romanian aliases, explicit chart commands, source ambiguity, extra interpretation requests, unregistered concepts with a valid-but-unrelated proposed ID, and explicit table/year/value requests require deterministic regression cases. Intent accuracy must be evaluated on a frozen request set, not claimed from one successful prompt.
 
 Structured generation is a parsing aid only. It does not replace source qualification or authorization checks. The raw model response is not scientific evidence and must not be persisted as chart data.
 
@@ -132,6 +135,8 @@ A primary-source URL cannot be represented as proof of a pipeline audit. If sour
 - Existing `/chart gistemp`, `/chart energy-institute` and `/chart bnr-bls-c01` remain backwards-compatible.
 - Natural-language intent recognizes a chart request independently from choosing its series; unknown or ambiguous series do not silently become a chart.
 - English and Romanian cases cover supported aliases, a single series, aliases shared by two candidates, requests for interpretation, explicit values/table requests, unsupported kinds and unsupported transformations.
+- False-positive tests send an unsupported concept (including `population over time`) with each valid catalog ID as the model proposal; every unrelated proposal must be rejected without constructing a chart.
+- A request mentioning a registered series without actually asking for a chart must not be converted to a chart-only response.
 - Invalid/truncated/non-JSON provider output, schema mismatch, unknown keys/IDs and unavailable structured-output support fail safely.
 - No model-provided coordinates, values, units, axes, paths or provenance can enter ChartSpec or Data.
 - Chart-only responses are deterministic and do not contain partial retrieval tables, escaped/internal serialized intent or duplicate chart-format output.
