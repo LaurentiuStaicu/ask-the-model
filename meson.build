@@ -2968,7 +2968,10 @@ chart_projection_test = executable(
   dependencies: [glib_dep, json_glib_dep],
   install: false
 )
+# The v4 catalog projection tests independently rebuild and validate three source profiles.
+# Keep the complete test (including all legacy cases) intact on slower Flatpak runners.
 test('chart-projection', chart_projection_test,
+  timeout: 90,
   env: {
     'ATM_CHART01_FIXTURE': meson.current_source_dir() / 'tests/fixtures/chart01',
     'ATM_BNR_BLS_FIXTURE': meson.current_source_dir() / 'tests/fixtures/chart01/rmd-bnr-bls'
@@ -3042,7 +3045,10 @@ chart_view_test = executable(
   c_args: ['-DATM_CHART_VIEW_TESTING'],
   install: false
 )
+# The v4 GTK adapter test reconstructs legacy and v4 views for each qualified profile.
+# Its aggregate source-admission/GTK lifecycle work exceeds Meson's default 30-second cap.
 test('chart-view', chart_view_test,
+  timeout: 90,
   env: {
     'GTK_A11Y': 'none', 'GTK_IM_MODULE': 'gtk-im-context-simple',
     'GSK_RENDERER': 'cairo',
