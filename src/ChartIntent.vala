@@ -188,6 +188,19 @@ namespace AskTheModel {
             return false;
         }
 
+        private static bool starts_with_any (
+            string text,
+            string[] terms
+        ) {
+            string trimmed = text.strip ();
+            foreach (string term in terms) {
+                if (trimmed.has_prefix (term)) {
+                    return true;
+                }
+            }
+            return false;
+        }
+
         /*
          * These guards run before alias selection. A recognized catalog alias
          * is only an entity match; negated, hypothetical, quoted-language and
@@ -248,7 +261,7 @@ namespace AskTheModel {
         }
 
         private static bool is_capability_only_chart_question (string normalized) {
-            return contains_any (normalized, {
+            return starts_with_any (normalized, {
                 "can you generate charts", "can you make charts",
                 "can you create charts", "do you support charts",
                 "do you support charting", "are you able to generate charts",
@@ -275,7 +288,7 @@ namespace AskTheModel {
         private static bool is_existing_chart_interpretation_question (
             string normalized
         ) {
-            return contains_any (normalized, {
+            return starts_with_any (normalized, {
                 "what does the chart show", "what does this chart show",
                 "what does that chart show", "what does the graph show",
                 "what does this graph show", "what is shown in the chart",
