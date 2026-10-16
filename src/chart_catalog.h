@@ -56,6 +56,7 @@ typedef enum {
 typedef struct {
     const char *series_id;
     const char *display_name;
+    const char *display_name_ro;
     const char *description;
     const char *const *aliases;
     gsize alias_count;
