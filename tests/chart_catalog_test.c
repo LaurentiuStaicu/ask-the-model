@@ -143,6 +143,9 @@ test_source_semantics_and_provenance (void)
     g_assert_nonnull (strstr (gistemp->pinned_artifact_description, "processed"));
 
     g_assert_cmpstr (ei->subject, ==, "global_total_energy_supply");
+    g_assert_cmpstr (ei->x_coordinate_semantics, ==, "calendar_year");
+    g_assert_cmpstr (ei->x_unit, ==, "calendar_year");
+    g_assert_cmpstr (ei->x_dimension, ==, "time");
     g_assert_cmpstr (ei->attribute, ==, "total_energy_supply");
     g_assert_cmpstr (ei->y_unit, ==, "exajoules/year");
     g_assert_cmpstr (ei->y_dimension, ==, "energy_flow_rate");
