@@ -250,31 +250,24 @@ namespace AskTheModel {
         private static bool is_capability_only_chart_question (string normalized) {
             return contains_any (normalized, {
                 "can you generate charts", "can you make charts",
-                "can you create charts", "can you generate a chart",
-                "can you make a chart", "can you create a chart",
-                "can you draw a chart", "can you plot a chart",
-                "could you generate a chart", "could you make a chart",
-                "could you create a chart", "could you draw a chart",
-                "do you support charts", "do you support charting",
-                "are you able to generate charts", "are you able to create charts",
-                "do you know how to make charts",
-                "does this app support charts", "does atm support charts",
-                "can this app generate charts", "can this app create a chart",
-                "does this app generate a chart", "does this app make charts",
+                "can you create charts", "do you support charts",
+                "do you support charting", "are you able to generate charts",
+                "are you able to create charts", "do you know how to make charts",
+                "does this app support charts", "does this app support creating charts",
+                "does this app support generating charts", "does atm support charts",
+                "does atm support charting", "does atm support creating gistemp charts",
+                "can this app generate charts", "does this app generate charts",
+                "what chart types do you support", "which chart types do you support",
+                "what kinds of charts can you generate",
                 "how can i generate a chart", "how do i make a chart",
                 "how to generate a chart", "how to create a chart",
                 "poți genera grafice", "poti genera grafice",
                 "poți crea grafice", "poti crea grafice",
-                "poți genera un grafic", "poti genera un grafic",
-                "poți crea un grafic", "poti crea un grafic",
                 "poți să generezi grafice", "poti sa generezi grafice",
-                "poți să generezi un grafic", "poti sa generezi un grafic",
-                "poți să creezi un grafic", "poti sa creezi un grafic",
-                "poți arăta un grafic", "poti arata un grafic",
                 "știi să faci grafice", "stii sa faci grafice",
-                "știi să faci un grafic", "stii sa faci un grafic",
                 "aplicația poate genera grafice", "aplicatia poate genera grafice",
-                "aplicația poate genera un grafic", "aplicatia poate genera un grafic"
+                "aplicația poate crea grafice", "aplicatia poate crea grafice",
+                "ce tipuri de grafice poți genera", "ce tipuri de grafice poti genera"
             });
         }
 
@@ -539,6 +532,8 @@ namespace AskTheModel {
             string prefix = normalized.substring (0, first_index).strip ();
             string[] request_prefixes = {
                 "please generate a ", "please create a ", "please make a ",
+                "can you generate a ", "can you create a ", "can you make a ",
+                "could you generate a ", "could you create a ", "could you make a ",
                 "generate a ", "generate an ", "generate ",
                 "create a ", "create an ", "create ",
                 "make a ", "make an ", "make ",
