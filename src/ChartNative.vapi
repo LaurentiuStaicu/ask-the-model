@@ -42,6 +42,12 @@ namespace AskTheModel.ChartNative {
         public unowned string? history_schema_version ();
     }
 
+    [CCode (cname = "atm_chart_catalog_match_request_series_id")]
+    public static string? match_catalog_request_series_id (
+        string request,
+        out bool ambiguous
+    );
+
     [CCode (cname = "atm_chart_live_reconstruct_v4")]
     public static bool reconstruct_live_v4 (
         string series_id,
