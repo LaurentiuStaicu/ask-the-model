@@ -698,13 +698,13 @@ namespace AskTheModel {
                 "generează ", "creeaza ", "creează ", "afiseaza ",
                 "afișează ", "vizualizeaza ", "vizualizează "
             };
-            gboolean changed = TRUE;
+            bool changed = true;
             while (changed) {
-                changed = FALSE;
+                changed = false;
                 foreach (string prefix in leading_commands) {
                     if (subject.has_prefix (prefix)) {
                         subject = subject.substring (prefix.length).strip ();
-                        changed = TRUE;
+                        changed = true;
                         break;
                     }
                 }
@@ -715,7 +715,7 @@ namespace AskTheModel {
                     subject = separator >= 0
                         ? subject.substring (separator + 1).strip ()
                         : "";
-                    changed = TRUE;
+                    changed = true;
                 }
             }
 
@@ -736,8 +736,8 @@ namespace AskTheModel {
                 return false;
             }
 
-            gboolean has_digit = false;
-            gboolean only_range_characters = true;
+            bool has_digit = false;
+            bool only_range_characters = true;
             for (int i = 0; i < normalized.length; i++) {
                 char character = normalized[i];
                 if (character >= '0' && character <= '9') {
