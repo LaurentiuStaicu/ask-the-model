@@ -8,6 +8,12 @@ namespace AskTheModel.ChartCatalog {
     [CCode (cname = "atm_chart_catalog_text_has_phrase")]
     public static bool text_has_phrase (string text, string phrase);
 
+    [CCode (cname = "atm_chart_catalog_match_exact_alias_series_id")]
+    public static string? match_exact_alias_series_id (
+        string subject,
+        out bool ambiguous
+    );
+
     [CCode (cname = "atm_chart_catalog_match_request_series_id")]
     public static string? match_request_series_id (
         string request,
