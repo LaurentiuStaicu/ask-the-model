@@ -296,6 +296,24 @@ alias_occurs_as_phrase (const char *request, const char *alias)
     return FALSE;
 }
 
+
+gboolean
+atm_chart_catalog_text_has_phrase (const char *text, const char *phrase)
+{
+    char *normalized_text = normalize_alias (text);
+    char *normalized_phrase = normalize_alias (phrase);
+    if (normalized_text == NULL || normalized_phrase == NULL) {
+        g_free (normalized_text);
+        g_free (normalized_phrase);
+        return FALSE;
+    }
+    gboolean matches = alias_occurs_as_phrase (
+        normalized_text, normalized_phrase);
+    g_free (normalized_text);
+    g_free (normalized_phrase);
+    return matches;
+}
+
 char *
 atm_chart_catalog_match_request_series_id (
     const char *request,
