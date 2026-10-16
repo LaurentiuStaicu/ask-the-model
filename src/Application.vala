@@ -3538,10 +3538,29 @@ namespace AskTheModel {
                     );
                 }
 
+                /*
+                 * History storage still contains its original source-specific
+                 * v1/v2/v3 recipe. After rebuilding and checking that recipe
+                 * against the exact pinned source, wrap the qualified source
+                 * spec in v4 only for the common Chart/Data presentation.
+                 */
+                string history_series_id = chart.chart_schema == "atm-chart-spec/3"
+                    ? "banking.bnr.bls-c01.credit-standards-net-percentage"
+                    : (chart.chart_schema == "atm-chart-spec/2"
+                        ? "energy.energy-institute.global-total-energy-supply"
+                        : "climate.gistemp.global-temperature-anomaly");
+                ChartNative.SpecV4 history_spec_v4;
+                if (!ChartNative.wrap_qualified_spec_v4 (
+                        history_series_id, spec, out history_spec_v4)) {
+                    throw new GLib.IOError.INVALID_DATA (
+                        "Qualified History source does not match the catalog-bound ChartSpec v4 presentation."
+                    );
+                }
+
                 ChartNative.View view;
-                if (!ChartNative.create (spec, out view)) {
+                if (!ChartNative.create_v4 (history_spec_v4, out view)) {
                     throw new GLib.IOError.FAILED (
-                        "Qualified chart could not be rendered."
+                        "Qualified History chart could not be rendered by the catalog-bound Chart/Data view."
                     );
                 }
 
