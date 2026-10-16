@@ -359,6 +359,24 @@ int main () {
     assert (negated_english.intent == "not_chart");
     assert (negated_english.response_mode == "none");
 
+    var negated_show_english = AskTheModel.ChartIntent.parse (
+        "Don't show me a GISTEMP chart."
+    );
+    assert (negated_show_english.series_id == null);
+    assert (negated_show_english.intent == "not_chart");
+
+    var negated_show_romanian = AskTheModel.ChartIntent.parse (
+        "Nu arăta un grafic GISTEMP."
+    );
+    assert (negated_show_romanian.series_id == null);
+    assert (negated_show_romanian.intent == "not_chart");
+
+    var negated_want_romanian = AskTheModel.ChartIntent.parse (
+        "Nu vreau să generezi un grafic GISTEMP."
+    );
+    assert (negated_want_romanian.series_id == null);
+    assert (negated_want_romanian.intent == "not_chart");
+
     var negated_explicit_request = AskTheModel.ChartIntent.parse (
         "I am not asking for a chart of GISTEMP."
     );
