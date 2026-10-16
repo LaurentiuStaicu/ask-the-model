@@ -8,6 +8,9 @@ namespace AskTheModel {
         public bool gistemp_requested { get; private set; }
         public bool energy_institute_requested { get; private set; }
         public bool bnr_bls_c01_requested { get; private set; }
+        public string? series_id { get; private set; }
+        public string intent { get; private set; }
+        public string response_mode { get; private set; }
         public string query { get; private set; }
 
         /*
@@ -138,13 +141,26 @@ namespace AskTheModel {
             bool gistemp_requested,
             bool energy_institute_requested,
             bool bnr_bls_c01_requested,
-            string query
+            string query,
+            string? parsed_intent = null
         ) {
             Object ();
             this.gistemp_requested = gistemp_requested;
             this.energy_institute_requested = energy_institute_requested;
             this.bnr_bls_c01_requested = bnr_bls_c01_requested;
             this.query = query;
+            this.series_id = gistemp_requested
+                ? "climate.gistemp.global-temperature-anomaly"
+                : (energy_institute_requested
+                    ? "energy.energy-institute.global-total-energy-supply"
+                    : (bnr_bls_c01_requested
+                        ? "banking.bnr.bls-c01.credit-standards-net-percentage"
+                        : null));
+            this.intent = parsed_intent ??
+                (this.series_id == null ? "not_chart" : "chart");
+            this.response_mode = this.series_id == null
+                ? "none"
+                : (is_chart_only_request () ? "chart_only" : "chart_and_text");
         }
 
         private static bool contains_any (
@@ -158,6 +174,64 @@ namespace AskTheModel {
             }
 
             return false;
+        }
+
+        /*
+         * These guards run before alias selection. A recognized catalog alias
+         * is only an entity match; negated, hypothetical, quoted-language and
+         * capability-only prompts are not chart authorization.
+         */
+        private static bool is_explicitly_negated_chart_request (string normalized) {
+            return contains_any (normalized, {
+                "do not make", "do not generate", "do not create", "do not draw",
+                "do not plot", "don't make", "don't generate", "don't create",
+                "don't draw", "don't plot", "dont make", "dont generate",
+                "dont create", "not asking for a chart", "not asking for chart",
+                "not a chart request", "no chart", "without a chart",
+                "without chart",
+                "nu genera", "nu crea", "nu creea", "nu desena",
+                "nu afisa", "nu afișa", "nu vizualiza", "nu vreau un grafic",
+                "nu vreau grafic", "nu-mi genera", "nu imi genera",
+                "nu face un grafic", "nu face grafic", "nu este o cerere de grafic",
+                "nu cer un grafic", "fara grafic", "fără grafic"
+            });
+        }
+
+        private static bool is_hypothetical_chart_request (string normalized) {
+            return contains_any (normalized, {
+                "what if", "hypothetically", "hypothetical", "suppose we",
+                "suppose i", "imagine if", "if i were to", "if we were to",
+                "if i wanted to", "if one wanted to",
+                "dacă aș genera", "daca as genera", "dacă aș cere",
+                "daca as cere", "presupunând că", "presupunand ca",
+                "ipotetic", "imaginează-ți dacă", "imagineaza-ti daca"
+            });
+        }
+
+        private static bool asks_about_quoted_instruction (string normalized) {
+            return contains_any (normalized, {
+                "the phrase", "this phrase", "that phrase", "the sentence",
+                "this sentence", "the wording", "quoted instruction",
+                "is the phrase", "does the sentence", "what does the phrase",
+                "expresia", "fraza", "propozitia", "propoziția",
+                "formularea", "citatul", "ce înseamnă expresia",
+                "ce inseamna expresia"
+            });
+        }
+
+        private static bool is_capability_only_chart_question (string normalized) {
+            return contains_any (normalized, {
+                "can you generate charts", "can you make charts",
+                "can you create charts", "do you support charts",
+                "do you support charting", "are you able to generate charts",
+                "are you able to create charts", "do you know how to make charts",
+                "can this app generate charts", "does this app support charts",
+                "poți genera grafice", "poti genera grafice",
+                "poți crea grafice", "poti crea grafice",
+                "poți să generezi grafice", "poti sa generezi grafice",
+                "știi să faci grafice", "stii sa faci grafice",
+                "aplicația poate genera grafice", "aplicatia poate genera grafice"
+            });
         }
 
         private static bool requests_comparison (string normalized) {
@@ -295,93 +369,77 @@ namespace AskTheModel {
                 return new ChartIntent (false, false, false, prompt);
             }
 
+            if (is_explicitly_negated_chart_request (normalized) ||
+                is_hypothetical_chart_request (normalized) ||
+                asks_about_quoted_instruction (normalized) ||
+                is_capability_only_chart_question (normalized)) {
+                return new ChartIntent (
+                    false, false, false, prompt, "not_chart"
+                );
+            }
+
             bool asks_for_chart = contains_any (
                 normalized,
                 {
-                    "grafic",
-                    "chart",
-                    "plot",
-                    "diagram"
+                    "grafic", "chart", "graph", "plot", "diagram"
                 }
             );
             bool requests_visualization = contains_any (
                 normalized,
                 {
-                    "arată",
-                    "arata",
-                    "generează",
-                    "genereaza",
-                    "creează",
-                    "creeaza",
-                    "desenează",
-                    "deseneaza",
-                    "afișează",
-                    "afiseaza",
-                    "vizualizează",
-                    "vizualizeaza",
-                    "show",
-                    "generate",
-                    "create",
-                    "draw",
-                    "make",
-                    "plot"
+                    "arată", "arata", "generează", "genereaza",
+                    "creează", "creeaza", "desenează", "deseneaza",
+                    "afișează", "afiseaza", "vizualizează", "vizualizeaza",
+                    "show", "generate", "create", "draw", "make", "plot",
+                    "visualize", "visualise", "visualize", "visualise"
                 }
             );
-            bool names_gistemp_series = contains_any (
-                normalized,
-                {
-                    "gistemp",
-                    "temperatura globala",
-                    "temperatura globală",
-                    "temperaturii globale",
-                    "global temperature"
-                }
-            );
-            bool names_energy_institute_series = contains_any (
-                normalized,
-                {
-                    "energy institute",
-                    "total energy supply",
-                    "global total energy supply",
-                    "physical energy content",
-                    "furnizarea totală de energie",
-                    "furnizarea totala de energie",
-                    "oferta totală de energie",
-                    "oferta totala de energie"
-                }
-            );
-
-            /*
-             * Do not infer the BNR C01 profile from a generic measure name.
-             * "Net percentage" also describes unrelated indicators; admit
-             * natural-language requests only when they identify C01 directly
-             * or name the credit-standards subject. The exact source/profile
-             * is still independently requalified before a chart is shown.
-             */
-            bool names_bnr_series_id = contains_any (
-                normalized,
-                {
-                    "bnr bls c01", "bnr-bls-c01", "bls c01"
-                }
-            );
-            bool names_credit_standards = contains_any (
-                normalized,
-                {
-                    "credit standards",
-                    "standarde de credit",
-                    "standardele de credit",
-                    "standardelor de credit"
-                }
-            );
-            bool names_bnr_bls_c01_series =
-                names_bnr_series_id || names_credit_standards;
 
             if (asks_for_chart && requests_visualization) {
-                if (names_bnr_bls_c01_series &&
-                    (requests_comparison (normalized) ||
-                     requests_additional_series (normalized) ||
-                     requests_derived_series (normalized))) {
-                    return new ChartIntent (false, false, false, prompt);
+                bool ambiguous = false;
+                string? selected_series_id =
+                    ChartCatalog.match_request_series_id (prompt, out ambiguous);
+
+                if (ambiguous) {
+                    return new ChartIntent (
+                        false, false, false, prompt, "ambiguous"
+                    );
+                }
+
+                if (selected_series_id == null) {
+                    return new ChartIntent (
+                        false, false, false, prompt, "not_chart"
+                    );
+                }
+
+                /*
+                 * The first generic slice supports one native line series only.
+                 * Reject comparison/multiseries/derived requests before routing,
+                 * even when exactly one registered alias appears in the text.
+                 */
+                if (requests_comparison (normalized) ||
+                    requests_additional_series (normalized) ||
+                    requests_derived_series (normalized)) {
+                    return new ChartIntent (
+                        false, false, false, prompt, "ambiguous"
+                    );
+                }
+
+                if (selected_series_id ==
+                    "climate.gistemp.global-temperature-anomaly") {
+                    return new ChartIntent (true, false, false, prompt);
+                }
+                if (selected_series_id ==
+                    "energy.energy-institute.global-total-energy-supply") {
+                    return new ChartIntent (false, true, false, prompt);
+                }
+                if (selected_series_id ==
+                    "banking.bnr.bls-c01.credit-standards-net-percentage") {
+                    return new ChartIntent (false, false, true, prompt);
+                }
+            }
+
+            return new ChartIntent (false, false, false, prompt);
                 }
                 uint named_sources = (names_gistemp_series ? 1u : 0u) +
                     (names_energy_institute_series ? 1u : 0u) +
