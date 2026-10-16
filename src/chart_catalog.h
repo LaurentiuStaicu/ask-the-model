@@ -141,6 +141,13 @@ char *atm_chart_catalog_match_request_series_id (
     gboolean *out_ambiguous
 );
 
+
+/* Match a selected conversation repository ID to the catalog-owned repository binding. */
+gboolean atm_chart_catalog_repository_matches_series (
+    const char *series_id,
+    const char *repository_id
+);
+
 /* Exact 40-hex snapshot check against this entry's closed allowlist. */
 gboolean atm_chart_catalog_snapshot_admitted (
     const AtmChartCatalogEntry *entry,
