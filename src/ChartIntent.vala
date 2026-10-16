@@ -250,15 +250,54 @@ namespace AskTheModel {
         private static bool is_capability_only_chart_question (string normalized) {
             return contains_any (normalized, {
                 "can you generate charts", "can you make charts",
-                "can you create charts", "do you support charts",
-                "do you support charting", "are you able to generate charts",
-                "are you able to create charts", "do you know how to make charts",
-                "can this app generate charts", "does this app support charts",
+                "can you create charts", "can you generate a chart",
+                "can you make a chart", "can you create a chart",
+                "can you draw a chart", "can you plot a chart",
+                "could you generate a chart", "could you make a chart",
+                "could you create a chart", "could you draw a chart",
+                "do you support charts", "do you support charting",
+                "are you able to generate charts", "are you able to create charts",
+                "do you know how to make charts",
+                "does this app support charts", "does atm support charts",
+                "can this app generate charts", "can this app create a chart",
+                "does this app generate a chart", "does this app make charts",
+                "how can i generate a chart", "how do i make a chart",
+                "how to generate a chart", "how to create a chart",
                 "poți genera grafice", "poti genera grafice",
                 "poți crea grafice", "poti crea grafice",
+                "poți genera un grafic", "poti genera un grafic",
+                "poți crea un grafic", "poti crea un grafic",
                 "poți să generezi grafice", "poti sa generezi grafice",
+                "poți să generezi un grafic", "poti sa generezi un grafic",
+                "poți să creezi un grafic", "poti sa creezi un grafic",
+                "poți arăta un grafic", "poti arata un grafic",
                 "știi să faci grafice", "stii sa faci grafice",
-                "aplicația poate genera grafice", "aplicatia poate genera grafice"
+                "știi să faci un grafic", "stii sa faci un grafic",
+                "aplicația poate genera grafice", "aplicatia poate genera grafice",
+                "aplicația poate genera un grafic", "aplicatia poate genera un grafic"
+            });
+        }
+
+        private static bool is_existing_chart_interpretation_question (
+            string normalized
+        ) {
+            return contains_any (normalized, {
+                "what does the chart show", "what does this chart show",
+                "what does that chart show", "what does the graph show",
+                "what does this graph show", "what is shown in the chart",
+                "what is shown by the chart", "what does the chart tell us",
+                "what can we learn from the chart", "tell me what the chart shows",
+                "what does the gistemp chart show",
+                "what does the energy institute chart show",
+                "what does the bnr bls c01 chart show",
+                "what does the chart mean", "what does this chart mean",
+                "ce arată graficul", "ce arata graficul",
+                "ce ne arată graficul", "ce ne arata graficul",
+                "ce arată graficul gistemp", "ce arata graficul gistemp",
+                "ce înseamnă graficul", "ce inseamna graficul",
+                "ce ne spune graficul", "ce ne spune graficul gistemp",
+                "cum interpretez graficul", "cum interpretăm graficul",
+                "cum interpretam graficul"
             });
         }
 
@@ -695,7 +734,8 @@ namespace AskTheModel {
             if (is_explicitly_negated_chart_request (normalized) ||
                 is_hypothetical_chart_request (normalized) ||
                 asks_about_quoted_instruction (normalized) ||
-                is_capability_only_chart_question (normalized)) {
+                is_capability_only_chart_question (normalized) ||
+                is_existing_chart_interpretation_question (normalized)) {
                 return new ChartIntent (
                     false, false, false, prompt, "not_chart"
                 );
