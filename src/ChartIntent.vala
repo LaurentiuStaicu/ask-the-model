@@ -445,6 +445,14 @@ namespace AskTheModel {
                 }
             }
 
+            subject = subject
+                .replace (".", "")
+                .replace (",", "")
+                .replace ("?", "")
+                .replace ("!", "")
+                .replace (":", "")
+                .strip ();
+
             /* Drop a parenthesized acronym only when it is the terminal suffix. */
             int parenthesis = subject.index_of (" (");
             if (parenthesis >= 0 && subject.has_suffix (")")) {
