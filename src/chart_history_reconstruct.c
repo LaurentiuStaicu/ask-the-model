@@ -971,6 +971,13 @@ atm_chart_live_reconstruct_v4 (
         return reject (error,
             "Selected repository snapshot is not admitted for the catalog-bound series.");
 
+    /*
+     * Public callers may identify a pinned repo by its stable local key or
+     * full name. Source ChartSpec identities use the canonical catalog key,
+     * so normalize only after verifying that the caller's repository matches
+     * this exact catalog entry.
+     */
+    const char *canonical_repository_id = entry->repository_key;
     AtmChartSpec *source_spec = NULL;
     gboolean reconstructed = FALSE;
 
@@ -980,19 +987,19 @@ atm_chart_live_reconstruct_v4 (
             return reject (error,
                 "GISTEMP reconstruction requires the selected repository version.");
         reconstructed = atm_chart_live_reconstruct_gistemp (
-            snapshot_path, repository_id, repository_version,
+            snapshot_path, canonical_repository_id, repository_version,
             snapshot_sha, &source_spec, error);
         break;
 
     case ATM_CHART_CATALOG_ADAPTER_ENERGY_INSTITUTE_V2:
         reconstructed = atm_chart_live_reconstruct_energy_institute (
-            snapshot_path, repository_id, snapshot_sha, "line",
+            snapshot_path, canonical_repository_id, snapshot_sha, "line",
             &source_spec, error);
         break;
 
     case ATM_CHART_CATALOG_ADAPTER_BNR_BLS_C01_V3:
         reconstructed = atm_chart_live_reconstruct_bnr_bls_c01 (
-            snapshot_path, repository_id, snapshot_sha, "line",
+            snapshot_path, canonical_repository_id, snapshot_sha, "line",
             &source_spec, error);
         break;
 
