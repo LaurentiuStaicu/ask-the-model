@@ -870,6 +870,22 @@ int main () {
         "energy.energy-institute.global-total-energy-supply");
     assert (positive_ei_after_capability_comma.intent == "chart");
 
+    var positive_ei_after_capability_and =
+        AskTheModel.ChartIntent.parse (
+            "Does this app support charts and generate a chart of total energy supply."
+        );
+    assert (positive_ei_after_capability_and.series_id ==
+        "energy.energy-institute.global-total-energy-supply");
+    assert (positive_ei_after_capability_and.intent == "chart");
+
+    var positive_ei_after_capability_romanian_and =
+        AskTheModel.ChartIntent.parse (
+            "Aplicația poate genera grafice și generează un grafic privind furnizarea totală de energie."
+        );
+    assert (positive_ei_after_capability_romanian_and.series_id ==
+        "energy.energy-institute.global-total-energy-supply");
+    assert (positive_ei_after_capability_romanian_and.intent == "chart");
+
     var positive_ei_after_quoted_example_comma =
         AskTheModel.ChartIntent.parse (
             "The phrase 'Generate a GISTEMP chart' is an example, generate a chart of total energy supply."
@@ -877,6 +893,14 @@ int main () {
     assert (positive_ei_after_quoted_example_comma.series_id ==
         "energy.energy-institute.global-total-energy-supply");
     assert (positive_ei_after_quoted_example_comma.intent == "chart");
+
+    var positive_ei_after_quoted_example_and =
+        AskTheModel.ChartIntent.parse (
+            "The phrase 'Generate a GISTEMP chart' is an example and generate a chart of total energy supply."
+        );
+    assert (positive_ei_after_quoted_example_and.series_id ==
+        "energy.energy-institute.global-total-energy-supply");
+    assert (positive_ei_after_quoted_example_and.intent == "chart");
 
     var positive_ei_after_romanian_quoted_example_comma =
         AskTheModel.ChartIntent.parse (
