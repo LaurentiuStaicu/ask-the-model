@@ -648,6 +648,18 @@ int main () {
     assert (gistemp_full_range_between.series_id ==
         "climate.gistemp.global-temperature-anomaly");
 
+    var gistemp_full_range_between_upper = AskTheModel.ChartIntent.parse (
+        "/chart gistemp Show trend BETWEEN 1880 AND 2025."
+    );
+    assert (gistemp_full_range_between_upper.series_id ==
+        "climate.gistemp.global-temperature-anomaly");
+
+    var gistemp_partial_range_upper = AskTheModel.ChartIntent.parse (
+        "/chart gistemp Show trend FROM 1880 TO 2020."
+    );
+    assert (gistemp_partial_range_upper.series_id == null);
+    assert (gistemp_partial_range_upper.intent == "unsupported_period");
+
     var ei_full_range_from_through = AskTheModel.ChartIntent.parse (
         "/chart energy-institute Show trend from 1965 through 2025."
     );
