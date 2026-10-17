@@ -829,5 +829,60 @@ int main () {
     assert (bnr_subject_filter.series_id == null);
     assert (bnr_subject_filter.intent == "ambiguous");
 
+    /* Negation/capability guards are clause-scoped, not whole-message vetoes. */
+    var positive_ei_after_negated_gistemp =
+        AskTheModel.ChartIntent.parse (
+            "Don't show me a GISTEMP chart. Generate a chart of Energy Institute total energy supply."
+        );
+    assert (positive_ei_after_negated_gistemp.series_id ==
+        "energy.energy-institute.global-total-energy-supply");
+    assert (positive_ei_after_negated_gistemp.intent == "chart");
+
+    var positive_ei_after_negated_gistemp_romanian =
+        AskTheModel.ChartIntent.parse (
+            "Nu arăta un grafic GISTEMP; generează un grafic Energy Institute pentru furnizarea totală de energie."
+        );
+    assert (positive_ei_after_negated_gistemp_romanian.series_id ==
+        "energy.energy-institute.global-total-energy-supply");
+    assert (positive_ei_after_negated_gistemp_romanian.intent == "chart");
+
+    var positive_bnr_after_interpretation_question =
+        AskTheModel.ChartIntent.parse (
+            "What does the GISTEMP chart show? Generate a chart of BNR credit standards."
+        );
+    assert (positive_bnr_after_interpretation_question.series_id ==
+        "banking.bnr.bls-c01.credit-standards-net-percentage");
+    assert (positive_bnr_after_interpretation_question.intent == "chart");
+
+    var positive_gistemp_after_capability_question =
+        AskTheModel.ChartIntent.parse (
+            "Does this app support charts? Generate a chart of global temperature anomalies."
+        );
+    assert (positive_gistemp_after_capability_question.series_id ==
+        "climate.gistemp.global-temperature-anomaly");
+    assert (positive_gistemp_after_capability_question.intent == "chart");
+
+    var postposed_same_series_negation =
+        AskTheModel.ChartIntent.parse (
+            "Generate a GISTEMP chart. Don't show it."
+        );
+    assert (postposed_same_series_negation.series_id == null);
+    assert (postposed_same_series_negation.intent == "ambiguous");
+
+    var negation_of_other_series_does_not_cancel_positive =
+        AskTheModel.ChartIntent.parse (
+            "Generate a GISTEMP chart. Don't show me an Energy Institute chart."
+        );
+    assert (negation_of_other_series_does_not_cancel_positive.series_id ==
+        "climate.gistemp.global-temperature-anomaly");
+    assert (negation_of_other_series_does_not_cancel_positive.intent == "chart");
+
+    var two_positive_chart_clauses =
+        AskTheModel.ChartIntent.parse (
+            "Generate a GISTEMP chart. Generate an Energy Institute chart."
+        );
+    assert (two_positive_chart_clauses.series_id == null);
+    assert (two_positive_chart_clauses.intent == "ambiguous");
+
     return 0;
 }
