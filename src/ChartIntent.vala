@@ -293,10 +293,9 @@ namespace AskTheModel {
                 normalized,
                 {
                     "compare", "comparing", "comparison", "versus", " vs ", "vs.",
-                    "against", "relative to", "in relation to",
+                    "against",
                     "compară", "compara", "comparând", "comparand",
-                    "în comparație", "in comparatie", "în raport cu",
-                    "in raport cu", "față de", "fata de"
+                    "în comparație", "in comparatie"
                 }
             );
         }
@@ -335,6 +334,27 @@ namespace AskTheModel {
              * selector must not be silently ignored. Do not treat a reference
              * baseline such as 1951-1980 by itself as a filter.
              */
+            bool has_dashed_year_range = Regex.match_simple (
+                "\\b(19|20)[0-9]{2}[-–—](19|20)[0-9]{2}\\b",
+                normalized,
+                (RegexCompileFlags) 0,
+                (RegexMatchFlags) 0
+            );
+            if (has_dashed_year_range) {
+                bool is_gistemp_reference_period =
+                    (normalized.contains ("1951-1980") ||
+                     normalized.contains ("1951–1980") ||
+                     normalized.contains ("1951—1980")) &&
+                    contains_bounded_any (normalized, {
+                        "baseline", "reference period", "reference mean",
+                        "reference baseline", "periodo de referinta",
+                        "perioada de referință", "perioada de referinta"
+                    });
+                if (!is_gistemp_reference_period) {
+                    return true;
+                }
+            }
+
             string[] patterns = {
                 "\\b(from|since|after|before)\\s+(19|20)[0-9]{2}\\b",
                 "\\bbetween\\s+(19|20)[0-9]{2}\\s+(and|to|through|until)\\s+(19|20)[0-9]{2}\\b",
