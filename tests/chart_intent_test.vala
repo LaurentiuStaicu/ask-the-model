@@ -862,6 +862,30 @@ int main () {
         "climate.gistemp.global-temperature-anomaly");
     assert (positive_gistemp_after_capability_question.intent == "chart");
 
+    var positive_ei_after_capability_comma =
+        AskTheModel.ChartIntent.parse (
+            "Does this app support charts, generate a chart of total energy supply."
+        );
+    assert (positive_ei_after_capability_comma.series_id ==
+        "energy.energy-institute.global-total-energy-supply");
+    assert (positive_ei_after_capability_comma.intent == "chart");
+
+    var positive_ei_after_quoted_example_comma =
+        AskTheModel.ChartIntent.parse (
+            "The phrase 'Generate a GISTEMP chart' is an example, generate a chart of total energy supply."
+        );
+    assert (positive_ei_after_quoted_example_comma.series_id ==
+        "energy.energy-institute.global-total-energy-supply");
+    assert (positive_ei_after_quoted_example_comma.intent == "chart");
+
+    var positive_ei_after_romanian_quoted_example_comma =
+        AskTheModel.ChartIntent.parse (
+            "Fraza „Nu arăta un grafic GISTEMP” era doar un exemplu, generează un grafic privind furnizarea totală de energie."
+        );
+    assert (positive_ei_after_romanian_quoted_example_comma.series_id ==
+        "energy.energy-institute.global-total-energy-supply");
+    assert (positive_ei_after_romanian_quoted_example_comma.intent == "chart");
+
     var postposed_same_series_negation =
         AskTheModel.ChartIntent.parse (
             "Generate a GISTEMP chart. Don't show it."
