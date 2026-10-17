@@ -1,4 +1,5 @@
 #include "chart_history_reconstruct.h"
+#include "chart_spec_v4.h"
 #include "verified_series.h"
 #include "energy_institute_admission.h"
 #include "energy_institute_verified_series.h"
@@ -718,6 +719,113 @@ test_bnr_c01_history_reconstructs_pinned_snapshot (void)
     g_free (snapshot);
 }
 
+
+static void
+test_live_reconstruct_v4_catalog_dispatch (void)
+{
+    static const char *gistemp_id =
+        "climate.gistemp.global-temperature-anomaly";
+    static const char *energy_id =
+        "energy.energy-institute.global-total-energy-supply";
+    static const char *bnr_id =
+        "banking.bnr.bls-c01.credit-standards-net-percentage";
+    static const char *ewd_initial =
+        "d9e249339663015f6d1c05752338a955bf64ad0b";
+    static const char *rmd_snapshot =
+        "e43eb4e899f123d3b1aa0f6e20b7c8ed35434170";
+
+    char *ewd = fixture_snapshot_named ("ewd");
+    GError *error = NULL;
+    AtmChartSpecV4 *v4 = NULL;
+
+    g_assert_true (atm_chart_live_reconstruct_v4 (
+        gistemp_id, ewd, "LaurentiuStaicu/empirical-world3-dynamics", "2026-08-31", ewd_initial, &v4, &error));
+    g_assert_no_error (error);
+    g_assert_nonnull (v4);
+    g_assert_cmpstr (atm_chart_spec_v4_series_id (v4), ==, gistemp_id);
+    g_assert_cmpstr (atm_chart_spec_v4_schema (v4), ==, ATM_CHART_SPEC_V4_SCHEMA);
+    g_assert_cmpuint (atm_chart_spec_v4_coordinate_count (v4), ==, 146u);
+    g_assert_cmpuint (atm_chart_spec_v4_numeric_observation_count (v4), ==, 146u);
+    g_assert_cmpstr (atm_chart_spec_schema (
+        atm_chart_spec_v4_source_spec (v4)), ==, ATM_CHART_SPEC_SCHEMA);
+    g_assert_cmpstr (atm_chart_spec_series_snapshot_sha (
+        atm_chart_spec_v4_source_spec (v4), 0), ==, ewd_initial);
+    g_assert_cmpstr (atm_chart_spec_series_repository_id (
+        atm_chart_spec_v4_source_spec (v4), 0), ==, "ewd");
+    atm_chart_spec_v4_free (v4);
+    v4 = NULL;
+
+    g_assert_true (atm_chart_live_reconstruct_v4 (
+        energy_id, ewd, "LaurentiuStaicu/empirical-world3-dynamics", NULL, ewd_initial, &v4, &error));
+    g_assert_no_error (error);
+    g_assert_nonnull (v4);
+    g_assert_cmpstr (atm_chart_spec_v4_series_id (v4), ==, energy_id);
+    g_assert_cmpuint (atm_chart_spec_v4_coordinate_count (v4), ==, 61u);
+    g_assert_cmpuint (atm_chart_spec_v4_numeric_observation_count (v4), ==, 61u);
+    g_assert_cmpstr (atm_chart_spec_schema (
+        atm_chart_spec_v4_source_spec (v4)), ==, ATM_CHART_SPEC_V2_SCHEMA);
+    atm_chart_spec_v4_free (v4);
+    v4 = NULL;
+    g_free (ewd);
+
+    char *bnr = make_bnr_history_snapshot ();
+    g_assert_true (atm_chart_live_reconstruct_v4 (
+        bnr_id, bnr, "LaurentiuStaicu/romanian-monetary-dynamics", NULL, rmd_snapshot, &v4, &error));
+    g_assert_no_error (error);
+    g_assert_nonnull (v4);
+    g_assert_cmpstr (atm_chart_spec_v4_series_id (v4), ==, bnr_id);
+    g_assert_cmpuint (atm_chart_spec_v4_coordinate_count (v4), ==, 12u);
+    g_assert_cmpuint (atm_chart_spec_v4_numeric_observation_count (v4), ==, 11u);
+    g_assert_cmpstr (atm_chart_spec_series_repository_id (
+        atm_chart_spec_v4_source_spec (v4), 0), ==, "rmd");
+    g_assert_cmpstr (atm_chart_spec_v4_missing_coordinate (v4), ==, "2025-Q2");
+    g_assert_cmpstr (atm_chart_spec_v4_missing_reason (v4), ==,
+                     ATM_BNR_BLS_MISSING_REASON);
+    g_assert_cmpstr (atm_chart_spec_schema (
+        atm_chart_spec_v4_source_spec (v4)), ==, ATM_CHART_SPEC_V3_SCHEMA);
+    AtmChartPointView missing = {0};
+    g_assert_true (atm_chart_spec_point (
+        atm_chart_spec_v4_source_spec (v4), 0u, 10u, &missing));
+    g_assert_cmpint (missing.y_status, ==, ATM_CHART_POINT_MISSING);
+    g_assert_null (missing.source_decimal);
+    atm_chart_spec_v4_free (v4);
+    v4 = NULL;
+    remove_bnr_history_snapshot (bnr);
+    g_free (bnr);
+    ewd = fixture_snapshot_named ("ewd");
+
+    /* A model-proposed/unknown selector is never allowed to pick a fallback. */
+    g_assert_false (atm_chart_live_reconstruct_v4 (
+        "population", ewd, "ewd", "2026-08-31", ewd_initial, &v4, &error));
+    g_assert_error (error, ATM_SRA_ERROR, ATM_SRA_ERROR_IDENTITY);
+    g_assert_null (v4);
+    g_clear_error (&error);
+
+    /* A registered ID cannot override the conversation's different repository. */
+    g_assert_false (atm_chart_live_reconstruct_v4 (
+        gistemp_id, ewd, "rmd", "2026-08-31", ewd_initial, &v4, &error));
+    g_assert_error (error, ATM_SRA_ERROR, ATM_SRA_ERROR_IDENTITY);
+    g_assert_null (v4);
+    g_clear_error (&error);
+
+    /* A valid series ID cannot authorize a snapshot outside its catalog allowlist. */
+    g_assert_false (atm_chart_live_reconstruct_v4 (
+        bnr_id, ewd, "ewd", NULL, ewd_initial, &v4, &error));
+    g_assert_error (error, ATM_SRA_ERROR, ATM_SRA_ERROR_IDENTITY);
+    g_assert_null (v4);
+    g_clear_error (&error);
+    g_free (ewd);
+
+    /* GISTEMP requires its repository-version source identity as well. */
+    ewd = fixture_snapshot_named ("ewd");
+    g_assert_false (atm_chart_live_reconstruct_v4 (
+        gistemp_id, ewd, "ewd", NULL, ewd_initial, &v4, &error));
+    g_assert_error (error, ATM_SRA_ERROR, ATM_SRA_ERROR_IDENTITY);
+    g_assert_null (v4);
+    g_clear_error (&error);
+    g_free (ewd);
+}
+
 int
 main (int argc, char **argv)
 {
@@ -741,6 +849,11 @@ main (int argc, char **argv)
     g_test_add_func (
         "/chart/history-reconstruct/bnr-c01-pinned-snapshot",
         test_bnr_c01_history_reconstructs_pinned_snapshot
+    );
+
+    g_test_add_func (
+        "/chart/history-reconstruct/v4-catalog-dispatch",
+        test_live_reconstruct_v4_catalog_dispatch
     );
     return g_test_run ();
 }

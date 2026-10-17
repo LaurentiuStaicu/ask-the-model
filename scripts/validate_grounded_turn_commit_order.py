@@ -65,24 +65,81 @@ def main() -> int:
         "grounded preparation",
     )
 
-    qualification_gate = marker(
-        send,
-        "qualify_live_gistemp_request (state.session);",
-        "GISTEMP pre-model qualification",
-    )
     preparation_gate = marker(
         send,
         "state.session.prepare_turn (",
         "grounded preparation",
     )
-    require(
-        qualification_gate < preparation_gate,
-        "GISTEMP source qualification must finish before grounded turn preparation and any model call",
-    )
-    marker(
+
+    # Application performs one catalog-selected native qualification before
+    # grounded preparation. The native factory, not a duplicate Vala switch,
+    # owns the closed source-adapter dispatch.
+    qualification = marker(
         send,
-        'if (chart_intent.gistemp_requested &&\n                    !repository_id_in (state.repository_ids, "ewd")',
-        "GISTEMP repository-scope fail-closed gate",
+        "qualify_live_chart_request (",
+        "catalog-selected native source qualification",
+    )
+    require(
+        qualification < preparation_gate,
+        "catalog-selected source qualification must finish before grounded preparation and any model call",
+    )
+
+    native_chart = (
+        ROOT / "src" / "chart_history_reconstruct.c"
+    ).read_text(encoding="utf-8")
+    factory_start = marker(
+        native_chart,
+        "atm_chart_live_reconstruct_v4 (",
+        "native catalog-selected ChartSpec v4 factory",
+    )
+    factory_end = native_chart.find(
+        "\ngboolean\natm_chart_wrap_qualified_spec_v4 (",
+        factory_start + 1,
+    )
+    require(factory_end >= 0, "native v4 factory boundary missing")
+    factory = native_chart[factory_start:factory_end]
+
+    closed_adapters = (
+        (
+            "ATM_CHART_CATALOG_ADAPTER_GISTEMP_V1",
+            "atm_chart_live_reconstruct_gistemp (",
+        ),
+        (
+            "ATM_CHART_CATALOG_ADAPTER_ENERGY_INSTITUTE_V2",
+            "atm_chart_live_reconstruct_energy_institute (",
+        ),
+        (
+            "ATM_CHART_CATALOG_ADAPTER_BNR_BLS_C01_V3",
+            "atm_chart_live_reconstruct_bnr_bls_c01 (",
+        ),
+    )
+    for selector, adapter_call in closed_adapters:
+        selector_pos = marker(factory, selector, "native closed adapter dispatch")
+        call_pos = marker(factory, adapter_call, "native qualified source adapter")
+        spec_pos = marker(factory, "atm_chart_spec_v4_new (", "v4 source qualification")
+        require(
+            selector_pos < call_pos < spec_pos,
+            f"{selector} must select its qualified source adapter before constructing v4",
+        )
+
+    scope_gate = marker(
+        send,
+        "bool selected_repository_in_scope = false;",
+        "catalog-bound repository-scope gate",
+    )
+    scope_match = marker(
+        send,
+        "ChartNative.catalog_repository_matches_series (",
+        "catalog-bound repository-scope match",
+    )
+    scope_refusal = marker(
+        send,
+        "The repository bound to this qualified chart series is not included",
+        "catalog-bound repository-scope refusal",
+    )
+    require(
+        scope_gate < scope_match < scope_refusal < preparation_gate,
+        "catalog repository authorization must fail closed before grounded preparation or any model call",
     )
 
     required = [

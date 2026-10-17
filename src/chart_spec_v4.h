@@ -72,4 +72,9 @@ guint atm_chart_spec_v4_numeric_observation_count (const AtmChartSpecV4 *spec);
 const char *atm_chart_spec_v4_missing_coordinate (const AtmChartSpecV4 *spec);
 const char *atm_chart_spec_v4_missing_reason (const AtmChartSpecV4 *spec);
 
+
+const char *atm_chart_spec_v4_admission_profile_id (const AtmChartSpecV4 *spec);
+const char *atm_chart_spec_v4_reconstruction_profile_id (const AtmChartSpecV4 *spec);
+const char *atm_chart_spec_v4_history_schema_version (const AtmChartSpecV4 *spec);
+
 G_END_DECLS

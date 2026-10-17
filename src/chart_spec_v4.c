@@ -357,6 +357,7 @@ build_id (const AtmChartCatalogEntry *entry,
     add_text (builder, "catalog_version", ATM_CHART_CATALOG_VERSION);
     add_text (builder, "series_id", entry->series_id);
     add_text (builder, "display_name", entry->display_name);
+    add_text (builder, "description", entry->description);
     add_text (builder, "adapter_id", entry->adapter_id);
     add_text (builder, "catalog_series_profile_id", entry->series_profile_id);
     add_text (builder, "catalog_series_profile_version", entry->series_profile_version);
@@ -566,4 +567,22 @@ const char *
 atm_chart_spec_v4_missing_reason (const AtmChartSpecV4 *spec)
 {
     return spec != NULL ? spec->entry->missing_reason : NULL;
+}
+
+const char *
+atm_chart_spec_v4_admission_profile_id (const AtmChartSpecV4 *spec)
+{
+    return spec != NULL ? spec->entry->admission_profile_id : NULL;
+}
+
+const char *
+atm_chart_spec_v4_reconstruction_profile_id (const AtmChartSpecV4 *spec)
+{
+    return spec != NULL ? spec->entry->reconstruction_profile_id : NULL;
+}
+
+const char *
+atm_chart_spec_v4_history_schema_version (const AtmChartSpecV4 *spec)
+{
+    return spec != NULL ? spec->entry->history_schema_version : NULL;
 }

@@ -47,6 +47,7 @@ executable(
     'src/PresentationNative.vapi',
     'src/PresentationRenderer.vala',
     'src/ChartNative.vapi',
+    'src/ChartCatalog.vapi',
     'src/ChartIntent.vala',
     'src/chart_catalog.c',
     'src/chart_view.c',
@@ -205,6 +206,7 @@ pres09_application_sources = [
     'src/PresentationNative.vapi',
     'src/PresentationRenderer.vala',
     'src/ChartNative.vapi',
+    'src/ChartCatalog.vapi',
     'src/ChartIntent.vala',
     'src/chart_catalog.c',
     'src/chart_view.c',
@@ -880,9 +882,12 @@ test(
 chart_intent_test = executable(
   'chart-intent-test',
   [
+    'src/ChartCatalog.vapi',
     'src/ChartIntent.vala',
+    'src/chart_catalog.c',
     'tests/chart_intent_test.vala'
   ],
+  include_directories: include_directories('src'),
   dependencies: [glib_dep, dependency('gobject-2.0')],
   install: false
 )
@@ -3094,7 +3099,8 @@ test('series-contract', series_contract_test)
 # CHART-05: reconstruct persisted chart recipes from the pinned History snapshot.
 chart_history_reconstruct_test = executable(
   'chart-history-reconstruct-test',
-  ['src/chart_history_reconstruct.c', 'src/chart_spec.c', 'src/verified_series.c',
+  ['src/chart_history_reconstruct.c', 'src/chart_spec_v4.c', 'src/chart_catalog.c',
+   'src/chart_spec.c', 'src/verified_series.c',
    'src/gistemp_sra.c', 'src/gistemp_evidence.c', 'src/gistemp_admission.c',
    'src/annual_series_candidate.c', 'src/series_contract.c', 'src/series_evidence.c',
    'src/series_evidence_adapters.c', 'src/series_sra.c', 'src/series_adapter.c',
@@ -3120,6 +3126,7 @@ test('chart-history-reconstruct', chart_history_reconstruct_test,
 pres09_chart_history_e2e_test = executable(
   'pres09-chart-history-e2e-test',
   ['src/conversation_store.c', 'src/chart_history_reconstruct.c',
+   'src/chart_spec_v4.c', 'src/chart_catalog.c',
    'src/chart_spec.c', 'src/verified_series.c',
    'src/gistemp_sra.c', 'src/gistemp_evidence.c',
    'src/gistemp_admission.c', 'src/annual_series_candidate.c',
