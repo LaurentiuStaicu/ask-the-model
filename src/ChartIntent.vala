@@ -338,12 +338,13 @@ namespace AskTheModel {
              * series and a qualified GISTEMP reference baseline. Do not let any
              * other 18xx/19xx/20xx dashed range pass by accident.
              */
-            string range_check = normalized;
+            string request_text = normalized.down ();
+            string range_check = request_text;
 
             if (selected_series_id ==
                 "climate.gistemp.global-temperature-anomaly") {
                 bool has_reference_baseline = contains_bounded_any (
-                    normalized, {
+                    request_text, {
                         "baseline", "reference period", "reference mean",
                         "reference baseline", "relative to", "compared with",
                         "mean", "perioada de referinta",
