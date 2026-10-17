@@ -612,6 +612,36 @@ int main () {
     assert (explicit_time_range_romanian_unaccented.series_id ==
         "climate.gistemp.global-temperature-anomaly");
 
+    var explicit_outside_18xx_range = AskTheModel.ChartIntent.parse (
+        "/chart gistemp Show trend for 1850-2020."
+    );
+    assert (explicit_outside_18xx_range.series_id == null);
+    assert (explicit_outside_18xx_range.intent == "ambiguous");
+
+    var full_and_partial_ranges = AskTheModel.ChartIntent.parse (
+        "/chart gistemp Show trend for 1880-2025 and 2000-2020."
+    );
+    assert (full_and_partial_ranges.series_id == null);
+    assert (full_and_partial_ranges.intent == "ambiguous");
+
+    var gistemp_reference_baseline = AskTheModel.ChartIntent.parse (
+        "/chart gistemp Show the trend relative to the 1951-1980 baseline."
+    );
+    assert (gistemp_reference_baseline.series_id ==
+        "climate.gistemp.global-temperature-anomaly");
+
+    var ei_full_coverage_range = AskTheModel.ChartIntent.parse (
+        "/chart energy-institute Show trend for 1965-2025."
+    );
+    assert (ei_full_coverage_range.series_id ==
+        "energy.energy-institute.global-total-energy-supply");
+
+    var mismatched_full_coverage_range = AskTheModel.ChartIntent.parse (
+        "/chart energy-institute Show trend for 1880-2025."
+    );
+    assert (mismatched_full_coverage_range.series_id == null);
+    assert (mismatched_full_coverage_range.intent == "ambiguous");
+
     var explicit_grounded_subject = AskTheModel.ChartIntent.parse (
         "/chart gistemp Show a chart of global temperature anomalies over time."
     );
