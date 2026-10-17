@@ -1058,18 +1058,20 @@ namespace AskTheModel {
         ) {
             ambiguous = false;
             string segmented = prompt
-                .replace ("\\r\\n", "\\n")
-                .replace ("\\r", "\\n")
-                .replace (";", "\\n")
-                .replace (".", "\\n")
-                .replace ("?", "\\n")
-                .replace ("!", "\\n")
-                .replace (" but ", "\\n")
-                .replace (" instead ", "\\n")
-                .replace (" however ", "\\n")
-                .replace (" in schimb ", "\\n")
-                .replace (" ci ", "\\n");
-            string[] clauses = segmented.split ("\\n");
+                .replace ("\r\n", "\n")
+                .replace ("\r", "\n")
+                .replace (",", "\n")
+                .replace (":", "\n")
+                .replace (";", "\n")
+                .replace (".", "\n")
+                .replace ("?", "\n")
+                .replace ("!", "\n")
+                .replace (" but ", "\n")
+                .replace (" instead ", "\n")
+                .replace (" however ", "\n")
+                .replace (" in schimb ", "\n")
+                .replace (" ci ", "\n");
+            string[] clauses = segmented.split ("\n");
             string? found_clause = null;
             string? found_series_id = null;
 
@@ -1303,12 +1305,12 @@ namespace AskTheModel {
                     );
                 }
 
-                if (requests_comparison (normalized) ||
-                    requests_additional_series (normalized) ||
-                    requests_derived_series (normalized) ||
-                    requests_unsupported_chart_kind (normalized) ||
+                if (requests_comparison (routing_normalized) ||
+                    requests_additional_series (routing_normalized) ||
+                    requests_derived_series (routing_normalized) ||
+                    requests_unsupported_chart_kind (routing_normalized) ||
                     !request_subject_matches_series (
-                        normalized, selected_series_id
+                        routing_normalized, selected_series_id
                     )) {
                     return new ChartIntent (
                         false, false, false, prompt, "ambiguous"
