@@ -327,6 +327,34 @@ namespace AskTheModel {
         }
 
 
+        private static bool baseline_range_used_as_observation_filter (
+            string request_text
+        ) {
+            /*
+             * 1951–1980 is valid GISTEMP reference metadata only when it is
+             * not also selected as the observation range. A prompt can mention
+             * the baseline while independently asking to filter observations
+             * to that same span; baseline wording must not erase that filter.
+             */
+            string[] patterns = {
+                "\\b(from|since|after|before|during|between|only|starting in|beginning in|for the period|in the period)\\s+(the\\s+)?1951\\s*[-–—]\\s*1980\\b",
+                "\\b(from|since|after|before|during|between|only|starting in|beginning in|for the period|in the period)\\s+(the\\s+)?1951\\s+(to|through|until|and)\\s+1980\\b",
+                "\\b(din|între|intre|doar în|doar in|numai în|numai in|în perioada|in perioada|pe perioada|în intervalul|in intervalul)\\s+(anii\\s+)?1951\\s*[-–—]\\s*1980\\b",
+                "\\b(din|între|intre|doar în|doar in|numai în|numai in|în perioada|in perioada|pe perioada|în intervalul|in intervalul)\\s+(anii\\s+)?1951\\s+(până în|pana in|și|si|până la|pana la)\\s+1980\\b"
+            };
+
+            foreach (string pattern in patterns) {
+                if (Regex.match_simple (
+                        pattern,
+                        request_text,
+                        (RegexCompileFlags) 0,
+                        (RegexMatchFlags) 0)) {
+                    return true;
+                }
+            }
+            return false;
+        }
+
         private static bool requests_explicit_period_filter (
             string normalized,
             string selected_series_id
@@ -352,7 +380,8 @@ namespace AskTheModel {
                         "raportat la", "raportată la", "raportata la",
                         "media de referință", "media de referinta"
                     });
-                if (has_reference_baseline) {
+                if (has_reference_baseline &&
+                    !baseline_range_used_as_observation_filter (request_text)) {
                     range_check = range_check
                         .replace ("1951-1980", "")
                         .replace ("1951–1980", "")
