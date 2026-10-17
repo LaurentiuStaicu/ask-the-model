@@ -853,6 +853,11 @@ int main () {
     assert (positive_bnr_after_interpretation_question.series_id ==
         "banking.bnr.bls-c01.credit-standards-net-percentage");
     assert (positive_bnr_after_interpretation_question.intent == "chart");
+    assert (positive_bnr_after_interpretation_question.query.contains (
+        "What does the GISTEMP chart show?"
+    ));
+    assert (positive_bnr_after_interpretation_question.response_mode ==
+        "chart_and_text");
 
     var positive_gistemp_after_capability_question =
         AskTheModel.ChartIntent.parse (
@@ -861,6 +866,11 @@ int main () {
     assert (positive_gistemp_after_capability_question.series_id ==
         "climate.gistemp.global-temperature-anomaly");
     assert (positive_gistemp_after_capability_question.intent == "chart");
+    assert (positive_gistemp_after_capability_question.query.contains (
+        "Does this app support charts?"
+    ));
+    assert (positive_gistemp_after_capability_question.response_mode ==
+        "chart_and_text");
 
     var positive_ei_after_capability_comma =
         AskTheModel.ChartIntent.parse (
@@ -901,6 +911,11 @@ int main () {
     assert (positive_ei_after_quoted_example_and.series_id ==
         "energy.energy-institute.global-total-energy-supply");
     assert (positive_ei_after_quoted_example_and.intent == "chart");
+    assert (positive_ei_after_quoted_example_and.query.contains (
+        "The phrase 'Generate a GISTEMP chart' is an example"
+    ));
+    assert (positive_ei_after_quoted_example_and.response_mode ==
+        "chart_and_text");
 
     var positive_ei_after_romanian_quoted_example_comma =
         AskTheModel.ChartIntent.parse (
