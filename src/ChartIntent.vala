@@ -1045,6 +1045,95 @@ namespace AskTheModel {
             return trimmed.substring (prefix.length).strip ();
         }
 
+        /*
+         * Guard phrases apply to the clause that contains them, not to every
+         * other request in a compound message. If the user negates or discusses
+         * one chart but separately asks for one eligible chart, route only that
+         * positive clause. Multiple/unsupported positive chart clauses remain
+         * ambiguous and fail closed.
+         */
+        private static string? extract_single_positive_chart_clause (
+            string prompt,
+            out bool ambiguous
+        ) {
+            ambiguous = false;
+            string segmented = prompt
+                .replace ("\\r\\n", "\\n")
+                .replace ("\\r", "\\n")
+                .replace (";", "\\n")
+                .replace (".", "\\n")
+                .replace ("?", "\\n")
+                .replace ("!", "\\n")
+                .replace (" but ", "\\n")
+                .replace (" instead ", "\\n")
+                .replace (" however ", "\\n")
+                .replace (" in schimb ", "\\n")
+                .replace (" ci ", "\\n");
+            string[] clauses = segmented.split ("\\n");
+            string? found_clause = null;
+            string? found_series_id = null;
+
+            foreach (string raw_clause in clauses) {
+                string clause = raw_clause.strip ();
+                string normalized_clause = clause.down ();
+                if (normalized_clause.length == 0 ||
+                    is_explicitly_negated_chart_request (normalized_clause) ||
+                    is_hypothetical_chart_request (normalized_clause) ||
+                    asks_about_quoted_instruction (normalized_clause) ||
+                    is_capability_only_chart_question (normalized_clause) ||
+                    is_existing_chart_interpretation_question (normalized_clause)) {
+                    continue;
+                }
+
+                bool asks_for_chart = contains_bounded_any (
+                    normalized_clause,
+                    {"grafic", "chart", "graph", "plot", "diagram"}
+                );
+                bool requests_visualization = contains_bounded_any (
+                    normalized_clause,
+                    {
+                        "arată", "arata", "generează", "genereaza",
+                        "creează", "creeaza", "desenează", "deseneaza",
+                        "afișează", "afiseaza", "vizualizează", "vizualizeaza",
+                        "show", "generate", "create", "draw", "make", "plot",
+                        "visualize", "visualise",
+                        "can you generate", "can you create", "can you make",
+                        "could you generate", "could you create", "could you make",
+                        "poți genera", "poti genera", "poți crea", "poti crea",
+                        "poți să generezi", "poti sa generezi",
+                        "poți să creezi", "poti sa creezi"
+                    }
+                );
+                if (!asks_for_chart || !requests_visualization) {
+                    continue;
+                }
+
+                bool series_ambiguous = false;
+                string? series_id = ChartCatalog.match_request_series_id (
+                    clause, out series_ambiguous
+                );
+                if (series_ambiguous || series_id == null ||
+                    requests_explicit_period_filter (normalized_clause, series_id) ||
+                    requests_comparison (normalized_clause) ||
+                    requests_additional_series (normalized_clause) ||
+                    requests_derived_series (normalized_clause) ||
+                    requests_unsupported_chart_kind (normalized_clause) ||
+                    !request_subject_matches_series (normalized_clause, series_id)) {
+                    ambiguous = true;
+                    return null;
+                }
+
+                if (found_series_id != null) {
+                    ambiguous = true;
+                    return null;
+                }
+                found_clause = clause;
+                found_series_id = series_id;
+            }
+
+            return found_clause;
+        }
+
         public static ChartIntent parse (string prompt) {
             string trimmed = prompt.strip ();
             string normalized = prompt.down ();
@@ -1118,24 +1207,35 @@ namespace AskTheModel {
                 );
             }
 
+            string routing_prompt = prompt;
+            string routing_normalized = normalized;
             if (is_explicitly_negated_chart_request (normalized) ||
                 is_hypothetical_chart_request (normalized) ||
                 asks_about_quoted_instruction (normalized) ||
                 is_capability_only_chart_question (normalized) ||
                 is_existing_chart_interpretation_question (normalized)) {
-                return new ChartIntent (
-                    false, false, false, prompt, "not_chart"
+                bool compound_ambiguous = false;
+                string? positive_clause = extract_single_positive_chart_clause (
+                    prompt, out compound_ambiguous
                 );
+                if (positive_clause == null) {
+                    return new ChartIntent (
+                        false, false, false, prompt,
+                        compound_ambiguous ? "ambiguous" : "not_chart"
+                    );
+                }
+                routing_prompt = positive_clause;
+                routing_normalized = positive_clause.down ();
             }
 
             bool asks_for_chart = contains_bounded_any (
-                normalized,
+                routing_normalized,
                 {
                     "grafic", "chart", "graph", "plot", "diagram"
                 }
             );
             bool requests_visualization = contains_bounded_any (
-                normalized,
+                routing_normalized,
                 {
                     "arată", "arata", "generează", "genereaza",
                     "creează", "creeaza", "desenează", "deseneaza",
@@ -1153,7 +1253,7 @@ namespace AskTheModel {
             if (asks_for_chart && requests_visualization) {
                 bool ambiguous = false;
                 string? selected_series_id =
-                    ChartCatalog.match_request_series_id (prompt, out ambiguous);
+                    ChartCatalog.match_request_series_id (routing_prompt, out ambiguous);
 
                 if (ambiguous) {
                     return new ChartIntent (
@@ -1173,7 +1273,7 @@ namespace AskTheModel {
                  * even when exactly one registered alias appears in the text.
                  */
                 if (requests_explicit_period_filter (
-                        normalized, selected_series_id)) {
+                        routing_normalized, selected_series_id)) {
                     return new ChartIntent (
                         false, false, false, prompt, "unsupported_period"
                     );
@@ -1192,7 +1292,7 @@ namespace AskTheModel {
                 }
 
                 return new ChartIntent.for_catalog_series (
-                    selected_series_id, prompt
+                    selected_series_id, routing_prompt
                 );
             }
 
