@@ -345,8 +345,11 @@ namespace AskTheModel {
                 bool has_reference_baseline = contains_bounded_any (
                     normalized, {
                         "baseline", "reference period", "reference mean",
-                        "reference baseline", "periodo de referinta",
-                        "perioada de referință", "perioada de referinta"
+                        "reference baseline", "relative to", "compared with",
+                        "mean", "perioada de referinta",
+                        "perioada de referință", "perioada de referinta",
+                        "raportat la", "raportată la", "raportata la",
+                        "media de referință", "media de referinta"
                     });
                 if (has_reference_baseline) {
                     range_check = range_check
@@ -364,7 +367,20 @@ namespace AskTheModel {
                     .replace ("1880—2025", "")
                     .replace ("1880 - 2025", "")
                     .replace ("1880 – 2025", "")
-                    .replace ("1880 — 2025", "");
+                    .replace ("1880 — 2025", "")
+                    .replace ("from 1880 to 2025", "")
+                    .replace ("from 1880 through 2025", "")
+                    .replace ("from 1880 until 2025", "")
+                    .replace ("1880 to 2025", "")
+                    .replace ("1880 through 2025", "")
+                    .replace ("1880 until 2025", "")
+                    .replace ("between 1880 and 2025", "")
+                    .replace ("între 1880 și 2025", "")
+                    .replace ("între 1880 si 2025", "")
+                    .replace ("intre 1880 și 2025", "")
+                    .replace ("intre 1880 si 2025", "")
+                    .replace ("din 1880 până în 2025", "")
+                    .replace ("din 1880 pana in 2025", "");
             } else if (selected_series_id ==
                        "energy.energy-institute.global-total-energy-supply") {
                 range_check = range_check
@@ -373,7 +389,14 @@ namespace AskTheModel {
                     .replace ("1965—2025", "")
                     .replace ("1965 - 2025", "")
                     .replace ("1965 – 2025", "")
-                    .replace ("1965 — 2025", "");
+                    .replace ("1965 — 2025", "")
+                    .replace ("from 1965 to 2025", "")
+                    .replace ("from 1965 through 2025", "")
+                    .replace ("from 1965 until 2025", "")
+                    .replace ("1965 to 2025", "")
+                    .replace ("1965 through 2025", "")
+                    .replace ("1965 until 2025", "")
+                    .replace ("between 1965 and 2025", "");
             }
 
             bool has_dashed_year_range = Regex.match_simple (
