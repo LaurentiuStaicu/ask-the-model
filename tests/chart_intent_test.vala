@@ -616,13 +616,13 @@ int main () {
         "/chart gistemp Show trend for 1850-2020."
     );
     assert (explicit_outside_18xx_range.series_id == null);
-    assert (explicit_outside_18xx_range.intent == "ambiguous");
+    assert (explicit_outside_18xx_range.intent == "unsupported_period");
 
     var full_and_partial_ranges = AskTheModel.ChartIntent.parse (
         "/chart gistemp Show trend for 1880-2025 and 2000-2020."
     );
     assert (full_and_partial_ranges.series_id == null);
-    assert (full_and_partial_ranges.intent == "ambiguous");
+    assert (full_and_partial_ranges.intent == "unsupported_period");
 
     var gistemp_reference_baseline = AskTheModel.ChartIntent.parse (
         "/chart gistemp Show the trend relative to the 1951-1980 baseline."
@@ -640,7 +640,7 @@ int main () {
         "/chart energy-institute Show trend for 1880-2025."
     );
     assert (mismatched_full_coverage_range.series_id == null);
-    assert (mismatched_full_coverage_range.intent == "ambiguous");
+    assert (mismatched_full_coverage_range.intent == "unsupported_period");
 
     var explicit_grounded_subject = AskTheModel.ChartIntent.parse (
         "/chart gistemp Show a chart of global temperature anomalies over time."
@@ -691,31 +691,31 @@ int main () {
         "Generate a GISTEMP chart from 2000 to 2020."
     );
     assert (gistemp_year_range.series_id == null);
-    assert (gistemp_year_range.intent == "ambiguous");
+    assert (gistemp_year_range.intent == "unsupported_period");
 
     var gistemp_recent_period = AskTheModel.ChartIntent.parse (
         "Generate a GISTEMP chart for the last 10 years."
     );
     assert (gistemp_recent_period.series_id == null);
-    assert (gistemp_recent_period.intent == "ambiguous");
+    assert (gistemp_recent_period.intent == "unsupported_period");
 
     var ei_romanian_period = AskTheModel.ChartIntent.parse (
         "Generează un grafic Energy Institute între 2000 și 2020."
     );
     assert (ei_romanian_period.series_id == null);
-    assert (ei_romanian_period.intent == "ambiguous");
+    assert (ei_romanian_period.intent == "unsupported_period");
 
     var explicit_year_range = AskTheModel.ChartIntent.parse (
         "/chart gistemp from 2000 to 2020"
     );
     assert (explicit_year_range.series_id == null);
-    assert (explicit_year_range.intent == "ambiguous");
+    assert (explicit_year_range.intent == "unsupported_period");
 
     var explicit_romanian_year_range = AskTheModel.ChartIntent.parse (
         "/chart energy-institute între 2000 și 2020"
     );
     assert (explicit_romanian_year_range.series_id == null);
-    assert (explicit_romanian_year_range.intent == "ambiguous");
+    assert (explicit_romanian_year_range.intent == "unsupported_period");
 
     /* A matching alias must not override a conflicting geographic/subject filter. */
     var gistemp_regional_filter = AskTheModel.ChartIntent.parse (
