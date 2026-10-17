@@ -636,6 +636,21 @@ int main () {
     assert (gistemp_reference_mean.series_id ==
         "climate.gistemp.global-temperature-anomaly");
 
+    /* Baseline metadata must not erase a separately requested observation range. */
+    var gistemp_baseline_range_as_observations =
+        AskTheModel.ChartIntent.parse (
+            "/chart gistemp Show trend from 1951-1980 relative to the 1951-1980 mean."
+        );
+    assert (gistemp_baseline_range_as_observations.series_id == null);
+    assert (gistemp_baseline_range_as_observations.intent == "unsupported_period");
+
+    var gistemp_baseline_range_as_observations_romanian =
+        AskTheModel.ChartIntent.parse (
+            "/chart gistemp Arată tendința doar în intervalul 1951–1980, raportat la media de referință 1951–1980."
+        );
+    assert (gistemp_baseline_range_as_observations_romanian.series_id == null);
+    assert (gistemp_baseline_range_as_observations_romanian.intent == "unsupported_period");
+
     var gistemp_full_range_from_to = AskTheModel.ChartIntent.parse (
         "/chart gistemp Show trend from 1880 to 2025."
     );
