@@ -630,6 +630,36 @@ int main () {
     assert (gistemp_reference_baseline.series_id ==
         "climate.gistemp.global-temperature-anomaly");
 
+    var gistemp_reference_mean = AskTheModel.ChartIntent.parse (
+        "/chart gistemp Show the trend relative to the 1951-1980 mean."
+    );
+    assert (gistemp_reference_mean.series_id ==
+        "climate.gistemp.global-temperature-anomaly");
+
+    var gistemp_full_range_from_to = AskTheModel.ChartIntent.parse (
+        "/chart gistemp Show trend from 1880 to 2025."
+    );
+    assert (gistemp_full_range_from_to.series_id ==
+        "climate.gistemp.global-temperature-anomaly");
+
+    var gistemp_full_range_between = AskTheModel.ChartIntent.parse (
+        "/chart gistemp Show trend between 1880 and 2025."
+    );
+    assert (gistemp_full_range_between.series_id ==
+        "climate.gistemp.global-temperature-anomaly");
+
+    var ei_full_range_from_through = AskTheModel.ChartIntent.parse (
+        "/chart energy-institute Show trend from 1965 through 2025."
+    );
+    assert (ei_full_range_from_through.series_id ==
+        "energy.energy-institute.global-total-energy-supply");
+
+    var gistemp_partial_from_to = AskTheModel.ChartIntent.parse (
+        "/chart gistemp Show trend from 1880 to 2020."
+    );
+    assert (gistemp_partial_from_to.series_id == null);
+    assert (gistemp_partial_from_to.intent == "unsupported_period");
+
     var ei_full_coverage_range = AskTheModel.ChartIntent.parse (
         "/chart energy-institute Show trend for 1965-2025."
     );
