@@ -352,8 +352,8 @@ namespace AskTheModel {
                 if (Regex.match_simple (
                         pattern,
                         normalized,
-                        RegexCompileFlags.DEFAULT,
-                        RegexMatchFlags.DEFAULT)) {
+                        (RegexCompileFlags) 0,
+                        (RegexMatchFlags) 0)) {
                     return true;
                 }
             }
