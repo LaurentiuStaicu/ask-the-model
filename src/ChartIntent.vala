@@ -897,8 +897,7 @@ namespace AskTheModel {
                 requests_comparison (normalized) ||
                 requests_additional_series (normalized) ||
                 requests_derived_series (normalized) ||
-                requests_unsupported_chart_kind (normalized) ||
-                requests_explicit_period_filter (normalized, selected_series_id)) {
+                requests_unsupported_chart_kind (normalized)) {
                 return false;
             }
 
@@ -989,6 +988,13 @@ namespace AskTheModel {
 
             if (command_matches (trimmed, gistemp_prefix)) {
                 string query = command_query (trimmed, gistemp_prefix);
+                if (requests_explicit_period_filter (
+                        query,
+                        "climate.gistemp.global-temperature-anomaly")) {
+                    return new ChartIntent (
+                        false, false, false, prompt, "unsupported_period"
+                    );
+                }
                 if (!command_query_is_compatible (
                         query,
                         "climate.gistemp.global-temperature-anomaly")) {
@@ -1000,6 +1006,13 @@ namespace AskTheModel {
             }
             if (command_matches (trimmed, ei_prefix)) {
                 string query = command_query (trimmed, ei_prefix);
+                if (requests_explicit_period_filter (
+                        query,
+                        "energy.energy-institute.global-total-energy-supply")) {
+                    return new ChartIntent (
+                        false, false, false, prompt, "unsupported_period"
+                    );
+                }
                 if (!command_query_is_compatible (
                         query,
                         "energy.energy-institute.global-total-energy-supply")) {
@@ -1011,6 +1024,13 @@ namespace AskTheModel {
             }
             if (command_matches (trimmed, bnr_prefix)) {
                 string query = command_query (trimmed, bnr_prefix);
+                if (requests_explicit_period_filter (
+                        query,
+                        "banking.bnr.bls-c01.credit-standards-net-percentage")) {
+                    return new ChartIntent (
+                        false, false, false, prompt, "unsupported_period"
+                    );
+                }
                 if (!command_query_is_compatible (
                         query,
                         "banking.bnr.bls-c01.credit-standards-net-percentage")) {
@@ -1086,11 +1106,17 @@ namespace AskTheModel {
                  * Reject comparison/multiseries/derived requests before routing,
                  * even when exactly one registered alias appears in the text.
                  */
+                if (requests_explicit_period_filter (
+                        normalized, selected_series_id)) {
+                    return new ChartIntent (
+                        false, false, false, prompt, "unsupported_period"
+                    );
+                }
+
                 if (requests_comparison (normalized) ||
                     requests_additional_series (normalized) ||
                     requests_derived_series (normalized) ||
                     requests_unsupported_chart_kind (normalized) ||
-                    requests_explicit_period_filter (normalized, selected_series_id) ||
                     !request_subject_matches_series (
                         normalized, selected_series_id
                     )) {
