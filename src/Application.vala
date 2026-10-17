@@ -6298,20 +6298,19 @@ namespace AskTheModel {
                 return true;
             }
 
-            if (pres09_test_live_turn != 7 ||
-                !transcript.contains (
-                    "The repository bound to this qualified chart series is not included"
-                ) ||
-                state.pres09_test_chart_widgets.length != 0 ||
-                state.persistent_id != null) {
-                pres09_test_finish (
-                    false,
-                    "A supported chart series without its catalog-bound repository in Repository Scope did not fail closed before model routing or persistence"
-                );
-                return false;
-            }
-
             if (pres09_test_live_turn == 7) {
+                if (!transcript.contains (
+                        "The repository bound to this qualified chart series is not included"
+                    ) ||
+                    state.pres09_test_chart_widgets.length != 0 ||
+                    state.persistent_id != null) {
+                    pres09_test_finish (
+                        false,
+                        "A supported chart series without its catalog-bound repository in Repository Scope did not fail closed before model routing or persistence"
+                    );
+                    return false;
+                }
+
                 state.prompt.buffer.text = "/chart gistemp from 2000 to 2020";
                 pres09_test_live_turn = 8;
                 state.send_button.clicked ();
