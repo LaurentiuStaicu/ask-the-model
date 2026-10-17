@@ -1076,12 +1076,36 @@ namespace AskTheModel {
             foreach (string raw_clause in clauses) {
                 string clause = raw_clause.strip ();
                 string normalized_clause = clause.down ();
-                if (normalized_clause.length == 0 ||
-                    is_explicitly_negated_chart_request (normalized_clause) ||
+                if (normalized_clause.length == 0) {
+                    continue;
+                }
+
+                bool negated_clause =
+                    is_explicitly_negated_chart_request (normalized_clause);
+                if (negated_clause ||
                     is_hypothetical_chart_request (normalized_clause) ||
                     asks_about_quoted_instruction (normalized_clause) ||
                     is_capability_only_chart_question (normalized_clause) ||
                     is_existing_chart_interpretation_question (normalized_clause)) {
+                    /*
+                     * A later generic negation such as "don't show it" can
+                     * revoke the immediately preceding positive chart request.
+                     * A negation that names a different catalog series does
+                     * not revoke the one explicit positive clause selected.
+                     */
+                    if (found_series_id != null && negated_clause) {
+                        bool mentioned_ambiguous = false;
+                        string? negated_series_id =
+                            ChartCatalog.match_request_series_id (
+                                clause, out mentioned_ambiguous
+                            );
+                        if (mentioned_ambiguous ||
+                            negated_series_id == null ||
+                            negated_series_id == found_series_id) {
+                            ambiguous = true;
+                            return null;
+                        }
+                    }
                     continue;
                 }
 
