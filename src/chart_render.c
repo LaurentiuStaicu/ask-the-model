@@ -164,6 +164,44 @@ static char *data_view (const AtmChartSpec *spec)
     }
     return g_string_free (s, FALSE);
 }
+
+/*
+ * Build the established source-specific, exact Data representation without
+ * constructing a Cairo surface. The generic v4 painter can reuse the proven
+ * Data schema while owning its surface and deriving pixels only from the
+ * catalog-validated v4 projection.
+ *
+ * The returned string is allocated for the caller. Unknown ChartSpec versions
+ * are rejected rather than falling through to the GISTEMP serializer.
+ */
+char *
+atm_chart_render_data_for_spec (const AtmChartSpec *spec, GError **error)
+{
+    if (spec == NULL)
+        return reject (error, "Data serialization requires a qualified ChartSpec.");
+
+    AtmChartSpec *owned = NULL;
+    if (!atm_chart_spec_rebuild (spec, &owned, error))
+        return NULL;
+
+    AtmChartSpecVersion version = atm_chart_spec_version (owned);
+    if (version != ATM_CHART_SPEC_VERSION_GISTEMP_V1 &&
+        version != ATM_CHART_SPEC_VERSION_ENERGY_INSTITUTE_V2 &&
+        version != ATM_CHART_SPEC_VERSION_BNR_BLS_C01_V3) {
+        atm_chart_spec_free (owned);
+        reject (error, "Data serialization only admits independently qualified source ChartSpec v1/v2/v3.");
+        return NULL;
+    }
+
+    char *data = data_view (owned);
+    atm_chart_spec_free (owned);
+    if (data == NULL) {
+        reject (error, "Qualified source ChartSpec could not be serialized for Data view.");
+        return NULL;
+    }
+    return data;
+}
+
 static void font (cairo_t *cr, double size, gboolean bold)
 {
     cairo_select_font_face (cr, "monospace", CAIRO_FONT_SLANT_NORMAL,
