@@ -3079,21 +3079,19 @@ namespace AskTheModel {
             return button;
         }
 
-        private void qualify_live_gistemp_request (
-            ConversationSession session
+        private void qualify_live_chart_request (
+            ConversationSession session,
+            string series_id
         ) throws GLib.Error {
             ConversationRepositoryPin? chart_pin = null;
 
             for (uint i = 0; i < session.repository_count (); i++) {
                 ConversationRepositoryPin? pin =
                     session.repository_pin_at (i);
-                if (pin == null) {
-                    continue;
-                }
+                if (pin == null) continue;
 
-                if (pin.repository_id == "ewd" ||
-                    pin.repository_id ==
-                        "LaurentiuStaicu/empirical-world3-dynamics") {
+                if (ChartNative.catalog_repository_matches_series (
+                        series_id, pin.repository_id)) {
                     chart_pin = pin;
                     break;
                 }
@@ -3101,8 +3099,8 @@ namespace AskTheModel {
 
             if (chart_pin == null) {
                 throw new GLib.IOError.FAILED (
-                    "GISTEMP charts require EWD to be selected for this conversation. " +
-                    "Select EWD in Repository Scope and retry."
+                    "The repository bound to this qualified chart series is not included " +
+                    "in Repository Scope. Select its catalog-bound repository and retry."
                 );
             }
 
@@ -3110,157 +3108,45 @@ namespace AskTheModel {
                 repository_descriptor_for_id (chart_pin.repository_id);
             if (descriptor == null) {
                 throw new GLib.IOError.NOT_FOUND (
-                    "The pinned EWD repository required for the GISTEMP chart is unavailable."
+                    "The pinned repository required for the catalog-selected chart is unavailable."
                 );
             }
 
-            string snapshot_path =
-                RepositoryLifecycleService.snapshot_path (
-                    descriptor,
-                    chart_pin.snapshot_sha
-                );
-            if (!GLib.FileUtils.test (
-                    snapshot_path,
-                    GLib.FileTest.IS_DIR
-                )) {
+            string snapshot_path = RepositoryLifecycleService.snapshot_path (
+                descriptor, chart_pin.snapshot_sha
+            );
+            if (!GLib.FileUtils.test (snapshot_path, GLib.FileTest.IS_DIR)) {
                 throw new GLib.IOError.NOT_FOUND (
-                    "The pinned EWD snapshot required for the GISTEMP chart is unavailable."
+                    "The exact pinned repository snapshot required for the catalog-selected chart is unavailable."
                 );
             }
 
-            ChartNative.Spec spec;
-            if (!ChartNative.reconstruct_live_gistemp (
+            /*
+             * One native factory owns the closed adapter dispatch and complete
+             * source admission/reconstruction rules. Application must not
+             * maintain a parallel per-series preflight switch.
+             */
+            ChartNative.SpecV4 spec_v4;
+            if (!ChartNative.reconstruct_live_v4 (
+                    series_id,
                     snapshot_path,
                     chart_pin.repository_id,
                     chart_pin.repository_version,
                     chart_pin.snapshot_sha,
-                    out spec
-                ) || spec == null) {
+                    out spec_v4
+                ) || spec_v4 == null) {
                 throw new GLib.IOError.INVALID_DATA (
-                    "The pinned GISTEMP source could not be re-qualified."
+                    "The catalog-selected source could not be re-qualified before model invocation."
                 );
             }
 
-            string? scientific_id = spec.series_scientific_id (0);
-            string? qualified_id = spec.series_qualified_id (0);
-            string? chart_spec_id = spec.id ();
-            if (scientific_id == null || qualified_id == null ||
-                chart_spec_id == null) {
+            unowned ChartNative.Spec? source_spec = spec_v4.source_spec ();
+            if (spec_v4.series_id () != series_id ||
+                source_spec == null ||
+                source_spec.series_repository_id (0) != chart_pin.repository_id ||
+                source_spec.series_snapshot_sha (0) != chart_pin.snapshot_sha) {
                 throw new GLib.IOError.INVALID_DATA (
-                    "The qualified GISTEMP chart identities are unavailable."
-                );
-            }
-        }
-
-        private void qualify_live_energy_institute_request (
-            ConversationSession session
-        ) throws GLib.Error {
-            ConversationRepositoryPin? chart_pin = null;
-            for (uint i = 0; i < session.repository_count (); i++) {
-                ConversationRepositoryPin? pin = session.repository_pin_at (i);
-                if (pin == null) continue;
-                if (pin.repository_id == "ewd" ||
-                    pin.repository_id == "LaurentiuStaicu/empirical-world3-dynamics") {
-                    chart_pin = pin;
-                    break;
-                }
-            }
-            if (chart_pin == null) {
-                throw new GLib.IOError.FAILED (
-                    "Energy Institute charts require EWD to be selected for this conversation. " +
-                    "Select EWD in Repository Scope and retry."
-                );
-            }
-            RepositoryDescriptor? descriptor =
-                repository_descriptor_for_id (chart_pin.repository_id);
-            if (descriptor == null) {
-                throw new GLib.IOError.NOT_FOUND (
-                    "The pinned EWD repository required for the Energy Institute chart is unavailable."
-                );
-            }
-            string snapshot_path = RepositoryLifecycleService.snapshot_path (
-                descriptor, chart_pin.snapshot_sha
-            );
-            if (!GLib.FileUtils.test (snapshot_path, GLib.FileTest.IS_DIR)) {
-                throw new GLib.IOError.NOT_FOUND (
-                    "The pinned EWD snapshot required for the Energy Institute chart is unavailable."
-                );
-            }
-            ChartNative.Spec spec;
-            if (!ChartNative.reconstruct_live_energy_institute (
-                    snapshot_path, chart_pin.repository_id,
-                    chart_pin.snapshot_sha, "line", out spec
-                ) || spec == null) {
-                throw new GLib.IOError.INVALID_DATA (
-                    "The pinned Energy Institute source could not be re-qualified."
-                );
-            }
-            string? scientific_id = spec.series_scientific_id (0);
-            string? qualified_id = spec.series_qualified_id (0);
-            string? chart_spec_id = spec.id ();
-            if (scientific_id == null || qualified_id == null || chart_spec_id == null) {
-                throw new GLib.IOError.INVALID_DATA (
-                    "The qualified Energy Institute chart identities are unavailable."
-                );
-            }
-        }
-
-
-        private void qualify_live_bnr_bls_c01_request (
-            ConversationSession session
-        ) throws GLib.Error {
-            ConversationRepositoryPin? chart_pin = null;
-            for (uint i = 0; i < session.repository_count (); i++) {
-                ConversationRepositoryPin? pin = session.repository_pin_at (i);
-                if (pin == null) continue;
-                if (pin.repository_id == "rmd" ||
-                    pin.repository_id == "LaurentiuStaicu/romanian-monetary-dynamics") {
-                    chart_pin = pin;
-                    break;
-                }
-            }
-            if (chart_pin == null) {
-                throw new GLib.IOError.FAILED (
-                    "BNR BLS C01 charts require RMD to be selected for this conversation. " +
-                    "Select RMD in Repository Scope and retry."
-                );
-            }
-            if (chart_pin.snapshot_sha != "e43eb4e899f123d3b1aa0f6e20b7c8ed35434170") {
-                throw new GLib.IOError.INVALID_DATA (
-                    "BNR BLS C01 is qualified only for the pinned RMD snapshot " +
-                    "e43eb4e899f123d3b1aa0f6e20b7c8ed35434170."
-                );
-            }
-            RepositoryDescriptor? descriptor =
-                repository_descriptor_for_id (chart_pin.repository_id);
-            if (descriptor == null) {
-                throw new GLib.IOError.NOT_FOUND (
-                    "The pinned RMD repository required for the BNR BLS C01 chart is unavailable."
-                );
-            }
-            string snapshot_path = RepositoryLifecycleService.snapshot_path (
-                descriptor, chart_pin.snapshot_sha
-            );
-            if (!GLib.FileUtils.test (snapshot_path, GLib.FileTest.IS_DIR)) {
-                throw new GLib.IOError.NOT_FOUND (
-                    "The pinned RMD snapshot required for the BNR BLS C01 chart is unavailable."
-                );
-            }
-            ChartNative.Spec spec;
-            if (!ChartNative.reconstruct_live_bnr_bls_c01 (
-                    snapshot_path, chart_pin.repository_id,
-                    chart_pin.snapshot_sha, "line", out spec
-                ) || spec == null) {
-                throw new GLib.IOError.INVALID_DATA (
-                    "The pinned BNR BLS C01 source could not be re-qualified."
-                );
-            }
-            string? scientific_id = spec.series_scientific_id (0);
-            string? qualified_id = spec.series_qualified_id (0);
-            string? chart_spec_id = spec.id ();
-            if (scientific_id == null || qualified_id == null || chart_spec_id == null) {
-                throw new GLib.IOError.INVALID_DATA (
-                    "The qualified BNR BLS C01 chart identities are unavailable."
+                    "The native catalog factory returned a chart spec that differs from the authorized repository pin."
                 );
             }
         }
@@ -4022,29 +3908,10 @@ namespace AskTheModel {
                 );
 
                 if (source_chart_requested) {
-                    string? selected_adapter_id =
-                        ChartNative.catalog_adapter_id_for_series (
-                            selected_chart_series_id
-                        );
-                    if (selected_adapter_id == null) {
-                        throw new GLib.IOError.NOT_SUPPORTED (
-                            "The selected chart series has no registered native adapter."
-                        );
-                    }
-
-                    if (selected_adapter_id == "gistemp-pinned-annual/1") {
-                        qualify_live_gistemp_request (state.session);
-                    } else if (selected_adapter_id ==
-                               "energy-institute-tes-pinned-annual/1") {
-                        qualify_live_energy_institute_request (state.session);
-                    } else if (selected_adapter_id ==
-                               "bnr-bls-c01-pinned-quarterly/1") {
-                        qualify_live_bnr_bls_c01_request (state.session);
-                    } else {
-                        throw new GLib.IOError.NOT_SUPPORTED (
-                            "The catalog-selected native adapter is not qualified for live chart routing."
-                        );
-                    }
+                    qualify_live_chart_request (
+                        state.session,
+                        selected_chart_series_id
+                    );
                 }
 
                 bool needs_clarification;
