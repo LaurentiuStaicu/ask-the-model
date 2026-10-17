@@ -656,5 +656,49 @@ int main () {
     assert (population_with_bnr_alias.series_id == null);
     assert (population_with_bnr_alias.intent == "ambiguous");
 
+    /* The current line adapters always render the full catalogued coverage. */
+    var gistemp_year_range = AskTheModel.ChartIntent.parse (
+        "Generate a GISTEMP chart from 2000 to 2020."
+    );
+    assert (gistemp_year_range.series_id == null);
+    assert (gistemp_year_range.intent == "ambiguous");
+
+    var gistemp_recent_period = AskTheModel.ChartIntent.parse (
+        "Generate a GISTEMP chart for the last 10 years."
+    );
+    assert (gistemp_recent_period.series_id == null);
+    assert (gistemp_recent_period.intent == "ambiguous");
+
+    var ei_romanian_period = AskTheModel.ChartIntent.parse (
+        "Generează un grafic Energy Institute între 2000 și 2020."
+    );
+    assert (ei_romanian_period.series_id == null);
+    assert (ei_romanian_period.intent == "ambiguous");
+
+    var explicit_year_range = AskTheModel.ChartIntent.parse (
+        "/chart gistemp from 2000 to 2020"
+    );
+    assert (explicit_year_range.series_id == null);
+    assert (explicit_year_range.intent == "ambiguous");
+
+    /* A matching alias must not override a conflicting geographic/subject filter. */
+    var gistemp_regional_filter = AskTheModel.ChartIntent.parse (
+        "Generate a chart of GISTEMP global temperature anomalies for Romania."
+    );
+    assert (gistemp_regional_filter.series_id == null);
+    assert (gistemp_regional_filter.intent == "ambiguous");
+
+    var energy_regional_filter = AskTheModel.ChartIntent.parse (
+        "Generate a chart of Energy Institute total energy supply for Europe."
+    );
+    assert (energy_regional_filter.series_id == null);
+    assert (energy_regional_filter.intent == "ambiguous");
+
+    var bnr_subject_filter = AskTheModel.ChartIntent.parse (
+        "Generate a chart of BNR credit standards for households."
+    );
+    assert (bnr_subject_filter.series_id == null);
+    assert (bnr_subject_filter.intent == "ambiguous");
+
     return 0;
 }
