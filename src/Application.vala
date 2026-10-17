@@ -3773,7 +3773,14 @@ namespace AskTheModel {
 
             if (chart_intent.intent == "unsupported_period") {
                 bool romanian_request = ChartCatalog.text_has_phrase (
-                    prompt, "între") ||
+                    prompt, "grafic") ||
+                    ChartCatalog.text_has_phrase (prompt, "generează") ||
+                    ChartCatalog.text_has_phrase (prompt, "genereaza") ||
+                    ChartCatalog.text_has_phrase (prompt, "creează") ||
+                    ChartCatalog.text_has_phrase (prompt, "creeaza") ||
+                    ChartCatalog.text_has_phrase (prompt, "arată") ||
+                    ChartCatalog.text_has_phrase (prompt, "arata") ||
+                    ChartCatalog.text_has_phrase (prompt, "între") ||
                     ChartCatalog.text_has_phrase (prompt, "intre") ||
                     ChartCatalog.text_has_phrase (prompt, "ultimii ani") ||
                     ChartCatalog.text_has_phrase (prompt, "ultimele ani") ||
@@ -6317,22 +6324,41 @@ namespace AskTheModel {
                 return true;
             }
 
-            if (pres09_test_live_turn != 8 ||
+            if (pres09_test_live_turn == 8) {
+                if (!transcript.contains (
+                        "Custom year-range filtering is not available yet"
+                    ) ||
+                    state.pres09_test_chart_widgets.length != 0 ||
+                    state.persistent_id != null) {
+                    pres09_test_finish (
+                        false,
+                        "An unsupported English custom year range did not receive its explicit full-coverage refusal before model routing or persistence"
+                    );
+                    return false;
+                }
+
+                state.prompt.buffer.text = "/chart gistemp între 2000 și 2020";
+                pres09_test_live_turn = 9;
+                state.send_button.clicked ();
+                return true;
+            }
+
+            if (pres09_test_live_turn != 9 ||
                 !transcript.contains (
-                    "Custom year-range filtering is not available yet"
+                    "Filtrarea unui subinterval de ani nu este disponibilă încă"
                 ) ||
                 state.pres09_test_chart_widgets.length != 0 ||
                 state.persistent_id != null) {
                 pres09_test_finish (
                     false,
-                    "An unsupported custom year range did not receive its explicit full-coverage refusal before model routing or persistence"
+                    "An unsupported Romanian custom year range did not receive its explicit full-coverage refusal before model routing or persistence"
                 );
                 return false;
             }
 
             pres09_test_finish (
                 true,
-                "unsupported population, conflicting explicit /chart selection, unknown /chart selector, unrelated diabetes prevalence with a registered GISTEMP alias, unsupported pie-chart kind, unrelated explicit /chart subject, a valid series outside Repository Scope, and an unsupported custom period all failed closed without model routing, persistence or Chart/Data widgets"
+                "unsupported population, conflicting explicit /chart selection, unknown /chart selector, unrelated diabetes prevalence with a registered GISTEMP alias, unsupported pie-chart kind, unrelated explicit /chart subject, a valid series outside Repository Scope, and unsupported English/Romanian custom periods all failed closed without model routing, persistence or Chart/Data widgets"
             );
             return false;
         }
