@@ -739,7 +739,7 @@ test_live_reconstruct_v4_catalog_dispatch (void)
     AtmChartSpecV4 *v4 = NULL;
 
     g_assert_true (atm_chart_live_reconstruct_v4 (
-        gistemp_id, ewd, "ewd", "2026-08-31", ewd_initial, &v4, &error));
+        gistemp_id, ewd, "LaurentiuStaicu/empirical-world3-dynamics", "2026-08-31", ewd_initial, &v4, &error));
     g_assert_no_error (error);
     g_assert_nonnull (v4);
     g_assert_cmpstr (atm_chart_spec_v4_series_id (v4), ==, gistemp_id);
@@ -750,11 +750,13 @@ test_live_reconstruct_v4_catalog_dispatch (void)
         atm_chart_spec_v4_source_spec (v4)), ==, ATM_CHART_SPEC_SCHEMA);
     g_assert_cmpstr (atm_chart_spec_series_snapshot_sha (
         atm_chart_spec_v4_source_spec (v4), 0), ==, ewd_initial);
+    g_assert_cmpstr (atm_chart_spec_series_repository_id (
+        atm_chart_spec_v4_source_spec (v4), 0), ==, "ewd");
     atm_chart_spec_v4_free (v4);
     v4 = NULL;
 
     g_assert_true (atm_chart_live_reconstruct_v4 (
-        energy_id, ewd, "ewd", NULL, ewd_initial, &v4, &error));
+        energy_id, ewd, "LaurentiuStaicu/empirical-world3-dynamics", NULL, ewd_initial, &v4, &error));
     g_assert_no_error (error);
     g_assert_nonnull (v4);
     g_assert_cmpstr (atm_chart_spec_v4_series_id (v4), ==, energy_id);
@@ -768,12 +770,14 @@ test_live_reconstruct_v4_catalog_dispatch (void)
 
     char *bnr = make_bnr_history_snapshot ();
     g_assert_true (atm_chart_live_reconstruct_v4 (
-        bnr_id, bnr, "rmd", NULL, rmd_snapshot, &v4, &error));
+        bnr_id, bnr, "LaurentiuStaicu/romanian-monetary-dynamics", NULL, rmd_snapshot, &v4, &error));
     g_assert_no_error (error);
     g_assert_nonnull (v4);
     g_assert_cmpstr (atm_chart_spec_v4_series_id (v4), ==, bnr_id);
     g_assert_cmpuint (atm_chart_spec_v4_coordinate_count (v4), ==, 12u);
     g_assert_cmpuint (atm_chart_spec_v4_numeric_observation_count (v4), ==, 11u);
+    g_assert_cmpstr (atm_chart_spec_series_repository_id (
+        atm_chart_spec_v4_source_spec (v4), 0), ==, "rmd");
     g_assert_cmpstr (atm_chart_spec_v4_missing_coordinate (v4), ==, "2025-Q2");
     g_assert_cmpstr (atm_chart_spec_v4_missing_reason (v4), ==,
                      ATM_BNR_BLS_MISSING_REASON);
