@@ -741,6 +741,42 @@ int main () {
     assert (gistemp_recent_period.series_id == null);
     assert (gistemp_recent_period.intent == "unsupported_period");
 
+    var gistemp_last_decade = AskTheModel.ChartIntent.parse (
+        "Generate a GISTEMP chart for the last decade."
+    );
+    assert (gistemp_last_decade.series_id == null);
+    assert (gistemp_last_decade.intent == "unsupported_period");
+
+    var gistemp_recent_years = AskTheModel.ChartIntent.parse (
+        "Generate a GISTEMP chart for recent years."
+    );
+    assert (gistemp_recent_years.series_id == null);
+    assert (gistemp_recent_years.intent == "unsupported_period");
+
+    var gistemp_upto_year = AskTheModel.ChartIntent.parse (
+        "/chart gistemp Show the trend up to 2020."
+    );
+    assert (gistemp_upto_year.series_id == null);
+    assert (gistemp_upto_year.intent == "unsupported_period");
+
+    var gistemp_ro_last_decade = AskTheModel.ChartIntent.parse (
+        "Generează un grafic GISTEMP pentru ultimul deceniu."
+    );
+    assert (gistemp_ro_last_decade.series_id == null);
+    assert (gistemp_ro_last_decade.intent == "unsupported_period");
+
+    var gistemp_ro_recent_years = AskTheModel.ChartIntent.parse (
+        "Generează un grafic GISTEMP pentru anii recenți."
+    );
+    assert (gistemp_ro_recent_years.series_id == null);
+    assert (gistemp_ro_recent_years.intent == "unsupported_period");
+
+    var gistemp_ro_until_year = AskTheModel.ChartIntent.parse (
+        "/chart gistemp Arată tendința până în 2020."
+    );
+    assert (gistemp_ro_until_year.series_id == null);
+    assert (gistemp_ro_until_year.intent == "unsupported_period");
+
     var ei_romanian_period = AskTheModel.ChartIntent.parse (
         "Generează un grafic Energy Institute între 2000 și 2020."
     );
