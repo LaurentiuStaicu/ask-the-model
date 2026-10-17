@@ -412,16 +412,29 @@ namespace AskTheModel {
 
             string[] patterns = {
                 "\\b(from|since|after|before)\\s+(18|19|20)[0-9]{2}\\b",
+                "\\b(until|through|up to|upto|as of|as at)\\s+(18|19|20)[0-9]{2}\\b",
                 "\\bbetween\\s+(18|19|20)[0-9]{2}\\s+(and|to|through|until)\\s+(18|19|20)[0-9]{2}\\b",
                 "\\b(18|19|20)[0-9]{2}\\s+(to|through|until)\\s+(18|19|20)[0-9]{2}\\b",
-                "\\b(last|past)\\s+[0-9]+\\s+years?\\b",
+                "\\b(last|past|the last|the past)\\s+[0-9]+\\s+years?\\b",
+                "\\b(last|past|the last|the past)\\s+(one|two|three|four|five|six|seven|eight|nine|ten|eleven|twelve|twenty|thirty|forty|fifty|hundred)\\s+years?\\b",
+                "\\b(last|past|the last|the past)\\s+(few|several)\\s+years?\\b",
+                "\\b(last|past|the last|the past)\\s+decades?\\b",
+                "\\brecent\\s+(years?|decades?)\\b",
                 "\\bfrom\\s+(18|19|20)[0-9]{2}\\s+to\\s+(18|19|20)[0-9]{2}\\b",
                 "(^|\\s)între\\s+(18|19|20)[0-9]{2}\\s+(și|si)\\s+(18|19|20)[0-9]{2}($|\\s|[.,!?])",
                 "\\bintre\\s+(18|19|20)[0-9]{2}\\s+si\\s+(18|19|20)[0-9]{2}\\b",
                 "\\bdin\\s+(18|19|20)[0-9]{2}\\s+până în\\s+(18|19|20)[0-9]{2}\\b",
                 "\\bdin\\s+(18|19|20)[0-9]{2}\\s+pana in\\s+(18|19|20)[0-9]{2}\\b",
+                "\\b(până în|pana in|până la|pana la|până acum|pana acum)\\s+(18|19|20)[0-9]{2}\\b",
                 "\\bultimii\\s+[0-9]+\\s+ani\\b",
-                "\\bultimele\\s+[0-9]+\\s+ani\\b"
+                "\\bultimele\\s+[0-9]+\\s+ani\\b",
+                "\\bultimii\\s+(unu|doi|trei|patru|cinci|șase|sase|șapte|sapte|opt|nouă|noua|zece|douăzeci|douazeci)\\s+ani\\b",
+                "\\bultimele\\s+(unu|doi|trei|patru|cinci|șase|sase|șapte|sapte|opt|nouă|noua|zece|douăzeci|douazeci)\\s+ani\\b",
+                "\\bultimul\\s+deceniu\\b",
+                "\\bultimele\\s+decenii\\b",
+                "\\bultimii\\s+ani\\b",
+                "\\banii\\s+recenți\\b",
+                "\\banii\\s+recenti\\b"
             };
             foreach (string pattern in patterns) {
                 if (Regex.match_simple (
