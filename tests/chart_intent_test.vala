@@ -681,6 +681,12 @@ int main () {
     assert (explicit_year_range.series_id == null);
     assert (explicit_year_range.intent == "ambiguous");
 
+    var explicit_romanian_year_range = AskTheModel.ChartIntent.parse (
+        "/chart energy-institute între 2000 și 2020"
+    );
+    assert (explicit_romanian_year_range.series_id == null);
+    assert (explicit_romanian_year_range.intent == "ambiguous");
+
     /* A matching alias must not override a conflicting geographic/subject filter. */
     var gistemp_regional_filter = AskTheModel.ChartIntent.parse (
         "Generate a chart of GISTEMP global temperature anomalies for Romania."
