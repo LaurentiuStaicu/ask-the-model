@@ -328,6 +328,38 @@ namespace AskTheModel {
         }
 
 
+        private static bool requests_explicit_period_filter (string normalized) {
+            /*
+             * All three current adapters render the complete catalogued
+             * coverage. Filtering years is not implemented, so a period
+             * selector must not be silently ignored. Do not treat a reference
+             * baseline such as 1951-1980 by itself as a filter.
+             */
+            string[] patterns = {
+                "\\b(from|since|after|before)\\s+(19|20)[0-9]{2}\\b",
+                "\\bbetween\\s+(19|20)[0-9]{2}\\s+(and|to|through|until)\\s+(19|20)[0-9]{2}\\b",
+                "\\b(19|20)[0-9]{2}\\s+(to|through|until)\\s+(19|20)[0-9]{2}\\b",
+                "\\b(last|past)\\s+[0-9]+\\s+years?\\b",
+                "\\bfrom\\s+(19|20)[0-9]{2}\\s+to\\s+(19|20)[0-9]{2}\\b",
+                "\\bîntre\\s+(19|20)[0-9]{2}\\s+(și|si)\\s+(19|20)[0-9]{2}\\b",
+                "\\bintre\\s+(19|20)[0-9]{2}\\s+si\\s+(19|20)[0-9]{2}\\b",
+                "\\bdin\\s+(19|20)[0-9]{2}\\s+până în\\s+(19|20)[0-9]{2}\\b",
+                "\\bdin\\s+(19|20)[0-9]{2}\\s+pana in\\s+(19|20)[0-9]{2}\\b",
+                "\\bultimii\\s+[0-9]+\\s+ani\\b",
+                "\\bultimele\\s+[0-9]+\\s+ani\\b"
+            };
+            foreach (string pattern in patterns) {
+                if (Regex.match_simple (
+                        pattern,
+                        normalized,
+                        RegexCompileFlags.DEFAULT,
+                        RegexMatchFlags.DEFAULT)) {
+                    return true;
+                }
+            }
+            return false;
+        }
+
         private static bool requests_unsupported_chart_kind (string normalized) {
             return contains_bounded_any (normalized, {
                 "pie chart", "pie charts", "pie diagram",
@@ -814,7 +846,8 @@ namespace AskTheModel {
                 requests_comparison (normalized) ||
                 requests_additional_series (normalized) ||
                 requests_derived_series (normalized) ||
-                requests_unsupported_chart_kind (normalized)) {
+                requests_unsupported_chart_kind (normalized) ||
+                requests_explicit_period_filter (normalized)) {
                 return false;
             }
 
@@ -1006,6 +1039,7 @@ namespace AskTheModel {
                     requests_additional_series (normalized) ||
                     requests_derived_series (normalized) ||
                     requests_unsupported_chart_kind (normalized) ||
+                    requests_explicit_period_filter (normalized) ||
                     !request_subject_matches_series (
                         normalized, selected_series_id
                     )) {
