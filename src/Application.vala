@@ -3771,6 +3771,24 @@ namespace AskTheModel {
             ChartIntent chart_intent =
                 ChartIntent.parse (prompt);
 
+            if (chart_intent.intent == "unsupported_period") {
+                bool romanian_request = ChartCatalog.text_has_phrase (
+                    prompt, "între") ||
+                    ChartCatalog.text_has_phrase (prompt, "intre") ||
+                    ChartCatalog.text_has_phrase (prompt, "ultimii ani") ||
+                    ChartCatalog.text_has_phrase (prompt, "ultimele ani") ||
+                    ChartCatalog.text_has_phrase (prompt, "până în") ||
+                    ChartCatalog.text_has_phrase (prompt, "pana in") ||
+                    ChartCatalog.text_has_phrase (prompt, "interval");
+                string period_rejection = romanian_request
+                    ? "Filtrarea unui subinterval de ani nu este disponibilă încă. Graficul folosește întreaga acoperire temporală calificată a seriei. Cere intervalul complet disponibil; perioada de referință GISTEMP 1951–1980 este metadata de referință, nu un filtru al observațiilor."
+                    : "Custom year-range filtering is not available yet. The chart uses the full qualified time coverage of the selected series. Request its complete available range instead; GISTEMP's 1951–1980 reference baseline is metadata, not an observation-range filter.";
+                append_transcript (
+                    state.transcript, "Assistant: " + period_rejection
+                );
+                return;
+            }
+
             if (chart_intent.intent == "unsupported" ||
                 chart_intent.intent == "ambiguous") {
                 bool romanian_request = ChartCatalog.text_has_phrase (
@@ -6293,9 +6311,29 @@ namespace AskTheModel {
                 return false;
             }
 
+            if (pres09_test_live_turn == 7) {
+                state.prompt.buffer.text = "/chart gistemp from 2000 to 2020";
+                pres09_test_live_turn = 8;
+                state.send_button.clicked ();
+                return true;
+            }
+
+            if (pres09_test_live_turn != 8 ||
+                !transcript.contains (
+                    "Custom year-range filtering is not available yet"
+                ) ||
+                state.pres09_test_chart_widgets.length != 0 ||
+                state.persistent_id != null) {
+                pres09_test_finish (
+                    false,
+                    "An unsupported custom year range did not receive its explicit full-coverage refusal before model routing or persistence"
+                );
+                return false;
+            }
+
             pres09_test_finish (
                 true,
-                "unsupported population, conflicting explicit /chart selection, unknown /chart selector, unrelated diabetes prevalence with a registered GISTEMP alias, unsupported pie-chart kind, unrelated explicit /chart subject, and a valid series outside Repository Scope all failed closed without model routing, persistence or Chart/Data widgets"
+                "unsupported population, conflicting explicit /chart selection, unknown /chart selector, unrelated diabetes prevalence with a registered GISTEMP alias, unsupported pie-chart kind, unrelated explicit /chart subject, a valid series outside Repository Scope, and an unsupported custom period all failed closed without model routing, persistence or Chart/Data widgets"
             );
             return false;
         }
