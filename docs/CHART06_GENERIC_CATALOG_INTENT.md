@@ -47,6 +47,8 @@ Each entry must define, at minimum:
 
 Catalog startup validation must reject duplicate IDs, ambiguous aliases without an ambiguity marker, nonexistent adapter/profile identifiers, unsupported coordinate/kind combinations, empty provenance essentials, invalid missing policies and conflicting metadata. Catalog metadata is a selector and consistency assertion; the adapter must independently reconstruct and validate the actual series. It cannot turn metadata alone into evidence.
 
+The three currently registered profiles are initial qualification fixtures, not the intended limit of charting. The roadmap must generalize from eligible, independently qualified scientific series rather than add a permanent hard-coded route, renderer branch or adapter-enum case for every dataset. Issue #504 tracks this next eligibility milestone: prefer a generic adapter from an already-qualified `AtmSeriesContract`/series registry when it contains sufficient authority, and keep source-specific adapters only where the source bundle or scientific meaning genuinely requires them. This does **not** authorize arbitrary CSV/TSV column discovery; an unqualified column or a model-proposed ID remains ineligible without the full source/series qualification chain.
+
 ### Eligibility stages
 
 An entry is selectable only when all stages pass:
