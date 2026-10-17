@@ -327,51 +327,82 @@ namespace AskTheModel {
         }
 
 
-        private static bool requests_explicit_period_filter (string normalized) {
+        private static bool requests_explicit_period_filter (
+            string normalized,
+            string selected_series_id
+        ) {
             /*
              * All three current adapters render the complete catalogued
-             * coverage. Filtering years is not implemented, so a period
-             * selector must not be silently ignored. Do not treat a reference
-             * baseline such as 1951-1980 by itself as a filter.
+             * coverage; custom period filtering is not implemented. Explicitly
+             * exempt only the exact catalog coverage range for the selected
+             * series and a qualified GISTEMP reference baseline. Do not let any
+             * other 18xx/19xx/20xx dashed range pass by accident.
              */
-            bool has_dashed_year_range = Regex.match_simple (
-                "\\b(19|20)[0-9]{2}[-–—](19|20)[0-9]{2}\\b",
-                normalized,
-                (RegexCompileFlags) 0,
-                (RegexMatchFlags) 0
-            );
-            if (has_dashed_year_range) {
-                bool is_gistemp_reference_period =
-                    (normalized.contains ("1951-1980") ||
-                     normalized.contains ("1951–1980") ||
-                     normalized.contains ("1951—1980")) &&
-                    contains_bounded_any (normalized, {
+            string range_check = normalized;
+
+            if (selected_series_id ==
+                "climate.gistemp.global-temperature-anomaly") {
+                bool has_reference_baseline = contains_bounded_any (
+                    normalized, {
                         "baseline", "reference period", "reference mean",
                         "reference baseline", "periodo de referinta",
                         "perioada de referință", "perioada de referinta"
                     });
-                if (!is_gistemp_reference_period) {
-                    return true;
+                if (has_reference_baseline) {
+                    range_check = range_check
+                        .replace ("1951-1980", "")
+                        .replace ("1951–1980", "")
+                        .replace ("1951—1980", "")
+                        .replace ("1951 - 1980", "")
+                        .replace ("1951 – 1980", "")
+                        .replace ("1951 — 1980", "");
                 }
+
+                range_check = range_check
+                    .replace ("1880-2025", "")
+                    .replace ("1880–2025", "")
+                    .replace ("1880—2025", "")
+                    .replace ("1880 - 2025", "")
+                    .replace ("1880 – 2025", "")
+                    .replace ("1880 — 2025", "");
+            } else if (selected_series_id ==
+                       "energy.energy-institute.global-total-energy-supply") {
+                range_check = range_check
+                    .replace ("1965-2025", "")
+                    .replace ("1965–2025", "")
+                    .replace ("1965—2025", "")
+                    .replace ("1965 - 2025", "")
+                    .replace ("1965 – 2025", "")
+                    .replace ("1965 — 2025", "");
+            }
+
+            bool has_dashed_year_range = Regex.match_simple (
+                "\\b(18|19|20)[0-9]{2}\\s*[-–—]\\s*(18|19|20)[0-9]{2}\\b",
+                range_check,
+                (RegexCompileFlags) 0,
+                (RegexMatchFlags) 0
+            );
+            if (has_dashed_year_range) {
+                return true;
             }
 
             string[] patterns = {
-                "\\b(from|since|after|before)\\s+(19|20)[0-9]{2}\\b",
-                "\\bbetween\\s+(19|20)[0-9]{2}\\s+(and|to|through|until)\\s+(19|20)[0-9]{2}\\b",
-                "\\b(19|20)[0-9]{2}\\s+(to|through|until)\\s+(19|20)[0-9]{2}\\b",
+                "\\b(from|since|after|before)\\s+(18|19|20)[0-9]{2}\\b",
+                "\\bbetween\\s+(18|19|20)[0-9]{2}\\s+(and|to|through|until)\\s+(18|19|20)[0-9]{2}\\b",
+                "\\b(18|19|20)[0-9]{2}\\s+(to|through|until)\\s+(18|19|20)[0-9]{2}\\b",
                 "\\b(last|past)\\s+[0-9]+\\s+years?\\b",
-                "\\bfrom\\s+(19|20)[0-9]{2}\\s+to\\s+(19|20)[0-9]{2}\\b",
-                "(^|\\s)între\\s+(19|20)[0-9]{2}\\s+(și|si)\\s+(19|20)[0-9]{2}($|\\s|[.,!?])",
-                "\\bintre\\s+(19|20)[0-9]{2}\\s+si\\s+(19|20)[0-9]{2}\\b",
-                "\\bdin\\s+(19|20)[0-9]{2}\\s+până în\\s+(19|20)[0-9]{2}\\b",
-                "\\bdin\\s+(19|20)[0-9]{2}\\s+pana in\\s+(19|20)[0-9]{2}\\b",
+                "\\bfrom\\s+(18|19|20)[0-9]{2}\\s+to\\s+(18|19|20)[0-9]{2}\\b",
+                "(^|\\s)între\\s+(18|19|20)[0-9]{2}\\s+(și|si)\\s+(18|19|20)[0-9]{2}($|\\s|[.,!?])",
+                "\\bintre\\s+(18|19|20)[0-9]{2}\\s+si\\s+(18|19|20)[0-9]{2}\\b",
+                "\\bdin\\s+(18|19|20)[0-9]{2}\\s+până în\\s+(18|19|20)[0-9]{2}\\b",
+                "\\bdin\\s+(18|19|20)[0-9]{2}\\s+pana in\\s+(18|19|20)[0-9]{2}\\b",
                 "\\bultimii\\s+[0-9]+\\s+ani\\b",
                 "\\bultimele\\s+[0-9]+\\s+ani\\b"
             };
             foreach (string pattern in patterns) {
                 if (Regex.match_simple (
                         pattern,
-                        normalized,
+                        range_check,
                         (RegexCompileFlags) 0,
                         (RegexMatchFlags) 0)) {
                     return true;
@@ -867,7 +898,7 @@ namespace AskTheModel {
                 requests_additional_series (normalized) ||
                 requests_derived_series (normalized) ||
                 requests_unsupported_chart_kind (normalized) ||
-                requests_explicit_period_filter (normalized)) {
+                requests_explicit_period_filter (normalized, selected_series_id)) {
                 return false;
             }
 
@@ -1059,7 +1090,7 @@ namespace AskTheModel {
                     requests_additional_series (normalized) ||
                     requests_derived_series (normalized) ||
                     requests_unsupported_chart_kind (normalized) ||
-                    requests_explicit_period_filter (normalized) ||
+                    requests_explicit_period_filter (normalized, selected_series_id) ||
                     !request_subject_matches_series (
                         normalized, selected_series_id
                     )) {
