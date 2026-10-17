@@ -832,7 +832,7 @@ int main () {
     /* Negation/capability guards are clause-scoped, not whole-message vetoes. */
     var positive_ei_after_negated_gistemp =
         AskTheModel.ChartIntent.parse (
-            "Don't show me a GISTEMP chart. Generate a chart of Energy Institute total energy supply."
+            "Don't show me a GISTEMP chart. Generate a chart of total energy supply."
         );
     assert (positive_ei_after_negated_gistemp.series_id ==
         "energy.energy-institute.global-total-energy-supply");
@@ -840,7 +840,7 @@ int main () {
 
     var positive_ei_after_negated_gistemp_romanian =
         AskTheModel.ChartIntent.parse (
-            "Nu arăta un grafic GISTEMP; generează un grafic Energy Institute pentru furnizarea totală de energie."
+            "Nu arăta un grafic GISTEMP; generează un grafic privind furnizarea totală de energie."
         );
     assert (positive_ei_after_negated_gistemp_romanian.series_id ==
         "energy.energy-institute.global-total-energy-supply");
@@ -848,7 +848,7 @@ int main () {
 
     var positive_bnr_after_interpretation_question =
         AskTheModel.ChartIntent.parse (
-            "What does the GISTEMP chart show? Generate a chart of BNR credit standards."
+            "What does the GISTEMP chart show? Generate a chart of credit standards."
         );
     assert (positive_bnr_after_interpretation_question.series_id ==
         "banking.bnr.bls-c01.credit-standards-net-percentage");
@@ -871,7 +871,7 @@ int main () {
 
     var negation_of_other_series_does_not_cancel_positive =
         AskTheModel.ChartIntent.parse (
-            "Generate a GISTEMP chart. Don't show me an Energy Institute chart."
+            "Generate a GISTEMP chart. Don't show me a total energy supply chart."
         );
     assert (negation_of_other_series_does_not_cancel_positive.series_id ==
         "climate.gistemp.global-temperature-anomaly");
