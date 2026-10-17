@@ -895,6 +895,8 @@ int main () {
     assert (positive_ei_after_capability_romanian_and.series_id ==
         "energy.energy-institute.global-total-energy-supply");
     assert (positive_ei_after_capability_romanian_and.intent == "chart");
+    assert (positive_ei_after_capability_romanian_and.response_mode ==
+        "chart_and_text");
 
     var positive_ei_after_quoted_example_comma =
         AskTheModel.ChartIntent.parse (
@@ -924,6 +926,11 @@ int main () {
     assert (positive_ei_after_romanian_quoted_example_comma.series_id ==
         "energy.energy-institute.global-total-energy-supply");
     assert (positive_ei_after_romanian_quoted_example_comma.intent == "chart");
+    assert (positive_ei_after_romanian_quoted_example_comma.query.contains (
+        "Fraza „Nu arăta un grafic GISTEMP” era doar un exemplu"
+    ));
+    assert (positive_ei_after_romanian_quoted_example_comma.response_mode ==
+        "chart_and_text");
 
     var postposed_same_series_negation =
         AskTheModel.ChartIntent.parse (
