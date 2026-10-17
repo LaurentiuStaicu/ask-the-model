@@ -50,6 +50,9 @@ namespace AskTheModel {
                     "calculate", "table", "values", "value", "list", "give me",
                     "which year", "when did", "how much", "how has", "how did",
                     "what happened", "data say", "analysis", "explanation",
+                    "does this app support", "does atm support",
+                    "the phrase", "this phrase", "that phrase", "the wording",
+                    "quoted instruction",
                     "explică", "explica", "interpretează", "interpreteaza",
                     "analizează", "analizeaza", "compară", "compara",
                     "rezumă", "rezuma", "descrie", "discută", "discuta",
@@ -1272,7 +1275,11 @@ namespace AskTheModel {
                         compound_ambiguous ? "ambiguous" : "not_chart"
                     );
                 }
-                routing_prompt = positive_clause;
+                /*
+                 * The positive clause is routing evidence only. Keep the full
+                 * original prompt for response composition so a separate
+                 * interpretation/capability question is not silently dropped.
+                 */
                 routing_normalized = positive_clause.down ();
             }
 
@@ -1301,7 +1308,7 @@ namespace AskTheModel {
             if (asks_for_chart && requests_visualization) {
                 bool ambiguous = false;
                 string? selected_series_id =
-                    ChartCatalog.match_request_series_id (routing_prompt, out ambiguous);
+                    ChartCatalog.match_request_series_id (routing_normalized, out ambiguous);
 
                 if (ambiguous) {
                     return new ChartIntent (
