@@ -339,8 +339,8 @@ namespace AskTheModel {
             string[] patterns = {
                 "\\b(from|since|after|before|during|between|only|starting in|beginning in|for the period|in the period)\\s+(the\\s+)?1951\\s*[-–—]\\s*1980\\b",
                 "\\b(from|since|after|before|during|between|only|starting in|beginning in|for the period|in the period)\\s+(the\\s+)?1951\\s+(to|through|until|and)\\s+1980\\b",
-                "\\b(din|între|intre|doar în|doar in|numai în|numai in|în perioada|in perioada|pe perioada|în intervalul|in intervalul)\\s+(anii\\s+)?1951\\s*[-–—]\\s*1980\\b",
-                "\\b(din|între|intre|doar în|doar in|numai în|numai in|în perioada|in perioada|pe perioada|în intervalul|in intervalul)\\s+(anii\\s+)?1951\\s+(până în|pana in|și|si|până la|pana la)\\s+1980\\b"
+                "\\b(doar în intervalul|doar in intervalul|numai în intervalul|numai in intervalul|în intervalul|in intervalul|în perioada|in perioada|pe perioada|din|între|intre|doar în|doar in|numai în|numai in)\\s+(anii\\s+)?1951\\s*[-–—]\\s*1980\\b",
+                "\\b(doar în intervalul|doar in intervalul|numai în intervalul|numai in intervalul|în intervalul|in intervalul|în perioada|in perioada|pe perioada|din|între|intre|doar în|doar in|numai în|numai in)\\s+(anii\\s+)?1951\\s+(până în|pana in|și|si|până la|pana la|to|through|until|and)\\s+1980\\b"
             };
 
             foreach (string pattern in patterns) {
