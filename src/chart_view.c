@@ -159,19 +159,19 @@ static void append_v4_source_attribution (GtkBox *container,
     if (entry == NULL || source == NULL)
         return;
 
+    /*
+     * Keep the visible source summary human-readable and concise. Exact
+     * snapshot/path/count/decimal metadata stays in the trusted catalog,
+     * identities and Data/provenance contract, not in the ordinary paragraph.
+     */
     char *summary_text = g_strdup_printf (
-        "Primary source: %s. %s Coverage: %s–%s; %u coordinates, %u numeric observations. "
-        "Unit: %s. Pinned artifact: %s. AtM scope: %s",
+        "Primary source: %s.\n%s\n"
+        "AtM reconstructs the pinned processed dataset; it does not independently "
+        "reproduce the publisher's original processing pipeline.",
         entry->publisher_name != NULL ? entry->publisher_name : "Registered publisher",
-        entry->observation_meaning != NULL ? entry->observation_meaning : "",
-        entry->coverage_start != NULL ? entry->coverage_start : "unknown",
-        entry->coverage_end != NULL ? entry->coverage_end : "unknown",
-        entry->coordinate_count, entry->numeric_observation_count,
-        entry->y_unit != NULL ? entry->y_unit : "source-defined",
-        entry->pinned_artifact_description != NULL
-            ? entry->pinned_artifact_description : "Pinned qualified repository artifact.",
-        entry->reconstruction_scope != NULL
-            ? entry->reconstruction_scope : "Reconstructs the pinned artifact.");
+        entry->description != NULL ? entry->description
+            : (entry->display_name != NULL ? entry->display_name : "Qualified source series.")
+    );
 
     GtkWidget *summary = gtk_label_new (summary_text);
     g_free (summary_text);
