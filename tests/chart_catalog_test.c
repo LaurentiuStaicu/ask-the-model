@@ -184,6 +184,163 @@ test_catalog_does_not_promote_arbitrary_columns (void)
     g_assert_null (entry ("food_production_index"));
 }
 
+
+static void
+test_request_alias_phrase_boundaries (void)
+{
+    gboolean ambiguous = FALSE;
+    char *series_id = atm_chart_catalog_match_request_series_id (
+        "Generate a chart of global temperature anomalies over time.",
+        &ambiguous);
+    g_assert_false (ambiguous);
+    g_assert_cmpstr (series_id, ==,
+                     "climate.gistemp.global-temperature-anomaly");
+    g_free (series_id);
+
+    series_id = atm_chart_catalog_match_request_series_id (
+        "Show a chart of total energy supply (TES).", &ambiguous);
+    g_assert_false (ambiguous);
+    g_assert_cmpstr (series_id, ==,
+                     "energy.energy-institute.global-total-energy-supply");
+    g_free (series_id);
+
+    series_id = atm_chart_catalog_match_request_series_id (
+        "Generate a chart of credit standards over time.", &ambiguous);
+    g_assert_false (ambiguous);
+    g_assert_cmpstr (series_id, ==,
+                     "banking.bnr.bls-c01.credit-standards-net-percentage");
+    g_free (series_id);
+
+    /* The short alias TES is a whole token, never a substring of another word. */
+    series_id = atm_chart_catalog_match_request_series_id (
+        "Generate a chart about the latest Tesla production data.", &ambiguous);
+    g_assert_false (ambiguous);
+    g_assert_null (series_id);
+
+    series_id = atm_chart_catalog_match_request_series_id (
+        "Show a chart of population over time.", &ambiguous);
+    g_assert_false (ambiguous);
+    g_assert_null (series_id);
+
+    series_id = atm_chart_catalog_match_request_series_id (
+        "Compare GISTEMP global temperature with Energy Institute total energy supply.",
+        &ambiguous);
+    g_assert_true (ambiguous);
+    g_assert_null (series_id);
+
+    series_id = atm_chart_catalog_match_request_series_id ("   ", &ambiguous);
+    g_assert_false (ambiguous);
+    g_assert_null (series_id);
+    g_assert_null (atm_chart_catalog_match_request_series_id ("gistemp", NULL));
+}
+
+
+static void
+test_exact_chart_subject_alias_lookup (void)
+{
+    gboolean ambiguous = FALSE;
+    char *series_id = atm_chart_catalog_match_exact_alias_series_id (
+        "global temperature anomalies", &ambiguous);
+    g_assert_false (ambiguous);
+    g_assert_cmpstr (series_id, ==,
+                     "climate.gistemp.global-temperature-anomaly");
+    g_free (series_id);
+
+    series_id = atm_chart_catalog_match_exact_alias_series_id (
+        "global tes", &ambiguous);
+    g_assert_false (ambiguous);
+    g_assert_cmpstr (series_id, ==,
+                     "energy.energy-institute.global-total-energy-supply");
+    g_free (series_id);
+
+    series_id = atm_chart_catalog_match_exact_alias_series_id (
+        "diabetes prevalence", &ambiguous);
+    g_assert_false (ambiguous);
+    g_assert_null (series_id);
+
+    series_id = atm_chart_catalog_match_exact_alias_series_id (
+        "global temperature anomalies using GISTEMP", &ambiguous);
+    g_assert_false (ambiguous);
+    g_assert_null (series_id);
+
+    series_id = atm_chart_catalog_match_exact_alias_series_id (
+        "procentului net privind standardele de credit", &ambiguous);
+    g_assert_false (ambiguous);
+    g_assert_cmpstr (series_id, ==,
+                     "banking.bnr.bls-c01.credit-standards-net-percentage");
+    g_free (series_id);
+
+    g_assert_null (
+        atm_chart_catalog_match_exact_alias_series_id ("gistemp", NULL)
+    );
+}
+
+
+static void
+test_catalog_response_prose_uses_registered_metadata (void)
+{
+    static const char *series_ids[] = {
+        "climate.gistemp.global-temperature-anomaly",
+        "energy.energy-institute.global-total-energy-supply",
+        "banking.bnr.bls-c01.credit-standards-net-percentage"
+    };
+
+    for (gsize i = 0; i < G_N_ELEMENTS (series_ids); i++) {
+        const AtmChartCatalogEntry *entry =
+            atm_chart_catalog_find_id (series_ids[i]);
+        g_assert_nonnull (entry);
+
+        g_assert_cmpstr (
+            atm_chart_catalog_adapter_id_for_series (series_ids[i]), ==,
+            entry->adapter_id);
+
+        char *guidance =
+            atm_chart_catalog_response_guidance (series_ids[i]);
+        char *english =
+            atm_chart_catalog_chart_only_response (series_ids[i], FALSE);
+        char *romanian =
+            atm_chart_catalog_chart_only_response (series_ids[i], TRUE);
+        g_assert_nonnull (guidance);
+        g_assert_nonnull (english);
+        g_assert_nonnull (romanian);
+        g_assert_nonnull (strstr (guidance, entry->display_name));
+        g_assert_nonnull (strstr (guidance, entry->description));
+        g_assert_nonnull (strstr (guidance, entry->repository_full_name));
+        g_assert_nonnull (strstr (guidance, entry->y_unit));
+        g_assert_nonnull (strstr (guidance, entry->publisher_name));
+        g_assert_nonnull (strstr (guidance, entry->reconstruction_scope));
+        g_assert_nonnull (strstr (guidance, "native Chart/Data widget"));
+        g_assert_nonnull (strstr (guidance, "pseudo-table"));
+        g_assert_nonnull (strstr (english, entry->display_name));
+        g_assert_nonnull (strstr (english, "qualified Chart/Data view"));
+        g_assert_nonnull (strstr (english, "If chart construction fails"));
+        g_assert_nonnull (strstr (romanian, entry->display_name_ro));
+        g_assert_nonnull (strstr (romanian, "Cerere de grafic"));
+        g_free (guidance);
+        g_free (english);
+        g_free (romanian);
+    }
+
+    char *bnr_guidance = atm_chart_catalog_response_guidance (
+        "banking.bnr.bls-c01.credit-standards-net-percentage");
+    char *bnr_english = atm_chart_catalog_chart_only_response (
+        "banking.bnr.bls-c01.credit-standards-net-percentage", FALSE);
+    char *bnr_romanian = atm_chart_catalog_chart_only_response (
+        "banking.bnr.bls-c01.credit-standards-net-percentage", TRUE);
+    g_assert_nonnull (strstr (bnr_guidance, "2025-Q2"));
+    g_assert_nonnull (strstr (bnr_guidance, "MISSING"));
+    g_assert_nonnull (strstr (bnr_guidance, "not zero"));
+    g_assert_nonnull (strstr (bnr_english, "2025-Q2 observation is missing"));
+    g_assert_nonnull (strstr (bnr_romanian, "2025-Q2 lipsește din sursă"));
+    g_free (bnr_guidance);
+    g_free (bnr_english);
+    g_free (bnr_romanian);
+
+    g_assert_null (atm_chart_catalog_adapter_id_for_series ("population"));
+    g_assert_null (atm_chart_catalog_response_guidance ("population"));
+    g_assert_null (atm_chart_catalog_chart_only_response ("population", FALSE));
+}
+
 int
 main (int argc, char **argv)
 {
@@ -191,6 +348,9 @@ main (int argc, char **argv)
     g_test_add_func ("/chart-catalog/validates", test_catalog_validates);
     g_test_add_func ("/chart-catalog/stable-ids", test_stable_ids_and_profiles);
     g_test_add_func ("/chart-catalog/aliases", test_alias_normalization);
+    g_test_add_func ("/chart-catalog/request-phrase-boundaries", test_request_alias_phrase_boundaries);
+    g_test_add_func ("/chart-catalog/exact-subject-alias", test_exact_chart_subject_alias_lookup);
+    g_test_add_func ("/chart-catalog/response-prose-metadata", test_catalog_response_prose_uses_registered_metadata);
     g_test_add_func ("/chart-catalog/snapshot-allowlists", test_snapshot_allowlists);
     g_test_add_func ("/chart-catalog/source-semantics", test_source_semantics_and_provenance);
     g_test_add_func ("/chart-catalog/no-arbitrary-columns", test_catalog_does_not_promote_arbitrary_columns);
