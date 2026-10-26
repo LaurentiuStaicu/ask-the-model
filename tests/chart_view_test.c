@@ -87,13 +87,21 @@ static void screenshot (GtkWindow *window, const char *name)
     g_assert_true (gdk_texture_save_to_png (texture, path));
     g_free (path); g_object_unref (texture); gsk_render_node_unref (node); g_object_unref (paintable);
 }
-static AtmChartView *build_view (void)
+static AtmChartSpec *build_gistemp_spec (void)
 {
-    AtmChartSpec *spec = atm_chart_test_spec (ATM_CHART_LINE); AtmChartView *view = NULL;
-    g_assert_true (atm_chart_view_new (spec, &view, NULL)); atm_chart_spec_free (spec); return view;
+    return atm_chart_test_spec (ATM_CHART_LINE);
 }
 
-static AtmChartView *build_ei_view (void)
+static AtmChartView *build_view (void)
+{
+    AtmChartSpec *spec = build_gistemp_spec ();
+    AtmChartView *view = NULL;
+    g_assert_true (atm_chart_view_new (spec, &view, NULL));
+    atm_chart_spec_free (spec);
+    return view;
+}
+
+static AtmChartSpec *build_ei_spec (void)
 {
     const char *root = g_getenv ("ATM_CHART01_FIXTURE");
     const char *snapshot = "dc710d8e604c0fff713a3acfdb18ab47a1a902bb";
@@ -118,7 +126,6 @@ static AtmChartView *build_ei_view (void)
     AtmEnergyInstituteAdmission *admission = NULL;
     AtmEnergyInstituteVerifiedSeries *series = NULL;
     AtmChartSpec *spec = NULL;
-    AtmChartView *view = NULL;
     g_assert_true (atm_energy_institute_admission_new (
         "LaurentiuStaicu/empirical-world3-dynamics",
         snapshot, sources, &admission, &error));
@@ -133,14 +140,21 @@ static AtmChartView *build_ei_view (void)
     g_assert_no_error (error);
     atm_energy_institute_verified_series_free (series);
     atm_energy_institute_admission_free (admission);
+    return spec;
+}
+
+static AtmChartView *build_ei_view (void)
+{
+    AtmChartSpec *spec = build_ei_spec ();
+    AtmChartView *view = NULL;
+    GError *error = NULL;
     g_assert_true (atm_chart_view_new (spec, &view, &error));
     g_assert_no_error (error);
     atm_chart_spec_free (spec);
     return view;
 }
 
-static AtmChartView *
-build_bnr_view (void)
+static AtmChartSpec *build_bnr_spec (void)
 {
     const char *root = g_getenv ("ATM_BNR_BLS_FIXTURE");
     g_assert_nonnull (root);
@@ -167,7 +181,6 @@ build_bnr_view (void)
     AtmBnrBlsSeriesContract *contract = NULL;
     AtmBnrBlsVerifiedSeries *series = NULL;
     AtmChartSpec *spec = NULL;
-    AtmChartView *view = NULL;
     GError *error = NULL;
     g_assert_true (atm_bnr_bls_panel_new (
         ATM_BNR_BLS_UPSTREAM_REPOSITORY,
@@ -190,6 +203,14 @@ build_bnr_view (void)
     atm_bnr_bls_series_contract_free (contract);
     atm_bnr_bls_sra_free (sra);
     atm_bnr_bls_panel_free (panel);
+    return spec;
+}
+
+static AtmChartView *build_bnr_view (void)
+{
+    AtmChartSpec *spec = build_bnr_spec ();
+    AtmChartView *view = NULL;
+    GError *error = NULL;
     g_assert_true (atm_chart_view_new (spec, &view, &error));
     g_assert_no_error (error);
     atm_chart_spec_free (spec);
@@ -535,6 +556,149 @@ static void test_keyboard_window (void)
     gtk_window_destroy (window); settle ();
     gpointer weak = view; g_object_add_weak_pointer (G_OBJECT (view), &weak); g_object_unref (view); g_assert_null (weak);
 }
+typedef AtmChartSpec *(*ChartSpecBuilder) (void);
+
+static void assert_v4_catalog_view (const char *series_id,
+                                    ChartSpecBuilder build_source_spec,
+                                    const char *expected_first_detail,
+                                    gboolean exercise_resize)
+{
+    const AtmChartCatalogEntry *entry = atm_chart_catalog_find_id (series_id);
+    g_assert_nonnull (entry);
+    AtmChartSpec *source_spec = build_source_spec ();
+    g_assert_nonnull (source_spec);
+
+    AtmChartView *legacy_view = NULL;
+    AtmChartSpecV4 *spec_v4 = NULL;
+    AtmChartView *view = NULL;
+    GError *error = NULL;
+    g_assert_true (atm_chart_view_new (source_spec, &legacy_view, &error));
+    g_assert_no_error (error);
+    g_assert_true (atm_chart_spec_v4_new (entry, source_spec, &spec_v4, &error));
+    g_assert_no_error (error);
+    atm_chart_spec_free (source_spec);
+
+    /* The GTK adapter must reject a v4 spec whose nested identity was altered. */
+    char *mutable_id = (char *) atm_chart_spec_v4_id (spec_v4);
+    g_assert_nonnull (mutable_id);
+    char original = mutable_id[0];
+    mutable_id[0] = original == 'a' ? 'b' : 'a';
+    AtmChartView *invalid_view = NULL;
+    g_assert_false (atm_chart_view_new_v4 (spec_v4, &invalid_view, &error));
+    g_assert_null (invalid_view);
+    g_assert_nonnull (error);
+    g_clear_error (&error);
+    mutable_id[0] = original;
+
+    g_assert_true (atm_chart_view_new_v4 (spec_v4, &view, &error));
+    g_assert_no_error (error);
+    AtmChartView *occupied = view;
+    g_assert_false (atm_chart_view_new_v4 (spec_v4, &occupied, &error));
+    g_assert_true (occupied == view);
+    g_assert_nonnull (error);
+    g_clear_error (&error);
+
+    g_assert_cmpuint (atm_chart_view_row_count (view), ==, entry->coordinate_count);
+    g_assert_cmpstr (atm_chart_view_data (view), ==, atm_chart_view_data (legacy_view));
+
+    GtkWidget *chart_page = chart_page_named (view, "chart");
+    GtkWidget *data_page = chart_page_named (view, "data");
+    GtkLabel *summary = find_label_containing (
+        chart_page, entry->publisher_name != NULL ? entry->publisher_name : "Primary source:");
+    g_assert_nonnull (summary);
+    const char *summary_text = gtk_label_get_text (summary);
+    g_assert_nonnull (strstr (summary_text, "Primary source:"));
+    const char *human_description = entry->description != NULL
+        ? entry->description
+        : (entry->display_name != NULL ? entry->display_name
+                                       : "Qualified source series.");
+    g_assert_nonnull (strstr (summary_text, human_description));
+    g_assert_nonnull (strstr (summary_text,
+        "does not independently reproduce the publisher's original processing pipeline."));
+    /*
+     * The ordinary source paragraph is intentionally concise. Scientific
+     * observation semantics remain in catalog-qualified detail/provenance,
+     * while the pinned artifact is available through its explicit link below.
+     */
+    g_assert_null (strstr (summary_text, entry->pinned_artifact_description));
+    g_assert_null (strstr (summary_text, entry->reconstruction_scope));
+    g_assert_nonnull (find_link_button_with_uri (chart_page, entry->publisher_url));
+    g_assert_nonnull (find_link_button_with_uri (data_page, entry->publisher_url));
+
+    const AtmChartSpec *owned_source =
+        atm_chart_spec_v4_source_spec (spec_v4);
+    const char *snapshot = atm_chart_spec_series_snapshot_sha (owned_source, 0);
+    g_assert_nonnull (snapshot);
+    char *pinned_url = g_strdup_printf ("https://github.com/%s/blob/%s/%s",
+        entry->repository_full_name, snapshot, entry->source_path);
+    g_assert_nonnull (find_link_button_with_uri (chart_page, pinned_url));
+    g_assert_nonnull (find_link_button_with_uri (data_page, pinned_url));
+    g_free (pinned_url);
+
+    g_assert_true (atm_chart_view_select_row (view, 0));
+    char *detail = atm_chart_view_provenance (view);
+    g_assert_nonnull (detail);
+    g_assert_true (g_str_has_prefix (detail, expected_first_detail));
+    g_assert_nonnull (strstr (detail, "Primary source:"));
+    g_free (detail);
+
+    if (exercise_resize) {
+        char *data_before = g_strdup (atm_chart_view_data (view));
+        int width = 0, height = 0, scale = 0;
+        atm_chart_view_test_request_resize (view, 740, 420, 1);
+        settle ();
+        atm_chart_view_test_render_size (view, &width, &height, &scale);
+        g_assert_cmpint (width, ==, 740);
+        g_assert_cmpint (height, ==, 420);
+        g_assert_cmpint (scale, ==, 1);
+        g_assert_cmpstr (atm_chart_view_data (view), ==, data_before);
+
+        /* Minimum valid viewport uses the source renderer's existing fallback,
+         * while keeping the exact catalog-qualified Data page and rows. */
+        atm_chart_view_test_request_resize (view, 240, 140, 1);
+        settle ();
+        atm_chart_view_test_render_size (view, &width, &height, &scale);
+        g_assert_cmpint (width, ==, 240);
+        g_assert_cmpint (height, ==, 140);
+        g_assert_cmpstr (atm_chart_view_data (view), ==, data_before);
+        g_assert_cmpuint (atm_chart_view_row_count (view), ==, entry->coordinate_count);
+
+        /* Invalid resize must leave the last render and Data state intact. */
+        atm_chart_view_test_request_resize (view, 100, 100, 1);
+        settle ();
+        atm_chart_view_test_render_size (view, &width, &height, &scale);
+        g_assert_cmpint (width, ==, 240);
+        g_assert_cmpint (height, ==, 140);
+        g_assert_cmpstr (atm_chart_view_data (view), ==, data_before);
+        g_free (data_before);
+    }
+
+    atm_chart_view_show_data (view);
+    g_assert_cmpstr (atm_chart_view_visible_page (view), ==, "data");
+    g_assert_cmpstr (atm_chart_view_data (view), ==, atm_chart_view_data (legacy_view));
+    g_object_unref (view);
+    g_object_unref (legacy_view);
+    atm_chart_spec_v4_free (spec_v4);
+}
+
+static void test_v4_gtk_catalog_profiles (void)
+{
+    g_test_message ("CHART-06f GISTEMP v4 GTK Chart/Data adapter");
+    assert_v4_catalog_view (
+        "climate.gistemp.global-temperature-anomaly",
+        build_gistemp_spec, "Year: 1880\n", TRUE);
+
+    g_test_message ("CHART-06f Energy Institute v4 GTK Chart/Data adapter");
+    assert_v4_catalog_view (
+        "energy.energy-institute.global-total-energy-supply",
+        build_ei_spec, "Year: 1965\n", FALSE);
+
+    g_test_message ("CHART-06f BNR C01 v4 GTK Chart/Data adapter");
+    assert_v4_catalog_view (
+        "banking.bnr.bls-c01.credit-standards-net-percentage",
+        build_bnr_spec, "Quarter: 2022-Q4\n", FALSE);
+}
+
 static void test_invalid (void)
 {
     AtmChartSpec *spec = atm_chart_test_spec (ATM_CHART_LINE); AtmChartView *view = NULL;
@@ -556,6 +720,7 @@ int main (int argc, char **argv)
     g_test_add_func ("/chart-view/resize-coalescing",test_resize_coalescing);
     g_test_add_func ("/chart-view/transcript-anchor-minimum-viewport",test_transcript_anchor_minimum_viewport);
     g_test_add_func ("/chart-view/keyboard-window",test_keyboard_window);
+    g_test_add_func ("/chart-view/v4-catalog-profiles",test_v4_gtk_catalog_profiles);
     g_test_add_func ("/chart-view/invalid",test_invalid);
     return g_test_run ();
 }
