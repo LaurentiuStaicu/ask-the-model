@@ -344,7 +344,7 @@ static void test_gistemp_data_view_uses_qualified_snapshot (void)
             atm_chart_spec_series_snapshot_sha (rendered_spec, 0);
         g_assert_cmpstr (qualified_snapshot, ==, snapshots[i]);
         char *expected_line = g_strdup_printf (
-            "# source_snapshot\\t%s\\n", qualified_snapshot);
+            "# source_snapshot\t%s\n", qualified_snapshot);
         g_assert_nonnull (strstr (atm_chart_render_data (rendered), expected_line));
         g_free (expected_line);
         atm_chart_render_free (rendered);
