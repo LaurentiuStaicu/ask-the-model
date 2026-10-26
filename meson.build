@@ -2969,7 +2969,9 @@ chart_projection_test = executable(
   dependencies: [glib_dep, json_glib_dep],
   install: false
 )
+# The source-qualified v4 projection tests can exceed Meson's default 30-second cap in Flatpak CI.
 test('chart-projection', chart_projection_test,
+  timeout: 90,
   env: {
     'ATM_CHART01_FIXTURE': meson.current_source_dir() / 'tests/fixtures/chart01',
     'ATM_BNR_BLS_FIXTURE': meson.current_source_dir() / 'tests/fixtures/chart01/rmd-bnr-bls'
