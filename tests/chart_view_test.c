@@ -608,12 +608,20 @@ static void assert_v4_catalog_view (const char *series_id,
     g_assert_nonnull (summary);
     const char *summary_text = gtk_label_get_text (summary);
     g_assert_nonnull (strstr (summary_text, "Primary source:"));
-    g_assert_nonnull (strstr (summary_text, entry->observation_meaning));
-    g_assert_nonnull (strstr (summary_text, entry->coverage_start));
-    g_assert_nonnull (strstr (summary_text, entry->coverage_end));
-    g_assert_nonnull (strstr (summary_text, entry->y_unit));
-    g_assert_nonnull (strstr (summary_text, entry->pinned_artifact_description));
-    g_assert_nonnull (strstr (summary_text, entry->reconstruction_scope));
+    const char *human_description = entry->description != NULL
+        ? entry->description
+        : (entry->display_name != NULL ? entry->display_name
+                                       : "Qualified source series.");
+    g_assert_nonnull (strstr (summary_text, human_description));
+    g_assert_nonnull (strstr (summary_text,
+        "does not independently reproduce the publisher's original processing pipeline."));
+    /*
+     * The ordinary source paragraph is intentionally concise. Scientific
+     * observation semantics remain in catalog-qualified detail/provenance,
+     * while the pinned artifact is available through its explicit link below.
+     */
+    g_assert_null (strstr (summary_text, entry->pinned_artifact_description));
+    g_assert_null (strstr (summary_text, entry->reconstruction_scope));
     g_assert_nonnull (find_link_button_with_uri (chart_page, entry->publisher_url));
     g_assert_nonnull (find_link_button_with_uri (data_page, entry->publisher_url));
 
