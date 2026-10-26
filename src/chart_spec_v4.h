@@ -82,4 +82,9 @@ gboolean atm_chart_spec_v4_test_build_id (
 );
 #endif
 
+const char *atm_chart_spec_v4_admission_profile_id (const AtmChartSpecV4 *spec);
+const char *atm_chart_spec_v4_reconstruction_profile_id (const AtmChartSpecV4 *spec);
+/* History recipe schema is persistence metadata; it is deliberately not part of the semantic ChartSpec ID. */
+const char *atm_chart_spec_v4_history_schema_version (const AtmChartSpecV4 *spec);
+
 G_END_DECLS
