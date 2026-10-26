@@ -731,12 +731,14 @@ test_v4_identity_ignores_nonsemantic_catalog_metadata (void)
     g_free (id);
 
     /* Adding/removing other admitted pins must not renumber this selected pin. */
-    static const char *const unrelated_pins[] = {
+    const char *admitted_with_unrelated_pin[] = {
+        atm_chart_spec_series_snapshot_sha (source, 0),
         "0000000000000000000000000000000000000001"
     };
+    g_assert_nonnull (admitted_with_unrelated_pin[0]);
     variant = *entry;
-    variant.snapshot_shas = unrelated_pins;
-    variant.snapshot_count = G_N_ELEMENTS (unrelated_pins);
+    variant.snapshot_shas = admitted_with_unrelated_pin;
+    variant.snapshot_count = G_N_ELEMENTS (admitted_with_unrelated_pin);
     id = build_v4_test_identity (&variant, source);
     g_assert_cmpstr (id, ==, baseline);
     g_free (id);
