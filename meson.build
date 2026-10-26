@@ -2937,6 +2937,7 @@ chart_spec_test = executable(
    'src/scientific_derivation.c', 'tests/chart_spec_test.c'],
   include_directories: include_directories('src'),
   dependencies: [glib_dep, json_glib_dep],
+  c_args: ['-DATM_CHART_SPEC_V4_TESTING'],
   install: false
 )
 test('chart-spec', chart_spec_test,
