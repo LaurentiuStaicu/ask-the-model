@@ -343,10 +343,15 @@ static void test_gistemp_data_view_uses_qualified_snapshot (void)
         const char *qualified_snapshot =
             atm_chart_spec_series_snapshot_sha (rendered_spec, 0);
         g_assert_cmpstr (qualified_snapshot, ==, snapshots[i]);
-        char *expected_line = g_strdup_printf (
-            "# source_snapshot\t%s\n", qualified_snapshot);
-        g_assert_nonnull (strstr (atm_chart_render_data (rendered), expected_line));
-        g_free (expected_line);
+        const char *qualified_repository =
+            atm_chart_spec_series_repository_id (rendered_spec, 0);
+        const char *qualified_path =
+            atm_chart_spec_series_source_path (rendered_spec, 0);
+        char *expected_header = g_strdup_printf (
+            "# source_repository\t%s\n# source_snapshot\t%s\n# source_path\t%s\n",
+            qualified_repository, qualified_snapshot, qualified_path);
+        g_assert_nonnull (strstr (atm_chart_render_data (rendered), expected_header));
+        g_free (expected_header);
         atm_chart_render_free (rendered);
         atm_chart_spec_free (spec);
     }
