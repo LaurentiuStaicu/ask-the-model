@@ -47,6 +47,7 @@ executable(
     'src/PresentationNative.vapi',
     'src/PresentationRenderer.vala',
     'src/ChartNative.vapi',
+    'src/ChartCatalog.vapi',
     'src/ChartIntent.vala',
     'src/chart_catalog.c',
     'src/chart_view.c',
@@ -205,6 +206,7 @@ pres09_application_sources = [
     'src/PresentationNative.vapi',
     'src/PresentationRenderer.vala',
     'src/ChartNative.vapi',
+    'src/ChartCatalog.vapi',
     'src/ChartIntent.vala',
     'src/chart_catalog.c',
     'src/chart_view.c',
@@ -880,9 +882,12 @@ test(
 chart_intent_test = executable(
   'chart-intent-test',
   [
+    'src/ChartCatalog.vapi',
     'src/ChartIntent.vala',
+    'src/chart_catalog.c',
     'tests/chart_intent_test.vala'
   ],
+  include_directories: include_directories('src'),
   dependencies: [glib_dep, dependency('gobject-2.0')],
   install: false
 )
@@ -2969,7 +2974,7 @@ chart_projection_test = executable(
   dependencies: [glib_dep, json_glib_dep],
   install: false
 )
-# The source-qualified v4 projection tests can exceed Meson's default 30-second cap in Flatpak CI.
+# The catalog projection tests independently revalidate all three source profiles.
 test('chart-projection', chart_projection_test,
   timeout: 90,
   env: {
@@ -3027,7 +3032,7 @@ test('chart-render', chart_render_test,
 # CHART-03: reusable GTK component and Vala ABI; deliberately test-only.
 chart_view_test = executable(
   'chart-view-test',
-  ['src/chart_view.c', 'tests/chart_fixture.c', 'src/chart_render.c', 'src/chart_render_v4.c', 'src/chart_projection_v4.c', 'src/chart_projection.c', 'src/chart_spec_v4.c', 'src/chart_catalog.c', 'src/chart_spec.c, 'src/verified_series.c', 'src/gistemp_sra.c', 'src/gistemp_evidence.c',
+  ['src/chart_view.c', 'tests/chart_fixture.c', 'src/chart_render.c', 'src/chart_render_v4.c', 'src/chart_projection_v4.c', 'src/chart_projection.c', 'src/chart_spec_v4.c', 'src/chart_catalog.c', 'src/chart_spec.c', 'src/verified_series.c', 'src/gistemp_sra.c', 'src/gistemp_evidence.c',
    'src/gistemp_admission.c', 'src/annual_series_candidate.c',
    'src/scientific_canonical.c', 'src/scientific_artifact.c',
    'src/scientific_result.c', 'src/scientific_operation.c',
@@ -3056,7 +3061,7 @@ test('chart-view', chart_view_test,
 
 chart_view_vala_test = executable(
   'chart-view-vala-test',
-  ['src/ChartNative.vapi', 'src/chart_view.c', 'tests/chart_fixture.c', 'src/chart_render.c', 'src/chart_render_v4.c', 'src/chart_projection_v4.c', 'src/chart_projection.c', 'src/chart_spec_v4.c', 'src/chart_catalog.c', 'src/chart_spec.c, 'src/verified_series.c', 'src/gistemp_sra.c', 'src/gistemp_evidence.c',
+  ['src/ChartNative.vapi', 'src/chart_view.c', 'tests/chart_fixture.c', 'src/chart_render.c', 'src/chart_render_v4.c', 'src/chart_projection_v4.c', 'src/chart_projection.c', 'src/chart_spec_v4.c', 'src/chart_catalog.c', 'src/chart_spec.c', 'src/verified_series.c', 'src/gistemp_sra.c', 'src/gistemp_evidence.c',
    'src/gistemp_admission.c', 'src/annual_series_candidate.c',
    'src/scientific_canonical.c', 'src/scientific_artifact.c',
    'src/scientific_result.c', 'src/scientific_operation.c',
@@ -3092,7 +3097,7 @@ test('series-contract', series_contract_test)
 # CHART-05: reconstruct persisted chart recipes from the pinned History snapshot.
 chart_history_reconstruct_test = executable(
   'chart-history-reconstruct-test',
-  ['src/chart_history_reconstruct.c', 'src/chart_spec.c', 'src/verified_series.c',
+  ['src/chart_history_reconstruct.c', 'src/chart_spec_v4.c', 'src/chart_catalog.c', 'src/chart_spec.c', 'src/verified_series.c',
    'src/gistemp_sra.c', 'src/gistemp_evidence.c', 'src/gistemp_admission.c',
    'src/annual_series_candidate.c', 'src/series_contract.c', 'src/series_evidence.c',
    'src/series_evidence_adapters.c', 'src/series_sra.c', 'src/series_adapter.c',
@@ -3118,7 +3123,7 @@ test('chart-history-reconstruct', chart_history_reconstruct_test,
 pres09_chart_history_e2e_test = executable(
   'pres09-chart-history-e2e-test',
   ['src/conversation_store.c', 'src/chart_history_reconstruct.c',
-   'src/chart_spec.c', 'src/verified_series.c',
+   'src/chart_spec_v4.c', 'src/chart_catalog.c', 'src/chart_spec.c', 'src/verified_series.c',
    'src/gistemp_sra.c', 'src/gistemp_evidence.c',
    'src/gistemp_admission.c', 'src/annual_series_candidate.c',
    'src/series_contract.c', 'src/series_evidence.c',
