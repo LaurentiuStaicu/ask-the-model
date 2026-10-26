@@ -132,6 +132,7 @@ jobs:
           /tmp/verified-series-test
           cc -std=c11 -Wall -Wextra -Werror -g -O1 \
             -fsanitize=address,undefined -fno-omit-frame-pointer -Isrc \
+            -DATM_CHART_SPEC_V4_TESTING \
             src/chart_spec.c src/verified_series.c src/gistemp_sra.c src/gistemp_evidence.c \
             src/gistemp_admission.c src/annual_series_candidate.c \
             src/energy_institute_verified_series.c src/energy_institute_admission.c \
