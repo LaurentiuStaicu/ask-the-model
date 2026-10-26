@@ -689,6 +689,79 @@ test_v4_rejects_unregistered_or_incompatible_specs (void)
     atm_chart_spec_free (gistemp_line);
 }
 
+
+static char *
+build_v4_test_identity (const AtmChartCatalogEntry *entry,
+                        const AtmChartSpec *source)
+{
+    char *id = NULL;
+    GError *error = NULL;
+    g_assert_true (atm_chart_spec_v4_test_build_id (entry, source, &id, &error));
+    g_assert_no_error (error);
+    g_assert_nonnull (id);
+    return id;
+}
+
+static void
+test_v4_identity_ignores_nonsemantic_catalog_metadata (void)
+{
+    const AtmChartCatalogEntry *entry = atm_chart_catalog_find_id (
+        "climate.gistemp.global-temperature-anomaly");
+    AtmChartSpec *source = build_gistemp_chart_spec (ATM_CHART_LINE);
+    AtmChartSpecV4 *spec = NULL;
+    GError *error = NULL;
+    g_assert_nonnull (entry);
+    g_assert_true (atm_chart_spec_v4_new (entry, source, &spec, &error));
+    g_assert_no_error (error);
+
+    char *baseline = build_v4_test_identity (entry, source);
+    g_assert_cmpstr (baseline, ==, atm_chart_spec_v4_id (spec));
+
+    AtmChartCatalogEntry variant = *entry;
+    variant.history_schema_version = "99";
+    char *id = build_v4_test_identity (&variant, source);
+    g_assert_cmpstr (id, ==, baseline);
+    g_free (id);
+
+    variant = *entry;
+    variant.display_name = "Different display copy";
+    variant.description = "Updated explanatory wording only.";
+    id = build_v4_test_identity (&variant, source);
+    g_assert_cmpstr (id, ==, baseline);
+    g_free (id);
+
+    /* Adding/removing other admitted pins must not renumber this selected pin. */
+    static const char *const unrelated_pins[] = {
+        "0000000000000000000000000000000000000001"
+    };
+    variant = *entry;
+    variant.snapshot_shas = unrelated_pins;
+    variant.snapshot_count = G_N_ELEMENTS (unrelated_pins);
+    id = build_v4_test_identity (&variant, source);
+    g_assert_cmpstr (id, ==, baseline);
+    g_free (id);
+
+    variant = *entry;
+    variant.publisher_name = "Different attribution wording";
+    variant.publisher_url = "https://example.invalid/source";
+    variant.pinned_artifact_description = "Different artifact prose";
+    variant.reconstruction_scope = "Different scope prose";
+    id = build_v4_test_identity (&variant, source);
+    g_assert_cmpstr (id, ==, baseline);
+    g_free (id);
+
+    /* Scientific/chart semantics remain identity-bearing. */
+    variant = *entry;
+    variant.y_unit = "kelvin";
+    id = build_v4_test_identity (&variant, source);
+    g_assert_cmpstr (id, !=, baseline);
+    g_free (id);
+
+    g_free (baseline);
+    atm_chart_spec_v4_free (spec);
+    atm_chart_spec_free (source);
+}
+
 static void
 test_v4_revalidates_identity_tampering (void)
 {
@@ -727,5 +800,6 @@ int main (int argc, char **argv)
     g_test_add_func ("/chart-spec-v4/all-catalog-profiles", test_v4_catalog_bound_all_three_profiles);
     g_test_add_func ("/chart-spec-v4/rejections", test_v4_rejects_unregistered_or_incompatible_specs);
     g_test_add_func ("/chart-spec-v4/identity-tampering", test_v4_revalidates_identity_tampering);
+    g_test_add_func ("/chart-spec-v4/identity-ignores-nonsemantic-metadata", test_v4_identity_ignores_nonsemantic_catalog_metadata);
     return g_test_run ();
 }
