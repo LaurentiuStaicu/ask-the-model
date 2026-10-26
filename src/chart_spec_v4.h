@@ -72,4 +72,14 @@ guint atm_chart_spec_v4_numeric_observation_count (const AtmChartSpecV4 *spec);
 const char *atm_chart_spec_v4_missing_coordinate (const AtmChartSpecV4 *spec);
 const char *atm_chart_spec_v4_missing_reason (const AtmChartSpecV4 *spec);
 
+#ifdef ATM_CHART_SPEC_V4_TESTING
+/* Test-only identity hook: exercises canonicalization with metadata variants. */
+gboolean atm_chart_spec_v4_test_build_id (
+    const AtmChartCatalogEntry *entry,
+    const AtmChartSpec *source,
+    char **out_id,
+    GError **error
+);
+#endif
+
 G_END_DECLS
