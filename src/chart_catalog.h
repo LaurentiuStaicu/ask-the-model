@@ -56,6 +56,7 @@ typedef enum {
 typedef struct {
     const char *series_id;
     const char *display_name;
+    const char *display_name_ro;
     const char *description;
     const char *const *aliases;
     gsize alias_count;
@@ -126,6 +127,56 @@ const AtmChartCatalogEntry *atm_chart_catalog_find_id (const char *series_id);
 AtmChartCatalogLookupResult atm_chart_catalog_find_alias (
     const char *alias,
     const AtmChartCatalogEntry **out_entry
+);
+
+
+/*
+ * Find one registered alias as a complete phrase in free-form request text.
+ * Returns a newly allocated stable series ID for one unique matching entry,
+ * NULL for no match/invalid text/ambiguity; *out_ambiguous distinguishes
+ * ambiguity from a normal no-match. This function does NOT establish that the
+ * request positively asks for a chart; callers must independently qualify it.
+ */
+char *atm_chart_catalog_match_request_series_id (
+    const char *request,
+    gboolean *out_ambiguous
+);
+
+
+
+
+/* Exact normalized alias lookup for a parsed chart subject; unlike the free-form
+ * request matcher, this rejects extra unsupported subject words before/after
+ * the alias. */
+char *atm_chart_catalog_match_exact_alias_series_id (
+    const char *subject,
+    gboolean *out_ambiguous
+);
+
+/* Unicode-aware whole-word/phrase matcher shared by deterministic intent gates. */
+gboolean atm_chart_catalog_text_has_phrase (
+    const char *text,
+    const char *phrase
+);
+
+/* Return the closed native adapter selector associated with a registered series. */
+const char *atm_chart_catalog_adapter_id_for_series (const char *series_id);
+
+/* Match a selected conversation repository ID to the catalog-owned repository binding. */
+gboolean atm_chart_catalog_repository_matches_series (
+    const char *series_id,
+    const char *repository_id
+);
+
+
+/* Catalog-derived prose for the model prompt and chart-only UI. Returns a
+ * newly allocated string; NULL means that the series ID is not registered.
+ * These helpers expose only reviewed compiled-in metadata, never data values.
+ */
+char *atm_chart_catalog_response_guidance (const char *series_id);
+char *atm_chart_catalog_chart_only_response (
+    const char *series_id,
+    gboolean romanian
 );
 
 /* Exact 40-hex snapshot check against this entry's closed allowlist. */
