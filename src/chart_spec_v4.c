@@ -354,9 +354,11 @@ build_id (const AtmChartCatalogEntry *entry,
 
     add_text (builder, "schema", ATM_CHART_SPEC_V4_SCHEMA);
     add_text (builder, "catalog_schema", ATM_CHART_CATALOG_SCHEMA);
-    add_text (builder, "catalog_version", ATM_CHART_CATALOG_VERSION);
+    /* Identity follows selected-series/source semantics and render contract.
+     * Catalog release version, unrelated admitted pins, History schema migration
+     * version, and user-facing presentation copy are intentionally excluded.
+     */
     add_text (builder, "series_id", entry->series_id);
-    add_text (builder, "display_name", entry->display_name);
     add_text (builder, "adapter_id", entry->adapter_id);
     add_text (builder, "catalog_series_profile_id", entry->series_profile_id);
     add_text (builder, "catalog_series_profile_version", entry->series_profile_version);
@@ -370,16 +372,10 @@ build_id (const AtmChartCatalogEntry *entry,
               atm_chart_spec_series_scientific_id (source, 0));
     add_text (builder, "source_qualified_series_id",
               atm_chart_spec_series_qualified_id (source, 0));
-    add_text (builder, "history_schema_version", entry->history_schema_version);
 
     add_text (builder, "repository_key", entry->repository_key);
     add_text (builder, "repository_full_name", entry->repository_full_name);
     add_text (builder, "snapshot_sha", atm_chart_spec_series_snapshot_sha (source, 0));
-    json_builder_set_member_name (builder, "admitted_snapshots");
-    json_builder_begin_array (builder);
-    for (gsize i = 0; i < entry->snapshot_count; i++)
-        json_builder_add_string_value (builder, entry->snapshot_shas[i]);
-    json_builder_end_array (builder);
     add_text (builder, "source_path", entry->source_path);
 
     add_text (builder, "x_coordinate_semantics", entry->x_coordinate_semantics);
@@ -409,10 +405,6 @@ build_id (const AtmChartCatalogEntry *entry,
     json_builder_add_string_value (builder, "LINE");
     add_text (builder, "display_profile_id", entry->display_profile_id);
     add_text (builder, "display_profile_version", entry->display_profile_version);
-    add_text (builder, "publisher_name", entry->publisher_name);
-    add_text (builder, "publisher_url", entry->publisher_url);
-    add_text (builder, "pinned_artifact_description", entry->pinned_artifact_description);
-    add_text (builder, "reconstruction_scope", entry->reconstruction_scope);
 
     json_builder_end_object (builder);
     JsonNode *root = json_builder_get_root (builder);
@@ -425,6 +417,20 @@ build_id (const AtmChartCatalogEntry *entry,
     g_object_unref (builder);
     return ok;
 }
+
+#ifdef ATM_CHART_SPEC_V4_TESTING
+gboolean
+atm_chart_spec_v4_test_build_id (const AtmChartCatalogEntry *entry,
+                                  const AtmChartSpec *source,
+                                  char **out_id,
+                                  GError **error)
+{
+    if (entry == NULL || source == NULL || out_id == NULL || *out_id != NULL)
+        return reject (error, ATM_CHART_SPEC_V4_ERROR_ARGUMENT,
+            "Test identity inputs must be non-NULL and output initially empty.");
+    return build_id (entry, source, out_id, error);
+}
+#endif
 
 gboolean
 atm_chart_spec_v4_new (const AtmChartCatalogEntry *entry,
