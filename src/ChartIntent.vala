@@ -1104,7 +1104,12 @@ namespace AskTheModel {
             out bool ambiguous
         ) {
             ambiguous = false;
-            string segmented = prompt
+            /*
+             * Normalize before splitting: sentence-initial "And"/"Și" and
+             * uppercase user text must behave like their lowercase forms.
+             * The original prompt remains intact for response composition.
+             */
+            string segmented = prompt.down ()
                 .replace ("\r\n", "\n")
                 .replace ("\r", "\n")
                 .replace (",", "\n")
