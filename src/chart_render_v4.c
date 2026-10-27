@@ -2,6 +2,7 @@
 
 #include "scientific_canonical.h"
 
+#include <json-glib/json-glib.h>
 #include <math.h>
 #include <string.h>
 
@@ -168,7 +169,6 @@ projection_labels_fit (const AtmChartProjection *projection,
 
     const double left = 84.0;
     const double top = 108.0;
-    const double plot_width = (double) width - 112.0;
     const double plot_height = (double) height - 210.0;
     cairo_surface_t *measure_surface = cairo_image_surface_create (
         CAIRO_FORMAT_ARGB32, 1, 1);
