@@ -1,4 +1,5 @@
 #include "chart_projection.h"
+#include "chart_projection_v4.h"
 #include "chart_projection_internal.h"
 #include "energy_institute_verified_series.h"
 #include "energy_institute_admission.h"
@@ -538,6 +539,160 @@ static void test_tampering (void)
     g_assert_true (atm_chart_projection_validate (p, NULL));
     atm_chart_projection_free (p);
 }
+
+static AtmChartSpecV4 *
+v4_spec_from_source (const char *series_id, AtmChartSpec *source)
+{
+    const AtmChartCatalogEntry *entry = atm_chart_catalog_find_id (series_id);
+    AtmChartSpecV4 *spec = NULL;
+    GError *error = NULL;
+    g_assert_nonnull (entry);
+    g_assert_true (atm_chart_spec_v4_new (entry, source, &spec, &error));
+    g_assert_no_error (error);
+    atm_chart_spec_free (source);
+    return spec;
+}
+
+static AtmChartProjectionV4 *
+project_v4 (const AtmChartSpecV4 *spec, double width, double height)
+{
+    AtmChartProjectionV4 *projection = NULL;
+    GError *error = NULL;
+    g_assert_true (atm_chart_projection_v4_new (
+        spec, width, height, &projection, &error));
+    g_assert_no_error (error);
+    return projection;
+}
+
+static void
+test_v4_projection_all_catalog_profiles (void)
+{
+    AtmChartSpecV4 *gistemp_spec = v4_spec_from_source (
+        "climate.gistemp.global-temperature-anomaly",
+        specification (ATM_CHART_LINE));
+    AtmChartProjectionV4 *gistemp = project_v4 (gistemp_spec, 580, 220);
+    g_assert_cmpstr (atm_chart_projection_v4_schema (gistemp), ==,
+                     ATM_CHART_PROJECTION_V4_SCHEMA);
+    g_assert_cmpstr (atm_chart_projection_v4_series_id (gistemp), ==,
+                     "climate.gistemp.global-temperature-anomaly");
+    g_assert_cmpstr (atm_chart_projection_v4_policy (gistemp), ==,
+                     "atm-display/gistemp-linear/1");
+    g_assert_cmpuint (atm_chart_projection_v4_coordinate_count (gistemp), ==, 146u);
+    g_assert_cmpuint (atm_chart_projection_v4_numeric_observation_count (gistemp), ==, 146u);
+    g_assert_cmpuint (atm_chart_projection_count (
+        atm_chart_projection_v4_source_projection (gistemp)), ==, 146u);
+    g_assert_true (atm_chart_projection_v4_validate (gistemp, NULL));
+    g_assert_cmpstr (atm_chart_spec_id (
+        atm_chart_projection_spec (atm_chart_projection_v4_source_projection (gistemp))), ==,
+        atm_chart_spec_id (atm_chart_spec_v4_source_spec (
+            atm_chart_projection_v4_spec (gistemp))));
+    atm_chart_projection_v4_free (gistemp);
+    atm_chart_spec_v4_free (gistemp_spec);
+
+    const char *snapshots[] = {
+        "d9e249339663015f6d1c05752338a955bf64ad0b",
+        "dc710d8e604c0fff713a3acfdb18ab47a1a902bb"
+    };
+    for (guint i = 0; i < G_N_ELEMENTS (snapshots); i++) {
+        AtmChartSpecV4 *ei_spec = v4_spec_from_source (
+            "energy.energy-institute.global-total-energy-supply",
+            ei_specification (ATM_CHART_LINE, snapshots[i]));
+        AtmChartProjectionV4 *ei = project_v4 (ei_spec, 580, 220);
+        g_assert_cmpstr (atm_chart_projection_v4_policy (ei), ==,
+                         "atm-display/energy-institute-tes-linear/1");
+        g_assert_cmpuint (atm_chart_projection_v4_coordinate_count (ei), ==, 61u);
+        g_assert_cmpuint (atm_chart_projection_v4_numeric_observation_count (ei), ==, 61u);
+        g_assert_cmpuint (atm_chart_projection_count (
+            atm_chart_projection_v4_source_projection (ei)), ==, 61u);
+        g_assert_true (atm_chart_projection_v4_validate (ei, NULL));
+        atm_chart_projection_v4_free (ei);
+        atm_chart_spec_v4_free (ei_spec);
+    }
+
+    AtmChartSpecV4 *bnr_spec = v4_spec_from_source (
+        "banking.bnr.bls-c01.credit-standards-net-percentage",
+        bnr_specification (ATM_CHART_LINE));
+    AtmChartProjectionV4 *bnr = project_v4 (bnr_spec, 580, 220);
+    const AtmChartProjection *bnr_projection =
+        atm_chart_projection_v4_source_projection (bnr);
+    g_assert_cmpstr (atm_chart_projection_v4_policy (bnr), ==,
+                     "atm-display/bnr-bls-c01-quarterly-gap/1");
+    g_assert_cmpuint (atm_chart_projection_v4_coordinate_count (bnr), ==, 12u);
+    g_assert_cmpuint (atm_chart_projection_v4_numeric_observation_count (bnr), ==, 11u);
+    g_assert_cmpstr (atm_chart_spec_v4_missing_coordinate (
+        atm_chart_projection_v4_spec (bnr)), ==, "2025-Q2");
+    g_assert_cmpstr (atm_chart_spec_v4_missing_reason (
+        atm_chart_projection_v4_spec (bnr)), ==, "source_round_not_retained");
+    g_assert_cmpuint (atm_chart_projection_count (bnr_projection), ==, 11u);
+    for (guint i = 0; i < 10u; i++)
+        g_assert_cmpuint (atm_chart_projection_point (bnr_projection, i)->point_index, ==, i);
+    g_assert_cmpuint (atm_chart_projection_point (bnr_projection, 10)->point_index, ==, 11u);
+    g_assert_true (atm_chart_projection_v4_validate (bnr, NULL));
+    atm_chart_projection_v4_free (bnr);
+    atm_chart_spec_v4_free (bnr_spec);
+}
+
+static void
+test_v4_projection_rejections_and_tampering (void)
+{
+    AtmChartSpecV4 *spec = v4_spec_from_source (
+        "climate.gistemp.global-temperature-anomaly",
+        specification (ATM_CHART_LINE));
+    AtmChartProjectionV4 *projection = NULL;
+    GError *error = NULL;
+
+    g_assert_false (atm_chart_projection_v4_new (
+        NULL, 580, 220, &projection, &error));
+    g_assert_nonnull (error);
+    g_clear_error (&error);
+    g_assert_null (projection);
+
+    g_assert_false (atm_chart_projection_v4_new (
+        spec, 319.0, 220, &projection, &error));
+    g_assert_nonnull (error);
+    g_clear_error (&error);
+    g_assert_null (projection);
+
+    char *id = (char *) atm_chart_spec_v4_id (spec);
+    char saved = id[0];
+    id[0] = saved == 'a' ? 'b' : 'a';
+    g_assert_false (atm_chart_projection_v4_new (
+        spec, 580, 220, &projection, &error));
+    g_assert_nonnull (error);
+    g_clear_error (&error);
+    g_assert_null (projection);
+    id[0] = saved;
+
+    projection = project_v4 (spec, 580, 220);
+    AtmChartProjectionV4 *saved_projection = projection;
+    g_assert_false (atm_chart_projection_v4_new (
+        spec, 580, 220, &projection, &error));
+    g_assert_error (error, ATM_CHART_PROJECTION_V4_ERROR,
+                    ATM_CHART_PROJECTION_V4_ERROR_ARGUMENT);
+    g_clear_error (&error);
+    g_assert_true (projection == saved_projection);
+
+    AtmChartProjectedPoint *point = (AtmChartProjectedPoint *)
+        atm_chart_projection_point (
+            atm_chart_projection_v4_source_projection (projection), 0);
+    guint old_index = point->point_index;
+    point->point_index++;
+    g_assert_false (atm_chart_projection_v4_validate (projection, NULL));
+    point->point_index = old_index;
+    g_assert_true (atm_chart_projection_v4_validate (projection, NULL));
+
+    atm_chart_projection_v4_free (projection);
+    atm_chart_spec_v4_free (spec);
+    g_assert_false (atm_chart_projection_v4_validate (NULL, NULL));
+    g_assert_null (atm_chart_projection_v4_spec (NULL));
+    g_assert_null (atm_chart_projection_v4_source_projection (NULL));
+    g_assert_null (atm_chart_projection_v4_series_id (NULL));
+    g_assert_null (atm_chart_projection_v4_policy (NULL));
+    g_assert_cmpuint (atm_chart_projection_v4_coordinate_count (NULL), ==, 0u);
+    g_assert_cmpuint (atm_chart_projection_v4_numeric_observation_count (NULL), ==, 0u);
+    atm_chart_projection_v4_free (NULL);
+}
+
 int main (int argc, char **argv)
 {
     g_test_init (&argc, &argv, NULL);
@@ -549,5 +704,7 @@ int main (int argc, char **argv)
     g_test_add_func ("/chart-projection/ei-decimal-conversion", test_ei_decimal_conversion);
     g_test_add_func ("/chart-projection/ei-policy-resize", test_ei_projection_both_snapshots_and_resize);
     g_test_add_func ("/chart-projection/ei-tampering", test_ei_projection_tampering);
+    g_test_add_func ("/chart-projection-v4/all-catalog-profiles", test_v4_projection_all_catalog_profiles);
+    g_test_add_func ("/chart-projection-v4/rejections-tampering", test_v4_projection_rejections_and_tampering);
     return g_test_run ();
 }
