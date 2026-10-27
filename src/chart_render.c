@@ -181,8 +181,10 @@ static char *data_view (const AtmChartSpec *spec)
 char *
 atm_chart_render_data_for_spec (const AtmChartSpec *spec, GError **error)
 {
-    if (spec == NULL)
-        return reject (error, "Data serialization requires a qualified ChartSpec.");
+    if (spec == NULL) {
+        reject (error, "Data serialization requires a qualified ChartSpec.");
+        return NULL;
+    }
 
     AtmChartSpec *owned = NULL;
     if (!atm_chart_spec_rebuild (spec, &owned, error))
