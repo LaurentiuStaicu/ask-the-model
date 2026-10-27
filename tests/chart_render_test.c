@@ -856,7 +856,7 @@ int main (int argc, char **argv)
     g_test_add_func ("/chart-render/fallback-arguments", test_fallback_arguments);
     g_test_add_func ("/chart-render/bnr-data-view-and-real-gap", test_bnr_data_view_and_real_gap);
     g_test_add_func ("/chart-render/ei-exact-data-resize", test_ei_projection_renders_exact_data_and_resizes);
-    g_test_add_func ("/chart-render-v4/legacy-parity", test_v4_render_profiles_exact_legacy_parity);
+    g_test_add_func ("/chart-render-v4/generic-painter", test_v4_render_profiles_projection_and_data_parity);
     g_test_add_func ("/chart-render-v4/gistemp-data-qualified-snapshot", test_v4_gistemp_data_view_uses_qualified_snapshot);
     g_test_add_func ("/chart-render-v4/fallback-data", test_v4_render_fallback_keeps_exact_data);
     g_test_add_func ("/chart-render-v4/rejections-tampering", test_v4_render_rejections_and_tampering);
