@@ -332,6 +332,36 @@ static void save_preview (AtmChartRender *r, const char *name, gboolean data)
         g_assert_true (g_file_set_contents (path, atm_chart_render_data (r), -1, NULL)); g_free (path);
     }
 }
+static void test_gistemp_data_view_uses_qualified_snapshot (void)
+{
+    const char *snapshots[] = {
+        GISTEMP_SNAPSHOT_INITIAL,
+        GISTEMP_SNAPSHOT_CURRENT
+    };
+    for (guint i = 0; i < G_N_ELEMENTS (snapshots); i++) {
+        AtmChartSpec *spec = specification_for_snapshot (
+            ATM_CHART_LINE, snapshots[i]);
+        AtmChartRender *rendered = render (spec, 860, 500, 1);
+        const AtmChartSpec *rendered_spec = atm_chart_render_spec (rendered);
+        const char *data = atm_chart_render_data (rendered);
+        g_assert_cmpstr (
+            atm_chart_spec_series_snapshot_sha (rendered_spec, 0), ==,
+            snapshots[i]);
+        g_assert_cmpstr (
+            atm_chart_spec_series_repository_id (rendered_spec, 0), ==, "ewd");
+        g_assert_nonnull (strstr (data,
+            "# source_repository\tLaurentiuStaicu/empirical-world3-dynamics\n"));
+        char *snapshot_line = g_strdup_printf (
+            "# source_snapshot\t%s\n", snapshots[i]);
+        g_assert_nonnull (strstr (data, snapshot_line));
+        g_free (snapshot_line);
+        g_assert_nonnull (strstr (data,
+            "# source_path\tscience/data/processed/nasa_gistemp_global_2026.csv\n"));
+        atm_chart_render_free (rendered);
+        atm_chart_spec_free (spec);
+    }
+}
+
 static void test_line_data_ownership (void)
 {
     AtmChartSpec *spec = specification (ATM_CHART_LINE);
