@@ -1,4 +1,6 @@
 #include "chart_spec.h"
+#include "chart_spec_v4.h"
+#include "chart_catalog.h"
 #include "energy_institute_verified_series.h"
 #include "energy_institute_admission.h"
 #include "bnr_bls_verified_series.h"
@@ -487,6 +489,320 @@ test_ei_v2_rejections_and_tampering (void)
     atm_energy_institute_verified_series_free (source);
 }
 
+
+static AtmChartSpec *
+build_gistemp_chart_spec (AtmChartKind kind)
+{
+    AtmVerifiedSeries *source = build ();
+    const AtmVerifiedSeries *inputs[] = {source};
+    AtmChartSpec *spec = NULL;
+    GError *error = NULL;
+    g_assert_true (atm_chart_spec_new (kind, inputs, G_N_ELEMENTS (inputs),
+                                       &spec, &error));
+    g_assert_no_error (error);
+    atm_verified_series_free (source);
+    return spec;
+}
+
+static AtmChartSpec *
+build_ei_chart_spec (const char *snapshot, AtmChartKind kind)
+{
+    AtmEnergyInstituteVerifiedSeries *source = build_ei_series (snapshot);
+    AtmChartSpec *spec = NULL;
+    GError *error = NULL;
+    g_assert_true (atm_chart_spec_new_energy_institute_v2 (kind, source,
+                                                           &spec, &error));
+    g_assert_no_error (error);
+    atm_energy_institute_verified_series_free (source);
+    return spec;
+}
+
+static AtmChartSpec *
+build_bnr_chart_spec (AtmChartKind kind)
+{
+    AtmBnrBlsVerifiedSeries *source = build_bnr_verified_series ();
+    AtmChartSpec *spec = NULL;
+    GError *error = NULL;
+    g_assert_true (atm_chart_spec_new_bnr_bls_c01_v3 (kind, source,
+                                                       &spec, &error));
+    g_assert_no_error (error);
+    atm_bnr_bls_verified_series_free (source);
+    return spec;
+}
+
+static void
+test_v4_catalog_bound_all_three_profiles (void)
+{
+    const AtmChartCatalogEntry *gistemp_entry = atm_chart_catalog_find_id (
+        "climate.gistemp.global-temperature-anomaly");
+    const AtmChartCatalogEntry *ei_entry = atm_chart_catalog_find_id (
+        "energy.energy-institute.global-total-energy-supply");
+    const AtmChartCatalogEntry *bnr_entry = atm_chart_catalog_find_id (
+        "banking.bnr.bls-c01.credit-standards-net-percentage");
+    g_assert_nonnull (gistemp_entry);
+    g_assert_nonnull (ei_entry);
+    g_assert_nonnull (bnr_entry);
+
+    AtmChartSpec *gistemp_source = build_gistemp_chart_spec (ATM_CHART_LINE);
+    AtmChartSpecV4 *gistemp = NULL, *gistemp_again = NULL;
+    GError *error = NULL;
+    g_assert_true (atm_chart_spec_v4_new (gistemp_entry, gistemp_source,
+                                          &gistemp, &error));
+    g_assert_no_error (error);
+    g_assert_cmpstr (atm_chart_spec_v4_schema (gistemp), ==,
+                     ATM_CHART_SPEC_V4_SCHEMA);
+    g_assert_cmpstr (atm_chart_spec_v4_series_id (gistemp), ==,
+                     gistemp_entry->series_id);
+    g_assert_true (atm_chart_spec_v4_catalog_entry (gistemp) == gistemp_entry);
+    g_assert_cmpint (atm_chart_spec_v4_kind (gistemp), ==, ATM_CHART_LINE);
+    g_assert_cmpuint (atm_chart_spec_v4_coordinate_count (gistemp), ==, 146u);
+    g_assert_cmpuint (atm_chart_spec_v4_numeric_observation_count (gistemp), ==, 146u);
+    g_assert_null (atm_chart_spec_v4_missing_coordinate (gistemp));
+    g_assert_null (atm_chart_spec_v4_missing_reason (gistemp));
+    g_assert_true (atm_chart_spec_v4_validate (gistemp, &error));
+    g_assert_no_error (error);
+    g_assert_true (atm_chart_spec_v4_rebuild (gistemp, &gistemp_again, &error));
+    g_assert_no_error (error);
+    g_assert_cmpstr (atm_chart_spec_v4_id (gistemp), ==,
+                     atm_chart_spec_v4_id (gistemp_again));
+    g_assert_cmpstr (atm_chart_spec_id (
+        atm_chart_spec_v4_source_spec (gistemp)), ==,
+        atm_chart_spec_id (gistemp_source));
+    atm_chart_spec_v4_free (gistemp_again);
+    atm_chart_spec_v4_free (gistemp);
+    atm_chart_spec_free (gistemp_source);
+
+    const char *old_snapshot = "d9e249339663015f6d1c05752338a955bf64ad0b";
+    const char *current_snapshot = "dc710d8e604c0fff713a3acfdb18ab47a1a902bb";
+    AtmChartSpec *ei_old_source = build_ei_chart_spec (old_snapshot, ATM_CHART_LINE);
+    AtmChartSpec *ei_current_source = build_ei_chart_spec (current_snapshot, ATM_CHART_LINE);
+    AtmChartSpecV4 *ei_old = NULL, *ei_current = NULL;
+    g_assert_true (atm_chart_spec_v4_new (ei_entry, ei_old_source, &ei_old, &error));
+    g_assert_no_error (error);
+    g_assert_true (atm_chart_spec_v4_new (ei_entry, ei_current_source, &ei_current, &error));
+    g_assert_no_error (error);
+    g_assert_cmpuint (atm_chart_spec_v4_coordinate_count (ei_current), ==, 61u);
+    g_assert_cmpuint (atm_chart_spec_v4_numeric_observation_count (ei_current), ==, 61u);
+    g_assert_cmpstr (atm_chart_spec_v4_id (ei_old), !=,
+                     atm_chart_spec_v4_id (ei_current));
+    g_assert_cmpstr (atm_chart_spec_x_unit (
+        atm_chart_spec_v4_source_spec (ei_current)), ==, "calendar_year");
+    g_assert_true (atm_chart_spec_v4_validate (ei_current, &error));
+    g_assert_no_error (error);
+    atm_chart_spec_v4_free (ei_old);
+    atm_chart_spec_v4_free (ei_current);
+    atm_chart_spec_free (ei_old_source);
+    atm_chart_spec_free (ei_current_source);
+
+    AtmChartSpec *bnr_source = build_bnr_chart_spec (ATM_CHART_LINE);
+    AtmChartSpecV4 *bnr = NULL, *bnr_again = NULL;
+    g_assert_true (atm_chart_spec_v4_new (bnr_entry, bnr_source, &bnr, &error));
+    g_assert_no_error (error);
+    g_assert_cmpuint (atm_chart_spec_v4_coordinate_count (bnr), ==, 12u);
+    g_assert_cmpuint (atm_chart_spec_v4_numeric_observation_count (bnr), ==, 11u);
+    g_assert_cmpstr (atm_chart_spec_v4_missing_coordinate (bnr), ==, "2025-Q2");
+    g_assert_cmpstr (atm_chart_spec_v4_missing_reason (bnr), ==,
+                     "source_round_not_retained");
+    AtmChartPointView missing = {0};
+    g_assert_true (atm_chart_spec_point (
+        atm_chart_spec_v4_source_spec (bnr), 0, 10, &missing));
+    g_assert_cmpint (missing.y_status, ==, ATM_CHART_POINT_MISSING);
+    g_assert_null (missing.source_decimal);
+    g_assert_null (missing.coefficient);
+    g_assert_cmpstr (missing.missing_reason, ==, "source_round_not_retained");
+    g_assert_true (atm_chart_spec_v4_rebuild (bnr, &bnr_again, &error));
+    g_assert_no_error (error);
+    g_assert_cmpstr (atm_chart_spec_v4_id (bnr), ==,
+                     atm_chart_spec_v4_id (bnr_again));
+    atm_chart_spec_v4_free (bnr_again);
+    atm_chart_spec_v4_free (bnr);
+    atm_chart_spec_free (bnr_source);
+}
+
+static void
+test_v4_rejects_unregistered_or_incompatible_specs (void)
+{
+    const AtmChartCatalogEntry *gistemp_entry = atm_chart_catalog_find_id (
+        "climate.gistemp.global-temperature-anomaly");
+    const AtmChartCatalogEntry *ei_entry = atm_chart_catalog_find_id (
+        "energy.energy-institute.global-total-energy-supply");
+    g_assert_nonnull (gistemp_entry);
+    g_assert_nonnull (ei_entry);
+
+    AtmChartSpec *gistemp_line = build_gistemp_chart_spec (ATM_CHART_LINE);
+    AtmChartSpecV4 *spec = NULL;
+    GError *error = NULL;
+
+    AtmChartCatalogEntry forged = *gistemp_entry;
+    g_assert_false (atm_chart_spec_v4_new (&forged, gistemp_line, &spec, &error));
+    g_assert_error (error, ATM_CHART_SPEC_V4_ERROR, ATM_CHART_SPEC_V4_ERROR_CATALOG);
+    g_clear_error (&error);
+    g_assert_null (spec);
+
+    g_assert_false (atm_chart_spec_v4_new (ei_entry, gistemp_line, &spec, &error));
+    g_assert_error (error, ATM_CHART_SPEC_V4_ERROR, ATM_CHART_SPEC_V4_ERROR_PROFILE);
+    g_clear_error (&error);
+    g_assert_null (spec);
+
+    AtmChartSpec *gistemp_scatter = build_gistemp_chart_spec (ATM_CHART_SCATTER);
+    g_assert_false (atm_chart_spec_v4_new (gistemp_entry, gistemp_scatter,
+                                            &spec, &error));
+    g_assert_error (error, ATM_CHART_SPEC_V4_ERROR, ATM_CHART_SPEC_V4_ERROR_SEMANTICS);
+    g_clear_error (&error);
+    g_assert_null (spec);
+
+    g_assert_false (atm_chart_spec_v4_new (NULL, gistemp_line, &spec, &error));
+    g_assert_error (error, ATM_CHART_SPEC_V4_ERROR, ATM_CHART_SPEC_V4_ERROR_CATALOG);
+    g_clear_error (&error);
+    g_assert_null (spec);
+    g_assert_false (atm_chart_spec_v4_new (gistemp_entry, NULL, &spec, &error));
+    g_assert_error (error, ATM_CHART_SPEC_V4_ERROR, ATM_CHART_SPEC_V4_ERROR_ARGUMENT);
+    g_clear_error (&error);
+    g_assert_null (spec);
+    g_assert_false (atm_chart_spec_v4_new (gistemp_entry, gistemp_line, NULL, &error));
+    g_assert_error (error, ATM_CHART_SPEC_V4_ERROR, ATM_CHART_SPEC_V4_ERROR_ARGUMENT);
+    g_clear_error (&error);
+
+    AtmChartSpecV4 *occupied = NULL;
+    g_assert_true (atm_chart_spec_v4_new (gistemp_entry, gistemp_line,
+                                           &occupied, &error));
+    g_assert_no_error (error);
+    AtmChartSpecV4 *saved_occupied = occupied;
+    g_assert_false (atm_chart_spec_v4_new (gistemp_entry, gistemp_line,
+                                            &occupied, &error));
+    g_assert_error (error, ATM_CHART_SPEC_V4_ERROR, ATM_CHART_SPEC_V4_ERROR_ARGUMENT);
+    g_clear_error (&error);
+    g_assert_true (occupied == saved_occupied);
+    atm_chart_spec_v4_free (occupied);
+
+    g_assert_null (atm_chart_spec_v4_id (NULL));
+    g_assert_null (atm_chart_spec_v4_series_id (NULL));
+    g_assert_null (atm_chart_spec_v4_catalog_entry (NULL));
+    g_assert_null (atm_chart_spec_v4_source_spec (NULL));
+    g_assert_cmpint (atm_chart_spec_v4_kind (NULL), ==, 0);
+    g_assert_cmpuint (atm_chart_spec_v4_coordinate_count (NULL), ==, 0u);
+    g_assert_cmpuint (atm_chart_spec_v4_numeric_observation_count (NULL), ==, 0u);
+    g_assert_null (atm_chart_spec_v4_missing_coordinate (NULL));
+    g_assert_null (atm_chart_spec_v4_missing_reason (NULL));
+
+    atm_chart_spec_free (gistemp_scatter);
+    atm_chart_spec_free (gistemp_line);
+}
+
+
+static char *
+build_v4_test_identity (const AtmChartCatalogEntry *entry,
+                        const AtmChartSpec *source)
+{
+    char *id = NULL;
+    GError *error = NULL;
+    g_assert_true (atm_chart_spec_v4_test_build_id (entry, source, &id, &error));
+    g_assert_no_error (error);
+    g_assert_nonnull (id);
+    return id;
+}
+
+static void
+test_v4_identity_ignores_nonsemantic_catalog_metadata (void)
+{
+    const AtmChartCatalogEntry *entry = atm_chart_catalog_find_id (
+        "climate.gistemp.global-temperature-anomaly");
+    AtmChartSpec *source = build_gistemp_chart_spec (ATM_CHART_LINE);
+    AtmChartSpecV4 *spec = NULL;
+    GError *error = NULL;
+    g_assert_nonnull (entry);
+    g_assert_true (atm_chart_spec_v4_new (entry, source, &spec, &error));
+    g_assert_no_error (error);
+
+    char *baseline = build_v4_test_identity (entry, source);
+    g_assert_cmpstr (baseline, ==, atm_chart_spec_v4_id (spec));
+
+    AtmChartCatalogEntry variant = *entry;
+    variant.history_schema_version = "99";
+    char *id = build_v4_test_identity (&variant, source);
+    g_assert_cmpstr (id, ==, baseline);
+    g_free (id);
+
+    variant = *entry;
+    variant.display_name = "Different display copy";
+    variant.description = "Updated explanatory wording only.";
+    id = build_v4_test_identity (&variant, source);
+    g_assert_cmpstr (id, ==, baseline);
+    g_free (id);
+
+    /* Display-profile identity is semantic even though the display copy is not. */
+    variant = *entry;
+    variant.display_profile_id = "atm-display/gistemp-alternate";
+    id = build_v4_test_identity (&variant, source);
+    g_assert_cmpstr (id, !=, baseline);
+    g_free (id);
+
+    variant = *entry;
+    variant.display_profile_version = "2";
+    id = build_v4_test_identity (&variant, source);
+    g_assert_cmpstr (id, !=, baseline);
+    g_free (id);
+
+    /* Adding/removing other admitted pins must not renumber this selected pin. */
+    const char *admitted_with_unrelated_pin[] = {
+        atm_chart_spec_series_snapshot_sha (source, 0),
+        "0000000000000000000000000000000000000001"
+    };
+    g_assert_nonnull (admitted_with_unrelated_pin[0]);
+    variant = *entry;
+    variant.snapshot_shas = admitted_with_unrelated_pin;
+    variant.snapshot_count = G_N_ELEMENTS (admitted_with_unrelated_pin);
+    id = build_v4_test_identity (&variant, source);
+    g_assert_cmpstr (id, ==, baseline);
+    g_free (id);
+
+    variant = *entry;
+    variant.publisher_name = "Different attribution wording";
+    variant.publisher_url = "https://example.invalid/source";
+    variant.pinned_artifact_description = "Different artifact prose";
+    variant.reconstruction_scope = "Different scope prose";
+    id = build_v4_test_identity (&variant, source);
+    g_assert_cmpstr (id, ==, baseline);
+    g_free (id);
+
+    /* Scientific/chart semantics remain identity-bearing. */
+    variant = *entry;
+    variant.y_unit = "kelvin";
+    id = build_v4_test_identity (&variant, source);
+    g_assert_cmpstr (id, !=, baseline);
+    g_free (id);
+
+    g_free (baseline);
+    atm_chart_spec_v4_free (spec);
+    atm_chart_spec_free (source);
+}
+
+static void
+test_v4_revalidates_identity_tampering (void)
+{
+    const AtmChartCatalogEntry *entry = atm_chart_catalog_find_id (
+        "climate.gistemp.global-temperature-anomaly");
+    AtmChartSpec *source = build_gistemp_chart_spec (ATM_CHART_LINE);
+    AtmChartSpecV4 *spec = NULL;
+    GError *error = NULL;
+
+    g_assert_true (atm_chart_spec_v4_new (entry, source, &spec, &error));
+    g_assert_no_error (error);
+
+    char *id = (char *) atm_chart_spec_v4_id (spec);
+    char saved = id[0];
+    id[0] = saved == 'a' ? 'b' : 'a';
+    g_assert_false (atm_chart_spec_v4_validate (spec, &error));
+    g_assert_error (error, ATM_CHART_SPEC_V4_ERROR, ATM_CHART_SPEC_V4_ERROR_IDENTITY);
+    g_clear_error (&error);
+    id[0] = saved;
+    g_assert_true (atm_chart_spec_v4_validate (spec, &error));
+    g_assert_no_error (error);
+
+    atm_chart_spec_v4_free (spec);
+    atm_chart_spec_free (source);
+}
+
 int main (int argc, char **argv)
 {
     g_test_init (&argc, &argv, NULL);
@@ -496,5 +812,9 @@ int main (int argc, char **argv)
     g_test_add_func ("/chart-spec/tampering", test_tampering);
     g_test_add_func ("/chart-spec/ei-v2-source-bound", test_ei_v2_source_bound_identity_and_generic_accessors);
     g_test_add_func ("/chart-spec/ei-v2-rejections", test_ei_v2_rejections_and_tampering);
+    g_test_add_func ("/chart-spec-v4/all-catalog-profiles", test_v4_catalog_bound_all_three_profiles);
+    g_test_add_func ("/chart-spec-v4/rejections", test_v4_rejects_unregistered_or_incompatible_specs);
+    g_test_add_func ("/chart-spec-v4/identity-tampering", test_v4_revalidates_identity_tampering);
+    g_test_add_func ("/chart-spec-v4/identity-ignores-nonsemantic-metadata", test_v4_identity_ignores_nonsemantic_catalog_metadata);
     return g_test_run ();
 }
