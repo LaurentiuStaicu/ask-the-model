@@ -528,6 +528,36 @@ int main () {
     assert (directly_grounded_ei.series_id ==
         "energy.energy-institute.global-total-energy-supply");
 
+    /* Source-prefixed subjects are valid catalog aliases, not unrelated topics. */
+    var gistemp_source_prefixed_subject = AskTheModel.ChartIntent.parse (
+        "Generate a chart of GISTEMP global temperature over time."
+    );
+    assert (gistemp_source_prefixed_subject.series_id ==
+        "climate.gistemp.global-temperature-anomaly");
+    assert (gistemp_source_prefixed_subject.intent == "chart");
+
+    var energy_source_prefixed_subject = AskTheModel.ChartIntent.parse (
+        "Generate a chart of Energy Institute total energy supply over time."
+    );
+    assert (energy_source_prefixed_subject.series_id ==
+        "energy.energy-institute.global-total-energy-supply");
+    assert (energy_source_prefixed_subject.intent == "chart");
+
+    var bnr_source_prefixed_subject = AskTheModel.ChartIntent.parse (
+        "Generate a chart of BNR credit standards over time."
+    );
+    assert (bnr_source_prefixed_subject.series_id ==
+        "banking.bnr.bls-c01.credit-standards-net-percentage");
+    assert (bnr_source_prefixed_subject.intent == "chart");
+
+    var bnr_source_prefixed_subject_romanian =
+        AskTheModel.ChartIntent.parse (
+            "Generează un grafic al standardelor de credit BNR în timp."
+        );
+    assert (bnr_source_prefixed_subject_romanian.series_id ==
+        "banking.bnr.bls-c01.credit-standards-net-percentage");
+    assert (bnr_source_prefixed_subject_romanian.intent == "chart");
+
     var unsupported_pie_chart = AskTheModel.ChartIntent.parse (
         "Generate a pie chart of global temperature anomalies."
     );
