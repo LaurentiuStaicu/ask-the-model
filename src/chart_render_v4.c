@@ -591,27 +591,27 @@ atm_chart_render_v4_validate (const AtmChartRenderV4 *render,
             atm_chart_projection_v4_source_projection (render->projection);
         const AtmChartSpec *projected_source =
             atm_chart_projection_spec (source_projection);
+        const AtmChartCatalogEntry *entry =
+            atm_chart_spec_v4_catalog_entry (render->owned_spec);
         if (source_projection == NULL || projected_source == NULL ||
+            entry == NULL || entry->display_profile_id == NULL ||
+            entry->display_profile_version == NULL ||
             g_strcmp0 (atm_chart_spec_id (source_spec),
                        atm_chart_spec_id (projected_source)) != 0 ||
             g_strcmp0 (atm_chart_projection_v4_series_id (render->projection),
-                       atm_chart_spec_v4_series_id (render->owned_spec)) != 0 ||
-            g_strcmp0 (atm_chart_projection_v4_policy (render->projection),
-                       atm_chart_catalog_find_id (
-                           atm_chart_spec_v4_series_id (render->owned_spec))
-                           ->display_profile_id) == 0) {
-            /*
-             * The exact profile includes a version component. The authoritative
-             * full policy comparison is performed by projection_v4_validate;
-             * this guard only requires that the policy exists.
-             */
-            if (source_projection == NULL || projected_source == NULL ||
-                g_strcmp0 (atm_chart_spec_id (source_spec),
-                           atm_chart_spec_id (projected_source)) != 0 ||
-                atm_chart_projection_v4_policy (render->projection) == NULL)
-                return reject (error, ATM_CHART_RENDER_V4_ERROR_PROJECTION,
-                    "The projected source identity or display policy differs from the catalog-bound v4 specification.");
-        }
+                       atm_chart_spec_v4_series_id (render->owned_spec)) != 0)
+            return reject (error, ATM_CHART_RENDER_V4_ERROR_PROJECTION,
+                "The projected source identity differs from the catalog-bound v4 specification.");
+
+        char *expected_policy = g_strdup_printf (
+            "%s/%s", entry->display_profile_id, entry->display_profile_version);
+        gboolean policy_matches = g_strcmp0 (
+            atm_chart_projection_v4_policy (render->projection),
+            expected_policy) == 0;
+        g_free (expected_policy);
+        if (!policy_matches)
+            return reject (error, ATM_CHART_RENDER_V4_ERROR_PROJECTION,
+                "The generic painter's projection policy differs from the catalog's exact display-profile version.");
 
         if (atm_chart_projection_v4_coordinate_count (render->projection) !=
                 atm_chart_spec_v4_coordinate_count (render->owned_spec) ||
