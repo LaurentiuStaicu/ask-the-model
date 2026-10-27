@@ -693,6 +693,37 @@ int main () {
     assert (ei_full_coverage_range.series_id ==
         "energy.energy-institute.global-total-energy-supply");
 
+    /* The BNR adapter admits its full quarter range, but not a filtered subset. */
+    var bnr_full_range_from_to = AskTheModel.ChartIntent.parse (
+        "/chart bnr-bls-c01 Show trend from 2022-Q4 to 2025-Q3."
+    );
+    assert (bnr_full_range_from_to.series_id ==
+        "banking.bnr.bls-c01.credit-standards-net-percentage");
+
+    var bnr_full_range_dashed = AskTheModel.ChartIntent.parse (
+        "/chart bnr-bls-c01 Show trend for 2022-Q4–2025-Q3."
+    );
+    assert (bnr_full_range_dashed.series_id ==
+        "banking.bnr.bls-c01.credit-standards-net-percentage");
+
+    var bnr_full_range_romanian = AskTheModel.ChartIntent.parse (
+        "/chart bnr-bls-c01 Arată tendința din 2022-Q4 până în 2025-Q3."
+    );
+    assert (bnr_full_range_romanian.series_id ==
+        "banking.bnr.bls-c01.credit-standards-net-percentage");
+
+    var bnr_partial_range = AskTheModel.ChartIntent.parse (
+        "/chart bnr-bls-c01 Show trend from 2023-Q1 to 2025-Q3."
+    );
+    assert (bnr_partial_range.series_id == null);
+    assert (bnr_partial_range.intent == "unsupported_period");
+
+    var bnr_full_and_partial_ranges = AskTheModel.ChartIntent.parse (
+        "/chart bnr-bls-c01 Show trend from 2022-Q4 to 2025-Q3 and from 2023-Q1 to 2025-Q3."
+    );
+    assert (bnr_full_and_partial_ranges.series_id == null);
+    assert (bnr_full_and_partial_ranges.intent == "unsupported_period");
+
     var mismatched_full_coverage_range = AskTheModel.ChartIntent.parse (
         "/chart energy-institute Show trend for 1880-2025."
     );
