@@ -362,7 +362,7 @@ paint_v4_surface (const AtmChartSpecV4 *spec,
     const AtmChartProjection *projection =
         atm_chart_projection_v4_source_projection (projection_v4);
     gboolean fallback = projection_v4 == NULL ||
-        width < 432u || height < 370u ||
+        width < 448u || height < 370u ||
         !layout_fits (spec, projection, width, height);
 
     if (fallback) {
@@ -370,7 +370,8 @@ paint_v4_surface (const AtmChartSpecV4 *spec,
     } else {
         const double left = 84.0;
         const double top = 108.0;
-        const double plot_width = (double) width - 112.0;
+        /* Reserve room for the final X tick label and a 12px canvas margin. */
+        const double plot_width = (double) width - 128.0;
         const double plot_height = (double) height - 210.0;
 
         font (cr, 14.0, TRUE);
@@ -633,7 +634,7 @@ atm_chart_render_v4_new (const AtmChartSpecV4 *spec,
     gboolean fallback = width < 432u || height < 370u;
     if (!fallback) {
         if (!atm_chart_projection_v4_new (
-                owned_spec, (double) width - 112.0,
+                owned_spec, (double) width - 128.0,
                 (double) height - 210.0, &projection, error)) {
             g_free (data);
             atm_chart_spec_v4_free (owned_spec);
