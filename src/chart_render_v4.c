@@ -419,6 +419,8 @@ paint_v4_surface (const AtmChartSpecV4 *spec,
         cairo_clip (cr);
         cairo_set_line_width (cr, 1.5);
         guint previous_point_index = G_MAXUINT;
+        guint segment_point_count = 0u;
+        double segment_start_x = 0.0, segment_start_y = 0.0;
         gboolean path_started = FALSE;
         AtmChartKind kind = atm_chart_spec_v4_kind (spec);
         for (guint i = 0; i < atm_chart_projection_count (projection); i++) {
@@ -434,17 +436,41 @@ paint_v4_surface (const AtmChartSpecV4 *spec,
             } else if (!path_started) {
                 cairo_move_to (cr, x, y);
                 path_started = TRUE;
+                segment_point_count = 1u;
+                segment_start_x = x;
+                segment_start_y = y;
             } else if (point->point_index != previous_point_index + 1u) {
-                /* A catalog-authorized MISSING coordinate creates a true gap. */
+                /*
+                 * A catalog-authorized MISSING coordinate creates a true gap.
+                 * If that leaves a one-observation segment, paint its real
+                 * observation as a square rather than losing it to a no-op
+                 * cairo_stroke(). No line is connected across the gap.
+                 */
                 cairo_stroke (cr);
+                if (segment_point_count == 1u) {
+                    cairo_rectangle (cr, segment_start_x - 1.5,
+                        segment_start_y - 1.5, 3.0, 3.0);
+                    cairo_fill (cr);
+                }
                 cairo_move_to (cr, x, y);
+                segment_point_count = 1u;
+                segment_start_x = x;
+                segment_start_y = y;
             } else {
                 cairo_line_to (cr, x, y);
+                segment_point_count++;
             }
             previous_point_index = point->point_index;
         }
-        if (kind == ATM_CHART_LINE && path_started)
+        if (kind == ATM_CHART_LINE && path_started) {
             cairo_stroke (cr);
+            if (segment_point_count == 1u) {
+                /* Preserve an isolated final observation after a real gap. */
+                cairo_rectangle (cr, segment_start_x - 1.5,
+                    segment_start_y - 1.5, 3.0, 3.0);
+                cairo_fill (cr);
+            }
+        }
         cairo_restore (cr);
 
         font (cr, 12.0, FALSE);
