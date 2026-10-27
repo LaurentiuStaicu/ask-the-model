@@ -50,9 +50,6 @@ void atm_chart_render_v4_free (AtmChartRenderV4 *render);
 const AtmChartSpecV4 *atm_chart_render_v4_spec (
     const AtmChartRenderV4 *render
 );
-const AtmChartRender *atm_chart_render_v4_source_render (
-    const AtmChartRenderV4 *render
-);
 const AtmChartProjectionV4 *atm_chart_render_v4_projection (
     const AtmChartRenderV4 *render
 );
