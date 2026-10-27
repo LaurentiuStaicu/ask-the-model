@@ -567,71 +567,106 @@ test_v4_gistemp_data_view_uses_qualified_snapshot (void)
     }
 }
 
-static void
-assert_render_v4_pixel_parity (const AtmChartRenderV4 *wrapped,
-                               const AtmChartRender *legacy)
+static char *
+v4_surface_digest (cairo_surface_t *surface)
 {
-    cairo_surface_t *a = atm_chart_render_v4_surface (wrapped);
-    cairo_surface_t *b = atm_chart_render_surface (legacy);
-    g_assert_nonnull (a);
-    g_assert_nonnull (b);
-    cairo_surface_flush (a);
-    cairo_surface_flush (b);
-    g_assert_cmpint (cairo_image_surface_get_width (a), ==,
-                     cairo_image_surface_get_width (b));
-    g_assert_cmpint (cairo_image_surface_get_height (a), ==,
-                     cairo_image_surface_get_height (b));
-    int astride = cairo_image_surface_get_stride (a);
-    int bstride = cairo_image_surface_get_stride (b);
-    g_assert_cmpint (astride, ==, bstride);
-    g_assert_cmpmem (cairo_image_surface_get_data (a), astride *
-                     cairo_image_surface_get_height (a),
-                     cairo_image_surface_get_data (b), bstride *
-                     cairo_image_surface_get_height (b));
+    g_assert_nonnull (surface);
+    g_assert_cmpint (cairo_surface_get_type (surface), ==,
+                     CAIRO_SURFACE_TYPE_IMAGE);
+    cairo_surface_flush (surface);
+    g_assert_cmpint (cairo_surface_status (surface), ==, CAIRO_STATUS_SUCCESS);
+    int width = cairo_image_surface_get_width (surface);
+    int height = cairo_image_surface_get_height (surface);
+    int stride = cairo_image_surface_get_stride (surface);
+    const unsigned char *pixels = cairo_image_surface_get_data (surface);
+    g_assert_cmpint (width, >, 0);
+    g_assert_cmpint (height, >, 0);
+    g_assert_cmpint (stride, >=, width * 4);
+    return g_compute_checksum_for_data (
+        G_CHECKSUM_SHA256, pixels, (gsize) stride * (gsize) height);
 }
 
 static void
-assert_render_v4_parity_for_source (const char *series_id,
-                                    AtmChartSpec *source_spec)
+assert_v4_surface_is_monochrome (cairo_surface_t *surface)
+{
+    g_assert_nonnull (surface);
+    g_assert_cmpint (cairo_surface_get_type (surface), ==,
+                     CAIRO_SURFACE_TYPE_IMAGE);
+    cairo_surface_flush (surface);
+    const unsigned char *bytes = cairo_image_surface_get_data (surface);
+    int width = cairo_image_surface_get_width (surface);
+    int height = cairo_image_surface_get_height (surface);
+    int stride = cairo_image_surface_get_stride (surface);
+    for (int y = 0; y < height; y++) {
+        const uint32_t *row =
+            (const uint32_t *) (bytes + (gsize) y * (gsize) stride);
+        for (int x = 0; x < width; x++) {
+            g_assert_true (row[x] == 0xff000000u || row[x] == 0xffffffffu);
+        }
+    }
+}
+
+static void
+assert_render_v4_profile_is_generic_and_exact_data (
+    const char *series_id,
+    AtmChartSpec *source_spec)
 {
     AtmChartSpecV4 *v4 = render_v4_spec_from_source (series_id, source_spec);
-    AtmChartRenderV4 *wrapped = render_v4_new_for_test (v4, 860, 500, 1);
+    AtmChartRenderV4 *rendered = render_v4_new_for_test (v4, 860, 500, 1);
     const AtmChartSpec *retained_source =
-        atm_chart_spec_v4_source_spec (atm_chart_render_v4_spec (wrapped));
-    AtmChartRender *legacy = NULL;
+        atm_chart_spec_v4_source_spec (atm_chart_render_v4_spec (rendered));
     GError *error = NULL;
-    g_assert_true (atm_chart_render_new (
-        retained_source, 860, 500, 1, &legacy, &error));
+    char *expected_data =
+        atm_chart_render_data_for_spec (retained_source, &error);
     g_assert_no_error (error);
+    g_assert_nonnull (expected_data);
 
-    g_assert_true (atm_chart_render_v4_validate (wrapped, &error));
+    AtmChartRender *legacy_data_reference = NULL;
+    g_assert_true (atm_chart_render_new (
+        retained_source, 860, 500, 1, &legacy_data_reference, &error));
     g_assert_no_error (error);
-    g_assert_nonnull (atm_chart_render_v4_id (wrapped));
-    g_assert_cmpstr (atm_chart_render_v4_schema (wrapped), ==,
+    g_assert_true (atm_chart_render_v4_validate (rendered, &error));
+    g_assert_no_error (error);
+    g_assert_nonnull (atm_chart_render_v4_id (rendered));
+    g_assert_cmpstr (atm_chart_render_v4_schema (rendered), ==,
                      ATM_CHART_RENDER_V4_SCHEMA);
     g_assert_cmpstr (atm_chart_spec_v4_id (
-        atm_chart_render_v4_spec (wrapped)), ==, atm_chart_spec_v4_id (v4));
-    g_assert_false (atm_chart_render_v4_is_fallback (wrapped));
-    g_assert_nonnull (atm_chart_render_v4_projection (wrapped));
-    g_assert_cmpstr (atm_chart_render_v4_data (wrapped), ==,
-                     atm_chart_render_data (legacy));
-    assert_render_v4_pixel_parity (wrapped, legacy);
+        atm_chart_render_v4_spec (rendered)), ==, atm_chart_spec_v4_id (v4));
+    g_assert_false (atm_chart_render_v4_is_fallback (rendered));
+    g_assert_nonnull (atm_chart_render_v4_projection (rendered));
+    g_assert_cmpstr (atm_chart_render_v4_data (rendered), ==, expected_data);
+    g_assert_cmpstr (atm_chart_render_v4_data (rendered), ==,
+                     atm_chart_render_data (legacy_data_reference));
+    assert_v4_surface_is_monochrome (atm_chart_render_v4_surface (rendered));
 
-    atm_chart_render_free (legacy);
-    atm_chart_render_v4_free (wrapped);
+    char *first_digest =
+        v4_surface_digest (atm_chart_render_v4_surface (rendered));
+    AtmChartRenderV4 *repeat = render_v4_new_for_test (v4, 860, 500, 1);
+    char *repeat_digest =
+        v4_surface_digest (atm_chart_render_v4_surface (repeat));
+    g_assert_cmpstr (first_digest, ==, repeat_digest);
+    g_assert_true (atm_chart_render_v4_validate (repeat, &error));
+    g_assert_no_error (error);
+
+    g_free (first_digest);
+    g_free (repeat_digest);
+    g_free (expected_data);
+    atm_chart_render_free (legacy_data_reference);
+    atm_chart_render_v4_free (repeat);
+    atm_chart_render_v4_free (rendered);
     atm_chart_spec_v4_free (v4);
 }
 
 static void
-test_v4_render_profiles_exact_legacy_parity (void)
+test_v4_generic_painter_profiles_and_exact_data (void)
 {
-    assert_render_v4_parity_for_source (
+    assert_render_v4_profile_is_generic_and_exact_data (
         "climate.gistemp.global-temperature-anomaly",
         specification (ATM_CHART_LINE));
-    assert_render_v4_parity_for_source (
+    assert_render_v4_profile_is_generic_and_exact_data (
         "energy.energy-institute.global-total-energy-supply",
         ei_specification_for_renderer_test ());
-    assert_render_v4_parity_for_source (
+    assert_render_v4_profile_is_generic_and_exact_data (
         "banking.bnr.bls-c01.credit-standards-net-percentage",
         bnr_specification_for_renderer_test (ATM_CHART_LINE));
 }
@@ -716,7 +751,6 @@ test_v4_render_rejections_and_tampering (void)
     atm_chart_spec_v4_free (spec);
     g_assert_false (atm_chart_render_v4_validate (NULL, NULL));
     g_assert_null (atm_chart_render_v4_spec (NULL));
-    g_assert_null (atm_chart_render_v4_source_render (NULL));
     g_assert_null (atm_chart_render_v4_projection (NULL));
     g_assert_null (atm_chart_render_v4_surface (NULL));
     g_assert_null (atm_chart_render_v4_data (NULL));
@@ -735,7 +769,7 @@ int main (int argc, char **argv)
     g_test_add_func ("/chart-render/fallback-arguments", test_fallback_arguments);
     g_test_add_func ("/chart-render/bnr-data-view-and-real-gap", test_bnr_data_view_and_real_gap);
     g_test_add_func ("/chart-render/ei-exact-data-resize", test_ei_projection_renders_exact_data_and_resizes);
-    g_test_add_func ("/chart-render-v4/legacy-parity", test_v4_render_profiles_exact_legacy_parity);
+    g_test_add_func ("/chart-render-v4/generic-painter-and-exact-data", test_v4_generic_painter_profiles_and_exact_data);
     g_test_add_func ("/chart-render-v4/gistemp-data-qualified-snapshot", test_v4_gistemp_data_view_uses_qualified_snapshot);
     g_test_add_func ("/chart-render-v4/fallback-data", test_v4_render_fallback_keeps_exact_data);
     g_test_add_func ("/chart-render-v4/rejections-tampering", test_v4_render_rejections_and_tampering);
