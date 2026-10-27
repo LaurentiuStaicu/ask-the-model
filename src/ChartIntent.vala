@@ -945,6 +945,16 @@ namespace AskTheModel {
                 return false;
             }
 
+            /*
+             * The catalog's sole quarterly profile has this exact admitted
+             * coverage. Treat its normalized range as period metadata, without
+             * making arbitrary quarter ranges bypass the unsupported-period
+             * guard.
+             */
+            if (normalized == "2022-q4-2025-q3") {
+                return true;
+            }
+
             bool has_digit = false;
             bool only_range_characters = true;
             for (int i = 0; i < normalized.length; i++) {
