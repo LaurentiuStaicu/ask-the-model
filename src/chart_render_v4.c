@@ -200,24 +200,49 @@ projection_labels_fit (const AtmChartProjection *projection,
             previous_right = tick_right;
         }
 
-        double previous_bottom = -G_MAXDOUBLE;
+        double tick_tops[ATM_CHART_PROJECTION_MAX_TICKS];
+        double tick_bottoms[ATM_CHART_PROJECTION_MAX_TICKS];
+        guint measured_ticks = 0;
         for (guint i = 0; ok &&
              i < atm_chart_projection_y_tick_count (projection); i++) {
             const AtmChartTick *tick =
                 atm_chart_projection_y_tick (projection, i);
-            if (tick == NULL) { ok = FALSE; break; }
+            if (tick == NULL ||
+                measured_ticks >= ATM_CHART_PROJECTION_MAX_TICKS) {
+                ok = FALSE;
+                break;
+            }
             cairo_text_extents_t extents;
             cairo_text_extents (cr, tick->label, &extents);
             double baseline = top + tick->position + 4.0;
             double tick_top = baseline + extents.y_bearing;
             double tick_bottom = tick_top + extents.height;
             if (!isfinite (tick_top) || !isfinite (tick_bottom) ||
-                extents.width > 64.0 || tick_top < previous_bottom + 2.0 ||
+                extents.width > 64.0 ||
                 baseline > top + plot_height + 4.0) {
                 ok = FALSE;
                 break;
             }
-            previous_bottom = tick_bottom;
+
+            /* Source projections do not all store Y ticks in visual order:
+             * GISTEMP and Energy Institute enumerate low-to-high while BNR
+             * enumerates high-to-low. Check interval overlap independent of
+             * that internal order instead of falsely forcing every layout to
+             * fallback for one of those valid orderings. */
+            for (guint previous = 0; previous < measured_ticks; previous++) {
+                gboolean separated =
+                    tick_bottom + 2.0 <= tick_tops[previous] ||
+                    tick_top >= tick_bottoms[previous] + 2.0;
+                if (!separated) {
+                    ok = FALSE;
+                    break;
+                }
+            }
+            if (!ok)
+                break;
+            tick_tops[measured_ticks] = tick_top;
+            tick_bottoms[measured_ticks] = tick_bottom;
+            measured_ticks++;
         }
     }
     cairo_destroy (cr);
