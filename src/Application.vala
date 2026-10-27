@@ -5853,7 +5853,7 @@ namespace AskTheModel {
                 }
                 pres09_test_request_started = true;
                 state.prompt.buffer.text =
-                    "/chart energy-institute Show the global TES trend.";
+                    "Arată-mi un grafic despre furnizarea totală de energie.";
                 state.send_button.clicked ();
                 return true;
             }
@@ -5894,7 +5894,7 @@ namespace AskTheModel {
 
                 pres09_test_live_turn = 1;
                 state.prompt.buffer.text =
-                    "/chart gistemp Show the global temperature anomaly trend.";
+                    "Generate a chart of global temperature anomalies.";
                 state.send_button.clicked ();
                 return true;
             }
@@ -5938,7 +5938,7 @@ namespace AskTheModel {
                     return false;
                 }
                 state.prompt.buffer.text =
-                    "/chart bnr-bls-c01 Show the quarterly credit standards net percentage trend.";
+                    "Generate a chart for quarterly credit standards.";
                 state.send_button.clicked ();
                 return true;
             }
