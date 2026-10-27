@@ -6,6 +6,14 @@ G_BEGIN_DECLS
 #define ATM_CHART_RENDER_MAX_SIZE 2048
 
 typedef struct AtmChartRender AtmChartRender;
+
+/*
+ * Serialize the established exact Data representation for a qualified source
+ * ChartSpec v1/v2/v3 without allocating a Cairo surface. Returns newly
+ * allocated text; failure returns NULL and sets error.
+ */
+char *atm_chart_render_data_for_spec (const AtmChartSpec *spec, GError **error);
+
 /* Headless prototype only, not linked into the application. Logical canvas:
  * 240..2048 by 140..2048; integer device scale 1 or 2. Small canvases produce
  * an explicit fallback with the same complete exact Data view. Owns all data.
