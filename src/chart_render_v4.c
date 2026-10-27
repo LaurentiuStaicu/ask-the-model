@@ -631,7 +631,7 @@ atm_chart_render_v4_new (const AtmChartSpecV4 *spec,
 
     AtmChartProjectionV4 *projection = NULL;
     cairo_surface_t *surface = NULL;
-    gboolean fallback = width < 432u || height < 370u;
+    gboolean fallback = width < 448u || height < 370u;
     if (!fallback) {
         if (!atm_chart_projection_v4_new (
                 owned_spec, (double) width - 128.0,
