@@ -993,6 +993,19 @@ int main () {
     assert (positive_ei_after_romanian_quoted_example_comma.response_mode ==
         "chart_and_text");
 
+    var uppercase_conjunction_after_quoted_example =
+        AskTheModel.ChartIntent.parse (
+            "The phrase 'Generate a GISTEMP chart' is an example AND GENERATE a chart of total energy supply."
+        );
+    assert (uppercase_conjunction_after_quoted_example.series_id ==
+        "energy.energy-institute.global-total-energy-supply");
+    assert (uppercase_conjunction_after_quoted_example.intent == "chart");
+    assert (uppercase_conjunction_after_quoted_example.query.contains (
+        "AND GENERATE a chart of total energy supply"
+    ));
+    assert (uppercase_conjunction_after_quoted_example.response_mode ==
+        "chart_and_text");
+
     var postposed_same_series_negation =
         AskTheModel.ChartIntent.parse (
             "Generate a GISTEMP chart. Don't show it."
