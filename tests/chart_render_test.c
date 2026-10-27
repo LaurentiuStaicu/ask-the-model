@@ -5,6 +5,7 @@
 #include "bnr_bls_verified_series.h"
 #include "bnr_bls_series_contract.h"
 #include <fontconfig/fontconfig.h>
+#include <math.h>
 #include <stdint.h>
 #include <string.h>
 static const char GISTEMP_SNAPSHOT_INITIAL[] =
@@ -567,27 +568,116 @@ test_v4_gistemp_data_view_uses_qualified_snapshot (void)
     }
 }
 
-static void
-assert_render_v4_pixel_parity (const AtmChartRenderV4 *wrapped,
-                               const AtmChartRender *legacy)
+static guint32
+surface_pixel (cairo_surface_t *surface, guint x, guint y)
 {
-    cairo_surface_t *a = atm_chart_render_v4_surface (wrapped);
-    cairo_surface_t *b = atm_chart_render_surface (legacy);
+    cairo_surface_flush (surface);
+    g_assert_cmpint (cairo_image_surface_get_format (surface), ==,
+                     CAIRO_FORMAT_ARGB32);
+    g_assert_cmpuint (x, <, (guint) cairo_image_surface_get_width (surface));
+    g_assert_cmpuint (y, <, (guint) cairo_image_surface_get_height (surface));
+    guint8 *data = cairo_image_surface_get_data (surface);
+    int stride = cairo_image_surface_get_stride (surface);
+    const guint32 *row = (const guint32 *) (const void *) (data + y * stride);
+    return row[x];
+}
+
+static void
+assert_surface_uses_retro_mono_ink (cairo_surface_t *surface)
+{
+    g_assert_nonnull (surface);
+    cairo_surface_flush (surface);
+    int width = cairo_image_surface_get_width (surface);
+    int height = cairo_image_surface_get_height (surface);
+    int stride = cairo_image_surface_get_stride (surface);
+    g_assert_cmpuint (surface_pixel (surface, 0u, 0u), ==, 0xffffffffu);
+    guint64 black_pixels = 0u;
+    const guint8 *data = cairo_image_surface_get_data (surface);
+    for (int y = 0; y < height; y++) {
+        const guint32 *row = (const guint32 *) (const void *)
+            (data + (gsize) y * (gsize) stride);
+        for (int x = 0; x < width; x++) {
+            guint32 pixel = row[x];
+            g_assert_true (pixel == 0xffffffffu || pixel == 0xff000000u);
+            if (pixel == 0xff000000u)
+                black_pixels++;
+        }
+    }
+    g_assert_cmpuint (black_pixels, >, 500u);
+    g_assert_cmpuint (black_pixels, <, (guint64) width * height / 4u);
+}
+
+static void
+assert_projection_matches_legacy (const AtmChartProjectionV4 *v4_projection,
+                                   const AtmChartProjection *legacy_projection)
+{
+    const AtmChartProjection *v4_source =
+        atm_chart_projection_v4_source_projection (v4_projection);
+    g_assert_nonnull (v4_source);
+    g_assert_nonnull (legacy_projection);
+    g_assert_cmpuint (atm_chart_projection_count (v4_source), ==,
+                      atm_chart_projection_count (legacy_projection));
+    g_assert_cmpuint (atm_chart_projection_x_tick_count (v4_source), ==,
+                      atm_chart_projection_x_tick_count (legacy_projection));
+    g_assert_cmpuint (atm_chart_projection_y_tick_count (v4_source), ==,
+                      atm_chart_projection_y_tick_count (legacy_projection));
+
+    const AtmChartDisplayDomain *a = atm_chart_projection_domain (v4_source);
+    const AtmChartDisplayDomain *b = atm_chart_projection_domain (legacy_projection);
     g_assert_nonnull (a);
     g_assert_nonnull (b);
-    cairo_surface_flush (a);
-    cairo_surface_flush (b);
-    g_assert_cmpint (cairo_image_surface_get_width (a), ==,
-                     cairo_image_surface_get_width (b));
-    g_assert_cmpint (cairo_image_surface_get_height (a), ==,
-                     cairo_image_surface_get_height (b));
-    int astride = cairo_image_surface_get_stride (a);
-    int bstride = cairo_image_surface_get_stride (b);
-    g_assert_cmpint (astride, ==, bstride);
-    g_assert_cmpmem (cairo_image_surface_get_data (a), astride *
-                     cairo_image_surface_get_height (a),
-                     cairo_image_surface_get_data (b), bstride *
-                     cairo_image_surface_get_height (b));
+    g_assert_cmpfloat (a->x_min, ==, b->x_min);
+    g_assert_cmpfloat (a->x_max, ==, b->x_max);
+    g_assert_cmpfloat (a->y_min, ==, b->y_min);
+    g_assert_cmpfloat (a->y_max, ==, b->y_max);
+
+    for (guint i = 0; i < atm_chart_projection_count (v4_source); i++) {
+        const AtmChartProjectedPoint *ap =
+            atm_chart_projection_point (v4_source, i);
+        const AtmChartProjectedPoint *bp =
+            atm_chart_projection_point (legacy_projection, i);
+        g_assert_nonnull (ap);
+        g_assert_nonnull (bp);
+        g_assert_cmpuint (ap->point_index, ==, bp->point_index);
+        g_assert_cmpfloat (ap->x, ==, bp->x);
+        g_assert_cmpfloat (ap->y, ==, bp->y);
+    }
+}
+
+static void
+assert_bnr_missing_gap_is_unpainted (const AtmChartRenderV4 *render)
+{
+    const AtmChartProjection *projection =
+        atm_chart_projection_v4_source_projection (
+            atm_chart_render_v4_projection (render));
+    const AtmChartProjectedPoint *before = NULL;
+    const AtmChartProjectedPoint *after = NULL;
+    for (guint i = 0; i < atm_chart_projection_count (projection); i++) {
+        const AtmChartProjectedPoint *point =
+            atm_chart_projection_point (projection, i);
+        if (point->point_index == 9u)
+            before = point;
+        else if (point->point_index == 11u)
+            after = point;
+    }
+    g_assert_nonnull (before);
+    g_assert_nonnull (after);
+
+    cairo_surface_t *surface = atm_chart_render_v4_surface (render);
+    int x = (int) lround (84.0 + (before->x + after->x) / 2.0);
+    int y = (int) lround (108.0 + (before->y + after->y) / 2.0);
+    /*
+     * A line incorrectly bridged across 2025-Q2 would cross this small region.
+     * The midpoint is between the actual 2025-Q1 and 2025-Q3 observations;
+     * no X-axis tick is defined for the missing coordinate.
+     */
+    for (int dy = -2; dy <= 2; dy++) {
+        for (int dx = -2; dx <= 2; dx++) {
+            guint32 pixel = surface_pixel (
+                surface, (guint) (x + dx), (guint) (y + dy));
+            g_assert_cmpuint (pixel, ==, 0xffffffffu);
+        }
+    }
 }
 
 static void
@@ -615,15 +705,47 @@ assert_render_v4_parity_for_source (const char *series_id,
     g_assert_nonnull (atm_chart_render_v4_projection (wrapped));
     g_assert_cmpstr (atm_chart_render_v4_data (wrapped), ==,
                      atm_chart_render_data (legacy));
-    assert_render_v4_pixel_parity (wrapped, legacy);
+    char *direct_data = atm_chart_render_data_for_spec (retained_source, &error);
+    g_assert_no_error (error);
+    g_assert_nonnull (direct_data);
+    g_assert_cmpstr (atm_chart_render_v4_data (wrapped), ==, direct_data);
+    g_free (direct_data);
 
+    assert_projection_matches_legacy (
+        atm_chart_render_v4_projection (wrapped),
+        atm_chart_render_projection (legacy));
+    cairo_surface_t *v4_surface = atm_chart_render_v4_surface (wrapped);
+    cairo_surface_t *legacy_surface = atm_chart_render_surface (legacy);
+    g_assert_cmpint (cairo_image_surface_get_width (v4_surface), ==,
+                     cairo_image_surface_get_width (legacy_surface));
+    g_assert_cmpint (cairo_image_surface_get_height (v4_surface), ==,
+                     cairo_image_surface_get_height (legacy_surface));
+    assert_surface_uses_retro_mono_ink (v4_surface);
+    assert_surface_uses_retro_mono_ink (legacy_surface);
+
+    AtmChartRenderV4 *repeat = render_v4_new_for_test (v4, 860, 500, 1);
+    cairo_surface_t *repeat_surface = atm_chart_render_v4_surface (repeat);
+    cairo_surface_flush (v4_surface);
+    cairo_surface_flush (repeat_surface);
+    g_assert_cmpmem (
+        cairo_image_surface_get_data (v4_surface),
+        cairo_image_surface_get_stride (v4_surface) *
+            cairo_image_surface_get_height (v4_surface),
+        cairo_image_surface_get_data (repeat_surface),
+        cairo_image_surface_get_stride (repeat_surface) *
+            cairo_image_surface_get_height (repeat_surface));
+    if (g_strcmp0 (series_id,
+            "banking.bnr.bls-c01.credit-standards-net-percentage") == 0)
+        assert_bnr_missing_gap_is_unpainted (wrapped);
+
+    atm_chart_render_v4_free (repeat);
     atm_chart_render_free (legacy);
     atm_chart_render_v4_free (wrapped);
     atm_chart_spec_v4_free (v4);
 }
 
 static void
-test_v4_render_profiles_exact_legacy_parity (void)
+test_v4_render_profiles_projection_and_data_parity (void)
 {
     assert_render_v4_parity_for_source (
         "climate.gistemp.global-temperature-anomaly",
@@ -716,7 +838,6 @@ test_v4_render_rejections_and_tampering (void)
     atm_chart_spec_v4_free (spec);
     g_assert_false (atm_chart_render_v4_validate (NULL, NULL));
     g_assert_null (atm_chart_render_v4_spec (NULL));
-    g_assert_null (atm_chart_render_v4_source_render (NULL));
     g_assert_null (atm_chart_render_v4_projection (NULL));
     g_assert_null (atm_chart_render_v4_surface (NULL));
     g_assert_null (atm_chart_render_v4_data (NULL));
