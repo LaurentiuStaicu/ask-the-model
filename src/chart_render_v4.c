@@ -282,7 +282,7 @@ layout_fits (const AtmChartSpecV4 *spec,
         font (cr, 12.0, FALSE);
         ok = ok && fits (cr, subtitle, width - 32.0) &&
             fits (cr, summary, width - 32.0) &&
-            fits (cr, y_label, 72.0) &&
+            fits (cr, y_label, width - 32.0) &&
             fits (cr, x_axis_label (entry), width - 32.0) &&
             fits (cr, footer, width - 32.0) &&
             fits (cr, details, width - 32.0);
