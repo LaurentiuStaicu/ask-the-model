@@ -177,6 +177,33 @@ pixel_is_black (const AtmChartRender *rendered, int x, int y)
     return ((const uint32_t *) (bytes + y * stride))[x] == 0xff000000u;
 }
 
+static gboolean
+surface_has_black_pixel_near (cairo_surface_t *surface,
+                              int center_x,
+                              int center_y,
+                              int radius)
+{
+    if (surface == NULL ||
+        cairo_surface_get_type (surface) != CAIRO_SURFACE_TYPE_IMAGE)
+        return FALSE;
+    cairo_surface_flush (surface);
+    const unsigned char *bytes = cairo_image_surface_get_data (surface);
+    int width = cairo_image_surface_get_width (surface);
+    int height = cairo_image_surface_get_height (surface);
+    int stride = cairo_image_surface_get_stride (surface);
+    for (int y = MAX (0, center_y - radius);
+         y <= MIN (height - 1, center_y + radius); y++) {
+        const uint32_t *row =
+            (const uint32_t *) (bytes + (gsize) y * (gsize) stride);
+        for (int x = MAX (0, center_x - radius);
+             x <= MIN (width - 1, center_x + radius); x++) {
+            if (row[x] == 0xff000000u)
+                return TRUE;
+        }
+    }
+    return FALSE;
+}
+
 static void
 test_bnr_data_view_and_real_gap (void)
 {
@@ -638,6 +665,44 @@ assert_render_v4_profile_is_generic_and_exact_data (
     g_assert_cmpstr (atm_chart_render_v4_data (rendered), ==,
                      atm_chart_render_data (legacy_data_reference));
     assert_v4_surface_is_monochrome (atm_chart_render_v4_surface (rendered));
+
+    /*
+     * BNR Q3 2025 follows the authorized missing Q2 2025 coordinate. The
+     * isolated real observation must remain visible as a square marker, while
+     * the interpolated midpoint across the gap must remain ink-free.
+     */
+    if (g_strcmp0 (series_id,
+            "banking.bnr.bls-c01.credit-standards-net-percentage") == 0) {
+        const AtmChartProjection *source_projection =
+            atm_chart_projection_v4_source_projection (
+                atm_chart_render_v4_projection (rendered));
+        g_assert_nonnull (source_projection);
+        guint projected_count =
+            atm_chart_projection_count (source_projection);
+        g_assert_cmpuint (projected_count, ==, 11u);
+        const AtmChartProjectedPoint *before_gap =
+            atm_chart_projection_point (source_projection,
+                                        projected_count - 2u);
+        const AtmChartProjectedPoint *after_gap =
+            atm_chart_projection_point (source_projection,
+                                        projected_count - 1u);
+        g_assert_nonnull (before_gap);
+        g_assert_nonnull (after_gap);
+        g_assert_cmpuint (before_gap->point_index, ==, 9u);
+        g_assert_cmpuint (after_gap->point_index, ==, 11u);
+        cairo_surface_t *surface = atm_chart_render_v4_surface (rendered);
+        int last_x = (int) (84.0 + after_gap->x + 0.5);
+        int last_y = (int) (108.0 + after_gap->y + 0.5);
+        g_assert_true (surface_has_black_pixel_near (
+            surface, last_x, last_y, 2));
+
+        int gap_x = (int) (84.0 +
+            (before_gap->x + after_gap->x) / 2.0 + 0.5);
+        int gap_y = (int) (108.0 +
+            (before_gap->y + after_gap->y) / 2.0 + 0.5);
+        g_assert_false (surface_has_black_pixel_near (
+            surface, gap_x, gap_y, 2));
+    }
 
     char *first_digest =
         v4_surface_digest (atm_chart_render_v4_surface (rendered));
