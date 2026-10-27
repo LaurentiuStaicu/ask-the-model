@@ -7,10 +7,22 @@
 #include <fontconfig/fontconfig.h>
 #include <stdint.h>
 #include <string.h>
-static AtmGistempAdmission *admit (void)
+static const char GISTEMP_SNAPSHOT_INITIAL[] =
+    "d9e249339663015f6d1c05752338a955bf64ad0b";
+static const char GISTEMP_SNAPSHOT_CURRENT[] =
+    "dc710d8e604c0fff713a3acfdb18ab47a1a902bb";
+
+static AtmGistempAdmission *admit_for_snapshot (const char *snapshot)
 {
     const char *root = g_getenv ("ATM_CHART01_FIXTURE");
     g_assert_nonnull (root);
+    const char *fixture_tree = NULL;
+    if (g_strcmp0 (snapshot, GISTEMP_SNAPSHOT_INITIAL) == 0)
+        fixture_tree = "ewd";
+    else if (g_strcmp0 (snapshot, GISTEMP_SNAPSHOT_CURRENT) == 0)
+        fixture_tree = "ewd-current";
+    else
+        g_assert_not_reached ();
     const char *paths[] = {
         "science/data/processed/nasa_gistemp_global_2026.csv",
         "science/data/processed/nasa_gistemp_global_2026.provenance.json",
@@ -18,21 +30,22 @@ static AtmGistempAdmission *admit (void)
     };
     GBytes *sources[4];
     for (guint i = 0; i < 4; i++) {
-        char *path = g_build_filename (root, "ewd", paths[i], NULL);
+        char *path = g_build_filename (root, fixture_tree, paths[i], NULL);
         char *bytes; gsize length;
         g_assert_true (g_file_get_contents (path, &bytes, &length, NULL));
         sources[i] = g_bytes_new_take (bytes, length);
         g_free (path);
     }
     AtmGistempAdmission *a = NULL;
-    g_assert_true (atm_gistemp_admission_new ("LaurentiuStaicu/empirical-world3-dynamics",
-        "d9e249339663015f6d1c05752338a955bf64ad0b", sources, &a, NULL));
+    g_assert_true (atm_gistemp_admission_new (
+        "LaurentiuStaicu/empirical-world3-dynamics", snapshot, sources, &a, NULL));
     for (guint i = 0; i < 4; i++) g_bytes_unref (sources[i]);
     return a;
 }
-static AtmVerifiedSeries *build (void)
+
+static AtmVerifiedSeries *build_for_snapshot (const char *snapshot)
 {
-    AtmGistempAdmission *a = admit ();
+    AtmGistempAdmission *a = admit_for_snapshot (snapshot);
     AtmVerifiedSeries *s = NULL;
     GError *error = NULL;
     g_assert_true (atm_verified_series_from_gistemp (a, &s, &error));
@@ -41,14 +54,20 @@ static AtmVerifiedSeries *build (void)
     return s;
 }
 
-
-static AtmChartSpec *specification (AtmChartKind kind)
+static AtmChartSpec *specification_for_snapshot (AtmChartKind kind,
+    const char *snapshot)
 {
-    AtmVerifiedSeries *s = build ();
+    AtmVerifiedSeries *s = build_for_snapshot (snapshot);
     const AtmVerifiedSeries *inputs[] = {s};
     AtmChartSpec *spec = NULL;
     g_assert_true (atm_chart_spec_new (kind, inputs, 1, &spec, NULL));
-    atm_verified_series_free (s); return spec;
+    atm_verified_series_free (s);
+    return spec;
+}
+
+static AtmChartSpec *specification (AtmChartKind kind)
+{
+    return specification_for_snapshot (kind, GISTEMP_SNAPSHOT_INITIAL);
 }
 
 static AtmChartSpec *
