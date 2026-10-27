@@ -71,11 +71,11 @@ static const char *
 y_axis_label (const AtmChartCatalogEntry *entry)
 {
     if (g_strcmp0 (entry->y_dimension, "temperature_difference") == 0)
-        return "Temperature anomaly (degrees C)";
+        return "deg C anomaly";
     if (g_strcmp0 (entry->y_dimension, "energy_flow_rate") == 0)
-        return "Energy supply (EJ/year)";
+        return "EJ/year";
     if (g_strcmp0 (entry->y_dimension, "survey_net_percentage") == 0)
-        return "Credit standards net percentage (%)";
+        return "Net %";
     return NULL;
 }
 
@@ -500,17 +500,25 @@ atm_chart_render_v4_validate (const AtmChartRenderV4 *render,
                 "A non-fallback render requires a validated v4 projection.");
         if (!atm_chart_projection_v4_validate (render->projection, error))
             return FALSE;
-        if (g_strcmp0 (atm_chart_projection_v4_series_id (render->projection),
-                       atm_chart_spec_v4_series_id (render->owned_spec)) != 0 ||
+        const AtmChartCatalogEntry *entry =
+            atm_chart_spec_v4_catalog_entry (render->owned_spec);
+        char *expected_policy = entry != NULL
+            ? g_strdup_printf ("%s/%s", entry->display_profile_id,
+                               entry->display_profile_version)
+            : NULL;
+        gboolean projection_identity_matches =
+            entry != NULL &&
+            g_strcmp0 (atm_chart_projection_v4_series_id (render->projection),
+                       atm_chart_spec_v4_series_id (render->owned_spec)) == 0 &&
+            expected_policy != NULL &&
             g_strcmp0 (atm_chart_projection_v4_policy (render->projection),
-                g_strconcat (
-                    atm_chart_spec_v4_catalog_entry (render->owned_spec)->display_profile_id,
-                    "/", atm_chart_spec_v4_catalog_entry (render->owned_spec)->display_profile_version,
-                    NULL)) != 0 ||
-            atm_chart_projection_v4_coordinate_count (render->projection) !=
-                atm_chart_spec_v4_coordinate_count (render->owned_spec) ||
-            atm_chart_projection_v4_numeric_observation_count (render->projection) !=
-                atm_chart_spec_v4_numeric_observation_count (render->owned_spec))
+                       expected_policy) == 0 &&
+            atm_chart_projection_v4_coordinate_count (render->projection) ==
+                atm_chart_spec_v4_coordinate_count (render->owned_spec) &&
+            atm_chart_projection_v4_numeric_observation_count (render->projection) ==
+                atm_chart_spec_v4_numeric_observation_count (render->owned_spec);
+        g_free (expected_policy);
+        if (!projection_identity_matches)
             return reject (error, ATM_CHART_RENDER_V4_ERROR_PROJECTION,
                 "The rendered v4 projection differs from catalog identity or coverage.");
     }
