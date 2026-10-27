@@ -436,6 +436,34 @@ namespace AskTheModel {
                     .replace ("1965 through 2025", "")
                     .replace ("1965 until 2025", "")
                     .replace ("between 1965 and 2025", "");
+            } else if (selected_series_id ==
+                       "banking.bnr.bls-c01.credit-standards-net-percentage") {
+                /*
+                 * The BNR adapter exposes this complete quarterly interval.
+                 * Filtering a subset is still unsupported. Remove only exact
+                 * spellings of the complete interval, so a second/partial
+                 * period in the same request remains visible to the guards.
+                 */
+                range_check = range_check
+                    .replace ("2022-q4-2025-q3", "")
+                    .replace ("2022-q4–2025-q3", "")
+                    .replace ("2022-q4—2025-q3", "")
+                    .replace ("2022-q4 - 2025-q3", "")
+                    .replace ("2022-q4 – 2025-q3", "")
+                    .replace ("2022-q4 — 2025-q3", "")
+                    .replace ("from 2022-q4 to 2025-q3", "")
+                    .replace ("from 2022-q4 through 2025-q3", "")
+                    .replace ("from 2022-q4 until 2025-q3", "")
+                    .replace ("2022-q4 to 2025-q3", "")
+                    .replace ("2022-q4 through 2025-q3", "")
+                    .replace ("2022-q4 until 2025-q3", "")
+                    .replace ("between 2022-q4 and 2025-q3", "")
+                    .replace ("între 2022-q4 și 2025-q3", "")
+                    .replace ("între 2022-q4 si 2025-q3", "")
+                    .replace ("intre 2022-q4 și 2025-q3", "")
+                    .replace ("intre 2022-q4 si 2025-q3", "")
+                    .replace ("din 2022-q4 până în 2025-q3", "")
+                    .replace ("din 2022-q4 pana in 2025-q3", "");
             }
 
             bool has_dashed_year_range = Regex.match_simple (
