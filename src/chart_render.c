@@ -139,15 +139,22 @@ static char *data_view (const AtmChartSpec *spec)
         return ei_data_view (spec);
     if (atm_chart_spec_version (spec) == ATM_CHART_SPEC_VERSION_BNR_BLS_C01_V3)
         return bnr_data_view (spec);
+    const char *snapshot = atm_chart_spec_series_snapshot_sha (spec, 0);
+    const char *source_path = atm_chart_spec_series_source_path (spec, 0);
+    if (snapshot == NULL || source_path == NULL)
+        return NULL;
+
     GString *s = g_string_new ("# GISTEMP global annual temperature anomaly\n");
     g_string_append_printf (s, "# unit\t%s\n# reference_period\t%s\n# chart_spec_id\t%s\n",
         atm_verified_series_unit (atm_chart_spec_series (spec, 0)),
         atm_verified_series_reference_period (atm_chart_spec_series (spec, 0)), atm_chart_spec_id (spec));
-    g_string_append (s, "# source_repository\tLaurentiuStaicu/empirical-world3-dynamics\n"
-        "# source_snapshot\td9e249339663015f6d1c05752338a955bf64ad0b\n"
-        "# source_path\tscience/data/processed/nasa_gistemp_global_2026.csv\n"
+    g_string_append_printf (s,
+        "# source_repository\tLaurentiuStaicu/empirical-world3-dynamics\n"
+        "# source_snapshot\t%s\n"
+        "# source_path\t%s\n"
         "# access_vintage\t2026-08-31\n"
-        "series\tyear\tsource_decimal\tcoefficient\texponent\tsource_row\tqualified_series_id\tsupport_ids\n");
+        "series\tyear\tsource_decimal\tcoefficient\texponent\tsource_row\tqualified_series_id\tsupport_ids\n",
+        snapshot, source_path);
     for (guint i = 0; i < atm_chart_spec_count (spec); i++) {
         const AtmVerifiedSeries *series = atm_chart_spec_series (spec, i);
         for (guint j = 0; j < atm_verified_series_count (series); j++) {
@@ -572,3 +579,4 @@ cairo_surface_t *atm_chart_render_surface (const AtmChartRender *r) { return r ?
 const char *atm_chart_render_data (const AtmChartRender *r) { return r ? r->data : NULL; }
 gboolean atm_chart_render_is_fallback (const AtmChartRender *r) { return r ? r->fallback : FALSE; }
 const AtmChartSpec *atm_chart_render_spec (const AtmChartRender *r) { return r ? r->spec : NULL; }
+const AtmChartProjection *atm_chart_render_projection (const AtmChartRender *r) { return r ? r->projection : NULL; }
