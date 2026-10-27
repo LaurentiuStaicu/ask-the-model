@@ -62,21 +62,41 @@ fits (cairo_t *cr, const char *value, double width)
 static const char *
 x_axis_label (const AtmChartCatalogEntry *entry)
 {
-    return entry->x_kind == ATM_CHART_CATALOG_X_CALENDAR_QUARTER
-        ? "Calendar quarter" : "Calendar year";
+    if (entry == NULL)
+        return NULL;
+    switch (entry->x_kind) {
+    case ATM_CHART_CATALOG_X_CALENDAR_YEAR:
+        return "Calendar year";
+    case ATM_CHART_CATALOG_X_CALENDAR_QUARTER:
+        return "Calendar quarter";
+    default:
+        return NULL;
+    }
 }
 
-/* Axis labels are selected from reviewed semantic dimensions, not series IDs. */
-static const char *
+/* Prefer concise labels for the current reviewed dimensions. For any other
+ * catalog-qualified unit, fall back to the catalog unit with underscores
+ * expanded rather than making the painter depend on a series ID. */
+static char *
 y_axis_label (const AtmChartCatalogEntry *entry)
 {
+    if (entry == NULL)
+        return NULL;
     if (g_strcmp0 (entry->y_dimension, "temperature_difference") == 0)
-        return "deg C anomaly";
+        return g_strdup ("deg C anomaly");
     if (g_strcmp0 (entry->y_dimension, "energy_flow_rate") == 0)
-        return "EJ/year";
+        return g_strdup ("EJ/year");
     if (g_strcmp0 (entry->y_dimension, "survey_net_percentage") == 0)
-        return "Net %";
-    return NULL;
+        return g_strdup ("Net %");
+    if (entry->y_unit == NULL || *entry->y_unit == '\0')
+        return NULL;
+
+    char *label_text = g_strdup (entry->y_unit);
+    for (char *cursor = label_text; *cursor != '\0'; cursor++) {
+        if (*cursor == '_')
+            *cursor = ' ';
+    }
+    return label_text;
 }
 
 static char *
@@ -86,12 +106,14 @@ coverage_summary (const AtmChartCatalogEntry *entry)
         entry->coverage_start == NULL || entry->coverage_end == NULL)
         return NULL;
 
-    if (entry->missing_coordinate != NULL) {
-        return g_strdup_printf ("%s | %s-%s | %u numeric + 1 missing",
+    if (entry->coordinate_count > entry->numeric_observation_count) {
+        guint missing_count =
+            entry->coordinate_count - entry->numeric_observation_count;
+        return g_strdup_printf ("%s | %s-%s | %u values, %u missing",
             entry->geography, entry->coverage_start, entry->coverage_end,
-            entry->numeric_observation_count);
+            entry->numeric_observation_count, missing_count);
     }
-    return g_strdup_printf ("%s | %s-%s | %u numeric",
+    return g_strdup_printf ("%s | %s-%s | %u values",
         entry->geography, entry->coverage_start, entry->coverage_end,
         entry->numeric_observation_count);
 }
@@ -104,12 +126,19 @@ source_footer (const AtmChartCatalogEntry *entry)
     return g_strdup_printf ("Source: %s", entry->publisher_name);
 }
 
-static const char *
+static char *
 detail_footer (const AtmChartCatalogEntry *entry)
 {
-    if (entry != NULL && entry->missing_coordinate != NULL)
-        return "2025-Q2 missing, not zero | Exact values and details: Data view";
-    return "Exact values and source details: Data view";
+    if (entry != NULL && entry->missing_coordinate != NULL) {
+        const char *reason =
+            g_strcmp0 (entry->missing_reason, "source_round_not_retained") == 0
+                ? "source round not retained"
+                : "source marks this observation missing";
+        return g_strdup_printf (
+            "Missing %s (%s; not zero) | Exact values and source details: Data view",
+            entry->missing_coordinate, reason);
+    }
+    return g_strdup ("Exact values and source details: Data view");
 }
 
 static gboolean
@@ -206,15 +235,18 @@ layout_fits (const AtmChartSpecV4 *spec,
         atm_chart_spec_v4_catalog_entry (spec);
     const char *title = entry != NULL ? entry->display_name : NULL;
     const char *subtitle = entry != NULL ? entry->observation_meaning : NULL;
-    const char *y_label = entry != NULL ? y_axis_label (entry) : NULL;
+    char *y_label = y_axis_label (entry);
     char *summary = coverage_summary (entry);
     char *footer = source_footer (entry);
+    char *details = detail_footer (entry);
     cairo_surface_t *measure_surface = cairo_image_surface_create (
         CAIRO_FORMAT_ARGB32, 1, 1);
     if (cairo_surface_status (measure_surface) != CAIRO_STATUS_SUCCESS) {
         cairo_surface_destroy (measure_surface);
         g_free (summary);
         g_free (footer);
+        g_free (y_label);
+        g_free (details);
         return FALSE;
     }
     cairo_t *cr = cairo_create (measure_surface);
@@ -228,7 +260,7 @@ layout_fits (const AtmChartSpecV4 *spec,
             fits (cr, y_label, 72.0) &&
             fits (cr, x_axis_label (entry), width - 32.0) &&
             fits (cr, footer, width - 32.0) &&
-            fits (cr, detail_footer (entry), width - 32.0);
+            fits (cr, details, width - 32.0);
     }
     cairo_destroy (cr);
     cairo_surface_destroy (measure_surface);
@@ -236,6 +268,8 @@ layout_fits (const AtmChartSpecV4 *spec,
         ok = projection_labels_fit (projection, width, height);
     g_free (summary);
     g_free (footer);
+    g_free (y_label);
+    g_free (details);
     return ok;
 }
 
@@ -321,7 +355,9 @@ paint_v4_surface (const AtmChartSpecV4 *spec,
         char *summary = coverage_summary (entry);
         label (cr, summary, 16.0, 68.0, 0.0);
         g_free (summary);
-        label (cr, y_axis_label (entry), left, 96.0, 0.0);
+        char *y_label = y_axis_label (entry);
+        label (cr, y_label, left, 96.0, 0.0);
+        g_free (y_label);
 
         const double dots[] = {1.0, 5.0};
         cairo_set_line_width (cr, 1.0);
@@ -391,8 +427,9 @@ paint_v4_surface (const AtmChartSpecV4 *spec,
         char *footer = source_footer (entry);
         label (cr, footer, 16.0, (double) height - 36.0, 0.0);
         g_free (footer);
-        label (cr, detail_footer (entry), 16.0,
-            (double) height - 16.0, 0.0);
+        char *details = detail_footer (entry);
+        label (cr, details, 16.0, (double) height - 16.0, 0.0);
+        g_free (details);
     }
 
     cairo_status_t drawing_status = cairo_status (cr);
