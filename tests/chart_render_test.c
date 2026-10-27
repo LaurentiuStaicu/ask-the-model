@@ -530,6 +530,44 @@ render_v4_new_for_test (const AtmChartSpecV4 *spec,
 }
 
 static void
+test_v4_gistemp_data_view_uses_qualified_snapshot (void)
+{
+    static const char *const series_id =
+        "climate.gistemp.global-temperature-anomaly";
+    const char *snapshots[] = {
+        GISTEMP_SNAPSHOT_INITIAL,
+        GISTEMP_SNAPSHOT_CURRENT
+    };
+
+    for (guint i = 0; i < G_N_ELEMENTS (snapshots); i++) {
+        AtmChartSpecV4 *spec = render_v4_spec_from_source (
+            series_id, specification_for_snapshot (ATM_CHART_LINE, snapshots[i]));
+        AtmChartRenderV4 *rendered = render_v4_new_for_test (
+            spec, 860, 500, 1);
+        const AtmChartSpec *source_spec = atm_chart_spec_v4_source_spec (
+            atm_chart_render_v4_spec (rendered));
+        const char *data = atm_chart_render_v4_data (rendered);
+
+        g_assert_cmpstr (
+            atm_chart_spec_series_snapshot_sha (source_spec, 0), ==,
+            snapshots[i]);
+        g_assert_cmpstr (
+            atm_chart_spec_series_repository_id (source_spec, 0), ==, "ewd");
+        g_assert_nonnull (strstr (data,
+            "# source_repository\tLaurentiuStaicu/empirical-world3-dynamics\n"));
+        char *snapshot_line = g_strdup_printf (
+            "# source_snapshot\t%s\n", snapshots[i]);
+        g_assert_nonnull (strstr (data, snapshot_line));
+        g_free (snapshot_line);
+        g_assert_nonnull (strstr (data,
+            "# source_path\tscience/data/processed/nasa_gistemp_global_2026.csv\n"));
+
+        atm_chart_render_v4_free (rendered);
+        atm_chart_spec_v4_free (spec);
+    }
+}
+
+static void
 assert_render_v4_pixel_parity (const AtmChartRenderV4 *wrapped,
                                const AtmChartRender *legacy)
 {
@@ -691,12 +729,14 @@ int main (int argc, char **argv)
 {
     g_test_init (&argc, &argv, NULL);
     g_test_add_func ("/chart-render/line-data-ownership", test_line_data_ownership);
+    g_test_add_func ("/chart-render/gistemp-data-qualified-snapshot", test_gistemp_data_view_uses_qualified_snapshot);
     g_test_add_func ("/chart-render/scatter-scale", test_scatter_scale);
     g_test_add_func ("/chart-render/resize-transactional", test_resize_transactional);
     g_test_add_func ("/chart-render/fallback-arguments", test_fallback_arguments);
     g_test_add_func ("/chart-render/bnr-data-view-and-real-gap", test_bnr_data_view_and_real_gap);
     g_test_add_func ("/chart-render/ei-exact-data-resize", test_ei_projection_renders_exact_data_and_resizes);
     g_test_add_func ("/chart-render-v4/legacy-parity", test_v4_render_profiles_exact_legacy_parity);
+    g_test_add_func ("/chart-render-v4/gistemp-data-qualified-snapshot", test_v4_gistemp_data_view_uses_qualified_snapshot);
     g_test_add_func ("/chart-render-v4/fallback-data", test_v4_render_fallback_keeps_exact_data);
     g_test_add_func ("/chart-render-v4/rejections-tampering", test_v4_render_rejections_and_tampering);
     int result = g_test_run ();
