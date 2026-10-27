@@ -171,6 +171,33 @@ static char *data_view (const AtmChartSpec *spec)
     }
     return g_string_free (s, FALSE);
 }
+
+/*
+ * Keep the exact source-specific TSV serializer reusable by the v4 painter
+ * without forcing the generic renderer to allocate or invoke a legacy Cairo
+ * surface. Spec rebuilding preserves the existing source-validation boundary.
+ */
+char *
+atm_chart_render_data_for_spec (const AtmChartSpec *spec, GError **error)
+{
+    if (spec == NULL) {
+        reject (error, "Cannot serialize Data without a qualified source ChartSpec.");
+        return NULL;
+    }
+
+    AtmChartSpec *owned = NULL;
+    if (!atm_chart_spec_rebuild (spec, &owned, error))
+        return NULL;
+
+    char *data = data_view (owned);
+    atm_chart_spec_free (owned);
+    if (data == NULL) {
+        reject (error, "The qualified source ChartSpec could not produce its exact Data representation.");
+        return NULL;
+    }
+    return data;
+}
+
 static void font (cairo_t *cr, double size, gboolean bold)
 {
     cairo_select_font_face (cr, "monospace", CAIRO_FONT_SLANT_NORMAL,
