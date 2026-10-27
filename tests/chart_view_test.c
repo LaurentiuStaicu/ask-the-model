@@ -642,6 +642,39 @@ static void assert_v4_catalog_view (const char *series_id,
     g_assert_nonnull (strstr (detail, "Primary source:"));
     g_free (detail);
 
+    /*
+     * Retain actual GTK snapshots from the catalog-bound v4 view, not from
+     * the legacy compatibility constructor. These images are the visual-review
+     * evidence for the new Cairo painter; BNR's chart image must show the open
+     * 2025-Q2 gap while its Data image retains the explicit MISSING row.
+     */
+    const char *preview_slug =
+        g_strcmp0 (series_id, "climate.gistemp.global-temperature-anomaly") == 0
+            ? "gistemp"
+            : (g_strcmp0 (series_id,
+                "energy.energy-institute.global-total-energy-supply") == 0
+                ? "energy-institute"
+                : "bnr-bls-c01");
+    GtkWindow *v4_preview_window = GTK_WINDOW (gtk_window_new ());
+    gtk_window_set_title (v4_preview_window, "AtM qualified ChartSpec v4 preview");
+    gtk_window_set_default_size (v4_preview_window, 1000, 760);
+    atm_chart_view_show_chart (view);
+    gtk_window_set_child (v4_preview_window, GTK_WIDGET (view));
+    gtk_window_present (v4_preview_window);
+    settle ();
+    char *v4_chart_filename =
+        g_strdup_printf ("atm-chart-v4-%s-chart.png", preview_slug);
+    screenshot (v4_preview_window, v4_chart_filename);
+    g_free (v4_chart_filename);
+    atm_chart_view_show_data (view);
+    settle ();
+    char *v4_data_filename =
+        g_strdup_printf ("atm-chart-v4-%s-data.png", preview_slug);
+    screenshot (v4_preview_window, v4_data_filename);
+    g_free (v4_data_filename);
+    gtk_window_destroy (v4_preview_window);
+    settle ();
+
     if (exercise_resize) {
         char *data_before = g_strdup (atm_chart_view_data (view));
         int width = 0, height = 0, scale = 0;
