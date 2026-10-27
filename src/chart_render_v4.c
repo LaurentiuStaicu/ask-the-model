@@ -2,14 +2,15 @@
 
 #include "scientific_canonical.h"
 
-#include <json-glib/json-glib.h>
 #include <math.h>
 #include <string.h>
 
 struct AtmChartRenderV4 {
     AtmChartSpecV4 *owned_spec;
     AtmChartProjectionV4 *projection;
-    AtmChartRender *source_render;
+    cairo_surface_t *surface;
+    char *data;
+    gboolean fallback;
     guint width;
     guint height;
     guint device_scale;
@@ -31,74 +32,383 @@ reject (GError **error,
     return FALSE;
 }
 
-static gboolean
-projection_geometry_equal (const AtmChartProjection *a,
-                           const AtmChartProjection *b)
+static void
+font (cairo_t *cr, double size, gboolean bold)
 {
-    if (a == NULL || b == NULL ||
-        g_strcmp0 (atm_chart_projection_policy (a),
-                   atm_chart_projection_policy (b)) != 0 ||
-        atm_chart_projection_count (a) != atm_chart_projection_count (b) ||
-        atm_chart_projection_x_tick_count (a) !=
-            atm_chart_projection_x_tick_count (b) ||
-        atm_chart_projection_y_tick_count (a) !=
-            atm_chart_projection_y_tick_count (b))
+    cairo_select_font_face (cr, "monospace", CAIRO_FONT_SLANT_NORMAL,
+        bold ? CAIRO_FONT_WEIGHT_BOLD : CAIRO_FONT_WEIGHT_NORMAL);
+    cairo_set_font_size (cr, size);
+}
+
+static void
+label (cairo_t *cr, const char *value, double x, double y, double alignment)
+{
+    cairo_text_extents_t extents;
+    cairo_text_extents (cr, value, &extents);
+    cairo_move_to (cr, x - extents.x_bearing - alignment * extents.width, y);
+    cairo_show_text (cr, value);
+}
+
+static gboolean
+fits (cairo_t *cr, const char *value, double width)
+{
+    cairo_text_extents_t extents;
+    if (value == NULL)
         return FALSE;
+    cairo_text_extents (cr, value, &extents);
+    return isfinite (extents.width) && extents.width <= width;
+}
 
-    const AtmChartDisplayDomain *ad = atm_chart_projection_domain (a);
-    const AtmChartDisplayDomain *bd = atm_chart_projection_domain (b);
-    if (ad == NULL || bd == NULL ||
-        ad->x_min != bd->x_min || ad->x_max != bd->x_max ||
-        ad->y_min != bd->y_min || ad->y_max != bd->y_max)
-        return FALSE;
+static const char *
+x_axis_label (const AtmChartCatalogEntry *entry)
+{
+    return entry->x_kind == ATM_CHART_CATALOG_X_CALENDAR_QUARTER
+        ? "Calendar quarter" : "Calendar year";
+}
 
-    for (guint i = 0; i < atm_chart_projection_count (a); i++) {
-        const AtmChartProjectedPoint *ap = atm_chart_projection_point (a, i);
-        const AtmChartProjectedPoint *bp = atm_chart_projection_point (b, i);
-        if (ap == NULL || bp == NULL ||
-            ap->series_index != bp->series_index ||
-            ap->point_index != bp->point_index ||
-            ap->x != bp->x || ap->y != bp->y)
-            return FALSE;
+/* Axis labels are selected from reviewed semantic dimensions, not series IDs. */
+static const char *
+y_axis_label (const AtmChartCatalogEntry *entry)
+{
+    if (g_strcmp0 (entry->y_dimension, "temperature_difference") == 0)
+        return "Temperature anomaly (degrees C)";
+    if (g_strcmp0 (entry->y_dimension, "energy_flow_rate") == 0)
+        return "Energy supply (EJ/year)";
+    if (g_strcmp0 (entry->y_dimension, "survey_net_percentage") == 0)
+        return "Credit standards net percentage (%)";
+    return NULL;
+}
+
+static char *
+coverage_summary (const AtmChartCatalogEntry *entry)
+{
+    if (entry == NULL || entry->geography == NULL ||
+        entry->coverage_start == NULL || entry->coverage_end == NULL)
+        return NULL;
+
+    if (entry->missing_coordinate != NULL) {
+        return g_strdup_printf ("%s | %s-%s | %u numeric + 1 missing",
+            entry->geography, entry->coverage_start, entry->coverage_end,
+            entry->numeric_observation_count);
     }
+    return g_strdup_printf ("%s | %s-%s | %u numeric",
+        entry->geography, entry->coverage_start, entry->coverage_end,
+        entry->numeric_observation_count);
+}
 
-    for (guint i = 0; i < atm_chart_projection_x_tick_count (a); i++) {
-        const AtmChartTick *at = atm_chart_projection_x_tick (a, i);
-        const AtmChartTick *bt = atm_chart_projection_x_tick (b, i);
-        if (at == NULL || bt == NULL || at->position != bt->position ||
-            g_strcmp0 (at->label, bt->label) != 0)
-            return FALSE;
-    }
+static char *
+source_footer (const AtmChartCatalogEntry *entry)
+{
+    if (entry == NULL || entry->publisher_name == NULL)
+        return NULL;
+    return g_strdup_printf ("Source: %s", entry->publisher_name);
+}
 
-    for (guint i = 0; i < atm_chart_projection_y_tick_count (a); i++) {
-        const AtmChartTick *at = atm_chart_projection_y_tick (a, i);
-        const AtmChartTick *bt = atm_chart_projection_y_tick (b, i);
-        if (at == NULL || bt == NULL || at->position != bt->position ||
-            g_strcmp0 (at->label, bt->label) != 0)
-            return FALSE;
-    }
-    return TRUE;
+static const char *
+detail_footer (const AtmChartCatalogEntry *entry)
+{
+    if (entry != NULL && entry->missing_coordinate != NULL)
+        return "2025-Q2 missing, not zero | Exact values and details: Data view";
+    return "Exact values and source details: Data view";
 }
 
 static gboolean
 data_identity_matches (const AtmChartSpec *source_spec,
-                       const AtmChartRender *source_render,
+                       const char *data,
                        GError **error)
 {
     const char *spec_id = atm_chart_spec_id (source_spec);
-    const char *rendered_id = atm_chart_spec_id (
-        atm_chart_render_spec (source_render));
-    const char *data = atm_chart_render_data (source_render);
-    if (spec_id == NULL || g_strcmp0 (spec_id, rendered_id) != 0 ||
-        data == NULL)
+    if (spec_id == NULL || data == NULL)
         return reject (error, ATM_CHART_RENDER_V4_ERROR_DATA,
-            "The source renderer and its Data view must retain the v4-bound source ChartSpec identity.");
+            "The catalog-qualified source spec or its exact Data view is unavailable.");
 
     char *identity_line = g_strdup_printf ("# chart_spec_id\t%s\n", spec_id);
     gboolean matches = strstr (data, identity_line) != NULL;
     g_free (identity_line);
     return matches || reject (error, ATM_CHART_RENDER_V4_ERROR_DATA,
-        "The renderer Data view does not identify the v4-bound source ChartSpec.");
+        "The Data view does not identify the exact v4-bound source ChartSpec.");
+}
+
+static gboolean
+projection_labels_fit (const AtmChartProjection *projection,
+                       guint width,
+                       guint height)
+{
+    if (projection == NULL)
+        return FALSE;
+
+    const double left = 84.0;
+    const double top = 108.0;
+    const double plot_width = (double) width - 112.0;
+    const double plot_height = (double) height - 210.0;
+    cairo_surface_t *measure_surface = cairo_image_surface_create (
+        CAIRO_FORMAT_ARGB32, 1, 1);
+    if (cairo_surface_status (measure_surface) != CAIRO_STATUS_SUCCESS) {
+        cairo_surface_destroy (measure_surface);
+        return FALSE;
+    }
+    cairo_t *cr = cairo_create (measure_surface);
+    gboolean ok = cairo_status (cr) == CAIRO_STATUS_SUCCESS;
+    if (ok) {
+        font (cr, 12.0, FALSE);
+        double previous_right = -1.0;
+        for (guint i = 0;
+             i < atm_chart_projection_x_tick_count (projection); i++) {
+            const AtmChartTick *tick =
+                atm_chart_projection_x_tick (projection, i);
+            if (tick == NULL) { ok = FALSE; break; }
+            cairo_text_extents_t extents;
+            cairo_text_extents (cr, tick->label, &extents);
+            double center = left + tick->position;
+            double tick_left = center - extents.width / 2.0;
+            double tick_right = center + extents.width / 2.0;
+            if (!isfinite (tick_left) || !isfinite (tick_right) ||
+                tick_left < 12.0 || tick_right > width - 12.0 ||
+                tick_left < previous_right + 5.0) {
+                ok = FALSE;
+                break;
+            }
+            previous_right = tick_right;
+        }
+
+        double previous_bottom = -G_MAXDOUBLE;
+        for (guint i = 0; ok &&
+             i < atm_chart_projection_y_tick_count (projection); i++) {
+            const AtmChartTick *tick =
+                atm_chart_projection_y_tick (projection, i);
+            if (tick == NULL) { ok = FALSE; break; }
+            cairo_text_extents_t extents;
+            cairo_text_extents (cr, tick->label, &extents);
+            double baseline = top + tick->position + 4.0;
+            double tick_top = baseline + extents.y_bearing;
+            double tick_bottom = tick_top + extents.height;
+            if (!isfinite (tick_top) || !isfinite (tick_bottom) ||
+                extents.width > 64.0 || tick_top < previous_bottom + 2.0 ||
+                baseline > top + plot_height + 4.0) {
+                ok = FALSE;
+                break;
+            }
+            previous_bottom = tick_bottom;
+        }
+    }
+    cairo_destroy (cr);
+    cairo_surface_destroy (measure_surface);
+    return ok;
+}
+
+static gboolean
+layout_fits (const AtmChartSpecV4 *spec,
+             const AtmChartProjection *projection,
+             guint width,
+             guint height)
+{
+    const AtmChartCatalogEntry *entry =
+        atm_chart_spec_v4_catalog_entry (spec);
+    const char *title = entry != NULL ? entry->display_name : NULL;
+    const char *subtitle = entry != NULL ? entry->observation_meaning : NULL;
+    const char *y_label = entry != NULL ? y_axis_label (entry) : NULL;
+    char *summary = coverage_summary (entry);
+    char *footer = source_footer (entry);
+    cairo_surface_t *measure_surface = cairo_image_surface_create (
+        CAIRO_FORMAT_ARGB32, 1, 1);
+    if (cairo_surface_status (measure_surface) != CAIRO_STATUS_SUCCESS) {
+        cairo_surface_destroy (measure_surface);
+        g_free (summary);
+        g_free (footer);
+        return FALSE;
+    }
+    cairo_t *cr = cairo_create (measure_surface);
+    gboolean ok = cairo_status (cr) == CAIRO_STATUS_SUCCESS;
+    if (ok) {
+        font (cr, 14.0, TRUE);
+        ok = fits (cr, title, width - 32.0);
+        font (cr, 12.0, FALSE);
+        ok = ok && fits (cr, subtitle, width - 32.0) &&
+            fits (cr, summary, width - 32.0) &&
+            fits (cr, y_label, 72.0) &&
+            fits (cr, x_axis_label (entry), width - 32.0) &&
+            fits (cr, footer, width - 32.0) &&
+            fits (cr, detail_footer (entry), width - 32.0);
+    }
+    cairo_destroy (cr);
+    cairo_surface_destroy (measure_surface);
+    if (ok)
+        ok = projection_labels_fit (projection, width, height);
+    g_free (summary);
+    g_free (footer);
+    return ok;
+}
+
+static void
+paint_fallback (cairo_t *cr)
+{
+    font (cr, 14.0, TRUE);
+    label (cr, "Chart needs more space.", 16.0, 30.0, 0.0);
+    font (cr, 12.0, FALSE);
+    label (cr, "Exact values remain available in Data view.", 16.0, 58.0, 0.0);
+}
+
+/*
+ * The painter consumes only the validated catalog-bound projection and
+ * metadata. Source admission/decimal conversion stay in the source adapter;
+ * no source-specific renderer is called here.
+ */
+static gboolean
+paint_v4_surface (const AtmChartSpecV4 *spec,
+                  const AtmChartProjectionV4 *projection_v4,
+                  guint width,
+                  guint height,
+                  guint device_scale,
+                  cairo_surface_t **out_surface,
+                  gboolean *out_fallback,
+                  GError **error)
+{
+    if (spec == NULL || out_surface == NULL || *out_surface != NULL ||
+        out_fallback == NULL || width < 240u || height < 140u ||
+        width > ATM_CHART_RENDER_MAX_SIZE ||
+        height > ATM_CHART_RENDER_MAX_SIZE ||
+        device_scale < 1u || device_scale > 2u) {
+        return reject (error, ATM_CHART_RENDER_V4_ERROR_ARGUMENT,
+            "The v4 painter received invalid canvas arguments.");
+    }
+
+    cairo_surface_t *surface = cairo_image_surface_create (
+        CAIRO_FORMAT_ARGB32, width * device_scale, height * device_scale);
+    if (cairo_surface_status (surface) != CAIRO_STATUS_SUCCESS) {
+        cairo_surface_destroy (surface);
+        return reject (error, ATM_CHART_RENDER_V4_ERROR_ARGUMENT,
+            "Cairo could not allocate the v4 chart surface.");
+    }
+    cairo_surface_set_device_scale (
+        surface, (double) device_scale, (double) device_scale);
+    cairo_t *cr = cairo_create (surface);
+    if (cairo_status (cr) != CAIRO_STATUS_SUCCESS) {
+        cairo_destroy (cr);
+        cairo_surface_destroy (surface);
+        return reject (error, ATM_CHART_RENDER_V4_ERROR_ARGUMENT,
+            "Cairo could not create a drawing context.");
+    }
+
+    cairo_set_source_rgb (cr, 1.0, 1.0, 1.0);
+    cairo_paint (cr);
+    cairo_set_source_rgb (cr, 0.0, 0.0, 0.0);
+    cairo_set_antialias (cr, CAIRO_ANTIALIAS_NONE);
+    cairo_font_options_t *options = cairo_font_options_create ();
+    cairo_font_options_set_antialias (options, CAIRO_ANTIALIAS_NONE);
+    cairo_set_font_options (cr, options);
+    cairo_font_options_destroy (options);
+
+    const AtmChartCatalogEntry *entry =
+        atm_chart_spec_v4_catalog_entry (spec);
+    const AtmChartProjection *projection =
+        atm_chart_projection_v4_source_projection (projection_v4);
+    gboolean fallback = projection_v4 == NULL ||
+        width < 432u || height < 370u ||
+        !layout_fits (spec, projection, width, height);
+
+    if (fallback) {
+        paint_fallback (cr);
+    } else {
+        const double left = 84.0;
+        const double top = 108.0;
+        const double plot_width = (double) width - 112.0;
+        const double plot_height = (double) height - 210.0;
+
+        font (cr, 14.0, TRUE);
+        label (cr, entry->display_name, 16.0, 26.0, 0.0);
+        font (cr, 12.0, FALSE);
+        label (cr, entry->observation_meaning, 16.0, 47.0, 0.0);
+        char *summary = coverage_summary (entry);
+        label (cr, summary, 16.0, 68.0, 0.0);
+        g_free (summary);
+        label (cr, y_axis_label (entry), left, 96.0, 0.0);
+
+        const double dots[] = {1.0, 5.0};
+        cairo_set_line_width (cr, 1.0);
+        for (guint i = 0;
+             i < atm_chart_projection_y_tick_count (projection); i++) {
+            const AtmChartTick *tick =
+                atm_chart_projection_y_tick (projection, i);
+            double y = top + tick->position;
+            cairo_set_dash (cr, dots, G_N_ELEMENTS (dots), 0.0);
+            cairo_move_to (cr, left, y);
+            cairo_line_to (cr, left + plot_width, y);
+            cairo_stroke (cr);
+            cairo_set_dash (cr, NULL, 0, 0);
+            label (cr, tick->label, left - 12.0, y + 4.0, 1.0);
+        }
+
+        cairo_rectangle (cr, left, top, plot_width, plot_height);
+        cairo_stroke (cr);
+        for (guint i = 0;
+             i < atm_chart_projection_x_tick_count (projection); i++) {
+            const AtmChartTick *tick =
+                atm_chart_projection_x_tick (projection, i);
+            double x = left + tick->position;
+            cairo_move_to (cr, x, top + plot_height);
+            cairo_line_to (cr, x, top + plot_height + 5.0);
+            cairo_stroke (cr);
+            label (cr, tick->label, x, top + plot_height + 22.0, 0.5);
+        }
+
+        cairo_save (cr);
+        cairo_rectangle (cr, left - 3.0, top - 3.0,
+            plot_width + 6.0, plot_height + 6.0);
+        cairo_clip (cr);
+        cairo_set_line_width (cr, 1.5);
+        guint previous_point_index = G_MAXUINT;
+        gboolean path_started = FALSE;
+        AtmChartKind kind = atm_chart_spec_v4_kind (spec);
+        for (guint i = 0; i < atm_chart_projection_count (projection); i++) {
+            const AtmChartProjectedPoint *point =
+                atm_chart_projection_point (projection, i);
+            if (point == NULL)
+                continue;
+            double x = left + point->x;
+            double y = top + point->y;
+            if (kind == ATM_CHART_SCATTER) {
+                cairo_rectangle (cr, x - 1.5, y - 1.5, 3.0, 3.0);
+                cairo_fill (cr);
+            } else if (!path_started) {
+                cairo_move_to (cr, x, y);
+                path_started = TRUE;
+            } else if (point->point_index != previous_point_index + 1u) {
+                /* A catalog-authorized MISSING coordinate creates a true gap. */
+                cairo_stroke (cr);
+                cairo_move_to (cr, x, y);
+            } else {
+                cairo_line_to (cr, x, y);
+            }
+            previous_point_index = point->point_index;
+        }
+        if (kind == ATM_CHART_LINE && path_started)
+            cairo_stroke (cr);
+        cairo_restore (cr);
+
+        font (cr, 12.0, FALSE);
+        label (cr, x_axis_label (entry),
+            left + plot_width / 2.0, (double) height - 56.0, 0.5);
+        char *footer = source_footer (entry);
+        label (cr, footer, 16.0, (double) height - 36.0, 0.0);
+        g_free (footer);
+        label (cr, detail_footer (entry), 16.0,
+            (double) height - 16.0, 0.0);
+    }
+
+    cairo_status_t drawing_status = cairo_status (cr);
+    cairo_destroy (cr);
+    cr = NULL;
+    cairo_surface_flush (surface);
+    if (drawing_status != CAIRO_STATUS_SUCCESS ||
+        cairo_surface_status (surface) != CAIRO_STATUS_SUCCESS) {
+        cairo_surface_destroy (surface);
+        return reject (error, ATM_CHART_RENDER_V4_ERROR_ARGUMENT,
+            "Cairo failed while painting the catalog-bound v4 chart.");
+    }
+
+    *out_surface = surface;
+    *out_fallback = fallback;
+    return TRUE;
 }
 
 static gboolean
@@ -108,16 +418,8 @@ build_id (const AtmChartRenderV4 *render,
 {
     const AtmChartSpecV4 *spec = render->owned_spec;
     const AtmChartSpec *source = atm_chart_spec_v4_source_spec (spec);
-    const AtmChartProjection *render_projection =
-        atm_chart_render_projection (render->source_render);
-    const char *projection_policy = NULL;
-
-    if (!atm_chart_render_is_fallback (render->source_render)) {
-        if (render->projection == NULL || render_projection == NULL)
-            return reject (error, ATM_CHART_RENDER_V4_ERROR_PROJECTION,
-                "A non-fallback v4 render requires both validated projection objects.");
-        projection_policy = atm_chart_projection_v4_policy (render->projection);
-    }
+    const char *projection_policy = render->projection != NULL
+        ? atm_chart_projection_v4_policy (render->projection) : NULL;
 
     JsonBuilder *builder = json_builder_new ();
     json_builder_begin_object (builder);
@@ -138,8 +440,7 @@ build_id (const AtmChartRenderV4 *render,
     json_builder_set_member_name (builder, "device_scale");
     json_builder_add_int_value (builder, render->device_scale);
     json_builder_set_member_name (builder, "fallback");
-    json_builder_add_boolean_value (builder,
-        atm_chart_render_is_fallback (render->source_render));
+    json_builder_add_boolean_value (builder, render->fallback);
     json_builder_set_member_name (builder, "projection_policy");
     if (projection_policy == NULL)
         json_builder_add_null_value (builder);
@@ -162,63 +463,56 @@ atm_chart_render_v4_validate (const AtmChartRenderV4 *render,
                               GError **error)
 {
     if (render == NULL || render->owned_spec == NULL ||
-        render->source_render == NULL || render->width < 240u ||
-        render->height < 140u || render->width > ATM_CHART_RENDER_MAX_SIZE ||
+        render->surface == NULL || render->data == NULL ||
+        render->width < 240u || render->height < 140u ||
+        render->width > ATM_CHART_RENDER_MAX_SIZE ||
         render->height > ATM_CHART_RENDER_MAX_SIZE ||
         render->device_scale < 1u || render->device_scale > 2u ||
         render->id == NULL)
         return reject (error, ATM_CHART_RENDER_V4_ERROR_ARGUMENT,
-            "The v4 render wrapper is incomplete or outside the qualified viewport limits.");
+            "The v4 render is incomplete or outside qualified viewport limits.");
 
     if (!atm_chart_spec_v4_validate (render->owned_spec, error))
         return FALSE;
-
     const AtmChartSpec *source_spec =
         atm_chart_spec_v4_source_spec (render->owned_spec);
-    const AtmChartSpec *rendered_spec =
-        atm_chart_render_spec (render->source_render);
-    cairo_surface_t *surface = atm_chart_render_surface (render->source_render);
-    const char *data = atm_chart_render_data (render->source_render);
-    if (source_spec == NULL || rendered_spec == NULL || surface == NULL ||
-        data == NULL || cairo_surface_status (surface) != CAIRO_STATUS_SUCCESS)
+    if (source_spec == NULL ||
+        cairo_surface_get_type (render->surface) != CAIRO_SURFACE_TYPE_IMAGE ||
+        cairo_image_surface_get_format (render->surface) != CAIRO_FORMAT_ARGB32 ||
+        cairo_image_surface_get_width (render->surface) !=
+            (int) (render->width * render->device_scale) ||
+        cairo_image_surface_get_height (render->surface) !=
+            (int) (render->height * render->device_scale) ||
+        cairo_surface_status (render->surface) != CAIRO_STATUS_SUCCESS)
         return reject (error, ATM_CHART_RENDER_V4_ERROR_ARGUMENT,
-            "The source renderer lacks a valid surface, source specification, or Data view.");
+            "The v4 render does not own a valid ARGB32 surface at its declared scale.");
 
-    if (!data_identity_matches (source_spec, render->source_render, error))
+    if (!data_identity_matches (source_spec, render->data, error))
         return FALSE;
 
-    const AtmChartProjection *render_projection =
-        atm_chart_render_projection (render->source_render);
-    if (render_projection != NULL &&
-        !atm_chart_projection_validate (render_projection, error))
-        return FALSE;
-
-    if (atm_chart_render_is_fallback (render->source_render)) {
+    if (render->fallback) {
         if (render->projection != NULL)
             return reject (error, ATM_CHART_RENDER_V4_ERROR_PROJECTION,
                 "A fallback render cannot claim an active v4 plot projection.");
     } else {
-        if (render->projection == NULL || render_projection == NULL)
+        if (render->projection == NULL)
             return reject (error, ATM_CHART_RENDER_V4_ERROR_PROJECTION,
-                "A non-fallback render requires an active source and v4 projection.");
-
+                "A non-fallback render requires a validated v4 projection.");
         if (!atm_chart_projection_v4_validate (render->projection, error))
             return FALSE;
-
-        const AtmChartProjection *v4_projection =
-            atm_chart_projection_v4_source_projection (render->projection);
-        if (!projection_geometry_equal (v4_projection, render_projection))
-            return reject (error, ATM_CHART_RENDER_V4_ERROR_PROJECTION,
-                "The exact source projection used by Cairo differs from the catalog-bound v4 projection.");
-
-        if (g_strcmp0 (atm_chart_projection_v4_policy (render->projection),
-                       atm_chart_projection_policy (render_projection)) != 0 ||
+        if (g_strcmp0 (atm_chart_projection_v4_series_id (render->projection),
+                       atm_chart_spec_v4_series_id (render->owned_spec)) != 0 ||
+            g_strcmp0 (atm_chart_projection_v4_policy (render->projection),
+                g_strconcat (
+                    atm_chart_spec_v4_catalog_entry (render->owned_spec)->display_profile_id,
+                    "/", atm_chart_spec_v4_catalog_entry (render->owned_spec)->display_profile_version,
+                    NULL)) != 0 ||
             atm_chart_projection_v4_coordinate_count (render->projection) !=
                 atm_chart_spec_v4_coordinate_count (render->owned_spec) ||
             atm_chart_projection_v4_numeric_observation_count (render->projection) !=
                 atm_chart_spec_v4_numeric_observation_count (render->owned_spec))
             return reject (error, ATM_CHART_RENDER_V4_ERROR_PROJECTION,
-                "The rendered projection policy or coverage differs from the catalog-bound v4 metadata.");
+                "The rendered v4 projection differs from catalog identity or coverage.");
     }
 
     char *expected_id = NULL;
@@ -227,7 +521,7 @@ atm_chart_render_v4_validate (const AtmChartRenderV4 *render,
     gboolean matches = g_strcmp0 (render->id, expected_id) == 0;
     g_free (expected_id);
     return matches || reject (error, ATM_CHART_RENDER_V4_ERROR_IDENTITY,
-        "Render v4 identity differs from reconstructed spec, viewport, and display policy.");
+        "Render v4 identity differs from reconstructed spec, viewport and display policy.");
 }
 
 gboolean
@@ -241,33 +535,60 @@ atm_chart_render_v4_new (const AtmChartSpecV4 *spec,
     if (out == NULL || *out != NULL)
         return reject (error, ATM_CHART_RENDER_V4_ERROR_ARGUMENT,
             "Render output must be non-NULL and initially empty.");
+    if (spec == NULL || width < 240u || height < 140u ||
+        width > ATM_CHART_RENDER_MAX_SIZE ||
+        height > ATM_CHART_RENDER_MAX_SIZE ||
+        device_scale < 1u || device_scale > 2u)
+        return reject (error, ATM_CHART_RENDER_V4_ERROR_ARGUMENT,
+            "The v4 render dimensions or device scale are outside qualified limits.");
 
     AtmChartSpecV4 *owned_spec = NULL;
     if (!atm_chart_spec_v4_rebuild (spec, &owned_spec, error))
         return FALSE;
-
-    AtmChartRender *source_render = NULL;
-    if (!atm_chart_render_new (atm_chart_spec_v4_source_spec (owned_spec),
-                              width, height, device_scale, &source_render, error)) {
+    char *data = atm_chart_render_data_for_spec (
+        atm_chart_spec_v4_source_spec (owned_spec), error);
+    if (data == NULL) {
+        atm_chart_spec_v4_free (owned_spec);
+        return FALSE;
+    }
+    if (!data_identity_matches (
+            atm_chart_spec_v4_source_spec (owned_spec), data, error)) {
+        g_free (data);
         atm_chart_spec_v4_free (owned_spec);
         return FALSE;
     }
 
     AtmChartProjectionV4 *projection = NULL;
-    if (!atm_chart_render_is_fallback (source_render)) {
-        if (!atm_chart_projection_v4_new (owned_spec,
-                (double) width - 112.0, (double) height - 188.0,
-                &projection, error)) {
-            atm_chart_render_free (source_render);
+    cairo_surface_t *surface = NULL;
+    gboolean fallback = width < 432u || height < 370u;
+    if (!fallback) {
+        if (!atm_chart_projection_v4_new (
+                owned_spec, (double) width - 112.0,
+                (double) height - 210.0, &projection, error)) {
+            g_free (data);
             atm_chart_spec_v4_free (owned_spec);
             return FALSE;
         }
     }
 
+    if (!paint_v4_surface (owned_spec, projection, width, height,
+            device_scale, &surface, &fallback, error)) {
+        atm_chart_projection_v4_free (projection);
+        g_free (data);
+        atm_chart_spec_v4_free (owned_spec);
+        return FALSE;
+    }
+    if (fallback) {
+        atm_chart_projection_v4_free (projection);
+        projection = NULL;
+    }
+
     AtmChartRenderV4 *render = g_new0 (AtmChartRenderV4, 1);
     render->owned_spec = owned_spec;
     render->projection = projection;
-    render->source_render = source_render;
+    render->surface = surface;
+    render->data = data;
+    render->fallback = fallback;
     render->width = width;
     render->height = height;
     render->device_scale = device_scale;
@@ -277,7 +598,6 @@ atm_chart_render_v4_new (const AtmChartSpecV4 *spec,
         atm_chart_render_v4_free (render);
         return FALSE;
     }
-
     *out = render;
     return TRUE;
 }
@@ -289,7 +609,9 @@ atm_chart_render_v4_free (AtmChartRenderV4 *render)
         return;
     atm_chart_spec_v4_free (render->owned_spec);
     atm_chart_projection_v4_free (render->projection);
-    atm_chart_render_free (render->source_render);
+    if (render->surface != NULL)
+        cairo_surface_destroy (render->surface);
+    g_free (render->data);
     g_free (render->id);
     g_free (render);
 }
@@ -298,12 +620,6 @@ const AtmChartSpecV4 *
 atm_chart_render_v4_spec (const AtmChartRenderV4 *render)
 {
     return render != NULL ? render->owned_spec : NULL;
-}
-
-const AtmChartRender *
-atm_chart_render_v4_source_render (const AtmChartRenderV4 *render)
-{
-    return render != NULL ? render->source_render : NULL;
 }
 
 const AtmChartProjectionV4 *
@@ -315,15 +631,13 @@ atm_chart_render_v4_projection (const AtmChartRenderV4 *render)
 cairo_surface_t *
 atm_chart_render_v4_surface (const AtmChartRenderV4 *render)
 {
-    return render != NULL ?
-        atm_chart_render_surface (render->source_render) : NULL;
+    return render != NULL ? render->surface : NULL;
 }
 
 const char *
 atm_chart_render_v4_data (const AtmChartRenderV4 *render)
 {
-    return render != NULL ?
-        atm_chart_render_data (render->source_render) : NULL;
+    return render != NULL ? render->data : NULL;
 }
 
 const char *
@@ -341,6 +655,5 @@ atm_chart_render_v4_id (const AtmChartRenderV4 *render)
 gboolean
 atm_chart_render_v4_is_fallback (const AtmChartRenderV4 *render)
 {
-    return render != NULL ?
-        atm_chart_render_is_fallback (render->source_render) : FALSE;
+    return render != NULL ? render->fallback : FALSE;
 }
