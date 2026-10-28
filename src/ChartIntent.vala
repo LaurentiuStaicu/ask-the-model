@@ -543,15 +543,23 @@ namespace AskTheModel {
          */
         private static string? extract_chart_subject (string normalized) {
             string[] specific_markers = {
-                "chart of ", "graph of ", "plot of ", "diagram of ",
-                "chart for ", "graph for ", "plot for ",
-                "chart about ", "graph about ", "chart on ", "graph on ",
-                "chart showing ", "graph showing ", "plot showing ",
-                "chart depicting ", "graph depicting ",
+                "chart of ", "charts of ", "graph of ", "graphs of ",
+                "plot of ", "plots of ", "diagram of ", "diagrams of ",
+                "chart for ", "charts for ", "graph for ", "graphs for ",
+                "plot for ", "plots for ",
+                "chart about ", "charts about ", "graph about ", "graphs about ",
+                "chart on ", "charts on ", "graph on ", "graphs on ",
+                "chart showing ", "charts showing ", "graph showing ",
+                "graphs showing ", "plot showing ", "plots showing ",
+                "chart depicting ", "charts depicting ", "graph depicting ",
+                "graphs depicting ",
                 "grafic al ", "graficul al ", "grafic pentru ",
                 "grafic despre ", "grafic privind ",
-                "diagramă a ", "diagrama a ",
-                "diagramă pentru ", "diagrama pentru "
+                "grafice ale ", "grafice pentru ", "grafice despre ",
+                "grafice privind ",
+                "diagramă a ", "diagrama a ", "diagrame ale ",
+                "diagramă pentru ", "diagrama pentru ", "diagrame pentru ",
+                "diagrame despre ", "diagrame privind "
             };
 
             int best_index = -1;
@@ -571,8 +579,9 @@ namespace AskTheModel {
             }
 
             string[] generic_markers = {
-                "chart ", "graph ", "plot ", "diagram ", "grafic ",
-                "diagrama ", "diagramă "
+                "chart ", "charts ", "graph ", "graphs ", "plot ", "plots ",
+                "diagram ", "diagrams ", "grafic ", "grafice ",
+                "diagrama ", "diagramă ", "diagrame "
             };
             foreach (string marker in generic_markers) {
                 int index = normalized.index_of (marker);
@@ -748,15 +757,23 @@ namespace AskTheModel {
             string normalized
         ) {
             return contains_bounded_any (normalized, {
-                "chart of ", "graph of ", "plot of ", "diagram of ",
-                "chart for ", "graph for ", "plot for ",
-                "chart about ", "graph about ", "chart on ", "graph on ",
-                "chart showing ", "graph showing ", "plot showing ",
-                "chart depicting ", "graph depicting ",
+                "chart of ", "charts of ", "graph of ", "graphs of ",
+                "plot of ", "plots of ", "diagram of ", "diagrams of ",
+                "chart for ", "charts for ", "graph for ", "graphs for ",
+                "plot for ", "plots for ",
+                "chart about ", "charts about ", "graph about ", "graphs about ",
+                "chart on ", "charts on ", "graph on ", "graphs on ",
+                "chart showing ", "charts showing ", "graph showing ",
+                "graphs showing ", "plot showing ", "plots showing ",
+                "chart depicting ", "charts depicting ", "graph depicting ",
+                "graphs depicting ",
                 "grafic al ", "graficul al ", "grafic pentru ",
                 "grafic despre ", "grafic privind ",
-                "diagramă a ", "diagrama a ",
-                "diagramă pentru ", "diagrama pentru "
+                "grafice ale ", "grafice pentru ", "grafice despre ",
+                "grafice privind ",
+                "diagramă a ", "diagrama a ", "diagrame ale ",
+                "diagramă pentru ", "diagrama pentru ", "diagrame pentru ",
+                "diagrame despre ", "diagrame privind "
             });
         }
 
