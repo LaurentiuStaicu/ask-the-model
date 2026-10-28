@@ -2551,7 +2551,8 @@ atm_conversation_store_validate (
         "messages",
         "citations",
         "message_charts",
-        "chart_series"
+        "chart_series",
+        "chart_presentations_v4"
     };
 
     if (store == NULL ||
@@ -4221,8 +4222,8 @@ atm_conversation_store_attach_chart (
     if (!prepare_statement (
             store->db,
             "INSERT INTO message_charts("
-            "message_id,ordinal,chart_schema,chart_spec_id,chart_kind,reconstruction_profile"
-            ") VALUES(?1,?2,?3,?4,?5,?6);",
+            "message_id,ordinal,chart_schema,chart_spec_id,chart_kind,reconstruction_profile,presentation_schema"
+            ") VALUES(?1,?2,?3,?4,?5,?6,?7);",
             &statement,
             error
         )) {
@@ -4234,6 +4235,10 @@ atm_conversation_store_attach_chart (
     sqlite3_bind_text (statement, 4, chart->chart_spec_id, -1, SQLITE_TRANSIENT);
     sqlite3_bind_text (statement, 5, chart->chart_kind, -1, SQLITE_TRANSIENT);
     sqlite3_bind_text (statement, 6, chart->reconstruction_profile, -1, SQLITE_TRANSIENT);
+    if (chart->presentation != NULL)
+        sqlite3_bind_text (statement, 7, chart->presentation->presentation_schema, -1, SQLITE_TRANSIENT);
+    else
+        sqlite3_bind_null (statement, 7);
     if (!step_done (
             store->db,
             statement,
@@ -4277,7 +4282,79 @@ atm_conversation_store_attach_chart (
     sqlite3_finalize (statement);
     statement = NULL;
 
+    if (chart->presentation != NULL) {
+        const AtmConversationChartPresentationInput *p = chart->presentation;
+        if (!prepare_statement (
+                store->db,
+                "INSERT INTO chart_presentations_v4("
+                "message_id,chart_ordinal,presentation_schema,presentation_spec_id,series_id,"
+                "catalog_schema,adapter_id,series_profile_id,series_profile_version,"
+                "admission_profile_id,admission_profile_version,reconstruction_profile_id,"
+                "source_chart_schema,source_chart_spec_id,x_coordinate_semantics,x_frequency,"
+                "x_unit,x_dimension,subject,attribute,y_unit,y_dimension,series_semantics,"
+                "missing_policy,missing_coordinate,missing_reason,display_profile_id,"
+                "display_profile_version,render_contract"
+                ") VALUES("
+                "?1,?2,?3,?4,?5,?6,?7,?8,?9,?10,?11,?12,?13,?14,?15,?16,"
+                "?17,?18,?19,?20,?21,?22,?23,?24,?25,?26,?27,?28,?29);",
+                &statement,
+                error
+            )) {
+            goto out;
+        }
+
+        sqlite3_bind_text (statement, 1, message_id, -1, SQLITE_TRANSIENT);
+        sqlite3_bind_int (statement, 2, (int) chart->ordinal);
+        const char *values[] = {
+            p->presentation_schema,
+            p->presentation_spec_id,
+            p->series_id,
+            p->catalog_schema,
+            p->adapter_id,
+            p->series_profile_id,
+            p->series_profile_version,
+            p->admission_profile_id,
+            p->admission_profile_version,
+            p->reconstruction_profile_id,
+            p->source_chart_schema,
+            p->source_chart_spec_id,
+            p->x_coordinate_semantics,
+            p->x_frequency,
+            p->x_unit,
+            p->x_dimension,
+            p->subject,
+            p->attribute,
+            p->y_unit,
+            p->y_dimension,
+            p->series_semantics,
+            p->missing_policy,
+            p->missing_coordinate,
+            p->missing_reason,
+            p->display_profile_id,
+            p->display_profile_version,
+            p->render_contract
+        };
+        for (guint i = 0; i < G_N_ELEMENTS (values); i++) {
+            if (values[i] == NULL && (i == 22 || i == 23)) {
+                sqlite3_bind_null (statement, (int) i + 3);
+            } else {
+                sqlite3_bind_text (statement, (int) i + 3, values[i], -1, SQLITE_TRANSIENT);
+            }
+        }
+        if (!step_done (
+                store->db,
+                statement,
+                "Could not persist catalog-bound v4 chart presentation",
+                error
+            )) {
+            goto out;
+        }
+        sqlite3_finalize (statement);
+        statement = NULL;
+    }
+
     if (!validate_chart_semantics (store->db, error) ||
+        !validate_chart_presentation_semantics (store->db, error) ||
         !exec_sql (store->db, "COMMIT;", error)) {
         goto out;
     }
@@ -4339,6 +4416,60 @@ atm_conversation_store_attach_chart_values (
         &chart,
         error
     );
+}
+
+gboolean
+atm_conversation_store_attach_chart_v4_values (
+    AtmConversationStore *store,
+    const char *conversation_id,
+    gint64 turn_no,
+    guint ordinal,
+    const char *chart_schema,
+    const char *chart_spec_id,
+    const char *chart_kind,
+    const char *reconstruction_profile,
+    const char *series_profile,
+    const char *admission_profile,
+    const char *scientific_id,
+    const char *qualified_id,
+    const char *repository_id,
+    const char *repository_version,
+    const char *snapshot_sha,
+    const char *source_path,
+    const AtmConversationChartPresentationInput *presentation,
+    GError **error
+)
+{
+    if (presentation == NULL) {
+        g_set_error_literal (
+            error, ATM_CONVERSATION_STORE_ERROR,
+            ATM_CONVERSATION_STORE_ERROR_ARGUMENT,
+            "The v4 chart attachment API requires a presentation recipe."
+        );
+        return FALSE;
+    }
+    AtmConversationChartSeriesInput series = {
+        .series_profile = series_profile,
+        .admission_profile = admission_profile,
+        .scientific_id = scientific_id,
+        .qualified_id = qualified_id,
+        .repository_id = repository_id,
+        .repository_version = repository_version,
+        .snapshot_sha = snapshot_sha,
+        .source_path = source_path
+    };
+    AtmConversationChartInput chart = {
+        .ordinal = ordinal,
+        .chart_schema = chart_schema,
+        .chart_spec_id = chart_spec_id,
+        .chart_kind = chart_kind,
+        .reconstruction_profile = reconstruction_profile,
+        .series = &series,
+        .series_count = 1,
+        .presentation = presentation
+    };
+    return atm_conversation_store_attach_chart (
+        store, conversation_id, turn_no, &chart, error);
 }
 
 gboolean
