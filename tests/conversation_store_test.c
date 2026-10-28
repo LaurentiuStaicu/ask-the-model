@@ -454,6 +454,38 @@ create_v4_store (
 }
 
 static void
+create_v5_store (
+    const char *path
+)
+{
+    GError *error = NULL;
+    GBytes *bytes = g_resources_lookup_data (
+        "/io/github/laurentiustaicu/ask_the_model/schemas/conversation-store-v5.sql",
+        G_RESOURCE_LOOKUP_FLAGS_NONE,
+        &error
+    );
+    g_assert_no_error (error);
+    g_assert_nonnull (bytes);
+    gsize size = 0;
+    const char *data = g_bytes_get_data (bytes, &size);
+    g_assert_nonnull (data);
+    g_assert_cmpuint (size, >, 0);
+    char *schema = g_strndup (data, size);
+    char *sql = g_strdup_printf (
+        "BEGIN IMMEDIATE;%s"
+        "PRAGMA application_id=%u;"
+        "PRAGMA user_version=5;"
+        "COMMIT;",
+        schema,
+        (guint) ATM_CONVERSATION_STORE_APPLICATION_ID
+    );
+    raw_exec (path, sql);
+    g_free (sql);
+    g_free (schema);
+    g_bytes_unref (bytes);
+}
+
+static void
 insert_v3_gistemp_chart_fixture (
     const char *path
 )
@@ -658,6 +690,81 @@ test_v4_to_v5_migration_rollback (void)
     g_assert_cmpint (raw_int64 (path,
         "SELECT count(*) FROM sqlite_schema WHERE type='trigger' "
         "AND name='chart_series_tuple_insert' AND tbl_name='messages';"), ==, 1);
+
+    g_free (path);
+    remove_tree_best_effort (root);
+    g_free (root);
+}
+
+static void
+test_v5_to_v6_migration_preserves_legacy_chart_rows (void)
+{
+    char *root = new_temp_root ("atm-conversation-v5-v6-XXXXXX");
+    char *path = store_path (root);
+    create_v5_store (path);
+    insert_v3_gistemp_chart_fixture (path);
+
+    AtmConversationStore *store = NULL;
+    GError *error = NULL;
+    g_assert_true (atm_conversation_store_open (path, &store, &error));
+    g_assert_no_error (error);
+    g_assert_cmpint (atm_conversation_store_schema_version (store), ==, 6);
+    g_assert_true (atm_conversation_store_validate (store, &error));
+    g_assert_no_error (error);
+    g_assert_cmpint (raw_int64 (path, "PRAGMA user_version;"), ==, 6);
+    g_assert_cmpint (raw_int64 (path,
+        "SELECT count(*) FROM message_charts "
+        "WHERE chart_schema='atm-chart-spec/1' AND presentation_schema IS NULL;"), ==, 1);
+    g_assert_cmpint (raw_int64 (path,
+        "SELECT count(*) FROM chart_series WHERE series_profile='atm-series/gistemp-complete-annual/1';"), ==, 1);
+    g_assert_cmpint (raw_int64 (path,
+        "SELECT count(*) FROM chart_presentations_v4;"), ==, 0);
+    g_assert_cmpint (raw_int64 (path, "SELECT count(*) FROM pragma_foreign_key_check;"), ==, 0);
+    char *schema_id = raw_text (path,
+        "SELECT schema_id FROM installation WHERE singleton_id=1;");
+    g_assert_cmpstr (schema_id, ==, "atm-conversation-store/6");
+    g_free (schema_id);
+
+    atm_conversation_store_close (store);
+    g_free (path);
+    remove_tree_best_effort (root);
+    g_free (root);
+}
+
+static void
+test_v5_to_v6_migration_rollback (void)
+{
+    char *root = new_temp_root ("atm-conversation-v5-v6-rollback-XXXXXX");
+    char *path = store_path (root);
+    create_v5_store (path);
+    insert_v3_gistemp_chart_fixture (path);
+
+    /* Force a late trigger-name collision after the migration has rebuilt tables. */
+    raw_exec (path,
+        "CREATE TRIGGER chart_presentations_v4_tuple_insert "
+        "BEFORE INSERT ON messages BEGIN SELECT 1; END;");
+
+    AtmConversationStore *store = NULL;
+    GError *error = NULL;
+    g_assert_false (atm_conversation_store_open (path, &store, &error));
+    g_assert_nonnull (error);
+    g_assert_null (store);
+    g_assert_nonnull (g_strstr_len (error->message, -1,
+        "chart_presentations_v4_tuple_insert"));
+    g_clear_error (&error);
+
+    g_assert_cmpint (raw_int64 (path, "PRAGMA user_version;"), ==, 5);
+    char *schema_id = raw_text (path,
+        "SELECT schema_id FROM installation WHERE singleton_id=1;");
+    g_assert_cmpstr (schema_id, ==, "atm-conversation-store/5");
+    g_free (schema_id);
+    g_assert_cmpint (raw_int64 (path,
+        "SELECT count(*) FROM message_charts WHERE chart_schema='atm-chart-spec/1';"), ==, 1);
+    g_assert_cmpint (raw_int64 (path,
+        "SELECT count(*) FROM chart_series WHERE series_profile='atm-series/gistemp-complete-annual/1';"), ==, 1);
+    g_assert_cmpint (raw_int64 (path,
+        "SELECT count(*) FROM sqlite_schema WHERE type='table' AND name='chart_presentations_v4';"), ==, 0);
+    g_assert_cmpint (raw_int64 (path, "SELECT count(*) FROM pragma_foreign_key_check;"), ==, 0);
 
     g_free (path);
     remove_tree_best_effort (root);
@@ -3358,6 +3465,14 @@ main (int argc, char **argv)
     g_test_add_func (
         "/conversation-store/v4-to-v5-rollback",
         test_v4_to_v5_migration_rollback
+    );
+    g_test_add_func (
+        "/conversation-store/v5-to-v6-migration",
+        test_v5_to_v6_migration_preserves_legacy_chart_rows
+    );
+    g_test_add_func (
+        "/conversation-store/v5-to-v6-rollback",
+        test_v5_to_v6_migration_rollback
     );
     g_test_add_func (
         "/conversation-store/chart-recipe-semantics",
