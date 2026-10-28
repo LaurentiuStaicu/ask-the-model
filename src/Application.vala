@@ -5577,6 +5577,9 @@ namespace AskTheModel {
                 return false;
             }
 
+            string? expected_ewd_sha = GLib.Environment.get_variable (
+                "ATM_PRES09_EWD_SNAPSHOT_SHA"
+            );
             ConversationPersistenceChart? ei = null;
             ConversationPersistenceChart? gistemp = null;
             ConversationPersistenceChart? bnr = null;
@@ -5598,7 +5601,10 @@ namespace AskTheModel {
                 }
             }
 
-            if (ei == null || gistemp == null || bnr == null ||
+            if (expected_ewd_sha == null ||
+                (expected_ewd_sha != "d9e249339663015f6d1c05752338a955bf64ad0b" &&
+                 expected_ewd_sha != "dc710d8e604c0fff713a3acfdb18ab47a1a902bb") ||
+                ei == null || gistemp == null || bnr == null ||
                 ei.series.length != 1 ||
                 gistemp.series.length != 1 ||
                 bnr.series.length != 1 ||
@@ -5606,8 +5612,8 @@ namespace AskTheModel {
                     "atm-series/energy-institute-tes-complete-annual/1" ||
                 ei.series[0].admission_profile !=
                     "atm-energy-institute-pinned-admission/3" ||
-                ei.series[0].snapshot_sha !=
-                    "dc710d8e604c0fff713a3acfdb18ab47a1a902bb" ||
+                ei.series[0].snapshot_sha != expected_ewd_sha ||
+                gistemp.series[0].snapshot_sha != expected_ewd_sha ||
                 ei.series[0].source_path !=
                     "science/data/processed/energy_institute_global_2026.csv" ||
                 gistemp.series[0].series_profile !=
@@ -5771,10 +5777,18 @@ namespace AskTheModel {
                 }
             }
 
-            if (ei == null || gistemp == null || bnr == null ||
+            if (expected_ewd_sha == null ||
+                (expected_ewd_sha != "d9e249339663015f6d1c05752338a955bf64ad0b" &&
+                 expected_ewd_sha != "dc710d8e604c0fff713a3acfdb18ab47a1a902bb") ||
+                ei == null || gistemp == null || bnr == null ||
+                ei.series.length != 1 ||
+                gistemp.series.length != 1 ||
+                bnr.series.length != 1 ||
                 ei.chart_spec_id != expected_ei_id ||
                 gistemp.chart_spec_id != expected_gistemp_id ||
                 bnr.chart_spec_id != expected_bnr_id ||
+                ei.series[0].snapshot_sha != expected_ewd_sha ||
+                gistemp.series[0].snapshot_sha != expected_ewd_sha ||
                 bnr.reconstruction_profile !=
                     "atm-chart-reconstruct/bnr-bls-c01-calendar-quarter/1" ||
                 bnr.series.length != 1 ||
