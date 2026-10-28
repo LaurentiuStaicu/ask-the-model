@@ -582,6 +582,15 @@ test_chart_binding_domain_export_bridge ()
                 "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
                 "line",
                 "atm-chart-reconstruct/gistemp-complete-annual/1",
+                { series }
+            );
+        var v4_chart =
+            new AskTheModel.ConversationPersistenceChart (
+                2,
+                "atm-chart-spec/1",
+                "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+                "line",
+                "atm-chart-reconstruct/gistemp-complete-annual/1",
                 { series },
                 presentation.presentation_schema,
                 presentation
@@ -607,6 +616,12 @@ test_chart_binding_domain_export_bridge ()
 
         assert (duplicate_rejected);
 
+        store.attach_chart (
+            conversation_id,
+            turn_no,
+            v4_chart
+        );
+
         var snapshot =
             store.load_snapshot (
                 conversation_id
@@ -614,10 +629,12 @@ test_chart_binding_domain_export_bridge ()
 
         assert (snapshot.messages.length == 2);
         assert (snapshot.messages[0].charts.length == 0);
-        assert (snapshot.messages[1].charts.length == 1);
+        assert (snapshot.messages[1].charts.length == 2);
 
         var loaded_chart =
             snapshot.messages[1].charts[0];
+        var loaded_v4_chart =
+            snapshot.messages[1].charts[1];
         assert (loaded_chart.ordinal == 1);
         assert (loaded_chart.chart_schema == "atm-chart-spec/1");
         assert (
@@ -638,10 +655,12 @@ test_chart_binding_domain_export_bridge ()
             loaded_chart.series[0].qualified_id ==
             "cccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccc"
         );
-        assert (loaded_chart.presentation_schema == "atm-chart-spec/4");
-        assert (loaded_chart.presentation != null);
+        assert (loaded_chart.presentation_schema == null);
+        assert (loaded_chart.presentation == null);
+        assert (loaded_v4_chart.presentation_schema == "atm-chart-spec/4");
+        assert (loaded_v4_chart.presentation != null);
         assert (
-            loaded_chart.presentation.presentation_spec_id ==
+            loaded_v4_chart.presentation.presentation_spec_id ==
             presentation.presentation_spec_id
         );
 
@@ -678,10 +697,15 @@ test_chart_binding_domain_export_bridge ()
         Json.Array charts =
             messages.get_object_element (1)
                 .get_array_member ("charts");
-        assert (charts.get_length () == 1);
+        assert (charts.get_length () == 2);
+
+        Json.Object exported_legacy_chart =
+            charts.get_object_element (0);
+        assert (exported_legacy_chart.get_null_member ("presentation_schema"));
+        assert (exported_legacy_chart.get_null_member ("presentation"));
 
         Json.Object exported_chart =
-            charts.get_object_element (0);
+            charts.get_object_element (1);
         assert (
             exported_chart.get_string_member ("chart_spec_id") ==
             loaded_chart.chart_spec_id
