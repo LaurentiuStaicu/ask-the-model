@@ -1552,6 +1552,101 @@ chart_series_input_is_valid (
 }
 
 static gboolean
+chart_presentation_input_is_valid (
+    const AtmConversationChartPresentationInput *p,
+    const AtmConversationChartInput *chart
+)
+{
+    if (p == NULL || chart == NULL ||
+        g_strcmp0 (chart->chart_kind, "line") != 0 ||
+        g_strcmp0 (p->presentation_schema, "atm-chart-spec/4") != 0 ||
+        !is_hex64 (p->presentation_spec_id) ||
+        g_strcmp0 (p->catalog_schema, "atm-chart-catalog/1") != 0 ||
+        g_strcmp0 (p->source_chart_schema, chart->chart_schema) != 0 ||
+        g_strcmp0 (p->source_chart_spec_id, chart->chart_spec_id) != 0 ||
+        g_strcmp0 (p->reconstruction_profile_id, chart->reconstruction_profile) != 0 ||
+        g_strcmp0 (p->series_profile_id, chart->series[0].series_profile) != 0 ||
+        g_strcmp0 (p->admission_profile_id, chart->series[0].admission_profile) != 0 ||
+        g_strcmp0 (p->render_contract, "atm-retro-mono/1") != 0 ||
+        g_strcmp0 (p->display_profile_version, "1") != 0 ||
+        g_strcmp0 (p->series_profile_version, "1") != 0 ||
+        !nonempty (p->adapter_id) ||
+        !nonempty (p->series_id) ||
+        !nonempty (p->admission_profile_version) ||
+        !nonempty (p->x_coordinate_semantics) ||
+        !nonempty (p->x_frequency) ||
+        !nonempty (p->x_unit) ||
+        !nonempty (p->x_dimension) ||
+        !nonempty (p->subject) ||
+        !nonempty (p->attribute) ||
+        !nonempty (p->y_unit) ||
+        !nonempty (p->y_dimension) ||
+        !nonempty (p->series_semantics) ||
+        !nonempty (p->missing_policy) ||
+        !nonempty (p->display_profile_id))
+        return FALSE;
+
+#define PRESENTATION_EQ(field, value) (g_strcmp0 (p->field, value) == 0)
+    if (PRESENTATION_EQ (series_id,
+            "climate.gistemp.global-temperature-anomaly")) {
+        return PRESENTATION_EQ (adapter_id, "gistemp-pinned-annual/1") &&
+            PRESENTATION_EQ (admission_profile_version, "1") &&
+            PRESENTATION_EQ (source_chart_schema, "atm-chart-spec/1") &&
+            PRESENTATION_EQ (x_coordinate_semantics, "calendar_year") &&
+            PRESENTATION_EQ (x_frequency, "annual") &&
+            PRESENTATION_EQ (x_unit, "calendar_year") &&
+            PRESENTATION_EQ (x_dimension, "time") &&
+            PRESENTATION_EQ (subject, "global_surface_temperature") &&
+            PRESENTATION_EQ (attribute, "annual_temperature_anomaly") &&
+            PRESENTATION_EQ (y_unit, "degree_Celsius_anomaly") &&
+            PRESENTATION_EQ (y_dimension, "temperature_difference") &&
+            PRESENTATION_EQ (series_semantics, "empirical_annual_observations") &&
+            PRESENTATION_EQ (missing_policy, "reject") &&
+            p->missing_coordinate == NULL && p->missing_reason == NULL &&
+            PRESENTATION_EQ (display_profile_id, "atm-display/gistemp-linear");
+    }
+    if (PRESENTATION_EQ (series_id,
+            "energy.energy-institute.global-total-energy-supply")) {
+        return PRESENTATION_EQ (adapter_id, "energy-institute-tes-pinned-annual/1") &&
+            PRESENTATION_EQ (admission_profile_version, "3") &&
+            PRESENTATION_EQ (source_chart_schema, "atm-chart-spec/2") &&
+            PRESENTATION_EQ (x_coordinate_semantics, "calendar_year") &&
+            PRESENTATION_EQ (x_frequency, "annual") &&
+            PRESENTATION_EQ (x_unit, "calendar_year") &&
+            PRESENTATION_EQ (x_dimension, "time") &&
+            PRESENTATION_EQ (subject, "global_total_energy_supply") &&
+            PRESENTATION_EQ (attribute, "total_energy_supply") &&
+            PRESENTATION_EQ (y_unit, "exajoules/year") &&
+            PRESENTATION_EQ (y_dimension, "energy_flow_rate") &&
+            PRESENTATION_EQ (series_semantics, "empirical_annual_observations") &&
+            PRESENTATION_EQ (missing_policy, "reject") &&
+            p->missing_coordinate == NULL && p->missing_reason == NULL &&
+            PRESENTATION_EQ (display_profile_id, "atm-display/energy-institute-tes-linear");
+    }
+    if (PRESENTATION_EQ (series_id,
+            "banking.bnr.bls-c01.credit-standards-net-percentage")) {
+        return PRESENTATION_EQ (adapter_id, "bnr-bls-c01-pinned-quarterly/1") &&
+            PRESENTATION_EQ (admission_profile_version, "1") &&
+            PRESENTATION_EQ (source_chart_schema, "atm-chart-spec/3") &&
+            PRESENTATION_EQ (x_coordinate_semantics, "calendar_quarter") &&
+            PRESENTATION_EQ (x_frequency, "quarterly") &&
+            PRESENTATION_EQ (x_unit, "calendar_quarter") &&
+            PRESENTATION_EQ (x_dimension, "time") &&
+            PRESENTATION_EQ (subject, "non_financial_corporations") &&
+            PRESENTATION_EQ (attribute, "nfc_credit_standards") &&
+            PRESENTATION_EQ (y_unit, "percent") &&
+            PRESENTATION_EQ (y_dimension, "survey_net_percentage") &&
+            PRESENTATION_EQ (series_semantics, "empirical_quarterly_observations") &&
+            PRESENTATION_EQ (missing_policy, "bounded_profile") &&
+            PRESENTATION_EQ (missing_coordinate, "2025-Q2") &&
+            PRESENTATION_EQ (missing_reason, "source_round_not_retained") &&
+            PRESENTATION_EQ (display_profile_id, "atm-display/bnr-bls-c01-quarterly-gap");
+    }
+#undef PRESENTATION_EQ
+    return FALSE;
+}
+
+static gboolean
 chart_input_is_valid (
     const AtmConversationChartInput *chart
 )
@@ -1566,19 +1661,21 @@ chart_input_is_valid (
         !chart_series_input_is_valid (&chart->series[0], chart->chart_schema))
         return FALSE;
 
+    gboolean source_tuple_valid = FALSE;
     if (g_strcmp0 (chart->chart_schema, "atm-chart-spec/1") == 0)
-        return g_strcmp0 (chart->reconstruction_profile,
+        source_tuple_valid = g_strcmp0 (chart->reconstruction_profile,
             "atm-chart-reconstruct/gistemp-complete-annual/1") == 0;
-
-    if (g_strcmp0 (chart->chart_schema, "atm-chart-spec/2") == 0)
-        return g_strcmp0 (chart->reconstruction_profile,
+    else if (g_strcmp0 (chart->chart_schema, "atm-chart-spec/2") == 0)
+        source_tuple_valid = g_strcmp0 (chart->reconstruction_profile,
             "atm-chart-reconstruct/energy-institute-tes-complete-annual/1") == 0;
-
-    if (g_strcmp0 (chart->chart_schema, "atm-chart-spec/3") == 0)
-        return g_strcmp0 (chart->reconstruction_profile,
+    else if (g_strcmp0 (chart->chart_schema, "atm-chart-spec/3") == 0)
+        source_tuple_valid = g_strcmp0 (chart->reconstruction_profile,
             "atm-chart-reconstruct/bnr-bls-c01-calendar-quarter/1") == 0;
 
-    return FALSE;
+    if (!source_tuple_valid)
+        return FALSE;
+    return chart->presentation == NULL ||
+        chart_presentation_input_is_valid (chart->presentation, chart);
 }
 
 gboolean
