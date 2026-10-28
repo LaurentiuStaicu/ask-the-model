@@ -484,6 +484,11 @@ const char *atm_conversation_snapshot_chart_presentation_schema_at (
     guint message_index,
     guint chart_index
 );
+const char *atm_conversation_snapshot_chart_presentation_sidecar_schema_at (
+    const AtmConversationSnapshot *snapshot,
+    guint message_index,
+    guint chart_index
+);
 const char *atm_conversation_snapshot_chart_presentation_spec_id_at (
     const AtmConversationSnapshot *snapshot,
     guint message_index,
