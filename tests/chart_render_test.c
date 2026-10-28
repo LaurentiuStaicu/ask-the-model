@@ -178,6 +178,40 @@ pixel_is_black (const AtmChartRender *rendered, int x, int y)
 }
 
 static gboolean
+surface_has_black_pixel_in_box (cairo_surface_t *surface,
+                                int left,
+                                int top,
+                                int right,
+                                int bottom)
+{
+    if (surface == NULL ||
+        cairo_surface_get_type (surface) != CAIRO_SURFACE_TYPE_IMAGE)
+        return FALSE;
+
+    cairo_surface_flush (surface);
+    int width = cairo_image_surface_get_width (surface);
+    int height = cairo_image_surface_get_height (surface);
+    int stride = cairo_image_surface_get_stride (surface);
+    const unsigned char *bytes = cairo_image_surface_get_data (surface);
+    left = MAX (0, left);
+    top = MAX (0, top);
+    right = MIN (width - 1, right);
+    bottom = MIN (height - 1, bottom);
+    if (left > right || top > bottom)
+        return FALSE;
+
+    for (int y = top; y <= bottom; y++) {
+        const uint32_t *row =
+            (const uint32_t *) (bytes + (gsize) y * (gsize) stride);
+        for (int x = left; x <= right; x++) {
+            if (row[x] == 0xff000000u)
+                return TRUE;
+        }
+    }
+    return FALSE;
+}
+
+static gboolean
 surface_has_black_pixel_near (cairo_surface_t *surface,
                               int center_x,
                               int center_y,
@@ -665,6 +699,17 @@ assert_render_v4_profile_is_generic_and_exact_data (
     g_assert_cmpstr (atm_chart_render_v4_data (rendered), ==,
                      atm_chart_render_data (legacy_data_reference));
     assert_v4_surface_is_monochrome (atm_chart_render_v4_surface (rendered));
+
+    /*
+     * GISTEMP's processed data has a pinned 2026-08-31 vintage. The chart
+     * summary must expose that date, not leave users to infer it from raw Data
+     * metadata; this area is reserved for the summary row above the plot.
+     */
+    if (g_strcmp0 (series_id,
+            "climate.gistemp.global-temperature-anomaly") == 0) {
+        g_assert_true (surface_has_black_pixel_in_box (
+            atm_chart_render_v4_surface (rendered), 260, 54, 430, 76));
+    }
 
     /*
      * BNR Q3 2025 follows the authorized missing Q2 2025 coordinate. The
