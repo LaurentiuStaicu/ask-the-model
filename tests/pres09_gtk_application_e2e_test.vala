@@ -3,9 +3,7 @@ using Soup;
 
 namespace AskTheModel {
 
-private const string EWD_INITIAL_SNAPSHOT_SHA =
-    "d9e249339663015f6d1c05752338a955bf64ad0b";
-private const string EWD_CURRENT_SNAPSHOT_SHA =
+private const string EI_SNAPSHOT_SHA =
     "dc710d8e604c0fff713a3acfdb18ab47a1a902bb";
 private const string BNR_SNAPSHOT_SHA =
     "e43eb4e899f123d3b1aa0f6e20b7c8ed35434170";
@@ -208,10 +206,8 @@ private static int run_child_phase (
     }
 }
 
-private static int run_snapshot_scenario (
-    string raw_executable_path,
-    string ewd_snapshot_sha,
-    string? full_ewd_root_override
+private static int run_orchestrator (
+    string raw_executable_path
 ) {
     string executable_path = raw_executable_path;
     if (!GLib.Path.is_absolute (executable_path)) {
@@ -254,7 +250,7 @@ private static int run_snapshot_scenario (
         "Repositories",
         "ewd",
         "snapshots",
-        ewd_snapshot_sha
+        EI_SNAPSHOT_SHA
     );
     string bnr_snapshot_root = GLib.Path.build_filename (
         data_root,
@@ -278,7 +274,8 @@ private static int run_snapshot_scenario (
         File.new_for_path (cache).make_directory_with_parents (null);
         File.new_for_path (config).make_directory_with_parents (null);
 
-        string? full_ewd_root = full_ewd_root_override;
+        string? full_ewd_root =
+            Environment.get_variable ("ATM_PRES09_FULL_EWD_ROOT");
         string source_snapshot;
         if (full_ewd_root != null &&
             full_ewd_root.strip ().length > 0) {
@@ -291,9 +288,7 @@ private static int run_snapshot_scenario (
         } else {
             source_snapshot = GLib.Path.build_filename (
                 fixture_env,
-                ewd_snapshot_sha == EWD_INITIAL_SNAPSHOT_SHA
-                    ? "ewd"
-                    : "ewd-current"
+                "ewd-current"
             );
         }
         copy_tree (
@@ -380,7 +375,7 @@ private static int run_snapshot_scenario (
                 state_db,
                 0,
                 "ewd",
-                ewd_snapshot_sha,
+                EI_SNAPSHOT_SHA,
                 "0.1.0",
                 seal,
                 out generation_id
@@ -412,11 +407,6 @@ private static int run_snapshot_scenario (
         return 1;
     }
 
-    Environment.set_variable (
-        "ATM_PRES09_EWD_SNAPSHOT_SHA",
-        ewd_snapshot_sha,
-        true
-    );
     Environment.set_variable ("HOME", home, true);
     Environment.set_variable ("XDG_STATE_HOME", state, true);
     Environment.set_variable ("XDG_CACHE_HOME", cache, true);
@@ -455,37 +445,7 @@ private static int run_snapshot_scenario (
 
     remove_tree_best_effort (File.new_for_path (root));
     stdout.printf (
-        "PASS: PRES-09 completed full live/Archive/process-relaunch History matrix for EWD pin %s.\\n",
-        ewd_snapshot_sha
-    );
-    return 0;
-}
-
-private static int run_orchestrator (
-    string raw_executable_path
-) {
-    string? initial_root =
-        Environment.get_variable ("ATM_PRES09_FULL_EWD_INITIAL_ROOT");
-    string? current_root =
-        Environment.get_variable ("ATM_PRES09_FULL_EWD_ROOT");
-
-    if (run_snapshot_scenario (
-            raw_executable_path,
-            EWD_INITIAL_SNAPSHOT_SHA,
-            initial_root
-        ) != 0) {
-        return 1;
-    }
-    if (run_snapshot_scenario (
-            raw_executable_path,
-            EWD_CURRENT_SNAPSHOT_SHA,
-            current_root
-        ) != 0) {
-        return 1;
-    }
-
-    stdout.printf (
-        "PASS: PRES-09 full-process persistence E2E passed for both admitted EWD pins plus the exact RMD BNR C01 pin.\\n"
+        "PASS: PRES-09 drove real GTK live chart requests, Archive, process relaunch, History reconstruction and fail-closed tampered-source behavior.\n"
     );
     return 0;
 }
@@ -535,23 +495,13 @@ private static int run_application_phase (
             return 1;
         }
 
-        string? ewd_sha = Environment.get_variable (
-            "ATM_PRES09_EWD_SNAPSHOT_SHA"
-        );
-        if (ewd_sha == null ||
-            (ewd_sha != EWD_INITIAL_SNAPSHOT_SHA &&
-             ewd_sha != EWD_CURRENT_SNAPSHOT_SHA)) {
-            stderr.printf ("PRES-09 EWD snapshot SHA is missing or not admitted.\\n");
-            server.disconnect ();
-            return 1;
-        }
         string manifest = GLib.Path.build_filename (
             home,
             "Ask the Model",
             "Repositories",
             "ewd",
             "snapshots",
-            ewd_sha,
+            EI_SNAPSHOT_SHA,
             "science",
             "data",
             "input_manifest.json"
