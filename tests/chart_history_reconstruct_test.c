@@ -772,6 +772,7 @@ test_live_reconstruct_v4_catalog_dispatch (void)
     g_assert_cmpstr (atm_chart_spec_v4_id (reopened_v4), ==,
                      atm_chart_spec_v4_id (v4));
     atm_chart_spec_v4_free (reopened_v4);
+    reopened_v4 = NULL;
 
     AtmConversationChartPresentationInput tampered_presentation =
         stored_presentation;
