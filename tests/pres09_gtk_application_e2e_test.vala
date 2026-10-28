@@ -454,7 +454,6 @@ private static int run_snapshot_scenario (
     }
 
     remove_tree_best_effort (File.new_for_path (root));
-    remove_tree_best_effort (File.new_for_path (root));
     stdout.printf (
         "PASS: PRES-09 completed full live/Archive/process-relaunch History matrix for EWD pin %s.\\n",
         ewd_snapshot_sha
