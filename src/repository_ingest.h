@@ -19,6 +19,20 @@ typedef enum {
 
 GQuark atm_ingest_error_quark (void);
 
+/*
+ * Apply the one compiled AtM metadata overlay for historical EWD SHA
+ * d9e249339663015f6d1c05752338a955bf64ad0b when .atm is wholly absent.
+ * Other identities are no-ops; existing .atm content is never overwritten.
+ * The overlay receipt is part of the local snapshot seal.
+ */
+gboolean atm_repository_apply_builtin_compatibility_overlay (
+    const char *snapshot_root,
+    const char *repository_id,
+    const char *snapshot_sha,
+    gboolean *out_applied,
+    GError **error
+);
+
 gboolean atm_repository_ingest_archive_cancellable (
     const char *data_root,
     const char *archive_path,
