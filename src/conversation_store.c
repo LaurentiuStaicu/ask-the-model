@@ -5624,7 +5624,7 @@ atm_conversation_store_load_snapshot (
     if (!prepare_statement (
             store->db,
             "SELECT m.sequence_no,c.ordinal,c.chart_schema,c.chart_spec_id,"
-            "c.chart_kind,c.reconstruction_profile "
+            "c.chart_kind,c.reconstruction_profile,c.presentation_schema "
             "FROM message_charts c "
             "JOIN messages m ON m.message_id=c.message_id "
             "WHERE m.conversation_id=?1 "
@@ -5657,6 +5657,7 @@ atm_conversation_store_load_snapshot (
         chart->chart_spec_id = column_text_dup (statement, 3);
         chart->chart_kind = column_text_dup (statement, 4);
         chart->reconstruction_profile = column_text_dup (statement, 5);
+        chart->presentation_schema = column_text_dup_nullable (statement, 6);
         chart->series =
             g_ptr_array_new_with_free_func (snapshot_chart_series_free);
         g_ptr_array_add (message->charts, chart);
@@ -5727,6 +5728,87 @@ atm_conversation_store_load_snapshot (
             error,
             ATM_CONVERSATION_STORE_ERROR_SQLITE,
             "Could not read durable conversation chart series bindings"
+        );
+        goto out;
+    }
+    sqlite3_finalize (statement);
+    statement = NULL;
+
+    if (!prepare_statement (
+            store->db,
+            "SELECT m.sequence_no,p.chart_ordinal,p.presentation_schema,"
+            "p.presentation_spec_id,p.series_id,p.catalog_schema,p.adapter_id,"
+            "p.series_profile_id,p.series_profile_version,p.admission_profile_id,"
+            "p.admission_profile_version,p.reconstruction_profile_id,p.source_chart_schema,"
+            "p.source_chart_spec_id,p.x_coordinate_semantics,p.x_frequency,p.x_unit,"
+            "p.x_dimension,p.subject,p.attribute,p.y_unit,p.y_dimension,p.series_semantics,"
+            "p.missing_policy,p.missing_coordinate,p.missing_reason,p.display_profile_id,"
+            "p.display_profile_version,p.render_contract "
+            "FROM chart_presentations_v4 p "
+            "JOIN messages m ON m.message_id=p.message_id "
+            "WHERE m.conversation_id=?1 "
+            "ORDER BY m.sequence_no ASC,p.chart_ordinal ASC;",
+            &statement,
+            error
+        )) {
+        goto out;
+    }
+    sqlite3_bind_text (statement, 1, conversation_id, -1, SQLITE_TRANSIENT);
+
+    while ((rc = sqlite3_step (statement)) == SQLITE_ROW) {
+        gint64 sequence_no = sqlite3_column_int64 (statement, 0);
+        gint64 chart_ordinal = sqlite3_column_int64 (statement, 1);
+        AtmConversationSnapshotMessage *message =
+            snapshot_message_for_sequence (snapshot, sequence_no);
+        AtmConversationSnapshotChart *chart =
+            snapshot_chart_for_ordinal (message, chart_ordinal);
+        if (chart == NULL || chart->presentation != NULL) {
+            g_set_error_literal (
+                error,
+                ATM_CONVERSATION_STORE_ERROR,
+                ATM_CONVERSATION_STORE_ERROR_INTEGRITY,
+                "V4 presentation sidecar refers to a missing or duplicate chart."
+            );
+            goto out;
+        }
+
+        AtmConversationSnapshotChartPresentation *p =
+            g_new0 (AtmConversationSnapshotChartPresentation, 1);
+        p->presentation_schema = column_text_dup (statement, 2);
+        p->presentation_spec_id = column_text_dup (statement, 3);
+        p->series_id = column_text_dup (statement, 4);
+        p->catalog_schema = column_text_dup (statement, 5);
+        p->adapter_id = column_text_dup (statement, 6);
+        p->series_profile_id = column_text_dup (statement, 7);
+        p->series_profile_version = column_text_dup (statement, 8);
+        p->admission_profile_id = column_text_dup (statement, 9);
+        p->admission_profile_version = column_text_dup (statement, 10);
+        p->reconstruction_profile_id = column_text_dup (statement, 11);
+        p->source_chart_schema = column_text_dup (statement, 12);
+        p->source_chart_spec_id = column_text_dup (statement, 13);
+        p->x_coordinate_semantics = column_text_dup (statement, 14);
+        p->x_frequency = column_text_dup (statement, 15);
+        p->x_unit = column_text_dup (statement, 16);
+        p->x_dimension = column_text_dup (statement, 17);
+        p->subject = column_text_dup (statement, 18);
+        p->attribute = column_text_dup (statement, 19);
+        p->y_unit = column_text_dup (statement, 20);
+        p->y_dimension = column_text_dup (statement, 21);
+        p->series_semantics = column_text_dup (statement, 22);
+        p->missing_policy = column_text_dup (statement, 23);
+        p->missing_coordinate = column_text_dup_nullable (statement, 24);
+        p->missing_reason = column_text_dup_nullable (statement, 25);
+        p->display_profile_id = column_text_dup (statement, 26);
+        p->display_profile_version = column_text_dup (statement, 27);
+        p->render_contract = column_text_dup (statement, 28);
+        chart->presentation = p;
+    }
+    if (rc != SQLITE_DONE) {
+        set_sqlite_error (
+            store->db,
+            error,
+            ATM_CONVERSATION_STORE_ERROR_SQLITE,
+            "Could not read durable v4 chart presentation recipes"
         );
         goto out;
     }
@@ -6218,8 +6300,133 @@ SNAPSHOT_CHART_TEXT_ACCESSOR (
     atm_conversation_snapshot_chart_reconstruction_profile_at,
     reconstruction_profile
 )
+SNAPSHOT_CHART_TEXT_ACCESSOR (
+    atm_conversation_snapshot_chart_presentation_schema_at,
+    presentation_schema
+)
 
 #undef SNAPSHOT_CHART_TEXT_ACCESSOR
+
+#define SNAPSHOT_CHART_PRESENTATION_TEXT_ACCESSOR(name, field) \
+const char * \
+name ( \
+    const AtmConversationSnapshot *snapshot, \
+    guint message_index, \
+    guint chart_index \
+) \
+{ \
+    AtmConversationSnapshotChart *chart = \
+        snapshot_chart_at (snapshot, message_index, chart_index); \
+    return chart != NULL && chart->presentation != NULL \
+        ? chart->presentation->field : NULL; \
+}
+
+SNAPSHOT_CHART_PRESENTATION_TEXT_ACCESSOR (
+    atm_conversation_snapshot_chart_presentation_spec_id_at,
+    presentation_spec_id
+)
+SNAPSHOT_CHART_PRESENTATION_TEXT_ACCESSOR (
+    atm_conversation_snapshot_chart_presentation_series_id_at,
+    series_id
+)
+SNAPSHOT_CHART_PRESENTATION_TEXT_ACCESSOR (
+    atm_conversation_snapshot_chart_presentation_catalog_schema_at,
+    catalog_schema
+)
+SNAPSHOT_CHART_PRESENTATION_TEXT_ACCESSOR (
+    atm_conversation_snapshot_chart_presentation_adapter_id_at,
+    adapter_id
+)
+SNAPSHOT_CHART_PRESENTATION_TEXT_ACCESSOR (
+    atm_conversation_snapshot_chart_presentation_series_profile_id_at,
+    series_profile_id
+)
+SNAPSHOT_CHART_PRESENTATION_TEXT_ACCESSOR (
+    atm_conversation_snapshot_chart_presentation_series_profile_version_at,
+    series_profile_version
+)
+SNAPSHOT_CHART_PRESENTATION_TEXT_ACCESSOR (
+    atm_conversation_snapshot_chart_presentation_admission_profile_id_at,
+    admission_profile_id
+)
+SNAPSHOT_CHART_PRESENTATION_TEXT_ACCESSOR (
+    atm_conversation_snapshot_chart_presentation_admission_profile_version_at,
+    admission_profile_version
+)
+SNAPSHOT_CHART_PRESENTATION_TEXT_ACCESSOR (
+    atm_conversation_snapshot_chart_presentation_reconstruction_profile_id_at,
+    reconstruction_profile_id
+)
+SNAPSHOT_CHART_PRESENTATION_TEXT_ACCESSOR (
+    atm_conversation_snapshot_chart_presentation_source_chart_schema_at,
+    source_chart_schema
+)
+SNAPSHOT_CHART_PRESENTATION_TEXT_ACCESSOR (
+    atm_conversation_snapshot_chart_presentation_source_chart_spec_id_at,
+    source_chart_spec_id
+)
+SNAPSHOT_CHART_PRESENTATION_TEXT_ACCESSOR (
+    atm_conversation_snapshot_chart_presentation_x_coordinate_semantics_at,
+    x_coordinate_semantics
+)
+SNAPSHOT_CHART_PRESENTATION_TEXT_ACCESSOR (
+    atm_conversation_snapshot_chart_presentation_x_frequency_at,
+    x_frequency
+)
+SNAPSHOT_CHART_PRESENTATION_TEXT_ACCESSOR (
+    atm_conversation_snapshot_chart_presentation_x_unit_at,
+    x_unit
+)
+SNAPSHOT_CHART_PRESENTATION_TEXT_ACCESSOR (
+    atm_conversation_snapshot_chart_presentation_x_dimension_at,
+    x_dimension
+)
+SNAPSHOT_CHART_PRESENTATION_TEXT_ACCESSOR (
+    atm_conversation_snapshot_chart_presentation_subject_at,
+    subject
+)
+SNAPSHOT_CHART_PRESENTATION_TEXT_ACCESSOR (
+    atm_conversation_snapshot_chart_presentation_attribute_at,
+    attribute
+)
+SNAPSHOT_CHART_PRESENTATION_TEXT_ACCESSOR (
+    atm_conversation_snapshot_chart_presentation_y_unit_at,
+    y_unit
+)
+SNAPSHOT_CHART_PRESENTATION_TEXT_ACCESSOR (
+    atm_conversation_snapshot_chart_presentation_y_dimension_at,
+    y_dimension
+)
+SNAPSHOT_CHART_PRESENTATION_TEXT_ACCESSOR (
+    atm_conversation_snapshot_chart_presentation_series_semantics_at,
+    series_semantics
+)
+SNAPSHOT_CHART_PRESENTATION_TEXT_ACCESSOR (
+    atm_conversation_snapshot_chart_presentation_missing_policy_at,
+    missing_policy
+)
+SNAPSHOT_CHART_PRESENTATION_TEXT_ACCESSOR (
+    atm_conversation_snapshot_chart_presentation_missing_coordinate_at,
+    missing_coordinate
+)
+SNAPSHOT_CHART_PRESENTATION_TEXT_ACCESSOR (
+    atm_conversation_snapshot_chart_presentation_missing_reason_at,
+    missing_reason
+)
+SNAPSHOT_CHART_PRESENTATION_TEXT_ACCESSOR (
+    atm_conversation_snapshot_chart_presentation_display_profile_id_at,
+    display_profile_id
+)
+SNAPSHOT_CHART_PRESENTATION_TEXT_ACCESSOR (
+    atm_conversation_snapshot_chart_presentation_display_profile_version_at,
+    display_profile_version
+)
+SNAPSHOT_CHART_PRESENTATION_TEXT_ACCESSOR (
+    atm_conversation_snapshot_chart_presentation_render_contract_at,
+    render_contract
+)
+
+#undef SNAPSHOT_CHART_PRESENTATION_TEXT_ACCESSOR
 
 guint
 atm_conversation_snapshot_chart_series_count_at (
