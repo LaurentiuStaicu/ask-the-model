@@ -2627,7 +2627,22 @@ test_bnr_chart_recipe_v5_persistence (void)
     g_assert_cmpstr (atm_conversation_snapshot_chart_series_source_path_at (
         snapshot, 1u, 0u, 0u), ==, series.source_path);
     atm_conversation_snapshot_free (snapshot);
+
+    /* A v4 marker without its sidecar must never validate or reopen. */
+    raw_exec (path,
+        "UPDATE message_charts SET presentation_schema='atm-chart-spec/4';");
+    g_assert_false (atm_conversation_store_validate (store, &error));
+    g_assert_error (error, ATM_CONVERSATION_STORE_ERROR,
+                    ATM_CONVERSATION_STORE_ERROR_INTEGRITY);
+    g_clear_error (&error);
+
     atm_conversation_store_close (store);
+    store = NULL;
+    g_assert_false (atm_conversation_store_open (path, &store, &error));
+    g_assert_error (error, ATM_CONVERSATION_STORE_ERROR,
+                    ATM_CONVERSATION_STORE_ERROR_INTEGRITY);
+    g_assert_null (store);
+    g_clear_error (&error);
 
     g_free (conversation_id);
     g_free (version);
