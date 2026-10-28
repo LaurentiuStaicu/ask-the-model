@@ -738,8 +738,13 @@ assert_render_v4_profile_is_generic_and_exact_data (
         cairo_surface_t *surface = atm_chart_render_v4_surface (rendered);
         int last_x = (int) (84.0 + after_gap->x + 0.5);
         int last_y = (int) (108.0 + after_gap->y + 0.5);
+        /*
+         * Probe one pixel inside the right plot border. A probe centered on
+         * last_x would also hit the frame itself and could pass if the
+         * singleton observation marker disappeared.
+         */
         g_assert_true (surface_has_black_pixel_near (
-            surface, last_x, last_y, 2));
+            surface, last_x - 1, last_y, 0));
 
         int gap_x = (int) (84.0 +
             (before_gap->x + after_gap->x) / 2.0 + 0.5);
