@@ -3061,7 +3061,7 @@ test('chart-view', chart_view_test,
 
 chart_view_vala_test = executable(
   'chart-view-vala-test',
-  ['src/ChartNative.vapi', 'src/chart_view.c', 'tests/chart_fixture.c', 'src/chart_render.c', 'src/chart_render_v4.c', 'src/chart_projection_v4.c', 'src/chart_projection.c', 'src/chart_spec_v4.c', 'src/chart_catalog.c', 'src/chart_spec.c', 'src/verified_series.c', 'src/gistemp_sra.c', 'src/gistemp_evidence.c',
+  ['src/ChartNative.vapi', 'src/ConversationStoreNative.vapi', 'src/chart_view.c', 'tests/chart_fixture.c', 'src/chart_render.c', 'src/chart_render_v4.c', 'src/chart_projection_v4.c', 'src/chart_projection.c', 'src/chart_spec_v4.c', 'src/chart_catalog.c', 'src/chart_spec.c', 'src/verified_series.c', 'src/gistemp_sra.c', 'src/gistemp_evidence.c',
    'src/gistemp_admission.c', 'src/annual_series_candidate.c',
    'src/scientific_canonical.c', 'src/scientific_artifact.c',
    'src/scientific_result.c', 'src/scientific_operation.c',
