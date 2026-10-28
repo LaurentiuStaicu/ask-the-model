@@ -784,6 +784,52 @@ test_live_reconstruct_v4_catalog_dispatch (void)
     g_assert_null (reopened_v4);
     g_clear_error (&error);
 
+    /*
+     * Every persisted catalog claim must be derived again, not accepted merely
+     * because its value has the right SQL shape. Exercise the entire sidecar.
+     */
+#define ASSERT_REJECTED_PRESENTATION_FIELD(field, bad_value) \
+    G_STMT_START { \
+        AtmConversationChartPresentationInput changed = stored_presentation; \
+        changed.field = (bad_value); \
+        g_assert_false (atm_chart_history_reconstruct_v4 ( \
+            gistemp_id, atm_chart_spec_v4_source_spec (v4), \
+            &changed, &reopened_v4, &error)); \
+        g_assert_error (error, ATM_SRA_ERROR, ATM_SRA_ERROR_IDENTITY); \
+        g_assert_null (reopened_v4); \
+        g_clear_error (&error); \
+    } G_STMT_END
+    ASSERT_REJECTED_PRESENTATION_FIELD (presentation_schema, "atm-chart-spec/99");
+    ASSERT_REJECTED_PRESENTATION_FIELD (presentation_spec_id,
+        "0000000000000000000000000000000000000000000000000000000000000000");
+    ASSERT_REJECTED_PRESENTATION_FIELD (series_id, "forged.series");
+    ASSERT_REJECTED_PRESENTATION_FIELD (catalog_schema, "atm-chart-catalog/99");
+    ASSERT_REJECTED_PRESENTATION_FIELD (adapter_id, "forged-adapter/1");
+    ASSERT_REJECTED_PRESENTATION_FIELD (series_profile_id, "forged-series/1");
+    ASSERT_REJECTED_PRESENTATION_FIELD (series_profile_version, "99");
+    ASSERT_REJECTED_PRESENTATION_FIELD (admission_profile_id, "forged-admission/1");
+    ASSERT_REJECTED_PRESENTATION_FIELD (admission_profile_version, "99");
+    ASSERT_REJECTED_PRESENTATION_FIELD (reconstruction_profile_id, "forged-reconstruction/1");
+    ASSERT_REJECTED_PRESENTATION_FIELD (source_chart_schema, "atm-chart-spec/3");
+    ASSERT_REJECTED_PRESENTATION_FIELD (source_chart_spec_id,
+        "1111111111111111111111111111111111111111111111111111111111111111");
+    ASSERT_REJECTED_PRESENTATION_FIELD (x_coordinate_semantics, "forged-coordinate");
+    ASSERT_REJECTED_PRESENTATION_FIELD (x_frequency, "quarterly");
+    ASSERT_REJECTED_PRESENTATION_FIELD (x_unit, "calendar_quarter");
+    ASSERT_REJECTED_PRESENTATION_FIELD (x_dimension, "space");
+    ASSERT_REJECTED_PRESENTATION_FIELD (subject, "forged-subject");
+    ASSERT_REJECTED_PRESENTATION_FIELD (attribute, "forged-attribute");
+    ASSERT_REJECTED_PRESENTATION_FIELD (y_unit, "percent");
+    ASSERT_REJECTED_PRESENTATION_FIELD (y_dimension, "survey_net_percentage");
+    ASSERT_REJECTED_PRESENTATION_FIELD (series_semantics, "forged-semantics");
+    ASSERT_REJECTED_PRESENTATION_FIELD (missing_policy, "bounded_profile");
+    ASSERT_REJECTED_PRESENTATION_FIELD (missing_coordinate, "2025-Q2");
+    ASSERT_REJECTED_PRESENTATION_FIELD (missing_reason, "source_round_not_retained");
+    ASSERT_REJECTED_PRESENTATION_FIELD (display_profile_id, "atm-display/forged");
+    ASSERT_REJECTED_PRESENTATION_FIELD (display_profile_version, "99");
+    ASSERT_REJECTED_PRESENTATION_FIELD (render_contract, "atm-retro-mono/99");
+#undef ASSERT_REJECTED_PRESENTATION_FIELD
+
     atm_chart_spec_v4_free (v4);
     v4 = NULL;
 
