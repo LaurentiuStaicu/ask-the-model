@@ -826,7 +826,10 @@ namespace AskTheModel {
                 string? trailing_subject = extract_chart_subject (normalized);
                 if (trailing_subject == null ||
                     trailing_subject.strip ().length == 0 ||
-                    is_allowed_chart_subject_tail (trailing_subject)) {
+                    is_allowed_chart_subject_tail (trailing_subject) ||
+                    is_existing_chart_interpretation_question (
+                        trailing_subject.down ().strip ()
+                    )) {
                     return true;
                 }
                 return false;
