@@ -3243,9 +3243,9 @@ namespace AskTheModel {
             }
 
             /*
-             * Keep the current source-specific History recipe contract intact.
-             * The v4 ID is for the live presentation wrapper only; persisted
-             * identity remains the exact underlying v1/v2/v3 ChartSpec.
+             * Keep the underlying source-specific History recipe identity
+             * in the v1/v2/v3 chart row. The v4 semantic presentation ID and
+             * catalog claims are persisted separately in the optional sidecar.
              */
             string repository_version = chart_schema == "atm-chart-spec/1"
                 ? chart_pin.repository_version
