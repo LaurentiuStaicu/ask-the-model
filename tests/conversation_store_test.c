@@ -1117,10 +1117,12 @@ test_newer_schema_rejected (void)
     g_assert_no_error (error);
     atm_conversation_store_close (store);
 
-    raw_exec (
-        path,
-        "PRAGMA user_version=6;"
+    char *newer_schema_sql = g_strdup_printf (
+        "PRAGMA user_version=%d;",
+        ATM_CONVERSATION_STORE_SCHEMA_VERSION + 1
     );
+    raw_exec (path, newer_schema_sql);
+    g_free (newer_schema_sql);
 
     store = NULL;
     g_assert_false (
