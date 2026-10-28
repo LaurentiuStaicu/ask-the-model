@@ -1158,6 +1158,179 @@ namespace AskTheModel {
                             );
                     }
 
+                    string? presentation_marker =
+                        ConversationStoreNative.snapshot_chart_presentation_schema_at (
+                            native_snapshot,
+                            message_index,
+                            chart_index
+                        );
+                    ConversationPersistenceChartPresentation? presentation = null;
+                    string? presentation_id =
+                        ConversationStoreNative.snapshot_chart_presentation_spec_id_at (
+                            native_snapshot,
+                            message_index,
+                            chart_index
+                        );
+                    if (presentation_id != null) {
+                        presentation =
+                            new ConversationPersistenceChartPresentation (
+                                require_native_text (
+                                    ConversationStoreNative.snapshot_chart_presentation_sidecar_schema_at (
+                                        native_snapshot, message_index, chart_index
+                                    ),
+                                    "v4 presentation schema"
+                                ),
+                                require_native_text (
+                                    presentation_id,
+                                    "v4 presentation spec id"
+                                ),
+                                require_native_text (
+                                    ConversationStoreNative.snapshot_chart_presentation_series_id_at (
+                                        native_snapshot, message_index, chart_index
+                                    ),
+                                    "v4 presentation series id"
+                                ),
+                                require_native_text (
+                                    ConversationStoreNative.snapshot_chart_presentation_catalog_schema_at (
+                                        native_snapshot, message_index, chart_index
+                                    ),
+                                    "v4 presentation catalog schema"
+                                ),
+                                require_native_text (
+                                    ConversationStoreNative.snapshot_chart_presentation_adapter_id_at (
+                                        native_snapshot, message_index, chart_index
+                                    ),
+                                    "v4 presentation adapter id"
+                                ),
+                                require_native_text (
+                                    ConversationStoreNative.snapshot_chart_presentation_series_profile_id_at (
+                                        native_snapshot, message_index, chart_index
+                                    ),
+                                    "v4 presentation series profile"
+                                ),
+                                require_native_text (
+                                    ConversationStoreNative.snapshot_chart_presentation_series_profile_version_at (
+                                        native_snapshot, message_index, chart_index
+                                    ),
+                                    "v4 presentation series profile version"
+                                ),
+                                require_native_text (
+                                    ConversationStoreNative.snapshot_chart_presentation_admission_profile_id_at (
+                                        native_snapshot, message_index, chart_index
+                                    ),
+                                    "v4 presentation admission profile"
+                                ),
+                                require_native_text (
+                                    ConversationStoreNative.snapshot_chart_presentation_admission_profile_version_at (
+                                        native_snapshot, message_index, chart_index
+                                    ),
+                                    "v4 presentation admission profile version"
+                                ),
+                                require_native_text (
+                                    ConversationStoreNative.snapshot_chart_presentation_reconstruction_profile_id_at (
+                                        native_snapshot, message_index, chart_index
+                                    ),
+                                    "v4 presentation reconstruction profile"
+                                ),
+                                require_native_text (
+                                    ConversationStoreNative.snapshot_chart_presentation_source_chart_schema_at (
+                                        native_snapshot, message_index, chart_index
+                                    ),
+                                    "v4 source chart schema"
+                                ),
+                                require_native_text (
+                                    ConversationStoreNative.snapshot_chart_presentation_source_chart_spec_id_at (
+                                        native_snapshot, message_index, chart_index
+                                    ),
+                                    "v4 source chart spec id"
+                                ),
+                                require_native_text (
+                                    ConversationStoreNative.snapshot_chart_presentation_x_coordinate_semantics_at (
+                                        native_snapshot, message_index, chart_index
+                                    ),
+                                    "v4 x-coordinate semantics"
+                                ),
+                                require_native_text (
+                                    ConversationStoreNative.snapshot_chart_presentation_x_frequency_at (
+                                        native_snapshot, message_index, chart_index
+                                    ),
+                                    "v4 x-frequency"
+                                ),
+                                require_native_text (
+                                    ConversationStoreNative.snapshot_chart_presentation_x_unit_at (
+                                        native_snapshot, message_index, chart_index
+                                    ),
+                                    "v4 x-unit"
+                                ),
+                                require_native_text (
+                                    ConversationStoreNative.snapshot_chart_presentation_x_dimension_at (
+                                        native_snapshot, message_index, chart_index
+                                    ),
+                                    "v4 x-dimension"
+                                ),
+                                require_native_text (
+                                    ConversationStoreNative.snapshot_chart_presentation_subject_at (
+                                        native_snapshot, message_index, chart_index
+                                    ),
+                                    "v4 subject"
+                                ),
+                                require_native_text (
+                                    ConversationStoreNative.snapshot_chart_presentation_attribute_at (
+                                        native_snapshot, message_index, chart_index
+                                    ),
+                                    "v4 attribute"
+                                ),
+                                require_native_text (
+                                    ConversationStoreNative.snapshot_chart_presentation_y_unit_at (
+                                        native_snapshot, message_index, chart_index
+                                    ),
+                                    "v4 y-unit"
+                                ),
+                                require_native_text (
+                                    ConversationStoreNative.snapshot_chart_presentation_y_dimension_at (
+                                        native_snapshot, message_index, chart_index
+                                    ),
+                                    "v4 y-dimension"
+                                ),
+                                require_native_text (
+                                    ConversationStoreNative.snapshot_chart_presentation_series_semantics_at (
+                                        native_snapshot, message_index, chart_index
+                                    ),
+                                    "v4 series semantics"
+                                ),
+                                require_native_text (
+                                    ConversationStoreNative.snapshot_chart_presentation_missing_policy_at (
+                                        native_snapshot, message_index, chart_index
+                                    ),
+                                    "v4 missing-value policy"
+                                ),
+                                ConversationStoreNative.snapshot_chart_presentation_missing_coordinate_at (
+                                    native_snapshot, message_index, chart_index
+                                ),
+                                ConversationStoreNative.snapshot_chart_presentation_missing_reason_at (
+                                    native_snapshot, message_index, chart_index
+                                ),
+                                require_native_text (
+                                    ConversationStoreNative.snapshot_chart_presentation_display_profile_id_at (
+                                        native_snapshot, message_index, chart_index
+                                    ),
+                                    "v4 display profile id"
+                                ),
+                                require_native_text (
+                                    ConversationStoreNative.snapshot_chart_presentation_display_profile_version_at (
+                                        native_snapshot, message_index, chart_index
+                                    ),
+                                    "v4 display profile version"
+                                ),
+                                require_native_text (
+                                    ConversationStoreNative.snapshot_chart_presentation_render_contract_at (
+                                        native_snapshot, message_index, chart_index
+                                    ),
+                                    "v4 render contract"
+                                )
+                            );
+                    }
+
                     charts +=
                         new ConversationPersistenceChart (
                             ConversationStoreNative.snapshot_chart_ordinal_at (
@@ -1197,7 +1370,9 @@ namespace AskTheModel {
                                 ),
                                 "chart reconstruction profile"
                             ),
-                            series
+                            series,
+                            presentation_marker,
+                            presentation
                         );
                 }
 
