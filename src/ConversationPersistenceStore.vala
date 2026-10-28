@@ -252,7 +252,7 @@ namespace AskTheModel {
         }
 
         public ConversationStoreNative.ChartPresentationInput to_native () {
-            var p = ConversationStoreNative.ChartPresentationInput ();
+            var p = new ConversationStoreNative.ChartPresentationInput ();
             p.presentation_schema = presentation_schema;
             p.presentation_spec_id = presentation_spec_id;
             p.series_id = series_id;
