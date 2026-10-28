@@ -100,6 +100,41 @@ y_axis_label (const AtmChartCatalogEntry *entry)
     return label_text;
 }
 
+static gboolean
+is_iso_date_vintage (const char *vintage)
+{
+    if (vintage == NULL || strlen (vintage) != 10u)
+        return FALSE;
+
+    for (guint i = 0; i < 10u; i++) {
+        if (i == 4u || i == 7u) {
+            if (vintage[i] != '-')
+                return FALSE;
+        } else if (!g_ascii_isdigit (vintage[i])) {
+            return FALSE;
+        }
+    }
+    return TRUE;
+}
+
+static gboolean
+vintage_already_explained (const AtmChartCatalogEntry *entry,
+                           const char *vintage)
+{
+    const char *visible_metadata[] = {
+        entry->display_name,
+        entry->observation_meaning,
+        entry->description,
+        entry->publisher_name
+    };
+    for (guint i = 0; i < G_N_ELEMENTS (visible_metadata); i++) {
+        if (visible_metadata[i] != NULL &&
+            strstr (visible_metadata[i], vintage) != NULL)
+            return TRUE;
+    }
+    return FALSE;
+}
+
 static char *
 coverage_summary (const AtmChartCatalogEntry *entry)
 {
@@ -107,16 +142,33 @@ coverage_summary (const AtmChartCatalogEntry *entry)
         entry->coverage_start == NULL || entry->coverage_end == NULL)
         return NULL;
 
+    char *summary = NULL;
     if (entry->coordinate_count > entry->numeric_observation_count) {
         guint missing_count =
             entry->coordinate_count - entry->numeric_observation_count;
-        return g_strdup_printf ("%s | %s-%s | %u values, %u missing",
+        summary = g_strdup_printf ("%s | %s-%s | %u values, %u missing",
             entry->geography, entry->coverage_start, entry->coverage_end,
             entry->numeric_observation_count, missing_count);
+    } else {
+        summary = g_strdup_printf ("%s | %s-%s | %u values",
+            entry->geography, entry->coverage_start, entry->coverage_end,
+            entry->numeric_observation_count);
     }
-    return g_strdup_printf ("%s | %s-%s | %u values",
-        entry->geography, entry->coverage_start, entry->coverage_end,
-        entry->numeric_observation_count);
+
+    /*
+     * The catalog vintage is authoritative source metadata. Expose an ISO-date
+     * vintage in the chart summary unless the same date is already explained
+     * by the visible series/publisher copy. This keeps source revisions
+     * distinguishable without introducing a series-ID-specific rendering path.
+     */
+    if (is_iso_date_vintage (entry->source_vintage) &&
+        !vintage_already_explained (entry, entry->source_vintage)) {
+        char *with_vintage = g_strdup_printf (
+            "%s | vintage %s", summary, entry->source_vintage);
+        g_free (summary);
+        summary = with_vintage;
+    }
+    return summary;
 }
 
 static char *
