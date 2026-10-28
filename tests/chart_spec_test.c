@@ -711,8 +711,10 @@ test_v4_identity_ignores_nonsemantic_catalog_metadata (void)
     AtmChartSpecV4 *spec = NULL;
     GError *error = NULL;
     g_assert_nonnull (entry);
+    g_assert_cmpstr (entry->history_schema_version, ==, "6");
     g_assert_true (atm_chart_spec_v4_new (entry, source, &spec, &error));
     g_assert_no_error (error);
+    g_assert_cmpstr (atm_chart_spec_v4_history_schema_version (spec), ==, "6");
 
     char *baseline = build_v4_test_identity (entry, source);
     g_assert_cmpstr (baseline, ==, atm_chart_spec_v4_id (spec));
