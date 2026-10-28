@@ -5787,6 +5787,34 @@ namespace AskTheModel {
                 return false;
             }
 
+            /*
+             * This E2E is specifically a sidecar save/reopen gate, not merely
+             * a source-only v1/v2/v3 compatibility test.
+             */
+            ConversationPersistenceChartPresentation? ei_presentation = ei.presentation;
+            ConversationPersistenceChartPresentation? gistemp_presentation = gistemp.presentation;
+            ConversationPersistenceChartPresentation? bnr_presentation = bnr.presentation;
+            if (ei.presentation_schema != "atm-chart-spec/4" ||
+                gistemp.presentation_schema != "atm-chart-spec/4" ||
+                bnr.presentation_schema != "atm-chart-spec/4" ||
+                ei_presentation == null ||
+                gistemp_presentation == null ||
+                bnr_presentation == null ||
+                ei_presentation.presentation_schema != "atm-chart-spec/4" ||
+                gistemp_presentation.presentation_schema != "atm-chart-spec/4" ||
+                bnr_presentation.presentation_schema != "atm-chart-spec/4" ||
+                ei_presentation.source_chart_schema != ei.chart_schema ||
+                ei_presentation.source_chart_spec_id != ei.chart_spec_id ||
+                gistemp_presentation.source_chart_schema != gistemp.chart_schema ||
+                gistemp_presentation.source_chart_spec_id != gistemp.chart_spec_id ||
+                bnr_presentation.source_chart_schema != bnr.chart_schema ||
+                bnr_presentation.source_chart_spec_id != bnr.chart_spec_id ||
+                bnr_presentation.missing_coordinate != "2025-Q2" ||
+                bnr_presentation.missing_reason != "source_round_not_retained") {
+                pres09_test_failure = "History did not persist and restore matching v4 presentation sidecars for all three source recipes";
+                return false;
+            }
+
             string ei_data = ei_view.data () ?? "";
             string gistemp_data = gistemp_view.data () ?? "";
             string bnr_data = bnr_view.data () ?? "";
