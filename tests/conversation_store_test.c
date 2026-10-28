@@ -2524,7 +2524,7 @@ test_archive_delete_lifecycle (void)
 }
 
 static void
-test_bnr_chart_recipe_v5_persistence (void)
+test_bnr_chart_recipe_v6_persistence (void)
 {
     char *root = new_temp_root ("atm-conversation-bnr-chart-v5-XXXXXX");
     char *path = store_path (root);
@@ -2576,6 +2576,35 @@ test_bnr_chart_recipe_v5_persistence (void)
         .snapshot_sha = sha,
         .source_path = "data/processed/bnr_bls_realised_rounds.csv"
     };
+    AtmConversationChartPresentationInput presentation = {
+        .presentation_schema = "atm-chart-spec/4",
+        .presentation_spec_id = "dddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddd",
+        .series_id = "banking.bnr.bls-c01.credit-standards-net-percentage",
+        .catalog_schema = "atm-chart-catalog/1",
+        .adapter_id = "bnr-bls-c01-pinned-quarterly/1",
+        .series_profile_id = "atm-series/bnr-bls-c01-calendar-quarter/1",
+        .series_profile_version = "1",
+        .admission_profile_id = "atm-bnr-bls-canonical-panel-admission/1",
+        .admission_profile_version = "1",
+        .reconstruction_profile_id = "atm-chart-reconstruct/bnr-bls-c01-calendar-quarter/1",
+        .source_chart_schema = "atm-chart-spec/3",
+        .source_chart_spec_id = "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+        .x_coordinate_semantics = "calendar_quarter",
+        .x_frequency = "quarterly",
+        .x_unit = "calendar_quarter",
+        .x_dimension = "time",
+        .subject = "non_financial_corporations",
+        .attribute = "nfc_credit_standards",
+        .y_unit = "percent",
+        .y_dimension = "survey_net_percentage",
+        .series_semantics = "empirical_quarterly_observations",
+        .missing_policy = "bounded_profile",
+        .missing_coordinate = "2025-Q2",
+        .missing_reason = "source_round_not_retained",
+        .display_profile_id = "atm-display/bnr-bls-c01-quarterly-gap",
+        .display_profile_version = "1",
+        .render_contract = "atm-retro-mono/1"
+    };
     AtmConversationChartInput chart = {
         .ordinal = 1,
         .chart_schema = "atm-chart-spec/3",
@@ -2583,7 +2612,8 @@ test_bnr_chart_recipe_v5_persistence (void)
         .chart_kind = "line",
         .reconstruction_profile = "atm-chart-reconstruct/bnr-bls-c01-calendar-quarter/1",
         .series = &series,
-        .series_count = 1
+        .series_count = 1,
+        .presentation = &presentation
     };
     g_assert_true (atm_conversation_store_attach_chart (
         store, conversation_id, turn, &chart, &error));
@@ -2628,11 +2658,20 @@ test_bnr_chart_recipe_v5_persistence (void)
         snapshot, 1u, 0u, 0u), ==, sha);
     g_assert_cmpstr (atm_conversation_snapshot_chart_series_source_path_at (
         snapshot, 1u, 0u, 0u), ==, series.source_path);
+    g_assert_cmpstr (atm_conversation_snapshot_chart_presentation_schema_at (
+        snapshot, 1u, 0u), ==, "atm-chart-spec/4");
+    g_assert_cmpstr (atm_conversation_snapshot_chart_presentation_spec_id_at (
+        snapshot, 1u, 0u), ==, presentation.presentation_spec_id);
+    g_assert_cmpstr (atm_conversation_snapshot_chart_presentation_series_id_at (
+        snapshot, 1u, 0u), ==, presentation.series_id);
+    g_assert_cmpstr (atm_conversation_snapshot_chart_presentation_missing_coordinate_at (
+        snapshot, 1u, 0u), ==, "2025-Q2");
+    g_assert_cmpstr (atm_conversation_snapshot_chart_presentation_missing_reason_at (
+        snapshot, 1u, 0u), ==, "source_round_not_retained");
     atm_conversation_snapshot_free (snapshot);
 
-    /* A v4 marker without its sidecar must never validate or reopen. */
-    raw_exec (path,
-        "UPDATE message_charts SET presentation_schema='atm-chart-spec/4';");
+    /* The relational invariant is enforced if a sidecar is deleted offline. */
+    raw_exec (path, "DELETE FROM chart_presentations_v4;");
     g_assert_false (atm_conversation_store_validate (store, &error));
     g_assert_error (error, ATM_CONVERSATION_STORE_ERROR,
                     ATM_CONVERSATION_STORE_ERROR_INTEGRITY);
@@ -3357,8 +3396,8 @@ main (int argc, char **argv)
         test_archive_delete_lifecycle
     );
     g_test_add_func (
-        "/conversation-store/bnr-chart-v5-persistence",
-        test_bnr_chart_recipe_v5_persistence
+        "/conversation-store/bnr-chart-v6-persistence",
+        test_bnr_chart_recipe_v6_persistence
     );
     g_test_add_func (
         "/conversation-store/chart-binding-write-load",
