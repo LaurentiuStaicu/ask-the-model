@@ -873,7 +873,7 @@ test_live_reconstruct_v4_catalog_dispatch (void)
     g_assert_true (atm_chart_live_reconstruct_v4 (
         gistemp_id, ewd_current,
         "LaurentiuStaicu/empirical-world3-dynamics",
-        "2026-08-31", ewd_current_sha, &current_v4, &error));
+        "main", ewd_current_sha, &current_v4, &error));
     g_assert_no_error (error);
     g_assert_nonnull (current_v4);
     g_assert_cmpstr (atm_chart_spec_series_snapshot_sha (
