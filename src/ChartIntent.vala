@@ -815,10 +815,14 @@ namespace AskTheModel {
          */
         private static string? extract_modifier_subject (string normalized) {
             string[] markers = {
-                "trend for ", "trend of ", "evolution of ", "evolution for ",
+                "trend for ", "trend of ", "trend in ",
+                "trends for ", "trends of ", "trends in ",
+                "evolution of ", "evolution for ",
                 "time series for ", "time series of ",
                 "tendința pentru ", "tendinta pentru ",
                 "tendința a ", "tendinta a ",
+                "tendințe pentru ", "tendinte pentru ",
+                "tendințele pentru ", "tendintele pentru ",
                 "evoluția pentru ", "evolutia pentru ",
                 "evoluția a ", "evolutia a "
             };
