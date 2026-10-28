@@ -80,11 +80,43 @@ typedef struct {
 } AtmConversationSnapshotChartSeries;
 
 typedef struct {
+    char *presentation_schema;
+    char *presentation_spec_id;
+    char *series_id;
+    char *catalog_schema;
+    char *adapter_id;
+    char *series_profile_id;
+    char *series_profile_version;
+    char *admission_profile_id;
+    char *admission_profile_version;
+    char *reconstruction_profile_id;
+    char *source_chart_schema;
+    char *source_chart_spec_id;
+    char *x_coordinate_semantics;
+    char *x_frequency;
+    char *x_unit;
+    char *x_dimension;
+    char *subject;
+    char *attribute;
+    char *y_unit;
+    char *y_dimension;
+    char *series_semantics;
+    char *missing_policy;
+    char *missing_coordinate;
+    char *missing_reason;
+    char *display_profile_id;
+    char *display_profile_version;
+    char *render_contract;
+} AtmConversationSnapshotChartPresentation;
+
+typedef struct {
     gint64 ordinal;
     char *chart_schema;
     char *chart_spec_id;
     char *chart_kind;
     char *reconstruction_profile;
+    char *presentation_schema;
+    AtmConversationSnapshotChartPresentation *presentation;
     GPtrArray *series;
 } AtmConversationSnapshotChart;
 
@@ -4523,6 +4555,38 @@ snapshot_chart_free (
     g_free (chart->chart_spec_id);
     g_free (chart->chart_kind);
     g_free (chart->reconstruction_profile);
+    g_free (chart->presentation_schema);
+    if (chart->presentation != NULL) {
+        AtmConversationSnapshotChartPresentation *p = chart->presentation;
+        g_free (p->presentation_schema);
+        g_free (p->presentation_spec_id);
+        g_free (p->series_id);
+        g_free (p->catalog_schema);
+        g_free (p->adapter_id);
+        g_free (p->series_profile_id);
+        g_free (p->series_profile_version);
+        g_free (p->admission_profile_id);
+        g_free (p->admission_profile_version);
+        g_free (p->reconstruction_profile_id);
+        g_free (p->source_chart_schema);
+        g_free (p->source_chart_spec_id);
+        g_free (p->x_coordinate_semantics);
+        g_free (p->x_frequency);
+        g_free (p->x_unit);
+        g_free (p->x_dimension);
+        g_free (p->subject);
+        g_free (p->attribute);
+        g_free (p->y_unit);
+        g_free (p->y_dimension);
+        g_free (p->series_semantics);
+        g_free (p->missing_policy);
+        g_free (p->missing_coordinate);
+        g_free (p->missing_reason);
+        g_free (p->display_profile_id);
+        g_free (p->display_profile_version);
+        g_free (p->render_contract);
+        g_free (p);
+    }
     g_clear_pointer (&chart->series, g_ptr_array_unref);
     g_free (chart);
 }
