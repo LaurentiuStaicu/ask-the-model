@@ -107,8 +107,9 @@ gboolean atm_chart_live_reconstruct_bnr_bls_c01 (
  * selects one closed source adapter from the series ID. The caller must first
  * authorize the requested series against the conversation's repository scope
  * and pass the actual pin identity; this function never accepts model-authored
- * scientific metadata. History remains source-specific v1/v2/v3 until its
- * separately qualified v4 persistence milestone.
+ * scientific metadata. Durable History rows retain source-specific v1/v2/v3
+ * identities; an optional v4 presentation sidecar is separately reconstructed
+ * and compared against the catalog and source identity on reopen.
  */
 gboolean atm_chart_live_reconstruct_v4 (
     const char *series_id,
