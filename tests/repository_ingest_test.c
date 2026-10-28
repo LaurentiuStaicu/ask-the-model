@@ -859,6 +859,100 @@ test_async_ingest_cancelled (void)
     g_free (root);
 }
 
+
+static void
+test_builtin_compatibility_overlay_is_sha_bound_and_sealed (void)
+{
+    const char *historical_sha =
+        "d9e249339663015f6d1c05752338a955bf64ad0b";
+    const char *other_sha =
+        "1111111111111111111111111111111111111111";
+    char *root = new_temp_root ();
+    char *historical_root = g_build_filename (root, historical_sha, NULL);
+    char *other_root = g_build_filename (root, other_sha, NULL);
+    GError *error = NULL;
+    gboolean applied = FALSE;
+    char *manifest_path = NULL;
+    char *receipt_path = NULL;
+    char *manifest = NULL;
+    char *receipt = NULL;
+    gsize manifest_length = 0;
+    gsize receipt_length = 0;
+    char *seal_before = NULL;
+    char *seal_after = NULL;
+    guint64 file_count = 0;
+    guint64 total_bytes = 0;
+    guint64 ignored_files = 0;
+    guint64 ignored_bytes = 0;
+
+    g_assert_cmpint (g_mkdir (historical_root, 0700), ==, 0);
+    g_assert_true (atm_repository_apply_builtin_compatibility_overlay (
+        historical_root, "ewd", historical_sha, &applied, &error));
+    g_assert_no_error (error);
+    g_assert_true (applied);
+
+    manifest_path = g_build_filename (
+        historical_root, ".atm", "repository.json", NULL);
+    receipt_path = g_build_filename (
+        historical_root, ".atm", "compatibility-overlay.json", NULL);
+    g_assert_true (g_file_get_contents (
+        manifest_path, &manifest, &manifest_length, &error));
+    g_assert_no_error (error);
+    g_assert_true (g_file_get_contents (
+        receipt_path, &receipt, &receipt_length, &error));
+    g_assert_no_error (error);
+    g_assert_nonnull (strstr (manifest, "\"repository_id\": \"ewd\""));
+    g_assert_nonnull (strstr (receipt, "atm-ewd-d9e249-manifest-overlay/1"));
+    g_assert_nonnull (strstr (receipt, historical_sha));
+    g_assert_nonnull (strstr (receipt, "absent from the upstream commit"));
+
+    g_assert_true (atm_snapshot_seal_compute (
+        historical_root, &seal_before, &file_count, &total_bytes, &error));
+    g_assert_no_error (error);
+    g_assert_cmpuint (file_count, ==, 2);
+    g_assert_cmpuint (total_bytes, >, 0);
+
+    /* A second call must not rewrite, replace, or "repair" the overlay. */
+    applied = TRUE;
+    g_assert_true (atm_repository_apply_builtin_compatibility_overlay (
+        historical_root, "ewd", historical_sha, &applied, &error));
+    g_assert_no_error (error);
+    g_assert_false (applied);
+    g_assert_true (atm_snapshot_seal_compute (
+        historical_root, &seal_after, &ignored_files, &ignored_bytes, &error));
+    g_assert_no_error (error);
+    g_assert_cmpstr (seal_before, ==, seal_after);
+
+    g_assert_cmpint (g_mkdir (other_root, 0700), ==, 0);
+    applied = TRUE;
+    g_assert_true (atm_repository_apply_builtin_compatibility_overlay (
+        other_root, "ewd", other_sha, &applied, &error));
+    g_assert_no_error (error);
+    g_assert_false (applied);
+    char *other_atm = g_build_filename (other_root, ".atm", NULL);
+    g_assert_false (g_file_test (other_atm, G_FILE_TEST_EXISTS));
+
+    /* The same historical SHA cannot activate the overlay for another repo. */
+    applied = TRUE;
+    g_assert_true (atm_repository_apply_builtin_compatibility_overlay (
+        other_root, "cbd", historical_sha, &applied, &error));
+    g_assert_no_error (error);
+    g_assert_false (applied);
+    g_assert_false (g_file_test (other_atm, G_FILE_TEST_EXISTS));
+
+    g_free (other_atm);
+    g_free (seal_after);
+    g_free (seal_before);
+    g_free (receipt);
+    g_free (manifest);
+    g_free (receipt_path);
+    g_free (manifest_path);
+    g_free (other_root);
+    g_free (historical_root);
+    remove_tree_best_effort (root);
+    g_free (root);
+}
+
 static void
 test_production_limits (void)
 {
@@ -915,6 +1009,10 @@ main (int argc, char **argv)
     g_test_add_func (
         "/ingest/async-cancelled",
         test_async_ingest_cancelled
+    );
+    g_test_add_func (
+        "/ingest/builtin-compatibility-overlay-sha-bound",
+        test_builtin_compatibility_overlay_is_sha_bound_and_sealed
     );
     g_test_add_func (
         "/ingest/production-limits",
