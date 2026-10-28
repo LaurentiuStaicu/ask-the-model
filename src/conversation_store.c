@@ -6322,6 +6322,10 @@ name ( \
 }
 
 SNAPSHOT_CHART_PRESENTATION_TEXT_ACCESSOR (
+    atm_conversation_snapshot_chart_presentation_sidecar_schema_at,
+    presentation_schema
+)
+SNAPSHOT_CHART_PRESENTATION_TEXT_ACCESSOR (
     atm_conversation_snapshot_chart_presentation_spec_id_at,
     presentation_spec_id
 )
