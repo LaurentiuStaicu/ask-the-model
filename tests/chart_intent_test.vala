@@ -606,6 +606,34 @@ int main () {
     assert (explicit_unknown_trend_subject.series_id == null);
     assert (explicit_unknown_trend_subject.intent == "ambiguous");
 
+    var explicit_unknown_plural_trend_subject =
+        AskTheModel.ChartIntent.parse (
+            "/chart gistemp Show trends of diabetes prevalence over time."
+        );
+    assert (explicit_unknown_plural_trend_subject.series_id == null);
+    assert (explicit_unknown_plural_trend_subject.intent == "ambiguous");
+
+    var explicit_valid_plural_trend_subject =
+        AskTheModel.ChartIntent.parse (
+            "/chart gistemp Show trends of global temperature anomalies over time."
+        );
+    assert (explicit_valid_plural_trend_subject.series_id ==
+        "climate.gistemp.global-temperature-anomaly");
+
+    var explicit_unknown_plural_trend_subject_romanian =
+        AskTheModel.ChartIntent.parse (
+            "/chart gistemp Arată tendințele pentru prevalența malariei în timp."
+        );
+    assert (explicit_unknown_plural_trend_subject_romanian.series_id == null);
+    assert (explicit_unknown_plural_trend_subject_romanian.intent == "ambiguous");
+
+    var explicit_valid_plural_trend_subject_romanian =
+        AskTheModel.ChartIntent.parse (
+            "/chart bnr-bls-c01 Arată tendințele pentru standardele de credit."
+        );
+    assert (explicit_valid_plural_trend_subject_romanian.series_id ==
+        "banking.bnr.bls-c01.credit-standards-net-percentage");
+
     var explicit_unknown_subject_before_trend = AskTheModel.ChartIntent.parse (
         "/chart gistemp Show malaria prevalence trend over time."
     );
