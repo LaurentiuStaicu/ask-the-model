@@ -428,6 +428,32 @@ test_ei_history_reconstructs_pinned_snapshots (void)
         g_assert_cmpuint (atm_chart_spec_point_count (restored, 0), ==, 61u);
         qualified_ids[i] = g_strdup (atm_chart_spec_series_qualified_id (restored, 0));
 
+        /*
+         * Exercise the v4 History sidecar reconstruction on both admitted EI
+         * snapshots, not just the one selected by the GTK Application E2E.
+         */
+        AtmChartSpecV4 *history_v4 = NULL;
+        AtmChartSpecV4 *reopened_v4 = NULL;
+        AtmConversationChartPresentationInput history_presentation = {0};
+        g_assert_true (atm_chart_wrap_qualified_spec_v4 (
+            "energy.energy-institute.global-total-energy-supply",
+            restored, &history_v4, &error));
+        g_assert_no_error (error);
+        g_assert_cmpstr (atm_chart_spec_series_snapshot_sha (
+            atm_chart_spec_v4_source_spec (history_v4), 0), ==, snapshots[i]);
+        g_assert_true (atm_chart_history_presentation_input_from_v4 (
+            history_v4, &history_presentation, &error));
+        g_assert_no_error (error);
+        g_assert_true (atm_chart_history_reconstruct_v4 (
+            "energy.energy-institute.global-total-energy-supply",
+            restored, &history_presentation, &reopened_v4, &error));
+        g_assert_no_error (error);
+        g_assert_nonnull (reopened_v4);
+        g_assert_cmpstr (atm_chart_spec_v4_id (reopened_v4), ==,
+                         atm_chart_spec_v4_id (history_v4));
+        atm_chart_spec_v4_free (reopened_v4);
+        atm_chart_spec_v4_free (history_v4);
+
         /* The persisted recipe may not relabel a source bundle's version,
          * source profile, admission, scientific identity or ChartSpec ID. */
         if (i == 0) {
@@ -833,6 +859,38 @@ test_live_reconstruct_v4_catalog_dispatch (void)
 
     atm_chart_spec_v4_free (v4);
     v4 = NULL;
+
+    /*
+     * Repeat the full v4-sidecar derivation/reconstruction check for the
+     * second catalog-admitted GISTEMP snapshot.
+     */
+    static const char *ewd_current_sha =
+        "dc710d8e604c0fff713a3acfdb18ab47a1a902bb";
+    char *ewd_current = fixture_snapshot_named ("ewd-current");
+    AtmChartSpecV4 *current_v4 = NULL;
+    AtmChartSpecV4 *current_reopened_v4 = NULL;
+    AtmConversationChartPresentationInput current_presentation = {0};
+    g_assert_true (atm_chart_live_reconstruct_v4 (
+        gistemp_id, ewd_current,
+        "LaurentiuStaicu/empirical-world3-dynamics",
+        "2026-08-31", ewd_current_sha, &current_v4, &error));
+    g_assert_no_error (error);
+    g_assert_nonnull (current_v4);
+    g_assert_cmpstr (atm_chart_spec_series_snapshot_sha (
+        atm_chart_spec_v4_source_spec (current_v4), 0), ==, ewd_current_sha);
+    g_assert_true (atm_chart_history_presentation_input_from_v4 (
+        current_v4, &current_presentation, &error));
+    g_assert_no_error (error);
+    g_assert_true (atm_chart_history_reconstruct_v4 (
+        gistemp_id, atm_chart_spec_v4_source_spec (current_v4),
+        &current_presentation, &current_reopened_v4, &error));
+    g_assert_no_error (error);
+    g_assert_nonnull (current_reopened_v4);
+    g_assert_cmpstr (atm_chart_spec_v4_id (current_reopened_v4), ==,
+                     atm_chart_spec_v4_id (current_v4));
+    atm_chart_spec_v4_free (current_reopened_v4);
+    atm_chart_spec_v4_free (current_v4);
+    g_free (ewd_current);
 
     g_assert_true (atm_chart_live_reconstruct_v4 (
         energy_id, ewd, "LaurentiuStaicu/empirical-world3-dynamics", NULL, ewd_initial, &v4, &error));
