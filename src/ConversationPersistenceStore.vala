@@ -116,12 +116,105 @@ namespace AskTheModel {
         }
     }
 
+    public class ConversationPersistenceChartPresentation : Object {
+        public string presentation_schema { get; construct; }
+        public string presentation_spec_id { get; construct; }
+        public string series_id { get; construct; }
+        public string catalog_schema { get; construct; }
+        public string adapter_id { get; construct; }
+        public string series_profile_id { get; construct; }
+        public string series_profile_version { get; construct; }
+        public string admission_profile_id { get; construct; }
+        public string admission_profile_version { get; construct; }
+        public string reconstruction_profile_id { get; construct; }
+        public string source_chart_schema { get; construct; }
+        public string source_chart_spec_id { get; construct; }
+        public string x_coordinate_semantics { get; construct; }
+        public string x_frequency { get; construct; }
+        public string x_unit { get; construct; }
+        public string x_dimension { get; construct; }
+        public string subject { get; construct; }
+        public string attribute { get; construct; }
+        public string y_unit { get; construct; }
+        public string y_dimension { get; construct; }
+        public string series_semantics { get; construct; }
+        public string missing_policy { get; construct; }
+        public string? missing_coordinate { get; construct; }
+        public string? missing_reason { get; construct; }
+        public string display_profile_id { get; construct; }
+        public string display_profile_version { get; construct; }
+        public string render_contract { get; construct; }
+
+        public ConversationPersistenceChartPresentation (
+            string presentation_schema,
+            string presentation_spec_id,
+            string series_id,
+            string catalog_schema,
+            string adapter_id,
+            string series_profile_id,
+            string series_profile_version,
+            string admission_profile_id,
+            string admission_profile_version,
+            string reconstruction_profile_id,
+            string source_chart_schema,
+            string source_chart_spec_id,
+            string x_coordinate_semantics,
+            string x_frequency,
+            string x_unit,
+            string x_dimension,
+            string subject,
+            string attribute,
+            string y_unit,
+            string y_dimension,
+            string series_semantics,
+            string missing_policy,
+            string? missing_coordinate,
+            string? missing_reason,
+            string display_profile_id,
+            string display_profile_version,
+            string render_contract
+        ) {
+            Object (
+                presentation_schema: presentation_schema,
+                presentation_spec_id: presentation_spec_id,
+                series_id: series_id,
+                catalog_schema: catalog_schema,
+                adapter_id: adapter_id,
+                series_profile_id: series_profile_id,
+                series_profile_version: series_profile_version,
+                admission_profile_id: admission_profile_id,
+                admission_profile_version: admission_profile_version,
+                reconstruction_profile_id: reconstruction_profile_id,
+                source_chart_schema: source_chart_schema,
+                source_chart_spec_id: source_chart_spec_id,
+                x_coordinate_semantics: x_coordinate_semantics,
+                x_frequency: x_frequency,
+                x_unit: x_unit,
+                x_dimension: x_dimension,
+                subject: subject,
+                attribute: attribute,
+                y_unit: y_unit,
+                y_dimension: y_dimension,
+                series_semantics: series_semantics,
+                missing_policy: missing_policy,
+                missing_coordinate: missing_coordinate,
+                missing_reason: missing_reason,
+                display_profile_id: display_profile_id,
+                display_profile_version: display_profile_version,
+                render_contract: render_contract
+            );
+        }
+    }
+
     public class ConversationPersistenceChart : Object {
         public int64 ordinal { get; construct; }
         public string chart_schema { get; construct; }
         public string chart_spec_id { get; construct; }
         public string chart_kind { get; construct; }
         public string reconstruction_profile { get; construct; }
+        /* NULL is a legacy source-only chart; v4 marker requires the sidecar. */
+        public string? presentation_schema { get; construct; }
+        public ConversationPersistenceChartPresentation? presentation { get; construct; }
         public ConversationPersistenceChartSeries[] series;
 
         public ConversationPersistenceChart (
@@ -130,14 +223,18 @@ namespace AskTheModel {
             string chart_spec_id,
             string chart_kind,
             string reconstruction_profile,
-            ConversationPersistenceChartSeries[] series
+            ConversationPersistenceChartSeries[] series,
+            string? presentation_schema = null,
+            ConversationPersistenceChartPresentation? presentation = null
         ) {
             Object (
                 ordinal: ordinal,
                 chart_schema: chart_schema,
                 chart_spec_id: chart_spec_id,
                 chart_kind: chart_kind,
-                reconstruction_profile: reconstruction_profile
+                reconstruction_profile: reconstruction_profile,
+                presentation_schema: presentation_schema,
+                presentation: presentation
             );
 
             this.series = series;
