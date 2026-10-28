@@ -1588,7 +1588,70 @@ namespace AskTheModel {
             ConversationPersistenceChartSeries series =
                 chart.series[0];
 
-            if (!ConversationStoreNative.attach_chart_values (
+            bool attached = false;
+            if (chart.presentation_schema == "atm-chart-spec/4") {
+                if (chart.presentation == null) {
+                    throw new GLib.IOError.INVALID_DATA (
+                        "A v4-marked chart cannot be persisted without its presentation sidecar."
+                    );
+                }
+                ConversationPersistenceChartPresentation p = chart.presentation;
+                var native_presentation = new ConversationStoreNative.ChartPresentationInput ();
+                native_presentation.presentation_schema = p.presentation_schema;
+                native_presentation.presentation_spec_id = p.presentation_spec_id;
+                native_presentation.series_id = p.series_id;
+                native_presentation.catalog_schema = p.catalog_schema;
+                native_presentation.adapter_id = p.adapter_id;
+                native_presentation.series_profile_id = p.series_profile_id;
+                native_presentation.series_profile_version = p.series_profile_version;
+                native_presentation.admission_profile_id = p.admission_profile_id;
+                native_presentation.admission_profile_version = p.admission_profile_version;
+                native_presentation.reconstruction_profile_id = p.reconstruction_profile_id;
+                native_presentation.source_chart_schema = p.source_chart_schema;
+                native_presentation.source_chart_spec_id = p.source_chart_spec_id;
+                native_presentation.x_coordinate_semantics = p.x_coordinate_semantics;
+                native_presentation.x_frequency = p.x_frequency;
+                native_presentation.x_unit = p.x_unit;
+                native_presentation.x_dimension = p.x_dimension;
+                native_presentation.subject = p.subject;
+                native_presentation.attribute = p.attribute;
+                native_presentation.y_unit = p.y_unit;
+                native_presentation.y_dimension = p.y_dimension;
+                native_presentation.series_semantics = p.series_semantics;
+                native_presentation.missing_policy = p.missing_policy;
+                native_presentation.missing_coordinate = p.missing_coordinate;
+                native_presentation.missing_reason = p.missing_reason;
+                native_presentation.display_profile_id = p.display_profile_id;
+                native_presentation.display_profile_version = p.display_profile_version;
+                native_presentation.render_contract = p.render_contract;
+
+                attached = ConversationStoreNative.attach_chart_v4_values (
+                    native_store,
+                    conversation_id,
+                    turn_no,
+                    (uint) chart.ordinal,
+                    chart.chart_schema,
+                    chart.chart_spec_id,
+                    chart.chart_kind,
+                    chart.reconstruction_profile,
+                    series.series_profile,
+                    series.admission_profile,
+                    series.scientific_id,
+                    series.qualified_id,
+                    series.repository_id,
+                    series.repository_version,
+                    series.snapshot_sha,
+                    series.source_path,
+                    ref native_presentation
+                );
+            } else {
+                if (chart.presentation_schema != null ||
+                    chart.presentation != null) {
+                    throw new GLib.IOError.INVALID_DATA (
+                        "The chart's v4 presentation marker and sidecar are inconsistent."
+                    );
+                }
+                attached = ConversationStoreNative.attach_chart_values (
                     native_store,
                     conversation_id,
                     turn_no,
@@ -1605,7 +1668,9 @@ namespace AskTheModel {
                     series.repository_version,
                     series.snapshot_sha,
                     series.source_path
-                )) {
+                );
+            }
+            if (!attached) {
                 throw new GLib.IOError.FAILED (
                     "Conversation chart reconstruction recipe could not be persisted."
                 );
