@@ -905,6 +905,12 @@ test_builtin_compatibility_overlay_is_sha_bound_and_sealed (void)
     g_assert_nonnull (strstr (receipt, "atm-ewd-d9e249-manifest-overlay/1"));
     g_assert_nonnull (strstr (receipt, historical_sha));
     g_assert_nonnull (strstr (receipt, "absent from the upstream commit"));
+    char *manifest_hash = g_compute_checksum_for_data (
+        G_CHECKSUM_SHA256,
+        (const guchar *) manifest,
+        manifest_length
+    );
+    g_assert_nonnull (strstr (receipt, manifest_hash));
 
     g_assert_true (atm_snapshot_seal_compute (
         historical_root, &seal_before, &file_count, &total_bytes, &error));
@@ -940,7 +946,27 @@ test_builtin_compatibility_overlay_is_sha_bound_and_sealed (void)
     g_assert_false (applied);
     g_assert_false (g_file_test (other_atm, G_FILE_TEST_EXISTS));
 
+    /* Existing partial .atm state must fail closed rather than be overlaid. */
+    char *partial_parent = g_build_filename (root, "partial", NULL);
+    char *partial_root = g_build_filename (
+        partial_parent, historical_sha, NULL);
+    char *partial_atm = g_build_filename (partial_root, ".atm", NULL);
+    g_assert_cmpint (g_mkdir_with_parents (partial_atm, 0700), ==, 0);
+    applied = TRUE;
+    g_assert_true (atm_repository_apply_builtin_compatibility_overlay (
+        partial_root, "ewd", historical_sha, &applied, &error));
+    g_assert_no_error (error);
+    g_assert_false (applied);
+    char *partial_manifest = g_build_filename (
+        partial_atm, "repository.json", NULL);
+    g_assert_false (g_file_test (partial_manifest, G_FILE_TEST_EXISTS));
+
+    g_free (partial_manifest);
+    g_free (partial_atm);
+    g_free (partial_root);
+    g_free (partial_parent);
     g_free (other_atm);
+    g_free (manifest_hash);
     g_free (seal_after);
     g_free (seal_before);
     g_free (receipt);
