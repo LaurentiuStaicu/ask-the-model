@@ -66,6 +66,20 @@ namespace AskTheModel.ChartNative {
         out SpecV4 spec
     ) throws GLib.Error;
 
+    [CCode (cname = "atm_chart_history_presentation_input_from_v4")]
+    public static bool history_presentation_input_from_v4 (
+        SpecV4 spec,
+        out ConversationStoreNative.ChartPresentationInput presentation
+    ) throws GLib.Error;
+
+    [CCode (cname = "atm_chart_history_reconstruct_v4")]
+    public static bool reconstruct_history_v4 (
+        string series_id,
+        Spec qualified_source_spec,
+        ref ConversationStoreNative.ChartPresentationInput presentation,
+        out SpecV4 spec
+    ) throws GLib.Error;
+
     [CCode (cname = "atm_chart_live_reconstruct_v4")]
     public static bool reconstruct_live_v4 (
         string series_id,
