@@ -26,6 +26,8 @@
 #define ATM_CONVERSATION_STORE_SCHEMA_V3_VERSION 3
 #define ATM_CONVERSATION_STORE_SCHEMA_V4_ID "atm-conversation-store/4"
 #define ATM_CONVERSATION_STORE_SCHEMA_V4_VERSION 4
+#define ATM_CONVERSATION_STORE_SCHEMA_V6_ID "atm-conversation-store/6"
+#define ATM_CONVERSATION_STORE_SCHEMA_V6_VERSION 6
 
 struct AtmConversationStore {
     sqlite3 *db;
@@ -2625,6 +2627,10 @@ atm_conversation_store_validate (
         validate_chart_semantics (
             store->db,
             error
+        ) &&
+        validate_chart_presentation_semantics (
+            store->db,
+            error
         );
 }
 
@@ -2966,7 +2972,7 @@ validate_v6_for_migration (
         !query_single_int64 (db, "PRAGMA user_version;", &user_version, error))
         return FALSE;
     if (application_id != (gint64) ATM_CONVERSATION_STORE_APPLICATION_ID ||
-        user_version != ATM_CONVERSATION_STORE_SCHEMA_VERSION) {
+        user_version != ATM_CONVERSATION_STORE_SCHEMA_V6_VERSION) {
         g_set_error_literal (error, ATM_CONVERSATION_STORE_ERROR,
             ATM_CONVERSATION_STORE_ERROR_SCHEMA,
             "Conversation-store v6 identity/version is invalid for migration.");
@@ -2978,7 +2984,7 @@ validate_v6_for_migration (
             &schema_id, error))
         return FALSE;
     gboolean schema_ok = g_strcmp0 (
-        schema_id, ATM_CONVERSATION_STORE_SCHEMA_ID) == 0;
+        schema_id, ATM_CONVERSATION_STORE_SCHEMA_V6_ID) == 0;
     g_free (schema_id);
     if (!schema_ok) {
         g_set_error_literal (error, ATM_CONVERSATION_STORE_ERROR,
@@ -3251,7 +3257,7 @@ migrate_v5_to_v6 (
         goto rollback;
 
     char *version_sql = g_strdup_printf ("PRAGMA user_version=%d;",
-        ATM_CONVERSATION_STORE_SCHEMA_VERSION);
+        ATM_CONVERSATION_STORE_SCHEMA_V6_VERSION);
     if (!exec_sql (store->db, version_sql, error)) {
         g_free (version_sql);
         goto rollback;
@@ -5814,6 +5820,10 @@ atm_conversation_store_load_snapshot (
     }
     sqlite3_finalize (statement);
     statement = NULL;
+
+    if (!validate_chart_presentation_semantics (store->db, error)) {
+        goto out;
+    }
 
     if (!exec_sql (
             store->db,
