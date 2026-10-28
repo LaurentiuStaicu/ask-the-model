@@ -5756,6 +5756,9 @@ namespace AskTheModel {
                 return false;
             }
 
+            string? expected_ewd_sha = GLib.Environment.get_variable (
+                "ATM_PRES09_EWD_SNAPSHOT_SHA"
+            );
             ConversationPersistenceChart? ei = null;
             ConversationPersistenceChart? gistemp = null;
             ConversationPersistenceChart? bnr = null;
