@@ -815,7 +815,21 @@ namespace AskTheModel {
             string? prefix = extract_series_name_before_chart_noun (normalized);
             if (prefix != null &&
                 exact_subject_matches_series (prefix, selected_series_id)) {
-                return true;
+                /*
+                 * A registered alias before "chart/graph" grounds the noun
+                 * phrase only; it must not authorize a different topic after
+                 * that noun (e.g. "GISTEMP chart with diabetes prevalence").
+                 * Permit only reviewed non-subject display modifiers such as
+                 * "over time" or "using NASA GISS"; any unknown tail fails
+                 * closed rather than falling back to the source-prefix match.
+                 */
+                string? trailing_subject = extract_chart_subject (normalized);
+                if (trailing_subject == null ||
+                    trailing_subject.strip ().length == 0 ||
+                    is_allowed_chart_subject_tail (trailing_subject)) {
+                    return true;
+                }
+                return false;
             }
 
             string? subject = extract_chart_subject (normalized);
