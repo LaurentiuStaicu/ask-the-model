@@ -3,7 +3,9 @@ using Soup;
 
 namespace AskTheModel {
 
-private const string EI_SNAPSHOT_SHA =
+private const string EWD_INITIAL_SNAPSHOT_SHA =
+    "d9e249339663015f6d1c05752338a955bf64ad0b";
+private const string EWD_CURRENT_SNAPSHOT_SHA =
     "dc710d8e604c0fff713a3acfdb18ab47a1a902bb";
 private const string BNR_SNAPSHOT_SHA =
     "e43eb4e899f123d3b1aa0f6e20b7c8ed35434170";
@@ -206,8 +208,10 @@ private static int run_child_phase (
     }
 }
 
-private static int run_orchestrator (
-    string raw_executable_path
+private static int run_snapshot_scenario (
+    string raw_executable_path,
+    string ewd_snapshot_sha,
+    string? full_ewd_root_override
 ) {
     string executable_path = raw_executable_path;
     if (!GLib.Path.is_absolute (executable_path)) {
@@ -250,7 +254,7 @@ private static int run_orchestrator (
         "Repositories",
         "ewd",
         "snapshots",
-        EI_SNAPSHOT_SHA
+        ewd_snapshot_sha
     );
     string bnr_snapshot_root = GLib.Path.build_filename (
         data_root,
@@ -274,8 +278,7 @@ private static int run_orchestrator (
         File.new_for_path (cache).make_directory_with_parents (null);
         File.new_for_path (config).make_directory_with_parents (null);
 
-        string? full_ewd_root =
-            Environment.get_variable ("ATM_PRES09_FULL_EWD_ROOT");
+        string? full_ewd_root = full_ewd_root_override;
         string source_snapshot;
         if (full_ewd_root != null &&
             full_ewd_root.strip ().length > 0) {
@@ -288,13 +291,33 @@ private static int run_orchestrator (
         } else {
             source_snapshot = GLib.Path.build_filename (
                 fixture_env,
-                "ewd-current"
+                ewd_snapshot_sha == EWD_INITIAL_SNAPSHOT_SHA
+                    ? "ewd"
+                    : "ewd-current"
             );
         }
         copy_tree (
             File.new_for_path (source_snapshot),
             File.new_for_path (snapshot_root)
         );
+
+        bool overlay_applied = false;
+        if (!RepositoryNative.apply_builtin_compatibility_overlay (
+                snapshot_root,
+                "ewd",
+                ewd_snapshot_sha,
+                out overlay_applied
+            )) {
+            stderr.printf ("PRES-09 could not apply the SHA-bound EWD metadata contract.\\n");
+            remove_tree_best_effort (File.new_for_path (root));
+            return 1;
+        }
+        if ((ewd_snapshot_sha == EWD_INITIAL_SNAPSHOT_SHA && !overlay_applied) ||
+            (ewd_snapshot_sha == EWD_CURRENT_SNAPSHOT_SHA && overlay_applied)) {
+            stderr.printf ("PRES-09 EWD metadata overlay admission did not match the exact snapshot pin.\\n");
+            remove_tree_best_effort (File.new_for_path (root));
+            return 1;
+        }
 
         string? full_rmd_root =
             Environment.get_variable ("ATM_PRES09_FULL_RMD_ROOT");
@@ -375,7 +398,7 @@ private static int run_orchestrator (
                 state_db,
                 0,
                 "ewd",
-                EI_SNAPSHOT_SHA,
+                ewd_snapshot_sha,
                 "0.1.0",
                 seal,
                 out generation_id
@@ -407,6 +430,11 @@ private static int run_orchestrator (
         return 1;
     }
 
+    Environment.set_variable (
+        "ATM_PRES09_EWD_SNAPSHOT_SHA",
+        ewd_snapshot_sha,
+        true
+    );
     Environment.set_variable ("HOME", home, true);
     Environment.set_variable ("XDG_STATE_HOME", state, true);
     Environment.set_variable ("XDG_CACHE_HOME", cache, true);
@@ -445,7 +473,37 @@ private static int run_orchestrator (
 
     remove_tree_best_effort (File.new_for_path (root));
     stdout.printf (
-        "PASS: PRES-09 drove real GTK live chart requests, Archive, process relaunch, History reconstruction and fail-closed tampered-source behavior.\n"
+        "PASS: PRES-09 completed live/Archive/process-relaunch History and fail-closed EWD/RMD source checks for EWD pin %s.\\n",
+        ewd_snapshot_sha
+    );
+    return 0;
+}
+
+private static int run_orchestrator (
+    string raw_executable_path
+) {
+    string? initial_root =
+        Environment.get_variable ("ATM_PRES09_FULL_EWD_INITIAL_ROOT");
+    string? current_root =
+        Environment.get_variable ("ATM_PRES09_FULL_EWD_ROOT");
+
+    if (run_snapshot_scenario (
+            raw_executable_path,
+            EWD_INITIAL_SNAPSHOT_SHA,
+            initial_root
+        ) != 0) {
+        return 1;
+    }
+    if (run_snapshot_scenario (
+            raw_executable_path,
+            EWD_CURRENT_SNAPSHOT_SHA,
+            current_root
+        ) != 0) {
+        return 1;
+    }
+
+    stdout.printf (
+        "PASS: PRES-09 completed the full application persistence matrix for both admitted EWD pins plus the exact RMD BNR C01 pin.\\n"
     );
     return 0;
 }
@@ -495,13 +553,23 @@ private static int run_application_phase (
             return 1;
         }
 
+        string? ewd_sha = Environment.get_variable (
+            "ATM_PRES09_EWD_SNAPSHOT_SHA"
+        );
+        if (ewd_sha == null ||
+            (ewd_sha != EWD_INITIAL_SNAPSHOT_SHA &&
+             ewd_sha != EWD_CURRENT_SNAPSHOT_SHA)) {
+            stderr.printf ("PRES-09 EWD snapshot SHA is missing or not admitted.\\n");
+            server.disconnect ();
+            return 1;
+        }
         string manifest = GLib.Path.build_filename (
             home,
             "Ask the Model",
             "Repositories",
             "ewd",
             "snapshots",
-            EI_SNAPSHOT_SHA,
+            ewd_sha,
             "science",
             "data",
             "input_manifest.json"
