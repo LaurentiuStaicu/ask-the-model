@@ -545,6 +545,36 @@ test_chart_binding_domain_export_bridge ()
                 "0123456789abcdef0123456789abcdef01234567",
                 "science/data/processed/nasa_gistemp_global_2026.csv"
             );
+        var presentation =
+            new AskTheModel.ConversationPersistenceChartPresentation (
+                "atm-chart-spec/4",
+                "dddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddd",
+                "climate.gistemp.global-temperature-anomaly",
+                "atm-chart-catalog/1",
+                "gistemp-pinned-annual/1",
+                "atm-series/gistemp-complete-annual/1",
+                "1",
+                "atm-gistemp-pinned-admission/1",
+                "1",
+                "atm-chart-reconstruct/gistemp-complete-annual/1",
+                "atm-chart-spec/1",
+                "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+                "calendar_year",
+                "annual",
+                "calendar_year",
+                "time",
+                "global_surface_temperature",
+                "annual_temperature_anomaly",
+                "degree_Celsius_anomaly",
+                "temperature_difference",
+                "empirical_annual_observations",
+                "reject",
+                null,
+                null,
+                "atm-display/gistemp-linear",
+                "1",
+                "atm-retro-mono/1"
+            );
         var chart =
             new AskTheModel.ConversationPersistenceChart (
                 1,
@@ -552,7 +582,9 @@ test_chart_binding_domain_export_bridge ()
                 "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
                 "line",
                 "atm-chart-reconstruct/gistemp-complete-annual/1",
-                { series }
+                { series },
+                presentation.presentation_schema,
+                presentation
             );
 
         store.attach_chart (
@@ -606,6 +638,12 @@ test_chart_binding_domain_export_bridge ()
             loaded_chart.series[0].qualified_id ==
             "cccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccc"
         );
+        assert (loaded_chart.presentation_schema == "atm-chart-spec/4");
+        assert (loaded_chart.presentation != null);
+        assert (
+            loaded_chart.presentation.presentation_spec_id ==
+            presentation.presentation_spec_id
+        );
 
         string first =
             store.export_conversation_json (
@@ -625,7 +663,7 @@ test_chart_binding_domain_export_bridge ()
             parser.get_root ().get_object ();
         assert (
             envelope.get_int_member ("schema_version") ==
-            2
+            3
         );
 
         Json.Array messages =
@@ -651,6 +689,38 @@ test_chart_binding_domain_export_bridge ()
         assert (
             exported_chart.get_string_member ("reconstruction_profile") ==
             loaded_chart.reconstruction_profile
+        );
+        assert (
+            exported_chart.get_string_member ("presentation_schema") ==
+            "atm-chart-spec/4"
+        );
+        Json.Object exported_presentation =
+            exported_chart.get_object_member ("presentation");
+        assert (
+            exported_presentation.get_string_member ("presentation_spec_id") ==
+            presentation.presentation_spec_id
+        );
+        assert (
+            exported_presentation.get_string_member ("series_id") ==
+            presentation.series_id
+        );
+        assert (
+            exported_presentation.get_string_member ("source_chart_schema") ==
+            loaded_chart.chart_schema
+        );
+        assert (
+            exported_presentation.get_string_member ("source_chart_spec_id") ==
+            loaded_chart.chart_spec_id
+        );
+        assert (
+            exported_presentation.get_string_member ("render_contract") ==
+            presentation.render_contract
+        );
+        assert (
+            exported_presentation.get_null_member ("missing_coordinate")
+        );
+        assert (
+            exported_presentation.get_null_member ("missing_reason")
         );
 
         Json.Array exported_series =
