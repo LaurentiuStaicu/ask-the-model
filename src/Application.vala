@@ -3260,6 +3260,17 @@ namespace AskTheModel {
                 source_snapshot_sha,
                 source_path
             );
+            ConversationStoreNative.ChartPresentationInput native_presentation = {};
+            if (!ChartNative.history_presentation_input_from_v4 (
+                    spec_v4, out native_presentation)) {
+                throw new GLib.IOError.INVALID_DATA (
+                    "Catalog-bound ChartSpec v4 presentation metadata could not be qualified for History."
+                );
+            }
+            ConversationPersistenceChartPresentation presentation =
+                ConversationPersistenceChartPresentation.from_native (
+                    ref native_presentation
+                );
             charts = {
                 new ConversationPersistenceChart (
                     1,
@@ -3267,7 +3278,9 @@ namespace AskTheModel {
                     chart_spec_id,
                     "line",
                     reconstruction_profile,
-                    { series }
+                    { series },
+                    presentation.presentation_schema,
+                    presentation
                 )
             };
 
@@ -3437,10 +3450,33 @@ namespace AskTheModel {
                         ? "energy.energy-institute.global-total-energy-supply"
                         : "climate.gistemp.global-temperature-anomaly");
                 ChartNative.SpecV4 history_spec_v4;
-                if (!ChartNative.wrap_qualified_spec_v4 (
-                        history_series_id, spec, out history_spec_v4)) {
+                if (chart.presentation_schema == null &&
+                    chart.presentation == null) {
+                    /* Legacy source-only rows retain their v1/v2/v3 contract. */
+                    if (!ChartNative.wrap_qualified_spec_v4 (
+                            history_series_id, spec, out history_spec_v4)) {
+                        throw new GLib.IOError.INVALID_DATA (
+                            "Qualified legacy History source does not match the catalog-bound ChartSpec v4 presentation."
+                        );
+                    }
+                } else if (chart.presentation_schema == "atm-chart-spec/4" &&
+                           chart.presentation != null) {
+                    ConversationPersistenceChartPresentation persisted_presentation =
+                        chart.presentation;
+                    ConversationStoreNative.ChartPresentationInput native_presentation =
+                        persisted_presentation.to_native ();
+                    if (!ChartNative.reconstruct_history_v4 (
+                            history_series_id,
+                            spec,
+                            ref native_presentation,
+                            out history_spec_v4)) {
+                        throw new GLib.IOError.INVALID_DATA (
+                            "Persisted History v4 presentation claims do not match the rebuilt catalog/source identity."
+                        );
+                    }
+                } else {
                     throw new GLib.IOError.INVALID_DATA (
-                        "Qualified History source does not match the catalog-bound ChartSpec v4 presentation."
+                        "Persisted History chart has an unsupported or inconsistent presentation marker."
                     );
                 }
 
@@ -4102,6 +4138,7 @@ namespace AskTheModel {
 
                         Gtk.Widget[] live_chart_widgets = {};
                         ConversationPersistenceChart[] live_charts = {};
+                        bool chart_persistence_failed = false;
 
                         if (source_chart_requested) {
                             try {
@@ -4125,14 +4162,30 @@ namespace AskTheModel {
                         if (live_charts.length > 0 &&
                             conversation_store != null &&
                             state.persistent_id != null) {
-                            foreach (
-                                ConversationPersistenceChart chart
-                                in live_charts
-                            ) {
-                                conversation_store.attach_chart (
-                                    state.persistent_id,
-                                    committed_turn_no,
-                                    chart
+                            try {
+                                foreach (
+                                    ConversationPersistenceChart chart
+                                    in live_charts
+                                ) {
+                                    conversation_store.attach_chart (
+                                        state.persistent_id,
+                                        committed_turn_no,
+                                        chart
+                                    );
+                                }
+                            } catch (GLib.Error chart_persistence_error) {
+                                /*
+                                 * The grounded answer is already durable. A
+                                 * secondary History attachment failure must not
+                                 * replace that committed answer with a system
+                                 * error or desynchronize the live session.
+                                 */
+                                chart_persistence_failed = true;
+                                live_chart_widgets = {};
+                                live_charts = {};
+                                stderr.printf (
+                                    "AtM: committed answer retained; chart History attachment failed: %s\\n",
+                                    chart_persistence_error.message
                                 );
                             }
                         }
@@ -4150,8 +4203,9 @@ namespace AskTheModel {
                         if (source_chart_requested &&
                             live_chart_widgets.length == 0) {
                             state.presentation.append_chart_status (
-                                "AtM could not render the qualified catalog series. " +
-                                "Check that its catalog-bound repository and exact pinned snapshot are available."
+                                chart_persistence_failed
+                                    ? "AtM saved the grounded answer, but could not save its chart in History. The answer is retained; the chart can be requested again."
+                                    : "AtM could not render the qualified catalog series. Check that its catalog-bound repository and exact pinned snapshot are available."
                             );
                         }
                         assistant_stream_started = true;
