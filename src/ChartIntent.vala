@@ -791,6 +791,50 @@ namespace AskTheModel {
             return !ambiguous && subject_series == selected_series_id;
         }
 
+        /*
+         * Return only the trailing text in the sentence containing the first
+         * chart noun. A later interpretation sentence must not be mistaken for
+         * a second subject, while a different topic attached to the noun must
+         * still be rejected by the source-prefix authorization path.
+         */
+        private static string? chart_noun_tail_in_first_sentence (
+            string normalized
+        ) {
+            string[] noun_markers = {
+                " chart", " charts", " graph", " graphs", " plot", " plots",
+                " diagram", " diagrams", " grafic", " grafice",
+                " diagrama", " diagramă", " diagrame"
+            };
+            int best_index = -1;
+            string best_marker = "";
+            foreach (string marker in noun_markers) {
+                int index = normalized.index_of (marker);
+                if (index >= 0 && (best_index < 0 || index < best_index)) {
+                    best_index = index;
+                    best_marker = marker;
+                }
+            }
+            if (best_index < 0) {
+                return null;
+            }
+
+            string tail = normalized.substring (
+                best_index + best_marker.length
+            );
+            string[] sentence_boundaries = { ".", "?", "!", ";", "\n", "\r" };
+            int cutoff = -1;
+            foreach (string boundary in sentence_boundaries) {
+                int index = tail.index_of (boundary);
+                if (index >= 0 && (cutoff < 0 || index < cutoff)) {
+                    cutoff = index;
+                }
+            }
+            if (cutoff >= 0) {
+                tail = tail.substring (0, cutoff);
+            }
+            return tail.strip ();
+        }
+
         private static bool request_subject_matches_series (
             string normalized,
             string selected_series_id
@@ -815,7 +859,22 @@ namespace AskTheModel {
             string? prefix = extract_series_name_before_chart_noun (normalized);
             if (prefix != null &&
                 exact_subject_matches_series (prefix, selected_series_id)) {
-                return true;
+                /*
+                 * A registered alias before "chart/graph" grounds the noun
+                 * phrase only; it must not authorize a different topic after
+                 * that noun (e.g. "GISTEMP chart with diabetes prevalence").
+                 * Permit only reviewed non-subject display modifiers such as
+                 * "over time" or "using NASA GISS"; any unknown tail fails
+                 * closed rather than falling back to the source-prefix match.
+                 */
+                string? trailing_subject =
+                    chart_noun_tail_in_first_sentence (normalized);
+                if (trailing_subject == null ||
+                    trailing_subject.strip ().length == 0 ||
+                    is_allowed_chart_subject_tail (trailing_subject)) {
+                    return true;
+                }
+                return false;
             }
 
             string? subject = extract_chart_subject (normalized);
