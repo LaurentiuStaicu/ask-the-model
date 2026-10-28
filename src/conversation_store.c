@@ -26,10 +26,6 @@
 #define ATM_CONVERSATION_STORE_SCHEMA_V3_VERSION 3
 #define ATM_CONVERSATION_STORE_SCHEMA_V4_ID "atm-conversation-store/4"
 #define ATM_CONVERSATION_STORE_SCHEMA_V4_VERSION 4
-#define ATM_CONVERSATION_STORE_SCHEMA_V5_ID "atm-conversation-store/5"
-#define ATM_CONVERSATION_STORE_SCHEMA_V5_VERSION 5
-#define ATM_CONVERSATION_STORE_SCHEMA_V6_ID "atm-conversation-store/6"
-#define ATM_CONVERSATION_STORE_SCHEMA_V6_VERSION 6
 
 struct AtmConversationStore {
     sqlite3 *db;
@@ -1291,6 +1287,65 @@ validate_chart_semantics (
         return FALSE;
     }
 
+    return TRUE;
+}
+
+/* V4 is a live presentation wrapper only; the durable v5 row remains source v1/v2/v3. */
+static gboolean
+validate_chart_presentation_semantics (
+    sqlite3 *db,
+    GError **error
+)
+{
+    gint64 invalid_presentation = 0;
+    if (!query_single_int64 (
+            db,
+            "SELECT count(*) FROM chart_presentations_v4 p "
+            "LEFT JOIN message_charts c "
+            "ON c.message_id=p.message_id AND c.ordinal=p.chart_ordinal "
+            "LEFT JOIN chart_series s "
+            "ON s.message_id=p.message_id AND s.chart_ordinal=p.chart_ordinal "
+            "AND s.series_ordinal=0 "
+            "WHERE c.message_id IS NULL "
+            "OR c.presentation_schema IS NOT p.presentation_schema "
+            "OR c.chart_schema IS NOT p.source_chart_schema "
+            "OR c.chart_spec_id IS NOT p.source_chart_spec_id "
+            "OR c.reconstruction_profile IS NOT p.reconstruction_profile_id "
+            "OR s.message_id IS NULL "
+            "OR s.series_profile IS NOT p.series_profile_id "
+            "OR s.admission_profile IS NOT p.admission_profile_id;",
+            &invalid_presentation,
+            error
+        )) {
+        return FALSE;
+    }
+
+    gint64 missing_presentation = 0;
+    if (!query_single_int64 (
+            db,
+            "SELECT count(*) FROM message_charts c "
+            "LEFT JOIN chart_presentations_v4 p "
+            "ON p.message_id=c.message_id AND p.chart_ordinal=c.ordinal "
+            "WHERE c.presentation_schema='atm-chart-spec/4' "
+            "AND p.message_id IS NULL;",
+            &missing_presentation,
+            error
+        )) {
+        return FALSE;
+    }
+
+    if (invalid_presentation != 0 || missing_presentation != 0) {
+        g_set_error (
+            error,
+            ATM_CONVERSATION_STORE_ERROR,
+            ATM_CONVERSATION_STORE_ERROR_INTEGRITY,
+            "Conversation-store v4 presentation sidecar validation failed "
+            "(invalid=%" G_GINT64_FORMAT ", missing=%" G_GINT64_FORMAT ").",
+            invalid_presentation,
+            missing_presentation
+        );
+        return FALSE;
+    }
     return TRUE;
 }
 
@@ -2715,6 +2770,98 @@ validate_v4_for_migration (
         validate_chart_semantics (db, error);
 }
 
+static gboolean
+validate_v5_for_migration (
+    sqlite3 *db,
+    GError **error
+)
+{
+    static const char *required_tables[] = {
+        "installation", "conversations", "conversation_repositories",
+        "messages", "citations", "message_charts", "chart_series"
+    };
+    gint64 application_id = 0;
+    gint64 user_version = 0;
+    for (gsize i = 0; i < G_N_ELEMENTS (required_tables); i++) {
+        if (!required_table_exists (db, required_tables[i], error))
+            return FALSE;
+    }
+    if (!query_single_int64 (db, "PRAGMA application_id;", &application_id, error) ||
+        !query_single_int64 (db, "PRAGMA user_version;", &user_version, error))
+        return FALSE;
+    if (application_id != (gint64) ATM_CONVERSATION_STORE_APPLICATION_ID ||
+        user_version != ATM_CONVERSATION_STORE_SCHEMA_V5_VERSION) {
+        g_set_error_literal (error, ATM_CONVERSATION_STORE_ERROR,
+            ATM_CONVERSATION_STORE_ERROR_SCHEMA,
+            "Conversation-store v5 identity/version is invalid for migration.");
+        return FALSE;
+    }
+    char *schema_id = NULL;
+    if (!query_single_text (db,
+            "SELECT schema_id FROM installation WHERE singleton_id=1;",
+            &schema_id, error))
+        return FALSE;
+    gboolean schema_ok = g_strcmp0 (
+        schema_id, ATM_CONVERSATION_STORE_SCHEMA_V5_ID) == 0;
+    g_free (schema_id);
+    if (!schema_ok) {
+        g_set_error_literal (error, ATM_CONVERSATION_STORE_ERROR,
+            ATM_CONVERSATION_STORE_ERROR_SCHEMA,
+            "Conversation-store v5 schema identity is invalid for migration.");
+        return FALSE;
+    }
+    return validate_integrity (db, error) &&
+        validate_base_semantics (db, error) &&
+        validate_chart_semantics (db, error);
+}
+
+static gboolean
+validate_v6_for_migration (
+    sqlite3 *db,
+    GError **error
+)
+{
+    static const char *required_tables[] = {
+        "installation", "conversations", "conversation_repositories",
+        "messages", "citations", "message_charts", "chart_series",
+        "chart_presentations_v4"
+    };
+    gint64 application_id = 0;
+    gint64 user_version = 0;
+    for (gsize i = 0; i < G_N_ELEMENTS (required_tables); i++) {
+        if (!required_table_exists (db, required_tables[i], error))
+            return FALSE;
+    }
+    if (!query_single_int64 (db, "PRAGMA application_id;", &application_id, error) ||
+        !query_single_int64 (db, "PRAGMA user_version;", &user_version, error))
+        return FALSE;
+    if (application_id != (gint64) ATM_CONVERSATION_STORE_APPLICATION_ID ||
+        user_version != ATM_CONVERSATION_STORE_SCHEMA_VERSION) {
+        g_set_error_literal (error, ATM_CONVERSATION_STORE_ERROR,
+            ATM_CONVERSATION_STORE_ERROR_SCHEMA,
+            "Conversation-store v6 identity/version is invalid for migration.");
+        return FALSE;
+    }
+    char *schema_id = NULL;
+    if (!query_single_text (db,
+            "SELECT schema_id FROM installation WHERE singleton_id=1;",
+            &schema_id, error))
+        return FALSE;
+    gboolean schema_ok = g_strcmp0 (
+        schema_id, ATM_CONVERSATION_STORE_SCHEMA_ID) == 0;
+    g_free (schema_id);
+    if (!schema_ok) {
+        g_set_error_literal (error, ATM_CONVERSATION_STORE_ERROR,
+            ATM_CONVERSATION_STORE_ERROR_SCHEMA,
+            "Conversation-store v6 schema identity is invalid for migration.");
+        return FALSE;
+    }
+    return validate_integrity (db, error) &&
+        validate_base_semantics (db, error) &&
+        validate_chart_semantics (db, error) &&
+        validate_chart_presentation_semantics (db, error);
+}
+
 
 static gboolean
 migrate_v1_to_v3 (
@@ -2925,6 +3072,55 @@ migrate_v4_to_v5 (
         goto rollback;
 
     char *version_sql = g_strdup_printf ("PRAGMA user_version=%d;",
+        ATM_CONVERSATION_STORE_SCHEMA_V5_VERSION);
+    if (!exec_sql (store->db, version_sql, error)) {
+        g_free (version_sql);
+        goto rollback;
+    }
+    g_free (version_sql);
+
+    if (!validate_v5_for_migration (store->db, error))
+        goto rollback;
+    if (!exec_sql (store->db, "COMMIT;", error))
+        goto rollback;
+
+    ok = TRUE;
+rollback:
+    if (!ok)
+        sqlite3_exec (store->db, "ROLLBACK;", NULL, NULL, NULL);
+    g_free (migration_sql);
+    return ok;
+}
+
+
+static gboolean
+migrate_v5_to_v6 (
+    AtmConversationStore *store,
+    GError **error
+)
+{
+    if (store == NULL || store->db == NULL) {
+        g_set_error_literal (error, ATM_CONVERSATION_STORE_ERROR,
+            ATM_CONVERSATION_STORE_ERROR_ARGUMENT,
+            "Conversation-store schema migration requires an open store.");
+        return FALSE;
+    }
+    if (!validate_v5_for_migration (store->db, error))
+        return FALSE;
+
+    char *migration_sql = NULL;
+    if (!load_migration_v5_v6_sql (&migration_sql, error))
+        return FALSE;
+    if (!exec_sql (store->db, "BEGIN IMMEDIATE;", error)) {
+        g_free (migration_sql);
+        return FALSE;
+    }
+
+    gboolean ok = FALSE;
+    if (!exec_sql (store->db, migration_sql, error))
+        goto rollback;
+
+    char *version_sql = g_strdup_printf ("PRAGMA user_version=%d;",
         ATM_CONVERSATION_STORE_SCHEMA_VERSION);
     if (!exec_sql (store->db, version_sql, error)) {
         g_free (version_sql);
@@ -2932,7 +3128,7 @@ migrate_v4_to_v5 (
     }
     g_free (version_sql);
 
-    if (!atm_conversation_store_validate (store, error))
+    if (!validate_v6_for_migration (store->db, error))
         goto rollback;
     if (!exec_sql (store->db, "COMMIT;", error))
         goto rollback;
@@ -3096,7 +3292,8 @@ atm_conversation_store_open (
     ) {
         if (!migrate_v1_to_v3 (store, error) ||
             !migrate_v3_to_v4 (store, error) ||
-            !migrate_v4_to_v5 (store, error)) {
+            !migrate_v4_to_v5 (store, error) ||
+            !migrate_v5_to_v6 (store, error)) {
             atm_conversation_store_close (store);
             return FALSE;
         }
@@ -3106,7 +3303,8 @@ atm_conversation_store_open (
     ) {
         if (!migrate_v2_to_v3 (store, error) ||
             !migrate_v3_to_v4 (store, error) ||
-            !migrate_v4_to_v5 (store, error)) {
+            !migrate_v4_to_v5 (store, error) ||
+            !migrate_v5_to_v6 (store, error)) {
             atm_conversation_store_close (store);
             return FALSE;
         }
@@ -3114,14 +3312,23 @@ atm_conversation_store_open (
         user_version == ATM_CONVERSATION_STORE_SCHEMA_V3_VERSION
     ) {
         if (!migrate_v3_to_v4 (store, error) ||
-            !migrate_v4_to_v5 (store, error)) {
+            !migrate_v4_to_v5 (store, error) ||
+            !migrate_v5_to_v6 (store, error)) {
             atm_conversation_store_close (store);
             return FALSE;
         }
     } else if (
         user_version == ATM_CONVERSATION_STORE_SCHEMA_V4_VERSION
     ) {
-        if (!migrate_v4_to_v5 (store, error)) {
+        if (!migrate_v4_to_v5 (store, error) ||
+            !migrate_v5_to_v6 (store, error)) {
+            atm_conversation_store_close (store);
+            return FALSE;
+        }
+    } else if (
+        user_version == ATM_CONVERSATION_STORE_SCHEMA_V5_VERSION
+    ) {
+        if (!migrate_v5_to_v6 (store, error)) {
             atm_conversation_store_close (store);
             return FALSE;
         }
