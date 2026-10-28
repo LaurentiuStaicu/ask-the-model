@@ -2722,6 +2722,42 @@ test_bnr_chart_recipe_v6_persistence (void)
         .series_count = 1,
         .presentation = &presentation
     };
+    /*
+     * Force the sidecar insert to fail after the source chart and series
+     * inserts. The combined attach must roll the entire transaction back.
+     */
+    raw_exec (path,
+        "CREATE TRIGGER fail_chart_presentation_insert "
+        "BEFORE INSERT ON chart_presentations_v4 "
+        "BEGIN SELECT RAISE(ABORT, 'injected sidecar insert failure'); END;");
+    g_assert_false (atm_conversation_store_attach_chart (
+        store, conversation_id, turn, &chart, &error));
+    g_assert_nonnull (error);
+    g_clear_error (&error);
+
+    char *chart_rows_sql = g_strdup_printf (
+        "SELECT count(*) FROM message_charts c "
+        "JOIN messages m ON m.message_id=c.message_id "
+        "WHERE m.conversation_id='%s' AND m.turn_no=0 AND m.role='assistant';",
+        conversation_id);
+    char *series_rows_sql = g_strdup_printf (
+        "SELECT count(*) FROM chart_series s "
+        "JOIN messages m ON m.message_id=s.message_id "
+        "WHERE m.conversation_id='%s' AND m.turn_no=0 AND m.role='assistant';",
+        conversation_id);
+    char *presentation_rows_sql = g_strdup_printf (
+        "SELECT count(*) FROM chart_presentations_v4 p "
+        "JOIN messages m ON m.message_id=p.message_id "
+        "WHERE m.conversation_id='%s' AND m.turn_no=0 AND m.role='assistant';",
+        conversation_id);
+    g_assert_cmpint (raw_int64 (path, chart_rows_sql), ==, 0);
+    g_assert_cmpint (raw_int64 (path, series_rows_sql), ==, 0);
+    g_assert_cmpint (raw_int64 (path, presentation_rows_sql), ==, 0);
+    g_free (chart_rows_sql);
+    g_free (series_rows_sql);
+    g_free (presentation_rows_sql);
+    raw_exec (path, "DROP TRIGGER fail_chart_presentation_insert;");
+
     g_assert_true (atm_conversation_store_attach_chart (
         store, conversation_id, turn, &chart, &error));
     g_assert_no_error (error);
