@@ -1,6 +1,7 @@
 #pragma once
 #include "chart_spec.h"
 #include "chart_spec_v4.h"
+#include "conversation_store.h"
 G_BEGIN_DECLS
 
 /* Reconstruct a persisted qualified GISTEMP chart from the pinned repository
@@ -125,6 +126,30 @@ gboolean atm_chart_live_reconstruct_v4 (
 gboolean atm_chart_wrap_qualified_spec_v4 (
     const char *series_id,
     const AtmChartSpec *qualified_source_spec,
+    AtmChartSpecV4 **out,
+    GError **error
+);
+
+
+/*
+ * Build the complete catalog-derived sidecar input for one qualified v4 spec.
+ * Returned string pointers are borrowed and remain valid while the spec lives.
+ */
+gboolean atm_chart_history_presentation_input_from_v4 (
+    const AtmChartSpecV4 *spec,
+    AtmConversationChartPresentationInput *out,
+    GError **error
+);
+
+/*
+ * Rebuild a v4 presentation from a source-specific spec already re-qualified
+ * from the pinned History snapshot, then compare every stored sidecar field
+ * and the semantic presentation ID before returning a renderable v4 spec.
+ */
+gboolean atm_chart_history_reconstruct_v4 (
+    const char *series_id,
+    const AtmChartSpec *qualified_source_spec,
+    const AtmConversationChartPresentationInput *persisted,
     AtmChartSpecV4 **out,
     GError **error
 );
