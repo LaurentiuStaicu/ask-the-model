@@ -9,9 +9,10 @@ G_BEGIN_DECLS
 #define ATM_CHART_SPEC_V4_ID_DOMAIN "atm.chart-spec.v4"
 
 /*
- * Catalog-bound generic ChartSpec envelope. This first v4 slice is deliberately
- * not a renderer, Application or History input. It wraps one independently
- * qualified v1/v2/v3 source spec and never accepts caller-authored point data.
+ * Catalog-bound generic ChartSpec envelope used for the live Chart/Data view
+ * and for rebuilding the optional History v4 presentation sidecar. It wraps
+ * one independently qualified v1/v2/v3 source spec and never accepts
+ * caller-authored point data or persisted numeric observations.
  */
 typedef struct AtmChartSpecV4 AtmChartSpecV4;
 
