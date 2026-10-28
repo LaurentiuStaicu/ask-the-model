@@ -752,6 +752,38 @@ test_live_reconstruct_v4_catalog_dispatch (void)
         atm_chart_spec_v4_source_spec (v4), 0), ==, ewd_initial);
     g_assert_cmpstr (atm_chart_spec_series_repository_id (
         atm_chart_spec_v4_source_spec (v4), 0), ==, "ewd");
+
+    AtmConversationChartPresentationInput stored_presentation = {0};
+    g_assert_true (atm_chart_history_presentation_input_from_v4 (
+        v4, &stored_presentation, &error));
+    g_assert_no_error (error);
+    g_assert_cmpstr (stored_presentation.presentation_spec_id, ==,
+                     atm_chart_spec_v4_id (v4));
+    g_assert_cmpstr (stored_presentation.source_chart_schema, ==,
+                     ATM_CHART_SPEC_SCHEMA);
+    g_assert_cmpstr (stored_presentation.source_chart_spec_id, ==,
+                     atm_chart_spec_id (atm_chart_spec_v4_source_spec (v4)));
+
+    AtmChartSpecV4 *reopened_v4 = NULL;
+    g_assert_true (atm_chart_history_reconstruct_v4 (
+        gistemp_id, atm_chart_spec_v4_source_spec (v4),
+        &stored_presentation, &reopened_v4, &error));
+    g_assert_no_error (error);
+    g_assert_cmpstr (atm_chart_spec_v4_id (reopened_v4), ==,
+                     atm_chart_spec_v4_id (v4));
+    atm_chart_spec_v4_free (reopened_v4);
+
+    AtmConversationChartPresentationInput tampered_presentation =
+        stored_presentation;
+    tampered_presentation.presentation_spec_id =
+        "0000000000000000000000000000000000000000000000000000000000000000";
+    g_assert_false (atm_chart_history_reconstruct_v4 (
+        gistemp_id, atm_chart_spec_v4_source_spec (v4),
+        &tampered_presentation, &reopened_v4, &error));
+    g_assert_error (error, ATM_SRA_ERROR, ATM_SRA_ERROR_IDENTITY);
+    g_assert_null (reopened_v4);
+    g_clear_error (&error);
+
     atm_chart_spec_v4_free (v4);
     v4 = NULL;
 
