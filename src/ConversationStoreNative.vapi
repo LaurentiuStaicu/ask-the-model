@@ -390,7 +390,7 @@ namespace AskTheModel.ConversationStoreNative {
     );
 
     [CCode (cname = "atm_conversation_snapshot_chart_presentation_sidecar_schema_at")]
-    public static unowned string? snapshot_chart_presentation_sidecar_schema _at (
+    public static unowned string? snapshot_chart_presentation_sidecar_schema_at (
         ConversationSnapshot snapshot,
         uint message_index,
         uint chart_index
@@ -404,175 +404,175 @@ namespace AskTheModel.ConversationStoreNative {
     );
 
     [CCode (cname = "atm_conversation_snapshot_chart_presentation_series_id_at")]
-    public static unowned string? snapshot_chart_presentation_series_id _at (
+    public static unowned string? snapshot_chart_presentation_series_id_at (
         ConversationSnapshot snapshot,
         uint message_index,
         uint chart_index
     );
 
     [CCode (cname = "atm_conversation_snapshot_chart_presentation_catalog_schema_at")]
-    public static unowned string? snapshot_chart_presentation_catalog_schema _at (
+    public static unowned string? snapshot_chart_presentation_catalog_schema_at (
         ConversationSnapshot snapshot,
         uint message_index,
         uint chart_index
     );
 
     [CCode (cname = "atm_conversation_snapshot_chart_presentation_adapter_id_at")]
-    public static unowned string? snapshot_chart_presentation_adapter_id _at (
+    public static unowned string? snapshot_chart_presentation_adapter_id_at (
         ConversationSnapshot snapshot,
         uint message_index,
         uint chart_index
     );
 
     [CCode (cname = "atm_conversation_snapshot_chart_presentation_series_profile_id_at")]
-    public static unowned string? snapshot_chart_presentation_series_profile_id _at (
+    public static unowned string? snapshot_chart_presentation_series_profile_id_at (
         ConversationSnapshot snapshot,
         uint message_index,
         uint chart_index
     );
 
     [CCode (cname = "atm_conversation_snapshot_chart_presentation_series_profile_version_at")]
-    public static unowned string? snapshot_chart_presentation_series_profile_version _at (
+    public static unowned string? snapshot_chart_presentation_series_profile_version_at (
         ConversationSnapshot snapshot,
         uint message_index,
         uint chart_index
     );
 
     [CCode (cname = "atm_conversation_snapshot_chart_presentation_admission_profile_id_at")]
-    public static unowned string? snapshot_chart_presentation_admission_profile_id _at (
+    public static unowned string? snapshot_chart_presentation_admission_profile_id_at (
         ConversationSnapshot snapshot,
         uint message_index,
         uint chart_index
     );
 
     [CCode (cname = "atm_conversation_snapshot_chart_presentation_admission_profile_version_at")]
-    public static unowned string? snapshot_chart_presentation_admission_profile_version _at (
+    public static unowned string? snapshot_chart_presentation_admission_profile_version_at (
         ConversationSnapshot snapshot,
         uint message_index,
         uint chart_index
     );
 
     [CCode (cname = "atm_conversation_snapshot_chart_presentation_reconstruction_profile_id_at")]
-    public static unowned string? snapshot_chart_presentation_reconstruction_profile_id _at (
+    public static unowned string? snapshot_chart_presentation_reconstruction_profile_id_at (
         ConversationSnapshot snapshot,
         uint message_index,
         uint chart_index
     );
 
     [CCode (cname = "atm_conversation_snapshot_chart_presentation_source_chart_schema_at")]
-    public static unowned string? snapshot_chart_presentation_source_chart_schema _at (
+    public static unowned string? snapshot_chart_presentation_source_chart_schema_at (
         ConversationSnapshot snapshot,
         uint message_index,
         uint chart_index
     );
 
     [CCode (cname = "atm_conversation_snapshot_chart_presentation_source_chart_spec_id_at")]
-    public static unowned string? snapshot_chart_presentation_source_chart_spec_id _at (
+    public static unowned string? snapshot_chart_presentation_source_chart_spec_id_at (
         ConversationSnapshot snapshot,
         uint message_index,
         uint chart_index
     );
 
     [CCode (cname = "atm_conversation_snapshot_chart_presentation_x_coordinate_semantics_at")]
-    public static unowned string? snapshot_chart_presentation_x_coordinate_semantics _at (
+    public static unowned string? snapshot_chart_presentation_x_coordinate_semantics_at (
         ConversationSnapshot snapshot,
         uint message_index,
         uint chart_index
     );
 
     [CCode (cname = "atm_conversation_snapshot_chart_presentation_x_frequency_at")]
-    public static unowned string? snapshot_chart_presentation_x_frequency _at (
+    public static unowned string? snapshot_chart_presentation_x_frequency_at (
         ConversationSnapshot snapshot,
         uint message_index,
         uint chart_index
     );
 
     [CCode (cname = "atm_conversation_snapshot_chart_presentation_x_unit_at")]
-    public static unowned string? snapshot_chart_presentation_x_unit _at (
+    public static unowned string? snapshot_chart_presentation_x_unit_at (
         ConversationSnapshot snapshot,
         uint message_index,
         uint chart_index
     );
 
     [CCode (cname = "atm_conversation_snapshot_chart_presentation_x_dimension_at")]
-    public static unowned string? snapshot_chart_presentation_x_dimension _at (
+    public static unowned string? snapshot_chart_presentation_x_dimension_at (
         ConversationSnapshot snapshot,
         uint message_index,
         uint chart_index
     );
 
     [CCode (cname = "atm_conversation_snapshot_chart_presentation_subject_at")]
-    public static unowned string? snapshot_chart_presentation_subject _at (
+    public static unowned string? snapshot_chart_presentation_subject_at (
         ConversationSnapshot snapshot,
         uint message_index,
         uint chart_index
     );
 
     [CCode (cname = "atm_conversation_snapshot_chart_presentation_attribute_at")]
-    public static unowned string? snapshot_chart_presentation_attribute _at (
+    public static unowned string? snapshot_chart_presentation_attribute_at (
         ConversationSnapshot snapshot,
         uint message_index,
         uint chart_index
     );
 
     [CCode (cname = "atm_conversation_snapshot_chart_presentation_y_unit_at")]
-    public static unowned string? snapshot_chart_presentation_y_unit _at (
+    public static unowned string? snapshot_chart_presentation_y_unit_at (
         ConversationSnapshot snapshot,
         uint message_index,
         uint chart_index
     );
 
     [CCode (cname = "atm_conversation_snapshot_chart_presentation_y_dimension_at")]
-    public static unowned string? snapshot_chart_presentation_y_dimension _at (
+    public static unowned string? snapshot_chart_presentation_y_dimension_at (
         ConversationSnapshot snapshot,
         uint message_index,
         uint chart_index
     );
 
     [CCode (cname = "atm_conversation_snapshot_chart_presentation_series_semantics_at")]
-    public static unowned string? snapshot_chart_presentation_series_semantics _at (
+    public static unowned string? snapshot_chart_presentation_series_semantics_at (
         ConversationSnapshot snapshot,
         uint message_index,
         uint chart_index
     );
 
     [CCode (cname = "atm_conversation_snapshot_chart_presentation_missing_policy_at")]
-    public static unowned string? snapshot_chart_presentation_missing_policy _at (
+    public static unowned string? snapshot_chart_presentation_missing_policy_at (
         ConversationSnapshot snapshot,
         uint message_index,
         uint chart_index
     );
 
     [CCode (cname = "atm_conversation_snapshot_chart_presentation_missing_coordinate_at")]
-    public static unowned string? snapshot_chart_presentation_missing_coordinate _at (
+    public static unowned string? snapshot_chart_presentation_missing_coordinate_at (
         ConversationSnapshot snapshot,
         uint message_index,
         uint chart_index
     );
 
     [CCode (cname = "atm_conversation_snapshot_chart_presentation_missing_reason_at")]
-    public static unowned string? snapshot_chart_presentation_missing_reason _at (
+    public static unowned string? snapshot_chart_presentation_missing_reason_at (
         ConversationSnapshot snapshot,
         uint message_index,
         uint chart_index
     );
 
     [CCode (cname = "atm_conversation_snapshot_chart_presentation_display_profile_id_at")]
-    public static unowned string? snapshot_chart_presentation_display_profile_id _at (
+    public static unowned string? snapshot_chart_presentation_display_profile_id_at (
         ConversationSnapshot snapshot,
         uint message_index,
         uint chart_index
     );
 
     [CCode (cname = "atm_conversation_snapshot_chart_presentation_display_profile_version_at")]
-    public static unowned string? snapshot_chart_presentation_display_profile_version _at (
+    public static unowned string? snapshot_chart_presentation_display_profile_version_at (
         ConversationSnapshot snapshot,
         uint message_index,
         uint chart_index
     );
 
     [CCode (cname = "atm_conversation_snapshot_chart_presentation_render_contract_at")]
-    public static unowned string? snapshot_chart_presentation_render_contract _at (
+    public static unowned string? snapshot_chart_presentation_render_contract_at (
         ConversationSnapshot snapshot,
         uint message_index,
         uint chart_index
