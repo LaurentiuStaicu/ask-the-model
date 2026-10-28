@@ -1331,6 +1331,17 @@ namespace AskTheModel {
                             );
                     }
 
+                    if ((presentation_marker == "atm-chart-spec/4") !=
+                            (presentation != null) ||
+                        (presentation_marker != null &&
+                            presentation_marker != "atm-chart-spec/4") ||
+                        (presentation != null &&
+                            presentation.presentation_schema != presentation_marker)) {
+                        throw new GLib.IOError.INVALID_DATA (
+                            "History chart presentation marker and sidecar are inconsistent."
+                        );
+                    }
+
                     charts +=
                         new ConversationPersistenceChart (
                             ConversationStoreNative.snapshot_chart_ordinal_at (
