@@ -3113,7 +3113,9 @@ chart_history_reconstruct_test = executable(
   dependencies: [glib_dep, gio_dep, json_glib_dep],
   install: false
 )
+# Catalog-derived v4 sidecar parity and per-field tamper tests make this path longer.
 test('chart-history-reconstruct', chart_history_reconstruct_test,
+  timeout: 90,
   env: {
     'ATM_CHART01_FIXTURE': meson.current_source_dir() / 'tests/fixtures/chart01',
     'ATM_BNR_BLS_FIXTURE': meson.current_source_dir() / 'tests/fixtures/chart01/rmd-bnr-bls'
