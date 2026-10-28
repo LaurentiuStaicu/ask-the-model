@@ -4184,7 +4184,7 @@ namespace AskTheModel {
                                 live_chart_widgets = {};
                                 live_charts = {};
                                 stderr.printf (
-                                    "AtM: committed answer retained; chart History attachment failed: %s\\n",
+                                    "AtM: committed answer retained; chart History attachment failed: %s\n",
                                     chart_persistence_error.message
                                 );
                             }
