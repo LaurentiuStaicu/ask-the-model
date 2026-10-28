@@ -7,11 +7,13 @@
 #include <string.h>
 
 #define ATM_CONVERSATION_STORE_SCHEMA_RESOURCE \
-    "/io/github/laurentiustaicu/ask_the_model/schemas/conversation-store-v5.sql"
+    "/io/github/laurentiustaicu/ask_the_model/schemas/conversation-store-v6.sql"
 #define ATM_CONVERSATION_STORE_MIGRATION_V3_V4_RESOURCE \
     "/io/github/laurentiustaicu/ask_the_model/schemas/conversation-store-v3-to-v4.sql"
 #define ATM_CONVERSATION_STORE_MIGRATION_V4_V5_RESOURCE \
     "/io/github/laurentiustaicu/ask_the_model/schemas/conversation-store-v4-to-v5.sql"
+#define ATM_CONVERSATION_STORE_MIGRATION_V5_V6_RESOURCE \
+    "/io/github/laurentiustaicu/ask_the_model/schemas/conversation-store-v5-to-v6.sql"
 #define ATM_CONVERSATION_STORE_MIGRATION_V1_V2_RESOURCE \
     "/io/github/laurentiustaicu/ask_the_model/schemas/conversation-store-v1-to-v2.sql"
 #define ATM_CONVERSATION_STORE_MIGRATION_V2_V3_RESOURCE \
@@ -24,6 +26,10 @@
 #define ATM_CONVERSATION_STORE_SCHEMA_V3_VERSION 3
 #define ATM_CONVERSATION_STORE_SCHEMA_V4_ID "atm-conversation-store/4"
 #define ATM_CONVERSATION_STORE_SCHEMA_V4_VERSION 4
+#define ATM_CONVERSATION_STORE_SCHEMA_V5_ID "atm-conversation-store/5"
+#define ATM_CONVERSATION_STORE_SCHEMA_V5_VERSION 5
+#define ATM_CONVERSATION_STORE_SCHEMA_V6_ID "atm-conversation-store/6"
+#define ATM_CONVERSATION_STORE_SCHEMA_V6_VERSION 6
 
 struct AtmConversationStore {
     sqlite3 *db;
@@ -449,6 +455,20 @@ load_migration_v4_v5_sql (
     return load_sql_resource (
         ATM_CONVERSATION_STORE_MIGRATION_V4_V5_RESOURCE,
         "v4-to-v5 migration",
+        out_sql,
+        error
+    );
+}
+
+static gboolean
+load_migration_v5_v6_sql (
+    char **out_sql,
+    GError **error
+)
+{
+    return load_sql_resource (
+        ATM_CONVERSATION_STORE_MIGRATION_V5_V6_RESOURCE,
+        "v5-to-v6 migration",
         out_sql,
         error
     );
