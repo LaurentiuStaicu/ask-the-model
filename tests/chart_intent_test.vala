@@ -558,6 +558,35 @@ int main () {
         "banking.bnr.bls-c01.credit-standards-net-percentage");
     assert (bnr_source_prefixed_subject_romanian.intent == "chart");
 
+    /*
+     * A registered alias before the chart noun must not authorize an
+     * unrelated subject added after the noun. Keep common reviewed modifiers.
+     */
+    var source_prefixed_chart_over_time = AskTheModel.ChartIntent.parse (
+        "Generate a GISTEMP chart over time."
+    );
+    assert (source_prefixed_chart_over_time.series_id ==
+        "climate.gistemp.global-temperature-anomaly");
+    assert (source_prefixed_chart_over_time.intent == "chart");
+
+    var gistemp_chart_with_unrelated_subject = AskTheModel.ChartIntent.parse (
+        "Generate a GISTEMP chart with diabetes prevalence."
+    );
+    assert (gistemp_chart_with_unrelated_subject.series_id == null);
+    assert (gistemp_chart_with_unrelated_subject.intent == "ambiguous");
+
+    var ei_chart_with_unrelated_subject = AskTheModel.ChartIntent.parse (
+        "Generate an Energy Institute total energy supply chart with diabetes prevalence."
+    );
+    assert (ei_chart_with_unrelated_subject.series_id == null);
+    assert (ei_chart_with_unrelated_subject.intent == "ambiguous");
+
+    var bnr_chart_with_unrelated_subject = AskTheModel.ChartIntent.parse (
+        "Generate a BNR credit standards chart with malaria prevalence."
+    );
+    assert (bnr_chart_with_unrelated_subject.series_id == null);
+    assert (bnr_chart_with_unrelated_subject.intent == "ambiguous");
+
     var unsupported_pie_chart = AskTheModel.ChartIntent.parse (
         "Generate a pie chart of global temperature anomalies."
     );
