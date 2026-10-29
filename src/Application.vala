@@ -3465,8 +3465,14 @@ namespace AskTheModel {
                         chart.presentation;
                     ChartNative.PresentationInput native_presentation =
                         persisted_presentation.to_native ();
+                    if (persisted_presentation.series_id == null ||
+                        persisted_presentation.series_id == "") {
+                        throw new GLib.IOError.INVALID_DATA (
+                            "Persisted History v4 presentation has no catalog series identity."
+                        );
+                    }
                     if (!ChartNative.reconstruct_history_v4 (
-                            history_series_id,
+                            persisted_presentation.series_id,
                             spec,
                             ref native_presentation,
                             out history_spec_v4)) {
