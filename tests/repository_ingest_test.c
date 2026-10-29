@@ -64,29 +64,12 @@ new_temp_root (void)
 }
 
 static void
-write_archive (
+write_archive_entries (
     const char *archive_path,
-    const char *manifest
+    const FixtureEntry *entries,
+    gsize entry_count
 )
 {
-    const FixtureEntry entries[] = {
-        { "repo-sha/", NULL, AE_IFDIR },
-        { "repo-sha/.atm/", NULL, AE_IFDIR },
-        { "repo-sha/.atm/repository.json", manifest, AE_IFREG },
-        {
-            "repo-sha/CITATION.cff",
-            "cff-version: 1.2.0\n"
-            "message: cite this\n"
-            "type: software\n"
-            "title: Test repository\n"
-            "version: 0.1.0\n",
-            AE_IFREG
-        },
-        { "repo-sha/STATUS.md", "# Status\n", AE_IFREG },
-        { "repo-sha/README.md", "# Readme\n", AE_IFREG },
-        { "repo-sha/model/", NULL, AE_IFDIR },
-        { "repo-sha/model/core.json", "{}\n", AE_IFREG }
-    };
     struct archive *writer = archive_write_new ();
 
     g_assert_nonnull (writer);
@@ -106,7 +89,7 @@ write_archive (
         ARCHIVE_OK
     );
 
-    for (gsize i = 0; i < G_N_ELEMENTS (entries); i++) {
+    for (gsize i = 0; i < entry_count; i++) {
         const FixtureEntry *fixture = &entries[i];
         struct archive_entry *entry = archive_entry_new ();
         gsize length =
@@ -153,6 +136,37 @@ write_archive (
         archive_write_free (writer),
         ==,
         ARCHIVE_OK
+    );
+}
+
+static void
+write_archive (
+    const char *archive_path,
+    const char *manifest
+)
+{
+    const FixtureEntry entries[] = {
+        { "repo-sha/", NULL, AE_IFDIR },
+        { "repo-sha/.atm/", NULL, AE_IFDIR },
+        { "repo-sha/.atm/repository.json", manifest, AE_IFREG },
+        {
+            "repo-sha/CITATION.cff",
+            "cff-version: 1.2.0\n"
+            "message: cite this\n"
+            "type: software\n"
+            "title: Test repository\n"
+            "version: 0.1.0\n",
+            AE_IFREG
+        },
+        { "repo-sha/STATUS.md", "# Status\n", AE_IFREG },
+        { "repo-sha/README.md", "# Readme\n", AE_IFREG },
+        { "repo-sha/model/", NULL, AE_IFDIR },
+        { "repo-sha/model/core.json", "{}\n", AE_IFREG }
+    };
+    write_archive_entries (
+        archive_path,
+        entries,
+        G_N_ELEMENTS (entries)
     );
 }
 
