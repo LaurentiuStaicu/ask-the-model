@@ -16,6 +16,39 @@ G_BEGIN_DECLS
  */
 typedef struct AtmChartSpecV4 AtmChartSpecV4;
 
+/* Pure chart-domain value tuple for catalog-derived History presentation metadata.
+ * Shared with persistence without importing the conversation-store layer. */
+typedef struct {
+    const char *presentation_schema;
+    const char *presentation_spec_id;
+    const char *series_id;
+    const char *catalog_schema;
+    const char *adapter_id;
+    const char *series_profile_id;
+    const char *series_profile_version;
+    const char *admission_profile_id;
+    const char *admission_profile_version;
+    const char *reconstruction_profile_id;
+    const char *source_chart_schema;
+    const char *source_chart_spec_id;
+    const char *x_coordinate_semantics;
+    const char *x_frequency;
+    const char *x_unit;
+    const char *x_dimension;
+    const char *subject;
+    const char *attribute;
+    const char *y_unit;
+    const char *y_dimension;
+    const char *series_semantics;
+    const char *missing_policy;
+    const char *missing_coordinate;
+    const char *missing_reason;
+    const char *display_profile_id;
+    const char *display_profile_version;
+    const char *render_contract;
+} AtmConversationChartPresentationInput;
+
+
 typedef enum {
     ATM_CHART_SPEC_V4_ERROR_ARGUMENT,
     ATM_CHART_SPEC_V4_ERROR_CATALOG,
