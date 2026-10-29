@@ -994,6 +994,126 @@ test_builtin_compatibility_overlay_is_sha_bound_and_sealed (void)
 }
 
 static void
+test_historical_ewd_overlay_is_applied_by_ingest (void)
+{
+    const char *historical_sha =
+        "d9e249339663015f6d1c05752338a955bf64ad0b";
+    const FixtureEntry entries[] = {
+        { "repo-sha/", NULL, AE_IFDIR },
+        { "repo-sha/CITATION.cff",
+          "cff-version: 1.2.0\nmessage: cite this\ntype: software\n"
+          "title: Empirical World3 Dynamics\nversion: 0.1.0\n",
+          AE_IFREG },
+        { "repo-sha/STATUS.md", "# Historical EWD status\n", AE_IFREG },
+        { "repo-sha/README.md", "# Historical EWD\n", AE_IFREG },
+        { "repo-sha/science/", NULL, AE_IFDIR },
+        { "repo-sha/science/configs/", NULL, AE_IFDIR },
+        { "repo-sha/science/configs/real_model_structure.json", "{}\n", AE_IFREG },
+        { "repo-sha/science/data/", NULL, AE_IFDIR },
+        { "repo-sha/science/data/registry.csv", "id\n", AE_IFREG },
+        { "repo-sha/science/data/processed/", NULL, AE_IFDIR },
+        { "repo-sha/science/data/experiments/", NULL, AE_IFDIR },
+        { "repo-sha/science/data/forecasts/", NULL, AE_IFDIR },
+        { "repo-sha/science/src/", NULL, AE_IFDIR },
+        { "repo-sha/science/src/world3_empirical/", NULL, AE_IFDIR },
+        { "repo-sha/science/src/world3_empirical/real_model_contract.py", "# fixture\n", AE_IFREG },
+        { "repo-sha/science/src/world3_empirical/model.py", "# fixture\n", AE_IFREG },
+        { "repo-sha/science/src/world3_empirical/world3_03.py", "# fixture\n", AE_IFREG },
+        { "repo-sha/science/scripts/", NULL, AE_IFDIR },
+        { "repo-sha/data/", NULL, AE_IFDIR },
+        { "repo-sha/data/scenarios/", NULL, AE_IFDIR },
+        { "repo-sha/data/scenarios/bau_hybrid_2026_manifest.json", "{}\n", AE_IFREG },
+        { "repo-sha/data/scenarios/fit_diagnostics.csv", "id\n", AE_IFREG },
+        { "repo-sha/data/scenarios/backtest_2019_latest.csv", "id\n", AE_IFREG },
+        { "repo-sha/data/scenarios/backtest_multi_origin.csv", "id\n", AE_IFREG },
+        { "repo-sha/data/scenarios/parameter_identifiability.csv", "id\n", AE_IFREG },
+        { "repo-sha/data/scenarios/candidate_ranking.csv", "id\n", AE_IFREG },
+        { "repo-sha/data/scenarios/validation_candidate_ranking.csv", "id\n", AE_IFREG }
+    };
+
+    char *root = new_temp_root ();
+    char *data_root = g_build_filename (root, "data", NULL);
+    char *archive_path = g_build_filename (
+        root, "historical-ewd-without-atm.tar.gz", NULL);
+    char *version = NULL;
+    char *snapshot_path = NULL;
+    char *manifest_path = NULL;
+    char *receipt_path = NULL;
+    char *manifest = NULL;
+    char *receipt = NULL;
+    char *seal = NULL;
+    guint64 entries_written = 0;
+    guint64 total_bytes = 0;
+    guint64 sealed_files = 0;
+    guint64 sealed_bytes = 0;
+    GError *error = NULL;
+    gsize manifest_length = 0;
+    gsize receipt_length = 0;
+
+    /* This synthetic archive deliberately has no upstream .atm directory.
+     * It exercises the production ingest seam; the separate PRES-09 E2E
+     * uses the complete upstream tree for the same exact historical pin. */
+    write_archive_entries (
+        archive_path,
+        entries,
+        G_N_ELEMENTS (entries)
+    );
+
+    g_assert_true (atm_repository_ingest_archive (
+        data_root,
+        archive_path,
+        "ewd",
+        "EWD",
+        "Empirical World3 Dynamics",
+        historical_sha,
+        &version,
+        &snapshot_path,
+        &entries_written,
+        &total_bytes,
+        &error
+    ));
+    g_assert_no_error (error);
+    g_assert_cmpstr (version, ==, "0.1.0");
+    g_assert_nonnull (snapshot_path);
+    g_assert_true (g_file_test (snapshot_path, G_FILE_TEST_IS_DIR));
+    g_assert_cmpuint (entries_written, ==, G_N_ELEMENTS (entries));
+    g_assert_cmpuint (total_bytes, >, 0);
+
+    manifest_path = g_build_filename (
+        snapshot_path, ".atm", "repository.json", NULL);
+    receipt_path = g_build_filename (
+        snapshot_path, ".atm", "compatibility-overlay.json", NULL);
+    g_assert_true (g_file_get_contents (
+        manifest_path, &manifest, &manifest_length, &error));
+    g_assert_no_error (error);
+    g_assert_true (g_file_get_contents (
+        receipt_path, &receipt, &receipt_length, &error));
+    g_assert_no_error (error);
+    g_assert_nonnull (strstr (manifest, "\"repository_id\": \"ewd\""));
+    g_assert_nonnull (strstr (receipt, "atm-ewd-d9e249-manifest-overlay/1"));
+    g_assert_nonnull (strstr (receipt, historical_sha));
+
+    g_assert_true (atm_snapshot_seal_compute (
+        snapshot_path, &seal, &sealed_files, &sealed_bytes, &error));
+    g_assert_no_error (error);
+    g_assert_cmpuint (sealed_files, >, G_N_ELEMENTS (entries));
+    g_assert_cmpuint (sealed_bytes, >, total_bytes);
+
+    g_free (seal);
+    g_free (receipt);
+    g_free (manifest);
+    g_free (receipt_path);
+    g_free (manifest_path);
+    g_free (snapshot_path);
+    g_free (version);
+    g_free (archive_path);
+    g_free (data_root);
+    remove_tree_best_effort (root);
+    g_free (root);
+}
+
+
+static void
 test_production_limits (void)
 {
     g_assert_cmpuint (ATM_INGEST_MAX_ENTRIES, ==, 10000);
@@ -1053,6 +1173,10 @@ main (int argc, char **argv)
     g_test_add_func (
         "/ingest/builtin-compatibility-overlay-sha-bound",
         test_builtin_compatibility_overlay_is_sha_bound_and_sealed
+    );
+    g_test_add_func (
+        "/ingest/historical-ewd-overlay-through-ingest",
+        test_historical_ewd_overlay_is_applied_by_ingest
     );
     g_test_add_func (
         "/ingest/production-limits",
