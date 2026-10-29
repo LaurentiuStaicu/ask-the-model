@@ -53,7 +53,7 @@ static const AtmChartCatalogEntry entries[] = {
         .admission_profile_id = "atm-gistemp-pinned-admission/1",
         .admission_profile_version = "1",
         .reconstruction_profile_id = "atm-chart-reconstruct/gistemp-complete-annual/1",
-        .chart_spec_schema = "atm-chart-spec/1", .history_schema_version = "6",
+        .chart_spec_schema = "atm-chart-spec/1",
         .repository_key = "ewd",
         .repository_full_name = "LaurentiuStaicu/empirical-world3-dynamics",
         .snapshot_shas = ewd_snapshots, .snapshot_count = G_N_ELEMENTS (ewd_snapshots),
@@ -91,7 +91,7 @@ static const AtmChartCatalogEntry entries[] = {
         .admission_profile_id = "atm-energy-institute-pinned-admission/3",
         .admission_profile_version = "3",
         .reconstruction_profile_id = "atm-chart-reconstruct/energy-institute-tes-complete-annual/1",
-        .chart_spec_schema = "atm-chart-spec/2", .history_schema_version = "6",
+        .chart_spec_schema = "atm-chart-spec/2",
         .repository_key = "ewd",
         .repository_full_name = "LaurentiuStaicu/empirical-world3-dynamics",
         .snapshot_shas = ewd_snapshots, .snapshot_count = G_N_ELEMENTS (ewd_snapshots),
@@ -129,7 +129,7 @@ static const AtmChartCatalogEntry entries[] = {
         .admission_profile_id = "atm-bnr-bls-canonical-panel-admission/1",
         .admission_profile_version = "1",
         .reconstruction_profile_id = "atm-chart-reconstruct/bnr-bls-c01-calendar-quarter/1",
-        .chart_spec_schema = "atm-chart-spec/3", .history_schema_version = "6",
+        .chart_spec_schema = "atm-chart-spec/3",
         .repository_key = "rmd",
         .repository_full_name = "LaurentiuStaicu/romanian-monetary-dynamics",
         .snapshot_shas = rmd_snapshot, .snapshot_count = G_N_ELEMENTS (rmd_snapshot),
@@ -454,7 +454,6 @@ policy_matches (const AtmChartCatalogEntry *e, GError **error)
             !IS(e->admission_profile_version,"1") ||
             !IS(e->reconstruction_profile_id,"atm-chart-reconstruct/gistemp-complete-annual/1") ||
             !IS(e->chart_spec_schema,"atm-chart-spec/1") ||
-            !IS(e->history_schema_version,"6") ||
             !IS(e->repository_key,"ewd") ||
             !IS(e->repository_full_name,"LaurentiuStaicu/empirical-world3-dynamics") ||
             !IS(e->source_path,"science/data/processed/nasa_gistemp_global_2026.csv") ||
@@ -493,7 +492,6 @@ policy_matches (const AtmChartCatalogEntry *e, GError **error)
             !IS(e->admission_profile_version,"3") ||
             !IS(e->reconstruction_profile_id,"atm-chart-reconstruct/energy-institute-tes-complete-annual/1") ||
             !IS(e->chart_spec_schema,"atm-chart-spec/2") ||
-            !IS(e->history_schema_version,"6") ||
             !IS(e->repository_key,"ewd") ||
             !IS(e->repository_full_name,"LaurentiuStaicu/empirical-world3-dynamics") ||
             !IS(e->source_path,"science/data/processed/energy_institute_global_2026.csv") ||
@@ -531,7 +529,6 @@ policy_matches (const AtmChartCatalogEntry *e, GError **error)
             !IS(e->admission_profile_version,"1") ||
             !IS(e->reconstruction_profile_id,"atm-chart-reconstruct/bnr-bls-c01-calendar-quarter/1") ||
             !IS(e->chart_spec_schema,"atm-chart-spec/3") ||
-            !IS(e->history_schema_version,"6") ||
             !IS(e->repository_key,"rmd") ||
             !IS(e->repository_full_name,"LaurentiuStaicu/romanian-monetary-dynamics") ||
             !IS(e->source_path,"data/processed/bnr_bls_realised_rounds.csv") ||
@@ -577,7 +574,7 @@ atm_chart_catalog_validate (GError **error)
             e->series_profile_id, e->series_profile_version,
             e->admission_profile_id, e->admission_profile_version,
             e->reconstruction_profile_id, e->chart_spec_schema,
-            e->history_schema_version, e->repository_key, e->repository_full_name,
+            e->repository_key, e->repository_full_name,
             e->source_path, e->x_coordinate_semantics, e->x_frequency, e->x_unit,
             e->x_dimension, e->subject, e->attribute, e->y_unit, e->y_dimension,
             e->series_semantics, e->observation_meaning, e->geography,
