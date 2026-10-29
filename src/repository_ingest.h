@@ -24,6 +24,11 @@ GQuark atm_ingest_error_quark (void);
  * d9e249339663015f6d1c05752338a955bf64ad0b when .atm is wholly absent.
  * Other identities are no-ops; existing .atm content is never overwritten.
  * The overlay receipt is part of the local snapshot seal.
+ *
+ * This API writes metadata but does not itself fsync the snapshot tree.
+ * Standalone callers that require crash durability before validation/sealing
+ * must call atm_snapshot_durability_sync_tree(snapshot_root, error) after a
+ * successful application. Archive ingestion already performs that sync.
  */
 gboolean atm_repository_apply_builtin_compatibility_overlay (
     const char *snapshot_root,
