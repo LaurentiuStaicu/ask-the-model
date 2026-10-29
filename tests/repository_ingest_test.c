@@ -1050,6 +1050,13 @@ test_historical_ewd_overlay_is_applied_by_ingest (void)
     gsize manifest_length = 0;
     gsize receipt_length = 0;
 
+    guint64 source_file_entries = 0;
+    for (gsize i = 0; i < G_N_ELEMENTS (entries); i++) {
+        if (entries[i].filetype == AE_IFREG) {
+            source_file_entries++;
+        }
+    }
+
     /* This synthetic archive deliberately has no upstream .atm directory.
      * It exercises the production ingest seam; the separate PRES-09 E2E
      * uses the complete upstream tree for the same exact historical pin. */
@@ -1096,7 +1103,8 @@ test_historical_ewd_overlay_is_applied_by_ingest (void)
     g_assert_true (atm_snapshot_seal_compute (
         snapshot_path, &seal, &sealed_files, &sealed_bytes, &error));
     g_assert_no_error (error);
-    g_assert_cmpuint (sealed_files, >, G_N_ELEMENTS (entries));
+    /* The local seal contains each source file plus the manifest and receipt. */
+    g_assert_cmpuint (sealed_files, ==, source_file_entries + 2);
     g_assert_cmpuint (sealed_bytes, >, total_bytes);
 
     g_free (seal);
