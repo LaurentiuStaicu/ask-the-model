@@ -91,7 +91,7 @@ namespace AskTheModel.ConversationStoreNative {
         string repository_version,
         string snapshot_sha,
         string source_path,
-        ref ChartNative.PresentationInput presentation
+        ref ChartPresentationNative.PresentationInput presentation
     ) throws GLib.Error;
 
     [CCode (cname = "atm_conversation_store_update_title")]
