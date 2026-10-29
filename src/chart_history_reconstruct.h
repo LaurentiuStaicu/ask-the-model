@@ -1,7 +1,6 @@
 #pragma once
 #include "chart_spec.h"
 #include "chart_spec_v4.h"
-#include "conversation_store.h"
 G_BEGIN_DECLS
 
 /* Reconstruct a persisted qualified GISTEMP chart from the pinned repository
