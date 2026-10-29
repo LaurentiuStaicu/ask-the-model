@@ -86,7 +86,7 @@ static const char ATM_EWD_D9_MANIFEST[] =
     "    \"evidence\": [\"science/data/registry.csv\", \"science/data/processed\", \"science/data/experiments\", \"science/data/forecasts\", \"data/scenarios/fit_diagnostics.csv\", \"data/scenarios/backtest_2019_latest.csv\", \"data/scenarios/backtest_multi_origin.csv\", \"data/scenarios/parameter_identifiability.csv\", \"data/scenarios/candidate_ranking.csv\", \"data/scenarios/validation_candidate_ranking.csv\"],\n"
     "    \"tabular\": [\"data/scenarios\", \"science/data/processed\", \"science/data/experiments\"],\n"
     "    \"implementation\": [\"science/src/world3_empirical\", \"science/scripts\"],\n"
-    "    \"exclude\": [\".github\", \"__pycache__\"]\n"
+    "    \"exclude\": [\".github\", \"science/vendor\", \"science/data/raw\", \"__pycache__\"]\n"
     "  }\n"
     "}\n";
 
