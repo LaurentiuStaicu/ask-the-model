@@ -729,6 +729,82 @@ test_chart_binding_domain_export_bridge ()
             presentation.series_id
         );
         assert (
+            exported_presentation.get_string_member ("catalog_schema") ==
+            presentation.catalog_schema
+        );
+        assert (
+            exported_presentation.get_string_member ("adapter_id") ==
+            presentation.adapter_id
+        );
+        assert (
+            exported_presentation.get_string_member ("series_profile_id") ==
+            presentation.series_profile_id
+        );
+        assert (
+            exported_presentation.get_string_member ("series_profile_version") ==
+            presentation.series_profile_version
+        );
+        assert (
+            exported_presentation.get_string_member ("admission_profile_id") ==
+            presentation.admission_profile_id
+        );
+        assert (
+            exported_presentation.get_string_member ("admission_profile_version") ==
+            presentation.admission_profile_version
+        );
+        assert (
+            exported_presentation.get_string_member ("reconstruction_profile_id") ==
+            presentation.reconstruction_profile_id
+        );
+        assert (
+            exported_presentation.get_string_member ("x_coordinate_semantics") ==
+            presentation.x_coordinate_semantics
+        );
+        assert (
+            exported_presentation.get_string_member ("x_frequency") ==
+            presentation.x_frequency
+        );
+        assert (
+            exported_presentation.get_string_member ("x_unit") ==
+            presentation.x_unit
+        );
+        assert (
+            exported_presentation.get_string_member ("x_dimension") ==
+            presentation.x_dimension
+        );
+        assert (
+            exported_presentation.get_string_member ("subject") ==
+            presentation.subject
+        );
+        assert (
+            exported_presentation.get_string_member ("attribute") ==
+            presentation.attribute
+        );
+        assert (
+            exported_presentation.get_string_member ("y_unit") ==
+            presentation.y_unit
+        );
+        assert (
+            exported_presentation.get_string_member ("y_dimension") ==
+            presentation.y_dimension
+        );
+        assert (
+            exported_presentation.get_string_member ("series_semantics") ==
+            presentation.series_semantics
+        );
+        assert (
+            exported_presentation.get_string_member ("missing_policy") ==
+            presentation.missing_policy
+        );
+        assert (
+            exported_presentation.get_string_member ("display_profile_id") ==
+            presentation.display_profile_id
+        );
+        assert (
+            exported_presentation.get_string_member ("display_profile_version") ==
+            presentation.display_profile_version
+        );
+        assert (
             exported_presentation.get_string_member ("source_chart_schema") ==
             loaded_chart.chart_schema
         );
