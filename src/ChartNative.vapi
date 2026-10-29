@@ -38,8 +38,6 @@ namespace AskTheModel.ChartNative {
         public unowned string? admission_profile_id ();
         [CCode (cname = "atm_chart_spec_v4_reconstruction_profile_id")]
         public unowned string? reconstruction_profile_id ();
-        [CCode (cname = "atm_chart_spec_v4_history_schema_version")]
-        public unowned string? history_schema_version ();
     }
 
     [CCode (cname = "atm_chart_catalog_adapter_id_for_series")]
