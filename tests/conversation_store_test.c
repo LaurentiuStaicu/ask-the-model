@@ -2811,6 +2811,52 @@ test_bnr_chart_recipe_v6_persistence (void)
         snapshot, 1u, 0u), ==, "2025-Q2");
     g_assert_cmpstr (atm_conversation_snapshot_chart_presentation_missing_reason_at (
         snapshot, 1u, 0u), ==, "source_round_not_retained");
+
+    /* Round-trip every remaining persisted ChartSpec v4 sidecar claim. */
+    g_assert_cmpstr (atm_conversation_snapshot_chart_presentation_catalog_schema_at (
+        snapshot, 1u, 0u), ==, presentation.catalog_schema);
+    g_assert_cmpstr (atm_conversation_snapshot_chart_presentation_adapter_id_at (
+        snapshot, 1u, 0u), ==, presentation.adapter_id);
+    g_assert_cmpstr (atm_conversation_snapshot_chart_presentation_series_profile_id_at (
+        snapshot, 1u, 0u), ==, presentation.series_profile_id);
+    g_assert_cmpstr (atm_conversation_snapshot_chart_presentation_series_profile_version_at (
+        snapshot, 1u, 0u), ==, presentation.series_profile_version);
+    g_assert_cmpstr (atm_conversation_snapshot_chart_presentation_admission_profile_id_at (
+        snapshot, 1u, 0u), ==, presentation.admission_profile_id);
+    g_assert_cmpstr (atm_conversation_snapshot_chart_presentation_admission_profile_version_at (
+        snapshot, 1u, 0u), ==, presentation.admission_profile_version);
+    g_assert_cmpstr (atm_conversation_snapshot_chart_presentation_reconstruction_profile_id_at (
+        snapshot, 1u, 0u), ==, presentation.reconstruction_profile_id);
+    g_assert_cmpstr (atm_conversation_snapshot_chart_presentation_source_chart_schema_at (
+        snapshot, 1u, 0u), ==, presentation.source_chart_schema);
+    g_assert_cmpstr (atm_conversation_snapshot_chart_presentation_source_chart_spec_id_at (
+        snapshot, 1u, 0u), ==, presentation.source_chart_spec_id);
+    g_assert_cmpstr (atm_conversation_snapshot_chart_presentation_x_coordinate_semantics_at (
+        snapshot, 1u, 0u), ==, presentation.x_coordinate_semantics);
+    g_assert_cmpstr (atm_conversation_snapshot_chart_presentation_x_frequency_at (
+        snapshot, 1u, 0u), ==, presentation.x_frequency);
+    g_assert_cmpstr (atm_conversation_snapshot_chart_presentation_x_unit_at (
+        snapshot, 1u, 0u), ==, presentation.x_unit);
+    g_assert_cmpstr (atm_conversation_snapshot_chart_presentation_x_dimension_at (
+        snapshot, 1u, 0u), ==, presentation.x_dimension);
+    g_assert_cmpstr (atm_conversation_snapshot_chart_presentation_subject_at (
+        snapshot, 1u, 0u), ==, presentation.subject);
+    g_assert_cmpstr (atm_conversation_snapshot_chart_presentation_attribute_at (
+        snapshot, 1u, 0u), ==, presentation.attribute);
+    g_assert_cmpstr (atm_conversation_snapshot_chart_presentation_y_unit_at (
+        snapshot, 1u, 0u), ==, presentation.y_unit);
+    g_assert_cmpstr (atm_conversation_snapshot_chart_presentation_y_dimension_at (
+        snapshot, 1u, 0u), ==, presentation.y_dimension);
+    g_assert_cmpstr (atm_conversation_snapshot_chart_presentation_series_semantics_at (
+        snapshot, 1u, 0u), ==, presentation.series_semantics);
+    g_assert_cmpstr (atm_conversation_snapshot_chart_presentation_missing_policy_at (
+        snapshot, 1u, 0u), ==, presentation.missing_policy);
+    g_assert_cmpstr (atm_conversation_snapshot_chart_presentation_display_profile_id_at (
+        snapshot, 1u, 0u), ==, presentation.display_profile_id);
+    g_assert_cmpstr (atm_conversation_snapshot_chart_presentation_display_profile_version_at (
+        snapshot, 1u, 0u), ==, presentation.display_profile_version);
+    g_assert_cmpstr (atm_conversation_snapshot_chart_presentation_render_contract_at (
+        snapshot, 1u, 0u), ==, presentation.render_contract);
     atm_conversation_snapshot_free (snapshot);
 
     /* The relational invariant is enforced if a sidecar is deleted offline. */
