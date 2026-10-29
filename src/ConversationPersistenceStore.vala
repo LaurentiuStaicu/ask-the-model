@@ -218,7 +218,7 @@ namespace AskTheModel {
         }
 
         public static ConversationPersistenceChartPresentation from_native (
-            ref ChartNative.PresentationInput p
+            ref ChartPresentationNative.PresentationInput p
         ) throws GLib.Error {
             return new ConversationPersistenceChartPresentation (
                 require_presentation_text (p.presentation_schema, "schema"),
@@ -251,8 +251,8 @@ namespace AskTheModel {
             );
         }
 
-        public ChartNative.PresentationInput to_native () {
-            var p = new ChartNative.PresentationInput ();
+        public ChartPresentationNative.PresentationInput to_native () {
+            var p = new ChartPresentationNative.PresentationInput ();
             p.presentation_schema = presentation_schema;
             p.presentation_spec_id = presentation_spec_id;
             p.series_id = series_id;
@@ -1685,7 +1685,7 @@ namespace AskTheModel {
                     );
                 }
                 ConversationPersistenceChartPresentation p = chart.presentation;
-                var native_presentation = new ChartNative.PresentationInput ();
+                var native_presentation = new ChartPresentationNative.PresentationInput ();
                 native_presentation.presentation_schema = p.presentation_schema;
                 native_presentation.presentation_spec_id = p.presentation_spec_id;
                 native_presentation.series_id = p.series_id;
