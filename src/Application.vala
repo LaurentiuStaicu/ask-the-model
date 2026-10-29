@@ -3260,7 +3260,7 @@ namespace AskTheModel {
                 source_snapshot_sha,
                 source_path
             );
-            ConversationStoreNative.ChartPresentationInput native_presentation = {};
+            ChartNative.PresentationInput native_presentation = {};
             if (!ChartNative.history_presentation_input_from_v4 (
                     spec_v4, out native_presentation)) {
                 throw new GLib.IOError.INVALID_DATA (
@@ -3463,7 +3463,7 @@ namespace AskTheModel {
                            chart.presentation != null) {
                     ConversationPersistenceChartPresentation persisted_presentation =
                         chart.presentation;
-                    ConversationStoreNative.ChartPresentationInput native_presentation =
+                    ChartNative.PresentationInput native_presentation =
                         persisted_presentation.to_native ();
                     if (!ChartNative.reconstruct_history_v4 (
                             history_series_id,
