@@ -1014,6 +1014,10 @@ test_historical_ewd_overlay_is_applied_by_ingest (void)
         { "repo-sha/science/data/processed/", NULL, AE_IFDIR },
         { "repo-sha/science/data/experiments/", NULL, AE_IFDIR },
         { "repo-sha/science/data/forecasts/", NULL, AE_IFDIR },
+        { "repo-sha/science/data/raw/", NULL, AE_IFDIR },
+        { "repo-sha/science/data/raw/source.csv", "raw source\n", AE_IFREG },
+        { "repo-sha/science/vendor/", NULL, AE_IFDIR },
+        { "repo-sha/science/vendor/library.py", "# vendored code\n", AE_IFREG },
         { "repo-sha/science/src/", NULL, AE_IFDIR },
         { "repo-sha/science/src/world3_empirical/", NULL, AE_IFDIR },
         { "repo-sha/science/src/world3_empirical/real_model_contract.py", "# fixture\n", AE_IFREG },
@@ -1097,6 +1101,8 @@ test_historical_ewd_overlay_is_applied_by_ingest (void)
         receipt_path, &receipt, &receipt_length, &error));
     g_assert_no_error (error);
     g_assert_nonnull (strstr (manifest, "\"repository_id\": \"ewd\""));
+    g_assert_nonnull (strstr (manifest, "\"science/vendor\""));
+    g_assert_nonnull (strstr (manifest, "\"science/data/raw\""));
     g_assert_nonnull (strstr (receipt, "atm-ewd-d9e249-manifest-overlay/1"));
     g_assert_nonnull (strstr (receipt, historical_sha));
 
