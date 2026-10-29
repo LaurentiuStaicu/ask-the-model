@@ -107,7 +107,7 @@ namespace AskTheModel.ChartNative {
     public static bool reconstruct_history_v4 (
         string series_id,
         Spec qualified_source_spec,
-        ref ConversationStoreNative.ChartPresentationInput presentation,
+        ref PresentationInput presentation,
         out SpecV4 spec
     ) throws GLib.Error;
 
