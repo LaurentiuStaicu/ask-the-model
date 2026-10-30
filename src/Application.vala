@@ -5845,6 +5845,9 @@ namespace AskTheModel {
             int render_width = 0;
             int render_height = 0;
             int render_scale = 0;
+            int area_width = 0;
+            int area_height = 0;
+            view.test_area_size (out area_width, out area_height);
             view.test_render_size (
                 out render_width,
                 out render_height,
@@ -5890,10 +5893,12 @@ namespace AskTheModel {
                     pres09_test_resize_wait_ticks++;
                     if (pres09_test_resize_wait_ticks > 100) {
                         pres09_test_failure =
-                            "Shrinking the application window did not enter renderer fallback: renderer=%d×%d, window=%d×%d, transcript=%d×%d, chart-view=%d×%d"
+                            "Shrinking the application window did not enter renderer fallback: renderer=%d×%d, canvas=%d×%d, window=%d×%d, transcript=%d×%d, chart-view=%d×%d"
                             .printf (
                                 render_width,
                                 render_height,
+                                area_width,
+                                area_height,
                                 window.get_width (),
                                 window.get_height (),
                                 state.transcript_scroll.get_width (),
