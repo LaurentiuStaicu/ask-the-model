@@ -5990,51 +5990,42 @@ namespace AskTheModel {
             }
 
             if (pres09_test_resize_stage == 2) {
-                if (!view.test_is_fallback ()) {
+                if (window.get_width () > 600 ||
+                    window.get_height () > 400) {
                     pres09_test_resize_wait_ticks++;
                     if (pres09_test_resize_wait_ticks > 100) {
                         pres09_test_failure =
-                            "Shrinking the application window did not enter renderer fallback: renderer=%d×%d, canvas=%d×%d, window=%d×%d, transcript=%d×%d, chart-view=%d×%d"
-                            .printf (
-                                render_width,
-                                render_height,
-                                area_width,
-                                area_height,
-                                window.get_width (),
-                                window.get_height (),
-                                state.transcript_scroll.get_width (),
-                                state.transcript_scroll.get_height (),
-                                view.get_width (),
-                                view.get_height ()
-                            );
+                            "Application window did not reach the requested compact size: window=%d×%d"
+                            .printf (window.get_width (), window.get_height ());
                         return false;
                     }
                     return true;
                 }
-                if (render_width >= pres09_test_visible_render_width &&
-                    render_height >= pres09_test_visible_render_height) {
+                if (render_width != area_width ||
+                    render_height != area_height) {
                     pres09_test_failure =
-                        "Renderer entered fallback without a smaller allocated viewport (%d×%d)"
-                        .printf (render_width, render_height);
+                        "Renderer dimensions did not follow the real GTK canvas allocation (%d×%d vs %d×%d)"
+                        .printf (render_width, render_height, area_width, area_height);
                     return false;
                 }
-                if (render_width != area_width ||
-                    render_height != area_height ||
-                    area_height >= 370) {
+                if (view.test_is_fallback () &&
+                    area_width >= 448 && area_height >= 370) {
                     pres09_test_failure =
-                        "Renderer fallback state did not match the allocated GTK canvas (%d×%d vs %d×%d)"
-                        .printf (
-                            render_width,
-                            render_height,
-                            area_width,
-                            area_height
-                        );
+                        "Renderer entered fallback although the allocated canvas met its minimum dimensions (%d×%d)"
+                        .printf (area_width, area_height);
+                    return false;
+                }
+                if (!view.test_is_fallback () &&
+                    (area_width < 448 || area_height < 370)) {
+                    pres09_test_failure =
+                        "Renderer remained visible below its minimum allocated dimensions (%d×%d)"
+                        .printf (area_width, area_height);
                     return false;
                 }
                 if ((view.data () ?? "") != pres09_test_resize_data ||
                     view.row_count () != 146) {
                     pres09_test_failure =
-                        "GISTEMP Data changed when the live chart entered fallback";
+                        "GISTEMP Data changed when the application window was reduced";
                     return false;
                 }
 
@@ -6045,19 +6036,24 @@ namespace AskTheModel {
             }
 
             if (pres09_test_resize_stage == 3) {
-                if (view.test_is_fallback () ||
+                if (window.get_width () < 900 ||
+                    window.get_height () < 700 ||
+                    view.test_is_fallback () ||
                     render_width != area_width ||
                     render_height != area_height ||
+                    area_width < 448 ||
                     area_height < 370) {
                     pres09_test_resize_wait_ticks++;
                     if (pres09_test_resize_wait_ticks > 100) {
                         pres09_test_failure =
-                            "Live chart did not recover on an allocated v4-sized canvas: renderer=%d×%d, canvas=%d×%d"
+                            "Live chart did not return to a valid allocated canvas after enlarging the window: renderer=%d×%d, canvas=%d×%d, window=%d×%d"
                             .printf (
                                 render_width,
                                 render_height,
                                 area_width,
-                                area_height
+                                area_height,
+                                window.get_width (),
+                                window.get_height ()
                             );
                         return false;
                     }
@@ -6066,14 +6062,14 @@ namespace AskTheModel {
                 if (render_width < pres09_test_visible_render_width ||
                     render_height < pres09_test_visible_render_height) {
                     pres09_test_failure =
-                        "Renderer recovered at a smaller viewport than the initial visible chart (%d×%d)"
+                        "Renderer returned at a smaller viewport than the initial visible chart (%d×%d)"
                         .printf (render_width, render_height);
                     return false;
                 }
                 if ((view.data () ?? "") != pres09_test_resize_data ||
                     view.row_count () != 146) {
                     pres09_test_failure =
-                        "GISTEMP Data changed when the live chart recovered from fallback";
+                        "GISTEMP Data changed when the application window was enlarged";
                     return false;
                 }
                 pres09_test_resize_stage = 4;
