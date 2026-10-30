@@ -604,8 +604,12 @@ static void assert_transcript_anchor_resize (AtmChartView *view,
     settle ();
 
     GtkWidget *area = chart_drawing_area (view);
-    g_assert_cmpint (gtk_widget_get_width (area), >=, 480);
+    g_assert_cmpint (gtk_widget_get_width (area), >=, minimum_width);
     g_assert_cmpint (gtk_widget_get_height (area), >=, 370);
+    atm_chart_view_test_render_size (view, &width, &height, &scale);
+    g_assert_cmpint (width, ==, gtk_widget_get_width (area));
+    g_assert_cmpint (height, ==, gtk_widget_get_height (area));
+    g_assert_cmpint (scale, >=, 1);
     g_assert_false (atm_chart_view_test_is_fallback (view));
 
     char *data_before = g_strdup (atm_chart_view_data (view));
