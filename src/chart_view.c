@@ -700,4 +700,4 @@ gboolean atm_chart_view_test_is_fallback (AtmChartView *self)
 {
     return view_is_fallback (self);
 }
-undefined#endif
+#endif
