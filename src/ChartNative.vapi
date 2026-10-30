@@ -87,6 +87,14 @@ namespace AskTheModel.ChartNative {
         public uint selected_row ();
         /* chart_view.h: caller owns returned provenance. */
         public string? provenance ();
+        [CCode (cname = "atm_chart_view_test_is_fallback")]
+        public bool test_is_fallback ();
+        [CCode (cname = "atm_chart_view_test_render_size")]
+        public void test_render_size (
+            out int width,
+            out int height,
+            out int scale
+        );
     }
     [CCode (cname = "atm_chart_view_new")]
     public static bool create (Spec? spec, out View view) throws GLib.Error;
