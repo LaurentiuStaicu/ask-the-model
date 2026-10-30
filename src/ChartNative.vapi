@@ -95,6 +95,11 @@ namespace AskTheModel.ChartNative {
             out int height,
             out int scale
         );
+        [CCode (cname = "atm_chart_view_test_area_size")]
+        public void test_area_size (
+            out int width,
+            out int height
+        );
         [CCode (cname = "atm_chart_view_test_set_canvas_minimum")]
         public void test_set_canvas_minimum (int width, int height);
     }
