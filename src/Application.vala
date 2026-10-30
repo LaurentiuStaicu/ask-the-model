@@ -3248,9 +3248,9 @@ namespace AskTheModel {
             }
 
             /*
-             * Keep the current source-specific History recipe contract intact.
-             * The v4 ID is for the live presentation wrapper only; persisted
-             * identity remains the exact underlying v1/v2/v3 ChartSpec.
+             * Keep the underlying source-specific History recipe identity
+             * in the v1/v2/v3 chart row. The v4 semantic presentation ID and
+             * catalog claims are persisted separately in the optional sidecar.
              */
             string repository_version = chart_schema == "atm-chart-spec/1"
                 ? chart_pin.repository_version
@@ -3265,6 +3265,17 @@ namespace AskTheModel {
                 source_snapshot_sha,
                 source_path
             );
+            ChartPresentationNative.PresentationInput native_presentation = {};
+            if (!ChartNative.history_presentation_input_from_v4 (
+                    spec_v4, out native_presentation)) {
+                throw new GLib.IOError.INVALID_DATA (
+                    "Catalog-bound ChartSpec v4 presentation metadata could not be qualified for History."
+                );
+            }
+            ConversationPersistenceChartPresentation presentation =
+                ConversationPersistenceChartPresentation.from_native (
+                    ref native_presentation
+                );
             charts = {
                 new ConversationPersistenceChart (
                     1,
@@ -3272,7 +3283,9 @@ namespace AskTheModel {
                     chart_spec_id,
                     "line",
                     reconstruction_profile,
-                    { series }
+                    { series },
+                    presentation.presentation_schema,
+                    presentation
                 )
             };
 
@@ -3442,10 +3455,39 @@ namespace AskTheModel {
                         ? "energy.energy-institute.global-total-energy-supply"
                         : "climate.gistemp.global-temperature-anomaly");
                 ChartNative.SpecV4 history_spec_v4;
-                if (!ChartNative.wrap_qualified_spec_v4 (
-                        history_series_id, spec, out history_spec_v4)) {
+                if (chart.presentation_schema == null &&
+                    chart.presentation == null) {
+                    /* Legacy source-only rows retain their v1/v2/v3 contract. */
+                    if (!ChartNative.wrap_qualified_spec_v4 (
+                            history_series_id, spec, out history_spec_v4)) {
+                        throw new GLib.IOError.INVALID_DATA (
+                            "Qualified legacy History source does not match the catalog-bound ChartSpec v4 presentation."
+                        );
+                    }
+                } else if (chart.presentation_schema == "atm-chart-spec/4" &&
+                           chart.presentation != null) {
+                    ConversationPersistenceChartPresentation persisted_presentation =
+                        chart.presentation;
+                    ChartPresentationNative.PresentationInput native_presentation =
+                        persisted_presentation.to_native ();
+                    if (persisted_presentation.series_id == null ||
+                        persisted_presentation.series_id == "") {
+                        throw new GLib.IOError.INVALID_DATA (
+                            "Persisted History v4 presentation has no catalog series identity."
+                        );
+                    }
+                    if (!ChartNative.reconstruct_history_v4 (
+                            persisted_presentation.series_id,
+                            spec,
+                            ref native_presentation,
+                            out history_spec_v4)) {
+                        throw new GLib.IOError.INVALID_DATA (
+                            "Persisted History v4 presentation claims do not match the rebuilt catalog/source identity."
+                        );
+                    }
+                } else {
                     throw new GLib.IOError.INVALID_DATA (
-                        "Qualified History source does not match the catalog-bound ChartSpec v4 presentation."
+                        "Persisted History chart has an unsupported or inconsistent presentation marker."
                     );
                 }
 
@@ -4107,6 +4149,7 @@ namespace AskTheModel {
 
                         Gtk.Widget[] live_chart_widgets = {};
                         ConversationPersistenceChart[] live_charts = {};
+                        bool chart_persistence_failed = false;
 
                         if (source_chart_requested) {
                             try {
@@ -4130,14 +4173,30 @@ namespace AskTheModel {
                         if (live_charts.length > 0 &&
                             conversation_store != null &&
                             state.persistent_id != null) {
-                            foreach (
-                                ConversationPersistenceChart chart
-                                in live_charts
-                            ) {
-                                conversation_store.attach_chart (
-                                    state.persistent_id,
-                                    committed_turn_no,
-                                    chart
+                            try {
+                                foreach (
+                                    ConversationPersistenceChart chart
+                                    in live_charts
+                                ) {
+                                    conversation_store.attach_chart (
+                                        state.persistent_id,
+                                        committed_turn_no,
+                                        chart
+                                    );
+                                }
+                            } catch (GLib.Error chart_persistence_error) {
+                                /*
+                                 * The grounded answer is already durable. A
+                                 * secondary History attachment failure must not
+                                 * replace that committed answer with a system
+                                 * error or desynchronize the live session.
+                                 */
+                                chart_persistence_failed = true;
+                                live_chart_widgets = {};
+                                live_charts = {};
+                                stderr.printf (
+                                    "AtM: committed answer retained; chart History attachment failed: %s\n",
+                                    chart_persistence_error.message
                                 );
                             }
                         }
@@ -4155,8 +4214,9 @@ namespace AskTheModel {
                         if (source_chart_requested &&
                             live_chart_widgets.length == 0) {
                             state.presentation.append_chart_status (
-                                "AtM could not render the qualified catalog series. " +
-                                "Check that its catalog-bound repository and exact pinned snapshot are available."
+                                chart_persistence_failed
+                                    ? "AtM saved the grounded answer, but could not save its chart in History. The answer is retained; the chart can be requested again."
+                                    : "AtM could not render the qualified catalog series. Check that its catalog-bound repository and exact pinned snapshot are available."
                             );
                         }
                         assistant_stream_started = true;
@@ -5528,6 +5588,9 @@ namespace AskTheModel {
                 return false;
             }
 
+            string? expected_ewd_sha = GLib.Environment.get_variable (
+                "ATM_PRES09_EWD_SNAPSHOT_SHA"
+            );
             ConversationPersistenceChart? ei = null;
             ConversationPersistenceChart? gistemp = null;
             ConversationPersistenceChart? bnr = null;
@@ -5549,7 +5612,10 @@ namespace AskTheModel {
                 }
             }
 
-            if (ei == null || gistemp == null || bnr == null ||
+            if (expected_ewd_sha == null ||
+                (expected_ewd_sha != "d9e249339663015f6d1c05752338a955bf64ad0b" &&
+                 expected_ewd_sha != "dc710d8e604c0fff713a3acfdb18ab47a1a902bb") ||
+                ei == null || gistemp == null || bnr == null ||
                 ei.series.length != 1 ||
                 gistemp.series.length != 1 ||
                 bnr.series.length != 1 ||
@@ -5557,8 +5623,8 @@ namespace AskTheModel {
                     "atm-series/energy-institute-tes-complete-annual/1" ||
                 ei.series[0].admission_profile !=
                     "atm-energy-institute-pinned-admission/3" ||
-                ei.series[0].snapshot_sha !=
-                    "dc710d8e604c0fff713a3acfdb18ab47a1a902bb" ||
+                ei.series[0].snapshot_sha != expected_ewd_sha ||
+                gistemp.series[0].snapshot_sha != expected_ewd_sha ||
                 ei.series[0].source_path !=
                     "science/data/processed/energy_institute_global_2026.csv" ||
                 gistemp.series[0].series_profile !=
@@ -5701,6 +5767,9 @@ namespace AskTheModel {
                 return false;
             }
 
+            string? expected_ewd_sha = GLib.Environment.get_variable (
+                "ATM_PRES09_EWD_SNAPSHOT_SHA"
+            );
             ConversationPersistenceChart? ei = null;
             ConversationPersistenceChart? gistemp = null;
             ConversationPersistenceChart? bnr = null;
@@ -5722,10 +5791,18 @@ namespace AskTheModel {
                 }
             }
 
-            if (ei == null || gistemp == null || bnr == null ||
+            if (expected_ewd_sha == null ||
+                (expected_ewd_sha != "d9e249339663015f6d1c05752338a955bf64ad0b" &&
+                 expected_ewd_sha != "dc710d8e604c0fff713a3acfdb18ab47a1a902bb") ||
+                ei == null || gistemp == null || bnr == null ||
+                ei.series.length != 1 ||
+                gistemp.series.length != 1 ||
+                bnr.series.length != 1 ||
                 ei.chart_spec_id != expected_ei_id ||
                 gistemp.chart_spec_id != expected_gistemp_id ||
                 bnr.chart_spec_id != expected_bnr_id ||
+                ei.series[0].snapshot_sha != expected_ewd_sha ||
+                gistemp.series[0].snapshot_sha != expected_ewd_sha ||
                 bnr.reconstruction_profile !=
                     "atm-chart-reconstruct/bnr-bls-c01-calendar-quarter/1" ||
                 bnr.series.length != 1 ||
@@ -5735,6 +5812,34 @@ namespace AskTheModel {
                 bnr.series[0].source_path !=
                     "data/processed/bnr_bls_realised_rounds.csv") {
                 pres09_test_failure = "History recipe identity differs from the three qualified live chart recipes";
+                return false;
+            }
+
+            /*
+             * This E2E is specifically a sidecar save/reopen gate, not merely
+             * a source-only v1/v2/v3 compatibility test.
+             */
+            ConversationPersistenceChartPresentation? ei_presentation = ei.presentation;
+            ConversationPersistenceChartPresentation? gistemp_presentation = gistemp.presentation;
+            ConversationPersistenceChartPresentation? bnr_presentation = bnr.presentation;
+            if (ei.presentation_schema != "atm-chart-spec/4" ||
+                gistemp.presentation_schema != "atm-chart-spec/4" ||
+                bnr.presentation_schema != "atm-chart-spec/4" ||
+                ei_presentation == null ||
+                gistemp_presentation == null ||
+                bnr_presentation == null ||
+                ei_presentation.presentation_schema != "atm-chart-spec/4" ||
+                gistemp_presentation.presentation_schema != "atm-chart-spec/4" ||
+                bnr_presentation.presentation_schema != "atm-chart-spec/4" ||
+                ei_presentation.source_chart_schema != ei.chart_schema ||
+                ei_presentation.source_chart_spec_id != ei.chart_spec_id ||
+                gistemp_presentation.source_chart_schema != gistemp.chart_schema ||
+                gistemp_presentation.source_chart_spec_id != gistemp.chart_spec_id ||
+                bnr_presentation.source_chart_schema != bnr.chart_schema ||
+                bnr_presentation.source_chart_spec_id != bnr.chart_spec_id ||
+                bnr_presentation.missing_coordinate != "2025-Q2" ||
+                bnr_presentation.missing_reason != "source_round_not_retained") {
+                pres09_test_failure = "History did not persist and restore matching v4 presentation sidecars for all three source recipes";
                 return false;
             }
 

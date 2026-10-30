@@ -52,6 +52,207 @@ remove_tree_best_effort (const char *path)
     g_rmdir (path);
 }
 
+
+/*
+ * The EWD GISTEMP history pin predates AtM's repository-manifest contract.
+ * Its scientific source bundle is still independently admitted, but its
+ * upstream tree has no .atm/repository.json. Add a versioned, AtM-owned
+ * metadata overlay for this exact repository/SHA only. The overlay receipt
+ * is sealed with the rest of the local snapshot and states plainly that the
+ * manifest is not part of the upstream commit. No fallback exists for any
+ * other SHA or repository.
+ */
+static const char ATM_EWD_D9_SHA[] =
+    "d9e249339663015f6d1c05752338a955bf64ad0b";
+
+static const char ATM_EWD_D9_MANIFEST[] =
+    "{\n"
+    "  \"schema_version\": 1,\n"
+    "  \"repository_id\": \"ewd\",\n"
+    "  \"acronym\": \"EWD\",\n"
+    "  \"display_name\": \"Empirical World3 Dynamics\",\n"
+    "  \"version_source\": {\"type\": \"cff\", \"path\": \"CITATION.cff\"},\n"
+    "  \"status_source\": \"STATUS.md\",\n"
+    "  \"required_paths\": [\n"
+    "    \"CITATION.cff\",\n"
+    "    \"STATUS.md\",\n"
+    "    \"science/configs/real_model_structure.json\",\n"
+    "    \"science/data/registry.csv\",\n"
+    "    \"data/scenarios/bau_hybrid_2026_manifest.json\"\n"
+    "  ],\n"
+    "  \"retrieval\": {\n"
+    "    \"canonical\": [\"STATUS.md\", \"README.md\", \"CITATION.cff\", \"data/scenarios/bau_hybrid_2026_manifest.json\"],\n"
+    "    \"structural\": [\"science/configs\", \"science/src/world3_empirical/real_model_contract.py\", \"science/src/world3_empirical/model.py\", \"science/src/world3_empirical/world3_03.py\"],\n"
+    "    \"evidence\": [\"science/data/registry.csv\", \"science/data/processed\", \"science/data/experiments\", \"science/data/forecasts\", \"data/scenarios/fit_diagnostics.csv\", \"data/scenarios/backtest_2019_latest.csv\", \"data/scenarios/backtest_multi_origin.csv\", \"data/scenarios/parameter_identifiability.csv\", \"data/scenarios/candidate_ranking.csv\", \"data/scenarios/validation_candidate_ranking.csv\"],\n"
+    "    \"tabular\": [\"data/scenarios\", \"science/data/processed\", \"science/data/experiments\"],\n"
+    "    \"implementation\": [\"science/src/world3_empirical\", \"science/scripts\"],\n"
+    "    \"exclude\": [\".github\", \"science/vendor\", \"science/data/raw\", \"__pycache__\"]\n"
+    "  }\n"
+    "}\n";
+
+gboolean
+atm_repository_apply_builtin_compatibility_overlay (
+    const char *snapshot_root,
+    const char *repository_id,
+    const char *snapshot_sha,
+    gboolean *out_applied,
+    GError **error
+)
+{
+    GStatBuf root_stat;
+    GStatBuf atm_stat;
+    char *basename = NULL;
+    char *atm_path = NULL;
+    char *manifest_path = NULL;
+    char *receipt_path = NULL;
+    char *manifest_sha256 = NULL;
+    char *receipt = NULL;
+    gboolean ok = FALSE;
+
+    if (snapshot_root == NULL || snapshot_root[0] == '\0' ||
+        repository_id == NULL || snapshot_sha == NULL ||
+        out_applied == NULL) {
+        g_set_error_literal (
+            error,
+            ATM_INGEST_ERROR,
+            ATM_INGEST_ERROR_IO,
+            "Compatibility metadata overlay received invalid arguments."
+        );
+        return FALSE;
+    }
+
+    *out_applied = FALSE;
+
+    if (g_strcmp0 (repository_id, "ewd") != 0 ||
+        g_strcmp0 (snapshot_sha, ATM_EWD_D9_SHA) != 0) {
+        return TRUE;
+    }
+
+    basename = g_path_get_basename (snapshot_root);
+    char *staging_basename = g_strdup_printf ("%s.part", ATM_EWD_D9_SHA);
+    gboolean path_is_bound =
+        g_strcmp0 (basename, ATM_EWD_D9_SHA) == 0 ||
+        g_strcmp0 (basename, staging_basename) == 0;
+    g_free (staging_basename);
+    if (!path_is_bound) {
+        g_set_error_literal (
+            error,
+            ATM_INGEST_ERROR,
+            ATM_INGEST_ERROR_IO,
+            "Compatibility overlay path is not bound to the admitted EWD SHA."
+        );
+        goto out;
+    }
+
+    if (g_lstat (snapshot_root, &root_stat) != 0 ||
+        !S_ISDIR (root_stat.st_mode) ||
+        S_ISLNK (root_stat.st_mode)) {
+        g_set_error_literal (
+            error,
+            ATM_INGEST_ERROR,
+            ATM_INGEST_ERROR_IO,
+            "Compatibility overlay requires a real snapshot/staging directory."
+        );
+        goto out;
+    }
+
+    atm_path = g_build_filename (snapshot_root, ".atm", NULL);
+    manifest_path = g_build_filename (
+        atm_path, "repository.json", NULL);
+    receipt_path = g_build_filename (
+        atm_path, "compatibility-overlay.json", NULL);
+
+    if (g_lstat (atm_path, &atm_stat) == 0) {
+        if (!S_ISDIR (atm_stat.st_mode) || S_ISLNK (atm_stat.st_mode)) {
+            g_set_error_literal (
+                error,
+                ATM_INGEST_ERROR,
+                ATM_INGEST_ERROR_IO,
+                "Existing .atm path is not a real directory; overlay refused."
+            );
+            goto out;
+        }
+
+        /* Never overwrite upstream metadata or repair a partial overlay in place.
+         * The normal manifest validator must accept or reject existing content. */
+        ok = TRUE;
+        goto out;
+    }
+    if (errno != ENOENT) {
+        g_set_error (
+            error,
+            ATM_INGEST_ERROR,
+            ATM_INGEST_ERROR_IO,
+            "Could not inspect .atm before applying compatibility overlay: %s.",
+            g_strerror (errno)
+        );
+        goto out;
+    }
+
+    if (g_mkdir (atm_path, 0700) != 0) {
+        g_set_error (
+            error,
+            ATM_INGEST_ERROR,
+            ATM_INGEST_ERROR_IO,
+            "Could not create AtM overlay directory: %s.",
+            g_strerror (errno)
+        );
+        goto out;
+    }
+
+    if (!g_file_set_contents (
+            manifest_path,
+            ATM_EWD_D9_MANIFEST,
+            (gssize) (sizeof (ATM_EWD_D9_MANIFEST) - 1),
+            error
+        )) {
+        g_rmdir (atm_path);
+        goto out;
+    }
+
+    manifest_sha256 = g_compute_checksum_for_data (
+        G_CHECKSUM_SHA256,
+        (const guchar *) ATM_EWD_D9_MANIFEST,
+        sizeof (ATM_EWD_D9_MANIFEST) - 1
+    );
+    receipt = g_strdup_printf (
+        "{\n"
+        "  \"schema_version\": 1,\n"
+        "  \"overlay_id\": \"atm-ewd-d9e249-manifest-overlay/1\",\n"
+        "  \"repository_id\": \"ewd\",\n"
+        "  \"upstream_sha\": \"%s\",\n"
+        "  \"manifest_sha256\": \"%s\",\n"
+        "  \"ownership\": \"AtM application metadata; absent from the upstream commit\"\n"
+        "}\n",
+        ATM_EWD_D9_SHA,
+        manifest_sha256
+    );
+
+    if (!g_file_set_contents (
+            receipt_path,
+            receipt,
+            -1,
+            error
+        )) {
+        g_remove (manifest_path);
+        g_rmdir (atm_path);
+        goto out;
+    }
+
+    *out_applied = TRUE;
+    ok = TRUE;
+
+out:
+    g_free (receipt);
+    g_free (manifest_sha256);
+    g_free (receipt_path);
+    g_free (manifest_path);
+    g_free (atm_path);
+    g_free (basename);
+    return ok;
+}
+
+
 static gboolean
 repository_ingest_archive_internal (
     const char *data_root,
@@ -210,6 +411,18 @@ repository_ingest_archive_internal (
     }
 
     staging_created = TRUE;
+
+    gboolean compatibility_overlay_applied = FALSE;
+    if (!atm_repository_apply_builtin_compatibility_overlay (
+            staging_path,
+            repository_id,
+            sha,
+            &compatibility_overlay_applied,
+            error
+        )) {
+        goto out;
+    }
+    (void) compatibility_overlay_applied;
 
     if (cancellable != NULL &&
         g_cancellable_set_error_if_cancelled (cancellable, error)) {

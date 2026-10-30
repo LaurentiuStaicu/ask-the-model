@@ -1324,7 +1324,7 @@ validate_chart_semantics (
     return TRUE;
 }
 
-/* V4 is a live presentation wrapper only; the durable v5 row remains source v1/v2/v3. */
+/* Source chart identity remains v1/v2/v3; v4 presentation claims live in a separately validated sidecar. */
 static gboolean
 validate_chart_presentation_semantics (
     sqlite3 *db,

@@ -454,6 +454,38 @@ create_v4_store (
 }
 
 static void
+create_v5_store (
+    const char *path
+)
+{
+    GError *error = NULL;
+    GBytes *bytes = g_resources_lookup_data (
+        "/io/github/laurentiustaicu/ask_the_model/schemas/conversation-store-v5.sql",
+        G_RESOURCE_LOOKUP_FLAGS_NONE,
+        &error
+    );
+    g_assert_no_error (error);
+    g_assert_nonnull (bytes);
+    gsize size = 0;
+    const char *data = g_bytes_get_data (bytes, &size);
+    g_assert_nonnull (data);
+    g_assert_cmpuint (size, >, 0);
+    char *schema = g_strndup (data, size);
+    char *sql = g_strdup_printf (
+        "BEGIN IMMEDIATE;%s"
+        "PRAGMA application_id=%u;"
+        "PRAGMA user_version=5;"
+        "COMMIT;",
+        schema,
+        (guint) ATM_CONVERSATION_STORE_APPLICATION_ID
+    );
+    raw_exec (path, sql);
+    g_free (sql);
+    g_free (schema);
+    g_bytes_unref (bytes);
+}
+
+static void
 insert_v3_gistemp_chart_fixture (
     const char *path
 )
@@ -658,6 +690,81 @@ test_v4_to_v5_migration_rollback (void)
     g_assert_cmpint (raw_int64 (path,
         "SELECT count(*) FROM sqlite_schema WHERE type='trigger' "
         "AND name='chart_series_tuple_insert' AND tbl_name='messages';"), ==, 1);
+
+    g_free (path);
+    remove_tree_best_effort (root);
+    g_free (root);
+}
+
+static void
+test_v5_to_v6_migration_preserves_legacy_chart_rows (void)
+{
+    char *root = new_temp_root ("atm-conversation-v5-v6-XXXXXX");
+    char *path = store_path (root);
+    create_v5_store (path);
+    insert_v3_gistemp_chart_fixture (path);
+
+    AtmConversationStore *store = NULL;
+    GError *error = NULL;
+    g_assert_true (atm_conversation_store_open (path, &store, &error));
+    g_assert_no_error (error);
+    g_assert_cmpint (atm_conversation_store_schema_version (store), ==, 6);
+    g_assert_true (atm_conversation_store_validate (store, &error));
+    g_assert_no_error (error);
+    g_assert_cmpint (raw_int64 (path, "PRAGMA user_version;"), ==, 6);
+    g_assert_cmpint (raw_int64 (path,
+        "SELECT count(*) FROM message_charts "
+        "WHERE chart_schema='atm-chart-spec/1' AND presentation_schema IS NULL;"), ==, 1);
+    g_assert_cmpint (raw_int64 (path,
+        "SELECT count(*) FROM chart_series WHERE series_profile='atm-series/gistemp-complete-annual/1';"), ==, 1);
+    g_assert_cmpint (raw_int64 (path,
+        "SELECT count(*) FROM chart_presentations_v4;"), ==, 0);
+    g_assert_cmpint (raw_int64 (path, "SELECT count(*) FROM pragma_foreign_key_check;"), ==, 0);
+    char *schema_id = raw_text (path,
+        "SELECT schema_id FROM installation WHERE singleton_id=1;");
+    g_assert_cmpstr (schema_id, ==, "atm-conversation-store/6");
+    g_free (schema_id);
+
+    atm_conversation_store_close (store);
+    g_free (path);
+    remove_tree_best_effort (root);
+    g_free (root);
+}
+
+static void
+test_v5_to_v6_migration_rollback (void)
+{
+    char *root = new_temp_root ("atm-conversation-v5-v6-rollback-XXXXXX");
+    char *path = store_path (root);
+    create_v5_store (path);
+    insert_v3_gistemp_chart_fixture (path);
+
+    /* Force a late trigger-name collision after the migration has rebuilt tables. */
+    raw_exec (path,
+        "CREATE TRIGGER chart_presentations_v4_tuple_insert "
+        "BEFORE INSERT ON messages BEGIN SELECT 1; END;");
+
+    AtmConversationStore *store = NULL;
+    GError *error = NULL;
+    g_assert_false (atm_conversation_store_open (path, &store, &error));
+    g_assert_nonnull (error);
+    g_assert_null (store);
+    g_assert_nonnull (g_strstr_len (error->message, -1,
+        "chart_presentations_v4_tuple_insert"));
+    g_clear_error (&error);
+
+    g_assert_cmpint (raw_int64 (path, "PRAGMA user_version;"), ==, 5);
+    char *schema_id = raw_text (path,
+        "SELECT schema_id FROM installation WHERE singleton_id=1;");
+    g_assert_cmpstr (schema_id, ==, "atm-conversation-store/5");
+    g_free (schema_id);
+    g_assert_cmpint (raw_int64 (path,
+        "SELECT count(*) FROM message_charts WHERE chart_schema='atm-chart-spec/1';"), ==, 1);
+    g_assert_cmpint (raw_int64 (path,
+        "SELECT count(*) FROM chart_series WHERE series_profile='atm-series/gistemp-complete-annual/1';"), ==, 1);
+    g_assert_cmpint (raw_int64 (path,
+        "SELECT count(*) FROM sqlite_schema WHERE type='table' AND name='chart_presentations_v4';"), ==, 0);
+    g_assert_cmpint (raw_int64 (path, "SELECT count(*) FROM pragma_foreign_key_check;"), ==, 0);
 
     g_free (path);
     remove_tree_best_effort (root);
@@ -2524,7 +2631,7 @@ test_archive_delete_lifecycle (void)
 }
 
 static void
-test_bnr_chart_recipe_v5_persistence (void)
+test_bnr_chart_recipe_v6_persistence (void)
 {
     char *root = new_temp_root ("atm-conversation-bnr-chart-v5-XXXXXX");
     char *path = store_path (root);
@@ -2576,6 +2683,35 @@ test_bnr_chart_recipe_v5_persistence (void)
         .snapshot_sha = sha,
         .source_path = "data/processed/bnr_bls_realised_rounds.csv"
     };
+    AtmConversationChartPresentationInput presentation = {
+        .presentation_schema = "atm-chart-spec/4",
+        .presentation_spec_id = "dddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddd",
+        .series_id = "banking.bnr.bls-c01.credit-standards-net-percentage",
+        .catalog_schema = "atm-chart-catalog/1",
+        .adapter_id = "bnr-bls-c01-pinned-quarterly/1",
+        .series_profile_id = "atm-series/bnr-bls-c01-calendar-quarter/1",
+        .series_profile_version = "1",
+        .admission_profile_id = "atm-bnr-bls-canonical-panel-admission/1",
+        .admission_profile_version = "1",
+        .reconstruction_profile_id = "atm-chart-reconstruct/bnr-bls-c01-calendar-quarter/1",
+        .source_chart_schema = "atm-chart-spec/3",
+        .source_chart_spec_id = "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+        .x_coordinate_semantics = "calendar_quarter",
+        .x_frequency = "quarterly",
+        .x_unit = "calendar_quarter",
+        .x_dimension = "time",
+        .subject = "non_financial_corporations",
+        .attribute = "nfc_credit_standards",
+        .y_unit = "percent",
+        .y_dimension = "survey_net_percentage",
+        .series_semantics = "empirical_quarterly_observations",
+        .missing_policy = "bounded_profile",
+        .missing_coordinate = "2025-Q2",
+        .missing_reason = "source_round_not_retained",
+        .display_profile_id = "atm-display/bnr-bls-c01-quarterly-gap",
+        .display_profile_version = "1",
+        .render_contract = "atm-retro-mono/1"
+    };
     AtmConversationChartInput chart = {
         .ordinal = 1,
         .chart_schema = "atm-chart-spec/3",
@@ -2583,8 +2719,45 @@ test_bnr_chart_recipe_v5_persistence (void)
         .chart_kind = "line",
         .reconstruction_profile = "atm-chart-reconstruct/bnr-bls-c01-calendar-quarter/1",
         .series = &series,
-        .series_count = 1
+        .series_count = 1,
+        .presentation = &presentation
     };
+    /*
+     * Force the sidecar insert to fail after the source chart and series
+     * inserts. The combined attach must roll the entire transaction back.
+     */
+    raw_exec (path,
+        "CREATE TRIGGER fail_chart_presentation_insert "
+        "BEFORE INSERT ON chart_presentations_v4 "
+        "BEGIN SELECT RAISE(ABORT, 'injected sidecar insert failure'); END;");
+    g_assert_false (atm_conversation_store_attach_chart (
+        store, conversation_id, turn, &chart, &error));
+    g_assert_nonnull (error);
+    g_clear_error (&error);
+
+    char *chart_rows_sql = g_strdup_printf (
+        "SELECT count(*) FROM message_charts c "
+        "JOIN messages m ON m.message_id=c.message_id "
+        "WHERE m.conversation_id='%s' AND m.turn_no=0 AND m.role='assistant';",
+        conversation_id);
+    char *series_rows_sql = g_strdup_printf (
+        "SELECT count(*) FROM chart_series s "
+        "JOIN messages m ON m.message_id=s.message_id "
+        "WHERE m.conversation_id='%s' AND m.turn_no=0 AND m.role='assistant';",
+        conversation_id);
+    char *presentation_rows_sql = g_strdup_printf (
+        "SELECT count(*) FROM chart_presentations_v4 p "
+        "JOIN messages m ON m.message_id=p.message_id "
+        "WHERE m.conversation_id='%s' AND m.turn_no=0 AND m.role='assistant';",
+        conversation_id);
+    g_assert_cmpint (raw_int64 (path, chart_rows_sql), ==, 0);
+    g_assert_cmpint (raw_int64 (path, series_rows_sql), ==, 0);
+    g_assert_cmpint (raw_int64 (path, presentation_rows_sql), ==, 0);
+    g_free (chart_rows_sql);
+    g_free (series_rows_sql);
+    g_free (presentation_rows_sql);
+    raw_exec (path, "DROP TRIGGER fail_chart_presentation_insert;");
+
     g_assert_true (atm_conversation_store_attach_chart (
         store, conversation_id, turn, &chart, &error));
     g_assert_no_error (error);
@@ -2628,11 +2801,66 @@ test_bnr_chart_recipe_v5_persistence (void)
         snapshot, 1u, 0u, 0u), ==, sha);
     g_assert_cmpstr (atm_conversation_snapshot_chart_series_source_path_at (
         snapshot, 1u, 0u, 0u), ==, series.source_path);
+    g_assert_cmpstr (atm_conversation_snapshot_chart_presentation_schema_at (
+        snapshot, 1u, 0u), ==, "atm-chart-spec/4");
+    g_assert_cmpstr (atm_conversation_snapshot_chart_presentation_spec_id_at (
+        snapshot, 1u, 0u), ==, presentation.presentation_spec_id);
+    g_assert_cmpstr (atm_conversation_snapshot_chart_presentation_series_id_at (
+        snapshot, 1u, 0u), ==, presentation.series_id);
+    g_assert_cmpstr (atm_conversation_snapshot_chart_presentation_missing_coordinate_at (
+        snapshot, 1u, 0u), ==, "2025-Q2");
+    g_assert_cmpstr (atm_conversation_snapshot_chart_presentation_missing_reason_at (
+        snapshot, 1u, 0u), ==, "source_round_not_retained");
+
+    /* Round-trip every remaining persisted ChartSpec v4 sidecar claim. */
+    g_assert_cmpstr (atm_conversation_snapshot_chart_presentation_catalog_schema_at (
+        snapshot, 1u, 0u), ==, presentation.catalog_schema);
+    g_assert_cmpstr (atm_conversation_snapshot_chart_presentation_adapter_id_at (
+        snapshot, 1u, 0u), ==, presentation.adapter_id);
+    g_assert_cmpstr (atm_conversation_snapshot_chart_presentation_series_profile_id_at (
+        snapshot, 1u, 0u), ==, presentation.series_profile_id);
+    g_assert_cmpstr (atm_conversation_snapshot_chart_presentation_series_profile_version_at (
+        snapshot, 1u, 0u), ==, presentation.series_profile_version);
+    g_assert_cmpstr (atm_conversation_snapshot_chart_presentation_admission_profile_id_at (
+        snapshot, 1u, 0u), ==, presentation.admission_profile_id);
+    g_assert_cmpstr (atm_conversation_snapshot_chart_presentation_admission_profile_version_at (
+        snapshot, 1u, 0u), ==, presentation.admission_profile_version);
+    g_assert_cmpstr (atm_conversation_snapshot_chart_presentation_reconstruction_profile_id_at (
+        snapshot, 1u, 0u), ==, presentation.reconstruction_profile_id);
+    g_assert_cmpstr (atm_conversation_snapshot_chart_presentation_source_chart_schema_at (
+        snapshot, 1u, 0u), ==, presentation.source_chart_schema);
+    g_assert_cmpstr (atm_conversation_snapshot_chart_presentation_source_chart_spec_id_at (
+        snapshot, 1u, 0u), ==, presentation.source_chart_spec_id);
+    g_assert_cmpstr (atm_conversation_snapshot_chart_presentation_x_coordinate_semantics_at (
+        snapshot, 1u, 0u), ==, presentation.x_coordinate_semantics);
+    g_assert_cmpstr (atm_conversation_snapshot_chart_presentation_x_frequency_at (
+        snapshot, 1u, 0u), ==, presentation.x_frequency);
+    g_assert_cmpstr (atm_conversation_snapshot_chart_presentation_x_unit_at (
+        snapshot, 1u, 0u), ==, presentation.x_unit);
+    g_assert_cmpstr (atm_conversation_snapshot_chart_presentation_x_dimension_at (
+        snapshot, 1u, 0u), ==, presentation.x_dimension);
+    g_assert_cmpstr (atm_conversation_snapshot_chart_presentation_subject_at (
+        snapshot, 1u, 0u), ==, presentation.subject);
+    g_assert_cmpstr (atm_conversation_snapshot_chart_presentation_attribute_at (
+        snapshot, 1u, 0u), ==, presentation.attribute);
+    g_assert_cmpstr (atm_conversation_snapshot_chart_presentation_y_unit_at (
+        snapshot, 1u, 0u), ==, presentation.y_unit);
+    g_assert_cmpstr (atm_conversation_snapshot_chart_presentation_y_dimension_at (
+        snapshot, 1u, 0u), ==, presentation.y_dimension);
+    g_assert_cmpstr (atm_conversation_snapshot_chart_presentation_series_semantics_at (
+        snapshot, 1u, 0u), ==, presentation.series_semantics);
+    g_assert_cmpstr (atm_conversation_snapshot_chart_presentation_missing_policy_at (
+        snapshot, 1u, 0u), ==, presentation.missing_policy);
+    g_assert_cmpstr (atm_conversation_snapshot_chart_presentation_display_profile_id_at (
+        snapshot, 1u, 0u), ==, presentation.display_profile_id);
+    g_assert_cmpstr (atm_conversation_snapshot_chart_presentation_display_profile_version_at (
+        snapshot, 1u, 0u), ==, presentation.display_profile_version);
+    g_assert_cmpstr (atm_conversation_snapshot_chart_presentation_render_contract_at (
+        snapshot, 1u, 0u), ==, presentation.render_contract);
     atm_conversation_snapshot_free (snapshot);
 
-    /* A v4 marker without its sidecar must never validate or reopen. */
-    raw_exec (path,
-        "UPDATE message_charts SET presentation_schema='atm-chart-spec/4';");
+    /* The relational invariant is enforced if a sidecar is deleted offline. */
+    raw_exec (path, "DELETE FROM chart_presentations_v4;");
     g_assert_false (atm_conversation_store_validate (store, &error));
     g_assert_error (error, ATM_CONVERSATION_STORE_ERROR,
                     ATM_CONVERSATION_STORE_ERROR_INTEGRITY);
@@ -3321,6 +3549,14 @@ main (int argc, char **argv)
         test_v4_to_v5_migration_rollback
     );
     g_test_add_func (
+        "/conversation-store/v5-to-v6-migration",
+        test_v5_to_v6_migration_preserves_legacy_chart_rows
+    );
+    g_test_add_func (
+        "/conversation-store/v5-to-v6-rollback",
+        test_v5_to_v6_migration_rollback
+    );
+    g_test_add_func (
         "/conversation-store/chart-recipe-semantics",
         test_chart_recipe_semantics
     );
@@ -3357,8 +3593,8 @@ main (int argc, char **argv)
         test_archive_delete_lifecycle
     );
     g_test_add_func (
-        "/conversation-store/bnr-chart-v5-persistence",
-        test_bnr_chart_recipe_v5_persistence
+        "/conversation-store/bnr-chart-v6-persistence",
+        test_bnr_chart_recipe_v6_persistence
     );
     g_test_add_func (
         "/conversation-store/chart-binding-write-load",

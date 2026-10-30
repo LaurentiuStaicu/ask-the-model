@@ -1,4 +1,4 @@
-[CCode (cheader_filename = "chart_view.h,chart_history_reconstruct.h,chart_catalog.h")]
+[CCode (cheader_filename = "chart_view.h,chart_history_reconstruct.h,chart_catalog.h,chart_spec_v4.h")]
 namespace AskTheModel.ChartNative {
     [Compact]
     [CCode (cname = "AtmChartSpec", free_function = "atm_chart_spec_free", has_type_id = false)]
@@ -38,8 +38,6 @@ namespace AskTheModel.ChartNative {
         public unowned string? admission_profile_id ();
         [CCode (cname = "atm_chart_spec_v4_reconstruction_profile_id")]
         public unowned string? reconstruction_profile_id ();
-        [CCode (cname = "atm_chart_spec_v4_history_schema_version")]
-        public unowned string? history_schema_version ();
     }
 
     [CCode (cname = "atm_chart_catalog_adapter_id_for_series")]
@@ -66,6 +64,20 @@ namespace AskTheModel.ChartNative {
         out SpecV4 spec
     ) throws GLib.Error;
 
+    [CCode (cname = "atm_chart_history_presentation_input_from_v4")]
+    public static bool history_presentation_input_from_v4 (
+        SpecV4 spec,
+        out ChartPresentationNative.PresentationInput presentation
+    ) throws GLib.Error;
+
+    [CCode (cname = "atm_chart_history_reconstruct_v4")]
+    public static bool reconstruct_history_v4 (
+        string series_id,
+        Spec qualified_source_spec,
+        ref ChartPresentationNative.PresentationInput presentation,
+        out SpecV4 spec
+    ) throws GLib.Error;
+
     [CCode (cname = "atm_chart_live_reconstruct_v4")]
     public static bool reconstruct_live_v4 (
         string series_id,
@@ -87,21 +99,6 @@ namespace AskTheModel.ChartNative {
         public uint selected_row ();
         /* chart_view.h: caller owns returned provenance. */
         public string? provenance ();
-        [CCode (cname = "atm_chart_view_test_is_fallback")]
-        public bool test_is_fallback ();
-        [CCode (cname = "atm_chart_view_test_render_size")]
-        public void test_render_size (
-            out int width,
-            out int height,
-            out int scale
-        );
-        [CCode (cname = "atm_chart_view_test_area_size")]
-        public void test_area_size (
-            out int width,
-            out int height
-        );
-        [CCode (cname = "atm_chart_view_test_set_canvas_minimum")]
-        public void test_set_canvas_minimum (int width, int height);
     }
     [CCode (cname = "atm_chart_view_new")]
     public static bool create (Spec? spec, out View view) throws GLib.Error;
