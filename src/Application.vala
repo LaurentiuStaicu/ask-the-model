@@ -5937,7 +5937,7 @@ namespace AskTheModel {
                     return false;
                 }
 
-                view.test_set_canvas_minimum (480, 400);
+                view.test_set_canvas_minimum (480, 500);
                 window.set_default_size (1100, 900);
                 pres09_test_resize_stage = 3;
                 pres09_test_resize_wait_ticks = 0;
