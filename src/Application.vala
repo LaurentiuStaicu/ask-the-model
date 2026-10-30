@@ -6125,6 +6125,16 @@ namespace AskTheModel {
             }
 
             if (pres09_test_live_turn == 0) {
+                if (!state.transcript.buffer.text.contains (
+                        "Cerere de grafic: Furnizarea totală globală de energie (Energy Institute TES). Valorile exacte și proveniența apar în vizualizarea Chart/Data calificată când este disponibilă. Dacă graficul nu poate fi construit, AtM raportează separat problema și nu substituie valori."
+                    )) {
+                    pres09_test_finish (
+                        false,
+                        "Live Energy Institute turn did not display the normalized Romanian chart-only answer"
+                    );
+                    return false;
+                }
+
                 if (state.pres09_test_chart_widgets.length != 1) {
                     pres09_test_finish (
                         false,
@@ -6162,6 +6172,16 @@ namespace AskTheModel {
             }
 
             if (pres09_test_live_turn == 1) {
+                if (!state.transcript.buffer.text.contains (
+                        "Requested chart: Global surface temperature anomaly (GISTEMP). Exact values and source provenance appear in the qualified Chart/Data view when available. If chart construction fails, AtM reports that separately rather than substituting values."
+                    )) {
+                    pres09_test_finish (
+                        false,
+                        "Live GISTEMP turn did not display the normalized English chart-only answer"
+                    );
+                    return false;
+                }
+
                 if (state.pres09_test_chart_widgets.length != 2) {
                     pres09_test_finish (
                         false,
