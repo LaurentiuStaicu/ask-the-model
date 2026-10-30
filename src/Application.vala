@@ -5880,7 +5880,7 @@ namespace AskTheModel {
                         "Live GISTEMP data was unavailable before the resize transition";
                     return false;
                 }
-                window.set_default_size (500, 400);
+                window.set_default_size (500, 390);
                 pres09_test_resize_stage = 2;
                 pres09_test_resize_wait_ticks = 0;
                 return true;
