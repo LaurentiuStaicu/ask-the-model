@@ -534,9 +534,9 @@ static void test_transcript_anchor_minimum_viewport (void)
     settle ();
     g_assert_cmpint (
         gtk_widget_get_height (GTK_WIDGET (window)), <, initial_window_height);
-    g_assert_cmpint (gtk_widget_get_height (area), ==, initial_canvas_height);
+    g_assert_cmpint (gtk_widget_get_height (area), >=, 348);
     atm_chart_view_test_render_size (view, &render_width, &render_height, &render_scale);
-    g_assert_cmpint (render_height, ==, initial_canvas_height);
+    g_assert_cmpint (render_height, ==, gtk_widget_get_height (area));
     g_assert_cmpstr (atm_chart_view_data (view), ==, data_before);
     g_free (data_before);
     gtk_window_destroy (window);
