@@ -521,19 +521,32 @@ static gboolean atm_chart_view_new_internal (const AtmChartSpec *spec,
                                       GError **error)
 {
     if (!out || *out) return reject (error, "Invalid chart widget output.");
+    const AtmChartSpec *initial_source_spec = spec != NULL
+        ? spec
+        : (spec_v4 != NULL
+            ? atm_chart_spec_v4_source_spec (spec_v4)
+            : NULL);
+    int initial_width =
+        g_strcmp0 (chart_source_profile (initial_source_spec), "bnr") == 0
+            ? 800 : 480;
+    const int initial_height = 380;
     AtmChartRender *initial = NULL;
     AtmChartRenderV4 *initial_v4 = NULL;
     if (spec_v4 != NULL) {
-        if (!atm_chart_render_v4_new (spec_v4, 860, 500, 1, &initial_v4, error))
+        if (!atm_chart_render_v4_new (
+                spec_v4, (guint) initial_width, initial_height, 1,
+                &initial_v4, error))
             return FALSE;
-    } else if (!atm_chart_render_new (spec, 860, 500, 1, &initial, error)) {
+    } else if (!atm_chart_render_new (
+            spec, (guint) initial_width, initial_height, 1,
+            &initial, error)) {
         return FALSE;
     }
     AtmChartView *self = g_object_ref_sink (g_object_new (ATM_TYPE_CHART_VIEW, "accessible-role", GTK_ACCESSIBLE_ROLE_GROUP, NULL));
     self->render = initial;
     self->render_v4 = initial_v4;
-    self->requested_width = self->render_width = 860;
-    self->requested_height = self->render_height = 500;
+    self->requested_width = self->render_width = initial_width;
+    self->requested_height = self->render_height = initial_height;
     self->requested_scale = self->render_scale = 1;
     self->data = g_strdup (view_data (self));
     self->rows = gtk_string_list_new (NULL);
