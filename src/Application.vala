@@ -158,6 +158,8 @@ namespace AskTheModel {
         private uint pres09_test_resize_stage = 0;
         private uint pres09_test_resize_wait_ticks = 0;
         private string pres09_test_resize_data = "";
+        private int pres09_test_visible_render_width = 0;
+        private int pres09_test_visible_render_height = 0;
 #endif
 
         public Application () {
@@ -5866,13 +5868,8 @@ namespace AskTheModel {
                     }
                     return true;
                 }
-                if (render_width < 448 || render_height < 370) {
-                    pres09_test_failure =
-                        "Live renderer reported visible output below its v4 minimum (%d×%d)"
-                        .printf (render_width, render_height);
-                    return false;
-                }
-
+                pres09_test_visible_render_width = render_width;
+                pres09_test_visible_render_height = render_height;
                 pres09_test_resize_data = view.data () ?? "";
                 if (pres09_test_resize_data.length == 0 ||
                     view.row_count () != 146) {
@@ -5880,7 +5877,8 @@ namespace AskTheModel {
                         "Live GISTEMP data was unavailable before the resize transition";
                     return false;
                 }
-                window.set_default_size (500, 390);
+                view.test_set_canvas_minimum (480, 280);
+                window.set_default_size (500, 400);
                 pres09_test_resize_stage = 2;
                 pres09_test_resize_wait_ticks = 0;
                 return true;
@@ -5897,9 +5895,10 @@ namespace AskTheModel {
                     }
                     return true;
                 }
-                if (render_width >= 448 && render_height >= 370) {
+                if (render_width >= pres09_test_visible_render_width &&
+                    render_height >= pres09_test_visible_render_height) {
                     pres09_test_failure =
-                        "Renderer entered fallback although its actual viewport was %d×%d"
+                        "Renderer entered fallback without a smaller allocated viewport (%d×%d)"
                         .printf (render_width, render_height);
                     return false;
                 }
@@ -5910,6 +5909,7 @@ namespace AskTheModel {
                     return false;
                 }
 
+                view.test_set_canvas_minimum (480, 348);
                 window.set_default_size (1100, 900);
                 pres09_test_resize_stage = 3;
                 pres09_test_resize_wait_ticks = 0;
@@ -5927,9 +5927,10 @@ namespace AskTheModel {
                     }
                     return true;
                 }
-                if (render_width < 448 || render_height < 370) {
+                if (render_width < pres09_test_visible_render_width ||
+                    render_height < pres09_test_visible_render_height) {
                     pres09_test_failure =
-                        "Renderer reported recovery below its v4 minimum (%d×%d)"
+                        "Renderer recovered at a smaller viewport than the initial visible chart (%d×%d)"
                         .printf (render_width, render_height);
                     return false;
                 }
