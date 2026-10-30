@@ -518,7 +518,7 @@ static void test_transcript_anchor_minimum_viewport (void)
     g_assert_true (gtk_stack_get_vhomogeneous (GTK_STACK (stack_widget)));
 
     GtkWidget *area = chart_drawing_area (view);
-    g_assert_cmpint (gtk_widget_get_width (area), >=, 480);
+    g_assert_cmpint (gtk_widget_get_width (area), >=, minimum_width);
     g_assert_cmpint (gtk_widget_get_height (area), >=, 370);
 
     int render_width = 0, render_height = 0, render_scale = 0;
@@ -574,7 +574,8 @@ static void test_keyboard_window (void)
 }
 typedef AtmChartSpec *(*ChartSpecBuilder) (void);
 
-static void assert_transcript_anchor_resize (AtmChartView *view)
+static void assert_transcript_anchor_resize (AtmChartView *view,
+                                             int minimum_width)
 {
     GtkWidget *transcript = gtk_text_view_new ();
     gtk_text_view_set_wrap_mode (
@@ -759,7 +760,11 @@ static void assert_v4_catalog_view (const char *series_id,
 
     if (exercise_resize) {
         atm_chart_view_show_chart (view);
-        assert_transcript_anchor_resize (view);
+        int minimum_width =
+            g_strcmp0 (series_id,
+                "banking.bnr.bls-c01.credit-standards-net-percentage") == 0
+                ? 800 : 480;
+        assert_transcript_anchor_resize (view, minimum_width);
     }
 
     if (exercise_resize) {
