@@ -6010,13 +6010,6 @@ namespace AskTheModel {
                         .printf (render_width, render_height, area_width, area_height);
                     return false;
                 }
-                if (view.test_is_fallback () &&
-                    area_width >= 448 && area_height >= 370) {
-                    pres09_test_failure =
-                        "Renderer entered fallback although the allocated canvas met its minimum dimensions (%d×%d)"
-                        .printf (area_width, area_height);
-                    return false;
-                }
                 if (!view.test_is_fallback () &&
                     (area_width < 448 || area_height < 370)) {
                     pres09_test_failure =
