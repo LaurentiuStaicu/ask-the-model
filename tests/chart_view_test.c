@@ -518,12 +518,12 @@ static void test_transcript_anchor_minimum_viewport (void)
     g_assert_true (gtk_stack_get_vhomogeneous (GTK_STACK (stack_widget)));
 
     GtkWidget *area = chart_drawing_area (view);
-    g_assert_cmpint (gtk_widget_get_width (area), >=, minimum_width);
+    g_assert_cmpint (gtk_widget_get_width (area), >=, 640);
     g_assert_cmpint (gtk_widget_get_height (area), >=, 370);
 
     int render_width = 0, render_height = 0, render_scale = 0;
     atm_chart_view_test_render_size (view, &render_width, &render_height, &render_scale);
-    g_assert_cmpint (render_width, >=, 480);
+    g_assert_cmpint (render_width, >=, 640);
     g_assert_cmpint (render_height, >=, 370);
     g_assert_cmpint (render_scale, >=, 1);
 
@@ -633,7 +633,7 @@ static void assert_transcript_anchor_resize (AtmChartView *view,
     gtk_window_set_default_size (window, 1000, 760);
     settle ();
     g_assert_false (atm_chart_view_test_is_fallback (view));
-    g_assert_cmpint (gtk_widget_get_width (area), >=, 448);
+    g_assert_cmpint (gtk_widget_get_width (area), >=, minimum_width);
     g_assert_cmpint (gtk_widget_get_height (area), >=, 370);
     atm_chart_view_test_render_size (view, &width, &height, &scale);
     g_assert_cmpint (width, ==, gtk_widget_get_width (area));
@@ -767,7 +767,7 @@ static void assert_v4_catalog_view (const char *series_id,
         int minimum_width =
             g_strcmp0 (series_id,
                 "banking.bnr.bls-c01.credit-standards-net-percentage") == 0
-                ? 800 : 480;
+                ? 800 : 640;
         assert_transcript_anchor_resize (view, minimum_width);
     }
 
