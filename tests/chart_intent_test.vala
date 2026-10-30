@@ -47,12 +47,33 @@ int main () {
     );
     assert (!generic_chart.gistemp_requested);
     assert (!generic_chart.energy_institute_requested);
+    assert (generic_chart.series_id == null);
+    assert (generic_chart.intent == "unsupported");
+    assert (generic_chart.response_mode == "none");
 
     var near_miss = AskTheModel.ChartIntent.parse (
         "/chart gistemp-ish Show the trend"
     );
     assert (!near_miss.gistemp_requested);
     assert (!near_miss.energy_institute_requested);
+    assert (near_miss.series_id == null);
+    assert (near_miss.intent == "unsupported");
+
+    var unknown_slash_selector = AskTheModel.ChartIntent.parse (
+        "/chart population"
+    );
+    assert (unknown_slash_selector.series_id == null);
+    assert (unknown_slash_selector.intent == "unsupported");
+
+    var unknown_slash_selector_with_verb = AskTheModel.ChartIntent.parse (
+        "/chart population generate a time trend"
+    );
+    assert (unknown_slash_selector_with_verb.series_id == null);
+    assert (unknown_slash_selector_with_verb.intent == "unsupported");
+
+    var bare_chart_command = AskTheModel.ChartIntent.parse ("/chart");
+    assert (bare_chart_command.series_id == null);
+    assert (bare_chart_command.intent == "unsupported");
 
     var empty = AskTheModel.ChartIntent.parse (
         "/chart gistemp"
@@ -71,14 +92,16 @@ int main () {
     assert (ei_guidance.contains ("native Chart/Data widget"));
     
     assert (ei_guidance.contains ("pseudo-table"));
-    assert (ei_guidance.contains ("more years are unavailable"));
-    assert (ei_guidance.contains ("Only provide year-by-year values or a table"));
+    assert (ei_guidance.contains ("Physical Energy Content"));
+    assert (ei_guidance.contains ("gross supply"));
+    assert (ei_guidance.contains ("does not independently reproduce publisher"));
+    assert (ei_guidance.contains ("only provide those details when explicitly requested"));
     assert (ei_command.is_chart_only_request ());
     string ei_response = ei_command.chart_only_response ();
-    assert (ei_response.contains ("Energy Institute global total energy supply chart"));
-    assert (ei_response.contains ("Data tab"));
-    assert (ei_response.contains ("source details"));
-    assert (!ei_response.contains ("source provenance"));
+    assert (ei_response.contains ("Global total energy supply (Energy Institute TES)"));
+    assert (ei_response.contains ("qualified Chart/Data view"));
+    assert (ei_response.contains ("source provenance"));
+    assert (ei_response.contains ("If chart construction fails"));
     assert (!ei_response.contains ("pseudo-table"));
     assert (!ei_response.contains ("couldn't render"));
 
@@ -103,14 +126,15 @@ int main () {
     assert (gistemp_guidance.contains ("native Chart/Data widget"));
     
     assert (gistemp_guidance.contains ("pseudo-table"));
-    assert (gistemp_guidance.contains ("more years are unavailable"));
-    assert (gistemp_guidance.contains ("Only provide year-by-year values or a table"));
+    assert (gistemp_guidance.contains ("Global annual land-ocean temperature anomaly"));
+    assert (gistemp_guidance.contains ("NASA's processing"));
+    assert (gistemp_guidance.contains ("only provide those details when explicitly requested"));
     assert (requested.is_chart_only_request ());
     string gistemp_response = requested.chart_only_response ();
-    assert (gistemp_response.contains ("GISTEMP global temperature anomaly chart"));
-    assert (gistemp_response.contains ("Data tab"));
-    assert (gistemp_response.contains ("source details"));
-    assert (!gistemp_response.contains ("source provenance"));
+    assert (gistemp_response.contains ("Global surface temperature anomaly (GISTEMP)"));
+    assert (gistemp_response.contains ("qualified Chart/Data view"));
+    assert (gistemp_response.contains ("source provenance"));
+    assert (gistemp_response.contains ("If chart construction fails"));
     assert (!gistemp_response.contains ("pseudo-table"));
     assert (!gistemp_response.contains ("couldn't render"));
 
@@ -120,11 +144,10 @@ int main () {
     assert (!gistemp_interpretation.is_chart_only_request ());
     assert (gistemp_interpretation.chart_only_response () == "");
 
-    assert (natural_english.chart_only_response ().contains ("GISTEMP global temperature anomaly chart"));
-    assert (natural_english.chart_only_response ().contains ("source details"));
-    assert (!natural_english.chart_only_response ().contains ("source provenance"));
-    assert (natural_romanian.chart_only_response ().contains ("Iată graficul GISTEMP"));
-    assert (natural_romanian.chart_only_response ().contains ("detalii despre sursă"));
+    assert (natural_english.chart_only_response ().contains ("Global surface temperature anomaly (GISTEMP)"));
+    assert (natural_english.chart_only_response ().contains ("source provenance"));
+    assert (natural_romanian.chart_only_response ().contains ("Cerere de grafic: Anomalia globală a temperaturii de la suprafață (GISTEMP)"));
+    assert (natural_romanian.chart_only_response ().contains ("proveniența"));
     assert (ordinary.response_guidance () == "");
 
     var ei_upper = AskTheModel.ChartIntent.parse (
@@ -138,7 +161,7 @@ int main () {
     );
     assert (!ei_romanian.gistemp_requested);
     assert (ei_romanian.energy_institute_requested);
-    assert (ei_romanian.chart_only_response ().contains ("detaliile sursei"));
+    assert (ei_romanian.chart_only_response ().contains ("proveniența"));
 
     var ei_english = AskTheModel.ChartIntent.parse (
         "Show me an Energy Institute chart of global total energy supply using Physical Energy Content."
@@ -168,14 +191,16 @@ int main () {
         "Show the quarterly credit standards net percentage trend.");
     assert (bnr_command.is_chart_only_request ());
     string bnr_guidance = bnr_command.response_guidance ();
-    assert (bnr_guidance.contains ("pinned RMD snapshot"));
+    assert (bnr_guidance.contains ("romanian-monetary-dynamics"));
     assert (bnr_guidance.contains ("2025-Q2"));
-    assert (bnr_guidance.contains ("MISSING, not zero"));
+    assert (bnr_guidance.contains ("MISSING"));
+    assert (bnr_guidance.contains ("not zero"));
     string bnr_response = bnr_command.chart_only_response ();
-    assert (bnr_response.contains ("BNR BLS C01 quarterly credit-standards"));
-    assert (bnr_response.contains ("missing, not zero"));
-    assert (bnr_response.contains ("source details"));
-    assert (bnr_response.contains ("Data"));
+    assert (bnr_response.contains ("BNR Bank Lending Survey: credit standards net percentage"));
+    assert (bnr_response.contains ("2025-Q2 observation is missing from the source, not zero"));
+    assert (bnr_response.contains ("source provenance"));
+    assert (bnr_response.contains ("Chart/Data"));
+    assert (bnr_response.contains ("If chart construction fails"));
 
     var bnr_upper = AskTheModel.ChartIntent.parse (
         "/CHART BNR-BLS-C01 Show the series."
@@ -191,15 +216,15 @@ int main () {
         "Generează un grafic BNR BLS C01 al procentului net privind standardele de credit."
     );
     assert (bnr_romanian.bnr_bls_c01_requested);
-    assert (bnr_romanian.chart_only_response ().contains ("Iată graficul trimestrial BNR BLS C01"));
-    assert (bnr_romanian.chart_only_response ().contains ("valoarea pentru 2025-Q2 lipsește, nu este zero"));
-    assert (bnr_romanian.chart_only_response ().contains ("detaliile sursei"));
+    assert (bnr_romanian.chart_only_response ().contains ("Cerere de grafic: Sondajul BNR privind creditarea: procentul net al standardelor de credit"));
+    assert (bnr_romanian.chart_only_response ().contains ("2025-Q2 lipsește din sursă; este lipsă, nu zero"));
+    assert (bnr_romanian.chart_only_response ().contains ("proveniența"));
 
     var bnr_english = AskTheModel.ChartIntent.parse (
         "Generate a BNR BLS C01 chart of credit standards net percentage."
     );
     assert (bnr_english.bnr_bls_c01_requested);
-    assert (bnr_english.chart_only_response ().contains ("Here is the BNR BLS C01"));
+    assert (bnr_english.chart_only_response ().contains ("Requested chart: BNR Bank Lending Survey"));
 
     var generic_net_percentage = AskTheModel.ChartIntent.parse (
         "Generate a chart of the net percentage of non-performing loans."
@@ -334,6 +359,759 @@ int main () {
         "Generează un grafic cu media mobilă a standardelor de credit."
     );
     assert (!bnr_romanian_definite_moving_average.bnr_bls_c01_requested);
+
+
+    /* Generic series routing requires a catalog alias and a positive request. */
+    assert (natural_english.series_id ==
+        "climate.gistemp.global-temperature-anomaly");
+    assert (natural_english.intent == "chart");
+    assert (natural_english.response_mode == "chart_only");
+    assert (ei_english.series_id ==
+        "energy.energy-institute.global-total-energy-supply");
+    assert (bnr_english.series_id ==
+        "banking.bnr.bls-c01.credit-standards-net-percentage");
+
+    var negated_english = AskTheModel.ChartIntent.parse (
+        "Do not make a GISTEMP chart."
+    );
+    assert (negated_english.series_id == null);
+    assert (negated_english.intent == "not_chart");
+    assert (negated_english.response_mode == "none");
+
+    var negated_show_english = AskTheModel.ChartIntent.parse (
+        "Don't show me a GISTEMP chart."
+    );
+    assert (negated_show_english.series_id == null);
+    assert (negated_show_english.intent == "not_chart");
+
+    var negated_show_romanian = AskTheModel.ChartIntent.parse (
+        "Nu arăta un grafic GISTEMP."
+    );
+    assert (negated_show_romanian.series_id == null);
+    assert (negated_show_romanian.intent == "not_chart");
+
+    var negated_want_romanian = AskTheModel.ChartIntent.parse (
+        "Nu vreau să generezi un grafic GISTEMP."
+    );
+    assert (negated_want_romanian.series_id == null);
+    assert (negated_want_romanian.intent == "not_chart");
+
+    var negated_explicit_request = AskTheModel.ChartIntent.parse (
+        "I am not asking for a chart of GISTEMP."
+    );
+    assert (negated_explicit_request.series_id == null);
+
+    var negated_romanian = AskTheModel.ChartIntent.parse (
+        "Nu genera un grafic GISTEMP."
+    );
+    assert (negated_romanian.series_id == null);
+    assert (negated_romanian.intent == "not_chart");
+
+    var hypothetical_english = AskTheModel.ChartIntent.parse (
+        "What if I were to generate a GISTEMP chart?"
+    );
+    assert (hypothetical_english.series_id == null);
+
+    var hypothetical_romanian = AskTheModel.ChartIntent.parse (
+        "Ipotetic, ce s-ar întâmpla dacă aș genera un grafic GISTEMP?"
+    );
+    assert (hypothetical_romanian.series_id == null);
+
+    var quoted_instruction = AskTheModel.ChartIntent.parse (
+        "Does the phrase \"Generate a GISTEMP chart\" express a clear request?"
+    );
+    assert (quoted_instruction.series_id == null);
+
+    var capability_specific = AskTheModel.ChartIntent.parse (
+        "Can you generate charts for GISTEMP?"
+    );
+    assert (capability_specific.series_id == null);
+
+    var capability_singular = AskTheModel.ChartIntent.parse (
+        "Does this app support creating GISTEMP charts?"
+    );
+    assert (capability_singular.series_id == null);
+    assert (capability_singular.intent == "not_chart");
+
+    var capability_romanian_singular = AskTheModel.ChartIntent.parse (
+        "Aplicația poate genera grafice GISTEMP?"
+    );
+    assert (capability_romanian_singular.series_id == null);
+    assert (capability_romanian_singular.intent == "not_chart");
+
+    var polite_request_english = AskTheModel.ChartIntent.parse (
+        "Can you create a GISTEMP chart?"
+    );
+    assert (polite_request_english.series_id ==
+        "climate.gistemp.global-temperature-anomaly");
+
+    var polite_request_romanian = AskTheModel.ChartIntent.parse (
+        "Poți genera un grafic GISTEMP?"
+    );
+    assert (polite_request_romanian.series_id ==
+        "climate.gistemp.global-temperature-anomaly");
+
+    var existing_chart_interpretation = AskTheModel.ChartIntent.parse (
+        "What does the GISTEMP chart show?"
+    );
+    assert (existing_chart_interpretation.series_id == null);
+    assert (existing_chart_interpretation.intent == "not_chart");
+
+    var existing_chart_interpretation_romanian =
+        AskTheModel.ChartIntent.parse ("Ce ne arată graficul GISTEMP?");
+    assert (existing_chart_interpretation_romanian.series_id == null);
+    assert (existing_chart_interpretation_romanian.intent == "not_chart");
+
+    var chart_request_followed_by_interpretation =
+        AskTheModel.ChartIntent.parse (
+            "Generate a GISTEMP chart. What does the GISTEMP chart show?"
+        );
+    assert (chart_request_followed_by_interpretation.series_id ==
+        "climate.gistemp.global-temperature-anomaly");
+    assert (chart_request_followed_by_interpretation.intent == "chart");
+    assert (!chart_request_followed_by_interpretation.is_chart_only_request ());
+
+    var subject_clause_followed_by_interpretation =
+        AskTheModel.ChartIntent.parse (
+            "Generate a chart of global temperature anomalies. What does the GISTEMP chart show?"
+        );
+    assert (subject_clause_followed_by_interpretation.series_id ==
+        "climate.gistemp.global-temperature-anomaly");
+    assert (subject_clause_followed_by_interpretation.intent == "chart");
+    assert (!subject_clause_followed_by_interpretation.is_chart_only_request ());
+
+    var short_alias_near_miss = AskTheModel.ChartIntent.parse (
+        "Make a chart about the latest Tesla production figures."
+    );
+    assert (short_alias_near_miss.series_id == null);
+
+    var exact_credit_alias = AskTheModel.ChartIntent.parse (
+        "Generate a chart of credit standards over time."
+    );
+    assert (exact_credit_alias.series_id ==
+        "banking.bnr.bls-c01.credit-standards-net-percentage");
+
+    var ambiguous_catalog_aliases = AskTheModel.ChartIntent.parse (
+        "Generate a chart comparing GISTEMP and Energy Institute total energy supply."
+    );
+    assert (ambiguous_catalog_aliases.series_id == null);
+    assert (ambiguous_catalog_aliases.intent == "ambiguous");
+
+    /* A catalog alias in a source/method clause does not ground the chart subject. */
+    var unrelated_subject_using_gistemp = AskTheModel.ChartIntent.parse (
+        "Generate a chart of diabetes prevalence using GISTEMP."
+    );
+    assert (unrelated_subject_using_gistemp.series_id == null);
+    assert (unrelated_subject_using_gistemp.intent == "ambiguous");
+
+    var unrelated_subject_using_ei = AskTheModel.ChartIntent.parse (
+        "Generate a chart of diabetes prevalence using Energy Institute."
+    );
+    assert (unrelated_subject_using_ei.series_id == null);
+    assert (unrelated_subject_using_ei.intent == "ambiguous");
+
+    var unrelated_subject_with_gistemp = AskTheModel.ChartIntent.parse (
+        "Generate a chart of global temperature anomalies over time with diabetes prevalence."
+    );
+    assert (unrelated_subject_with_gistemp.series_id == null);
+    assert (unrelated_subject_with_gistemp.intent == "ambiguous");
+
+    var directly_grounded_gistemp = AskTheModel.ChartIntent.parse (
+        "Generate a chart of GISTEMP global temperature anomaly."
+    );
+    assert (directly_grounded_gistemp.series_id ==
+        "climate.gistemp.global-temperature-anomaly");
+
+    var directly_grounded_ei = AskTheModel.ChartIntent.parse (
+        "Show a chart of total energy supply (TES)."
+    );
+    assert (directly_grounded_ei.series_id ==
+        "energy.energy-institute.global-total-energy-supply");
+
+    /* Source-prefixed subjects are valid catalog aliases, not unrelated topics. */
+    var gistemp_source_prefixed_subject = AskTheModel.ChartIntent.parse (
+        "Generate a chart of GISTEMP global temperature over time."
+    );
+    assert (gistemp_source_prefixed_subject.series_id ==
+        "climate.gistemp.global-temperature-anomaly");
+    assert (gistemp_source_prefixed_subject.intent == "chart");
+
+    var energy_source_prefixed_subject = AskTheModel.ChartIntent.parse (
+        "Generate a chart of Energy Institute total energy supply over time."
+    );
+    assert (energy_source_prefixed_subject.series_id ==
+        "energy.energy-institute.global-total-energy-supply");
+    assert (energy_source_prefixed_subject.intent == "chart");
+
+    var bnr_source_prefixed_subject = AskTheModel.ChartIntent.parse (
+        "Generate a chart of BNR credit standards over time."
+    );
+    assert (bnr_source_prefixed_subject.series_id ==
+        "banking.bnr.bls-c01.credit-standards-net-percentage");
+    assert (bnr_source_prefixed_subject.intent == "chart");
+
+    var bnr_source_prefixed_subject_romanian =
+        AskTheModel.ChartIntent.parse (
+            "Generează un grafic al standardelor de credit BNR în timp."
+        );
+    assert (bnr_source_prefixed_subject_romanian.series_id ==
+        "banking.bnr.bls-c01.credit-standards-net-percentage");
+    assert (bnr_source_prefixed_subject_romanian.intent == "chart");
+
+    /*
+     * A registered alias before the chart noun must not authorize an
+     * unrelated subject added after the noun. Keep common reviewed modifiers.
+     */
+    var source_prefixed_chart_over_time = AskTheModel.ChartIntent.parse (
+        "Generate a GISTEMP chart over time."
+    );
+    assert (source_prefixed_chart_over_time.series_id ==
+        "climate.gistemp.global-temperature-anomaly");
+    assert (source_prefixed_chart_over_time.intent == "chart");
+
+    var gistemp_chart_with_unrelated_subject = AskTheModel.ChartIntent.parse (
+        "Generate a GISTEMP chart with diabetes prevalence."
+    );
+    assert (gistemp_chart_with_unrelated_subject.series_id == null);
+    assert (gistemp_chart_with_unrelated_subject.intent == "ambiguous");
+
+    var ei_chart_with_unrelated_subject = AskTheModel.ChartIntent.parse (
+        "Generate an Energy Institute total energy supply chart with diabetes prevalence."
+    );
+    assert (ei_chart_with_unrelated_subject.series_id == null);
+    assert (ei_chart_with_unrelated_subject.intent == "ambiguous");
+
+    var bnr_chart_with_unrelated_subject = AskTheModel.ChartIntent.parse (
+        "Generate a BNR credit standards chart with malaria prevalence."
+    );
+    assert (bnr_chart_with_unrelated_subject.series_id == null);
+    assert (bnr_chart_with_unrelated_subject.intent == "ambiguous");
+
+    var unsupported_pie_chart = AskTheModel.ChartIntent.parse (
+        "Generate a pie chart of global temperature anomalies."
+    );
+    assert (unsupported_pie_chart.series_id == null);
+    assert (unsupported_pie_chart.intent == "ambiguous");
+
+    var unsupported_bar_chart = AskTheModel.ChartIntent.parse (
+        "Generate a bar chart of Energy Institute total energy supply."
+    );
+    assert (unsupported_bar_chart.series_id == null);
+    assert (unsupported_bar_chart.intent == "ambiguous");
+
+    var unsupported_explicit_chart_kind = AskTheModel.ChartIntent.parse (
+        "/chart gistemp Make a pie chart."
+    );
+    assert (unsupported_explicit_chart_kind.series_id == null);
+    assert (unsupported_explicit_chart_kind.intent == "ambiguous");
+
+    var explicit_population_conflict = AskTheModel.ChartIntent.parse (
+        "/chart gistemp Show population over time."
+    );
+    assert (explicit_population_conflict.series_id == null);
+    assert (explicit_population_conflict.intent == "ambiguous");
+
+    var explicit_unrelated_alias_conflict = AskTheModel.ChartIntent.parse (
+        "/chart gistemp Show a chart of diabetes prevalence using GISTEMP."
+    );
+    assert (explicit_unrelated_alias_conflict.series_id == null);
+    assert (explicit_unrelated_alias_conflict.intent == "ambiguous");
+
+    var explicit_unknown_subject_conflict = AskTheModel.ChartIntent.parse (
+        "/chart gistemp Plot malaria prevalence over time."
+    );
+    assert (explicit_unknown_subject_conflict.series_id == null);
+    assert (explicit_unknown_subject_conflict.intent == "ambiguous");
+
+    var explicit_unknown_subject_conflict_romanian = AskTheModel.ChartIntent.parse (
+        "/chart gistemp Desenează un grafic al prevalenței malariei în timp."
+    );
+    assert (explicit_unknown_subject_conflict_romanian.series_id == null);
+    assert (explicit_unknown_subject_conflict_romanian.intent == "ambiguous");
+
+    var explicit_unknown_trend_subject = AskTheModel.ChartIntent.parse (
+        "/chart gistemp Show the trend for malaria over time."
+    );
+    assert (explicit_unknown_trend_subject.series_id == null);
+    assert (explicit_unknown_trend_subject.intent == "ambiguous");
+
+    var explicit_unknown_plural_trend_subject =
+        AskTheModel.ChartIntent.parse (
+            "/chart gistemp Show trends of diabetes prevalence over time."
+        );
+    assert (explicit_unknown_plural_trend_subject.series_id == null);
+    assert (explicit_unknown_plural_trend_subject.intent == "ambiguous");
+
+    var explicit_valid_plural_trend_subject =
+        AskTheModel.ChartIntent.parse (
+            "/chart gistemp Show trends of global temperature anomalies over time."
+        );
+    assert (explicit_valid_plural_trend_subject.series_id ==
+        "climate.gistemp.global-temperature-anomaly");
+
+    var explicit_unknown_plural_trend_subject_romanian =
+        AskTheModel.ChartIntent.parse (
+            "/chart gistemp Arată tendințele pentru prevalența malariei în timp."
+        );
+    assert (explicit_unknown_plural_trend_subject_romanian.series_id == null);
+    assert (explicit_unknown_plural_trend_subject_romanian.intent == "ambiguous");
+
+    var explicit_valid_plural_trend_subject_romanian =
+        AskTheModel.ChartIntent.parse (
+            "/chart bnr-bls-c01 Arată tendințele pentru standardele de credit."
+        );
+    assert (explicit_valid_plural_trend_subject_romanian.series_id ==
+        "banking.bnr.bls-c01.credit-standards-net-percentage");
+
+    var explicit_unknown_plural_chart_subject =
+        AskTheModel.ChartIntent.parse (
+            "/chart gistemp Show charts of diabetes prevalence."
+        );
+    assert (explicit_unknown_plural_chart_subject.series_id == null);
+    assert (explicit_unknown_plural_chart_subject.intent == "ambiguous");
+
+    var explicit_valid_plural_chart_subject =
+        AskTheModel.ChartIntent.parse (
+            "/chart gistemp Show charts of global temperature anomalies."
+        );
+    assert (explicit_valid_plural_chart_subject.series_id ==
+        "climate.gistemp.global-temperature-anomaly");
+
+    var explicit_unknown_plural_chart_subject_romanian =
+        AskTheModel.ChartIntent.parse (
+            "/chart gistemp Generează grafice despre prevalența malariei."
+        );
+    assert (explicit_unknown_plural_chart_subject_romanian.series_id == null);
+    assert (explicit_unknown_plural_chart_subject_romanian.intent == "ambiguous");
+
+    var explicit_valid_plural_chart_subject_romanian =
+        AskTheModel.ChartIntent.parse (
+            "/chart bnr-bls-c01 Generează grafice privind standardele de credit."
+        );
+    assert (explicit_valid_plural_chart_subject_romanian.series_id ==
+        "banking.bnr.bls-c01.credit-standards-net-percentage");
+
+    var explicit_unknown_subject_before_trend = AskTheModel.ChartIntent.parse (
+        "/chart gistemp Show malaria prevalence trend over time."
+    );
+    assert (explicit_unknown_subject_before_trend.series_id == null);
+    assert (explicit_unknown_subject_before_trend.intent == "ambiguous");
+
+    var explicit_unknown_trend_subject_romanian = AskTheModel.ChartIntent.parse (
+        "/chart gistemp Arată tendința pentru malarie în timp."
+    );
+    assert (explicit_unknown_trend_subject_romanian.series_id == null);
+    assert (explicit_unknown_trend_subject_romanian.intent == "ambiguous");
+
+    var explicit_time_range_modifier = AskTheModel.ChartIntent.parse (
+        "/chart gistemp Show the trend for 1880-2025."
+    );
+    assert (explicit_time_range_modifier.series_id ==
+        "climate.gistemp.global-temperature-anomaly");
+
+    var explicit_time_range_modifier_romanian = AskTheModel.ChartIntent.parse (
+        "/chart gistemp Arată tendința pentru 1880-2025."
+    );
+    assert (explicit_time_range_modifier_romanian.series_id ==
+        "climate.gistemp.global-temperature-anomaly");
+
+    var explicit_time_range_without_article = AskTheModel.ChartIntent.parse (
+        "/chart gistemp Show trend for 1880-2025."
+    );
+    assert (explicit_time_range_without_article.series_id ==
+        "climate.gistemp.global-temperature-anomaly");
+
+    var explicit_time_range_romanian_unaccented = AskTheModel.ChartIntent.parse (
+        "/chart gistemp Arata tendinta pentru 1880-2025."
+    );
+    assert (explicit_time_range_romanian_unaccented.series_id ==
+        "climate.gistemp.global-temperature-anomaly");
+
+    var explicit_outside_18xx_range = AskTheModel.ChartIntent.parse (
+        "/chart gistemp Show trend for 1850-2020."
+    );
+    assert (explicit_outside_18xx_range.series_id == null);
+    assert (explicit_outside_18xx_range.intent == "unsupported_period");
+
+    var full_and_partial_ranges = AskTheModel.ChartIntent.parse (
+        "/chart gistemp Show trend for 1880-2025 and 2000-2020."
+    );
+    assert (full_and_partial_ranges.series_id == null);
+    assert (full_and_partial_ranges.intent == "unsupported_period");
+
+    var gistemp_reference_baseline = AskTheModel.ChartIntent.parse (
+        "/chart gistemp Show the trend relative to the 1951-1980 baseline."
+    );
+    assert (gistemp_reference_baseline.series_id ==
+        "climate.gistemp.global-temperature-anomaly");
+
+    var gistemp_reference_mean = AskTheModel.ChartIntent.parse (
+        "/chart gistemp Show the trend relative to the 1951-1980 mean."
+    );
+    assert (gistemp_reference_mean.series_id ==
+        "climate.gistemp.global-temperature-anomaly");
+
+    /* Baseline metadata must not erase a separately requested observation range. */
+    var gistemp_baseline_range_as_observations =
+        AskTheModel.ChartIntent.parse (
+            "/chart gistemp Show trend from 1951-1980 relative to the 1951-1980 mean."
+        );
+    assert (gistemp_baseline_range_as_observations.series_id == null);
+    assert (gistemp_baseline_range_as_observations.intent == "unsupported_period");
+
+    var gistemp_baseline_range_as_observations_romanian =
+        AskTheModel.ChartIntent.parse (
+            "/chart gistemp Arată tendința doar în intervalul 1951–1980, raportat la media de referință 1951–1980."
+        );
+    assert (gistemp_baseline_range_as_observations_romanian.series_id == null);
+    assert (gistemp_baseline_range_as_observations_romanian.intent == "unsupported_period");
+
+    var gistemp_full_range_from_to = AskTheModel.ChartIntent.parse (
+        "/chart gistemp Show trend from 1880 to 2025."
+    );
+    assert (gistemp_full_range_from_to.series_id ==
+        "climate.gistemp.global-temperature-anomaly");
+
+    var gistemp_full_range_between = AskTheModel.ChartIntent.parse (
+        "/chart gistemp Show trend between 1880 and 2025."
+    );
+    assert (gistemp_full_range_between.series_id ==
+        "climate.gistemp.global-temperature-anomaly");
+
+    var gistemp_full_range_between_upper = AskTheModel.ChartIntent.parse (
+        "/chart gistemp Show trend BETWEEN 1880 AND 2025."
+    );
+    assert (gistemp_full_range_between_upper.series_id ==
+        "climate.gistemp.global-temperature-anomaly");
+
+    var gistemp_partial_range_upper = AskTheModel.ChartIntent.parse (
+        "/chart gistemp Show trend FROM 1880 TO 2020."
+    );
+    assert (gistemp_partial_range_upper.series_id == null);
+    assert (gistemp_partial_range_upper.intent == "unsupported_period");
+
+    var ei_full_range_from_through = AskTheModel.ChartIntent.parse (
+        "/chart energy-institute Show trend from 1965 through 2025."
+    );
+    assert (ei_full_range_from_through.series_id ==
+        "energy.energy-institute.global-total-energy-supply");
+
+    var gistemp_partial_from_to = AskTheModel.ChartIntent.parse (
+        "/chart gistemp Show trend from 1880 to 2020."
+    );
+    assert (gistemp_partial_from_to.series_id == null);
+    assert (gistemp_partial_from_to.intent == "unsupported_period");
+
+    var ei_full_coverage_range = AskTheModel.ChartIntent.parse (
+        "/chart energy-institute Show trend for 1965-2025."
+    );
+    assert (ei_full_coverage_range.series_id ==
+        "energy.energy-institute.global-total-energy-supply");
+
+    /* The BNR adapter admits its full quarter range, but not a filtered subset. */
+    var bnr_full_range_from_to = AskTheModel.ChartIntent.parse (
+        "/chart bnr-bls-c01 Show trend from 2022-Q4 to 2025-Q3."
+    );
+    assert (bnr_full_range_from_to.series_id ==
+        "banking.bnr.bls-c01.credit-standards-net-percentage");
+
+    var bnr_full_range_dashed = AskTheModel.ChartIntent.parse (
+        "/chart bnr-bls-c01 Show trend for 2022-Q4–2025-Q3."
+    );
+    assert (bnr_full_range_dashed.series_id ==
+        "banking.bnr.bls-c01.credit-standards-net-percentage");
+
+    var bnr_full_range_romanian = AskTheModel.ChartIntent.parse (
+        "/chart bnr-bls-c01 Arată tendința din 2022-Q4 până în 2025-Q3."
+    );
+    assert (bnr_full_range_romanian.series_id ==
+        "banking.bnr.bls-c01.credit-standards-net-percentage");
+
+    var bnr_partial_range = AskTheModel.ChartIntent.parse (
+        "/chart bnr-bls-c01 Show trend from 2023-Q1 to 2025-Q3."
+    );
+    assert (bnr_partial_range.series_id == null);
+    assert (bnr_partial_range.intent == "unsupported_period");
+
+    var bnr_full_and_partial_ranges = AskTheModel.ChartIntent.parse (
+        "/chart bnr-bls-c01 Show trend from 2022-Q4 to 2025-Q3 and from 2023-Q1 to 2025-Q3."
+    );
+    assert (bnr_full_and_partial_ranges.series_id == null);
+    assert (bnr_full_and_partial_ranges.intent == "unsupported_period");
+
+    var mismatched_full_coverage_range = AskTheModel.ChartIntent.parse (
+        "/chart energy-institute Show trend for 1880-2025."
+    );
+    assert (mismatched_full_coverage_range.series_id == null);
+    assert (mismatched_full_coverage_range.intent == "unsupported_period");
+
+    var explicit_grounded_subject = AskTheModel.ChartIntent.parse (
+        "/chart gistemp Show a chart of global temperature anomalies over time."
+    );
+    assert (explicit_grounded_subject.series_id ==
+        "climate.gistemp.global-temperature-anomaly");
+
+
+    var explicit_cross_series_conflict = AskTheModel.ChartIntent.parse (
+        "/chart gistemp Compare global temperature with Energy Institute total energy supply."
+    );
+    assert (explicit_cross_series_conflict.series_id == null);
+    assert (explicit_cross_series_conflict.intent == "ambiguous");
+
+    var explicit_negation_conflict = AskTheModel.ChartIntent.parse (
+        "/chart gistemp Do not make a chart."
+    );
+    assert (explicit_negation_conflict.series_id == null);
+    assert (explicit_negation_conflict.intent == "ambiguous");
+
+    var unsupported_alias = AskTheModel.ChartIntent.parse (
+        "Generate a chart of population over time."
+    );
+    assert (unsupported_alias.intent == "unsupported");
+    assert (unsupported_alias.series_id == null);
+
+    /* A registered alias never overrides a different requested concept. */
+    var population_with_gistemp_alias = AskTheModel.ChartIntent.parse (
+        "Generate a GISTEMP chart of population over time."
+    );
+    assert (population_with_gistemp_alias.series_id == null);
+    assert (population_with_gistemp_alias.intent == "ambiguous");
+
+    var population_with_ei_alias = AskTheModel.ChartIntent.parse (
+        "Generate an Energy Institute chart of population over time."
+    );
+    assert (population_with_ei_alias.series_id == null);
+    assert (population_with_ei_alias.intent == "ambiguous");
+
+    var population_with_bnr_alias = AskTheModel.ChartIntent.parse (
+        "Generate a chart of BNR credit standards for population over time."
+    );
+    assert (population_with_bnr_alias.series_id == null);
+    assert (population_with_bnr_alias.intent == "ambiguous");
+
+    /* The current line adapters always render the full catalogued coverage. */
+    var gistemp_year_range = AskTheModel.ChartIntent.parse (
+        "Generate a GISTEMP chart from 2000 to 2020."
+    );
+    assert (gistemp_year_range.series_id == null);
+    assert (gistemp_year_range.intent == "unsupported_period");
+
+    var gistemp_recent_period = AskTheModel.ChartIntent.parse (
+        "Generate a GISTEMP chart for the last 10 years."
+    );
+    assert (gistemp_recent_period.series_id == null);
+    assert (gistemp_recent_period.intent == "unsupported_period");
+
+    var gistemp_last_decade = AskTheModel.ChartIntent.parse (
+        "Generate a GISTEMP chart for the last decade."
+    );
+    assert (gistemp_last_decade.series_id == null);
+    assert (gistemp_last_decade.intent == "unsupported_period");
+
+    var gistemp_recent_years = AskTheModel.ChartIntent.parse (
+        "Generate a GISTEMP chart for recent years."
+    );
+    assert (gistemp_recent_years.series_id == null);
+    assert (gistemp_recent_years.intent == "unsupported_period");
+
+    var gistemp_upto_year = AskTheModel.ChartIntent.parse (
+        "/chart gistemp Show the trend up to 2020."
+    );
+    assert (gistemp_upto_year.series_id == null);
+    assert (gistemp_upto_year.intent == "unsupported_period");
+
+    var gistemp_ro_last_decade = AskTheModel.ChartIntent.parse (
+        "Generează un grafic GISTEMP pentru ultimul deceniu."
+    );
+    assert (gistemp_ro_last_decade.series_id == null);
+    assert (gistemp_ro_last_decade.intent == "unsupported_period");
+
+    var gistemp_ro_recent_years = AskTheModel.ChartIntent.parse (
+        "Generează un grafic GISTEMP pentru anii recenți."
+    );
+    assert (gistemp_ro_recent_years.series_id == null);
+    assert (gistemp_ro_recent_years.intent == "unsupported_period");
+
+    var gistemp_ro_until_year = AskTheModel.ChartIntent.parse (
+        "/chart gistemp Arată tendința până în 2020."
+    );
+    assert (gistemp_ro_until_year.series_id == null);
+    assert (gistemp_ro_until_year.intent == "unsupported_period");
+
+    var ei_romanian_period = AskTheModel.ChartIntent.parse (
+        "Generează un grafic Energy Institute între 2000 și 2020."
+    );
+    assert (ei_romanian_period.series_id == null);
+    assert (ei_romanian_period.intent == "unsupported_period");
+
+    var explicit_year_range = AskTheModel.ChartIntent.parse (
+        "/chart gistemp from 2000 to 2020"
+    );
+    assert (explicit_year_range.series_id == null);
+    assert (explicit_year_range.intent == "unsupported_period");
+
+    var explicit_romanian_year_range = AskTheModel.ChartIntent.parse (
+        "/chart energy-institute între 2000 și 2020"
+    );
+    assert (explicit_romanian_year_range.series_id == null);
+    assert (explicit_romanian_year_range.intent == "unsupported_period");
+
+    /* A matching alias must not override a conflicting geographic/subject filter. */
+    var gistemp_regional_filter = AskTheModel.ChartIntent.parse (
+        "Generate a chart of GISTEMP global temperature anomalies for Romania."
+    );
+    assert (gistemp_regional_filter.series_id == null);
+    assert (gistemp_regional_filter.intent == "ambiguous");
+
+    var energy_regional_filter = AskTheModel.ChartIntent.parse (
+        "Generate a chart of Energy Institute total energy supply for Europe."
+    );
+    assert (energy_regional_filter.series_id == null);
+    assert (energy_regional_filter.intent == "ambiguous");
+
+    var bnr_subject_filter = AskTheModel.ChartIntent.parse (
+        "Generate a chart of BNR credit standards for households."
+    );
+    assert (bnr_subject_filter.series_id == null);
+    assert (bnr_subject_filter.intent == "ambiguous");
+
+    /* Negation/capability guards are clause-scoped, not whole-message vetoes. */
+    var positive_ei_after_negated_gistemp =
+        AskTheModel.ChartIntent.parse (
+            "Don't show me a GISTEMP chart. Generate a chart of total energy supply."
+        );
+    assert (positive_ei_after_negated_gistemp.series_id ==
+        "energy.energy-institute.global-total-energy-supply");
+    assert (positive_ei_after_negated_gistemp.intent == "chart");
+
+    var positive_ei_after_negated_gistemp_romanian =
+        AskTheModel.ChartIntent.parse (
+            "Nu arăta un grafic GISTEMP; generează un grafic privind furnizarea totală de energie."
+        );
+    assert (positive_ei_after_negated_gistemp_romanian.series_id ==
+        "energy.energy-institute.global-total-energy-supply");
+    assert (positive_ei_after_negated_gistemp_romanian.intent == "chart");
+
+    var positive_bnr_after_interpretation_question =
+        AskTheModel.ChartIntent.parse (
+            "What does the GISTEMP chart show? Generate a chart of credit standards."
+        );
+    assert (positive_bnr_after_interpretation_question.series_id ==
+        "banking.bnr.bls-c01.credit-standards-net-percentage");
+    assert (positive_bnr_after_interpretation_question.intent == "chart");
+    assert (positive_bnr_after_interpretation_question.query.contains (
+        "What does the GISTEMP chart show?"
+    ));
+    assert (positive_bnr_after_interpretation_question.response_mode ==
+        "chart_and_text");
+
+    var positive_gistemp_after_capability_question =
+        AskTheModel.ChartIntent.parse (
+            "Does this app support charts? Generate a chart of global temperature anomalies."
+        );
+    assert (positive_gistemp_after_capability_question.series_id ==
+        "climate.gistemp.global-temperature-anomaly");
+    assert (positive_gistemp_after_capability_question.intent == "chart");
+    assert (positive_gistemp_after_capability_question.query.contains (
+        "Does this app support charts?"
+    ));
+    assert (positive_gistemp_after_capability_question.response_mode ==
+        "chart_and_text");
+
+    var positive_ei_after_capability_comma =
+        AskTheModel.ChartIntent.parse (
+            "Does this app support charts, generate a chart of total energy supply."
+        );
+    assert (positive_ei_after_capability_comma.series_id ==
+        "energy.energy-institute.global-total-energy-supply");
+    assert (positive_ei_after_capability_comma.intent == "chart");
+
+    var positive_ei_after_capability_and =
+        AskTheModel.ChartIntent.parse (
+            "Does this app support charts and generate a chart of total energy supply."
+        );
+    assert (positive_ei_after_capability_and.series_id ==
+        "energy.energy-institute.global-total-energy-supply");
+    assert (positive_ei_after_capability_and.intent == "chart");
+
+    var positive_ei_after_capability_romanian_and =
+        AskTheModel.ChartIntent.parse (
+            "Aplicația poate genera grafice și generează un grafic privind furnizarea totală de energie."
+        );
+    assert (positive_ei_after_capability_romanian_and.series_id ==
+        "energy.energy-institute.global-total-energy-supply");
+    assert (positive_ei_after_capability_romanian_and.intent == "chart");
+    assert (positive_ei_after_capability_romanian_and.response_mode ==
+        "chart_and_text");
+
+    var positive_ei_after_quoted_example_comma =
+        AskTheModel.ChartIntent.parse (
+            "The phrase 'Generate a GISTEMP chart' is an example, generate a chart of total energy supply."
+        );
+    assert (positive_ei_after_quoted_example_comma.series_id ==
+        "energy.energy-institute.global-total-energy-supply");
+    assert (positive_ei_after_quoted_example_comma.intent == "chart");
+
+    var positive_ei_after_quoted_example_and =
+        AskTheModel.ChartIntent.parse (
+            "The phrase 'Generate a GISTEMP chart' is an example and generate a chart of total energy supply."
+        );
+    assert (positive_ei_after_quoted_example_and.series_id ==
+        "energy.energy-institute.global-total-energy-supply");
+    assert (positive_ei_after_quoted_example_and.intent == "chart");
+    assert (positive_ei_after_quoted_example_and.query.contains (
+        "The phrase 'Generate a GISTEMP chart' is an example"
+    ));
+    assert (positive_ei_after_quoted_example_and.response_mode ==
+        "chart_and_text");
+
+    var positive_ei_after_romanian_quoted_example_comma =
+        AskTheModel.ChartIntent.parse (
+            "Fraza „Nu arăta un grafic GISTEMP” era doar un exemplu, generează un grafic privind furnizarea totală de energie."
+        );
+    assert (positive_ei_after_romanian_quoted_example_comma.series_id ==
+        "energy.energy-institute.global-total-energy-supply");
+    assert (positive_ei_after_romanian_quoted_example_comma.intent == "chart");
+    assert (positive_ei_after_romanian_quoted_example_comma.query.contains (
+        "Fraza „Nu arăta un grafic GISTEMP” era doar un exemplu"
+    ));
+    assert (positive_ei_after_romanian_quoted_example_comma.response_mode ==
+        "chart_and_text");
+
+    var uppercase_conjunction_after_quoted_example =
+        AskTheModel.ChartIntent.parse (
+            "The phrase 'Generate a GISTEMP chart' is an example AND GENERATE a chart of total energy supply."
+        );
+    assert (uppercase_conjunction_after_quoted_example.series_id ==
+        "energy.energy-institute.global-total-energy-supply");
+    assert (uppercase_conjunction_after_quoted_example.intent == "chart");
+    assert (uppercase_conjunction_after_quoted_example.query.contains (
+        "AND GENERATE a chart of total energy supply"
+    ));
+    assert (uppercase_conjunction_after_quoted_example.response_mode ==
+        "chart_and_text");
+
+    var postposed_same_series_negation =
+        AskTheModel.ChartIntent.parse (
+            "Generate a GISTEMP chart. Don't show it."
+        );
+    assert (postposed_same_series_negation.series_id == null);
+    assert (postposed_same_series_negation.intent == "ambiguous");
+
+    var negation_of_other_series_does_not_cancel_positive =
+        AskTheModel.ChartIntent.parse (
+            "Generate a GISTEMP chart. Don't show me a total energy supply chart."
+        );
+    assert (negation_of_other_series_does_not_cancel_positive.series_id ==
+        "climate.gistemp.global-temperature-anomaly");
+    assert (negation_of_other_series_does_not_cancel_positive.intent == "chart");
+
+    var two_positive_chart_clauses =
+        AskTheModel.ChartIntent.parse (
+            "Generate a GISTEMP chart. Generate an Energy Institute chart."
+        );
+    assert (two_positive_chart_clauses.series_id == null);
+    assert (two_positive_chart_clauses.intent == "ambiguous");
 
     return 0;
 }

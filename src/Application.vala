@@ -155,6 +155,11 @@ namespace AskTheModel {
         private string pres09_test_failure = "";
         private Gtk.Window? pres09_test_history_window = null;
         private ChatTabState? pres09_test_state = null;
+        private uint pres09_test_resize_stage = 0;
+        private uint pres09_test_resize_wait_ticks = 0;
+        private string pres09_test_resize_data = "";
+        private int pres09_test_visible_render_width = 0;
+        private int pres09_test_visible_render_height = 0;
 #endif
 
         public Application () {
@@ -3079,21 +3084,19 @@ namespace AskTheModel {
             return button;
         }
 
-        private void qualify_live_gistemp_request (
-            ConversationSession session
+        private void qualify_live_chart_request (
+            ConversationSession session,
+            string series_id
         ) throws GLib.Error {
             ConversationRepositoryPin? chart_pin = null;
 
             for (uint i = 0; i < session.repository_count (); i++) {
                 ConversationRepositoryPin? pin =
                     session.repository_pin_at (i);
-                if (pin == null) {
-                    continue;
-                }
+                if (pin == null) continue;
 
-                if (pin.repository_id == "ewd" ||
-                    pin.repository_id ==
-                        "LaurentiuStaicu/empirical-world3-dynamics") {
+                if (ChartNative.catalog_repository_matches_series (
+                        series_id, pin.repository_id)) {
                     chart_pin = pin;
                     break;
                 }
@@ -3101,8 +3104,8 @@ namespace AskTheModel {
 
             if (chart_pin == null) {
                 throw new GLib.IOError.FAILED (
-                    "GISTEMP charts require EWD to be selected for this conversation. " +
-                    "Select EWD in Repository Scope and retry."
+                    "The repository bound to this qualified chart series is not included " +
+                    "in Repository Scope. Select its catalog-bound repository and retry."
                 );
             }
 
@@ -3110,157 +3113,45 @@ namespace AskTheModel {
                 repository_descriptor_for_id (chart_pin.repository_id);
             if (descriptor == null) {
                 throw new GLib.IOError.NOT_FOUND (
-                    "The pinned EWD repository required for the GISTEMP chart is unavailable."
+                    "The pinned repository required for the catalog-selected chart is unavailable."
                 );
             }
 
-            string snapshot_path =
-                RepositoryLifecycleService.snapshot_path (
-                    descriptor,
-                    chart_pin.snapshot_sha
-                );
-            if (!GLib.FileUtils.test (
-                    snapshot_path,
-                    GLib.FileTest.IS_DIR
-                )) {
+            string snapshot_path = RepositoryLifecycleService.snapshot_path (
+                descriptor, chart_pin.snapshot_sha
+            );
+            if (!GLib.FileUtils.test (snapshot_path, GLib.FileTest.IS_DIR)) {
                 throw new GLib.IOError.NOT_FOUND (
-                    "The pinned EWD snapshot required for the GISTEMP chart is unavailable."
+                    "The exact pinned repository snapshot required for the catalog-selected chart is unavailable."
                 );
             }
 
-            ChartNative.Spec spec;
-            if (!ChartNative.reconstruct_live_gistemp (
+            /*
+             * One native factory owns the closed adapter dispatch and complete
+             * source admission/reconstruction rules. Application must not
+             * maintain a parallel per-series preflight switch.
+             */
+            ChartNative.SpecV4 spec_v4;
+            if (!ChartNative.reconstruct_live_v4 (
+                    series_id,
                     snapshot_path,
                     chart_pin.repository_id,
                     chart_pin.repository_version,
                     chart_pin.snapshot_sha,
-                    out spec
-                ) || spec == null) {
+                    out spec_v4
+                ) || spec_v4 == null) {
                 throw new GLib.IOError.INVALID_DATA (
-                    "The pinned GISTEMP source could not be re-qualified."
+                    "The catalog-selected source could not be re-qualified before model invocation."
                 );
             }
 
-            string? scientific_id = spec.series_scientific_id (0);
-            string? qualified_id = spec.series_qualified_id (0);
-            string? chart_spec_id = spec.id ();
-            if (scientific_id == null || qualified_id == null ||
-                chart_spec_id == null) {
+            unowned ChartNative.Spec? source_spec = spec_v4.source_spec ();
+            if (spec_v4.series_id () != series_id ||
+                source_spec == null ||
+                source_spec.series_repository_id (0) != chart_pin.repository_id ||
+                source_spec.series_snapshot_sha (0) != chart_pin.snapshot_sha) {
                 throw new GLib.IOError.INVALID_DATA (
-                    "The qualified GISTEMP chart identities are unavailable."
-                );
-            }
-        }
-
-        private void qualify_live_energy_institute_request (
-            ConversationSession session
-        ) throws GLib.Error {
-            ConversationRepositoryPin? chart_pin = null;
-            for (uint i = 0; i < session.repository_count (); i++) {
-                ConversationRepositoryPin? pin = session.repository_pin_at (i);
-                if (pin == null) continue;
-                if (pin.repository_id == "ewd" ||
-                    pin.repository_id == "LaurentiuStaicu/empirical-world3-dynamics") {
-                    chart_pin = pin;
-                    break;
-                }
-            }
-            if (chart_pin == null) {
-                throw new GLib.IOError.FAILED (
-                    "Energy Institute charts require EWD to be selected for this conversation. " +
-                    "Select EWD in Repository Scope and retry."
-                );
-            }
-            RepositoryDescriptor? descriptor =
-                repository_descriptor_for_id (chart_pin.repository_id);
-            if (descriptor == null) {
-                throw new GLib.IOError.NOT_FOUND (
-                    "The pinned EWD repository required for the Energy Institute chart is unavailable."
-                );
-            }
-            string snapshot_path = RepositoryLifecycleService.snapshot_path (
-                descriptor, chart_pin.snapshot_sha
-            );
-            if (!GLib.FileUtils.test (snapshot_path, GLib.FileTest.IS_DIR)) {
-                throw new GLib.IOError.NOT_FOUND (
-                    "The pinned EWD snapshot required for the Energy Institute chart is unavailable."
-                );
-            }
-            ChartNative.Spec spec;
-            if (!ChartNative.reconstruct_live_energy_institute (
-                    snapshot_path, chart_pin.repository_id,
-                    chart_pin.snapshot_sha, "line", out spec
-                ) || spec == null) {
-                throw new GLib.IOError.INVALID_DATA (
-                    "The pinned Energy Institute source could not be re-qualified."
-                );
-            }
-            string? scientific_id = spec.series_scientific_id (0);
-            string? qualified_id = spec.series_qualified_id (0);
-            string? chart_spec_id = spec.id ();
-            if (scientific_id == null || qualified_id == null || chart_spec_id == null) {
-                throw new GLib.IOError.INVALID_DATA (
-                    "The qualified Energy Institute chart identities are unavailable."
-                );
-            }
-        }
-
-
-        private void qualify_live_bnr_bls_c01_request (
-            ConversationSession session
-        ) throws GLib.Error {
-            ConversationRepositoryPin? chart_pin = null;
-            for (uint i = 0; i < session.repository_count (); i++) {
-                ConversationRepositoryPin? pin = session.repository_pin_at (i);
-                if (pin == null) continue;
-                if (pin.repository_id == "rmd" ||
-                    pin.repository_id == "LaurentiuStaicu/romanian-monetary-dynamics") {
-                    chart_pin = pin;
-                    break;
-                }
-            }
-            if (chart_pin == null) {
-                throw new GLib.IOError.FAILED (
-                    "BNR BLS C01 charts require RMD to be selected for this conversation. " +
-                    "Select RMD in Repository Scope and retry."
-                );
-            }
-            if (chart_pin.snapshot_sha != "e43eb4e899f123d3b1aa0f6e20b7c8ed35434170") {
-                throw new GLib.IOError.INVALID_DATA (
-                    "BNR BLS C01 is qualified only for the pinned RMD snapshot " +
-                    "e43eb4e899f123d3b1aa0f6e20b7c8ed35434170."
-                );
-            }
-            RepositoryDescriptor? descriptor =
-                repository_descriptor_for_id (chart_pin.repository_id);
-            if (descriptor == null) {
-                throw new GLib.IOError.NOT_FOUND (
-                    "The pinned RMD repository required for the BNR BLS C01 chart is unavailable."
-                );
-            }
-            string snapshot_path = RepositoryLifecycleService.snapshot_path (
-                descriptor, chart_pin.snapshot_sha
-            );
-            if (!GLib.FileUtils.test (snapshot_path, GLib.FileTest.IS_DIR)) {
-                throw new GLib.IOError.NOT_FOUND (
-                    "The pinned RMD snapshot required for the BNR BLS C01 chart is unavailable."
-                );
-            }
-            ChartNative.Spec spec;
-            if (!ChartNative.reconstruct_live_bnr_bls_c01 (
-                    snapshot_path, chart_pin.repository_id,
-                    chart_pin.snapshot_sha, "line", out spec
-                ) || spec == null) {
-                throw new GLib.IOError.INVALID_DATA (
-                    "The pinned BNR BLS C01 source could not be re-qualified."
-                );
-            }
-            string? scientific_id = spec.series_scientific_id (0);
-            string? qualified_id = spec.series_qualified_id (0);
-            string? chart_spec_id = spec.id ();
-            if (scientific_id == null || qualified_id == null || chart_spec_id == null) {
-                throw new GLib.IOError.INVALID_DATA (
-                    "The qualified BNR BLS C01 chart identities are unavailable."
+                    "The native catalog factory returned a chart spec that differs from the authorized repository pin."
                 );
             }
         }
@@ -3268,8 +3159,7 @@ namespace AskTheModel {
 
         private Gtk.Widget[] build_live_chart_widgets (
             ConversationSession session,
-            bool energy_institute,
-            bool bnr_bls_c01,
+            string series_id,
             out ConversationPersistenceChart[] charts
         ) throws GLib.Error {
             Gtk.Widget[] widgets = {};
@@ -3279,29 +3169,14 @@ namespace AskTheModel {
             for (uint i = 0; i < session.repository_count (); i++) {
                 ConversationRepositoryPin? pin = session.repository_pin_at (i);
                 if (pin == null) continue;
-                bool repository_matches = bnr_bls_c01
-                    ? (pin.repository_id == "rmd" ||
-                       pin.repository_id == "LaurentiuStaicu/romanian-monetary-dynamics")
-                    : (pin.repository_id == "ewd" ||
-                       pin.repository_id == "LaurentiuStaicu/empirical-world3-dynamics");
-                if (repository_matches) {
+                if (ChartNative.catalog_repository_matches_series (
+                        series_id, pin.repository_id)) {
                     chart_pin = pin;
                     break;
                 }
             }
             if (chart_pin == null) return widgets;
-            if (bnr_bls_c01 &&
-                chart_pin.snapshot_sha != "e43eb4e899f123d3b1aa0f6e20b7c8ed35434170") {
-                throw new GLib.IOError.INVALID_DATA (
-                    "BNR BLS C01 charts require the exact qualified RMD snapshot."
-                );
-            }
 
-            string source_path = bnr_bls_c01
-                ? "data/processed/bnr_bls_realised_rounds.csv"
-                : (energy_institute
-                    ? "science/data/processed/energy_institute_global_2026.csv"
-                    : "science/data/processed/nasa_gistemp_global_2026.csv");
             RepositoryDescriptor? descriptor =
                 repository_descriptor_for_id (chart_pin.repository_id);
             if (descriptor == null) {
@@ -3318,57 +3193,68 @@ namespace AskTheModel {
                 );
             }
 
-            ChartNative.Spec spec;
-            bool reconstructed = false;
-            if (bnr_bls_c01) {
-                reconstructed = ChartNative.reconstruct_live_bnr_bls_c01 (
-                    snapshot_path, chart_pin.repository_id,
-                    chart_pin.snapshot_sha, "line", out spec
-                );
-            } else if (energy_institute) {
-                reconstructed = ChartNative.reconstruct_live_energy_institute (
-                    snapshot_path, chart_pin.repository_id,
-                    chart_pin.snapshot_sha, "line", out spec
-                );
-            } else {
-                reconstructed = ChartNative.reconstruct_live_gistemp (
-                    snapshot_path, chart_pin.repository_id,
-                    chart_pin.repository_version, chart_pin.snapshot_sha,
-                    out spec
-                );
-            }
-            if (!reconstructed || spec == null) {
+            ChartNative.SpecV4 spec_v4;
+            bool reconstructed = ChartNative.reconstruct_live_v4 (
+                series_id,
+                snapshot_path,
+                chart_pin.repository_id,
+                chart_pin.repository_version,
+                chart_pin.snapshot_sha,
+                out spec_v4
+            );
+            if (!reconstructed || spec_v4 == null) {
                 throw new GLib.IOError.INVALID_DATA (
-                    bnr_bls_c01
-                        ? "Pinned BNR BLS C01 source could not be re-qualified for chart presentation."
-                        : (energy_institute
-                            ? "Pinned Energy Institute source could not be re-qualified for chart presentation."
-                            : "Pinned GISTEMP source could not be re-qualified for chart presentation.")
+                    "The catalog-selected pinned source could not be re-qualified for ChartSpec v4 presentation."
                 );
             }
 
-            string? scientific_id = spec.series_scientific_id (0);
-            string? qualified_id = spec.series_qualified_id (0);
-            string? chart_spec_id = spec.id ();
-            if (scientific_id == null || qualified_id == null || chart_spec_id == null) {
+            unowned ChartNative.Spec? source_spec = spec_v4.source_spec ();
+            if (source_spec == null) {
                 throw new GLib.IOError.INVALID_DATA (
-                    "Qualified chart identities are unavailable."
+                    "Catalog-selected ChartSpec v4 has no qualified source ChartSpec."
                 );
             }
 
-            string series_profile = bnr_bls_c01
-                ? "atm-series/bnr-bls-c01-calendar-quarter/1"
-                : (energy_institute
-                    ? "atm-series/energy-institute-tes-complete-annual/1"
-                    : "atm-series/gistemp-complete-annual/1");
-            string admission_profile = bnr_bls_c01
-                ? "atm-bnr-bls-canonical-panel-admission/1"
-                : (energy_institute
-                    ? "atm-energy-institute-pinned-admission/3"
-                    : "atm-gistemp-pinned-admission/1");
-            string repository_version = (energy_institute || bnr_bls_c01)
-                ? "snapshot:" + chart_pin.snapshot_sha
-                : chart_pin.repository_version;
+            string? series_profile = source_spec.series_profile ();
+            string? admission_profile = spec_v4.admission_profile_id ();
+            string? reconstruction_profile =
+                spec_v4.reconstruction_profile_id ();
+            string? scientific_id = source_spec.series_scientific_id (0);
+            string? qualified_id = source_spec.series_qualified_id (0);
+            string? chart_schema = source_spec.schema ();
+            string? chart_spec_id = source_spec.id ();
+            string? source_path = source_spec.series_source_path (0);
+            string? source_snapshot_sha = source_spec.series_snapshot_sha (0);
+            string? source_repository_id =
+                source_spec.series_repository_id (0);
+
+            if (series_profile == null || admission_profile == null ||
+                reconstruction_profile == null || scientific_id == null ||
+                qualified_id == null || chart_schema == null ||
+                chart_spec_id == null || source_path == null ||
+                source_snapshot_sha == null || source_repository_id == null) {
+                throw new GLib.IOError.INVALID_DATA (
+                    "Catalog-selected chart identities or pinned source metadata are unavailable."
+                );
+            }
+
+            if (source_snapshot_sha != chart_pin.snapshot_sha ||
+                source_repository_id != chart_pin.repository_id ||
+                !ChartNative.catalog_repository_matches_series (
+                    series_id, source_repository_id)) {
+                throw new GLib.IOError.INVALID_DATA (
+                    "Reconstructed source identity differs from the selected repository pin or catalog."
+                );
+            }
+
+            /*
+             * Keep the current source-specific History recipe contract intact.
+             * The v4 ID is for the live presentation wrapper only; persisted
+             * identity remains the exact underlying v1/v2/v3 ChartSpec.
+             */
+            string repository_version = chart_schema == "atm-chart-spec/1"
+                ? chart_pin.repository_version
+                : "snapshot:" + source_snapshot_sha;
             var series = new ConversationPersistenceChartSeries (
                 series_profile,
                 admission_profile,
@@ -3376,33 +3262,24 @@ namespace AskTheModel {
                 qualified_id,
                 chart_pin.repository_id,
                 repository_version,
-                chart_pin.snapshot_sha,
+                source_snapshot_sha,
                 source_path
             );
             charts = {
                 new ConversationPersistenceChart (
                     1,
-                    bnr_bls_c01 ? "atm-chart-spec/3" :
-                        (energy_institute ? "atm-chart-spec/2" : "atm-chart-spec/1"),
+                    chart_schema,
                     chart_spec_id,
                     "line",
-                    bnr_bls_c01
-                        ? "atm-chart-reconstruct/bnr-bls-c01-calendar-quarter/1"
-                        : (energy_institute
-                            ? "atm-chart-reconstruct/energy-institute-tes-complete-annual/1"
-                            : "atm-chart-reconstruct/gistemp-complete-annual/1"),
+                    reconstruction_profile,
                     { series }
                 )
             };
 
             ChartNative.View view;
-            if (!ChartNative.create (spec, out view)) {
+            if (!ChartNative.create_v4 (spec_v4, out view)) {
                 throw new GLib.IOError.FAILED (
-                    bnr_bls_c01
-                        ? "Qualified live BNR BLS C01 chart could not be rendered."
-                        : (energy_institute
-                            ? "Qualified live Energy Institute chart could not be rendered."
-                            : "Qualified live GISTEMP chart could not be rendered.")
+                    "Catalog-selected qualified ChartSpec v4 could not be rendered."
                 );
             }
             view.add_css_class ("atm-history-chart");
@@ -3553,10 +3430,29 @@ namespace AskTheModel {
                     );
                 }
 
+                /*
+                 * History storage still contains its original source-specific
+                 * v1/v2/v3 recipe. After rebuilding and checking that recipe
+                 * against the exact pinned source, wrap the qualified source
+                 * spec in v4 only for the common Chart/Data presentation.
+                 */
+                string history_series_id = chart.chart_schema == "atm-chart-spec/3"
+                    ? "banking.bnr.bls-c01.credit-standards-net-percentage"
+                    : (chart.chart_schema == "atm-chart-spec/2"
+                        ? "energy.energy-institute.global-total-energy-supply"
+                        : "climate.gistemp.global-temperature-anomaly");
+                ChartNative.SpecV4 history_spec_v4;
+                if (!ChartNative.wrap_qualified_spec_v4 (
+                        history_series_id, spec, out history_spec_v4)) {
+                    throw new GLib.IOError.INVALID_DATA (
+                        "Qualified History source does not match the catalog-bound ChartSpec v4 presentation."
+                    );
+                }
+
                 ChartNative.View view;
-                if (!ChartNative.create (spec, out view)) {
+                if (!ChartNative.create_v4 (history_spec_v4, out view)) {
                     throw new GLib.IOError.FAILED (
-                        "Qualified chart could not be rendered."
+                        "Qualified History chart could not be rendered by the catalog-bound Chart/Data view."
                     );
                 }
 
@@ -3879,9 +3775,64 @@ namespace AskTheModel {
         ) {
             ChartIntent chart_intent =
                 ChartIntent.parse (prompt);
-            bool source_chart_requested = chart_intent.gistemp_requested ||
-                chart_intent.energy_institute_requested ||
-                chart_intent.bnr_bls_c01_requested;
+
+            if (chart_intent.intent == "unsupported_period") {
+                bool romanian_request = ChartCatalog.text_has_phrase (
+                    prompt, "grafic") ||
+                    ChartCatalog.text_has_phrase (prompt, "generează") ||
+                    ChartCatalog.text_has_phrase (prompt, "genereaza") ||
+                    ChartCatalog.text_has_phrase (prompt, "creează") ||
+                    ChartCatalog.text_has_phrase (prompt, "creeaza") ||
+                    ChartCatalog.text_has_phrase (prompt, "arată") ||
+                    ChartCatalog.text_has_phrase (prompt, "arata") ||
+                    ChartCatalog.text_has_phrase (prompt, "între") ||
+                    ChartCatalog.text_has_phrase (prompt, "intre") ||
+                    ChartCatalog.text_has_phrase (prompt, "ultimii ani") ||
+                    ChartCatalog.text_has_phrase (prompt, "ultimele ani") ||
+                    ChartCatalog.text_has_phrase (prompt, "până în") ||
+                    ChartCatalog.text_has_phrase (prompt, "pana in") ||
+                    ChartCatalog.text_has_phrase (prompt, "interval");
+                string period_rejection = romanian_request
+                    ? "Filtrarea unui subinterval de ani nu este disponibilă încă. Graficul folosește întreaga acoperire temporală calificată a seriei. Cere intervalul complet disponibil; perioada de referință GISTEMP 1951–1980 este metadata de referință, nu un filtru al observațiilor."
+                    : "Custom year-range filtering is not available yet. The chart uses the full qualified time coverage of the selected series. Request its complete available range instead; GISTEMP's 1951–1980 reference baseline is metadata, not an observation-range filter.";
+                append_transcript (
+                    state.transcript, "Assistant: " + period_rejection
+                );
+                return;
+            }
+
+            if (chart_intent.intent == "unsupported" ||
+                chart_intent.intent == "ambiguous") {
+                bool romanian_request = ChartCatalog.text_has_phrase (
+                    prompt, "grafic") ||
+                    ChartCatalog.text_has_phrase (prompt, "generează") ||
+                    ChartCatalog.text_has_phrase (prompt, "genereaza") ||
+                    ChartCatalog.text_has_phrase (prompt, "arată") ||
+                    ChartCatalog.text_has_phrase (prompt, "arata") ||
+                    ChartCatalog.text_has_phrase (prompt, "populație") ||
+                    ChartCatalog.text_has_phrase (prompt, "populatie") ||
+                    ChartCatalog.text_has_phrase (prompt, "temperatură") ||
+                    ChartCatalog.text_has_phrase (prompt, "temperatura") ||
+                    ChartCatalog.text_has_phrase (prompt, "inflație") ||
+                    ChartCatalog.text_has_phrase (prompt, "inflatie") ||
+                    ChartCatalog.text_has_phrase (prompt, "șomaj") ||
+                    ChartCatalog.text_has_phrase (prompt, "somaj") ||
+                    ChartCatalog.text_has_phrase (prompt, "furnizarea") ||
+                    ChartCatalog.text_has_phrase (prompt, "standardele de credit");
+                string rejection = chart_intent.intent == "unsupported"
+                    ? (romanian_request
+                        ? "AtM nu poate genera acest grafic: variabila cerută nu este în catalogul de serii grafice validate. Menționează GISTEMP, furnizarea totală de energie Energy Institute sau seria BNR BLS C01."
+                        : "AtM cannot generate that chart: the requested variable is not in the catalog of qualified chart series. Name GISTEMP, Energy Institute total energy supply, or BNR BLS C01.")
+                    : (romanian_request
+                        ? "Cererea de grafic este ambiguă, nu identifică subiectul unei serii validate sau cere un tip de grafic ori o transformare nesuportată. Alege o singură serie validată pentru un grafic liniar."
+                        : "The chart request is ambiguous, its subject is not a registered qualified series, or it asks for an unsupported chart type or transformation. Choose one qualified series for a supported line chart.");
+                append_transcript (state.transcript, "Assistant: " + rejection);
+                return;
+            }
+
+            string selected_chart_series_id = chart_intent.series_id ?? "";
+            bool source_chart_requested =
+                selected_chart_series_id.length > 0;
             string effective_prompt = source_chart_requested
                 ? chart_intent.query
                 : prompt;
@@ -3889,11 +3840,7 @@ namespace AskTheModel {
             if (source_chart_requested && effective_prompt.length == 0) {
                 append_transcript (
                     state.transcript,
-                    chart_intent.bnr_bls_c01_requested
-                        ? "Assistant: Use /chart bnr-bls-c01 followed by the grounded question you want to visualize."
-                        : (chart_intent.energy_institute_requested
-                            ? "Assistant: Use /chart energy-institute followed by the grounded question you want to visualize."
-                            : "Assistant: Use /chart gistemp followed by the grounded question you want to visualize.")
+                    "Assistant: Add a grounded question after this chart command so AtM can construct the selected qualified series."
                 );
                 return;
             }
@@ -3941,38 +3888,21 @@ namespace AskTheModel {
                     );
                 }
 
-                if (chart_intent.gistemp_requested &&
-                    !repository_id_in (state.repository_ids, "ewd") &&
-                    !repository_id_in (
-                        state.repository_ids,
-                        "LaurentiuStaicu/empirical-world3-dynamics"
-                    )) {
-                    throw new GLib.IOError.FAILED (
-                        "GISTEMP charts require EWD to be selected for this conversation. " +
-                        "Select EWD in Repository Scope and retry."
-                    );
-                }
-                if (chart_intent.energy_institute_requested &&
-                    !repository_id_in (state.repository_ids, "ewd") &&
-                    !repository_id_in (
-                        state.repository_ids,
-                        "LaurentiuStaicu/empirical-world3-dynamics"
-                    )) {
-                    throw new GLib.IOError.FAILED (
-                        "Energy Institute charts require EWD to be selected for this conversation. " +
-                        "Select EWD in Repository Scope and retry."
-                    );
-                }
-                if (chart_intent.bnr_bls_c01_requested &&
-                    !repository_id_in (state.repository_ids, "rmd") &&
-                    !repository_id_in (
-                        state.repository_ids,
-                        "LaurentiuStaicu/romanian-monetary-dynamics"
-                    )) {
-                    throw new GLib.IOError.FAILED (
-                        "BNR BLS C01 charts require RMD to be selected for this conversation. " +
-                        "Select RMD in Repository Scope and retry."
-                    );
+                if (source_chart_requested) {
+                    bool selected_repository_in_scope = false;
+                    foreach (string repository_id in state.repository_ids) {
+                        if (ChartNative.catalog_repository_matches_series (
+                                selected_chart_series_id, repository_id)) {
+                            selected_repository_in_scope = true;
+                            break;
+                        }
+                    }
+                    if (!selected_repository_in_scope) {
+                        throw new GLib.IOError.FAILED (
+                            "The repository bound to this qualified chart series is not included " +
+                            "in this conversation's Repository Scope. Add that catalog-bound repository and retry."
+                        );
+                    }
                 }
 
                 if (!state.session.is_active ()) {
@@ -4007,12 +3937,11 @@ namespace AskTheModel {
                     ollama_provider.model_digest
                 );
 
-                if (chart_intent.gistemp_requested) {
-                    qualify_live_gistemp_request (state.session);
-                } else if (chart_intent.energy_institute_requested) {
-                    qualify_live_energy_institute_request (state.session);
-                } else if (chart_intent.bnr_bls_c01_requested) {
-                    qualify_live_bnr_bls_c01_request (state.session);
+                if (source_chart_requested) {
+                    qualify_live_chart_request (
+                        state.session,
+                        selected_chart_series_id
+                    );
                 }
 
                 bool needs_clarification;
@@ -4033,28 +3962,6 @@ namespace AskTheModel {
 
                 string grounded_system_instructions =
                     system_instructions ?? "";
-                if (chart_intent.gistemp_requested) {
-                    grounded_system_instructions +=
-                        "\nThe application handles the requested qualified " +
-                        "GISTEMP chart from the complete pinned source. Do " +
-                        "not claim that you cannot render charts or invent " +
-                        "data or chart configuration.";
-                } else if (chart_intent.energy_institute_requested) {
-                    grounded_system_instructions +=
-                        "\nThe application reconstructs the requested Energy Institute " +
-                        "Global Total Energy Supply chart from its complete admitted EWD " +
-                        "snapshot. The chart uses the Physical Energy Content interpretation " +
-                        "and reports exajoules per year. Do not invent values, chart metadata, " +
-                        "transformations or interpretations beyond the grounded evidence.";
-                } else if (chart_intent.bnr_bls_c01_requested) {
-                    grounded_system_instructions +=
-                        "\nThe application reconstructs the BNR BLS C01 quarterly credit " +
-                        "standards net-percentage chart from the exact pinned RMD source bundle. " +
-                        "It contains eleven numeric source observations across twelve quarter " +
-                        "coordinates; 2025-Q2 is source-qualified MISSING, not zero. Do not " +
-                        "impute, interpolate, fabricate values, or claim a continuous line over " +
-                        "the missing quarter.";
-                }
                 grounded_system_instructions +=
                     chart_intent.response_guidance ();
 
@@ -4206,8 +4113,7 @@ namespace AskTheModel {
                                 live_chart_widgets =
                                     build_live_chart_widgets (
                                         state.session,
-                                        chart_intent.energy_institute_requested,
-                                        chart_intent.bnr_bls_c01_requested,
+                                        selected_chart_series_id,
                                         out live_charts
                                     );
                             } catch (GLib.Error chart_error) {
@@ -4249,11 +4155,8 @@ namespace AskTheModel {
                         if (source_chart_requested &&
                             live_chart_widgets.length == 0) {
                             state.presentation.append_chart_status (
-                                chart_intent.bnr_bls_c01_requested
-                                    ? "AtM could not render the qualified BNR BLS C01 chart. Check that RMD is selected and the exact pinned snapshot is available."
-                                    : (chart_intent.energy_institute_requested
-                                        ? "AtM could not render the qualified Energy Institute chart. Check that EWD is selected and its pinned snapshot is available."
-                                        : "AtM could not render the qualified GISTEMP chart. Check that EWD is selected and its pinned snapshot is available.")
+                                "AtM could not render the qualified catalog series. " +
+                                "Check that its catalog-bound repository and exact pinned snapshot are available."
                             );
                         }
                         assistant_stream_started = true;
@@ -5927,6 +5830,137 @@ namespace AskTheModel {
             return true;
         }
 
+        private bool pres09_test_resize_live_chart (
+            ChatTabState state,
+            ChartNative.View view
+        ) {
+            Gtk.ApplicationWindow? window =
+                this.active_window as Gtk.ApplicationWindow;
+            if (window == null) {
+                pres09_test_failure =
+                    "Live chart resize test could not find the application window";
+                return false;
+            }
+
+            int render_width = 0;
+            int render_height = 0;
+            int render_scale = 0;
+            int area_width = 0;
+            int area_height = 0;
+            view.test_area_size (out area_width, out area_height);
+            view.test_render_size (
+                out render_width,
+                out render_height,
+                out render_scale
+            );
+
+            if (pres09_test_resize_stage == 0) {
+                window.set_default_size (1100, 900);
+                pres09_test_resize_stage = 1;
+                pres09_test_resize_wait_ticks = 0;
+                return true;
+            }
+
+            if (pres09_test_resize_stage == 1) {
+                if (view.test_is_fallback ()) {
+                    pres09_test_resize_wait_ticks++;
+                    if (pres09_test_resize_wait_ticks > 100) {
+                        pres09_test_failure =
+                            "Live chart did not leave fallback after enlarging the application window (%d×%d)"
+                            .printf (render_width, render_height);
+                        return false;
+                    }
+                    return true;
+                }
+                pres09_test_visible_render_width = area_width;
+                pres09_test_visible_render_height = area_height;
+                pres09_test_resize_data = view.data () ?? "";
+                if (pres09_test_resize_data.length == 0 ||
+                    view.row_count () != 146) {
+                    pres09_test_failure =
+                        "Live GISTEMP data was unavailable before the resize transition";
+                    return false;
+                }
+                view.test_set_canvas_minimum (480, 200);
+                window.set_default_size (500, 300);
+                pres09_test_resize_stage = 2;
+                pres09_test_resize_wait_ticks = 0;
+                return true;
+            }
+
+            if (pres09_test_resize_stage == 2) {
+                if (!view.test_is_fallback ()) {
+                    pres09_test_resize_wait_ticks++;
+                    if (pres09_test_resize_wait_ticks > 100) {
+                        pres09_test_failure =
+                            "Shrinking the application window did not enter renderer fallback: renderer=%d×%d, canvas=%d×%d, window=%d×%d, transcript=%d×%d, chart-view=%d×%d"
+                            .printf (
+                                render_width,
+                                render_height,
+                                area_width,
+                                area_height,
+                                window.get_width (),
+                                window.get_height (),
+                                state.transcript_scroll.get_width (),
+                                state.transcript_scroll.get_height (),
+                                view.get_width (),
+                                view.get_height ()
+                            );
+                        return false;
+                    }
+                    return true;
+                }
+                if (render_width >= pres09_test_visible_render_width &&
+                    render_height >= pres09_test_visible_render_height) {
+                    pres09_test_failure =
+                        "Renderer entered fallback without a smaller allocated viewport (%d×%d)"
+                        .printf (render_width, render_height);
+                    return false;
+                }
+                if ((view.data () ?? "") != pres09_test_resize_data ||
+                    view.row_count () != 146) {
+                    pres09_test_failure =
+                        "GISTEMP Data changed when the live chart entered fallback";
+                    return false;
+                }
+
+                view.test_set_canvas_minimum (480, 348);
+                window.set_default_size (1100, 900);
+                pres09_test_resize_stage = 3;
+                pres09_test_resize_wait_ticks = 0;
+                return true;
+            }
+
+            if (pres09_test_resize_stage == 3) {
+                if (view.test_is_fallback ()) {
+                    pres09_test_resize_wait_ticks++;
+                    if (pres09_test_resize_wait_ticks > 100) {
+                        pres09_test_failure =
+                            "Live chart did not recover from fallback after enlarging the application window (%d×%d)"
+                            .printf (render_width, render_height);
+                        return false;
+                    }
+                    return true;
+                }
+                if (render_width < pres09_test_visible_render_width ||
+                    render_height < pres09_test_visible_render_height) {
+                    pres09_test_failure =
+                        "Renderer recovered at a smaller viewport than the initial visible chart (%d×%d)"
+                        .printf (render_width, render_height);
+                    return false;
+                }
+                if ((view.data () ?? "") != pres09_test_resize_data ||
+                    view.row_count () != 146) {
+                    pres09_test_failure =
+                        "GISTEMP Data changed when the live chart recovered from fallback";
+                    return false;
+                }
+                pres09_test_resize_stage = 4;
+            }
+
+            return true;
+        }
+
         private bool pres09_test_step_live () {
             if (startup_qualification_failed) {
                 pres09_test_finish (
@@ -5955,7 +5989,7 @@ namespace AskTheModel {
                 }
                 pres09_test_request_started = true;
                 state.prompt.buffer.text =
-                    "/chart energy-institute Show the global TES trend.";
+                    "Arată-mi un grafic despre furnizarea totală de energie.";
                 state.send_button.clicked ();
                 return true;
             }
@@ -5996,7 +6030,7 @@ namespace AskTheModel {
 
                 pres09_test_live_turn = 1;
                 state.prompt.buffer.text =
-                    "/chart gistemp Show the global temperature anomaly trend.";
+                    "Generate a chart of global temperature anomalies.";
                 state.send_button.clicked ();
                 return true;
             }
@@ -6031,6 +6065,21 @@ namespace AskTheModel {
                     return false;
                 }
 
+                if (pres09_test_resize_stage < 4) {
+                    if (!pres09_test_resize_live_chart (state, gistemp_view)) {
+                        pres09_test_finish (
+                            false,
+                            pres09_test_failure.length > 0
+                                ? pres09_test_failure
+                                : "Live GISTEMP resize recovery failed"
+                        );
+                        return false;
+                    }
+                    if (pres09_test_resize_stage < 4) {
+                        return true;
+                    }
+                }
+
                 pres09_test_live_turn = 2;
                 if (!pres09_test_select_ewd (state, true)) {
                     pres09_test_finish (
@@ -6040,7 +6089,7 @@ namespace AskTheModel {
                     return false;
                 }
                 state.prompt.buffer.text =
-                    "/chart bnr-bls-c01 Show the quarterly credit standards net percentage trend.";
+                    "Generate a chart for quarterly credit standards.";
                 state.send_button.clicked ();
                 return true;
             }
@@ -6256,6 +6305,215 @@ namespace AskTheModel {
             return false;
         }
 
+        private bool pres09_test_step_intent_rejection () {
+            if (active_chat == null) {
+                create_chat_tab ();
+            }
+            ChatTabState? state = active_chat;
+            if (state == null) {
+                pres09_test_finish (
+                    false,
+                    "Application did not create a chat tab for chart-intent rejection E2E"
+                );
+                return false;
+            }
+            pres09_test_state = state;
+
+            if (pres09_test_live_turn == 0) {
+                state.prompt.buffer.text =
+                    "Generate a chart of population over time.";
+                pres09_test_live_turn = 1;
+                state.send_button.clicked ();
+                return true;
+            }
+
+            if (generation_active || state.generating) {
+                return true;
+            }
+
+            string transcript = state.transcript.buffer.text;
+            if (pres09_test_live_turn == 1) {
+                if (!transcript.contains (
+                        "AtM cannot generate that chart") ||
+                    state.pres09_test_chart_widgets.length != 0) {
+                    pres09_test_finish (
+                        false,
+                        "Unsupported population request did not fail closed before provider invocation or chart creation"
+                    );
+                    return false;
+                }
+
+                state.prompt.buffer.text =
+                    "/chart gistemp Show population over time.";
+                pres09_test_live_turn = 2;
+                state.send_button.clicked ();
+                return true;
+            }
+
+            if (pres09_test_live_turn == 2) {
+                if (!transcript.contains (
+                        "The chart request is ambiguous") ||
+                    state.pres09_test_chart_widgets.length != 0 ||
+                    state.persistent_id != null) {
+                    pres09_test_finish (
+                        false,
+                        "A conflicting explicit /chart request did not fail closed without a chart or persistent turn"
+                    );
+                    return false;
+                }
+
+                state.prompt.buffer.text = "/chart population";
+                pres09_test_live_turn = 3;
+                state.send_button.clicked ();
+                return true;
+            }
+
+            int ambiguous_position =
+                transcript.index_of ("The chart request is ambiguous");
+            int latest_unsupported_position =
+                transcript.last_index_of ("AtM cannot generate that chart");
+            if (pres09_test_live_turn == 3) {
+                if (ambiguous_position < 0 ||
+                    latest_unsupported_position <= ambiguous_position ||
+                    state.pres09_test_chart_widgets.length != 0 ||
+                    state.persistent_id != null) {
+                    pres09_test_finish (
+                        false,
+                        "Unknown explicit /chart selector fell through to normal chat instead of a fail-closed refusal"
+                    );
+                    return false;
+                }
+
+                state.prompt.buffer.text =
+                    "Generate a chart of diabetes prevalence using GISTEMP.";
+                pres09_test_live_turn = 4;
+                state.send_button.clicked ();
+                return true;
+            }
+
+            if (pres09_test_live_turn == 4) {
+                int latest_ambiguous_position =
+                    transcript.last_index_of ("The chart request is ambiguous");
+                if (latest_ambiguous_position <= latest_unsupported_position ||
+                    state.pres09_test_chart_widgets.length != 0 ||
+                    state.persistent_id != null) {
+                    pres09_test_finish (
+                        false,
+                        "A registered GISTEMP alias incorrectly authorized a diabetes-prevalence chart"
+                    );
+                    return false;
+                }
+
+                state.prompt.buffer.text =
+                    "Generate a pie chart of global temperature anomalies.";
+                pres09_test_live_turn = 5;
+                state.send_button.clicked ();
+                return true;
+            }
+
+            if (pres09_test_live_turn == 5) {
+                if (transcript.last_index_of ("The chart request is ambiguous") <=
+                        transcript.last_index_of ("AtM cannot generate that chart") ||
+                    state.pres09_test_chart_widgets.length != 0 ||
+                    state.persistent_id != null) {
+                    pres09_test_finish (
+                        false,
+                        "A pie-chart request was routed into the line-only Chart/Data renderer instead of failing closed"
+                    );
+                    return false;
+                }
+
+                state.prompt.buffer.text =
+                    "/chart gistemp Show a chart of diabetes prevalence using GISTEMP.";
+                pres09_test_live_turn = 6;
+                state.send_button.clicked ();
+                return true;
+            }
+
+            if (pres09_test_live_turn == 6) {
+                if (transcript.last_index_of ("The chart request is ambiguous") <=
+                        transcript.last_index_of ("AtM cannot generate that chart") ||
+                    state.pres09_test_chart_widgets.length != 0 ||
+                    state.persistent_id != null) {
+                    pres09_test_finish (
+                        false,
+                        "An explicit /chart command accepted an unrelated chart subject merely because its registered series was mentioned"
+                    );
+                    return false;
+                }
+
+                /*
+                 * A registered chart series is not sufficient if its repository
+                 * has not been authorized in this conversation. This request
+                 * must fail on catalog-bound Repository Scope before prepare_turn,
+                 * model generation, durable conversation creation or widget creation.
+                 */
+                state.locked = true;
+                state.repository_ids = {};
+                state.prompt.buffer.text = "/chart gistemp Show the trend.";
+                pres09_test_live_turn = 7;
+                state.send_button.clicked ();
+                return true;
+            }
+
+            if (pres09_test_live_turn == 7) {
+                if (!transcript.contains (
+                        "The repository bound to this qualified chart series is not included"
+                    ) ||
+                    state.pres09_test_chart_widgets.length != 0 ||
+                    state.persistent_id != null) {
+                    pres09_test_finish (
+                        false,
+                        "A supported chart series without its catalog-bound repository in Repository Scope did not fail closed before model routing or persistence"
+                    );
+                    return false;
+                }
+
+                state.prompt.buffer.text = "/chart gistemp from 2000 to 2020";
+                pres09_test_live_turn = 8;
+                state.send_button.clicked ();
+                return true;
+            }
+
+            if (pres09_test_live_turn == 8) {
+                if (!transcript.contains (
+                        "Custom year-range filtering is not available yet"
+                    ) ||
+                    state.pres09_test_chart_widgets.length != 0 ||
+                    state.persistent_id != null) {
+                    pres09_test_finish (
+                        false,
+                        "An unsupported English custom year range did not receive its explicit full-coverage refusal before model routing or persistence"
+                    );
+                    return false;
+                }
+
+                state.prompt.buffer.text = "/chart gistemp între 2000 și 2020";
+                pres09_test_live_turn = 9;
+                state.send_button.clicked ();
+                return true;
+            }
+
+            if (pres09_test_live_turn != 9 ||
+                !transcript.contains (
+                    "Filtrarea unui subinterval de ani nu este disponibilă încă"
+                ) ||
+                state.pres09_test_chart_widgets.length != 0 ||
+                state.persistent_id != null) {
+                pres09_test_finish (
+                    false,
+                    "An unsupported Romanian custom year range did not receive its explicit full-coverage refusal before model routing or persistence"
+                );
+                return false;
+            }
+
+            pres09_test_finish (
+                true,
+                "unsupported population, conflicting explicit /chart selection, unknown /chart selector, unrelated diabetes prevalence with a registered GISTEMP alias, unsupported pie-chart kind, unrelated explicit /chart subject, a valid series outside Repository Scope, and unsupported English/Romanian custom periods all failed closed without model routing, persistence or Chart/Data widgets"
+            );
+            return false;
+        }
+
         private bool pres09_test_step () {
             pres09_test_ticks++;
             if (pres09_test_ticks > 2400) {
@@ -6295,6 +6553,9 @@ namespace AskTheModel {
 
             if (pres09_test_phase == "source-details") {
                 return pres09_test_step_source_details ();
+            }
+            if (pres09_test_phase == "intent-rejection") {
+                return pres09_test_step_intent_rejection ();
             }
             if (pres09_test_phase == "live") {
                 return pres09_test_step_live ();

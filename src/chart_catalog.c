@@ -2,19 +2,32 @@
 #include <string.h>
 
 static const char *const gistemp_aliases[] = {
-    "gistemp", "global temperature anomaly", "global temperature anomalies",
+    "gistemp", "global temperature", "global surface temperature",
+    "global temperature anomaly", "global temperature anomalies",
+    "gistemp global temperature", "gistemp global temperature anomaly",
+    "gistemp global temperature anomalies",
     "temperature anomaly", "temperatura globala", "temperatura globală",
     "anomalia temperaturii globale", "anomalii ale temperaturii globale"
 };
 static const char *const ei_aliases[] = {
-    "energy-institute", "total energy supply", "global total energy supply", "tes",
+    "energy-institute", "energy institute", "total energy supply",
+    "global total energy supply", "global tes",
+    "energy institute total energy supply",
+    "energy institute global total energy supply",
+    "total energy supply tes", "tes",
     "furnizarea totala de energie", "furnizarea totală de energie",
     "furnizarea totală globală de energie"
 };
 static const char *const bnr_aliases[] = {
-    "bnr-bls-c01", "credit standards net percentage",
+    "bnr-bls-c01", "bnr bls c01", "bnr credit standards",
+    "credit standards", "credit standards net percentage",
     "quarterly credit standards", "net percentage for credit standards",
-    "standardele de credit", "procent net privind standardele de credit",
+    "standardele de credit", "standarde de credit",
+    "standardelor de credit", "standardelor de credit bnr",
+    "procent net privind standardele de credit",
+    "procentului net privind standardele de credit",
+    "procentului net al standardelor de credit",
+    "bnr bls c01 al procentului net privind standardele de credit",
     "standardele de credit pentru companii"
 };
 static const char *const ewd_snapshots[] = {
@@ -30,7 +43,8 @@ static const AtmChartCatalogEntry entries[] = {
     {
         .series_id = "climate.gistemp.global-temperature-anomaly",
         .display_name = "Global surface temperature anomaly (GISTEMP)",
-        .description = "Annual global temperature anomaly relative to the 1951-1980 mean.",
+        .display_name_ro = "Anomalia globală a temperaturii de la suprafață (GISTEMP)",
+        .description = "Global annual land-ocean temperature anomaly in °C relative to the 1951–1980 mean.",
         .aliases = gistemp_aliases, .alias_count = G_N_ELEMENTS (gistemp_aliases),
         .adapter = ATM_CHART_CATALOG_ADAPTER_GISTEMP_V1,
         .adapter_id = "gistemp-pinned-annual/1",
@@ -67,7 +81,8 @@ static const AtmChartCatalogEntry entries[] = {
     {
         .series_id = "energy.energy-institute.global-total-energy-supply",
         .display_name = "Global total energy supply (Energy Institute TES)",
-        .description = "Global annual TES using the Physical Energy Content accounting method.",
+        .display_name_ro = "Furnizarea totală globală de energie (Energy Institute TES)",
+        .description = "Global total energy supply (TES) in EJ/year using the Physical Energy Content method. This is gross supply, not net energy or EROI.",
         .aliases = ei_aliases, .alias_count = G_N_ELEMENTS (ei_aliases),
         .adapter = ATM_CHART_CATALOG_ADAPTER_ENERGY_INSTITUTE_V2,
         .adapter_id = "energy-institute-tes-pinned-annual/1",
@@ -104,7 +119,8 @@ static const AtmChartCatalogEntry entries[] = {
     {
         .series_id = "banking.bnr.bls-c01.credit-standards-net-percentage",
         .display_name = "BNR Bank Lending Survey: credit standards net percentage",
-        .description = "Quarterly net percentage for credit standards on loans to non-financial corporations.",
+        .display_name_ro = "Sondajul BNR privind creditarea: procentul net al standardelor de credit",
+        .description = "Quarterly net percentage for credit standards on loans to non-financial corporations. Positive values indicate tightening; negative values indicate easing. The 2025-Q2 source round was not retained, so it is missing, not zero.",
         .aliases = bnr_aliases, .alias_count = G_N_ELEMENTS (bnr_aliases),
         .adapter = ATM_CHART_CATALOG_ADAPTER_BNR_BLS_C01_V3,
         .adapter_id = "bnr-bls-c01-pinned-quarterly/1",
@@ -267,6 +283,150 @@ atm_chart_catalog_find_alias (const char *alias, const AtmChartCatalogEntry **ou
     return ATM_CHART_CATALOG_LOOKUP_FOUND;
 }
 
+
+static gboolean
+word_character_at (const char *cursor)
+{
+    if (cursor == NULL || *cursor == '\0')
+        return FALSE;
+    gunichar character = g_utf8_get_char (cursor);
+    return g_unichar_isalnum (character) || character == '_';
+}
+
+static gboolean
+alias_occurs_as_phrase (const char *request, const char *alias)
+{
+    const char *cursor = request;
+    while ((cursor = strstr (cursor, alias)) != NULL) {
+        const char *after = cursor + strlen (alias);
+        const char *before = g_utf8_find_prev_char (request, cursor);
+        gboolean left_boundary = before == NULL ||
+            !word_character_at (before);
+        gboolean right_boundary = !word_character_at (after);
+        if (left_boundary && right_boundary)
+            return TRUE;
+        cursor = g_utf8_next_char (cursor);
+    }
+    return FALSE;
+}
+
+
+
+char *
+atm_chart_catalog_match_exact_alias_series_id (
+    const char *subject,
+    gboolean *out_ambiguous
+)
+{
+    if (out_ambiguous == NULL)
+        return NULL;
+    *out_ambiguous = FALSE;
+
+    char *key = normalize_alias (subject);
+    if (key == NULL)
+        return NULL;
+
+    const AtmChartCatalogEntry *found = NULL;
+    for (gsize i = 0; i < G_N_ELEMENTS (entries); i++) {
+        for (gsize j = 0; j < entries[i].alias_count; j++) {
+            char *alias = normalize_alias (entries[i].aliases[j]);
+            gboolean matches = alias != NULL && g_strcmp0 (key, alias) == 0;
+            g_free (alias);
+            if (!matches)
+                continue;
+            if (found != NULL && found != &entries[i]) {
+                *out_ambiguous = TRUE;
+                g_free (key);
+                return NULL;
+            }
+            found = &entries[i];
+        }
+    }
+
+    g_free (key);
+    return found != NULL ? g_strdup (found->series_id) : NULL;
+}
+
+gboolean
+atm_chart_catalog_text_has_phrase (const char *text, const char *phrase)
+{
+    char *normalized_text = normalize_alias (text);
+    char *normalized_phrase = normalize_alias (phrase);
+    if (normalized_text == NULL || normalized_phrase == NULL) {
+        g_free (normalized_text);
+        g_free (normalized_phrase);
+        return FALSE;
+    }
+    gboolean matches = alias_occurs_as_phrase (
+        normalized_text, normalized_phrase);
+    g_free (normalized_text);
+    g_free (normalized_phrase);
+    return matches;
+}
+
+char *
+atm_chart_catalog_match_request_series_id (
+    const char *request,
+    gboolean *out_ambiguous
+)
+{
+    if (out_ambiguous == NULL)
+        return NULL;
+    *out_ambiguous = FALSE;
+
+    char *normalized_request = normalize_alias (request);
+    if (normalized_request == NULL)
+        return NULL;
+
+    const AtmChartCatalogEntry *found = NULL;
+    for (gsize i = 0; i < G_N_ELEMENTS (entries); i++) {
+        gboolean entry_matches = FALSE;
+        for (gsize j = 0; j < entries[i].alias_count; j++) {
+            char *alias = normalize_alias (entries[i].aliases[j]);
+            gboolean matches = alias != NULL &&
+                alias_occurs_as_phrase (normalized_request, alias);
+            g_free (alias);
+            if (matches) {
+                entry_matches = TRUE;
+                break;
+            }
+        }
+        if (!entry_matches)
+            continue;
+        if (found != NULL && found != &entries[i]) {
+            *out_ambiguous = TRUE;
+            g_free (normalized_request);
+            return NULL;
+        }
+        found = &entries[i];
+    }
+
+    g_free (normalized_request);
+    return found != NULL ? g_strdup (found->series_id) : NULL;
+}
+
+
+const char *
+atm_chart_catalog_adapter_id_for_series (const char *series_id)
+{
+    const AtmChartCatalogEntry *entry =
+        atm_chart_catalog_find_id (series_id);
+    return entry != NULL ? entry->adapter_id : NULL;
+}
+
+gboolean
+atm_chart_catalog_repository_matches_series (
+    const char *series_id,
+    const char *repository_id
+)
+{
+    const AtmChartCatalogEntry *entry =
+        atm_chart_catalog_find_id (series_id);
+    return entry != NULL && repository_id != NULL &&
+        (g_strcmp0 (repository_id, entry->repository_key) == 0 ||
+         g_strcmp0 (repository_id, entry->repository_full_name) == 0);
+}
+
 gboolean
 atm_chart_catalog_snapshot_admitted (const AtmChartCatalogEntry *entry, const char *snapshot_sha)
 {
@@ -413,7 +573,7 @@ atm_chart_catalog_validate (GError **error)
     for (gsize i = 0; i < G_N_ELEMENTS (entries); i++) {
         const AtmChartCatalogEntry *e = &entries[i];
         const char *required[] = {
-            e->series_id, e->display_name, e->description, e->adapter_id,
+            e->series_id, e->display_name, e->display_name_ro, e->description, e->adapter_id,
             e->series_profile_id, e->series_profile_version,
             e->admission_profile_id, e->admission_profile_version,
             e->reconstruction_profile_id, e->chart_spec_schema,
@@ -491,4 +651,100 @@ atm_chart_catalog_validate (GError **error)
         if (!policy_matches(e, error)) return FALSE;
     }
     return TRUE;
+}
+
+
+
+char *
+atm_chart_catalog_response_guidance (const char *series_id)
+{
+    const AtmChartCatalogEntry *entry =
+        atm_chart_catalog_find_id (series_id);
+    if (entry == NULL)
+        return NULL;
+
+    char *missing_guidance = NULL;
+    if (entry->missing_policy == ATM_CHART_CATALOG_MISSING_BOUNDED_PROFILE) {
+        missing_guidance = g_strdup_printf (
+            "The observation at %s is source-authorized MISSING (%s), not zero. "
+            "Do not impute, interpolate, synthesize the point, or bridge a line across the gap.",
+            entry->missing_coordinate != NULL ? entry->missing_coordinate : "the declared coordinate",
+            entry->missing_reason != NULL ? entry->missing_reason : "the catalogued missing policy");
+    } else {
+        missing_guidance = g_strdup (
+            "The qualified source profile rejects missing observations. "
+            "Do not invent, impute, interpolate, or synthesize missing points.");
+    }
+
+    char *guidance = g_strdup_printf (
+        "\nThe application attempts to construct the qualified catalog series \"%s\" "
+        "from its exact admitted %s snapshot. Catalog description: %s. "
+        "X coordinates: %s, unit %s, coverage %s to %s. "
+        "Y unit: %s; observation meaning: %s. Reference period: %s. "
+        "%s The native Chart/Data widget, not prose, presents the complete qualified "
+        "series, exact values and source provenance. For a chart-only request, do not "
+        "reproduce individual values or years as a table or pseudo-table; only provide "
+        "those details when explicitly requested. Do not invent numeric values, axes, "
+        "units, transformations, missing-value semantics or unsupported interpretations. "
+        "Publisher/source: %s. Pinned processed artifact: %s. Reconstruction scope: %s. "
+        "Do not claim independent reproduction of the publisher's raw-to-processed pipeline "
+        "beyond that stated scope.",
+        entry->display_name,
+        entry->repository_full_name,
+        entry->description,
+        entry->x_frequency,
+        entry->x_unit,
+        entry->coverage_start,
+        entry->coverage_end,
+        entry->y_unit,
+        entry->observation_meaning,
+        entry->reference_period != NULL ? entry->reference_period : "not separately specified",
+        missing_guidance,
+        entry->publisher_name,
+        entry->pinned_artifact_description,
+        entry->reconstruction_scope);
+
+    g_free (missing_guidance);
+    return guidance;
+}
+
+char *
+atm_chart_catalog_chart_only_response (
+    const char *series_id,
+    gboolean romanian
+)
+{
+    const AtmChartCatalogEntry *entry =
+        atm_chart_catalog_find_id (series_id);
+    if (entry == NULL)
+        return NULL;
+
+    char *missing_note = NULL;
+    if (entry->missing_policy == ATM_CHART_CATALOG_MISSING_BOUNDED_PROFILE) {
+        missing_note = romanian
+            ? g_strdup_printf (" Observația %s lipsește din sursă; este lipsă, nu zero.",
+                entry->missing_coordinate != NULL ? entry->missing_coordinate : "declarată")
+            : g_strdup_printf (" The %s observation is missing from the source, not zero.",
+                entry->missing_coordinate != NULL ? entry->missing_coordinate : "declared");
+    } else {
+        missing_note = g_strdup ("");
+    }
+
+    char *response;
+    if (romanian) {
+        response = g_strdup_printf (
+            "Cerere de grafic: %s. Valorile exacte și proveniența apar în vizualizarea "
+            "Chart/Data calificată când este disponibilă.%s Dacă graficul nu poate fi "
+            "construit, AtM raportează separat problema și nu substituie valori.",
+            entry->display_name_ro, missing_note);
+    } else {
+        response = g_strdup_printf (
+            "Requested chart: %s. Exact values and source provenance appear in the "
+            "qualified Chart/Data view when available.%s If chart construction fails, "
+            "AtM reports that separately rather than substituting values.",
+            entry->display_name, missing_note);
+    }
+
+    g_free (missing_note);
+    return response;
 }

@@ -725,6 +725,7 @@ test_v4_identity_ignores_nonsemantic_catalog_metadata (void)
 
     variant = *entry;
     variant.display_name = "Different display copy";
+    variant.display_name_ro = "Alt text de afișare";
     variant.description = "Updated explanatory wording only.";
     id = build_v4_test_identity (&variant, source);
     g_assert_cmpstr (id, ==, baseline);
