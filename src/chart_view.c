@@ -582,12 +582,11 @@ static gboolean atm_chart_view_new_internal (const AtmChartSpec *spec,
     /*
      * GtkTextView child anchors allocate their children at minimum size.
      * Keep enough height for the renderer's 370px layout threshold, plus a
-     * small margin. GISTEMP/EI subtitles need more than 448px of text
-     * width; BNR's missing-value footer is longer and needs a wider minimum.
+     * small margin. initial_width reserves space for the longest qualified
+     * subtitle/footer in the selected source profile.
      */
-    int canvas_min_width = is_bnr ? 800 : 640;
-    gtk_drawing_area_set_content_width (self->area, canvas_min_width);
-    gtk_drawing_area_set_content_height (self->area, 380);
+    gtk_drawing_area_set_content_width (self->area, initial_width);
+    gtk_drawing_area_set_content_height (self->area, initial_height);
     gtk_widget_set_hexpand (GTK_WIDGET (self->area), TRUE); gtk_widget_set_vexpand (GTK_WIDGET (self->area), TRUE);
     gtk_widget_set_focusable (GTK_WIDGET (self->area), TRUE);
     accessible (GTK_WIDGET (self->area),
