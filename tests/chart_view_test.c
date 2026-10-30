@@ -604,7 +604,7 @@ static void assert_transcript_anchor_resize (AtmChartView *view)
 
     GtkWidget *area = chart_drawing_area (view);
     g_assert_cmpint (gtk_widget_get_width (area), >=, 480);
-    g_assert_cmpint (gtk_widget_get_height (area), >=, 348);
+    g_assert_cmpint (gtk_widget_get_height (area), >=, 370);
     g_assert_false (atm_chart_view_test_is_fallback (view));
 
     char *data_before = g_strdup (atm_chart_view_data (view));
