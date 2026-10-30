@@ -5878,7 +5878,7 @@ namespace AskTheModel {
                     return false;
                 }
                 view.test_set_canvas_minimum (480, 280);
-                window.set_default_size (500, 400);
+                window.set_default_size (500, 360);
                 pres09_test_resize_stage = 2;
                 pres09_test_resize_wait_ticks = 0;
                 return true;
