@@ -116,12 +116,105 @@ namespace AskTheModel {
         }
     }
 
+    public class ConversationPersistenceChartPresentation : Object {
+        public string presentation_schema { get; construct; }
+        public string presentation_spec_id { get; construct; }
+        public string series_id { get; construct; }
+        public string catalog_schema { get; construct; }
+        public string adapter_id { get; construct; }
+        public string series_profile_id { get; construct; }
+        public string series_profile_version { get; construct; }
+        public string admission_profile_id { get; construct; }
+        public string admission_profile_version { get; construct; }
+        public string reconstruction_profile_id { get; construct; }
+        public string source_chart_schema { get; construct; }
+        public string source_chart_spec_id { get; construct; }
+        public string x_coordinate_semantics { get; construct; }
+        public string x_frequency { get; construct; }
+        public string x_unit { get; construct; }
+        public string x_dimension { get; construct; }
+        public string subject { get; construct; }
+        public string attribute { get; construct; }
+        public string y_unit { get; construct; }
+        public string y_dimension { get; construct; }
+        public string series_semantics { get; construct; }
+        public string missing_policy { get; construct; }
+        public string? missing_coordinate { get; construct; }
+        public string? missing_reason { get; construct; }
+        public string display_profile_id { get; construct; }
+        public string display_profile_version { get; construct; }
+        public string render_contract { get; construct; }
+
+        public ConversationPersistenceChartPresentation (
+            string presentation_schema,
+            string presentation_spec_id,
+            string series_id,
+            string catalog_schema,
+            string adapter_id,
+            string series_profile_id,
+            string series_profile_version,
+            string admission_profile_id,
+            string admission_profile_version,
+            string reconstruction_profile_id,
+            string source_chart_schema,
+            string source_chart_spec_id,
+            string x_coordinate_semantics,
+            string x_frequency,
+            string x_unit,
+            string x_dimension,
+            string subject,
+            string attribute,
+            string y_unit,
+            string y_dimension,
+            string series_semantics,
+            string missing_policy,
+            string? missing_coordinate,
+            string? missing_reason,
+            string display_profile_id,
+            string display_profile_version,
+            string render_contract
+        ) {
+            Object (
+                presentation_schema: presentation_schema,
+                presentation_spec_id: presentation_spec_id,
+                series_id: series_id,
+                catalog_schema: catalog_schema,
+                adapter_id: adapter_id,
+                series_profile_id: series_profile_id,
+                series_profile_version: series_profile_version,
+                admission_profile_id: admission_profile_id,
+                admission_profile_version: admission_profile_version,
+                reconstruction_profile_id: reconstruction_profile_id,
+                source_chart_schema: source_chart_schema,
+                source_chart_spec_id: source_chart_spec_id,
+                x_coordinate_semantics: x_coordinate_semantics,
+                x_frequency: x_frequency,
+                x_unit: x_unit,
+                x_dimension: x_dimension,
+                subject: subject,
+                attribute: attribute,
+                y_unit: y_unit,
+                y_dimension: y_dimension,
+                series_semantics: series_semantics,
+                missing_policy: missing_policy,
+                missing_coordinate: missing_coordinate,
+                missing_reason: missing_reason,
+                display_profile_id: display_profile_id,
+                display_profile_version: display_profile_version,
+                render_contract: render_contract
+            );
+        }
+    }
+
     public class ConversationPersistenceChart : Object {
         public int64 ordinal { get; construct; }
         public string chart_schema { get; construct; }
         public string chart_spec_id { get; construct; }
         public string chart_kind { get; construct; }
         public string reconstruction_profile { get; construct; }
+        /* NULL is a legacy source-only chart; v4 marker requires the sidecar. */
+        public string? presentation_schema { get; construct; }
+        public ConversationPersistenceChartPresentation? presentation { get; construct; }
         public ConversationPersistenceChartSeries[] series;
 
         public ConversationPersistenceChart (
@@ -130,14 +223,18 @@ namespace AskTheModel {
             string chart_spec_id,
             string chart_kind,
             string reconstruction_profile,
-            ConversationPersistenceChartSeries[] series
+            ConversationPersistenceChartSeries[] series,
+            string? presentation_schema = null,
+            ConversationPersistenceChartPresentation? presentation = null
         ) {
             Object (
                 ordinal: ordinal,
                 chart_schema: chart_schema,
                 chart_spec_id: chart_spec_id,
                 chart_kind: chart_kind,
-                reconstruction_profile: reconstruction_profile
+                reconstruction_profile: reconstruction_profile,
+                presentation_schema: presentation_schema,
+                presentation: presentation
             );
 
             this.series = series;
@@ -1061,6 +1158,190 @@ namespace AskTheModel {
                             );
                     }
 
+                    string? presentation_marker =
+                        ConversationStoreNative.snapshot_chart_presentation_schema_at (
+                            native_snapshot,
+                            message_index,
+                            chart_index
+                        );
+                    ConversationPersistenceChartPresentation? presentation = null;
+                    string? presentation_id =
+                        ConversationStoreNative.snapshot_chart_presentation_spec_id_at (
+                            native_snapshot,
+                            message_index,
+                            chart_index
+                        );
+                    if (presentation_id != null) {
+                        presentation =
+                            new ConversationPersistenceChartPresentation (
+                                require_native_text (
+                                    ConversationStoreNative.snapshot_chart_presentation_sidecar_schema_at (
+                                        native_snapshot, message_index, chart_index
+                                    ),
+                                    "v4 presentation schema"
+                                ),
+                                require_native_text (
+                                    presentation_id,
+                                    "v4 presentation spec id"
+                                ),
+                                require_native_text (
+                                    ConversationStoreNative.snapshot_chart_presentation_series_id_at (
+                                        native_snapshot, message_index, chart_index
+                                    ),
+                                    "v4 presentation series id"
+                                ),
+                                require_native_text (
+                                    ConversationStoreNative.snapshot_chart_presentation_catalog_schema_at (
+                                        native_snapshot, message_index, chart_index
+                                    ),
+                                    "v4 presentation catalog schema"
+                                ),
+                                require_native_text (
+                                    ConversationStoreNative.snapshot_chart_presentation_adapter_id_at (
+                                        native_snapshot, message_index, chart_index
+                                    ),
+                                    "v4 presentation adapter id"
+                                ),
+                                require_native_text (
+                                    ConversationStoreNative.snapshot_chart_presentation_series_profile_id_at (
+                                        native_snapshot, message_index, chart_index
+                                    ),
+                                    "v4 presentation series profile"
+                                ),
+                                require_native_text (
+                                    ConversationStoreNative.snapshot_chart_presentation_series_profile_version_at (
+                                        native_snapshot, message_index, chart_index
+                                    ),
+                                    "v4 presentation series profile version"
+                                ),
+                                require_native_text (
+                                    ConversationStoreNative.snapshot_chart_presentation_admission_profile_id_at (
+                                        native_snapshot, message_index, chart_index
+                                    ),
+                                    "v4 presentation admission profile"
+                                ),
+                                require_native_text (
+                                    ConversationStoreNative.snapshot_chart_presentation_admission_profile_version_at (
+                                        native_snapshot, message_index, chart_index
+                                    ),
+                                    "v4 presentation admission profile version"
+                                ),
+                                require_native_text (
+                                    ConversationStoreNative.snapshot_chart_presentation_reconstruction_profile_id_at (
+                                        native_snapshot, message_index, chart_index
+                                    ),
+                                    "v4 presentation reconstruction profile"
+                                ),
+                                require_native_text (
+                                    ConversationStoreNative.snapshot_chart_presentation_source_chart_schema_at (
+                                        native_snapshot, message_index, chart_index
+                                    ),
+                                    "v4 source chart schema"
+                                ),
+                                require_native_text (
+                                    ConversationStoreNative.snapshot_chart_presentation_source_chart_spec_id_at (
+                                        native_snapshot, message_index, chart_index
+                                    ),
+                                    "v4 source chart spec id"
+                                ),
+                                require_native_text (
+                                    ConversationStoreNative.snapshot_chart_presentation_x_coordinate_semantics_at (
+                                        native_snapshot, message_index, chart_index
+                                    ),
+                                    "v4 x-coordinate semantics"
+                                ),
+                                require_native_text (
+                                    ConversationStoreNative.snapshot_chart_presentation_x_frequency_at (
+                                        native_snapshot, message_index, chart_index
+                                    ),
+                                    "v4 x-frequency"
+                                ),
+                                require_native_text (
+                                    ConversationStoreNative.snapshot_chart_presentation_x_unit_at (
+                                        native_snapshot, message_index, chart_index
+                                    ),
+                                    "v4 x-unit"
+                                ),
+                                require_native_text (
+                                    ConversationStoreNative.snapshot_chart_presentation_x_dimension_at (
+                                        native_snapshot, message_index, chart_index
+                                    ),
+                                    "v4 x-dimension"
+                                ),
+                                require_native_text (
+                                    ConversationStoreNative.snapshot_chart_presentation_subject_at (
+                                        native_snapshot, message_index, chart_index
+                                    ),
+                                    "v4 subject"
+                                ),
+                                require_native_text (
+                                    ConversationStoreNative.snapshot_chart_presentation_attribute_at (
+                                        native_snapshot, message_index, chart_index
+                                    ),
+                                    "v4 attribute"
+                                ),
+                                require_native_text (
+                                    ConversationStoreNative.snapshot_chart_presentation_y_unit_at (
+                                        native_snapshot, message_index, chart_index
+                                    ),
+                                    "v4 y-unit"
+                                ),
+                                require_native_text (
+                                    ConversationStoreNative.snapshot_chart_presentation_y_dimension_at (
+                                        native_snapshot, message_index, chart_index
+                                    ),
+                                    "v4 y-dimension"
+                                ),
+                                require_native_text (
+                                    ConversationStoreNative.snapshot_chart_presentation_series_semantics_at (
+                                        native_snapshot, message_index, chart_index
+                                    ),
+                                    "v4 series semantics"
+                                ),
+                                require_native_text (
+                                    ConversationStoreNative.snapshot_chart_presentation_missing_policy_at (
+                                        native_snapshot, message_index, chart_index
+                                    ),
+                                    "v4 missing-value policy"
+                                ),
+                                ConversationStoreNative.snapshot_chart_presentation_missing_coordinate_at (
+                                    native_snapshot, message_index, chart_index
+                                ),
+                                ConversationStoreNative.snapshot_chart_presentation_missing_reason_at (
+                                    native_snapshot, message_index, chart_index
+                                ),
+                                require_native_text (
+                                    ConversationStoreNative.snapshot_chart_presentation_display_profile_id_at (
+                                        native_snapshot, message_index, chart_index
+                                    ),
+                                    "v4 display profile id"
+                                ),
+                                require_native_text (
+                                    ConversationStoreNative.snapshot_chart_presentation_display_profile_version_at (
+                                        native_snapshot, message_index, chart_index
+                                    ),
+                                    "v4 display profile version"
+                                ),
+                                require_native_text (
+                                    ConversationStoreNative.snapshot_chart_presentation_render_contract_at (
+                                        native_snapshot, message_index, chart_index
+                                    ),
+                                    "v4 render contract"
+                                )
+                            );
+                    }
+
+                    if ((presentation_marker == "atm-chart-spec/4") !=
+                            (presentation != null) ||
+                        (presentation_marker != null &&
+                            presentation_marker != "atm-chart-spec/4") ||
+                        (presentation != null &&
+                            presentation.presentation_schema != presentation_marker)) {
+                        throw new GLib.IOError.INVALID_DATA (
+                            "History chart presentation marker and sidecar are inconsistent."
+                        );
+                    }
+
                     charts +=
                         new ConversationPersistenceChart (
                             ConversationStoreNative.snapshot_chart_ordinal_at (
@@ -1100,7 +1381,9 @@ namespace AskTheModel {
                                 ),
                                 "chart reconstruction profile"
                             ),
-                            series
+                            series,
+                            presentation_marker,
+                            presentation
                         );
                 }
 
@@ -1316,7 +1599,70 @@ namespace AskTheModel {
             ConversationPersistenceChartSeries series =
                 chart.series[0];
 
-            if (!ConversationStoreNative.attach_chart_values (
+            bool attached = false;
+            if (chart.presentation_schema == "atm-chart-spec/4") {
+                if (chart.presentation == null) {
+                    throw new GLib.IOError.INVALID_DATA (
+                        "A v4-marked chart cannot be persisted without its presentation sidecar."
+                    );
+                }
+                ConversationPersistenceChartPresentation p = chart.presentation;
+                var native_presentation = new ConversationStoreNative.ChartPresentationInput ();
+                native_presentation.presentation_schema = p.presentation_schema;
+                native_presentation.presentation_spec_id = p.presentation_spec_id;
+                native_presentation.series_id = p.series_id;
+                native_presentation.catalog_schema = p.catalog_schema;
+                native_presentation.adapter_id = p.adapter_id;
+                native_presentation.series_profile_id = p.series_profile_id;
+                native_presentation.series_profile_version = p.series_profile_version;
+                native_presentation.admission_profile_id = p.admission_profile_id;
+                native_presentation.admission_profile_version = p.admission_profile_version;
+                native_presentation.reconstruction_profile_id = p.reconstruction_profile_id;
+                native_presentation.source_chart_schema = p.source_chart_schema;
+                native_presentation.source_chart_spec_id = p.source_chart_spec_id;
+                native_presentation.x_coordinate_semantics = p.x_coordinate_semantics;
+                native_presentation.x_frequency = p.x_frequency;
+                native_presentation.x_unit = p.x_unit;
+                native_presentation.x_dimension = p.x_dimension;
+                native_presentation.subject = p.subject;
+                native_presentation.attribute = p.attribute;
+                native_presentation.y_unit = p.y_unit;
+                native_presentation.y_dimension = p.y_dimension;
+                native_presentation.series_semantics = p.series_semantics;
+                native_presentation.missing_policy = p.missing_policy;
+                native_presentation.missing_coordinate = p.missing_coordinate;
+                native_presentation.missing_reason = p.missing_reason;
+                native_presentation.display_profile_id = p.display_profile_id;
+                native_presentation.display_profile_version = p.display_profile_version;
+                native_presentation.render_contract = p.render_contract;
+
+                attached = ConversationStoreNative.attach_chart_v4_values (
+                    native_store,
+                    conversation_id,
+                    turn_no,
+                    (uint) chart.ordinal,
+                    chart.chart_schema,
+                    chart.chart_spec_id,
+                    chart.chart_kind,
+                    chart.reconstruction_profile,
+                    series.series_profile,
+                    series.admission_profile,
+                    series.scientific_id,
+                    series.qualified_id,
+                    series.repository_id,
+                    series.repository_version,
+                    series.snapshot_sha,
+                    series.source_path,
+                    ref native_presentation
+                );
+            } else {
+                if (chart.presentation_schema != null ||
+                    chart.presentation != null) {
+                    throw new GLib.IOError.INVALID_DATA (
+                        "The chart's v4 presentation marker and sidecar are inconsistent."
+                    );
+                }
+                attached = ConversationStoreNative.attach_chart_values (
                     native_store,
                     conversation_id,
                     turn_no,
@@ -1333,7 +1679,9 @@ namespace AskTheModel {
                     series.repository_version,
                     series.snapshot_sha,
                     series.source_path
-                )) {
+                );
+            }
+            if (!attached) {
                 throw new GLib.IOError.FAILED (
                     "Conversation chart reconstruction recipe could not be persisted."
                 );
