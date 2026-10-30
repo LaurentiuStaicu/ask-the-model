@@ -529,7 +529,6 @@ static void test_transcript_anchor_minimum_viewport (void)
 
     char *data_before = g_strdup (atm_chart_view_data (view));
     int initial_window_height = gtk_widget_get_height (GTK_WIDGET (window));
-    int initial_canvas_height = gtk_widget_get_height (area);
     gtk_window_set_default_size (window, 300, 420);
     settle ();
     g_assert_cmpint (
