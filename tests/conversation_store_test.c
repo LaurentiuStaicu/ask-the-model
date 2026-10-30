@@ -454,6 +454,30 @@ create_v4_store (
 }
 
 static void
+create_v5_store (
+    const char *path
+)
+{
+    create_v4_store (path);
+    GError *error = NULL;
+    GBytes *bytes = g_resources_lookup_data (
+        "/io/github/laurentiustaicu/ask_the_model/schemas/conversation-store-v4-to-v5.sql",
+        G_RESOURCE_LOOKUP_FLAGS_NONE, &error);
+    g_assert_no_error (error);
+    g_assert_nonnull (bytes);
+    gsize size = 0;
+    const char *data = g_bytes_get_data (bytes, &size);
+    g_assert_nonnull (data);
+    char *migration = g_strndup (data, size);
+    char *sql = g_strdup_printf (
+        "BEGIN IMMEDIATE;%sPRAGMA user_version=5;COMMIT;", migration);
+    raw_exec (path, sql);
+    g_free (sql);
+    g_free (migration);
+    g_bytes_unref (bytes);
+}
+
+static void
 insert_v3_gistemp_chart_fixture (
     const char *path
 )
@@ -2654,6 +2678,146 @@ test_bnr_chart_recipe_v5_persistence (void)
 }
 
 static void
+assert_v4_sidecar_delete_guard (const char *path)
+{
+    AtmConversationStore *store = NULL;
+    GError *error = NULL;
+    const char *snapshot_sha = "0123456789abcdef0123456789abcdef01234567";
+    const char *chart_spec_id = "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa";
+
+    g_assert_true (atm_conversation_store_open (path, &store, &error));
+    g_assert_no_error (error);
+
+    AtmConversationRepositoryInput repository = {
+        .repository_id = "ewd",
+        .repository_version = "0.1.0",
+        .snapshot_sha = snapshot_sha
+    };
+    char *conversation_id = NULL;
+    g_assert_true (atm_conversation_store_create_conversation (
+        store, "v4 sidecar delete guard", 1, "model-a", NULL, 7,
+        &repository, 1, &conversation_id, &error));
+    g_assert_no_error (error);
+
+    AtmConversationCitationInput citation = {
+        .label = "S1",
+        .repository_id = "ewd",
+        .repository_version = "0.1.0",
+        .snapshot_sha = snapshot_sha,
+        .logical_source_id = "gistemp-global-annual",
+        .source_path = "science/data/processed/nasa_gistemp_global_2026.csv",
+        .locator = "rows 1-146",
+        .title = "GISTEMP global annual",
+        .excerpt = "Qualified annual observations",
+        .immutable_permalink = NULL
+    };
+    gint64 turn_no = -1;
+    g_assert_true (atm_conversation_store_commit_turn (
+        store, conversation_id, "show the series", "answer [S1]", "answer",
+        TRUE, 2, &citation, 1, &turn_no, &error));
+    g_assert_no_error (error);
+
+    AtmConversationChartPresentationInput presentation = {
+        .presentation_schema = "atm-chart-spec/4",
+        .presentation_spec_id = "dddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddd",
+        .series_id = "climate.gistemp.global-temperature-anomaly",
+        .catalog_schema = "atm-chart-catalog/1",
+        .adapter_id = "gistemp-pinned-annual/1",
+        .series_profile_id = "atm-series/gistemp-complete-annual/1",
+        .series_profile_version = "1",
+        .admission_profile_id = "atm-gistemp-pinned-admission/1",
+        .admission_profile_version = "1",
+        .reconstruction_profile_id = "atm-chart-reconstruct/gistemp-complete-annual/1",
+        .source_chart_schema = "atm-chart-spec/1",
+        .source_chart_spec_id = chart_spec_id,
+        .x_coordinate_semantics = "calendar_year",
+        .x_frequency = "annual",
+        .x_unit = "calendar_year",
+        .x_dimension = "time",
+        .subject = "global_surface_temperature",
+        .attribute = "annual_temperature_anomaly",
+        .y_unit = "degree_Celsius_anomaly",
+        .y_dimension = "temperature_difference",
+        .series_semantics = "empirical_annual_observations",
+        .missing_policy = "reject",
+        .missing_coordinate = NULL,
+        .missing_reason = NULL,
+        .display_profile_id = "atm-display/gistemp-linear",
+        .display_profile_version = "1",
+        .render_contract = "atm-retro-mono/1"
+    };
+
+    g_assert_true (atm_conversation_store_attach_chart_v4_values (
+        store, conversation_id, turn_no, 1,
+        "atm-chart-spec/1", chart_spec_id, "line",
+        "atm-chart-reconstruct/gistemp-complete-annual/1",
+        "atm-series/gistemp-complete-annual/1",
+        "atm-gistemp-pinned-admission/1",
+        "bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb",
+        "cccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccc",
+        "ewd", "0.1.0", snapshot_sha,
+        "science/data/processed/nasa_gistemp_global_2026.csv",
+        &presentation, &error));
+    g_assert_no_error (error);
+    g_assert_cmpint (raw_int64 (path,
+        "SELECT count(*) FROM chart_presentations_v4;"), ==, 1);
+
+    sqlite3 *db = NULL;
+    char *message = NULL;
+    g_assert_cmpint (sqlite3_open (path, &db), ==, SQLITE_OK);
+    int rc = sqlite3_exec (
+        db, "DELETE FROM chart_presentations_v4;", NULL, NULL, &message);
+    g_assert_cmpint (rc & 0xff, ==, SQLITE_CONSTRAINT);
+    g_assert_nonnull (message);
+    g_assert_nonnull (strstr (message, "cannot delete a v4 presentation"));
+    sqlite3_free (message);
+    message = NULL;
+
+    rc = sqlite3_exec (
+        db, "UPDATE message_charts SET presentation_schema=NULL;",
+        NULL, NULL, &message);
+    g_assert_cmpint (rc & 0xff, ==, SQLITE_CONSTRAINT);
+    sqlite3_free (message);
+    sqlite3_close (db);
+
+    g_assert_cmpint (raw_int64 (path,
+        "SELECT count(*) FROM chart_presentations_v4;"), ==, 1);
+    g_assert_true (atm_conversation_store_delete_conversation (
+        store, conversation_id, &error));
+    g_assert_no_error (error);
+    g_assert_cmpint (raw_int64 (path,
+        "SELECT count(*) FROM chart_presentations_v4;"), ==, 0);
+
+    atm_conversation_store_close (store);
+    g_free (conversation_id);
+}
+
+static void
+test_v4_sidecar_delete_guard_bootstrap (void)
+{
+    char *root = new_temp_root ("atm-v4-sidecar-bootstrap-XXXXXX");
+    char *path = store_path (root);
+    assert_v4_sidecar_delete_guard (path);
+    g_free (path);
+    remove_tree_best_effort (root);
+    g_free (root);
+}
+
+static void
+test_v4_sidecar_delete_guard_v5_migration (void)
+{
+    char *root = new_temp_root ("atm-v4-sidecar-migration-XXXXXX");
+    char *path = store_path (root);
+    create_v5_store (path);
+    g_assert_cmpint (raw_int64 (path, "PRAGMA user_version;"), ==, 5);
+    assert_v4_sidecar_delete_guard (path);
+    g_assert_cmpint (raw_int64 (path, "PRAGMA user_version;"), ==, 6);
+    g_free (path);
+    remove_tree_best_effort (root);
+    g_free (root);
+}
+
+static void
 test_chart_binding_write_load (void)
 {
     char *root = new_temp_root ("atm-conversation-chart-binding-XXXXXX");
@@ -3359,6 +3523,14 @@ main (int argc, char **argv)
     g_test_add_func (
         "/conversation-store/bnr-chart-v5-persistence",
         test_bnr_chart_recipe_v5_persistence
+    );
+    g_test_add_func (
+        "/conversation-store/v4-sidecar-delete-guard-bootstrap",
+        test_v4_sidecar_delete_guard_bootstrap
+    );
+    g_test_add_func (
+        "/conversation-store/v4-sidecar-delete-guard-v5-migration",
+        test_v4_sidecar_delete_guard_v5_migration
     );
     g_test_add_func (
         "/conversation-store/chart-binding-write-load",
