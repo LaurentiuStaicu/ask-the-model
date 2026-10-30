@@ -580,12 +580,17 @@ static gboolean atm_chart_view_new_internal (const AtmChartSpec *spec,
     gtk_box_append (GTK_BOX (chart), GTK_WIDGET (self->status));
     self->area = GTK_DRAWING_AREA (gtk_drawing_area_new ());
     /*
-     * GtkTextView child anchors allocate their children at minimum size.
-     * Keep enough height for the renderer's 370px layout threshold, plus a
-     * small margin. initial_width reserves space for the longest qualified
-     * subtitle/footer in the selected source profile.
+     * Keep the renderer's full source-profile size as its initial surface,
+     * but do not turn that preferred width into a GTK minimum. The drawing
+     * area must be allowed to shrink with the transcript/window; the renderer
+     * then selects its explicit unavailable-at-this-size fallback while the
+     * exact Data page remains intact.
+     *
+     * 480px leaves a small margin above the renderer's 448px hard width floor.
+     * Long BNR/Energy Institute labels may still select the fallback at this
+     * width; that is preferable to imposing an 640/800px window minimum.
      */
-    gtk_drawing_area_set_content_width (self->area, initial_width);
+    gtk_drawing_area_set_content_width (self->area, 480);
     gtk_drawing_area_set_content_height (self->area, initial_height);
     gtk_widget_set_hexpand (GTK_WIDGET (self->area), TRUE); gtk_widget_set_vexpand (GTK_WIDGET (self->area), TRUE);
     gtk_widget_set_focusable (GTK_WIDGET (self->area), TRUE);
