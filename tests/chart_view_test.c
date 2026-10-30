@@ -574,6 +574,72 @@ static void test_keyboard_window (void)
 }
 typedef AtmChartSpec *(*ChartSpecBuilder) (void);
 
+static void assert_transcript_anchor_resize (AtmChartView *view)
+{
+    GtkWidget *transcript = gtk_text_view_new ();
+    gtk_text_view_set_wrap_mode (
+        GTK_TEXT_VIEW (transcript), GTK_WRAP_WORD_CHAR);
+    GtkTextBuffer *buffer = gtk_text_view_get_buffer (
+        GTK_TEXT_VIEW (transcript));
+    GtkTextIter end;
+    gtk_text_buffer_get_end_iter (buffer, &end);
+    GtkTextChildAnchor *anchor =
+        gtk_text_buffer_create_child_anchor (buffer, &end);
+    gtk_text_view_add_child_at_anchor (
+        GTK_TEXT_VIEW (transcript), GTK_WIDGET (view), anchor);
+
+    GtkWidget *scroller = gtk_scrolled_window_new ();
+    gtk_scrolled_window_set_policy (
+        GTK_SCROLLED_WINDOW (scroller),
+        GTK_POLICY_NEVER,
+        GTK_POLICY_AUTOMATIC);
+    gtk_scrolled_window_set_child (
+        GTK_SCROLLED_WINDOW (scroller), transcript);
+
+    GtkWindow *window = GTK_WINDOW (gtk_window_new ());
+    gtk_window_set_default_size (window, 1000, 760);
+    gtk_window_set_child (window, scroller);
+    gtk_window_present (window);
+    settle ();
+
+    GtkWidget *area = chart_drawing_area (view);
+    g_assert_cmpint (gtk_widget_get_width (area), >=, 480);
+    g_assert_cmpint (gtk_widget_get_height (area), >=, 348);
+    g_assert_false (atm_chart_view_test_is_fallback (view));
+
+    char *data_before = g_strdup (atm_chart_view_data (view));
+    int initial_window_width = gtk_widget_get_width (GTK_WIDGET (window));
+    int initial_window_height = gtk_widget_get_height (GTK_WIDGET (window));
+
+    gtk_window_set_default_size (window, 300, 420);
+    settle ();
+    g_assert_cmpint (
+        gtk_widget_get_width (GTK_WIDGET (window)), <, initial_window_width);
+    g_assert_cmpint (
+        gtk_widget_get_height (GTK_WIDGET (window)), <, initial_window_height);
+    g_assert_cmpstr (atm_chart_view_data (view), ==, data_before);
+
+    int width = 0, height = 0, scale = 0;
+    atm_chart_view_test_render_size (view, &width, &height, &scale);
+    g_assert_cmpint (width, ==, gtk_widget_get_width (area));
+    g_assert_cmpint (height, ==, gtk_widget_get_height (area));
+    g_assert_cmpint (scale, >=, 1);
+
+    gtk_window_set_default_size (window, 1000, 760);
+    settle ();
+    g_assert_false (atm_chart_view_test_is_fallback (view));
+    g_assert_cmpint (gtk_widget_get_width (area), >=, 448);
+    g_assert_cmpint (gtk_widget_get_height (area), >=, 370);
+    atm_chart_view_test_render_size (view, &width, &height, &scale);
+    g_assert_cmpint (width, ==, gtk_widget_get_width (area));
+    g_assert_cmpint (height, ==, gtk_widget_get_height (area));
+    g_assert_cmpstr (atm_chart_view_data (view), ==, data_before);
+
+    g_free (data_before);
+    gtk_window_destroy (window);
+    settle ();
+}
+
 static void assert_v4_catalog_view (const char *series_id,
                                     ChartSpecBuilder build_source_spec,
                                     const char *expected_first_detail,
@@ -690,6 +756,11 @@ static void assert_v4_catalog_view (const char *series_id,
     g_free (v4_data_filename);
     gtk_window_destroy (v4_preview_window);
     settle ();
+
+    if (exercise_resize) {
+        atm_chart_view_show_chart (view);
+        assert_transcript_anchor_resize (view);
+    }
 
     if (exercise_resize) {
         char *data_before = g_strdup (atm_chart_view_data (view));
