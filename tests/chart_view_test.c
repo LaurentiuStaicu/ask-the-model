@@ -651,6 +651,7 @@ static void assert_v4_catalog_view (const char *series_id,
         g_assert_cmpint (width, ==, 740);
         g_assert_cmpint (height, ==, 420);
         g_assert_cmpint (scale, ==, 1);
+        g_assert_false (atm_chart_view_test_is_fallback (view));
         g_assert_cmpstr (atm_chart_view_data (view), ==, data_before);
 
         /* Minimum valid viewport uses the source renderer's existing fallback,
