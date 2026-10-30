@@ -700,6 +700,7 @@ void atm_chart_view_test_set_canvas_minimum (
         return;
     gtk_drawing_area_set_content_width (self->area, width);
     gtk_drawing_area_set_content_height (self->area, height);
+    gtk_widget_set_vexpand (GTK_WIDGET (self->stack), height >= 348);
     if (height < 348) {
         gtk_scrolled_window_set_min_content_height (self->data_scroll, 1);
         gtk_scrolled_window_set_min_content_height (self->details_scroll, 1);
