@@ -156,6 +156,7 @@ namespace AskTheModel {
         private Gtk.Window? pres09_test_history_window = null;
         private ChatTabState? pres09_test_state = null;
         private uint pres09_test_resize_stage = 0;
+        private Gtk.Widget? pres09_test_resize_composer = null;
         private uint pres09_test_resize_wait_ticks = 0;
         private string pres09_test_resize_data = "";
         private int pres09_test_visible_render_width = 0;
@@ -5831,6 +5832,7 @@ namespace AskTheModel {
         }
 
         private bool pres09_test_resize_live_chart (
+            ChatTabState state,
             ChartNative.View view
         ) {
             Gtk.ApplicationWindow? window =
@@ -5877,6 +5879,16 @@ namespace AskTheModel {
                         "Live GISTEMP data was unavailable before the resize transition";
                     return false;
                 }
+                Gtk.Widget? prompt_overlay = state.prompt.get_parent ();
+                pres09_test_resize_composer = prompt_overlay != null
+                    ? prompt_overlay.get_parent ()
+                    : null;
+                if (pres09_test_resize_composer == null) {
+                    pres09_test_failure =
+                        "Live chart resize test could not find the prompt composer";
+                    return false;
+                }
+                pres09_test_resize_composer.set_visible (false);
                 view.test_set_canvas_minimum (480, 200);
                 window.set_default_size (500, 300);
                 pres09_test_resize_stage = 2;
@@ -5909,6 +5921,10 @@ namespace AskTheModel {
                     return false;
                 }
 
+                if (pres09_test_resize_composer != null) {
+                    pres09_test_resize_composer.set_visible (true);
+                    pres09_test_resize_composer = null;
+                }
                 view.test_set_canvas_minimum (480, 348);
                 window.set_default_size (1100, 900);
                 pres09_test_resize_stage = 3;
@@ -6051,7 +6067,7 @@ namespace AskTheModel {
                 }
 
                 if (pres09_test_resize_stage < 4) {
-                    if (!pres09_test_resize_live_chart (gistemp_view)) {
+                    if (!pres09_test_resize_live_chart (state, gistemp_view)) {
                         pres09_test_finish (
                             false,
                             pres09_test_failure.length > 0
