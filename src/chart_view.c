@@ -688,6 +688,12 @@ void atm_chart_view_test_render_size (AtmChartView *self, int *width, int *heigh
     if (height) *height = self->render_height;
     if (scale) *scale = self->render_scale;
 }
+void atm_chart_view_test_area_size (AtmChartView *self, int *width, int *height)
+{
+    if (!self || !self->area) return;
+    if (width) *width = gtk_widget_get_width (GTK_WIDGET (self->area));
+    if (height) *height = gtk_widget_get_height (GTK_WIDGET (self->area));
+}
 gboolean atm_chart_view_test_is_fallback (AtmChartView *self)
 {
     return view_is_fallback (self);
