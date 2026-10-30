@@ -682,4 +682,8 @@ void atm_chart_view_test_render_size (AtmChartView *self, int *width, int *heigh
     if (height) *height = self->render_height;
     if (scale) *scale = self->render_scale;
 }
+gboolean atm_chart_view_test_is_fallback (AtmChartView *self)
+{
+    return view_is_fallback (self);
+}
 #endif
