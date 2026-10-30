@@ -5983,7 +5983,6 @@ namespace AskTheModel {
                         "Live GISTEMP data was unavailable before the resize transition";
                     return false;
                 }
-                view.test_set_canvas_minimum (480, 200);
                 window.set_default_size (500, 300);
                 pres09_test_resize_stage = 2;
                 pres09_test_resize_wait_ticks = 0;
@@ -6039,7 +6038,6 @@ namespace AskTheModel {
                     return false;
                 }
 
-                view.test_set_canvas_minimum (700, 500);
                 window.set_default_size (1100, 900);
                 pres09_test_resize_stage = 3;
                 pres09_test_resize_wait_ticks = 0;
