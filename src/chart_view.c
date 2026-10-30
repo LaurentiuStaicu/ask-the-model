@@ -566,12 +566,16 @@ static gboolean atm_chart_view_new_internal (const AtmChartSpec *spec,
     gtk_label_set_xalign (self->status, 0); gtk_widget_set_visible (GTK_WIDGET (self->status), FALSE);
     gtk_box_append (GTK_BOX (chart), GTK_WIDGET (self->status));
     self->area = GTK_DRAWING_AREA (gtk_drawing_area_new ());
-    /* The view is embedded at a GtkTextView child anchor. Reserve enough
-     * natural width for the longest qualified renderer footer. At 432 logical
-     * pixels EI meets the projection minimum but falls back because the footer
-     * does not fit; 480 leaves 448px for its label and the 32px side margins. */
-    gtk_drawing_area_set_content_width (self->area, 480);
-    gtk_drawing_area_set_content_height (self->area, 348);
+    /*
+     * GtkTextView child anchors allocate their children at minimum size.
+     * Keep enough height for the renderer's 370px layout threshold, plus a
+     * small margin. BNR's longer qualified footer needs a wider minimum;
+     * other current catalog families retain the 480px baseline.
+     */
+    int canvas_min_width =
+        g_strcmp0 (chart_source_profile (spec), "bnr") == 0 ? 800 : 480;
+    gtk_drawing_area_set_content_width (self->area, canvas_min_width);
+    gtk_drawing_area_set_content_height (self->area, 380);
     gtk_widget_set_hexpand (GTK_WIDGET (self->area), TRUE); gtk_widget_set_vexpand (GTK_WIDGET (self->area), TRUE);
     gtk_widget_set_focusable (GTK_WIDGET (self->area), TRUE);
     accessible (GTK_WIDGET (self->area),
