@@ -3449,19 +3449,17 @@ namespace AskTheModel {
                  * against the exact pinned source, wrap the qualified source
                  * spec in v4 only for the common Chart/Data presentation.
                  */
-                string history_series_id = chart.chart_schema == "atm-chart-spec/3"
-                    ? "banking.bnr.bls-c01.credit-standards-net-percentage"
-                    : (chart.chart_schema == "atm-chart-spec/2"
-                        ? "energy.energy-institute.global-total-energy-supply"
-                        : "climate.gistemp.global-temperature-anomaly");
-                ChartNative.SpecV4 history_spec_v4;
+                ChartNative.View view;
                 if (chart.presentation_schema == null &&
                     chart.presentation == null) {
-                    /* Legacy source-only rows retain their v1/v2/v3 contract. */
-                    if (!ChartNative.wrap_qualified_spec_v4 (
-                            history_series_id, spec, out history_spec_v4)) {
-                        throw new GLib.IOError.INVALID_DATA (
-                            "Qualified legacy History source does not match the catalog-bound ChartSpec v4 presentation."
+                    /*
+                     * Legacy rows have no v4 presentation claim. Preserve
+                     * their original source-specific v1/v2/v3 History view;
+                     * do not silently promote them into the v4 renderer.
+                     */
+                    if (!ChartNative.create (spec, out view)) {
+                        throw new GLib.IOError.FAILED (
+                            "Qualified legacy History chart could not be rendered by its original view."
                         );
                     }
                 } else if (chart.presentation_schema == "atm-chart-spec/4" &&
@@ -3476,6 +3474,7 @@ namespace AskTheModel {
                             "Persisted History v4 presentation has no catalog series identity."
                         );
                     }
+                    ChartNative.SpecV4 history_spec_v4;
                     if (!ChartNative.reconstruct_history_v4 (
                             persisted_presentation.series_id,
                             spec,
@@ -3485,16 +3484,14 @@ namespace AskTheModel {
                             "Persisted History v4 presentation claims do not match the rebuilt catalog/source identity."
                         );
                     }
+                    if (!ChartNative.create_v4 (history_spec_v4, out view)) {
+                        throw new GLib.IOError.FAILED (
+                            "Qualified History v4 chart could not be rendered by the catalog-bound Chart/Data view."
+                        );
+                    }
                 } else {
                     throw new GLib.IOError.INVALID_DATA (
                         "Persisted History chart has an unsupported or inconsistent presentation marker."
-                    );
-                }
-
-                ChartNative.View view;
-                if (!ChartNative.create_v4 (history_spec_v4, out view)) {
-                    throw new GLib.IOError.FAILED (
-                        "Qualified History chart could not be rendered by the catalog-bound Chart/Data view."
                     );
                 }
 
