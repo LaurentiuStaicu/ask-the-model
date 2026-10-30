@@ -5990,7 +5990,7 @@ namespace AskTheModel {
             }
 
             if (pres09_test_resize_stage == 2) {
-                if (window.get_width () > 600 ||
+                if (window.get_width () > 800 ||
                     window.get_height () > 400) {
                     pres09_test_resize_wait_ticks++;
                     if (pres09_test_resize_wait_ticks > 100) {
