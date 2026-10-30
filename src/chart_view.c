@@ -13,7 +13,6 @@ struct _AtmChartView {
     GtkDrawingArea *area;
     GtkScrolledWindow *data_scroll;
     GtkScrolledWindow *details_scroll;
-    GtkExpander *details_expander;
     GtkColumnView *table;
     GtkStringList *rows;
     GtkSingleSelection *selection;
@@ -629,10 +628,10 @@ static gboolean atm_chart_view_new_internal (const AtmChartSpec *spec,
     self->details_scroll = GTK_SCROLLED_WINDOW (gtk_scrolled_window_new ());
     gtk_scrolled_window_set_child (self->details_scroll, detail);
     gtk_scrolled_window_set_min_content_height (self->details_scroll, 140);
-    self->details_expander = GTK_EXPANDER (gtk_expander_new ("Source details"));
-    gtk_expander_set_expanded (self->details_expander, TRUE);
-    gtk_expander_set_child (self->details_expander, GTK_WIDGET (self->details_scroll));
-    gtk_box_append (GTK_BOX (data), GTK_WIDGET (self->details_expander));
+    GtkWidget *expander = gtk_expander_new ("Source details");
+    gtk_expander_set_expanded (GTK_EXPANDER (expander), TRUE);
+    gtk_expander_set_child (GTK_EXPANDER (expander), GTK_WIDGET (self->details_scroll));
+    gtk_box_append (GTK_BOX (data), expander);
     gtk_stack_add_titled (self->stack, data, "data", "Data");
     gtk_box_append (GTK_BOX (self), GTK_WIDGET (self->stack));
     g_signal_connect (self->selection, "notify::selected", G_CALLBACK (selection_changed), self);
@@ -704,11 +703,9 @@ void atm_chart_view_test_set_canvas_minimum (
     if (height < 348) {
         gtk_scrolled_window_set_min_content_height (self->data_scroll, 1);
         gtk_scrolled_window_set_min_content_height (self->details_scroll, 1);
-        gtk_expander_set_expanded (self->details_expander, FALSE);
-    } else {
+     } else {
         gtk_scrolled_window_set_min_content_height (self->data_scroll, 180);
         gtk_scrolled_window_set_min_content_height (self->details_scroll, 140);
-        gtk_expander_set_expanded (self->details_expander, TRUE);
-    }
+     }
 }
 #endif
