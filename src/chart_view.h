@@ -1,5 +1,6 @@
 #pragma once
 #include "chart_render.h"
+#include "chart_spec_v4.h"
 #include <gtk/gtk.h>
 G_BEGIN_DECLS
 #define ATM_TYPE_CHART_VIEW (atm_chart_view_get_type ())
@@ -7,6 +8,8 @@ G_DECLARE_FINAL_TYPE (AtmChartView, atm_chart_view, ATM, CHART_VIEW, GtkBox)
 /* Dormant reusable GTK component. Revalidates and owns the supplied source.
  * Returns a full, non-floating reference; *out must be NULL. */
 gboolean atm_chart_view_new (const AtmChartSpec *spec, AtmChartView **out, GError **error);
+/* Dormant catalog-bound GTK path. Reuses the same Chart/Data UI and owns a v4 render. */
+gboolean atm_chart_view_new_v4 (const AtmChartSpecV4 *spec, AtmChartView **out, GError **error);
 guint atm_chart_view_row_count (AtmChartView *view);
 /* Borrowed exact TSV, independent of canvas size and selected page. */
 const char *atm_chart_view_data (AtmChartView *view);
@@ -22,5 +25,6 @@ char *atm_chart_view_provenance (AtmChartView *view);
 void atm_chart_view_test_request_resize (AtmChartView *view, int width, int height, int scale);
 guint atm_chart_view_test_resize_apply_count (AtmChartView *view);
 void atm_chart_view_test_render_size (AtmChartView *view, int *width, int *height, int *scale);
+gboolean atm_chart_view_test_is_fallback (AtmChartView *view);
 #endif
 G_END_DECLS
