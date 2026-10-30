@@ -155,6 +155,9 @@ namespace AskTheModel {
         private string pres09_test_failure = "";
         private Gtk.Window? pres09_test_history_window = null;
         private ChatTabState? pres09_test_state = null;
+        private uint pres09_test_resize_stage = 0;
+        private uint pres09_test_resize_wait_ticks = 0;
+        private string pres09_test_resize_data = "";
 #endif
 
         public Application () {
@@ -5825,6 +5828,123 @@ namespace AskTheModel {
             return true;
         }
 
+        private bool pres09_test_resize_live_chart (
+            ChartNative.View view
+        ) {
+            Gtk.ApplicationWindow? window =
+                this.active_window as Gtk.ApplicationWindow;
+            if (window == null) {
+                pres09_test_failure =
+                    "Live chart resize test could not find the application window";
+                return false;
+            }
+
+            int render_width = 0;
+            int render_height = 0;
+            int render_scale = 0;
+            view.test_render_size (
+                out render_width,
+                out render_height,
+                out render_scale
+            );
+
+            if (pres09_test_resize_stage == 0) {
+                window.set_default_size (1100, 900);
+                pres09_test_resize_stage = 1;
+                pres09_test_resize_wait_ticks = 0;
+                return true;
+            }
+
+            if (pres09_test_resize_stage == 1) {
+                if (view.test_is_fallback ()) {
+                    pres09_test_resize_wait_ticks++;
+                    if (pres09_test_resize_wait_ticks > 100) {
+                        pres09_test_failure =
+                            "Live chart did not leave fallback after enlarging the application window (%d×%d)"
+                            .printf (render_width, render_height);
+                        return false;
+                    }
+                    return true;
+                }
+                if (render_width < 448 || render_height < 370) {
+                    pres09_test_failure =
+                        "Live renderer reported visible output below its v4 minimum (%d×%d)"
+                        .printf (render_width, render_height);
+                    return false;
+                }
+
+                pres09_test_resize_data = view.data () ?? "";
+                if (pres09_test_resize_data.length == 0 ||
+                    view.row_count () != 146) {
+                    pres09_test_failure =
+                        "Live GISTEMP data was unavailable before the resize transition";
+                    return false;
+                }
+                window.set_default_size (500, 400);
+                pres09_test_resize_stage = 2;
+                pres09_test_resize_wait_ticks = 0;
+                return true;
+            }
+
+            if (pres09_test_resize_stage == 2) {
+                if (!view.test_is_fallback ()) {
+                    pres09_test_resize_wait_ticks++;
+                    if (pres09_test_resize_wait_ticks > 100) {
+                        pres09_test_failure =
+                            "Shrinking the application window did not enter renderer fallback (%d×%d)"
+                            .printf (render_width, render_height);
+                        return false;
+                    }
+                    return true;
+                }
+                if (render_width >= 448 && render_height >= 370) {
+                    pres09_test_failure =
+                        "Renderer entered fallback although its actual viewport was %d×%d"
+                        .printf (render_width, render_height);
+                    return false;
+                }
+                if ((view.data () ?? "") != pres09_test_resize_data ||
+                    view.row_count () != 146) {
+                    pres09_test_failure =
+                        "GISTEMP Data changed when the live chart entered fallback";
+                    return false;
+                }
+
+                window.set_default_size (1100, 900);
+                pres09_test_resize_stage = 3;
+                pres09_test_resize_wait_ticks = 0;
+                return true;
+            }
+
+            if (pres09_test_resize_stage == 3) {
+                if (view.test_is_fallback ()) {
+                    pres09_test_resize_wait_ticks++;
+                    if (pres09_test_resize_wait_ticks > 100) {
+                        pres09_test_failure =
+                            "Live chart did not recover from fallback after enlarging the application window (%d×%d)"
+                            .printf (render_width, render_height);
+                        return false;
+                    }
+                    return true;
+                }
+                if (render_width < 448 || render_height < 370) {
+                    pres09_test_failure =
+                        "Renderer reported recovery below its v4 minimum (%d×%d)"
+                        .printf (render_width, render_height);
+                    return false;
+                }
+                if ((view.data () ?? "") != pres09_test_resize_data ||
+                    view.row_count () != 146) {
+                    pres09_test_failure =
+                        "GISTEMP Data changed when the live chart recovered from fallback";
+                    return false;
+                }
+                pres09_test_resize_stage = 4;
+            }
+
+            return true;
+        }
+
         private bool pres09_test_step_live () {
             if (startup_qualification_failed) {
                 pres09_test_finish (
@@ -5927,6 +6047,21 @@ namespace AskTheModel {
                             : "Live GISTEMP Chart/Data view is unavailable"
                     );
                     return false;
+                }
+
+                if (pres09_test_resize_stage < 4) {
+                    if (!pres09_test_resize_live_chart (gistemp_view)) {
+                        pres09_test_finish (
+                            false,
+                            pres09_test_failure.length > 0
+                                ? pres09_test_failure
+                                : "Live GISTEMP resize recovery failed"
+                        );
+                        return false;
+                    }
+                    if (pres09_test_resize_stage < 4) {
+                        return true;
+                    }
                 }
 
                 pres09_test_live_turn = 2;
