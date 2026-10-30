@@ -686,4 +686,13 @@ gboolean atm_chart_view_test_is_fallback (AtmChartView *self)
 {
     return view_is_fallback (self);
 }
+void atm_chart_view_test_set_canvas_minimum (
+    AtmChartView *self, int width, int height
+)
+{
+    if (self == NULL || self->area == NULL || width < 1 || height < 1)
+        return;
+    gtk_drawing_area_set_content_width (self->area, width);
+    gtk_drawing_area_set_content_height (self->area, height);
+}
 #endif
