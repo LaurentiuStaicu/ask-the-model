@@ -25,5 +25,6 @@ char *atm_chart_view_provenance (AtmChartView *view);
 void atm_chart_view_test_request_resize (AtmChartView *view, int width, int height, int scale);
 guint atm_chart_view_test_resize_apply_count (AtmChartView *view);
 void atm_chart_view_test_render_size (AtmChartView *view, int *width, int *height, int *scale);
+gboolean atm_chart_view_test_is_fallback (AtmChartView *view);
 #endif
 G_END_DECLS
