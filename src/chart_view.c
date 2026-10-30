@@ -572,8 +572,7 @@ static gboolean atm_chart_view_new_internal (const AtmChartSpec *spec,
      * small margin. BNR's longer qualified footer needs a wider minimum;
      * other current catalog families retain the 480px baseline.
      */
-    int canvas_min_width =
-        g_strcmp0 (chart_source_profile (spec), "bnr") == 0 ? 800 : 480;
+    int canvas_min_width = is_bnr ? 800 : 480;
     gtk_drawing_area_set_content_width (self->area, canvas_min_width);
     gtk_drawing_area_set_content_height (self->area, 380);
     gtk_widget_set_hexpand (GTK_WIDGET (self->area), TRUE); gtk_widget_set_vexpand (GTK_WIDGET (self->area), TRUE);
