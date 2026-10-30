@@ -4,6 +4,121 @@
 #include "chart_spec_v4.h"
 #include <string.h>
 
+/*
+ * GtkTextView child anchors size embedded widgets from their natural request.
+ * A plain GtkDrawingArea exposes one content height as both its minimum and
+ * natural request, which prevents a chart from being both tall when space is
+ * available and shrinkable when the transcript viewport is small. This small
+ * one-child widget reports distinct minimum/natural dimensions and allocates
+ * the drawing area to the actual viewport.
+ */
+typedef struct _AtmChartCanvas {
+    GtkWidget parent_instance;
+    GtkWidget *child;
+} AtmChartCanvas;
+
+typedef struct _AtmChartCanvasClass {
+    GtkWidgetClass parent_class;
+} AtmChartCanvasClass;
+
+G_DEFINE_TYPE (AtmChartCanvas, atm_chart_canvas, GTK_TYPE_WIDGET)
+
+static void
+atm_chart_canvas_measure (
+    GtkWidget *widget,
+    GtkOrientation orientation,
+    int for_size,
+    int *minimum,
+    int *natural,
+    int *minimum_baseline,
+    int *natural_baseline
+)
+{
+    AtmChartCanvas *self = (AtmChartCanvas *) widget;
+    int child_minimum = 0;
+    int child_natural = 0;
+
+    if (self->child != NULL && orientation == GTK_ORIENTATION_HORIZONTAL) {
+        gtk_widget_measure (
+            self->child, orientation, for_size,
+            &child_minimum, &child_natural, NULL, NULL
+        );
+    }
+
+    if (orientation == GTK_ORIENTATION_VERTICAL) {
+        *minimum = 200;
+        *natural = 500;
+    } else {
+        *minimum = MAX (480, child_minimum);
+        *natural = MAX (800, child_natural);
+    }
+
+    if (minimum_baseline != NULL)
+        *minimum_baseline = -1;
+    if (natural_baseline != NULL)
+        *natural_baseline = -1;
+}
+
+static void
+atm_chart_canvas_size_allocate (
+    GtkWidget *widget,
+    int width,
+    int height,
+    int baseline
+)
+{
+    AtmChartCanvas *self = (AtmChartCanvas *) widget;
+    if (self->child != NULL)
+        gtk_widget_allocate (self->child, width, height, baseline, NULL);
+}
+
+static void
+atm_chart_canvas_snapshot (GtkWidget *widget, GtkSnapshot *snapshot)
+{
+    AtmChartCanvas *self = (AtmChartCanvas *) widget;
+    if (self->child != NULL)
+        gtk_widget_snapshot_child (widget, self->child, snapshot);
+}
+
+static void
+atm_chart_canvas_dispose (GObject *object)
+{
+    AtmChartCanvas *self = (AtmChartCanvas *) object;
+    if (self->child != NULL) {
+        gtk_widget_unparent (self->child);
+        self->child = NULL;
+    }
+    G_OBJECT_CLASS (atm_chart_canvas_parent_class)->dispose (object);
+}
+
+static void
+atm_chart_canvas_class_init (AtmChartCanvasClass *klass)
+{
+    GObjectClass *object_class = G_OBJECT_CLASS (klass);
+    GtkWidgetClass *widget_class = GTK_WIDGET_CLASS (klass);
+    object_class->dispose = atm_chart_canvas_dispose;
+    widget_class->measure = atm_chart_canvas_measure;
+    widget_class->size_allocate = atm_chart_canvas_size_allocate;
+    widget_class->snapshot = atm_chart_canvas_snapshot;
+}
+
+static void
+atm_chart_canvas_init (AtmChartCanvas *self)
+{
+    gtk_widget_set_overflow (GTK_WIDGET (self), GTK_OVERFLOW_HIDDEN);
+}
+
+static GtkWidget *
+atm_chart_canvas_new (GtkWidget *child)
+{
+    AtmChartCanvas *self = g_object_new (atm_chart_canvas_get_type (), NULL);
+    self->child = child;
+    gtk_widget_set_parent (child, GTK_WIDGET (self));
+    gtk_widget_set_hexpand (GTK_WIDGET (self), TRUE);
+    gtk_widget_set_vexpand (GTK_WIDGET (self), TRUE);
+    return GTK_WIDGET (self);
+}
+
 struct _AtmChartView {
     GtkBox parent_instance;
     AtmChartRender *render;
@@ -573,7 +688,8 @@ static gboolean atm_chart_view_new_internal (const AtmChartSpec *spec,
      * footer's horizontal reserve, but use a modest vertical minimum: the
      * renderer itself selects its unavailable/fallback state below 370px. */
     gtk_drawing_area_set_content_width (self->area, 480);
-    gtk_drawing_area_set_content_height (self->area, 200);
+    /* The wrapper supplies a 200px minimum and 500px natural height. */
+    gtk_drawing_area_set_content_height (self->area, 0);
     gtk_widget_set_hexpand (GTK_WIDGET (self->area), TRUE); gtk_widget_set_vexpand (GTK_WIDGET (self->area), TRUE);
     gtk_widget_set_focusable (GTK_WIDGET (self->area), TRUE);
     accessible (GTK_WIDGET (self->area),
@@ -588,7 +704,7 @@ static gboolean atm_chart_view_new_internal (const AtmChartSpec *spec,
     gtk_drawing_area_set_draw_func (self->area, draw, self, NULL);
     g_signal_connect (self->area, "resize", G_CALLBACK (resize), self);
     g_signal_connect (self->area, "notify::scale-factor", G_CALLBACK (scale_changed), self);
-    gtk_box_append (GTK_BOX (chart), GTK_WIDGET (self->area));
+    gtk_box_append (GTK_BOX (chart), atm_chart_canvas_new (GTK_WIDGET (self->area)));
     append_view_source_attribution (GTK_BOX (chart), self);
     gtk_stack_add_titled (self->stack, chart, "chart", "Chart");
     GtkWidget *data = gtk_box_new (GTK_ORIENTATION_VERTICAL, 8);
