@@ -654,8 +654,8 @@ static void assert_v4_catalog_view (const char *series_id,
         g_assert_false (atm_chart_view_test_is_fallback (view));
         g_assert_cmpstr (atm_chart_view_data (view), ==, data_before);
 
-        /* Minimum valid viewport enters renderer fallback while retaining exact data.
-         * while keeping the exact catalog-qualified Data page and rows. */
+        /* Minimum valid viewport enters renderer fallback while retaining exact data,
+         * catalog-qualified Data contents and rows. */
         atm_chart_view_test_request_resize (view, 240, 140, 1);
         settle ();
         atm_chart_view_test_render_size (view, &width, &height, &scale);
