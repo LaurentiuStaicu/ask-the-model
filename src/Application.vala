@@ -5831,6 +5831,7 @@ namespace AskTheModel {
         }
 
         private bool pres09_test_resize_live_chart (
+            ChatTabState state,
             ChartNative.View view
         ) {
             Gtk.ApplicationWindow? window =
@@ -5893,8 +5894,17 @@ namespace AskTheModel {
                     pres09_test_resize_wait_ticks++;
                     if (pres09_test_resize_wait_ticks > 100) {
                         pres09_test_failure =
-                            "Shrinking the application window did not enter renderer fallback (%d×%d)"
-                            .printf (render_width, render_height);
+                            "Shrinking the application window did not enter renderer fallback: renderer=%d×%d, window=%d×%d, transcript=%d×%d, chart-view=%d×%d"
+                            .printf (
+                                render_width,
+                                render_height,
+                                window.get_width (),
+                                window.get_height (),
+                                state.transcript_scroll.get_width (),
+                                state.transcript_scroll.get_height (),
+                                view.get_width (),
+                                view.get_height ()
+                            );
                         return false;
                     }
                     return true;
@@ -6057,7 +6067,7 @@ namespace AskTheModel {
                 }
 
                 if (pres09_test_resize_stage < 4) {
-                    if (!pres09_test_resize_live_chart (gistemp_view)) {
+                    if (!pres09_test_resize_live_chart (state, gistemp_view)) {
                         pres09_test_finish (
                             false,
                             pres09_test_failure.length > 0
