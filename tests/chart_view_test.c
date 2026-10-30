@@ -513,6 +513,10 @@ static void test_transcript_anchor_minimum_viewport (void)
     gtk_window_present (window);
     settle ();
 
+    GtkWidget *stack_widget = gtk_widget_get_last_child (GTK_WIDGET (view));
+    g_assert_true (GTK_IS_STACK (stack_widget));
+    g_assert_false (gtk_stack_get_vhomogeneous (GTK_STACK (stack_widget)));
+
     GtkWidget *area = chart_drawing_area (view);
     g_assert_cmpint (gtk_widget_get_width (area), >=, 480);
     g_assert_cmpint (gtk_widget_get_height (area), >=, 348);
@@ -522,6 +526,16 @@ static void test_transcript_anchor_minimum_viewport (void)
     g_assert_cmpint (render_width, >=, 480);
     g_assert_cmpint (render_height, >=, 348);
     g_assert_cmpint (render_scale, >=, 1);
+
+    char *data_before = g_strdup (atm_chart_view_data (view));
+    gtk_window_set_default_size (window, 300, 420);
+    settle ();
+    g_assert_cmpint (gtk_widget_get_height (area), <, 370);
+    atm_chart_view_test_render_size (view, &render_width, &render_height, &render_scale);
+    g_assert_cmpint (render_height, <, 370);
+    g_assert_true (atm_chart_view_test_is_fallback (view));
+    g_assert_cmpstr (atm_chart_view_data (view), ==, data_before);
+    g_free (data_before);
     gtk_window_destroy (window);
     settle ();
     g_object_unref (view);
