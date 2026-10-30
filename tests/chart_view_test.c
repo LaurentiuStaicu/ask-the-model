@@ -738,12 +738,12 @@ static void test_v4_gtk_catalog_profiles (void)
     g_test_message ("CHART-06f Energy Institute v4 GTK Chart/Data adapter");
     assert_v4_catalog_view (
         "energy.energy-institute.global-total-energy-supply",
-        build_ei_spec, "Year: 1965\n", FALSE);
+        build_ei_spec, "Year: 1965\n", TRUE);
 
     g_test_message ("CHART-06f BNR C01 v4 GTK Chart/Data adapter");
     assert_v4_catalog_view (
         "banking.bnr.bls-c01.credit-standards-net-percentage",
-        build_bnr_spec, "Quarter: 2022-Q4\n", FALSE);
+        build_bnr_spec, "Quarter: 2022-Q4\n", TRUE);
 }
 
 static void test_invalid (void)
