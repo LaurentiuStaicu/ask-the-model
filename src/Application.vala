@@ -5852,9 +5852,7 @@ namespace AskTheModel {
             );
 
             if (pres09_test_resize_stage == 0) {
-                window.set_visible (false);
                 window.set_default_size (1100, 900);
-                window.present ();
                 pres09_test_resize_stage = 1;
                 pres09_test_resize_wait_ticks = 0;
                 return true;
@@ -5881,9 +5879,7 @@ namespace AskTheModel {
                     return false;
                 }
                 view.test_set_canvas_minimum (480, 100);
-                window.set_visible (false);
                 window.set_default_size (500, 300);
-                window.present ();
                 pres09_test_resize_stage = 2;
                 pres09_test_resize_wait_ticks = 0;
                 return true;
@@ -5924,9 +5920,7 @@ namespace AskTheModel {
                 }
 
                 view.test_set_canvas_minimum (480, 348);
-                window.set_visible (false);
                 window.set_default_size (1100, 900);
-                window.present ();
                 pres09_test_resize_stage = 3;
                 pres09_test_resize_wait_ticks = 0;
                 return true;
