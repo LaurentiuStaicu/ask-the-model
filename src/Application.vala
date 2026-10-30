@@ -5591,6 +5591,7 @@ namespace AskTheModel {
             ConversationPersistenceChart? ei = null;
             ConversationPersistenceChart? gistemp = null;
             ConversationPersistenceChart? bnr = null;
+            ConversationPersistenceChart? existing_legacy_ei = null;
             foreach (
                 ConversationPersistenceMessage message
                 in snapshot.messages
@@ -5600,7 +5601,13 @@ namespace AskTheModel {
                     in message.charts
                 ) {
                     if (chart.chart_schema == "atm-chart-spec/2") {
-                        ei = chart;
+                        if (chart.presentation_schema == "atm-chart-spec/4" &&
+                            chart.presentation != null) {
+                            ei = chart;
+                        } else if (chart.presentation_schema == null &&
+                                   chart.presentation == null) {
+                            existing_legacy_ei = chart;
+                        }
                     } else if (chart.chart_schema == "atm-chart-spec/1") {
                         gistemp = chart;
                     } else if (chart.chart_schema == "atm-chart-spec/3") {
@@ -5643,6 +5650,59 @@ namespace AskTheModel {
                 bnr.series[0].source_path !=
                     "data/processed/bnr_bls_realised_rounds.csv") {
                 pres09_test_failure = "Durable live recipes did not contain the qualified EI v2, GISTEMP v1 and BNR C01 v3 contracts";
+                return false;
+            }
+
+            if (existing_legacy_ei != null) {
+                pres09_test_failure =
+                    "Live PRES-09 conversation unexpectedly already contains a legacy EI chart";
+                return false;
+            }
+
+            /*
+             * Chart ordinals are per assistant message. BNR remains ordinal 1;
+             * the sidecar-less legacy EI chart is ordinal 2 on turn_no 2.
+             */
+            var legacy_ei = new ConversationPersistenceChart (
+                2, ei.chart_schema, ei.chart_spec_id, ei.chart_kind,
+                ei.reconstruction_profile, ei.series, null, null
+            );
+            try {
+                conversation_store.attach_chart (state.persistent_id, 2, legacy_ei);
+                snapshot = conversation_store.load_snapshot (state.persistent_id);
+            } catch (GLib.Error error) {
+                pres09_test_failure =
+                    "Could not persist and reload the sidecar-less legacy EI chart: %s"
+                    .printf (error.message);
+                return false;
+            }
+
+            uint persisted_chart_count = 0;
+            bool found_legacy_ei = false;
+            bool found_bnr_turn_primary = false;
+            foreach (ConversationPersistenceMessage message in snapshot.messages) {
+                foreach (ConversationPersistenceChart chart in message.charts) {
+                    persisted_chart_count++;
+                    if (message.turn_no == 2 && chart.ordinal == 1 &&
+                        chart.chart_schema == "atm-chart-spec/3") {
+                        found_bnr_turn_primary = true;
+                    }
+                    if (message.turn_no == 2 && chart.ordinal == 2 &&
+                        chart.chart_schema == "atm-chart-spec/2" &&
+                        chart.chart_spec_id == ei.chart_spec_id &&
+                        chart.presentation_schema == null && chart.presentation == null &&
+                        chart.series.length == 1 &&
+                        chart.series[0].repository_id == "ewd" &&
+                        chart.series[0].snapshot_sha == expected_ewd_sha &&
+                        chart.series[0].source_path ==
+                            "science/data/processed/energy_institute_global_2026.csv") {
+                        found_legacy_ei = true;
+                    }
+                }
+            }
+            if (persisted_chart_count != 4 || !found_bnr_turn_primary || !found_legacy_ei) {
+                pres09_test_failure =
+                    "Live persistence did not retain three v4 charts plus legacy EI at turn 2 ordinal 2";
                 return false;
             }
 
@@ -5733,8 +5793,8 @@ namespace AskTheModel {
                 return false;
             }
 
-            if (state.pres09_test_chart_widgets.length != 3) {
-                pres09_test_failure = "History rendered %u chart widgets, expected EI, GISTEMP and BNR C01".printf (
+            if (state.pres09_test_chart_widgets.length != 4) {
+                pres09_test_failure = "History rendered %u chart widgets, expected EI, GISTEMP, BNR C01 and legacy EI".printf (
                     state.pres09_test_chart_widgets.length
                 );
                 return false;
@@ -5746,8 +5806,11 @@ namespace AskTheModel {
                 state.pres09_test_chart_widgets[1] as ChartNative.View;
             ChartNative.View? bnr_view =
                 state.pres09_test_chart_widgets[2] as ChartNative.View;
+            ChartNative.View? legacy_ei_view =
+                state.pres09_test_chart_widgets[3] as ChartNative.View;
 
-            if (ei_view == null || gistemp_view == null || bnr_view == null) {
+            if (ei_view == null || gistemp_view == null ||
+                bnr_view == null || legacy_ei_view == null) {
                 pres09_test_failure = "History did not reconstruct all three charts as qualified Chart/Data widgets";
                 return false;
             }
@@ -5768,8 +5831,10 @@ namespace AskTheModel {
                 "ATM_PRES09_EWD_SNAPSHOT_SHA"
             );
             ConversationPersistenceChart? ei = null;
+            ConversationPersistenceChart? ei_legacy = null;
             ConversationPersistenceChart? gistemp = null;
             ConversationPersistenceChart? bnr = null;
+            int64 legacy_ei_turn_no = -1;
             foreach (
                 ConversationPersistenceMessage message
                 in snapshot.messages
@@ -5779,7 +5844,14 @@ namespace AskTheModel {
                     in message.charts
                 ) {
                     if (chart.chart_schema == "atm-chart-spec/2") {
-                        ei = chart;
+                        if (chart.presentation_schema == "atm-chart-spec/4" &&
+                            chart.presentation != null) {
+                            ei = chart;
+                        } else if (chart.presentation_schema == null &&
+                                   chart.presentation == null) {
+                            ei_legacy = chart;
+                            legacy_ei_turn_no = message.turn_no;
+                        }
                     } else if (chart.chart_schema == "atm-chart-spec/1") {
                         gistemp = chart;
                     } else if (chart.chart_schema == "atm-chart-spec/3") {
@@ -5791,11 +5863,23 @@ namespace AskTheModel {
             if (expected_ewd_sha == null ||
                 (expected_ewd_sha != "d9e249339663015f6d1c05752338a955bf64ad0b" &&
                  expected_ewd_sha != "dc710d8e604c0fff713a3acfdb18ab47a1a902bb") ||
-                ei == null || gistemp == null || bnr == null ||
-                ei.series.length != 1 ||
-                gistemp.series.length != 1 ||
-                bnr.series.length != 1 ||
+                ei == null || ei_legacy == null || gistemp == null || bnr == null ||
+                ei.series.length != 1 || ei_legacy.series.length != 1 ||
+                gistemp.series.length != 1 || bnr.series.length != 1 ||
                 ei.chart_spec_id != expected_ei_id ||
+                ei_legacy.ordinal != 2 || legacy_ei_turn_no != 2 ||
+                ei_legacy.chart_schema != "atm-chart-spec/2" ||
+                ei_legacy.chart_spec_id != expected_ei_id ||
+                ei_legacy.reconstruction_profile !=
+                    "atm-chart-reconstruct/energy-institute-tes-complete-annual/1" ||
+                ei_legacy.presentation_schema != null || ei_legacy.presentation != null ||
+                ei_legacy.series[0].repository_id != "ewd" ||
+                ei_legacy.series[0].repository_version != "snapshot:" + expected_ewd_sha ||
+                ei_legacy.series[0].snapshot_sha != expected_ewd_sha ||
+                ei_legacy.series[0].source_path !=
+                    "science/data/processed/energy_institute_global_2026.csv" ||
+                ei_legacy.series[0].scientific_id != ei.series[0].scientific_id ||
+                ei_legacy.series[0].qualified_id != ei.series[0].qualified_id ||
                 gistemp.chart_spec_id != expected_gistemp_id ||
                 bnr.chart_spec_id != expected_bnr_id ||
                 ei.series[0].snapshot_sha != expected_ewd_sha ||
@@ -5841,9 +5925,12 @@ namespace AskTheModel {
             }
 
             string ei_data = ei_view.data () ?? "";
+            string legacy_ei_data = legacy_ei_view.data () ?? "";
             string gistemp_data = gistemp_view.data () ?? "";
             string bnr_data = bnr_view.data () ?? "";
-            if (!pres09_test_compare_file (
+            if (legacy_ei_view.row_count () != 61 ||
+                !pres09_test_compare_file ("pres09-ei-data.tsv", legacy_ei_data) ||
+                !pres09_test_compare_file (
                     "pres09-ei-data.tsv",
                     ei_data
                 ) ||
@@ -5867,6 +5954,16 @@ namespace AskTheModel {
                 !pres09_test_compare_file (
                     "pres09-ei-last-provenance.txt",
                     ei_view.provenance () ?? ""
+                ) ||
+                !legacy_ei_view.select_row (0) ||
+                !pres09_test_compare_file (
+                    "pres09-ei-first-provenance.txt",
+                    legacy_ei_view.provenance () ?? ""
+                ) ||
+                !legacy_ei_view.select_row (legacy_ei_view.row_count () - 1) ||
+                !pres09_test_compare_file (
+                    "pres09-ei-last-provenance.txt",
+                    legacy_ei_view.provenance () ?? ""
                 ) ||
                 !gistemp_view.select_row (0) ||
                 !pres09_test_compare_file (
@@ -5893,6 +5990,21 @@ namespace AskTheModel {
                     "pres09-bnr-c01-last-provenance.txt",
                     bnr_view.provenance () ?? ""
                 )) {
+                return false;
+            }
+
+            var v4_ei_source_text = new GLib.StringBuilder ();
+            pres09_test_collect_source_detail_text (ei_view, v4_ei_source_text);
+            var legacy_ei_source_text = new GLib.StringBuilder ();
+            pres09_test_collect_source_detail_text (legacy_ei_view, legacy_ei_source_text);
+            if (!v4_ei_source_text.str.contains ("Open pinned dataset used by AtM") ||
+                !v4_ei_source_text.str.contains ("AtM reconstructs the pinned processed dataset") ||
+                !legacy_ei_source_text.str.contains ("Open Energy Institute data") ||
+                !legacy_ei_source_text.str.contains ("Open pinned repository copy") ||
+                legacy_ei_source_text.str.contains ("Open pinned dataset used by AtM") ||
+                legacy_ei_source_text.str.contains ("AtM reconstructs the pinned processed dataset")) {
+                pres09_test_failure =
+                    "Restored legacy EI chart did not retain legacy constructor source attribution";
                 return false;
             }
 
