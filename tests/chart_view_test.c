@@ -519,12 +519,12 @@ static void test_transcript_anchor_minimum_viewport (void)
 
     GtkWidget *area = chart_drawing_area (view);
     g_assert_cmpint (gtk_widget_get_width (area), >=, 480);
-    g_assert_cmpint (gtk_widget_get_height (area), >=, 348);
+    g_assert_cmpint (gtk_widget_get_height (area), >=, 370);
 
     int render_width = 0, render_height = 0, render_scale = 0;
     atm_chart_view_test_render_size (view, &render_width, &render_height, &render_scale);
     g_assert_cmpint (render_width, >=, 480);
-    g_assert_cmpint (render_height, >=, 348);
+    g_assert_cmpint (render_height, >=, 370);
     g_assert_cmpint (render_scale, >=, 1);
 
     char *data_before = g_strdup (atm_chart_view_data (view));
@@ -533,7 +533,7 @@ static void test_transcript_anchor_minimum_viewport (void)
     settle ();
     g_assert_cmpint (
         gtk_widget_get_height (GTK_WIDGET (window)), <, initial_window_height);
-    g_assert_cmpint (gtk_widget_get_height (area), >=, 348);
+    g_assert_cmpint (gtk_widget_get_height (area), >=, 370);
     atm_chart_view_test_render_size (view, &render_width, &render_height, &render_scale);
     g_assert_cmpint (render_height, ==, gtk_widget_get_height (area));
     g_assert_cmpstr (atm_chart_view_data (view), ==, data_before);
