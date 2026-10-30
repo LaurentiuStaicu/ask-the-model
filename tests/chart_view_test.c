@@ -651,15 +651,17 @@ static void assert_v4_catalog_view (const char *series_id,
         g_assert_cmpint (width, ==, 740);
         g_assert_cmpint (height, ==, 420);
         g_assert_cmpint (scale, ==, 1);
+        g_assert_false (atm_chart_view_test_is_fallback (view));
         g_assert_cmpstr (atm_chart_view_data (view), ==, data_before);
 
-        /* Minimum valid viewport uses the source renderer's existing fallback,
+        /* Minimum valid viewport enters renderer fallback while retaining exact data.
          * while keeping the exact catalog-qualified Data page and rows. */
         atm_chart_view_test_request_resize (view, 240, 140, 1);
         settle ();
         atm_chart_view_test_render_size (view, &width, &height, &scale);
         g_assert_cmpint (width, ==, 240);
         g_assert_cmpint (height, ==, 140);
+        g_assert_true (atm_chart_view_test_is_fallback (view));
         g_assert_cmpstr (atm_chart_view_data (view), ==, data_before);
         g_assert_cmpuint (atm_chart_view_row_count (view), ==, entry->coordinate_count);
 
@@ -669,7 +671,19 @@ static void assert_v4_catalog_view (const char *series_id,
         atm_chart_view_test_render_size (view, &width, &height, &scale);
         g_assert_cmpint (width, ==, 240);
         g_assert_cmpint (height, ==, 140);
+        g_assert_true (atm_chart_view_test_is_fallback (view));
         g_assert_cmpstr (atm_chart_view_data (view), ==, data_before);
+
+        /* A valid viewport above the v4 minimum must rebuild a real chart. */
+        atm_chart_view_test_request_resize (view, 740, 420, 1);
+        settle ();
+        atm_chart_view_test_render_size (view, &width, &height, &scale);
+        g_assert_cmpint (width, ==, 740);
+        g_assert_cmpint (height, ==, 420);
+        g_assert_cmpint (scale, ==, 1);
+        g_assert_false (atm_chart_view_test_is_fallback (view));
+        g_assert_cmpstr (atm_chart_view_data (view), ==, data_before);
+        g_assert_cmpuint (atm_chart_view_row_count (view), ==, entry->coordinate_count);
         g_free (data_before);
     }
 
