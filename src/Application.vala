@@ -5917,6 +5917,19 @@ namespace AskTheModel {
                         .printf (render_width, render_height);
                     return false;
                 }
+                if (render_width != area_width ||
+                    render_height != area_height ||
+                    area_height >= 370) {
+                    pres09_test_failure =
+                        "Renderer fallback state did not match the allocated GTK canvas (%d×%d vs %d×%d)"
+                        .printf (
+                            render_width,
+                            render_height,
+                            area_width,
+                            area_height
+                        );
+                    return false;
+                }
                 if ((view.data () ?? "") != pres09_test_resize_data ||
                     view.row_count () != 146) {
                     pres09_test_failure =
@@ -5924,7 +5937,7 @@ namespace AskTheModel {
                     return false;
                 }
 
-                view.test_set_canvas_minimum (480, 348);
+                view.test_set_canvas_minimum (700, 500);
                 window.set_default_size (1100, 900);
                 pres09_test_resize_stage = 3;
                 pres09_test_resize_wait_ticks = 0;
@@ -5932,12 +5945,20 @@ namespace AskTheModel {
             }
 
             if (pres09_test_resize_stage == 3) {
-                if (view.test_is_fallback ()) {
+                if (view.test_is_fallback () ||
+                    render_width != area_width ||
+                    render_height != area_height ||
+                    area_height < 370) {
                     pres09_test_resize_wait_ticks++;
                     if (pres09_test_resize_wait_ticks > 100) {
                         pres09_test_failure =
-                            "Live chart did not recover from fallback after enlarging the application window (%d×%d)"
-                            .printf (render_width, render_height);
+                            "Live chart did not recover on an allocated v4-sized canvas: renderer=%d×%d, canvas=%d×%d"
+                            .printf (
+                                render_width,
+                                render_height,
+                                area_width,
+                                area_height
+                            );
                         return false;
                     }
                     return true;

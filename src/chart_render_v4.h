@@ -21,14 +21,14 @@ typedef enum {
 GQuark atm_chart_render_v4_error_quark (void);
 
 /*
- * Catalog-bound envelope around the already qualified source renderer.
- * Pixel painting and exact Data serialization remain delegated to
- * AtmChartRender; v4 adds identity/policy cross-checks, not a new renderer.
+ * Catalog-bound ChartSpec v4 renderer. The Cairo surface is painted directly
+ * from the validated v4 projection using the shared monochrome layout policy.
+ * The exact Data TSV is produced separately from the independently rebuilt
+ * source ChartSpec; no legacy Cairo surface is created by this path.
  *
- * Small-canvas/layout fallback is preserved. In fallback mode the complete
- * existing Data view remains available and no synthetic projection is added.
- * Output must be NULL on entry; failure leaves it unchanged. Not an
- * Application route, provider protocol, or History persistence schema.
+ * Small-canvas/layout fallback preserves the complete Data view but claims no
+ * active projection. Output must be NULL on entry; failure leaves it unchanged.
+ * This is not a History persistence schema or arbitrary-source eligibility API.
  */
 gboolean atm_chart_render_v4_new (
     const AtmChartSpecV4 *spec,
@@ -48,9 +48,6 @@ void atm_chart_render_v4_free (AtmChartRenderV4 *render);
 
 /* Borrowed read-only objects. */
 const AtmChartSpecV4 *atm_chart_render_v4_spec (
-    const AtmChartRenderV4 *render
-);
-const AtmChartRender *atm_chart_render_v4_source_render (
     const AtmChartRenderV4 *render
 );
 const AtmChartProjectionV4 *atm_chart_render_v4_projection (

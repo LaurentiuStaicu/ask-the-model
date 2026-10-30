@@ -171,6 +171,44 @@ static char *data_view (const AtmChartSpec *spec)
     }
     return g_string_free (s, FALSE);
 }
+
+/*
+ * Serialize the established source-specific exact Data representation without
+ * allocating or rendering a Cairo surface. ChartSpec v4 owns and paints its
+ * own surface; it reuses this validated serialization only for the accessible
+ * Data page. Numeric values still come only from the reconstructed source spec.
+ */
+char *
+atm_chart_render_data_for_spec (const AtmChartSpec *spec, GError **error)
+{
+    if (spec == NULL) {
+        reject (error, "Data serialization requires a qualified ChartSpec.");
+        return NULL;
+    }
+
+    AtmChartSpec *owned = NULL;
+    if (!atm_chart_spec_rebuild (spec, &owned, error))
+        return NULL;
+
+    AtmChartSpecVersion version = atm_chart_spec_version (owned);
+    if (version != ATM_CHART_SPEC_VERSION_GISTEMP_V1 &&
+        version != ATM_CHART_SPEC_VERSION_ENERGY_INSTITUTE_V2 &&
+        version != ATM_CHART_SPEC_VERSION_BNR_BLS_C01_V3) {
+        atm_chart_spec_free (owned);
+        reject (error, "Data serialization only admits independently qualified source ChartSpec v1/v2/v3.");
+        return NULL;
+    }
+
+    char *data = data_view (owned);
+    atm_chart_spec_free (owned);
+    if (data == NULL) {
+        reject (error, "Qualified source ChartSpec could not be serialized for Data view.");
+        return NULL;
+    }
+    return data;
+}
+
+
 static void font (cairo_t *cr, double size, gboolean bold)
 {
     cairo_select_font_face (cr, "monospace", CAIRO_FONT_SLANT_NORMAL,
