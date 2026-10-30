@@ -369,6 +369,18 @@ BEGIN
     SELECT RAISE(ABORT, 'v4 presentation identity does not match its source chart recipe');
 END;
 
+CREATE TRIGGER chart_presentations_v4_delete_guard
+BEFORE DELETE ON chart_presentations_v4
+FOR EACH ROW
+WHEN EXISTS (
+    SELECT 1 FROM message_charts c
+    WHERE c.message_id=OLD.message_id
+      AND c.ordinal=OLD.chart_ordinal
+)
+BEGIN
+    SELECT RAISE(ABORT, 'cannot delete a v4 presentation while its source chart exists');
+END;
+
 CREATE TRIGGER message_charts_presentation_update
 BEFORE UPDATE ON message_charts
 FOR EACH ROW
