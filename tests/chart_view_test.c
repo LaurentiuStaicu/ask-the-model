@@ -608,6 +608,7 @@ static void assert_transcript_anchor_resize (AtmChartView *view,
     GtkWidget *area = chart_drawing_area (view);
     g_assert_cmpint (gtk_widget_get_width (area), >=, minimum_width);
     g_assert_cmpint (gtk_widget_get_height (area), >=, 370);
+    int width = 0, height = 0, scale = 0;
     atm_chart_view_test_render_size (view, &width, &height, &scale);
     g_assert_cmpint (width, ==, gtk_widget_get_width (area));
     g_assert_cmpint (height, ==, gtk_widget_get_height (area));
@@ -626,7 +627,6 @@ static void assert_transcript_anchor_resize (AtmChartView *view,
         gtk_widget_get_height (GTK_WIDGET (window)), <, initial_window_height);
     g_assert_cmpstr (atm_chart_view_data (view), ==, data_before);
 
-    int width = 0, height = 0, scale = 0;
     atm_chart_view_test_render_size (view, &width, &height, &scale);
     g_assert_cmpint (width, ==, gtk_widget_get_width (area));
     g_assert_cmpint (height, ==, gtk_widget_get_height (area));
