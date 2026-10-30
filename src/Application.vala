@@ -5842,22 +5842,6 @@ namespace AskTheModel {
 
             string ei_data = ei_view.data () ?? "";
             string gistemp_data = gistemp_view.data () ?? "";
-            if (pres09_test_resize_stage < 4) {
-                if (!pres09_test_resize_live_chart (
-                        state, bnr_view, 12, "BNR BLS C01")) {
-                    pres09_test_finish (
-                        false,
-                        pres09_test_failure.length > 0
-                            ? pres09_test_failure
-                            : "BNR BLS C01 resize recovery failed"
-                    );
-                    return false;
-                }
-                if (pres09_test_resize_stage < 4) {
-                    return true;
-                }
-            }
-
             string bnr_data = bnr_view.data () ?? "";
             if (!pres09_test_compare_file (
                     "pres09-ei-data.tsv",
@@ -6304,6 +6288,22 @@ namespace AskTheModel {
                         : "Live BNR BLS C01 Chart/Data view is unavailable"
                 );
                 return false;
+            }
+
+            if (pres09_test_resize_stage < 4) {
+                if (!pres09_test_resize_live_chart (
+                        state, bnr_view, 12, "BNR BLS C01")) {
+                    pres09_test_finish (
+                        false,
+                        pres09_test_failure.length > 0
+                            ? pres09_test_failure
+                            : "BNR BLS C01 resize recovery failed"
+                    );
+                    return false;
+                }
+                if (pres09_test_resize_stage < 4) {
+                    return true;
+                }
             }
 
             string bnr_data = bnr_view.data () ?? "";
