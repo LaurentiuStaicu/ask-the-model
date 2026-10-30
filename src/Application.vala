@@ -5880,7 +5880,7 @@ namespace AskTheModel {
                         "Live GISTEMP data was unavailable before the resize transition";
                     return false;
                 }
-                view.test_set_canvas_minimum (480, 200);
+                view.test_set_canvas_minimum (480, 100);
                 window.set_visible (false);
                 window.set_default_size (500, 300);
                 window.present ();
