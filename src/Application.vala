@@ -6069,7 +6069,7 @@ namespace AskTheModel {
                     return false;
                 }
                 if ((view.data () ?? "") != pres09_test_resize_data ||
-                    view.row_count () != 146) {
+                    view.row_count () != expected_rows) {
                     pres09_test_failure =
                         "%s Data changed when the application window was enlarged".printf (chart_label);
                     return false;
