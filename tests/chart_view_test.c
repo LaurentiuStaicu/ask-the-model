@@ -776,10 +776,10 @@ static void assert_v4_catalog_view (const char *series_id,
     if (exercise_resize) {
         char *data_before = g_strdup (atm_chart_view_data (view));
         int width = 0, height = 0, scale = 0;
-        atm_chart_view_test_request_resize (view, 740, 420, 1);
+        atm_chart_view_test_request_resize (view, 820, 420, 1);
         settle ();
         atm_chart_view_test_render_size (view, &width, &height, &scale);
-        g_assert_cmpint (width, ==, 740);
+        g_assert_cmpint (width, ==, 820);
         g_assert_cmpint (height, ==, 420);
         g_assert_cmpint (scale, ==, 1);
         g_assert_false (atm_chart_view_test_is_fallback (view));
@@ -806,10 +806,10 @@ static void assert_v4_catalog_view (const char *series_id,
         g_assert_cmpstr (atm_chart_view_data (view), ==, data_before);
 
         /* Returning to a valid viewport must restore the rendered chart. */
-        atm_chart_view_test_request_resize (view, 740, 420, 1);
+        atm_chart_view_test_request_resize (view, 820, 420, 1);
         settle ();
         atm_chart_view_test_render_size (view, &width, &height, &scale);
-        g_assert_cmpint (width, ==, 740);
+        g_assert_cmpint (width, ==, 820);
         g_assert_cmpint (height, ==, 420);
         g_assert_cmpint (scale, ==, 1);
         g_assert_false (atm_chart_view_test_is_fallback (view));
