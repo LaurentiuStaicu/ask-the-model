@@ -5842,6 +5842,22 @@ namespace AskTheModel {
 
             string ei_data = ei_view.data () ?? "";
             string gistemp_data = gistemp_view.data () ?? "";
+            if (pres09_test_resize_stage < 4) {
+                if (!pres09_test_resize_live_chart (
+                        state, bnr_view, 12, "BNR BLS C01")) {
+                    pres09_test_finish (
+                        false,
+                        pres09_test_failure.length > 0
+                            ? pres09_test_failure
+                            : "BNR BLS C01 resize recovery failed"
+                    );
+                    return false;
+                }
+                if (pres09_test_resize_stage < 4) {
+                    return true;
+                }
+            }
+
             string bnr_data = bnr_view.data () ?? "";
             if (!pres09_test_compare_file (
                     "pres09-ei-data.tsv",
@@ -5934,7 +5950,9 @@ namespace AskTheModel {
 
         private bool pres09_test_resize_live_chart (
             ChatTabState state,
-            ChartNative.View view
+            ChartNative.View view,
+            uint expected_rows,
+            string chart_label
         ) {
             Gtk.ApplicationWindow? window =
                 this.active_window as Gtk.ApplicationWindow;
@@ -5978,9 +5996,9 @@ namespace AskTheModel {
                 pres09_test_visible_render_height = area_height;
                 pres09_test_resize_data = view.data () ?? "";
                 if (pres09_test_resize_data.length == 0 ||
-                    view.row_count () != 146) {
+                    view.row_count () != expected_rows) {
                     pres09_test_failure =
-                        "Live GISTEMP data was unavailable before the resize transition";
+                        "%s data was unavailable before the resize transition".printf (chart_label);
                     return false;
                 }
                 window.set_default_size (500, 300);
@@ -6023,9 +6041,9 @@ namespace AskTheModel {
                     return false;
                 }
                 if ((view.data () ?? "") != pres09_test_resize_data ||
-                    view.row_count () != 146) {
+                    view.row_count () != expected_rows) {
                     pres09_test_failure =
-                        "GISTEMP Data changed when the application window was reduced";
+                        "%s Data changed when the application window was reduced".printf (chart_label);
                     return false;
                 }
 
@@ -6069,7 +6087,7 @@ namespace AskTheModel {
                 if ((view.data () ?? "") != pres09_test_resize_data ||
                     view.row_count () != 146) {
                     pres09_test_failure =
-                        "GISTEMP Data changed when the application window was enlarged";
+                        "%s Data changed when the application window was enlarged".printf (chart_label);
                     return false;
                 }
                 pres09_test_resize_stage = 4;
@@ -6155,6 +6173,24 @@ namespace AskTheModel {
                     return false;
                 }
 
+                if (pres09_test_resize_stage < 4) {
+                    if (!pres09_test_resize_live_chart (
+                            state, view, 61, "Energy Institute")) {
+                        pres09_test_finish (
+                            false,
+                            pres09_test_failure.length > 0
+                                ? pres09_test_failure
+                                : "Energy Institute resize recovery failed"
+                        );
+                        return false;
+                    }
+                    if (pres09_test_resize_stage < 4) {
+                        return true;
+                    }
+                }
+
+                pres09_test_resize_stage = 0;
+                pres09_test_resize_wait_ticks = 0;
                 pres09_test_live_turn = 1;
                 state.prompt.buffer.text =
                     "Generate a chart of global temperature anomalies.";
@@ -6203,7 +6239,8 @@ namespace AskTheModel {
                 }
 
                 if (pres09_test_resize_stage < 4) {
-                    if (!pres09_test_resize_live_chart (state, gistemp_view)) {
+                    if (!pres09_test_resize_live_chart (
+                            state, gistemp_view, 146, "GISTEMP")) {
                         pres09_test_finish (
                             false,
                             pres09_test_failure.length > 0
@@ -6217,6 +6254,8 @@ namespace AskTheModel {
                     }
                 }
 
+                pres09_test_resize_stage = 0;
+                pres09_test_resize_wait_ticks = 0;
                 pres09_test_live_turn = 2;
                 if (!pres09_test_select_ewd (state, true)) {
                     pres09_test_finish (
