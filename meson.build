@@ -335,6 +335,7 @@ pres09_gtk_application_e2e_test = executable(
     sqlite_dep,
     md4c_dep
   ],
+  c_args: ['-DATM_CHART_VIEW_TESTING'],
   vala_args: [
     '--define=ATM_M12_TEST',
     '--define=ATM_PRES09_TEST'
