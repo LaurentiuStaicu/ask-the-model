@@ -5872,8 +5872,8 @@ namespace AskTheModel {
                     }
                     return true;
                 }
-                pres09_test_visible_render_width = render_width;
-                pres09_test_visible_render_height = render_height;
+                pres09_test_visible_render_width = area_width;
+                pres09_test_visible_render_height = area_height;
                 pres09_test_resize_data = view.data () ?? "";
                 if (pres09_test_resize_data.length == 0 ||
                     view.row_count () != 146) {
@@ -5881,7 +5881,7 @@ namespace AskTheModel {
                         "Live GISTEMP data was unavailable before the resize transition";
                     return false;
                 }
-                view.test_set_canvas_minimum (480, 100);
+                view.test_set_canvas_minimum (480, 200);
                 window.set_default_size (500, 300);
                 pres09_test_resize_stage = 2;
                 pres09_test_resize_wait_ticks = 0;
