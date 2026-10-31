@@ -106,8 +106,9 @@ gboolean atm_chart_live_reconstruct_bnr_bls_c01 (
  * selects one closed source adapter from the series ID. The caller must first
  * authorize the requested series against the conversation's repository scope
  * and pass the actual pin identity; this function never accepts model-authored
- * scientific metadata. History remains source-specific v1/v2/v3 until its
- * separately qualified v4 persistence milestone.
+ * scientific metadata. Durable History rows retain source-specific v1/v2/v3
+ * identities; an optional v4 presentation sidecar is separately reconstructed
+ * and compared against the catalog and source identity on reopen.
  */
 gboolean atm_chart_live_reconstruct_v4 (
     const char *series_id,
@@ -125,6 +126,30 @@ gboolean atm_chart_live_reconstruct_v4 (
 gboolean atm_chart_wrap_qualified_spec_v4 (
     const char *series_id,
     const AtmChartSpec *qualified_source_spec,
+    AtmChartSpecV4 **out,
+    GError **error
+);
+
+
+/*
+ * Build the complete catalog-derived sidecar input for one qualified v4 spec.
+ * Returned string pointers are borrowed and remain valid while the spec lives.
+ */
+gboolean atm_chart_history_presentation_input_from_v4 (
+    const AtmChartSpecV4 *spec,
+    AtmConversationChartPresentationInput *out,
+    GError **error
+);
+
+/*
+ * Rebuild a v4 presentation from a source-specific spec already re-qualified
+ * from the pinned History snapshot, then compare every stored sidecar field
+ * and the semantic presentation ID before returning a renderable v4 spec.
+ */
+gboolean atm_chart_history_reconstruct_v4 (
+    const char *series_id,
+    const AtmChartSpec *qualified_source_spec,
+    const AtmConversationChartPresentationInput *persisted,
     AtmChartSpecV4 **out,
     GError **error
 );

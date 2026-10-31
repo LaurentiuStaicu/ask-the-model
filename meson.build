@@ -47,6 +47,7 @@ executable(
     'src/PresentationNative.vapi',
     'src/PresentationRenderer.vala',
     'src/ChartNative.vapi',
+    'src/ChartPresentationNative.vapi',
     'src/ChartCatalog.vapi',
     'src/ChartIntent.vala',
     'src/chart_catalog.c',
@@ -206,6 +207,7 @@ pres09_application_sources = [
     'src/PresentationNative.vapi',
     'src/PresentationRenderer.vala',
     'src/ChartNative.vapi',
+    'src/ChartPresentationNative.vapi',
     'src/ChartCatalog.vapi',
     'src/ChartIntent.vala',
     'src/chart_catalog.c',
@@ -325,8 +327,11 @@ pres09_application_sources = [
 # exist only in this test binary. It is excluded from normal/default builds.
 pres09_gtk_application_e2e_test = executable(
   'pres09-gtk-application-e2e-test',
-  pres09_application_sources + ['tests/pres09_gtk_application_e2e_test.vala'],
-  include_directories: include_directories('src'),
+  pres09_application_sources + [
+    'tests/pres09_gtk_application_e2e_test.vala',
+    'tests/pres09_sidecar_tamper.c'
+  ],
+  include_directories: include_directories(['src', 'tests']),
   dependencies: [
     gtk_dep,
     granite_dep,
@@ -606,6 +611,7 @@ conversation_store_test = executable(
     resources
   ],
   include_directories: include_directories('src'),
+  c_args: ['-DATM_CONVERSATION_STORE_TESTING'],
   dependencies: [
     glib_dep,
     gio_dep,
@@ -622,6 +628,7 @@ test(
 conversation_persistence_store_test = executable(
   'conversation-persistence-store-test',
   [
+    'src/ChartPresentationNative.vapi',
     'src/ConversationStoreNative.vapi',
     'src/ConversationPersistenceStore.vala',
     'src/PublicationBarrier.vala',
@@ -681,6 +688,7 @@ repository_gc_durable_roots_test = executable(
     'src/RepositoryState.vala',
     'src/ControlStateNative.vala',
     'src/ControlRepositoryState.vala',
+    'src/ChartPresentationNative.vapi',
     'src/ConversationStoreNative.vapi',
     'src/ConversationPersistenceStore.vala',
     'src/PublicationBarrier.vala',
@@ -732,6 +740,7 @@ repository_gc_isolation_orchestrator_test = executable(
     'src/RepositoryState.vala',
     'src/ControlStateNative.vala',
     'src/ControlRepositoryState.vala',
+    'src/ChartPresentationNative.vapi',
     'src/ConversationStoreNative.vapi',
     'src/ConversationPersistenceStore.vala',
     'src/PublicationBarrier.vala',
@@ -785,6 +794,7 @@ repository_gc_purge_orchestrator_test = executable(
     'src/RepositoryState.vala',
     'src/ControlStateNative.vala',
     'src/ControlRepositoryState.vala',
+    'src/ChartPresentationNative.vapi',
     'src/ConversationStoreNative.vapi',
     'src/ConversationPersistenceStore.vala',
     'src/PublicationBarrier.vala',
@@ -2254,6 +2264,7 @@ grounded_turn_commit_protocol_test = executable(
   [
     'src/ConversationGrounding.vala',
     'src/ConversationSession.vala',
+    'src/ChartPresentationNative.vapi',
     'src/ConversationStoreNative.vapi',
     'src/ConversationPersistenceStore.vala',
     'src/PublicationBarrier.vala',
@@ -2316,6 +2327,7 @@ repository_lifecycle_service_test = executable(
     'src/RepositoryState.vala',
     'src/ControlStateNative.vala',
     'src/ControlRepositoryState.vala',
+    'src/ChartPresentationNative.vapi',
     'src/ConversationStoreNative.vapi',
     'src/ConversationPersistenceStore.vala',
     'src/PublicationBarrier.vala',
@@ -2405,6 +2417,7 @@ repository_lifecycle_durability_fault_test = executable(
     'src/RepositoryState.vala',
     'src/ControlStateNative.vala',
     'src/ControlRepositoryState.vala',
+    'src/ChartPresentationNative.vapi',
     'src/ConversationStoreNative.vapi',
     'src/ConversationPersistenceStore.vala',
     'src/PublicationBarrier.vala',
@@ -3062,7 +3075,7 @@ test('chart-view', chart_view_test,
 
 chart_view_vala_test = executable(
   'chart-view-vala-test',
-  ['src/ChartNative.vapi', 'src/chart_view.c', 'tests/chart_fixture.c', 'src/chart_render.c', 'src/chart_render_v4.c', 'src/chart_projection_v4.c', 'src/chart_projection.c', 'src/chart_spec_v4.c', 'src/chart_catalog.c', 'src/chart_spec.c', 'src/verified_series.c', 'src/gistemp_sra.c', 'src/gistemp_evidence.c',
+  ['src/ChartNative.vapi', 'src/ChartPresentationNative.vapi', 'src/chart_view.c', 'tests/chart_fixture.c', 'src/chart_render.c', 'src/chart_render_v4.c', 'src/chart_projection_v4.c', 'src/chart_projection.c', 'src/chart_spec_v4.c', 'src/chart_catalog.c', 'src/chart_spec.c', 'src/verified_series.c', 'src/gistemp_sra.c', 'src/gistemp_evidence.c',
    'src/gistemp_admission.c', 'src/annual_series_candidate.c',
    'src/scientific_canonical.c', 'src/scientific_artifact.c',
    'src/scientific_result.c', 'src/scientific_operation.c',
@@ -3114,7 +3127,9 @@ chart_history_reconstruct_test = executable(
   dependencies: [glib_dep, gio_dep, json_glib_dep],
   install: false
 )
+# Catalog-derived v4 sidecar parity and per-field tamper tests make this path longer.
 test('chart-history-reconstruct', chart_history_reconstruct_test,
+  timeout: 90,
   env: {
     'ATM_CHART01_FIXTURE': meson.current_source_dir() / 'tests/fixtures/chart01',
     'ATM_BNR_BLS_FIXTURE': meson.current_source_dir() / 'tests/fixtures/chart01/rmd-bnr-bls'

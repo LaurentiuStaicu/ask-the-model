@@ -204,6 +204,84 @@ namespace AskTheModel {
                 render_contract: render_contract
             );
         }
+
+        private static string require_presentation_text (
+            string? value,
+            string field_name
+        ) throws GLib.Error {
+            if (value == null) {
+                throw new GLib.IOError.INVALID_DATA (
+                    "Catalog-bound presentation is missing %s.".printf (field_name)
+                );
+            }
+            return value;
+        }
+
+        public static ConversationPersistenceChartPresentation from_native (
+            ref ChartPresentationNative.PresentationInput p
+        ) throws GLib.Error {
+            return new ConversationPersistenceChartPresentation (
+                require_presentation_text (p.presentation_schema, "schema"),
+                require_presentation_text (p.presentation_spec_id, "semantic ID"),
+                require_presentation_text (p.series_id, "series ID"),
+                require_presentation_text (p.catalog_schema, "catalog schema"),
+                require_presentation_text (p.adapter_id, "adapter ID"),
+                require_presentation_text (p.series_profile_id, "series profile"),
+                require_presentation_text (p.series_profile_version, "series profile version"),
+                require_presentation_text (p.admission_profile_id, "admission profile"),
+                require_presentation_text (p.admission_profile_version, "admission profile version"),
+                require_presentation_text (p.reconstruction_profile_id, "reconstruction profile"),
+                require_presentation_text (p.source_chart_schema, "source schema"),
+                require_presentation_text (p.source_chart_spec_id, "source semantic ID"),
+                require_presentation_text (p.x_coordinate_semantics, "x-coordinate semantics"),
+                require_presentation_text (p.x_frequency, "x frequency"),
+                require_presentation_text (p.x_unit, "x unit"),
+                require_presentation_text (p.x_dimension, "x dimension"),
+                require_presentation_text (p.subject, "subject"),
+                require_presentation_text (p.attribute, "attribute"),
+                require_presentation_text (p.y_unit, "y unit"),
+                require_presentation_text (p.y_dimension, "y dimension"),
+                require_presentation_text (p.series_semantics, "series semantics"),
+                require_presentation_text (p.missing_policy, "missing policy"),
+                p.missing_coordinate,
+                p.missing_reason,
+                require_presentation_text (p.display_profile_id, "display profile"),
+                require_presentation_text (p.display_profile_version, "display profile version"),
+                require_presentation_text (p.render_contract, "render contract")
+            );
+        }
+
+        public ChartPresentationNative.PresentationInput to_native () {
+            var p = new ChartPresentationNative.PresentationInput ();
+            p.presentation_schema = presentation_schema;
+            p.presentation_spec_id = presentation_spec_id;
+            p.series_id = series_id;
+            p.catalog_schema = catalog_schema;
+            p.adapter_id = adapter_id;
+            p.series_profile_id = series_profile_id;
+            p.series_profile_version = series_profile_version;
+            p.admission_profile_id = admission_profile_id;
+            p.admission_profile_version = admission_profile_version;
+            p.reconstruction_profile_id = reconstruction_profile_id;
+            p.source_chart_schema = source_chart_schema;
+            p.source_chart_spec_id = source_chart_spec_id;
+            p.x_coordinate_semantics = x_coordinate_semantics;
+            p.x_frequency = x_frequency;
+            p.x_unit = x_unit;
+            p.x_dimension = x_dimension;
+            p.subject = subject;
+            p.attribute = attribute;
+            p.y_unit = y_unit;
+            p.y_dimension = y_dimension;
+            p.series_semantics = series_semantics;
+            p.missing_policy = missing_policy;
+            p.missing_coordinate = missing_coordinate;
+            p.missing_reason = missing_reason;
+            p.display_profile_id = display_profile_id;
+            p.display_profile_version = display_profile_version;
+            p.render_contract = render_contract;
+            return p;
+        }
     }
 
     public class ConversationPersistenceChart : Object {
@@ -1607,7 +1685,7 @@ namespace AskTheModel {
                     );
                 }
                 ConversationPersistenceChartPresentation p = chart.presentation;
-                var native_presentation = new ConversationStoreNative.ChartPresentationInput ();
+                var native_presentation = new ChartPresentationNative.PresentationInput ();
                 native_presentation.presentation_schema = p.presentation_schema;
                 native_presentation.presentation_spec_id = p.presentation_spec_id;
                 native_presentation.series_id = p.series_id;

@@ -1066,3 +1066,161 @@ atm_chart_wrap_qualified_spec_v4 (
     return atm_chart_spec_v4_new (
         entry, qualified_source_spec, out, error);
 }
+
+
+/*
+ * Convert a qualified v4 spec into the durable sidecar claims. Pointers in
+ * the output are borrowed from the immutable spec/catalog and remain valid
+ * while the spec remains alive. No numeric observations or display state are
+ * copied to History.
+ */
+gboolean
+atm_chart_history_presentation_input_from_v4 (
+    const AtmChartSpecV4 *spec,
+    AtmConversationChartPresentationInput *out,
+    GError **error
+)
+{
+    if (spec == NULL || out == NULL) {
+        return reject (error,
+            "History v4 presentation input requires a spec and output.");
+    }
+    if (!atm_chart_spec_v4_validate (spec, error))
+        return FALSE;
+
+    const AtmChartCatalogEntry *entry =
+        atm_chart_spec_v4_catalog_entry (spec);
+    const AtmChartSpec *source =
+        atm_chart_spec_v4_source_spec (spec);
+    if (entry == NULL || source == NULL) {
+        return reject (error,
+            "Qualified v4 spec has no catalog entry or source recipe.");
+    }
+
+    const char *missing_policy = NULL;
+    if (entry->missing_policy == ATM_CHART_CATALOG_MISSING_REJECT) {
+        missing_policy = "reject";
+    } else if (entry->missing_policy ==
+               ATM_CHART_CATALOG_MISSING_BOUNDED_PROFILE) {
+        missing_policy = "bounded_profile";
+    } else {
+        return reject (error,
+            "Catalog v4 missing policy is unsupported for History.");
+    }
+
+    memset (out, 0, sizeof (*out));
+    out->presentation_schema = atm_chart_spec_v4_schema (spec);
+    out->presentation_spec_id = atm_chart_spec_v4_id (spec);
+    out->series_id = entry->series_id;
+    out->catalog_schema = ATM_CHART_CATALOG_SCHEMA;
+    out->adapter_id = entry->adapter_id;
+    out->series_profile_id = entry->series_profile_id;
+    out->series_profile_version = entry->series_profile_version;
+    out->admission_profile_id = entry->admission_profile_id;
+    out->admission_profile_version = entry->admission_profile_version;
+    out->reconstruction_profile_id = entry->reconstruction_profile_id;
+    out->source_chart_schema = atm_chart_spec_schema (source);
+    out->source_chart_spec_id = atm_chart_spec_id (source);
+    out->x_coordinate_semantics = entry->x_coordinate_semantics;
+    out->x_frequency = entry->x_frequency;
+    out->x_unit = entry->x_unit;
+    out->x_dimension = entry->x_dimension;
+    out->subject = entry->subject;
+    out->attribute = entry->attribute;
+    out->y_unit = entry->y_unit;
+    out->y_dimension = entry->y_dimension;
+    out->series_semantics = entry->series_semantics;
+    out->missing_policy = missing_policy;
+    out->missing_coordinate = entry->missing_coordinate;
+    out->missing_reason = entry->missing_reason;
+    out->display_profile_id = entry->display_profile_id;
+    out->display_profile_version = entry->display_profile_version;
+    out->render_contract = "atm-retro-mono/1";
+    return TRUE;
+}
+
+static gboolean
+history_presentation_inputs_equal (
+    const AtmConversationChartPresentationInput *actual,
+    const AtmConversationChartPresentationInput *expected
+)
+{
+    if (actual == NULL || expected == NULL)
+        return FALSE;
+#define SAME_FIELD(name) (g_strcmp0 (actual->name, expected->name) == 0)
+    gboolean equal =
+        SAME_FIELD (presentation_schema) &&
+        SAME_FIELD (presentation_spec_id) &&
+        SAME_FIELD (series_id) &&
+        SAME_FIELD (catalog_schema) &&
+        SAME_FIELD (adapter_id) &&
+        SAME_FIELD (series_profile_id) &&
+        SAME_FIELD (series_profile_version) &&
+        SAME_FIELD (admission_profile_id) &&
+        SAME_FIELD (admission_profile_version) &&
+        SAME_FIELD (reconstruction_profile_id) &&
+        SAME_FIELD (source_chart_schema) &&
+        SAME_FIELD (source_chart_spec_id) &&
+        SAME_FIELD (x_coordinate_semantics) &&
+        SAME_FIELD (x_frequency) &&
+        SAME_FIELD (x_unit) &&
+        SAME_FIELD (x_dimension) &&
+        SAME_FIELD (subject) &&
+        SAME_FIELD (attribute) &&
+        SAME_FIELD (y_unit) &&
+        SAME_FIELD (y_dimension) &&
+        SAME_FIELD (series_semantics) &&
+        SAME_FIELD (missing_policy) &&
+        SAME_FIELD (missing_coordinate) &&
+        SAME_FIELD (missing_reason) &&
+        SAME_FIELD (display_profile_id) &&
+        SAME_FIELD (display_profile_version) &&
+        SAME_FIELD (render_contract);
+#undef SAME_FIELD
+    return equal;
+}
+
+/*
+ * Rebuild a v4 presentation from the already re-qualified source-specific
+ * ChartSpec, then compare every persisted sidecar claim against the freshly
+ * derived catalog tuple and semantic v4 identity. A 64-hex ID by itself is
+ * never accepted as proof of presentation identity.
+ */
+gboolean
+atm_chart_history_reconstruct_v4 (
+    const char *series_id,
+    const AtmChartSpec *qualified_source_spec,
+    const AtmConversationChartPresentationInput *persisted,
+    AtmChartSpecV4 **out,
+    GError **error
+)
+{
+    if (out == NULL || *out != NULL ||
+        series_id == NULL || series_id[0] == '\0' ||
+        qualified_source_spec == NULL || persisted == NULL) {
+        return reject (error,
+            "History v4 reconstruction requires a registered series, qualified source, sidecar and empty output.");
+    }
+
+    AtmChartSpecV4 *rebuilt = NULL;
+    if (!atm_chart_wrap_qualified_spec_v4 (
+            series_id, qualified_source_spec, &rebuilt, error)) {
+        return FALSE;
+    }
+
+    AtmConversationChartPresentationInput expected = {0};
+    if (!atm_chart_history_presentation_input_from_v4 (
+            rebuilt, &expected, error)) {
+        atm_chart_spec_v4_free (rebuilt);
+        return FALSE;
+    }
+
+    if (!history_presentation_inputs_equal (persisted, &expected)) {
+        atm_chart_spec_v4_free (rebuilt);
+        return reject (error,
+            "Persisted History v4 presentation claims differ from the rebuilt catalog-bound spec.");
+    }
+
+    *out = rebuilt;
+    return TRUE;
+}

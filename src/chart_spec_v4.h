@@ -9,11 +9,45 @@ G_BEGIN_DECLS
 #define ATM_CHART_SPEC_V4_ID_DOMAIN "atm.chart-spec.v4"
 
 /*
- * Catalog-bound generic ChartSpec envelope. This first v4 slice is deliberately
- * not a renderer, Application or History input. It wraps one independently
- * qualified v1/v2/v3 source spec and never accepts caller-authored point data.
+ * Catalog-bound generic ChartSpec envelope used for the live Chart/Data view
+ * and for rebuilding the optional History v4 presentation sidecar. It wraps
+ * one independently qualified v1/v2/v3 source spec and never accepts
+ * caller-authored point data or persisted numeric observations.
  */
 typedef struct AtmChartSpecV4 AtmChartSpecV4;
+
+/* Pure chart-domain value tuple for catalog-derived History presentation metadata.
+ * Shared with persistence without importing the conversation-store layer. */
+typedef struct {
+    const char *presentation_schema;
+    const char *presentation_spec_id;
+    const char *series_id;
+    const char *catalog_schema;
+    const char *adapter_id;
+    const char *series_profile_id;
+    const char *series_profile_version;
+    const char *admission_profile_id;
+    const char *admission_profile_version;
+    const char *reconstruction_profile_id;
+    const char *source_chart_schema;
+    const char *source_chart_spec_id;
+    const char *x_coordinate_semantics;
+    const char *x_frequency;
+    const char *x_unit;
+    const char *x_dimension;
+    const char *subject;
+    const char *attribute;
+    const char *y_unit;
+    const char *y_dimension;
+    const char *series_semantics;
+    const char *missing_policy;
+    const char *missing_coordinate;
+    const char *missing_reason;
+    const char *display_profile_id;
+    const char *display_profile_version;
+    const char *render_contract;
+} AtmConversationChartPresentationInput;
+
 
 typedef enum {
     ATM_CHART_SPEC_V4_ERROR_ARGUMENT,
@@ -84,7 +118,5 @@ gboolean atm_chart_spec_v4_test_build_id (
 
 const char *atm_chart_spec_v4_admission_profile_id (const AtmChartSpecV4 *spec);
 const char *atm_chart_spec_v4_reconstruction_profile_id (const AtmChartSpecV4 *spec);
-/* History recipe schema is persistence metadata; it is deliberately not part of the semantic ChartSpec ID. */
-const char *atm_chart_spec_v4_history_schema_version (const AtmChartSpecV4 *spec);
 
 G_END_DECLS
