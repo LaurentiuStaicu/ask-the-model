@@ -3481,7 +3481,7 @@ namespace AskTheModel {
                             ref native_presentation,
                             out history_spec_v4)) {
                         throw new GLib.IOError.INVALID_DATA (
-                            "Persisted History v4 presentation claims do not match the rebuilt catalog/source identity."
+                            "Persisted History v4 presentation claims differ from the rebuilt catalog-bound spec."
                         );
                     }
                     if (!ChartNative.create_v4 (history_spec_v4, out view)) {
