@@ -12,6 +12,12 @@ private const string BNR_SNAPSHOT_SHA =
 private const string TEST_MODEL = "test-model";
 private const string TEST_DIGEST = "test-digest";
 
+[CCode (cheader_filename = "pres09_sidecar_tamper.h")]
+private static extern bool atm_pres09_tamper_first_persistent_v4_sidecar (
+    string database_path,
+    string conversation_id
+) throws GLib.Error;
+
 private static void write_json_response (
     Soup.ServerMessage message,
     string body
@@ -267,6 +273,10 @@ private static int run_snapshot_scenario (
         state,
         "control-state.sqlite3"
     );
+    string conversation_db = GLib.Path.build_filename (
+        state,
+        "conversations.sqlite3"
+    );
     string flatpak_info = GLib.Path.build_filename (
         root,
         "flatpak-info"
@@ -457,10 +467,51 @@ private static int run_snapshot_scenario (
         "intent-rejection",
         "live",
         "history",
+        "history-tampered-sidecar",
         "history-invalid"
     };
 
     foreach (string phase in phases) {
+        if (phase == "history-tampered-sidecar") {
+            string conversation_id;
+            size_t conversation_id_length;
+            string conversation_id_path = GLib.Path.build_filename (
+                home,
+                "pres09-conversation-id"
+            );
+            try {
+                if (!GLib.FileUtils.get_contents (
+                        conversation_id_path,
+                        out conversation_id,
+                        out conversation_id_length
+                    )) {
+                    throw new GLib.IOError.FAILED (
+                        "Could not read the archived conversation id before persistent sidecar tampering."
+                    );
+                }
+                conversation_id = conversation_id.strip ();
+                if (conversation_id.length == 0 ||
+                    !atm_pres09_tamper_first_persistent_v4_sidecar (
+                        conversation_db,
+                        conversation_id
+                    )) {
+                    throw new GLib.IOError.FAILED (
+                        "Could not persistently tamper with exactly one v4 presentation sidecar."
+                    );
+                }
+            } catch (GLib.Error error) {
+                stderr.printf (
+                    "PRES-09 persistent sidecar tamper setup failed: %s\n",
+                    error.message
+                );
+                return 1;
+            }
+            stdout.printf (
+                "PRES09-GTK: tampered one persisted EI v4 presentation_spec_id in %s\n",
+                conversation_db
+            );
+        }
+
         if (run_child_phase (executable_path, phase) != 0) {
             stderr.printf (
                 "PRES09 GTK Application E2E stopped at phase '%s'; fixture retained at %s\n",

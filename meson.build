@@ -327,8 +327,11 @@ pres09_application_sources = [
 # exist only in this test binary. It is excluded from normal/default builds.
 pres09_gtk_application_e2e_test = executable(
   'pres09-gtk-application-e2e-test',
-  pres09_application_sources + ['tests/pres09_gtk_application_e2e_test.vala'],
-  include_directories: include_directories('src'),
+  pres09_application_sources + [
+    'tests/pres09_gtk_application_e2e_test.vala',
+    'tests/pres09_sidecar_tamper.c'
+  ],
+  include_directories: include_directories(['src', 'tests']),
   dependencies: [
     gtk_dep,
     granite_dep,

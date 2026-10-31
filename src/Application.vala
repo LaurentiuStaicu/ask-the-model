@@ -6044,6 +6044,104 @@ namespace AskTheModel {
             return true;
         }
 
+        private bool pres09_test_check_tampered_sidecar_restore (
+            ChatTabState state
+        ) {
+            string? conversation_id =
+                pres09_test_read_file ("pres09-conversation-id");
+            if (conversation_store == null ||
+                conversation_id == null ||
+                state.persistent_id != conversation_id ||
+                !state.archived ||
+                state.pres09_test_chart_widgets.length != 4) {
+                pres09_test_failure =
+                    "Tampered-sidecar History did not restore the expected archived conversation and four chart slots";
+                return false;
+            }
+
+            uint view_count = 0;
+            uint unavailable_count = 0;
+            foreach (
+                Gtk.Widget widget
+                in state.pres09_test_chart_widgets
+            ) {
+                if (widget is ChartNative.View) {
+                    ChartNative.View view = (ChartNative.View) widget;
+                    if (view.row_count () == 0 ||
+                        (view.data () ?? "").length == 0) {
+                        pres09_test_failure =
+                            "An unaffected History chart lost its persisted data";
+                        return false;
+                    }
+                    view_count++;
+                }
+
+                Gtk.Label? label = widget as Gtk.Label;
+                if (label != null &&
+                    label.label.has_prefix ("Chart unavailable:")) {
+                    if (!label.label.contains (
+                            "Persisted History v4 presentation claims differ")) {
+                        pres09_test_failure =
+                            "The unavailable chart did not fail specifically on persisted v4 presentation identity";
+                        return false;
+                    }
+                    unavailable_count++;
+                }
+            }
+
+            if (view_count != 3 || unavailable_count != 1 ||
+                !state.transcript.buffer.text.contains ("Requested chart:")) {
+                pres09_test_failure =
+                    "A single tampered sidecar did not preserve the answer and three valid charts while rejecting exactly one chart";
+                return false;
+            }
+
+            ConversationPersistenceSnapshot snapshot;
+            try {
+                snapshot = conversation_store.load_snapshot (
+                    conversation_id
+                );
+            } catch (GLib.Error error) {
+                pres09_test_failure =
+                    "Tampered persistent sidecar could not be loaded for integrity assertion: %s"
+                    .printf (error.message);
+                return false;
+            }
+
+            uint v4_count = 0;
+            uint forged_count = 0;
+            foreach (
+                ConversationPersistenceMessage message
+                in snapshot.messages
+            ) {
+                foreach (
+                    ConversationPersistenceChart chart
+                    in message.charts
+                ) {
+                    ConversationPersistenceChartPresentation? presentation =
+                        chart.presentation;
+                    if (presentation == null) {
+                        continue;
+                    }
+                    v4_count++;
+                    if (presentation.presentation_spec_id ==
+                            "ffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffff" &&
+                        presentation.series_id ==
+                            "energy.energy-institute.global-total-energy-supply") {
+                        forged_count++;
+                    }
+                }
+            }
+
+            if (v4_count != 3 || forged_count != 1) {
+                pres09_test_failure =
+                    "History did not load exactly one persistently forged EI v4 sidecar alongside two intact v4 sidecars";
+                return false;
+            }
+
+            return true;
+        }
+
         private bool pres09_test_resize_live_chart (
             ChatTabState state,
             ChartNative.View view,
@@ -6538,6 +6636,68 @@ namespace AskTheModel {
             return false;
         }
 
+        private bool pres09_test_step_history_tampered_sidecar () {
+            if (startup_qualification_failed) {
+                pres09_test_finish (
+                    false,
+                    "Startup qualification failed before tampered-sidecar History restoration: %s".printf (
+                        startup_qualification_detail ?? "unknown reason"
+                    )
+                );
+                return false;
+            }
+
+            if (!pres09_test_history_open_requested) {
+                if (history_button == null ||
+                    !history_button.sensitive) {
+                    return true;
+                }
+                pres09_test_history_open_requested = true;
+                history_button.clicked ();
+                return true;
+            }
+
+            if (!pres09_test_history_open_clicked) {
+                Gtk.Button? open_button =
+                    pres09_test_find_button (
+                        pres09_test_history_window,
+                        "Open"
+                    );
+                if (open_button == null) {
+                    return true;
+                }
+
+                pres09_test_history_open_clicked = true;
+                open_button.clicked ();
+                return true;
+            }
+
+            string? conversation_id =
+                pres09_test_read_file ("pres09-conversation-id");
+            if (conversation_id == null ||
+                active_chat == null ||
+                active_chat.persistent_id != conversation_id) {
+                return true;
+            }
+
+            pres09_test_state = active_chat;
+            if (active_chat.restored_view_only ||
+                restored_qualification_running) {
+                return true;
+            }
+
+            if (!pres09_test_check_tampered_sidecar_restore (active_chat)) {
+                pres09_test_finish (false, pres09_test_failure);
+                return false;
+            }
+
+            pres09_test_finish (
+                true,
+                "a process-reopened History conversation retained its answer and unaffected charts while rejecting the persistently forged EI v4 presentation identity"
+            );
+            return false;
+        }
+
         private bool pres09_test_step_history_invalid () {
             if (!pres09_test_history_open_requested) {
                 if (history_button == null ||
@@ -6843,6 +7003,9 @@ namespace AskTheModel {
             }
             if (pres09_test_phase == "history") {
                 return pres09_test_step_history ();
+            }
+            if (pres09_test_phase == "history-tampered-sidecar") {
+                return pres09_test_step_history_tampered_sidecar ();
             }
             if (pres09_test_phase == "history-invalid") {
                 return pres09_test_step_history_invalid ();
