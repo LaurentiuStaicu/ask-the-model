@@ -6082,7 +6082,9 @@ namespace AskTheModel {
                     if (!label.label.contains (
                             "Persisted History v4 presentation claims do not match the rebuilt catalog/source identity.")) {
                         pres09_test_failure =
-                            "The unavailable chart did not fail specifically on persisted v4 presentation identity";
+                            "The unavailable chart did not fail specifically on persisted v4 presentation identity: %s".printf (
+                                label.label
+                            );
                         return false;
                     }
                     unavailable_count++;
