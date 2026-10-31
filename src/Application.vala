@@ -6080,7 +6080,7 @@ namespace AskTheModel {
                 if (label != null &&
                     label.label.has_prefix ("Chart unavailable:")) {
                     if (!label.label.contains (
-                            "Persisted History v4 presentation claims differ")) {
+                            "Persisted History v4 presentation claims do not match the rebuilt catalog/source identity.")) {
                         pres09_test_failure =
                             "The unavailable chart did not fail specifically on persisted v4 presentation identity";
                         return false;
