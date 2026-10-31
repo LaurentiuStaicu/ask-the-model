@@ -2817,6 +2817,145 @@ test_v4_sidecar_delete_guard_v5_migration (void)
     g_free (root);
 }
 
+
+static void
+test_v5_to_v6_migration_preserves_populated_chart_rows (void)
+{
+    char *root = new_temp_root ("atm-conversation-v5-v6-preserve-XXXXXX");
+    char *path = store_path (root);
+    create_v5_store (path);
+    insert_v3_gistemp_chart_fixture (path);
+
+    g_assert_cmpint (raw_int64 (path, "PRAGMA user_version;"), ==, 5);
+    g_assert_cmpint (raw_int64 (path,
+        "SELECT count(*) FROM message_charts WHERE chart_schema='atm-chart-spec/1' "
+        "AND chart_spec_id='aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa' "
+        "AND chart_kind='line' "
+        "AND reconstruction_profile='atm-chart-reconstruct/gistemp-complete-annual/1' "
+        "AND presentation_schema IS NULL;"), ==, 1);
+    g_assert_cmpint (raw_int64 (path,
+        "SELECT count(*) FROM chart_series WHERE message_id='v3-chart-assistant' "
+        "AND chart_ordinal=1 AND series_ordinal=0 "
+        "AND series_profile='atm-series/gistemp-complete-annual/1' "
+        "AND admission_profile='atm-gistemp-pinned-admission/1' "
+        "AND scientific_id='bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb' "
+        "AND qualified_id='cccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccc' "
+        "AND repository_id='ewd' AND repository_version='0.1.0' "
+        "AND snapshot_sha='0123456789abcdef0123456789abcdef01234567' "
+        "AND source_path='science/data/processed/nasa_gistemp_global_2026.csv';"), ==, 1);
+
+    AtmConversationStore *store = NULL;
+    GError *error = NULL;
+    g_assert_true (atm_conversation_store_open (path, &store, &error));
+    g_assert_no_error (error);
+    g_assert_nonnull (store);
+    g_assert_cmpint (atm_conversation_store_schema_version (store), ==, 6);
+    g_assert_true (atm_conversation_store_validate (store, &error));
+    g_assert_no_error (error);
+
+    g_assert_cmpint (raw_int64 (path, "PRAGMA user_version;"), ==, 6);
+    char *schema_id = raw_text (path,
+        "SELECT schema_id FROM installation WHERE singleton_id=1;");
+    g_assert_cmpstr (schema_id, ==, "atm-conversation-store/6");
+    g_free (schema_id);
+
+    g_assert_cmpint (raw_int64 (path,
+        "SELECT count(*) FROM conversations WHERE conversation_id='v3-chart-conv' "
+        "AND title='V3 Chart' AND archived=1 AND open_on_startup=0;"), ==, 1);
+    g_assert_cmpint (raw_int64 (path,
+        "SELECT count(*) FROM conversation_repositories WHERE conversation_id='v3-chart-conv' "
+        "AND repository_id='ewd' AND repository_version='0.1.0' "
+        "AND snapshot_sha='0123456789abcdef0123456789abcdef01234567';"), ==, 1);
+    g_assert_cmpint (raw_int64 (path,
+        "SELECT count(*) FROM messages WHERE message_id='v3-chart-assistant' "
+        "AND conversation_id='v3-chart-conv' AND role='assistant' "
+        "AND provider_content='a' AND display_content='a' AND grounded=1;"), ==, 1);
+    g_assert_cmpint (raw_int64 (path,
+        "SELECT count(*) FROM message_charts WHERE chart_schema='atm-chart-spec/1' "
+        "AND chart_spec_id='aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa' "
+        "AND chart_kind='line' "
+        "AND reconstruction_profile='atm-chart-reconstruct/gistemp-complete-annual/1' "
+        "AND presentation_schema IS NULL;"), ==, 1);
+    g_assert_cmpint (raw_int64 (path,
+        "SELECT count(*) FROM chart_series WHERE message_id='v3-chart-assistant' "
+        "AND chart_ordinal=1 AND series_ordinal=0 "
+        "AND series_profile='atm-series/gistemp-complete-annual/1' "
+        "AND admission_profile='atm-gistemp-pinned-admission/1' "
+        "AND scientific_id='bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb' "
+        "AND qualified_id='cccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccc' "
+        "AND repository_id='ewd' AND repository_version='0.1.0' "
+        "AND snapshot_sha='0123456789abcdef0123456789abcdef01234567' "
+        "AND source_path='science/data/processed/nasa_gistemp_global_2026.csv';"), ==, 1);
+    g_assert_cmpint (raw_int64 (path,
+        "SELECT count(*) FROM chart_presentations_v4;"), ==, 0);
+    g_assert_cmpint (raw_int64 (path,
+        "SELECT count(*) FROM pragma_foreign_key_check;"), ==, 0);
+
+    atm_conversation_store_close (store);
+    g_free (path);
+    remove_tree_best_effort (root);
+    g_free (root);
+}
+
+
+static void
+test_v5_to_v6_migration_final_validation_rollback (void)
+{
+    char *root = new_temp_root ("atm-conversation-v5-v6-final-rollback-XXXXXX");
+    char *path = store_path (root);
+    create_v5_store (path);
+    insert_v3_gistemp_chart_fixture (path);
+
+    g_assert_cmpint (raw_int64 (path, "PRAGMA user_version;"), ==, 5);
+    g_setenv ("ATM_TEST_FAIL_V5_TO_V6_FINAL_VALIDATION", "1", TRUE);
+
+    AtmConversationStore *store = NULL;
+    GError *error = NULL;
+    g_assert_false (atm_conversation_store_open (path, &store, &error));
+    g_assert_nonnull (error);
+    g_assert_null (store);
+    g_assert_nonnull (g_strstr_len (error->message, -1,
+        "Injected v5-to-v6 final validation failure."));
+    g_clear_error (&error);
+    g_unsetenv ("ATM_TEST_FAIL_V5_TO_V6_FINAL_VALIDATION");
+
+    /* The injected failure is reached only after the v6 version and
+     * installation identity checks passed inside the still-open transaction.
+     * The failed migration must restore the complete original v5 state. */
+    g_assert_cmpint (raw_int64 (path, "PRAGMA user_version;"), ==, 5);
+    char *schema_id = raw_text (path,
+        "SELECT schema_id FROM installation WHERE singleton_id=1;");
+    g_assert_cmpstr (schema_id, ==, "atm-conversation-store/5");
+    g_free (schema_id);
+
+    g_assert_cmpint (raw_int64 (path,
+        "SELECT count(*) FROM message_charts WHERE chart_schema='atm-chart-spec/1' "
+        "AND chart_spec_id='aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa' "
+        "AND chart_kind='line' "
+        "AND reconstruction_profile='atm-chart-reconstruct/gistemp-complete-annual/1';"),
+        ==, 1);
+    g_assert_cmpint (raw_int64 (path,
+        "SELECT count(*) FROM chart_series WHERE message_id='v3-chart-assistant' "
+        "AND chart_ordinal=1 AND series_ordinal=0 "
+        "AND series_profile='atm-series/gistemp-complete-annual/1' "
+        "AND admission_profile='atm-gistemp-pinned-admission/1' "
+        "AND scientific_id='bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb' "
+        "AND qualified_id='cccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccc' "
+        "AND repository_id='ewd' AND repository_version='0.1.0' "
+        "AND snapshot_sha='0123456789abcdef0123456789abcdef01234567' "
+        "AND source_path='science/data/processed/nasa_gistemp_global_2026.csv';"), ==, 1);
+    g_assert_cmpint (raw_int64 (path,
+        "SELECT count(*) FROM sqlite_schema WHERE type='table' "
+        "AND name IN ('chart_presentations_v4','message_charts_v6',"
+        "'chart_series_v6','installation_v6');"), ==, 0);
+    g_assert_cmpint (raw_int64 (path,
+        "SELECT count(*) FROM pragma_foreign_key_check;"), ==, 0);
+
+    g_free (path);
+    remove_tree_best_effort (root);
+    g_free (root);
+}
+
 static void
 test_v5_to_v6_migration_rollback (void)
 {
@@ -3544,6 +3683,14 @@ main (int argc, char **argv)
     g_test_add_func (
         "/conversation-store/v4-to-v5-rollback",
         test_v4_to_v5_migration_rollback
+    );
+    g_test_add_func (
+        "/conversation-store/v5-to-v6-migration-preserves-populated-chart-rows",
+        test_v5_to_v6_migration_preserves_populated_chart_rows
+    );
+    g_test_add_func (
+        "/conversation-store/v5-to-v6-final-validation-rollback",
+        test_v5_to_v6_migration_final_validation_rollback
     );
     g_test_add_func (
         "/conversation-store/v5-to-v6-rollback",

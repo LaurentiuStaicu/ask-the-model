@@ -611,6 +611,7 @@ conversation_store_test = executable(
     resources
   ],
   include_directories: include_directories('src'),
+  c_args: ['-DATM_CONVERSATION_STORE_TESTING'],
   dependencies: [
     glib_dep,
     gio_dep,
