@@ -12,7 +12,7 @@ private const string BNR_SNAPSHOT_SHA =
 private const string TEST_MODEL = "test-model";
 private const string TEST_DIGEST = "test-digest";
 
-[CCode (cheader_filename = "pres09_sidecar_tamper.h")]
+[CCode (cname = "atm_pres09_tamper_first_persistent_v4_sidecar", cheader_filename = "pres09_sidecar_tamper.h")]
 private static extern bool atm_pres09_tamper_first_persistent_v4_sidecar (
     string database_path,
     string conversation_id
