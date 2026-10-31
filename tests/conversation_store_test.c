@@ -2980,9 +2980,6 @@ test_v4_sidecar_insert_failure_rolls_back_chart_attachment (void)
 
     /* No partial chart, series, or presentation may survive the rollback. */
     g_assert_cmpint (raw_int64 (path,
-        "SELECT count(*) FROM message_charts WHERE message_id='"
-        "invalid-message-id';"), ==, 0);
-    g_assert_cmpint (raw_int64 (path,
         "SELECT count(*) FROM message_charts;"), ==, 0);
     g_assert_cmpint (raw_int64 (path,
         "SELECT count(*) FROM chart_series;"), ==, 0);
