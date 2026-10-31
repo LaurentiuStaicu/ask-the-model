@@ -3085,6 +3085,8 @@ test_v5_to_v6_migration_preserves_populated_chart_rows (void)
         "SELECT count(*) FROM chart_series WHERE message_id='v5-ei-assistant' "
         "AND series_profile='atm-series/energy-institute-tes-complete-annual/1' "
         "AND admission_profile='atm-energy-institute-pinned-admission/3' "
+        "AND scientific_id='dddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddd' "
+        "AND qualified_id='eeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeee' "
         "AND repository_id='ewd' "
         "AND repository_version='snapshot:d9e249339663015f6d1c05752338a955bf64ad0b' "
         "AND snapshot_sha='d9e249339663015f6d1c05752338a955bf64ad0b' "
@@ -3093,10 +3095,18 @@ test_v5_to_v6_migration_preserves_populated_chart_rows (void)
         "SELECT count(*) FROM chart_series WHERE message_id='v5-bnr-assistant' "
         "AND series_profile='atm-series/bnr-bls-c01-calendar-quarter/1' "
         "AND admission_profile='atm-bnr-bls-canonical-panel-admission/1' "
+        "AND scientific_id='bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb' "
+        "AND qualified_id='cccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccc' "
         "AND repository_id='rmd' "
         "AND repository_version='snapshot:e43eb4e899f123d3b1aa0f6e20b7c8ed35434170' "
         "AND snapshot_sha='e43eb4e899f123d3b1aa0f6e20b7c8ed35434170' "
         "AND source_path='data/processed/bnr_bls_realised_rounds.csv';"), ==, 1);
+    g_assert_cmpint (raw_int64 (path,
+        "SELECT count(*) FROM conversations WHERE conversation_id IN "
+        "('v5-ei-conv','v5-bnr-conv');"), ==, 2);
+    g_assert_cmpint (raw_int64 (path,
+        "SELECT count(*) FROM messages WHERE message_id IN "
+        "('v5-ei-user','v5-ei-assistant','v5-bnr-user','v5-bnr-assistant');"), ==, 4);
     g_assert_cmpint (raw_int64 (path,
         "SELECT count(*) FROM pragma_foreign_key_check;"), ==, 0);
 
