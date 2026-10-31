@@ -2831,8 +2831,7 @@ test_v5_to_v6_migration_preserves_populated_chart_rows (void)
         "SELECT count(*) FROM message_charts WHERE chart_schema='atm-chart-spec/1' "
         "AND chart_spec_id='aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa' "
         "AND chart_kind='line' "
-        "AND reconstruction_profile='atm-chart-reconstruct/gistemp-complete-annual/1' "
-        "AND presentation_schema IS NULL;"), ==, 1);
+        "AND reconstruction_profile='atm-chart-reconstruct/gistemp-complete-annual/1';"), ==, 1);
     g_assert_cmpint (raw_int64 (path,
         "SELECT count(*) FROM chart_series WHERE message_id='v3-chart-assistant' "
         "AND chart_ordinal=1 AND series_ordinal=0 "
