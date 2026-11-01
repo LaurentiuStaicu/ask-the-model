@@ -1,5 +1,4 @@
 #include "chart_history_reconstruct.h"
-#include "chart_render.h"
 #include "chart_spec_v4.h"
 #include "verified_series.h"
 #include "energy_institute_admission.h"
@@ -12,20 +11,82 @@ static void
 assert_exact_chart_data_equal (const AtmChartSpec *expected,
                                const AtmChartSpec *actual)
 {
-    GError *error = NULL;
-    char *expected_data = atm_chart_render_data_for_spec (expected, &error);
-    g_assert_no_error (error);
-    g_assert_nonnull (expected_data);
+    g_assert_cmpint (atm_chart_spec_version (actual), ==,
+                     atm_chart_spec_version (expected));
+    g_assert_cmpstr (atm_chart_spec_schema (actual), ==,
+                     atm_chart_spec_schema (expected));
+    g_assert_cmpstr (atm_chart_spec_id (actual), ==,
+                     atm_chart_spec_id (expected));
+    g_assert_cmpint (atm_chart_spec_kind (actual), ==,
+                     atm_chart_spec_kind (expected));
+    g_assert_cmpuint (atm_chart_spec_count (actual), ==,
+                      atm_chart_spec_count (expected));
+    g_assert_cmpstr (atm_chart_spec_x_unit (actual), ==,
+                     atm_chart_spec_x_unit (expected));
+    g_assert_cmpstr (atm_chart_spec_x_dimension (actual), ==,
+                     atm_chart_spec_x_dimension (expected));
+    g_assert_cmpstr (atm_chart_spec_y_unit (actual), ==,
+                     atm_chart_spec_y_unit (expected));
+    g_assert_cmpstr (atm_chart_spec_y_dimension (actual), ==,
+                     atm_chart_spec_y_dimension (expected));
+    g_assert_cmpstr (atm_chart_spec_series_profile (actual), ==,
+                     atm_chart_spec_series_profile (expected));
+    g_assert_cmpuint (atm_chart_spec_x_min (actual), ==,
+                      atm_chart_spec_x_min (expected));
+    g_assert_cmpuint (atm_chart_spec_x_max (actual), ==,
+                      atm_chart_spec_x_max (expected));
+    g_assert_cmpstr (atm_chart_spec_calendar_quarter_min (actual), ==,
+                     atm_chart_spec_calendar_quarter_min (expected));
+    g_assert_cmpstr (atm_chart_spec_calendar_quarter_max (actual), ==,
+                     atm_chart_spec_calendar_quarter_max (expected));
 
-    char *actual_data = atm_chart_render_data_for_spec (actual, &error);
-    g_assert_no_error (error);
-    g_assert_nonnull (actual_data);
-    g_assert_cmpstr (actual_data, ==, expected_data);
+    for (guint series = 0; series < atm_chart_spec_count (expected); series++) {
+        g_assert_cmpstr (atm_chart_spec_series_snapshot_sha (actual, series), ==,
+                         atm_chart_spec_series_snapshot_sha (expected, series));
+        g_assert_cmpstr (atm_chart_spec_series_source_path (actual, series), ==,
+                         atm_chart_spec_series_source_path (expected, series));
+        g_assert_cmpstr (atm_chart_spec_series_repository_id (actual, series), ==,
+                         atm_chart_spec_series_repository_id (expected, series));
+        g_assert_cmpstr (atm_chart_spec_series_scientific_id (actual, series), ==,
+                         atm_chart_spec_series_scientific_id (expected, series));
+        g_assert_cmpstr (atm_chart_spec_series_qualified_id (actual, series), ==,
+                         atm_chart_spec_series_qualified_id (expected, series));
+        g_assert_cmpuint (atm_chart_spec_point_count (actual, series), ==,
+                          atm_chart_spec_point_count (expected, series));
 
-    g_free (actual_data);
-    g_free (expected_data);
+        for (guint point = 0;
+             point < atm_chart_spec_point_count (expected, series); point++) {
+            AtmChartPointView expected_point = { 0 };
+            AtmChartPointView actual_point = { 0 };
+            g_assert_true (atm_chart_spec_point (expected, series, point,
+                                                 &expected_point));
+            g_assert_true (atm_chart_spec_point (actual, series, point,
+                                                 &actual_point));
+            g_assert_cmpuint (actual_point.order, ==, expected_point.order);
+            g_assert_cmpuint (actual_point.calendar_year, ==,
+                              expected_point.calendar_year);
+            g_assert_cmpstr (actual_point.calendar_quarter, ==,
+                             expected_point.calendar_quarter);
+            g_assert_cmpuint (actual_point.source_row, ==,
+                              expected_point.source_row);
+            g_assert_cmpstr (actual_point.missing_reason, ==,
+                             expected_point.missing_reason);
+            g_assert_cmpint (actual_point.y_status, ==, expected_point.y_status);
+            g_assert_cmpstr (actual_point.source_decimal, ==,
+                             expected_point.source_decimal);
+            g_assert_cmpstr (actual_point.coefficient, ==,
+                             expected_point.coefficient);
+            g_assert_cmpint (actual_point.exponent, ==, expected_point.exponent);
+            g_assert_cmpint (actual_point.break_before, ==,
+                             expected_point.break_before);
+            g_assert_cmpuint (actual_point.support->len, ==,
+                              expected_point.support->len);
+            for (guint support = 0; support < expected_point.support->len; support++)
+                g_assert_cmpstr (g_ptr_array_index (actual_point.support, support), ==,
+                                 g_ptr_array_index (expected_point.support, support));
+        }
+    }
 }
-
 static char *
 fixture_snapshot (void)
 {
