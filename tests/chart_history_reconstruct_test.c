@@ -1,4 +1,5 @@
 #include "chart_history_reconstruct.h"
+#include "chart_render.h"
 #include "chart_spec_v4.h"
 #include "verified_series.h"
 #include "energy_institute_admission.h"
@@ -135,6 +136,9 @@ test_reconstruct_and_identity (void)
     g_assert_no_error (error);
     g_assert_nonnull (spec);
     g_assert_cmpstr (
+        atm_chart_spec_id (spec), ==, atm_chart_spec_id (reference)
+    );
+    assert_exact_chart_data_equal (reference, spec);    g_assert_cmpstr (
         atm_chart_spec_id (spec), ==, atm_chart_spec_id (reference)
     );
 
@@ -451,6 +455,8 @@ test_ei_history_reconstructs_pinned_snapshots (void)
         g_assert_cmpstr (atm_chart_spec_series_qualified_id (restored, 0), ==,
                          recipe.qualified_id);
         g_assert_cmpuint (atm_chart_spec_point_count (restored, 0), ==, 61u);
+        assert_exact_chart_data_equal (reference, restored);
+        qualified_ids[i]        g_assert_cmpuint (atm_chart_spec_point_count (restored, 0), ==, 61u);
         qualified_ids[i] = g_strdup (atm_chart_spec_series_qualified_id (restored, 0));
 
         /*
@@ -720,6 +726,7 @@ test_bnr_c01_history_reconstructs_pinned_snapshot (void)
     g_assert_no_error (error);
     g_assert_nonnull (restored);
     g_assert_cmpstr (atm_chart_spec_id (restored), ==, atm_chart_spec_id (live));
+    assert_exact_chart_data_equal (live, restored);    g_assert_cmpstr (atm_chart_spec_id (restored), ==, atm_chart_spec_id (live));
     g_assert_cmpstr (atm_chart_spec_series_scientific_id (restored, 0), ==,
                      atm_chart_spec_series_scientific_id (live, 0));
     g_assert_cmpstr (atm_chart_spec_series_qualified_id (restored, 0), ==,
