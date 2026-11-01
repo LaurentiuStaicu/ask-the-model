@@ -138,9 +138,10 @@ test_reconstruct_and_identity (void)
     g_assert_cmpstr (
         atm_chart_spec_id (spec), ==, atm_chart_spec_id (reference)
     );
-    assert_exact_chart_data_equal (reference, spec);    g_assert_cmpstr (
+    g_assert_cmpstr (
         atm_chart_spec_id (spec), ==, atm_chart_spec_id (reference)
     );
+    assert_exact_chart_data_equal (reference, spec);
 
     AtmChartSpec *live = NULL;
     g_assert_true (atm_chart_live_reconstruct_gistemp (
@@ -726,7 +727,8 @@ test_bnr_c01_history_reconstructs_pinned_snapshot (void)
     g_assert_no_error (error);
     g_assert_nonnull (restored);
     g_assert_cmpstr (atm_chart_spec_id (restored), ==, atm_chart_spec_id (live));
-    assert_exact_chart_data_equal (live, restored);    g_assert_cmpstr (atm_chart_spec_id (restored), ==, atm_chart_spec_id (live));
+    g_assert_cmpstr (atm_chart_spec_id (restored), ==, atm_chart_spec_id (live));
+    assert_exact_chart_data_equal (live, restored);
     g_assert_cmpstr (atm_chart_spec_series_scientific_id (restored, 0), ==,
                      atm_chart_spec_series_scientific_id (live, 0));
     g_assert_cmpstr (atm_chart_spec_series_qualified_id (restored, 0), ==,
