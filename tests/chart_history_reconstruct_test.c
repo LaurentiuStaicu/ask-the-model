@@ -20,13 +20,6 @@ assert_exact_chart_data_equal (const AtmChartSpec *expected,
     char *actual_data = atm_chart_render_data_for_spec (actual, &error);
     g_assert_no_error (error);
     g_assert_nonnull (actual_data);
-
-    /*
-     * This compares every serialized coordinate, status, original decimal,
-     * canonical coefficient/exponent, source row, qualified-series identity
-     * and support reference. Unlike the GTK E2E live baseline, both operands
-     * are independently rebuilt from the pinned source snapshot.
-     */
     g_assert_cmpstr (actual_data, ==, expected_data);
 
     g_free (actual_data);
@@ -135,9 +128,6 @@ test_reconstruct_and_identity (void)
     ));
     g_assert_no_error (error);
     g_assert_nonnull (spec);
-    g_assert_cmpstr (
-        atm_chart_spec_id (spec), ==, atm_chart_spec_id (reference)
-    );
     g_assert_cmpstr (
         atm_chart_spec_id (spec), ==, atm_chart_spec_id (reference)
     );
@@ -457,7 +447,6 @@ test_ei_history_reconstructs_pinned_snapshots (void)
                          recipe.qualified_id);
         g_assert_cmpuint (atm_chart_spec_point_count (restored, 0), ==, 61u);
         assert_exact_chart_data_equal (reference, restored);
-        qualified_ids[i]        g_assert_cmpuint (atm_chart_spec_point_count (restored, 0), ==, 61u);
         qualified_ids[i] = g_strdup (atm_chart_spec_series_qualified_id (restored, 0));
 
         /*
@@ -726,7 +715,6 @@ test_bnr_c01_history_reconstructs_pinned_snapshot (void)
         &restored, &error));
     g_assert_no_error (error);
     g_assert_nonnull (restored);
-    g_assert_cmpstr (atm_chart_spec_id (restored), ==, atm_chart_spec_id (live));
     g_assert_cmpstr (atm_chart_spec_id (restored), ==, atm_chart_spec_id (live));
     assert_exact_chart_data_equal (live, restored);
     g_assert_cmpstr (atm_chart_spec_series_scientific_id (restored, 0), ==,
