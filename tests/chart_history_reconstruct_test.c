@@ -7,6 +7,31 @@
 #include <glib.h>
 #include <glib/gstdio.h>
 
+static void
+assert_exact_chart_data_equal (const AtmChartSpec *expected,
+                               const AtmChartSpec *actual)
+{
+    GError *error = NULL;
+    char *expected_data = atm_chart_render_data_for_spec (expected, &error);
+    g_assert_no_error (error);
+    g_assert_nonnull (expected_data);
+
+    char *actual_data = atm_chart_render_data_for_spec (actual, &error);
+    g_assert_no_error (error);
+    g_assert_nonnull (actual_data);
+
+    /*
+     * This compares every serialized coordinate, status, original decimal,
+     * canonical coefficient/exponent, source row, qualified-series identity
+     * and support reference. Unlike the GTK E2E live baseline, both operands
+     * are independently rebuilt from the pinned source snapshot.
+     */
+    g_assert_cmpstr (actual_data, ==, expected_data);
+
+    g_free (actual_data);
+    g_free (expected_data);
+}
+
 static char *
 fixture_snapshot (void)
 {
