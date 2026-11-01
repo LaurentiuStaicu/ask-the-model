@@ -40,6 +40,25 @@ assert_exact_chart_data_equal (const AtmChartSpec *expected,
     g_assert_cmpstr (atm_chart_spec_calendar_quarter_max (actual), ==,
                      atm_chart_spec_calendar_quarter_max (expected));
 
+    const AtmScientificDecimal *expected_y_min =
+        atm_chart_spec_y_min (expected);
+    const AtmScientificDecimal *actual_y_min =
+        atm_chart_spec_y_min (actual);
+    const AtmScientificDecimal *expected_y_max =
+        atm_chart_spec_y_max (expected);
+    const AtmScientificDecimal *actual_y_max =
+        atm_chart_spec_y_max (actual);
+    g_assert_nonnull (expected_y_min);
+    g_assert_nonnull (actual_y_min);
+    g_assert_nonnull (expected_y_max);
+    g_assert_nonnull (actual_y_max);
+    g_assert_cmpstr (actual_y_min->coefficient, ==,
+                     expected_y_min->coefficient);
+    g_assert_cmpint (actual_y_min->exponent, ==, expected_y_min->exponent);
+    g_assert_cmpstr (actual_y_max->coefficient, ==,
+                     expected_y_max->coefficient);
+    g_assert_cmpint (actual_y_max->exponent, ==, expected_y_max->exponent);
+
     for (guint series = 0; series < atm_chart_spec_count (expected); series++) {
         g_assert_cmpstr (atm_chart_spec_series_snapshot_sha (actual, series), ==,
                          atm_chart_spec_series_snapshot_sha (expected, series));
