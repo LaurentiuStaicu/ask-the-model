@@ -5772,7 +5772,8 @@ namespace AskTheModel {
         }
 
         private bool pres09_test_check_valid_restore (
-            ChatTabState state
+            ChatTabState state,
+            bool expect_legacy_migrated = false
         ) {
             string? conversation_id =
                 pres09_test_read_file ("pres09-conversation-id");
@@ -5844,8 +5845,15 @@ namespace AskTheModel {
                     in message.charts
                 ) {
                     if (chart.chart_schema == "atm-chart-spec/2") {
-                        if (chart.presentation_schema == "atm-chart-spec/4" &&
-                            chart.presentation != null) {
+                        if (expect_legacy_migrated) {
+                            if (chart.ordinal == 1) {
+                                ei = chart;
+                            } else if (chart.ordinal == 2) {
+                                ei_legacy = chart;
+                                legacy_ei_turn_no = message.turn_no;
+                            }
+                        } else if (chart.presentation_schema == "atm-chart-spec/4" &&
+                                   chart.presentation != null) {
                             ei = chart;
                         } else if (chart.presentation_schema == null &&
                                    chart.presentation == null) {
@@ -5896,32 +5904,43 @@ namespace AskTheModel {
                 return false;
             }
 
-            /*
-             * This E2E is specifically a sidecar save/reopen gate, not merely
-             * a source-only v1/v2/v3 compatibility test.
-             */
-            ConversationPersistenceChartPresentation? ei_presentation = ei.presentation;
-            ConversationPersistenceChartPresentation? gistemp_presentation = gistemp.presentation;
-            ConversationPersistenceChartPresentation? bnr_presentation = bnr.presentation;
-            if (ei.presentation_schema != "atm-chart-spec/4" ||
-                gistemp.presentation_schema != "atm-chart-spec/4" ||
-                bnr.presentation_schema != "atm-chart-spec/4" ||
-                ei_presentation == null ||
-                gistemp_presentation == null ||
-                bnr_presentation == null ||
-                ei_presentation.presentation_schema != "atm-chart-spec/4" ||
-                gistemp_presentation.presentation_schema != "atm-chart-spec/4" ||
-                bnr_presentation.presentation_schema != "atm-chart-spec/4" ||
-                ei_presentation.source_chart_schema != ei.chart_schema ||
-                ei_presentation.source_chart_spec_id != ei.chart_spec_id ||
-                gistemp_presentation.source_chart_schema != gistemp.chart_schema ||
-                gistemp_presentation.source_chart_spec_id != gistemp.chart_spec_id ||
-                bnr_presentation.source_chart_schema != bnr.chart_schema ||
-                bnr_presentation.source_chart_spec_id != bnr.chart_spec_id ||
-                bnr_presentation.missing_coordinate != "2025-Q2" ||
-                bnr_presentation.missing_reason != "source_round_not_retained") {
-                pres09_test_failure = "History did not persist and restore matching v4 presentation sidecars for all three source recipes";
-                return false;
+            if (expect_legacy_migrated) {
+                if (ei.presentation_schema != null || ei.presentation != null ||
+                    ei_legacy.presentation_schema != null || ei_legacy.presentation != null ||
+                    gistemp.presentation_schema != null || gistemp.presentation != null ||
+                    bnr.presentation_schema != null || bnr.presentation != null) {
+                    pres09_test_failure =
+                        "Migrated v5 History rows unexpectedly gained v4 presentation sidecars";
+                    return false;
+                }
+            } else {
+                /*
+                 * This E2E is specifically a sidecar save/reopen gate, not merely
+                 * a source-only v1/v2/v3 compatibility test.
+                 */
+                ConversationPersistenceChartPresentation? ei_presentation = ei.presentation;
+                ConversationPersistenceChartPresentation? gistemp_presentation = gistemp.presentation;
+                ConversationPersistenceChartPresentation? bnr_presentation = bnr.presentation;
+                if (ei.presentation_schema != "atm-chart-spec/4" ||
+                    gistemp.presentation_schema != "atm-chart-spec/4" ||
+                    bnr.presentation_schema != "atm-chart-spec/4" ||
+                    ei_presentation == null ||
+                    gistemp_presentation == null ||
+                    bnr_presentation == null ||
+                    ei_presentation.presentation_schema != "atm-chart-spec/4" ||
+                    gistemp_presentation.presentation_schema != "atm-chart-spec/4" ||
+                    bnr_presentation.presentation_schema != "atm-chart-spec/4" ||
+                    ei_presentation.source_chart_schema != ei.chart_schema ||
+                    ei_presentation.source_chart_spec_id != ei.chart_spec_id ||
+                    gistemp_presentation.source_chart_schema != gistemp.chart_schema ||
+                    gistemp_presentation.source_chart_spec_id != gistemp.chart_spec_id ||
+                    bnr_presentation.source_chart_schema != bnr.chart_schema ||
+                    bnr_presentation.source_chart_spec_id != bnr.chart_spec_id ||
+                    bnr_presentation.missing_coordinate != "2025-Q2" ||
+                    bnr_presentation.missing_reason != "source_round_not_retained") {
+                    pres09_test_failure = "History did not persist and restore matching v4 presentation sidecars for all three source recipes";
+                    return false;
+                }
             }
 
             string ei_data = ei_view.data () ?? "";
@@ -5993,16 +6012,27 @@ namespace AskTheModel {
                 return false;
             }
 
-            var v4_ei_source_text = new GLib.StringBuilder ();
-            pres09_test_collect_source_detail_text (ei_view, v4_ei_source_text);
+            var ei_source_text = new GLib.StringBuilder ();
+            pres09_test_collect_source_detail_text (ei_view, ei_source_text);
             var legacy_ei_source_text = new GLib.StringBuilder ();
             pres09_test_collect_source_detail_text (legacy_ei_view, legacy_ei_source_text);
-            if (!v4_ei_source_text.str.contains ("Open pinned dataset used by AtM") ||
-                !v4_ei_source_text.str.contains ("AtM reconstructs the pinned processed dataset") ||
-                !legacy_ei_source_text.str.contains ("Open Energy Institute data") ||
-                !legacy_ei_source_text.str.contains ("Open pinned repository copy") ||
-                legacy_ei_source_text.str.contains ("Open pinned dataset used by AtM") ||
-                legacy_ei_source_text.str.contains ("AtM reconstructs the pinned processed dataset")) {
+            if (expect_legacy_migrated) {
+                if (!ei_source_text.str.contains ("Open Energy Institute data") ||
+                    !ei_source_text.str.contains ("Open pinned repository copy") ||
+                    !legacy_ei_source_text.str.contains ("Open Energy Institute data") ||
+                    !legacy_ei_source_text.str.contains ("Open pinned repository copy") ||
+                    ei_source_text.str.contains ("Open pinned dataset used by AtM") ||
+                    legacy_ei_source_text.str.contains ("AtM reconstructs the pinned processed dataset")) {
+                    pres09_test_failure =
+                        "Migrated v5 EI rows did not retain original source-specific attribution";
+                    return false;
+                }
+            } else if (!ei_source_text.str.contains ("Open pinned dataset used by AtM") ||
+                       !ei_source_text.str.contains ("AtM reconstructs the pinned processed dataset") ||
+                       !legacy_ei_source_text.str.contains ("Open Energy Institute data") ||
+                       !legacy_ei_source_text.str.contains ("Open pinned repository copy") ||
+                       legacy_ei_source_text.str.contains ("Open pinned dataset used by AtM") ||
+                       legacy_ei_source_text.str.contains ("AtM reconstructs the pinned processed dataset")) {
                 pres09_test_failure =
                     "Restored legacy EI chart did not retain legacy constructor source attribution";
                 return false;
@@ -6638,6 +6668,58 @@ namespace AskTheModel {
             return false;
         }
 
+        private bool pres09_test_step_history_migrated_v5 () {
+            if (startup_qualification_failed) {
+                pres09_test_finish (
+                    false,
+                    "Startup qualification failed before migrated-v5 History restoration: %s".printf (
+                        startup_qualification_detail ?? "unknown reason"
+                    )
+                );
+                return false;
+            }
+
+            if (!pres09_test_history_open_requested) {
+                if (history_button == null || !history_button.sensitive)
+                    return true;
+                pres09_test_history_open_requested = true;
+                history_button.clicked ();
+                return true;
+            }
+
+            if (!pres09_test_history_open_clicked) {
+                Gtk.Button? open_button = pres09_test_find_button (
+                    pres09_test_history_window,
+                    "Open"
+                );
+                if (open_button == null)
+                    return true;
+                pres09_test_history_open_clicked = true;
+                open_button.clicked ();
+                return true;
+            }
+
+            string? conversation_id = pres09_test_read_file ("pres09-conversation-id");
+            if (conversation_id == null || active_chat == null ||
+                active_chat.persistent_id != conversation_id)
+                return true;
+
+            pres09_test_state = active_chat;
+            if (active_chat.restored_view_only || restored_qualification_running)
+                return true;
+
+            if (!pres09_test_check_valid_restore (active_chat, true)) {
+                pres09_test_finish (false, pres09_test_failure);
+                return false;
+            }
+
+            pres09_test_finish (
+                true,
+                "fresh process migrated a populated v5 store to v6 and restored four exact legacy v1/v2/v3 History charts without sidecars"
+            );
+            return false;
+        }
+
         private bool pres09_test_step_history_tampered_sidecar () {
             if (startup_qualification_failed) {
                 pres09_test_finish (
@@ -7005,6 +7087,9 @@ namespace AskTheModel {
             }
             if (pres09_test_phase == "history") {
                 return pres09_test_step_history ();
+            }
+            if (pres09_test_phase == "history-migrated-v5") {
+                return pres09_test_step_history_migrated_v5 ();
             }
             if (pres09_test_phase == "history-tampered-sidecar") {
                 return pres09_test_step_history_tampered_sidecar ();

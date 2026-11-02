@@ -18,6 +18,19 @@ private static extern bool atm_pres09_tamper_first_persistent_v4_sidecar (
     string conversation_id
 ) throws GLib.Error;
 
+[CCode (cname = "atm_pres09_create_v5_legacy_history_fixture", cheader_filename = "pres09_sidecar_tamper.h")]
+private static extern bool atm_pres09_create_v5_legacy_history_fixture (
+    string source_database_path,
+    string target_database_path,
+    string conversation_id
+) throws GLib.Error;
+
+[CCode (cname = "atm_pres09_verify_migrated_v5_legacy_history", cheader_filename = "pres09_sidecar_tamper.h")]
+private static extern bool atm_pres09_verify_migrated_v5_legacy_history (
+    string database_path,
+    string conversation_id
+) throws GLib.Error;
+
 private static void write_json_response (
     Soup.ServerMessage message,
     string body
@@ -277,6 +290,15 @@ private static int run_snapshot_scenario (
         state,
         "conversations.sqlite3"
     );
+    string migrated_state = GLib.Path.build_filename (root, "state-v5-migration");
+    string migrated_control_db = GLib.Path.build_filename (
+        migrated_state,
+        "control-state.sqlite3"
+    );
+    string migrated_conversation_db = GLib.Path.build_filename (
+        migrated_state,
+        "conversations.sqlite3"
+    );
     string flatpak_info = GLib.Path.build_filename (
         root,
         "flatpak-info"
@@ -467,6 +489,7 @@ private static int run_snapshot_scenario (
         "intent-rejection",
         "live",
         "history",
+        "history-migrated-v5",
         "history-tampered-sidecar",
         "history-invalid"
     };
@@ -512,13 +535,86 @@ private static int run_snapshot_scenario (
             );
         }
 
-        if (run_child_phase (executable_path, phase) != 0) {
+        bool migrated_v5_phase = phase == "history-migrated-v5";
+        string migrated_conversation_id = "";
+        if (migrated_v5_phase) {
+            string conversation_id_path = GLib.Path.build_filename (
+                home,
+                "pres09-conversation-id"
+            );
+            try {
+                size_t conversation_id_length;
+                if (!GLib.FileUtils.get_contents (
+                        conversation_id_path,
+                        out migrated_conversation_id,
+                        out conversation_id_length
+                    )) {
+                    throw new GLib.IOError.FAILED (
+                        "Could not read the live archived conversation id for v5 migration."
+                    );
+                }
+                migrated_conversation_id = migrated_conversation_id.strip ();
+                if (migrated_conversation_id.length == 0) {
+                    throw new GLib.IOError.INVALID_DATA (
+                        "The live archived conversation id is empty."
+                    );
+                }
+                File.new_for_path (migrated_state).make_directory_with_parents (null);
+                File.new_for_path (state_db).copy (
+                    File.new_for_path (migrated_control_db),
+                    FileCopyFlags.OVERWRITE
+                );
+                if (!atm_pres09_create_v5_legacy_history_fixture (
+                        conversation_db,
+                        migrated_conversation_db,
+                        migrated_conversation_id
+                    )) {
+                    throw new GLib.IOError.FAILED (
+                        "Could not build a populated v5 store from the exact live History recipes."
+                    );
+                }
+            } catch (GLib.Error error) {
+                stderr.printf (
+                    "PRES-09 populated v5 fixture setup failed: %s\\n",
+                    error.message
+                );
+                return 1;
+            }
+            Environment.set_variable ("XDG_STATE_HOME", migrated_state, true);
+        }
+
+        int phase_status = run_child_phase (executable_path, phase);
+        if (migrated_v5_phase) {
+            Environment.set_variable ("XDG_STATE_HOME", state, true);
+        }
+        if (phase_status != 0) {
             stderr.printf (
                 "PRES09 GTK Application E2E stopped at phase '%s'; fixture retained at %s\n",
                 phase,
                 root
             );
             return 1;
+        }
+        if (migrated_v5_phase) {
+            try {
+                if (!atm_pres09_verify_migrated_v5_legacy_history (
+                        migrated_conversation_db,
+                        migrated_conversation_id
+                    )) {
+                    throw new GLib.IOError.FAILED (
+                        "The application did not preserve the four legacy recipes in a valid migrated v6 store."
+                    );
+                }
+            } catch (GLib.Error error) {
+                stderr.printf (
+                    "PRES-09 migrated v5 History verification failed: %s\\n",
+                    error.message
+                );
+                return 1;
+            }
+            stdout.printf (
+                "PRES09-GTK: fresh process migrated populated v5 store to v6 and reconstructed four legacy charts without sidecars\\n"
+            );
         }
     }
 
