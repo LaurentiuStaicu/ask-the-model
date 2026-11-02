@@ -535,8 +535,6 @@ atm_pres09_verify_migrated_v5_legacy_history (
     gint64 marked_count = 0;
     gint64 foreign_key_count = 0;
     gboolean success = FALSE;
-
-    g_printerr ("PRES09-VERIFY enter db=%s conversation=%s\n", database_path != NULL ? database_path : "(null)", conversation_id != NULL ? conversation_id : "(null)");
     if (database_path == NULL || database_path[0] == '\0' ||
         conversation_id == NULL || conversation_id[0] == '\0') {
         g_set_error_literal (error, G_IO_ERROR, G_IO_ERROR_INVALID_ARGUMENT,
@@ -547,13 +545,10 @@ atm_pres09_verify_migrated_v5_legacy_history (
     gint rc = sqlite3_open_v2 (
         database_path, &database, SQLITE_OPEN_READONLY | SQLITE_OPEN_FULLMUTEX, NULL
     );
-    g_printerr ("PRES09-VERIFY sqlite open rc=%d\n", rc);
     if (rc != SQLITE_OK) {
         set_sqlite_failure (error, database, "Could not reopen migrated v6 History database");
         goto out;
     }
-
-    g_printerr ("PRES09-VERIFY opened database\n");
     if (!pres09_query_int64 (database, "PRAGMA application_id;", &application_id, error) ||
         !pres09_query_int64 (database, "PRAGMA user_version;", &user_version, error) ||
         !pres09_query_text (database,
@@ -568,8 +563,6 @@ atm_pres09_verify_migrated_v5_legacy_history (
                              "Application did not migrate the populated v5 store to schema v6.");
         goto out;
     }
-
-    g_printerr ("PRES09-VERIFY identity app=%" G_GINT64_FORMAT " version=%" G_GINT64_FORMAT " schema=%s\n", application_id, user_version, schema_id);
     quoted_conversation_id = sqlite3_mprintf ("%Q", conversation_id);
     if (quoted_conversation_id == NULL) {
         g_set_error_literal (error, G_IO_ERROR, G_IO_ERROR_NO_SPACE,
@@ -580,47 +573,41 @@ atm_pres09_verify_migrated_v5_legacy_history (
         "SELECT archived FROM conversations WHERE conversation_id=%s;",
         quoted_conversation_id
     );
-    g_printerr ("PRES09-VERIFY query archived\n");
     if (!pres09_query_int64 (database, sql, &archived, error))
         goto out;
-    g_free (sql);
+    g_clear_pointer (&sql, g_free);
     sql = g_strdup_printf (
         "SELECT count(*) FROM message_charts c JOIN messages m ON m.message_id=c.message_id "
         "WHERE m.conversation_id=%s;",
         quoted_conversation_id
     );
-    g_printerr ("PRES09-VERIFY query charts\n");
     if (!pres09_query_int64 (database, sql, &chart_count, error))
         goto out;
-    g_free (sql);
+    g_clear_pointer (&sql, g_free);
     sql = g_strdup_printf (
         "SELECT count(*) FROM chart_series s JOIN messages m ON m.message_id=s.message_id "
         "WHERE m.conversation_id=%s;",
         quoted_conversation_id
     );
-    g_printerr ("PRES09-VERIFY query series\n");
     if (!pres09_query_int64 (database, sql, &series_count, error))
         goto out;
-    g_free (sql);
+    g_clear_pointer (&sql, g_free);
     sql = g_strdup_printf (
         "SELECT count(*) FROM message_charts c JOIN messages m ON m.message_id=c.message_id "
         "WHERE m.conversation_id=%s AND c.presentation_schema IS NOT NULL;",
         quoted_conversation_id
     );
-    g_printerr ("PRES09-VERIFY query markers\n");
     if (!pres09_query_int64 (database, sql, &marked_count, error))
         goto out;
-    g_free (sql);
+    g_clear_pointer (&sql, g_free);
     sql = g_strdup_printf (
         "SELECT count(*) FROM chart_presentations_v4 p JOIN messages m ON m.message_id=p.message_id "
         "WHERE m.conversation_id=%s;",
         quoted_conversation_id
     );
-    g_printerr ("PRES09-VERIFY query sidecars\n");
     if (!pres09_query_int64 (database, sql, &sidecar_count, error))
         goto out;
-    g_free (sql);
-    g_printerr ("PRES09-VERIFY query fk/integrity\n");
+    g_clear_pointer (&sql, g_free);
     if (!pres09_query_int64 (database, "SELECT count(*) FROM pragma_foreign_key_check;", &foreign_key_count, error) ||
         !pres09_query_text (database, "PRAGMA integrity_check;", &integrity, error))
         goto out;
@@ -639,17 +626,14 @@ atm_pres09_verify_migrated_v5_legacy_history (
         );
         goto out;
     }
-
-    g_printerr ("PRES09-VERIFY rows archived=%" G_GINT64_FORMAT " charts=%" G_GINT64_FORMAT " series=%" G_GINT64_FORMAT " markers=%" G_GINT64_FORMAT " sidecars=%" G_GINT64_FORMAT " fk=%" G_GINT64_FORMAT " integrity=%s\n", archived, chart_count, series_count, marked_count, sidecar_count, foreign_key_count, integrity != NULL ? integrity : "(null)");
     success = TRUE;
 out:
     g_free (schema_id);
     g_free (integrity);
-    g_free (sql);
+    g_clear_pointer (&sql, g_free);
     if (quoted_conversation_id != NULL)
         sqlite3_free (quoted_conversation_id);
     if (database != NULL) {
-        g_printerr ("PRES09-VERIFY close success=%d\n", success);
         sqlite3_close (database);
     }
     return success;
