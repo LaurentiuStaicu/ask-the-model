@@ -632,8 +632,7 @@ private static int run_snapshot_scenario (
         }
         if (migrated_v5_phase) {
             try {
-                stdout.printf ("PRES09-VERIFY parent invoking C verifier\n");
-                fflush (stdout);
+                stderr.printf ("PRES09-VERIFY parent invoking C verifier\n");
                 if (!atm_pres09_verify_migrated_v5_legacy_history (
                         migrated_conversation_db,
                         migrated_conversation_id
@@ -642,8 +641,7 @@ private static int run_snapshot_scenario (
                         "The application did not preserve the four legacy recipes in a valid migrated v6 store."
                     );
                 }
-                stdout.printf ("PRES09-VERIFY parent C verifier succeeded\n");
-                fflush (stdout);
+                stderr.printf ("PRES09-VERIFY parent C verifier succeeded\n");
             } catch (GLib.Error error) {
                 stderr.printf (
                     "PRES-09 migrated v5 History verification failed: %s\n",
