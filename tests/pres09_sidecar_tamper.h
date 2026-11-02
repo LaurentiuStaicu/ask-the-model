@@ -10,12 +10,6 @@ gboolean atm_pres09_tamper_first_persistent_v4_sidecar (
     GError **error
 );
 
-gboolean atm_pres09_copy_sqlite_database (
-    const gchar *source_database_path,
-    const gchar *target_database_path,
-    GError **error
-);
-
 gboolean atm_pres09_create_v5_legacy_history_fixture (
     const gchar *source_database_path,
     const gchar *target_database_path,

@@ -18,12 +18,6 @@ private static extern bool atm_pres09_tamper_first_persistent_v4_sidecar (
     string conversation_id
 ) throws GLib.Error;
 
-[CCode (cname = "atm_pres09_copy_sqlite_database", cheader_filename = "pres09_sidecar_tamper.h")]
-private static extern bool atm_pres09_copy_sqlite_database (
-    string source_database_path,
-    string target_database_path
-) throws GLib.Error;
-
 [CCode (cname = "atm_pres09_create_v5_legacy_history_fixture", cheader_filename = "pres09_sidecar_tamper.h")]
 private static extern bool atm_pres09_create_v5_legacy_history_fixture (
     string source_database_path,
@@ -309,6 +303,10 @@ private static int run_snapshot_scenario (
         root,
         "flatpak-info"
     );
+    string seal = "";
+    string bnr_seal = "";
+    int64 generation_id = 0;
+    int64 rmd_generation_id = 0;
 
     try {
         File.new_for_path (home).make_directory_with_parents (null);
@@ -393,7 +391,6 @@ private static int run_snapshot_scenario (
             "runtime-extensions=org.example.Runtime=%s;\n".printf (runtime_extension_commit);
         FileUtils.set_contents (flatpak_info, flatpak_text);
 
-        string seal;
         uint64 file_count;
         uint64 total_bytes;
         if (!RepositoryNative.compute_snapshot_seal (
@@ -406,7 +403,6 @@ private static int run_snapshot_scenario (
             remove_tree_best_effort (File.new_for_path (root));
             return 1;
         }
-        string bnr_seal;
         uint64 bnr_file_count;
         uint64 bnr_total_bytes;
         if (!RepositoryNative.compute_snapshot_seal (
@@ -431,7 +427,6 @@ private static int run_snapshot_scenario (
         }
         ControlStateNative.close_for_test (control_store);
 
-        int64 generation_id = 0;
         if (!ControlStateNative.set_current_values_guarded (
                 state_db,
                 0,
@@ -445,7 +440,6 @@ private static int run_snapshot_scenario (
             remove_tree_best_effort (File.new_for_path (root));
             return 1;
         }
-        int64 rmd_generation_id = 0;
         if (!ControlStateNative.set_current_values_guarded (
                 state_db,
                 generation_id,
@@ -566,12 +560,43 @@ private static int run_snapshot_scenario (
                     );
                 }
                 File.new_for_path (migrated_state).make_directory_with_parents (null);
-                if (!atm_pres09_copy_sqlite_database (
-                        state_db,
-                        migrated_control_db
-                    )) {
+                void* migrated_control_store = null;
+                if (!ControlStateNative.open_for_test (
+                        migrated_control_db,
+                        out migrated_control_store
+                    ) || migrated_control_store == null) {
                     throw new GLib.IOError.FAILED (
-                        "Could not create a consistent Control DB snapshot for migrated History."
+                        "Could not initialize the isolated migrated-History Control DB."
+                    );
+                }
+                ControlStateNative.close_for_test (migrated_control_store);
+
+                int64 migrated_generation_id = 0;
+                if (!ControlStateNative.set_current_values_guarded (
+                        migrated_control_db,
+                        0,
+                        "ewd",
+                        ewd_snapshot_sha,
+                        "0.1.0",
+                        seal,
+                        out migrated_generation_id
+                    ) || migrated_generation_id != generation_id) {
+                    throw new GLib.IOError.FAILED (
+                        "Migrated-History Control DB did not reproduce the EWD generation identity."
+                    );
+                }
+                int64 migrated_rmd_generation_id = 0;
+                if (!ControlStateNative.set_current_values_guarded (
+                        migrated_control_db,
+                        migrated_generation_id,
+                        "rmd",
+                        BNR_SNAPSHOT_SHA,
+                        "0.3.0",
+                        bnr_seal,
+                        out migrated_rmd_generation_id
+                    ) || migrated_rmd_generation_id != rmd_generation_id) {
+                    throw new GLib.IOError.FAILED (
+                        "Migrated-History Control DB did not reproduce the RMD generation identity."
                     );
                 }
                 if (!atm_pres09_create_v5_legacy_history_fixture (
