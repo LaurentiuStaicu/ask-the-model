@@ -753,6 +753,262 @@ test_v4_to_v5_migration_rollback (void)
 }
 
 static void
+assert_v5_v6_migration_fixture (
+    const char *path,
+    gint expected_version,
+    const char *expected_schema_id,
+    gboolean migrated
+)
+{
+    g_assert_cmpint (
+        raw_int64 (path, "PRAGMA user_version;"),
+        ==,
+        expected_version
+    );
+    char *schema_id = raw_text (
+        path,
+        "SELECT schema_id FROM installation WHERE singleton_id=1;"
+    );
+    g_assert_cmpstr (schema_id, ==, expected_schema_id);
+    g_free (schema_id);
+
+    char *integrity = raw_text (path, "PRAGMA integrity_check;");
+    g_assert_cmpstr (integrity, ==, "ok");
+    g_free (integrity);
+    g_assert_cmpint (
+        raw_int64 (path, "SELECT count(*) FROM pragma_foreign_key_check;"),
+        ==,
+        0
+    );
+
+    g_assert_cmpint (
+        raw_int64 (path,
+            "SELECT count(*) FROM conversations "
+            "WHERE conversation_id='v3-chart-conv' "
+            "AND title='V3 Chart' AND created_at_us=1 AND updated_at_us=2 "
+            "AND model_name='model-a' AND model_digest IS NULL "
+            "AND repository_generation_id=7 AND archived=1 "
+            "AND open_on_startup=0;"),
+        ==,
+        1
+    );
+    g_assert_cmpint (
+        raw_int64 (path, "SELECT count(*) FROM conversations;"),
+        ==,
+        1
+    );
+    g_assert_cmpint (
+        raw_int64 (path,
+            "SELECT count(*) FROM conversation_repositories "
+            "WHERE conversation_id='v3-chart-conv' AND repository_id='ewd' "
+            "AND repository_version='0.1.0' "
+            "AND snapshot_sha='0123456789abcdef0123456789abcdef01234567';"),
+        ==,
+        1
+    );
+    g_assert_cmpint (
+        raw_int64 (path, "SELECT count(*) FROM conversation_repositories;"),
+        ==,
+        1
+    );
+    g_assert_cmpint (
+        raw_int64 (path,
+            "SELECT count(*) FROM messages WHERE "
+            "(message_id='v3-chart-user' AND conversation_id='v3-chart-conv' "
+            "AND sequence_no=0 AND turn_no=0 AND role='user' "
+            "AND provider_content='q' AND display_content='q' "
+            "AND grounded=0 AND created_at_us=1) OR "
+            "(message_id='v3-chart-assistant' AND conversation_id='v3-chart-conv' "
+            "AND sequence_no=1 AND turn_no=0 AND role='assistant' "
+            "AND provider_content='a' AND display_content='a' "
+            "AND grounded=1 AND created_at_us=2);"),
+        ==,
+        2
+    );
+    g_assert_cmpint (
+        raw_int64 (path, "SELECT count(*) FROM messages;"),
+        ==,
+        2
+    );
+    g_assert_cmpint (
+        raw_int64 (path,
+            "SELECT count(*) FROM message_charts WHERE "
+            "message_id='v3-chart-assistant' AND ordinal=1 "
+            "AND chart_schema='atm-chart-spec/1' "
+            "AND chart_spec_id='aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa' "
+            "AND chart_kind='line' "
+            "AND reconstruction_profile='atm-chart-reconstruct/gistemp-complete-annual/1';"),
+        ==,
+        1
+    );
+    g_assert_cmpint (
+        raw_int64 (path, "SELECT count(*) FROM message_charts;"),
+        ==,
+        1
+    );
+    g_assert_cmpint (
+        raw_int64 (path,
+            "SELECT count(*) FROM chart_series WHERE "
+            "message_id='v3-chart-assistant' AND chart_ordinal=1 "
+            "AND series_ordinal=0 "
+            "AND series_profile='atm-series/gistemp-complete-annual/1' "
+            "AND admission_profile='atm-gistemp-pinned-admission/1' "
+            "AND scientific_id='bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb' "
+            "AND qualified_id='cccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccc' "
+            "AND repository_id='ewd' AND repository_version='0.1.0' "
+            "AND snapshot_sha='0123456789abcdef0123456789abcdef01234567' "
+            "AND source_path='science/data/processed/nasa_gistemp_global_2026.csv';"),
+        ==,
+        1
+    );
+    g_assert_cmpint (
+        raw_int64 (path, "SELECT count(*) FROM chart_series;"),
+        ==,
+        1
+    );
+
+    if (migrated) {
+        g_assert_cmpint (
+            raw_int64 (path,
+                "SELECT count(*) FROM sqlite_schema "
+                "WHERE type='table' AND name='chart_presentations_v4';"),
+            ==,
+            1
+        );
+        g_assert_cmpint (
+            raw_int64 (path,
+                "SELECT count(*) FROM sqlite_schema WHERE name IN ("
+                "'message_charts_v6','chart_series_v6','installation_v6',"
+                "'test_installation_ref','test_installation_schema_id_uq');"),
+            ==,
+            0
+        );
+    } else {
+        g_assert_cmpint (
+            raw_int64 (path,
+                "SELECT count(*) FROM sqlite_schema WHERE name IN ("
+                "'message_charts_v6','chart_series_v6','chart_presentations_v4',"
+                "'idx_chart_presentations_series_id',"
+                "'chart_presentations_v4_tuple_insert',"
+                "'chart_presentations_v4_tuple_update',"
+                "'chart_presentations_v4_delete_guard',"
+                "'message_charts_presentation_update');"),
+            ==,
+            0
+        );
+        g_assert_cmpint (
+            raw_int64 (path,
+                "SELECT count(*) FROM sqlite_schema "
+                "WHERE type='table' AND name IN ("
+                "'installation','conversations','conversation_repositories',"
+                "'messages','citations','message_charts','chart_series');"),
+            ==,
+            7
+        );
+    }
+}
+
+static void
+test_v5_to_v6_migration_rollback_deferred_foreign_key_mismatch (void)
+{
+    char *root = new_temp_root ("atm-conversation-v5-v6-rollback-XXXXXX");
+    char *path = store_path (root);
+    create_v5_store (path);
+    insert_v3_gistemp_chart_fixture (path);
+
+    raw_exec (
+        path,
+        "CREATE UNIQUE INDEX test_installation_schema_id_uq "
+        "ON installation(schema_id);"
+        "CREATE TABLE test_installation_ref("
+        "schema_id TEXT NOT NULL "
+        "REFERENCES installation(schema_id) "
+        "DEFERRABLE INITIALLY DEFERRED) STRICT;"
+        "INSERT INTO test_installation_ref(schema_id) "
+        "VALUES('atm-conversation-store/5');"
+    );
+
+    /* The deferred reference is valid against v5 and must become a mismatch
+     * only after migration replaces installation with its v6 definition. */
+    assert_v5_v6_migration_fixture (
+        path,
+        ATM_CONVERSATION_STORE_SCHEMA_V5_VERSION,
+        ATM_CONVERSATION_STORE_SCHEMA_V5_ID,
+        FALSE
+    );
+
+    AtmConversationStore *store = NULL;
+    GError *error = NULL;
+    g_assert_false (atm_conversation_store_open (path, &store, &error));
+    g_assert_null (store);
+    g_assert_nonnull (error);
+    g_assert_cmpuint (
+        error->domain,
+        ==,
+        ATM_CONVERSATION_STORE_ERROR
+    );
+    if (error->code == ATM_CONVERSATION_STORE_ERROR_SQLITE) {
+        g_assert_nonnull (g_strstr_len (
+            error->message,
+            -1,
+            "Could not prepare conversation-store foreign_key_check"
+        ));
+        g_assert_nonnull (g_strstr_len (
+            error->message,
+            -1,
+            "foreign key mismatch"
+        ));
+    } else {
+        g_assert_error (
+            error,
+            ATM_CONVERSATION_STORE_ERROR,
+            ATM_CONVERSATION_STORE_ERROR_INTEGRITY
+        );
+        g_assert_cmpstr (
+            error->message,
+            ==,
+            "Conversation-store foreign_key_check reported a violation."
+        );
+    }
+    g_clear_error (&error);
+
+    assert_v5_v6_migration_fixture (
+        path,
+        ATM_CONVERSATION_STORE_SCHEMA_V5_VERSION,
+        ATM_CONVERSATION_STORE_SCHEMA_V5_ID,
+        FALSE
+    );
+
+    raw_exec (
+        path,
+        "DROP TABLE test_installation_ref;"
+        "DROP INDEX test_installation_schema_id_uq;"
+    );
+
+    g_assert_true (atm_conversation_store_open (path, &store, &error));
+    g_assert_no_error (error);
+    g_assert_nonnull (store);
+    g_assert_cmpint (
+        atm_conversation_store_schema_version (store),
+        ==,
+        ATM_CONVERSATION_STORE_SCHEMA_VERSION
+    );
+    g_assert_true (atm_conversation_store_validate (store, &error));
+    g_assert_no_error (error);
+    assert_v5_v6_migration_fixture (
+        path,
+        ATM_CONVERSATION_STORE_SCHEMA_VERSION,
+        ATM_CONVERSATION_STORE_SCHEMA_ID,
+        TRUE
+    );
+
+    atm_conversation_store_close (store);
+    g_free (path);
+    remove_tree_best_effort (root);
+    g_free (root);
+}
+
+static void
 test_v1_to_v5_migration (void)
 {
     char *root = new_temp_root (
@@ -3918,6 +4174,10 @@ main (int argc, char **argv)
     g_test_add_func (
         "/conversation-store/v5-to-v6-rollback",
         test_v5_to_v6_migration_rollback
+    );
+    g_test_add_func (
+        "/conversation-store/v5-to-v6-rollback-deferred-foreign-key-mismatch",
+        test_v5_to_v6_migration_rollback_deferred_foreign_key_mismatch
     );
     g_test_add_func (
         "/conversation-store/chart-recipe-semantics",
