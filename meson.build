@@ -3033,6 +3033,7 @@ chart_render_test = executable(
    'tests/chart_render_test.c'],
   include_directories: include_directories('src'),
   dependencies: [glib_dep, json_glib_dep, dependency('cairo'), dependency('fontconfig')],
+  c_args: ['-DATM_CHART_RENDER_V4_TESTING'],
   install: false
 )
 # ASan/UBSan plus v4 parity tests can exceed Meson's default 30-second test limit.
