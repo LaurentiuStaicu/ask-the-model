@@ -5848,7 +5848,7 @@ namespace AskTheModel {
                         if (expect_legacy_migrated) {
                             if (chart.ordinal == 1) {
                                 ei = chart;
-                            } else if (chart.ordinal == 2) {
+                            } else if (chart.ordinal == 2 && message.turn_no == 2) {
                                 ei_legacy = chart;
                                 legacy_ei_turn_no = message.turn_no;
                             }

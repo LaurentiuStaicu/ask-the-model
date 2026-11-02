@@ -164,6 +164,80 @@ out:
 }
 
 
+gboolean
+atm_pres09_copy_sqlite_database (
+    const gchar *source_database_path,
+    const gchar *target_database_path,
+    GError **error
+) {
+    sqlite3 *source = NULL;
+    sqlite3 *target = NULL;
+    sqlite3_backup *backup = NULL;
+    gboolean success = FALSE;
+    gint rc = SQLITE_OK;
+
+    if (source_database_path == NULL || source_database_path[0] == '\0' ||
+        target_database_path == NULL || target_database_path[0] == '\0') {
+        g_set_error_literal (
+            error, G_IO_ERROR, G_IO_ERROR_INVALID_ARGUMENT,
+            "PRES-09 SQLite backup requires source and target paths."
+        );
+        return FALSE;
+    }
+    if (g_file_test (target_database_path, G_FILE_TEST_EXISTS)) {
+        g_set_error_literal (
+            error, G_IO_ERROR, G_IO_ERROR_EXISTS,
+            "PRES-09 SQLite backup target already exists; refusing to overwrite it."
+        );
+        return FALSE;
+    }
+
+    rc = sqlite3_open_v2 (
+        source_database_path, &source,
+        SQLITE_OPEN_READONLY | SQLITE_OPEN_FULLMUTEX, NULL
+    );
+    if (rc != SQLITE_OK) {
+        set_sqlite_failure (error, source, "Could not open PRES-09 SQLite backup source");
+        goto out;
+    }
+
+    rc = sqlite3_open_v2 (
+        target_database_path, &target,
+        SQLITE_OPEN_READWRITE | SQLITE_OPEN_CREATE | SQLITE_OPEN_FULLMUTEX, NULL
+    );
+    if (rc != SQLITE_OK) {
+        set_sqlite_failure (error, target, "Could not open PRES-09 SQLite backup target");
+        goto out;
+    }
+
+    backup = sqlite3_backup_init (target, "main", source, "main");
+    if (backup == NULL) {
+        set_sqlite_failure (error, target, "Could not initialize PRES-09 SQLite online backup");
+        goto out;
+    }
+
+    do {
+        rc = sqlite3_backup_step (backup, -1);
+    } while (rc == SQLITE_OK);
+
+    gint finish_rc = sqlite3_backup_finish (backup);
+    backup = NULL;
+    if (rc != SQLITE_DONE || finish_rc != SQLITE_OK) {
+        set_sqlite_failure (error, target, "PRES-09 SQLite online backup did not complete");
+        goto out;
+    }
+
+    success = TRUE;
+out:
+    if (backup != NULL)
+        sqlite3_backup_finish (backup);
+    if (source != NULL)
+        sqlite3_close (source);
+    if (target != NULL)
+        sqlite3_close (target);
+    return success;
+}
+
 static gboolean
 pres09_query_int64 (
     sqlite3 *database,
@@ -262,7 +336,9 @@ atm_pres09_create_v5_legacy_history_fixture (
     gchar *quoted_conversation_id = NULL;
     gboolean transaction_open = FALSE;
     gboolean success = FALSE;
+    gint64 source_application_id = 0;
     gint64 source_version = 0;
+    gchar *source_schema_id = NULL;
     gint64 source_chart_count = 0;
     gint64 source_series_count = 0;
     gint64 target_chart_count = 0;
@@ -345,13 +421,20 @@ atm_pres09_create_v5_legacy_history_fixture (
         goto out;
     }
 
-    if (!pres09_query_int64 (database, "PRAGMA source.user_version;", &source_version, error))
+    if (!pres09_query_int64 (database, "PRAGMA source.application_id;", &source_application_id, error) ||
+        !pres09_query_int64 (database, "PRAGMA source.user_version;", &source_version, error) ||
+        !pres09_query_text (database,
+            "SELECT schema_id FROM source.installation WHERE singleton_id=1;",
+            &source_schema_id, error))
         goto out;
-    if (source_version != ATM_CONVERSATION_STORE_SCHEMA_VERSION) {
+    if (source_application_id != ATM_CONVERSATION_STORE_APPLICATION_ID ||
+        source_version != ATM_CONVERSATION_STORE_SCHEMA_VERSION ||
+        g_strcmp0 (source_schema_id, ATM_CONVERSATION_STORE_SCHEMA_ID) != 0) {
         g_set_error (
             error, G_IO_ERROR, G_IO_ERROR_INVALID_DATA,
-            "PRES-09 source store must be v6, found user_version=%" G_GINT64_FORMAT ".",
-            source_version
+            "PRES-09 source store identity/version is not AtM schema v6 (application_id=%" G_GINT64_FORMAT ", user_version=%" G_GINT64_FORMAT ", schema_id=%s).",
+            source_application_id, source_version,
+            source_schema_id != NULL ? source_schema_id : "unavailable"
         );
         goto out;
     }
@@ -461,11 +544,25 @@ atm_pres09_create_v5_legacy_history_fixture (
     g_free (copy_sql);
     copy_sql = NULL;
 
-    if (target_chart_count != source_chart_count || target_series_count != source_series_count ||
-        !pres09_query_int64 (database, "SELECT count(*) FROM pragma_foreign_key_check;", &foreign_key_count, error) ||
-        foreign_key_count != 0 ||
+    if (target_chart_count != source_chart_count || target_series_count != source_series_count) {
+        g_set_error (
+            error, G_IO_ERROR, G_IO_ERROR_INVALID_DATA,
+            "PRES-09 v5 fixture row counts changed during copy (charts=%" G_GINT64_FORMAT "/%" G_GINT64_FORMAT ", series=%" G_GINT64_FORMAT "/%" G_GINT64_FORMAT ").",
+            target_chart_count, source_chart_count, target_series_count, source_series_count
+        );
+        goto out;
+    }
+    if (!pres09_query_int64 (database, "SELECT count(*) FROM pragma_foreign_key_check;", &foreign_key_count, error) ||
         !pres09_query_text (database, "PRAGMA integrity_check;", &integrity, error))
         goto out;
+    if (foreign_key_count != 0) {
+        g_set_error (
+            error, G_IO_ERROR, G_IO_ERROR_INVALID_DATA,
+            "PRES-09 v5 fixture has %" G_GINT64_FORMAT " foreign-key violations.",
+            foreign_key_count
+        );
+        goto out;
+    }
     if (g_strcmp0 (integrity, "ok") != 0) {
         g_set_error_literal (error, G_IO_ERROR, G_IO_ERROR_INVALID_DATA,
                              "PRES-09 v5 fixture failed SQLite integrity_check.");
@@ -480,6 +577,7 @@ out:
     if (attach_statement != NULL)
         sqlite3_finalize (attach_statement);
     g_free (integrity);
+    g_free (source_schema_id);
     g_free (copy_sql);
     if (quoted_conversation_id != NULL)
         sqlite3_free (quoted_conversation_id);

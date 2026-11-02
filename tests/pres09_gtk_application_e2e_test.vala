@@ -18,6 +18,12 @@ private static extern bool atm_pres09_tamper_first_persistent_v4_sidecar (
     string conversation_id
 ) throws GLib.Error;
 
+[CCode (cname = "atm_pres09_copy_sqlite_database", cheader_filename = "pres09_sidecar_tamper.h")]
+private static extern bool atm_pres09_copy_sqlite_database (
+    string source_database_path,
+    string target_database_path
+) throws GLib.Error;
+
 [CCode (cname = "atm_pres09_create_v5_legacy_history_fixture", cheader_filename = "pres09_sidecar_tamper.h")]
 private static extern bool atm_pres09_create_v5_legacy_history_fixture (
     string source_database_path,
@@ -340,13 +346,13 @@ private static int run_snapshot_scenario (
                 ewd_snapshot_sha,
                 out overlay_applied
             )) {
-            stderr.printf ("PRES-09 could not apply the SHA-bound EWD metadata contract.\\n");
+            stderr.printf ("PRES-09 could not apply the SHA-bound EWD metadata contract.\n");
             remove_tree_best_effort (File.new_for_path (root));
             return 1;
         }
         if ((ewd_snapshot_sha == EWD_INITIAL_SNAPSHOT_SHA && !overlay_applied) ||
             (ewd_snapshot_sha == EWD_CURRENT_SNAPSHOT_SHA && overlay_applied)) {
-            stderr.printf ("PRES-09 EWD metadata overlay admission did not match the exact snapshot pin.\\n");
+            stderr.printf ("PRES-09 EWD metadata overlay admission did not match the exact snapshot pin.\n");
             remove_tree_best_effort (File.new_for_path (root));
             return 1;
         }
@@ -354,7 +360,7 @@ private static int run_snapshot_scenario (
         string? full_rmd_root =
             Environment.get_variable ("ATM_PRES09_FULL_RMD_ROOT");
         if (full_rmd_root == null || full_rmd_root.strip ().length == 0) {
-            stderr.printf ("ATM_PRES09_FULL_RMD_ROOT is required for the BNR C01 application E2E.\\n");
+            stderr.printf ("ATM_PRES09_FULL_RMD_ROOT is required for the BNR C01 application E2E.\n");
             remove_tree_best_effort (File.new_for_path (root));
             return 1;
         }
@@ -396,7 +402,7 @@ private static int run_snapshot_scenario (
                 out file_count,
                 out total_bytes
             )) {
-            stderr.printf ("PRES-09 could not compute fixture EWD snapshot seal.\\n");
+            stderr.printf ("PRES-09 could not compute fixture EWD snapshot seal.\n");
             remove_tree_best_effort (File.new_for_path (root));
             return 1;
         }
@@ -409,7 +415,7 @@ private static int run_snapshot_scenario (
                 out bnr_file_count,
                 out bnr_total_bytes
             )) {
-            stderr.printf ("PRES-09 could not compute fixture RMD snapshot seal.\\n");
+            stderr.printf ("PRES-09 could not compute fixture RMD snapshot seal.\n");
             remove_tree_best_effort (File.new_for_path (root));
             return 1;
         }
@@ -419,7 +425,7 @@ private static int run_snapshot_scenario (
                 state_db,
                 out control_store
             ) || control_store == null) {
-            stderr.printf ("PRES-09 could not initialize the isolated Control DB schema.\\n");
+            stderr.printf ("PRES-09 could not initialize the isolated Control DB schema.\n");
             remove_tree_best_effort (File.new_for_path (root));
             return 1;
         }
@@ -435,7 +441,7 @@ private static int run_snapshot_scenario (
                 seal,
                 out generation_id
             ) || generation_id <= 0) {
-            stderr.printf ("PRES-09 could not seed the pinned EWD Control DB generation.\\n");
+            stderr.printf ("PRES-09 could not seed the pinned EWD Control DB generation.\n");
             remove_tree_best_effort (File.new_for_path (root));
             return 1;
         }
@@ -449,7 +455,7 @@ private static int run_snapshot_scenario (
                 bnr_seal,
                 out rmd_generation_id
             ) || rmd_generation_id <= generation_id) {
-            stderr.printf ("PRES-09 could not seed the pinned RMD Control DB generation.\\n");
+            stderr.printf ("PRES-09 could not seed the pinned RMD Control DB generation.\n");
             remove_tree_best_effort (File.new_for_path (root));
             return 1;
         }
@@ -560,10 +566,14 @@ private static int run_snapshot_scenario (
                     );
                 }
                 File.new_for_path (migrated_state).make_directory_with_parents (null);
-                File.new_for_path (state_db).copy (
-                    File.new_for_path (migrated_control_db),
-                    FileCopyFlags.OVERWRITE
-                );
+                if (!atm_pres09_copy_sqlite_database (
+                        state_db,
+                        migrated_control_db
+                    )) {
+                    throw new GLib.IOError.FAILED (
+                        "Could not create a consistent Control DB snapshot for migrated History."
+                    );
+                }
                 if (!atm_pres09_create_v5_legacy_history_fixture (
                         conversation_db,
                         migrated_conversation_db,
@@ -575,7 +585,7 @@ private static int run_snapshot_scenario (
                 }
             } catch (GLib.Error error) {
                 stderr.printf (
-                    "PRES-09 populated v5 fixture setup failed: %s\\n",
+                    "PRES-09 populated v5 fixture setup failed: %s\n",
                     error.message
                 );
                 return 1;
@@ -607,20 +617,20 @@ private static int run_snapshot_scenario (
                 }
             } catch (GLib.Error error) {
                 stderr.printf (
-                    "PRES-09 migrated v5 History verification failed: %s\\n",
+                    "PRES-09 migrated v5 History verification failed: %s\n",
                     error.message
                 );
                 return 1;
             }
             stdout.printf (
-                "PRES09-GTK: fresh process migrated populated v5 store to v6 and reconstructed four legacy charts without sidecars\\n"
+                "PRES09-GTK: fresh process migrated populated v5 store to v6 and reconstructed four legacy charts without sidecars\n"
             );
         }
     }
 
     remove_tree_best_effort (File.new_for_path (root));
     stdout.printf (
-        "PASS: PRES-09 completed live/Archive/process-relaunch History and fail-closed EWD/RMD source checks for EWD pin %s.\\n",
+        "PASS: PRES-09 completed live/Archive/process-relaunch History and fail-closed EWD/RMD source checks for EWD pin %s.\n",
         ewd_snapshot_sha
     );
     return 0;
@@ -650,7 +660,7 @@ private static int run_orchestrator (
     }
 
     stdout.printf (
-        "PASS: PRES-09 completed the full application persistence matrix for both admitted EWD pins plus the exact RMD BNR C01 pin.\\n"
+        "PASS: PRES-09 completed the full application persistence matrix for both admitted EWD pins plus the exact RMD BNR C01 pin.\n"
     );
     return 0;
 }
@@ -706,7 +716,7 @@ private static int run_application_phase (
         if (ewd_sha == null ||
             (ewd_sha != EWD_INITIAL_SNAPSHOT_SHA &&
              ewd_sha != EWD_CURRENT_SNAPSHOT_SHA)) {
-            stderr.printf ("PRES-09 EWD snapshot SHA is missing or not admitted.\\n");
+            stderr.printf ("PRES-09 EWD snapshot SHA is missing or not admitted.\n");
             server.disconnect ();
             return 1;
         }
