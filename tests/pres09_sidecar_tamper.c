@@ -1,4 +1,5 @@
 #include "pres09_sidecar_tamper.h"
+#include "conversation_store.h"
 
 #include <sqlite3.h>
 
