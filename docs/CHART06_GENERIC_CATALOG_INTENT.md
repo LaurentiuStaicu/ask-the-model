@@ -45,6 +45,26 @@ Each entry must define, at minimum:
 | `display_profile_id/version` | Pre-reviewed display conversion and axis/tick policy. The model cannot choose or modify it. |
 | `history_policy` | Exact recipe schema/adapter version and source identity needed to rebuild the same chart after the original conversation is archived. |
 
+### Persisted History representation
+
+`history_policy` is a conceptual catalog contract, not a persisted SQLite column or JSON member. In conversation-store schema v6, it is materialized as an optional `chart_presentations_v4` sidecar attached to the source chart by `(message_id, chart_ordinal)`.
+
+The sidecar persists these claims:
+
+- **Presentation identity:** `presentation_schema`, `presentation_spec_id`, `series_id`.
+- **Catalog and adapter:** `catalog_schema`, `adapter_id`.
+- **Qualification profiles:** `series_profile_id`, `series_profile_version`, `admission_profile_id`, `admission_profile_version`, `reconstruction_profile_id`.
+- **Source-recipe binding:** `source_chart_schema`, `source_chart_spec_id`.
+- **X semantics:** `x_coordinate_semantics`, `x_frequency`, `x_unit`, `x_dimension`.
+- **Y semantics:** `subject`, `attribute`, `y_unit`, `y_dimension`, `series_semantics`.
+- **Missing-value declaration:** `missing_policy`, `missing_coordinate`, `missing_reason`.
+- **Presentation policy:** `display_profile_id`, `display_profile_version`, `render_contract`.
+
+The source chart row remains authoritative for its pinned repository identity, snapshot SHA, source path and source-specific v1/v2/v3 recipe. The sidecar's `source_chart_schema` and `source_chart_spec_id` must match that source chart row. The sidecar does not duplicate the source pin or replace the original recipe.
+
+During History reconstruction, AtM independently re-reads and requalifies the pinned source, rebuilds the catalog-bound presentation specification, and compares every persisted sidecar claim against the rebuilt result. A missing sidecar follows the legacy source-specific History path. A present but invalid, inconsistent or incomplete sidecar fails closed; it must not silently fall back to the legacy path.
+
+
 Catalog startup validation must reject duplicate IDs, ambiguous aliases without an ambiguity marker, nonexistent adapter/profile identifiers, unsupported coordinate/kind combinations, empty provenance essentials, invalid missing policies and conflicting metadata. Catalog metadata is a selector and consistency assertion; the adapter must independently reconstruct and validate the actual series. It cannot turn metadata alone into evidence.
 
 The three currently registered profiles are initial qualification fixtures, not the intended limit of charting. The roadmap must generalize from eligible, independently qualified scientific series rather than add a permanent hard-coded route, renderer branch or adapter-enum case for every dataset. Issue #504 tracks this next eligibility milestone: prefer a generic adapter from an already-qualified `AtmSeriesContract`/series registry when it contains sufficient authority, and keep source-specific adapters only where the source bundle or scientific meaning genuinely requires them. This does **not** authorize arbitrary CSV/TSV column discovery; an unqualified column or a model-proposed ID remains ineligible without the full source/series qualification chain.
