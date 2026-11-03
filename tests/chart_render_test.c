@@ -886,6 +886,62 @@ test_v4_render_rejects_projection_from_other_snapshot (void)
 }
 
 static void
+test_v4_render_rejects_same_source_projection_with_wrong_geometry (void)
+{
+    static const char *const series_id =
+        "climate.gistemp.global-temperature-anomaly";
+    AtmChartSpecV4 *spec = render_v4_spec_from_source (
+        series_id, specification_for_snapshot (
+            ATM_CHART_LINE, GISTEMP_SNAPSHOT_CURRENT));
+    AtmChartRenderV4 *render = render_v4_new_for_test (
+        spec, 860, 500, 1);
+    AtmChartProjectionV4 *wrong_geometry = NULL;
+    GError *error = NULL;
+
+    /* Same admitted source/profile, but a different plot rectangle. */
+    g_assert_true (atm_chart_projection_v4_new (
+        spec, 600.0, 240.0, &wrong_geometry, &error));
+    g_assert_no_error (error);
+    g_assert_nonnull (wrong_geometry);
+    g_assert_true (atm_chart_projection_v4_validate (
+        wrong_geometry, &error));
+    g_assert_no_error (error);
+
+    const AtmChartProjection *render_projection =
+        atm_chart_projection_v4_source_projection (
+            atm_chart_render_v4_projection (render));
+    const AtmChartProjection *foreign_projection =
+        atm_chart_projection_v4_source_projection (wrong_geometry);
+    g_assert_nonnull (render_projection);
+    g_assert_nonnull (foreign_projection);
+    g_assert_cmpstr (
+        atm_chart_spec_v4_id (atm_chart_projection_v4_spec (
+            wrong_geometry)), ==,
+        atm_chart_spec_v4_id (atm_chart_render_v4_spec (render)));
+    g_assert_cmpfloat (
+        atm_chart_projection_width (foreign_projection), !=,
+        atm_chart_projection_width (render_projection));
+    g_assert_cmpfloat (
+        atm_chart_projection_height (foreign_projection), !=,
+        atm_chart_projection_height (render_projection));
+
+    /* Valid in isolation is insufficient: geometry is not interchangeable. */
+    g_assert_false (_atm_chart_render_v4_test_validate_with_projection (
+        render, wrong_geometry, &error));
+    g_assert_error (error, ATM_CHART_RENDER_V4_ERROR,
+                    ATM_CHART_RENDER_V4_ERROR_PROJECTION);
+    g_clear_error (&error);
+
+    /* Rejection must not corrupt or replace the renderer's owned projection. */
+    g_assert_true (atm_chart_render_v4_validate (render, &error));
+    g_assert_no_error (error);
+
+    atm_chart_projection_v4_free (wrong_geometry);
+    atm_chart_render_v4_free (render);
+    atm_chart_spec_v4_free (spec);
+}
+
+static void
 test_v4_render_rejections_and_tampering (void)
 {
     AtmChartSpecV4 *spec = render_v4_spec_from_source (
