@@ -1021,6 +1021,7 @@ int main (int argc, char **argv)
     g_test_add_func ("/chart-render-v4/gistemp-data-qualified-snapshot", test_v4_gistemp_data_view_uses_qualified_snapshot);
     g_test_add_func ("/chart-render-v4/fallback-data", test_v4_render_fallback_keeps_exact_data);
     g_test_add_func ("/chart-render-v4/rejects-foreign-snapshot-projection", test_v4_render_rejects_projection_from_other_snapshot);
+    g_test_add_func ("/chart-render-v4/rejects-same-source-wrong-geometry", test_v4_render_rejects_same_source_projection_with_wrong_geometry);
     g_test_add_func ("/chart-render-v4/rejections-tampering", test_v4_render_rejections_and_tampering);
     int result = g_test_run ();
     /* Release process-wide Cairo/Fontconfig test caches after every object is
