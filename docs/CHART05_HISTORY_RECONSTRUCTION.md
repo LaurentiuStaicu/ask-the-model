@@ -20,18 +20,8 @@ History has two distinct persisted/reconstructed identities when a v4 presentati
 
 On reopen, History first reconstructs and requalifies the source recipe from pinned bytes. It then independently rebuilds the presentation contract and compares every persisted sidecar claim against the compiled catalog, reconstructed source and approved policy. A missing sidecar retains the legacy source-specific reconstruction path. A present but invalid or unsupported sidecar fails closed; it MUST NOT silently fall back to the legacy path.
 
-Adapter, scientific-profile, reconstruction-profile, display-profile and render-contract versions remain independent. The sidecar records the selected versions required for requalification; it does not make a source eligible merely by persisting their identifiers.
+Adapter, scientific-profile, reconstruction-profile, display-profile and render-contract versions remain independent. Persisting their identifiers does not itself authorize a source or series.
 
-The legacy route retains the existing schema and identity contracts:
-
-- schema: `atm-chart-spec/1`;
-- series profile: `atm-series/gistemp-complete-annual/1`;
-- admission profile: `atm-gistemp-pinned-admission/1`;
-- reconstruction profile: `atm-chart-reconstruct/gistemp-complete-annual/1`;
-- source path: `science/data/processed/nasa_gistemp_global_2026.csv`;
-- source semantics: complete annual global temperature anomaly, 1880–2025.
-
-GISTEMP's existing source-bound reconstruction and presentation strings are preserved; its recipe still contains identities and provenance rather than numeric chart points.
 
 ## Energy Institute v2 reconstruction
 
