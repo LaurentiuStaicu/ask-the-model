@@ -10,6 +10,18 @@ Malformed recipes, missing bytes, unsupported snapshots, cross-bundle file mixes
 
 ## GISTEMP v1 reconstruction
 
+## Version-domain separation and v4 sidecar
+
+History has two distinct persisted/reconstructed identities when a v4 presentation is present:
+
+- The source recipe remains the admitted source-specific ChartSpec v1/v2/v3. It carries the source reconstruction identity, repository pin and source provenance.
+- The optional presentation sidecar carries the catalog-bound `atm-chart-spec/4` presentation identity and its selected profile/adapter/display claims.
+- The enclosing conversation store uses `atm-conversation-store/6` for SQLite structure, migration and atomicity. This store version does not replace or rename either ChartSpec identity.
+
+On reopen, History first reconstructs and requalifies the source recipe from pinned bytes. It then independently rebuilds the presentation contract and compares every persisted sidecar claim against the compiled catalog, reconstructed source and approved policy. A missing sidecar retains the legacy source-specific reconstruction path. A present but invalid or unsupported sidecar fails closed; it MUST NOT silently fall back to the legacy path.
+
+Adapter, scientific-profile, reconstruction-profile, display-profile and render-contract versions remain independent. The sidecar records the selected versions required for requalification; it does not make a source eligible merely by persisting their identifiers.
+
 The legacy route retains the existing schema and identity contracts:
 
 - schema: `atm-chart-spec/1`;
