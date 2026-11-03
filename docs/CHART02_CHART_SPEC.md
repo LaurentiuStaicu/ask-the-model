@@ -2,26 +2,25 @@
 
 *Historical design and initial v1 contract details follow; the current v1/v2 behavior is stated first.*
 
-**Current status (2026-10-13): GISTEMP v1 remains unchanged; Energy Institute v2 is integrated through C2a–C2e.** The application admits only the reviewed source-specific paths: `/chart gistemp` and `/chart energy-institute`, plus natural-language requests that unambiguously name one supported source and request a visualization. Live and History reconstruct from pinned source bytes; persisted recipes are not numeric authority. The model supplies neither scientific values nor units, axes, domains, transforms or chart metadata.
+**Current status updated 2026-10-15:** the application admits three bounded source-specific routes: GISTEMP ChartSpec v1, Energy Institute TES v2, and BNR BLS C01 quarterly ChartSpec v3. The BNR route was integrated through PRs #471–#479 and uses the exact pinned RMD source bundle; live and History reconstruction requalify the source and preserve its one authorized `MISSING` coordinate at 2025-Q2 without assigning a numeric value or joining the line across the gap. The current routes are `/chart gistemp`, `/chart energy-institute` and `/chart bnr-bls-c01`, with narrow natural-language routing for their admitted source profiles. The generic catalog/intent proposal in draft PR #487 is not yet implemented: a generic request such as `population over time` must not be treated as an eligible chart merely because a repository file contains a column with that name. Live and History reconstruct from pinned source bytes; persisted recipes are not numeric authority. The model supplies neither scientific values nor units, axes, domains, transforms or chart metadata.
 
 The implementation-stage notes below preserve the original design and qualification history. Statements that EI was `0-unqualified`, the renderer rejected EI, or no application caller existed refer to their original milestone gates and were superseded by C2c–C2e. Unsupported inputs still fail closed: no arbitrary source/series, model-authored values, STEP/BAR, general missing/event series, implicit conversions, smoothing or multi-source comparison UI is enabled.
 
 ## C2a: separate native Energy Institute ChartSpec v2
 
-The native ChartSpec API now keeps the legacy GISTEMP v1 path and identity serializer separate from an EI v2 constructor. GISTEMP v1 continues to use schema `atm-chart-spec/1`, domain `atm.chart-spec.v1`, the same ordered qualified-series IDs and the same existing ownership/reconstruction checks. The new EI entry point accepts only `AtmEnergyInstituteVerifiedSeries`; it does not accept a generic `AtmSeriesContract`, point arrays, arbitrary unit metadata or identity strings.
+## Version domains and presentation compatibility
 
-EI v2 is a single-series, calendar-year TES contract only. Before owning input, the constructor independently rebuilds the typed source series, and therefore rechecks one of the two exact v3 EI source bundles and its source → Evidence → finalized SRA → series chain. Its new `atm-chart-spec/2` identity is separately namespaced and binds the kind, scientific/qualified series identities, profile and admission versions, repository snapshot, source path, semantic fields, exact-decimal extents, ordered series identity and point count. The qualified series ID binds the source-specific SRA identity and point support; ChartSpec does not treat stored points or source labels as authority.
+The version domains are deliberately independent:
 
-The new source-neutral point view exposes calendar year, status, exact source-decimal token, canonical coefficient/exponent, discontinuity flag and borrowed support IDs for either admitted current source. EI uses EJ/year and energy-flow-rate dimension; it never passes through the GISTEMP temperature display conversion. Tests cover both admitted EI snapshots: the reconstructed SRA scientific fact content remains equivalent, but the generic series serialization includes each point's snapshot-qualified support IDs, so both series identities and the ChartSpec identities differ. Cross-snapshot mixes remain rejected by source admission.
+- `atm-conversation-store/6` identifies SQLite storage, migrations and constraints.
+- `atm-chart-spec/1`, `/2` and `/3` identify existing source-specific scientific recipes.
+- `atm-chart-spec/4` identifies the catalog-bound presentation envelope persisted as an optional sidecar.
+- Adapter, admission, scientific-series, reconstruction, display and render-contract versions each identify independently governed behavior.
 
-**Historical C2a gate record:** at the C2a milestone, native ChartSpec v2 was not by itself a rendering qualification and its EI display marker was `0-unqualified`. C2b subsequently qualified display profile version `1`; C2c–C2e later integrated durable persistence, History reconstruction, and the application renderer. None of these development gates changes the immutable v0.6.3 release artifact.
+A store migration from v5 to v6 does not imply a ChartSpec revision. Introducing the presentation v4 sidecar does not rewrite source recipes v1/v2/v3. Legacy records without a sidecar retain their original source-specific History path; a present but invalid sidecar fails closed rather than falling back.
 
+The selected source/profile/adapter tuple must be explicitly admitted and independently reconstructed from the exact pinned source bundle. A valid snapshot, parseable file, catalog membership or persisted identity string alone does not authorize presentation.
 
-The entry point consumes validated, owned or safely retained VerifiedSeries
-objects, not identity strings or model-authored arrays. The first allowed
-profile is `atm-series/gistemp-complete-annual/1`. The model may express intent
-and select qualified references; it cannot supply numeric values, units, scale
-policy or axis domains.
 
 ## C2b: deterministic Energy Institute TES display projection (historical gate record)
 
@@ -142,4 +141,4 @@ input lifetime, invalid dimensions, altered specifications and tampered derived
 geometry. Validation reconstructs domains, labels and coordinates from the owned
 specification. No cached display data is scientific authority.
 
-Current integration in `src/Application.vala` uses `ChartIntent` and `ChartNative` for the two source-specific routes, with schema-v1 GISTEMP and schema-v2 EI conversation recipes. PRES-09 is integrated via PR #447: its dedicated GTK Application test drives live EI v2 and GISTEMP v1 requests through the actual composer/send and Save to History handlers, relaunches a separate process, opens archived History, compares chart identities/exact Data/row provenance, and rejects a tampered source manifest with `Chart unavailable`. All 12 exact-head workflow runs passed on candidate `f4c5c879fed905556bd7bc77c67c4a93735770b6`. This qualifies that bounded application route; the separate CHART-01 source-audit JSON remains a record of its original gate, so its historical `runtime_adapter_enabled: false` field is not the current application capability status.
+Current integration in `src/Application.vala` uses `ChartIntent` and `ChartNative` for three source-specific routes. GISTEMP uses schema-v1 recipes, Energy Institute TES uses schema-v2 recipes, and BNR BLS C01 uses ChartSpec v3 plus schema-v5 conversation persistence and `atm-chart-reconstruct/bnr-bls-c01-calendar-quarter/1`. PRs #471–#479 integrated the BNR live route and History reconstruction, with the exact pinned RMD bundle and a 12-coordinate quarter sequence (11 numeric points plus `MISSING` at 2025-Q2). The related exact-head checks include CHART-01 native ASan/UBSan, CHART-03 GTK, CHART-04 resize, CHART-05 persistence, PRES-09 Application E2E, Presentation Interaction, Invariant Registry and Flatpak/Meson. These bounded routes do not qualify arbitrary sources, generic multi-series charts, general missing/event/derived profiles or all possible coordinate/chart kinds; issue #343 remains open.
