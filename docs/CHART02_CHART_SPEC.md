@@ -8,6 +8,19 @@ The implementation-stage notes below preserve the original design and qualificat
 
 ## C2a: separate native Energy Institute ChartSpec v2
 
+## Version domains and presentation compatibility
+
+The version domains are deliberately independent:
+
+- `atm-conversation-store/6` identifies SQLite storage, migrations and constraints.
+- `atm-chart-spec/1`, `/2` and `/3` identify the existing source-specific scientific recipes.
+- `atm-chart-spec/4` identifies the catalog-bound presentation envelope persisted as an optional sidecar.
+- Adapter, admission, scientific-series, reconstruction, display and render-contract versions each identify their own independently governed behavior.
+
+Consequently, a store migration from v5 to v6 does not imply a ChartSpec revision, and introducing the presentation v4 sidecar does not rewrite source recipes v1/v2/v3. Legacy records without a sidecar continue through their original source-specific History path; a present but invalid sidecar must fail closed rather than fall back.
+
+The selected source/profile/adapter tuple must be explicitly admitted and independently reconstructed from the exact pinned source bundle. A valid snapshot, parseable file, catalog membership or persisted identity string alone does not authorize presentation.
+
 The native ChartSpec API now keeps the legacy GISTEMP v1 path and identity serializer separate from an EI v2 constructor. GISTEMP v1 continues to use schema `atm-chart-spec/1`, domain `atm.chart-spec.v1`, the same ordered qualified-series IDs and the same existing ownership/reconstruction checks. The new EI entry point accepts only `AtmEnergyInstituteVerifiedSeries`; it does not accept a generic `AtmSeriesContract`, point arrays, arbitrary unit metadata or identity strings.
 
 EI v2 is a single-series, calendar-year TES contract only. Before owning input, the constructor independently rebuilds the typed source series, and therefore rechecks one of the two exact v3 EI source bundles and its source → Evidence → finalized SRA → series chain. Its new `atm-chart-spec/2` identity is separately namespaced and binds the kind, scientific/qualified series identities, profile and admission versions, repository snapshot, source path, semantic fields, exact-decimal extents, ordered series identity and point count. The qualified series ID binds the source-specific SRA identity and point support; ChartSpec does not treat stored points or source labels as authority.
