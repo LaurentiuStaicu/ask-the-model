@@ -1,6 +1,7 @@
 #include "chart_render_v4.h"
 
 #include "scientific_canonical.h"
+#include "chart_projection.h"
 
 #include <json-glib/json-glib.h>
 #include <math.h>
@@ -678,9 +679,15 @@ atm_chart_render_v4_validate (const AtmChartRenderV4 *render,
             atm_chart_projection_v4_numeric_observation_count (render->projection) ==
                 atm_chart_spec_v4_numeric_observation_count (render->owned_spec);
         g_free (expected_policy);
-        if (!projection_identity_matches)
+        const AtmChartProjection *source_projection =
+            atm_chart_projection_v4_source_projection (render->projection);
+        gboolean geometry_matches =
+            _atm_chart_projection_geometry_matches (
+                source_projection, (double) render->width - 128.0,
+                (double) render->height - 210.0);
+        if (!projection_identity_matches || !geometry_matches)
             return reject (error, ATM_CHART_RENDER_V4_ERROR_PROJECTION,
-                "The rendered v4 projection differs from catalog identity, specification identity or coverage.");
+                "The rendered v4 projection differs from catalog identity, specification identity, coverage or expected plot geometry.");
     }
 
     char *expected_id = NULL;
