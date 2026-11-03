@@ -112,6 +112,51 @@ The first generic chart should have an explicit renderer/Data projection policy 
 
 ## 6. Sparse records and source-provenance requirements
 
+## 5.1. Independent version domains
+
+The version domains below are independent. A change in one domain MUST NOT implicitly change another.
+
+| Domain | Identity | Responsibility |
+|---|---|---|
+| Conversation store | `atm-conversation-store/6` | SQLite persistence schema, migrations and constraints |
+| Source ChartSpec | `atm-chart-spec/1`, `/2`, `/3` | Source-specific scientific reconstruction recipe |
+| Presentation ChartSpec | `atm-chart-spec/4` | Catalog-bound chart presentation identity and contract |
+| Adapter | `adapter_id` plus adapter version | Deterministic source qualification and conversion |
+| Scientific profiles | `profile_id` plus profile version | Source admission and scientific series semantics |
+| Reconstruction profile | `profile_id` plus profile version | Live and History reconstruction behavior |
+| Display profile | `profile_id` plus profile version | Exact-decimal projection and axis policy |
+| Render contract | `contract_id` plus contract version | Native rendering behavior and compatibility |
+
+The conversation-store schema version is not a ChartSpec version. Store schema v6 permits persistence of an optional ChartSpec v4 presentation sidecar while retaining the underlying source ChartSpec v1/v2/v3 recipe.
+
+ChartSpec v4 is a presentation envelope, not a replacement for the source-specific scientific reconstruction recipes.
+
+Adapter, scientific-profile, reconstruction-profile, display-profile and render-contract versions are independently managed. Each version changes only when its own contract changes. Viewport dimensions, projected coordinates and rendered pixels are not persistent scientific authority.
+
+### Source/profile/adapter admission
+
+A valid source snapshot does not automatically authorize a chart.
+
+Chart eligibility requires an explicitly admitted tuple:
+
+- stable catalog `series_id`;
+- exact repository identity and immutable snapshot SHA;
+- complete admitted source bundle and digest bindings;
+- admission profile ID/version;
+- scientific series profile ID/version;
+- deterministic adapter ID/version;
+- reconstruction profile ID/version.
+
+The adapter must independently reconstruct and qualify this tuple from the original pinned source bytes.
+
+Catalog membership, successful parsing, numeric columns, valid source metadata or a model-proposed series ID are insufficient authorization.
+
+History reconstruction MUST independently re-read the pinned source bundle, re-run source admission and series qualification, and compare the reconstructed tuple against the persisted source recipe and presentation sidecar.
+
+A valid source snapshot with an unsupported profile or adapter version MUST fail closed.
+
+A persisted presentation sidecar is a set of expected claims to compare, not independent scientific authority.
+
 A CSV/TSV row is not automatically a complete multi-variable observation. For each registered series the adapter must define which source column is authoritative, what an empty token means in that particular source, whether the source is primary, processed, simulated or derived, and what coverage is actually supported.
 
 Specifically, the EWD `empirical_model_inputs_2026-08-28.csv` row containing `year=1960`, a numeric `population` value and empty `food_production_index`, `fossil_co2_proxy` and `industrial_output` cells must not be promoted wholesale into four complete series. The empty fields must not become zeros or be filled from the model's prose. Nor does the presence of a population value alone prove that this processed/model-input file is the primary source for a population trajectory. The proposed series must first be traced to a specific publisher/source and an independently admitted numeric artifact with defensible units, coordinate semantics, completeness and provenance. Until that qualification exists, those columns remain ineligible.
