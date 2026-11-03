@@ -5,8 +5,10 @@
 G_BEGIN_DECLS
 
 #define ATM_CONVERSATION_STORE_APPLICATION_ID 0x41544331
-#define ATM_CONVERSATION_STORE_SCHEMA_VERSION 5
-#define ATM_CONVERSATION_STORE_SCHEMA_ID "atm-conversation-store/5"
+#define ATM_CONVERSATION_STORE_SCHEMA_V5_VERSION 5
+#define ATM_CONVERSATION_STORE_SCHEMA_V5_ID "atm-conversation-store/5"
+#define ATM_CONVERSATION_STORE_SCHEMA_VERSION 6
+#define ATM_CONVERSATION_STORE_SCHEMA_ID "atm-conversation-store/6"
 
 typedef enum {
     ATM_CONVERSATION_STORE_ERROR_ARGUMENT,
@@ -57,6 +59,36 @@ typedef struct {
 } AtmConversationChartSeriesInput;
 
 typedef struct {
+    const char *presentation_schema;
+    const char *presentation_spec_id;
+    const char *series_id;
+    const char *catalog_schema;
+    const char *adapter_id;
+    const char *series_profile_id;
+    const char *series_profile_version;
+    const char *admission_profile_id;
+    const char *admission_profile_version;
+    const char *reconstruction_profile_id;
+    const char *source_chart_schema;
+    const char *source_chart_spec_id;
+    const char *x_coordinate_semantics;
+    const char *x_frequency;
+    const char *x_unit;
+    const char *x_dimension;
+    const char *subject;
+    const char *attribute;
+    const char *y_unit;
+    const char *y_dimension;
+    const char *series_semantics;
+    const char *missing_policy;
+    const char *missing_coordinate;
+    const char *missing_reason;
+    const char *display_profile_id;
+    const char *display_profile_version;
+    const char *render_contract;
+} AtmConversationChartPresentationInput;
+
+typedef struct {
     guint ordinal;
     const char *chart_schema;
     const char *chart_spec_id;
@@ -64,6 +96,7 @@ typedef struct {
     const char *reconstruction_profile;
     const AtmConversationChartSeriesInput *series;
     gsize series_count;
+    const AtmConversationChartPresentationInput *presentation;
 } AtmConversationChartInput;
 
 GQuark atm_conversation_store_error_quark (void);
@@ -153,6 +186,28 @@ gboolean atm_conversation_store_attach_chart_values (
     const char *repository_version,
     const char *snapshot_sha,
     const char *source_path,
+    GError **error
+);
+
+/* Atomically attaches a source v1/v2/v3 recipe and its catalog-bound v4 presentation sidecar. */
+gboolean atm_conversation_store_attach_chart_v4_values (
+    AtmConversationStore *store,
+    const char *conversation_id,
+    gint64 turn_no,
+    guint ordinal,
+    const char *chart_schema,
+    const char *chart_spec_id,
+    const char *chart_kind,
+    const char *reconstruction_profile,
+    const char *series_profile,
+    const char *admission_profile,
+    const char *scientific_id,
+    const char *qualified_id,
+    const char *repository_id,
+    const char *repository_version,
+    const char *snapshot_sha,
+    const char *source_path,
+    const AtmConversationChartPresentationInput *presentation,
     GError **error
 );
 
@@ -419,6 +474,147 @@ const char *atm_conversation_snapshot_chart_kind_at (
 );
 
 const char *atm_conversation_snapshot_chart_reconstruction_profile_at (
+    const AtmConversationSnapshot *snapshot,
+    guint message_index,
+    guint chart_index
+);
+
+const char *atm_conversation_snapshot_chart_presentation_schema_at (
+    const AtmConversationSnapshot *snapshot,
+    guint message_index,
+    guint chart_index
+);
+const char *atm_conversation_snapshot_chart_presentation_sidecar_schema_at (
+    const AtmConversationSnapshot *snapshot,
+    guint message_index,
+    guint chart_index
+);
+const char *atm_conversation_snapshot_chart_presentation_spec_id_at (
+    const AtmConversationSnapshot *snapshot,
+    guint message_index,
+    guint chart_index
+);
+const char *atm_conversation_snapshot_chart_presentation_series_id_at (
+    const AtmConversationSnapshot *snapshot,
+    guint message_index,
+    guint chart_index
+);
+const char *atm_conversation_snapshot_chart_presentation_catalog_schema_at (
+    const AtmConversationSnapshot *snapshot,
+    guint message_index,
+    guint chart_index
+);
+const char *atm_conversation_snapshot_chart_presentation_adapter_id_at (
+    const AtmConversationSnapshot *snapshot,
+    guint message_index,
+    guint chart_index
+);
+const char *atm_conversation_snapshot_chart_presentation_series_profile_id_at (
+    const AtmConversationSnapshot *snapshot,
+    guint message_index,
+    guint chart_index
+);
+const char *atm_conversation_snapshot_chart_presentation_series_profile_version_at (
+    const AtmConversationSnapshot *snapshot,
+    guint message_index,
+    guint chart_index
+);
+const char *atm_conversation_snapshot_chart_presentation_admission_profile_id_at (
+    const AtmConversationSnapshot *snapshot,
+    guint message_index,
+    guint chart_index
+);
+const char *atm_conversation_snapshot_chart_presentation_admission_profile_version_at (
+    const AtmConversationSnapshot *snapshot,
+    guint message_index,
+    guint chart_index
+);
+const char *atm_conversation_snapshot_chart_presentation_reconstruction_profile_id_at (
+    const AtmConversationSnapshot *snapshot,
+    guint message_index,
+    guint chart_index
+);
+const char *atm_conversation_snapshot_chart_presentation_source_chart_schema_at (
+    const AtmConversationSnapshot *snapshot,
+    guint message_index,
+    guint chart_index
+);
+const char *atm_conversation_snapshot_chart_presentation_source_chart_spec_id_at (
+    const AtmConversationSnapshot *snapshot,
+    guint message_index,
+    guint chart_index
+);
+const char *atm_conversation_snapshot_chart_presentation_x_coordinate_semantics_at (
+    const AtmConversationSnapshot *snapshot,
+    guint message_index,
+    guint chart_index
+);
+const char *atm_conversation_snapshot_chart_presentation_x_frequency_at (
+    const AtmConversationSnapshot *snapshot,
+    guint message_index,
+    guint chart_index
+);
+const char *atm_conversation_snapshot_chart_presentation_x_unit_at (
+    const AtmConversationSnapshot *snapshot,
+    guint message_index,
+    guint chart_index
+);
+const char *atm_conversation_snapshot_chart_presentation_x_dimension_at (
+    const AtmConversationSnapshot *snapshot,
+    guint message_index,
+    guint chart_index
+);
+const char *atm_conversation_snapshot_chart_presentation_subject_at (
+    const AtmConversationSnapshot *snapshot,
+    guint message_index,
+    guint chart_index
+);
+const char *atm_conversation_snapshot_chart_presentation_attribute_at (
+    const AtmConversationSnapshot *snapshot,
+    guint message_index,
+    guint chart_index
+);
+const char *atm_conversation_snapshot_chart_presentation_y_unit_at (
+    const AtmConversationSnapshot *snapshot,
+    guint message_index,
+    guint chart_index
+);
+const char *atm_conversation_snapshot_chart_presentation_y_dimension_at (
+    const AtmConversationSnapshot *snapshot,
+    guint message_index,
+    guint chart_index
+);
+const char *atm_conversation_snapshot_chart_presentation_series_semantics_at (
+    const AtmConversationSnapshot *snapshot,
+    guint message_index,
+    guint chart_index
+);
+const char *atm_conversation_snapshot_chart_presentation_missing_policy_at (
+    const AtmConversationSnapshot *snapshot,
+    guint message_index,
+    guint chart_index
+);
+const char *atm_conversation_snapshot_chart_presentation_missing_coordinate_at (
+    const AtmConversationSnapshot *snapshot,
+    guint message_index,
+    guint chart_index
+);
+const char *atm_conversation_snapshot_chart_presentation_missing_reason_at (
+    const AtmConversationSnapshot *snapshot,
+    guint message_index,
+    guint chart_index
+);
+const char *atm_conversation_snapshot_chart_presentation_display_profile_id_at (
+    const AtmConversationSnapshot *snapshot,
+    guint message_index,
+    guint chart_index
+);
+const char *atm_conversation_snapshot_chart_presentation_display_profile_version_at (
+    const AtmConversationSnapshot *snapshot,
+    guint message_index,
+    guint chart_index
+);
+const char *atm_conversation_snapshot_chart_presentation_render_contract_at (
     const AtmConversationSnapshot *snapshot,
     guint message_index,
     guint chart_index

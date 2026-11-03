@@ -7,11 +7,13 @@
 #include <string.h>
 
 #define ATM_CONVERSATION_STORE_SCHEMA_RESOURCE \
-    "/io/github/laurentiustaicu/ask_the_model/schemas/conversation-store-v5.sql"
+    "/io/github/laurentiustaicu/ask_the_model/schemas/conversation-store-v6.sql"
 #define ATM_CONVERSATION_STORE_MIGRATION_V3_V4_RESOURCE \
     "/io/github/laurentiustaicu/ask_the_model/schemas/conversation-store-v3-to-v4.sql"
 #define ATM_CONVERSATION_STORE_MIGRATION_V4_V5_RESOURCE \
     "/io/github/laurentiustaicu/ask_the_model/schemas/conversation-store-v4-to-v5.sql"
+#define ATM_CONVERSATION_STORE_MIGRATION_V5_V6_RESOURCE \
+    "/io/github/laurentiustaicu/ask_the_model/schemas/conversation-store-v5-to-v6.sql"
 #define ATM_CONVERSATION_STORE_MIGRATION_V1_V2_RESOURCE \
     "/io/github/laurentiustaicu/ask_the_model/schemas/conversation-store-v1-to-v2.sql"
 #define ATM_CONVERSATION_STORE_MIGRATION_V2_V3_RESOURCE \
@@ -24,6 +26,8 @@
 #define ATM_CONVERSATION_STORE_SCHEMA_V3_VERSION 3
 #define ATM_CONVERSATION_STORE_SCHEMA_V4_ID "atm-conversation-store/4"
 #define ATM_CONVERSATION_STORE_SCHEMA_V4_VERSION 4
+#define ATM_CONVERSATION_STORE_SCHEMA_V6_ID "atm-conversation-store/6"
+#define ATM_CONVERSATION_STORE_SCHEMA_V6_VERSION 6
 
 struct AtmConversationStore {
     sqlite3 *db;
@@ -78,11 +82,43 @@ typedef struct {
 } AtmConversationSnapshotChartSeries;
 
 typedef struct {
+    char *presentation_schema;
+    char *presentation_spec_id;
+    char *series_id;
+    char *catalog_schema;
+    char *adapter_id;
+    char *series_profile_id;
+    char *series_profile_version;
+    char *admission_profile_id;
+    char *admission_profile_version;
+    char *reconstruction_profile_id;
+    char *source_chart_schema;
+    char *source_chart_spec_id;
+    char *x_coordinate_semantics;
+    char *x_frequency;
+    char *x_unit;
+    char *x_dimension;
+    char *subject;
+    char *attribute;
+    char *y_unit;
+    char *y_dimension;
+    char *series_semantics;
+    char *missing_policy;
+    char *missing_coordinate;
+    char *missing_reason;
+    char *display_profile_id;
+    char *display_profile_version;
+    char *render_contract;
+} AtmConversationSnapshotChartPresentation;
+
+typedef struct {
     gint64 ordinal;
     char *chart_schema;
     char *chart_spec_id;
     char *chart_kind;
     char *reconstruction_profile;
+    char *presentation_schema;
+    AtmConversationSnapshotChartPresentation *presentation;
     GPtrArray *series;
 } AtmConversationSnapshotChart;
 
@@ -449,6 +485,20 @@ load_migration_v4_v5_sql (
     return load_sql_resource (
         ATM_CONVERSATION_STORE_MIGRATION_V4_V5_RESOURCE,
         "v4-to-v5 migration",
+        out_sql,
+        error
+    );
+}
+
+static gboolean
+load_migration_v5_v6_sql (
+    char **out_sql,
+    GError **error
+)
+{
+    return load_sql_resource (
+        ATM_CONVERSATION_STORE_MIGRATION_V5_V6_RESOURCE,
+        "v5-to-v6 migration",
         out_sql,
         error
     );
@@ -1274,6 +1324,65 @@ validate_chart_semantics (
     return TRUE;
 }
 
+/* V4 is a live presentation wrapper only; the durable v5 row remains source v1/v2/v3. */
+static gboolean
+validate_chart_presentation_semantics (
+    sqlite3 *db,
+    GError **error
+)
+{
+    gint64 invalid_presentation = 0;
+    if (!query_single_int64 (
+            db,
+            "SELECT count(*) FROM chart_presentations_v4 p "
+            "LEFT JOIN message_charts c "
+            "ON c.message_id=p.message_id AND c.ordinal=p.chart_ordinal "
+            "LEFT JOIN chart_series s "
+            "ON s.message_id=p.message_id AND s.chart_ordinal=p.chart_ordinal "
+            "AND s.series_ordinal=0 "
+            "WHERE c.message_id IS NULL "
+            "OR c.presentation_schema IS NOT p.presentation_schema "
+            "OR c.chart_schema IS NOT p.source_chart_schema "
+            "OR c.chart_spec_id IS NOT p.source_chart_spec_id "
+            "OR c.reconstruction_profile IS NOT p.reconstruction_profile_id "
+            "OR s.message_id IS NULL "
+            "OR s.series_profile IS NOT p.series_profile_id "
+            "OR s.admission_profile IS NOT p.admission_profile_id;",
+            &invalid_presentation,
+            error
+        )) {
+        return FALSE;
+    }
+
+    gint64 missing_presentation = 0;
+    if (!query_single_int64 (
+            db,
+            "SELECT count(*) FROM message_charts c "
+            "LEFT JOIN chart_presentations_v4 p "
+            "ON p.message_id=c.message_id AND p.chart_ordinal=c.ordinal "
+            "WHERE c.presentation_schema='atm-chart-spec/4' "
+            "AND p.message_id IS NULL;",
+            &missing_presentation,
+            error
+        )) {
+        return FALSE;
+    }
+
+    if (invalid_presentation != 0 || missing_presentation != 0) {
+        g_set_error (
+            error,
+            ATM_CONVERSATION_STORE_ERROR,
+            ATM_CONVERSATION_STORE_ERROR_INTEGRITY,
+            "Conversation-store v4 presentation sidecar validation failed "
+            "(invalid=%" G_GINT64_FORMAT ", missing=%" G_GINT64_FORMAT ").",
+            invalid_presentation,
+            missing_presentation
+        );
+        return FALSE;
+    }
+    return TRUE;
+}
+
 static gboolean
 prepare_statement (
     sqlite3 *db,
@@ -1445,6 +1554,101 @@ chart_series_input_is_valid (
 }
 
 static gboolean
+chart_presentation_input_is_valid (
+    const AtmConversationChartPresentationInput *p,
+    const AtmConversationChartInput *chart
+)
+{
+    if (p == NULL || chart == NULL ||
+        g_strcmp0 (chart->chart_kind, "line") != 0 ||
+        g_strcmp0 (p->presentation_schema, "atm-chart-spec/4") != 0 ||
+        !is_hex64 (p->presentation_spec_id) ||
+        g_strcmp0 (p->catalog_schema, "atm-chart-catalog/1") != 0 ||
+        g_strcmp0 (p->source_chart_schema, chart->chart_schema) != 0 ||
+        g_strcmp0 (p->source_chart_spec_id, chart->chart_spec_id) != 0 ||
+        g_strcmp0 (p->reconstruction_profile_id, chart->reconstruction_profile) != 0 ||
+        g_strcmp0 (p->series_profile_id, chart->series[0].series_profile) != 0 ||
+        g_strcmp0 (p->admission_profile_id, chart->series[0].admission_profile) != 0 ||
+        g_strcmp0 (p->render_contract, "atm-retro-mono/1") != 0 ||
+        g_strcmp0 (p->display_profile_version, "1") != 0 ||
+        g_strcmp0 (p->series_profile_version, "1") != 0 ||
+        !nonempty (p->adapter_id) ||
+        !nonempty (p->series_id) ||
+        !nonempty (p->admission_profile_version) ||
+        !nonempty (p->x_coordinate_semantics) ||
+        !nonempty (p->x_frequency) ||
+        !nonempty (p->x_unit) ||
+        !nonempty (p->x_dimension) ||
+        !nonempty (p->subject) ||
+        !nonempty (p->attribute) ||
+        !nonempty (p->y_unit) ||
+        !nonempty (p->y_dimension) ||
+        !nonempty (p->series_semantics) ||
+        !nonempty (p->missing_policy) ||
+        !nonempty (p->display_profile_id))
+        return FALSE;
+
+#define PRESENTATION_EQ(field, value) (g_strcmp0 (p->field, value) == 0)
+    if (PRESENTATION_EQ (series_id,
+            "climate.gistemp.global-temperature-anomaly")) {
+        return PRESENTATION_EQ (adapter_id, "gistemp-pinned-annual/1") &&
+            PRESENTATION_EQ (admission_profile_version, "1") &&
+            PRESENTATION_EQ (source_chart_schema, "atm-chart-spec/1") &&
+            PRESENTATION_EQ (x_coordinate_semantics, "calendar_year") &&
+            PRESENTATION_EQ (x_frequency, "annual") &&
+            PRESENTATION_EQ (x_unit, "calendar_year") &&
+            PRESENTATION_EQ (x_dimension, "time") &&
+            PRESENTATION_EQ (subject, "global_surface_temperature") &&
+            PRESENTATION_EQ (attribute, "annual_temperature_anomaly") &&
+            PRESENTATION_EQ (y_unit, "degree_Celsius_anomaly") &&
+            PRESENTATION_EQ (y_dimension, "temperature_difference") &&
+            PRESENTATION_EQ (series_semantics, "empirical_annual_observations") &&
+            PRESENTATION_EQ (missing_policy, "reject") &&
+            p->missing_coordinate == NULL && p->missing_reason == NULL &&
+            PRESENTATION_EQ (display_profile_id, "atm-display/gistemp-linear");
+    }
+    if (PRESENTATION_EQ (series_id,
+            "energy.energy-institute.global-total-energy-supply")) {
+        return PRESENTATION_EQ (adapter_id, "energy-institute-tes-pinned-annual/1") &&
+            PRESENTATION_EQ (admission_profile_version, "3") &&
+            PRESENTATION_EQ (source_chart_schema, "atm-chart-spec/2") &&
+            PRESENTATION_EQ (x_coordinate_semantics, "calendar_year") &&
+            PRESENTATION_EQ (x_frequency, "annual") &&
+            PRESENTATION_EQ (x_unit, "calendar_year") &&
+            PRESENTATION_EQ (x_dimension, "time") &&
+            PRESENTATION_EQ (subject, "global_total_energy_supply") &&
+            PRESENTATION_EQ (attribute, "total_energy_supply") &&
+            PRESENTATION_EQ (y_unit, "exajoules/year") &&
+            PRESENTATION_EQ (y_dimension, "energy_flow_rate") &&
+            PRESENTATION_EQ (series_semantics, "empirical_annual_observations") &&
+            PRESENTATION_EQ (missing_policy, "reject") &&
+            p->missing_coordinate == NULL && p->missing_reason == NULL &&
+            PRESENTATION_EQ (display_profile_id, "atm-display/energy-institute-tes-linear");
+    }
+    if (PRESENTATION_EQ (series_id,
+            "banking.bnr.bls-c01.credit-standards-net-percentage")) {
+        return PRESENTATION_EQ (adapter_id, "bnr-bls-c01-pinned-quarterly/1") &&
+            PRESENTATION_EQ (admission_profile_version, "1") &&
+            PRESENTATION_EQ (source_chart_schema, "atm-chart-spec/3") &&
+            PRESENTATION_EQ (x_coordinate_semantics, "calendar_quarter") &&
+            PRESENTATION_EQ (x_frequency, "quarterly") &&
+            PRESENTATION_EQ (x_unit, "calendar_quarter") &&
+            PRESENTATION_EQ (x_dimension, "time") &&
+            PRESENTATION_EQ (subject, "non_financial_corporations") &&
+            PRESENTATION_EQ (attribute, "nfc_credit_standards") &&
+            PRESENTATION_EQ (y_unit, "percent") &&
+            PRESENTATION_EQ (y_dimension, "survey_net_percentage") &&
+            PRESENTATION_EQ (series_semantics, "empirical_quarterly_observations") &&
+            PRESENTATION_EQ (missing_policy, "bounded_profile") &&
+            PRESENTATION_EQ (missing_coordinate, "2025-Q2") &&
+            PRESENTATION_EQ (missing_reason, "source_round_not_retained") &&
+            PRESENTATION_EQ (display_profile_id, "atm-display/bnr-bls-c01-quarterly-gap");
+    }
+#undef PRESENTATION_EQ
+    return FALSE;
+}
+
+static gboolean
 chart_input_is_valid (
     const AtmConversationChartInput *chart
 )
@@ -1459,19 +1663,21 @@ chart_input_is_valid (
         !chart_series_input_is_valid (&chart->series[0], chart->chart_schema))
         return FALSE;
 
+    gboolean source_tuple_valid = FALSE;
     if (g_strcmp0 (chart->chart_schema, "atm-chart-spec/1") == 0)
-        return g_strcmp0 (chart->reconstruction_profile,
+        source_tuple_valid = g_strcmp0 (chart->reconstruction_profile,
             "atm-chart-reconstruct/gistemp-complete-annual/1") == 0;
-
-    if (g_strcmp0 (chart->chart_schema, "atm-chart-spec/2") == 0)
-        return g_strcmp0 (chart->reconstruction_profile,
+    else if (g_strcmp0 (chart->chart_schema, "atm-chart-spec/2") == 0)
+        source_tuple_valid = g_strcmp0 (chart->reconstruction_profile,
             "atm-chart-reconstruct/energy-institute-tes-complete-annual/1") == 0;
-
-    if (g_strcmp0 (chart->chart_schema, "atm-chart-spec/3") == 0)
-        return g_strcmp0 (chart->reconstruction_profile,
+    else if (g_strcmp0 (chart->chart_schema, "atm-chart-spec/3") == 0)
+        source_tuple_valid = g_strcmp0 (chart->reconstruction_profile,
             "atm-chart-reconstruct/bnr-bls-c01-calendar-quarter/1") == 0;
 
-    return FALSE;
+    if (!source_tuple_valid)
+        return FALSE;
+    return chart->presentation == NULL ||
+        chart_presentation_input_is_valid (chart->presentation, chart);
 }
 
 gboolean
@@ -2347,7 +2553,8 @@ atm_conversation_store_validate (
         "messages",
         "citations",
         "message_charts",
-        "chart_series"
+        "chart_series",
+        "chart_presentations_v4"
     };
 
     if (store == NULL ||
@@ -2418,6 +2625,10 @@ atm_conversation_store_validate (
             error
         ) &&
         validate_chart_semantics (
+            store->db,
+            error
+        ) &&
+        validate_chart_presentation_semantics (
             store->db,
             error
         );
@@ -2695,6 +2906,98 @@ validate_v4_for_migration (
         validate_chart_semantics (db, error);
 }
 
+static gboolean
+validate_v5_for_migration (
+    sqlite3 *db,
+    GError **error
+)
+{
+    static const char *required_tables[] = {
+        "installation", "conversations", "conversation_repositories",
+        "messages", "citations", "message_charts", "chart_series"
+    };
+    gint64 application_id = 0;
+    gint64 user_version = 0;
+    for (gsize i = 0; i < G_N_ELEMENTS (required_tables); i++) {
+        if (!required_table_exists (db, required_tables[i], error))
+            return FALSE;
+    }
+    if (!query_single_int64 (db, "PRAGMA application_id;", &application_id, error) ||
+        !query_single_int64 (db, "PRAGMA user_version;", &user_version, error))
+        return FALSE;
+    if (application_id != (gint64) ATM_CONVERSATION_STORE_APPLICATION_ID ||
+        user_version != ATM_CONVERSATION_STORE_SCHEMA_V5_VERSION) {
+        g_set_error_literal (error, ATM_CONVERSATION_STORE_ERROR,
+            ATM_CONVERSATION_STORE_ERROR_SCHEMA,
+            "Conversation-store v5 identity/version is invalid for migration.");
+        return FALSE;
+    }
+    char *schema_id = NULL;
+    if (!query_single_text (db,
+            "SELECT schema_id FROM installation WHERE singleton_id=1;",
+            &schema_id, error))
+        return FALSE;
+    gboolean schema_ok = g_strcmp0 (
+        schema_id, ATM_CONVERSATION_STORE_SCHEMA_V5_ID) == 0;
+    g_free (schema_id);
+    if (!schema_ok) {
+        g_set_error_literal (error, ATM_CONVERSATION_STORE_ERROR,
+            ATM_CONVERSATION_STORE_ERROR_SCHEMA,
+            "Conversation-store v5 schema identity is invalid for migration.");
+        return FALSE;
+    }
+    return validate_integrity (db, error) &&
+        validate_base_semantics (db, error) &&
+        validate_chart_semantics (db, error);
+}
+
+static gboolean
+validate_v6_for_migration (
+    sqlite3 *db,
+    GError **error
+)
+{
+    static const char *required_tables[] = {
+        "installation", "conversations", "conversation_repositories",
+        "messages", "citations", "message_charts", "chart_series",
+        "chart_presentations_v4"
+    };
+    gint64 application_id = 0;
+    gint64 user_version = 0;
+    for (gsize i = 0; i < G_N_ELEMENTS (required_tables); i++) {
+        if (!required_table_exists (db, required_tables[i], error))
+            return FALSE;
+    }
+    if (!query_single_int64 (db, "PRAGMA application_id;", &application_id, error) ||
+        !query_single_int64 (db, "PRAGMA user_version;", &user_version, error))
+        return FALSE;
+    if (application_id != (gint64) ATM_CONVERSATION_STORE_APPLICATION_ID ||
+        user_version != ATM_CONVERSATION_STORE_SCHEMA_V6_VERSION) {
+        g_set_error_literal (error, ATM_CONVERSATION_STORE_ERROR,
+            ATM_CONVERSATION_STORE_ERROR_SCHEMA,
+            "Conversation-store v6 identity/version is invalid for migration.");
+        return FALSE;
+    }
+    char *schema_id = NULL;
+    if (!query_single_text (db,
+            "SELECT schema_id FROM installation WHERE singleton_id=1;",
+            &schema_id, error))
+        return FALSE;
+    gboolean schema_ok = g_strcmp0 (
+        schema_id, ATM_CONVERSATION_STORE_SCHEMA_V6_ID) == 0;
+    g_free (schema_id);
+    if (!schema_ok) {
+        g_set_error_literal (error, ATM_CONVERSATION_STORE_ERROR,
+            ATM_CONVERSATION_STORE_ERROR_SCHEMA,
+            "Conversation-store v6 schema identity is invalid for migration.");
+        return FALSE;
+    }
+    return validate_integrity (db, error) &&
+        validate_base_semantics (db, error) &&
+        validate_chart_semantics (db, error) &&
+        validate_chart_presentation_semantics (db, error);
+}
+
 
 static gboolean
 migrate_v1_to_v3 (
@@ -2905,14 +3208,63 @@ migrate_v4_to_v5 (
         goto rollback;
 
     char *version_sql = g_strdup_printf ("PRAGMA user_version=%d;",
-        ATM_CONVERSATION_STORE_SCHEMA_VERSION);
+        ATM_CONVERSATION_STORE_SCHEMA_V5_VERSION);
     if (!exec_sql (store->db, version_sql, error)) {
         g_free (version_sql);
         goto rollback;
     }
     g_free (version_sql);
 
-    if (!atm_conversation_store_validate (store, error))
+    if (!validate_v5_for_migration (store->db, error))
+        goto rollback;
+    if (!exec_sql (store->db, "COMMIT;", error))
+        goto rollback;
+
+    ok = TRUE;
+rollback:
+    if (!ok)
+        sqlite3_exec (store->db, "ROLLBACK;", NULL, NULL, NULL);
+    g_free (migration_sql);
+    return ok;
+}
+
+
+static gboolean
+migrate_v5_to_v6 (
+    AtmConversationStore *store,
+    GError **error
+)
+{
+    if (store == NULL || store->db == NULL) {
+        g_set_error_literal (error, ATM_CONVERSATION_STORE_ERROR,
+            ATM_CONVERSATION_STORE_ERROR_ARGUMENT,
+            "Conversation-store schema migration requires an open store.");
+        return FALSE;
+    }
+    if (!validate_v5_for_migration (store->db, error))
+        return FALSE;
+
+    char *migration_sql = NULL;
+    if (!load_migration_v5_v6_sql (&migration_sql, error))
+        return FALSE;
+    if (!exec_sql (store->db, "BEGIN IMMEDIATE;", error)) {
+        g_free (migration_sql);
+        return FALSE;
+    }
+
+    gboolean ok = FALSE;
+    if (!exec_sql (store->db, migration_sql, error))
+        goto rollback;
+
+    char *version_sql = g_strdup_printf ("PRAGMA user_version=%d;",
+        ATM_CONVERSATION_STORE_SCHEMA_V6_VERSION);
+    if (!exec_sql (store->db, version_sql, error)) {
+        g_free (version_sql);
+        goto rollback;
+    }
+    g_free (version_sql);
+
+    if (!validate_v6_for_migration (store->db, error))
         goto rollback;
     if (!exec_sql (store->db, "COMMIT;", error))
         goto rollback;
@@ -3076,7 +3428,8 @@ atm_conversation_store_open (
     ) {
         if (!migrate_v1_to_v3 (store, error) ||
             !migrate_v3_to_v4 (store, error) ||
-            !migrate_v4_to_v5 (store, error)) {
+            !migrate_v4_to_v5 (store, error) ||
+            !migrate_v5_to_v6 (store, error)) {
             atm_conversation_store_close (store);
             return FALSE;
         }
@@ -3086,7 +3439,8 @@ atm_conversation_store_open (
     ) {
         if (!migrate_v2_to_v3 (store, error) ||
             !migrate_v3_to_v4 (store, error) ||
-            !migrate_v4_to_v5 (store, error)) {
+            !migrate_v4_to_v5 (store, error) ||
+            !migrate_v5_to_v6 (store, error)) {
             atm_conversation_store_close (store);
             return FALSE;
         }
@@ -3094,14 +3448,23 @@ atm_conversation_store_open (
         user_version == ATM_CONVERSATION_STORE_SCHEMA_V3_VERSION
     ) {
         if (!migrate_v3_to_v4 (store, error) ||
-            !migrate_v4_to_v5 (store, error)) {
+            !migrate_v4_to_v5 (store, error) ||
+            !migrate_v5_to_v6 (store, error)) {
             atm_conversation_store_close (store);
             return FALSE;
         }
     } else if (
         user_version == ATM_CONVERSATION_STORE_SCHEMA_V4_VERSION
     ) {
-        if (!migrate_v4_to_v5 (store, error)) {
+        if (!migrate_v4_to_v5 (store, error) ||
+            !migrate_v5_to_v6 (store, error)) {
+            atm_conversation_store_close (store);
+            return FALSE;
+        }
+    } else if (
+        user_version == ATM_CONVERSATION_STORE_SCHEMA_V5_VERSION
+    ) {
+        if (!migrate_v5_to_v6 (store, error)) {
             atm_conversation_store_close (store);
             return FALSE;
         }
@@ -3865,8 +4228,8 @@ atm_conversation_store_attach_chart (
     if (!prepare_statement (
             store->db,
             "INSERT INTO message_charts("
-            "message_id,ordinal,chart_schema,chart_spec_id,chart_kind,reconstruction_profile"
-            ") VALUES(?1,?2,?3,?4,?5,?6);",
+            "message_id,ordinal,chart_schema,chart_spec_id,chart_kind,reconstruction_profile,presentation_schema"
+            ") VALUES(?1,?2,?3,?4,?5,?6,?7);",
             &statement,
             error
         )) {
@@ -3878,6 +4241,10 @@ atm_conversation_store_attach_chart (
     sqlite3_bind_text (statement, 4, chart->chart_spec_id, -1, SQLITE_TRANSIENT);
     sqlite3_bind_text (statement, 5, chart->chart_kind, -1, SQLITE_TRANSIENT);
     sqlite3_bind_text (statement, 6, chart->reconstruction_profile, -1, SQLITE_TRANSIENT);
+    if (chart->presentation != NULL)
+        sqlite3_bind_text (statement, 7, chart->presentation->presentation_schema, -1, SQLITE_TRANSIENT);
+    else
+        sqlite3_bind_null (statement, 7);
     if (!step_done (
             store->db,
             statement,
@@ -3921,7 +4288,79 @@ atm_conversation_store_attach_chart (
     sqlite3_finalize (statement);
     statement = NULL;
 
+    if (chart->presentation != NULL) {
+        const AtmConversationChartPresentationInput *p = chart->presentation;
+        if (!prepare_statement (
+                store->db,
+                "INSERT INTO chart_presentations_v4("
+                "message_id,chart_ordinal,presentation_schema,presentation_spec_id,series_id,"
+                "catalog_schema,adapter_id,series_profile_id,series_profile_version,"
+                "admission_profile_id,admission_profile_version,reconstruction_profile_id,"
+                "source_chart_schema,source_chart_spec_id,x_coordinate_semantics,x_frequency,"
+                "x_unit,x_dimension,subject,attribute,y_unit,y_dimension,series_semantics,"
+                "missing_policy,missing_coordinate,missing_reason,display_profile_id,"
+                "display_profile_version,render_contract"
+                ") VALUES("
+                "?1,?2,?3,?4,?5,?6,?7,?8,?9,?10,?11,?12,?13,?14,?15,?16,"
+                "?17,?18,?19,?20,?21,?22,?23,?24,?25,?26,?27,?28,?29);",
+                &statement,
+                error
+            )) {
+            goto out;
+        }
+
+        sqlite3_bind_text (statement, 1, message_id, -1, SQLITE_TRANSIENT);
+        sqlite3_bind_int (statement, 2, (int) chart->ordinal);
+        const char *values[] = {
+            p->presentation_schema,
+            p->presentation_spec_id,
+            p->series_id,
+            p->catalog_schema,
+            p->adapter_id,
+            p->series_profile_id,
+            p->series_profile_version,
+            p->admission_profile_id,
+            p->admission_profile_version,
+            p->reconstruction_profile_id,
+            p->source_chart_schema,
+            p->source_chart_spec_id,
+            p->x_coordinate_semantics,
+            p->x_frequency,
+            p->x_unit,
+            p->x_dimension,
+            p->subject,
+            p->attribute,
+            p->y_unit,
+            p->y_dimension,
+            p->series_semantics,
+            p->missing_policy,
+            p->missing_coordinate,
+            p->missing_reason,
+            p->display_profile_id,
+            p->display_profile_version,
+            p->render_contract
+        };
+        for (guint i = 0; i < G_N_ELEMENTS (values); i++) {
+            if (values[i] == NULL && (i == 22 || i == 23)) {
+                sqlite3_bind_null (statement, (int) i + 3);
+            } else {
+                sqlite3_bind_text (statement, (int) i + 3, values[i], -1, SQLITE_TRANSIENT);
+            }
+        }
+        if (!step_done (
+                store->db,
+                statement,
+                "Could not persist catalog-bound v4 chart presentation",
+                error
+            )) {
+            goto out;
+        }
+        sqlite3_finalize (statement);
+        statement = NULL;
+    }
+
     if (!validate_chart_semantics (store->db, error) ||
+        !validate_chart_presentation_semantics (store->db, error) ||
         !exec_sql (store->db, "COMMIT;", error)) {
         goto out;
     }
@@ -3983,6 +4422,60 @@ atm_conversation_store_attach_chart_values (
         &chart,
         error
     );
+}
+
+gboolean
+atm_conversation_store_attach_chart_v4_values (
+    AtmConversationStore *store,
+    const char *conversation_id,
+    gint64 turn_no,
+    guint ordinal,
+    const char *chart_schema,
+    const char *chart_spec_id,
+    const char *chart_kind,
+    const char *reconstruction_profile,
+    const char *series_profile,
+    const char *admission_profile,
+    const char *scientific_id,
+    const char *qualified_id,
+    const char *repository_id,
+    const char *repository_version,
+    const char *snapshot_sha,
+    const char *source_path,
+    const AtmConversationChartPresentationInput *presentation,
+    GError **error
+)
+{
+    if (presentation == NULL) {
+        g_set_error_literal (
+            error, ATM_CONVERSATION_STORE_ERROR,
+            ATM_CONVERSATION_STORE_ERROR_ARGUMENT,
+            "The v4 chart attachment API requires a presentation recipe."
+        );
+        return FALSE;
+    }
+    AtmConversationChartSeriesInput series = {
+        .series_profile = series_profile,
+        .admission_profile = admission_profile,
+        .scientific_id = scientific_id,
+        .qualified_id = qualified_id,
+        .repository_id = repository_id,
+        .repository_version = repository_version,
+        .snapshot_sha = snapshot_sha,
+        .source_path = source_path
+    };
+    AtmConversationChartInput chart = {
+        .ordinal = ordinal,
+        .chart_schema = chart_schema,
+        .chart_spec_id = chart_spec_id,
+        .chart_kind = chart_kind,
+        .reconstruction_profile = reconstruction_profile,
+        .series = &series,
+        .series_count = 1,
+        .presentation = presentation
+    };
+    return atm_conversation_store_attach_chart (
+        store, conversation_id, turn_no, &chart, error);
 }
 
 gboolean
@@ -4296,6 +4789,38 @@ snapshot_chart_free (
     g_free (chart->chart_spec_id);
     g_free (chart->chart_kind);
     g_free (chart->reconstruction_profile);
+    g_free (chart->presentation_schema);
+    if (chart->presentation != NULL) {
+        AtmConversationSnapshotChartPresentation *p = chart->presentation;
+        g_free (p->presentation_schema);
+        g_free (p->presentation_spec_id);
+        g_free (p->series_id);
+        g_free (p->catalog_schema);
+        g_free (p->adapter_id);
+        g_free (p->series_profile_id);
+        g_free (p->series_profile_version);
+        g_free (p->admission_profile_id);
+        g_free (p->admission_profile_version);
+        g_free (p->reconstruction_profile_id);
+        g_free (p->source_chart_schema);
+        g_free (p->source_chart_spec_id);
+        g_free (p->x_coordinate_semantics);
+        g_free (p->x_frequency);
+        g_free (p->x_unit);
+        g_free (p->x_dimension);
+        g_free (p->subject);
+        g_free (p->attribute);
+        g_free (p->y_unit);
+        g_free (p->y_dimension);
+        g_free (p->series_semantics);
+        g_free (p->missing_policy);
+        g_free (p->missing_coordinate);
+        g_free (p->missing_reason);
+        g_free (p->display_profile_id);
+        g_free (p->display_profile_version);
+        g_free (p->render_contract);
+        g_free (p);
+    }
     g_clear_pointer (&chart->series, g_ptr_array_unref);
     g_free (chart);
 }
@@ -5105,7 +5630,7 @@ atm_conversation_store_load_snapshot (
     if (!prepare_statement (
             store->db,
             "SELECT m.sequence_no,c.ordinal,c.chart_schema,c.chart_spec_id,"
-            "c.chart_kind,c.reconstruction_profile "
+            "c.chart_kind,c.reconstruction_profile,c.presentation_schema "
             "FROM message_charts c "
             "JOIN messages m ON m.message_id=c.message_id "
             "WHERE m.conversation_id=?1 "
@@ -5138,6 +5663,7 @@ atm_conversation_store_load_snapshot (
         chart->chart_spec_id = column_text_dup (statement, 3);
         chart->chart_kind = column_text_dup (statement, 4);
         chart->reconstruction_profile = column_text_dup (statement, 5);
+        chart->presentation_schema = column_text_dup_nullable (statement, 6);
         chart->series =
             g_ptr_array_new_with_free_func (snapshot_chart_series_free);
         g_ptr_array_add (message->charts, chart);
@@ -5213,6 +5739,91 @@ atm_conversation_store_load_snapshot (
     }
     sqlite3_finalize (statement);
     statement = NULL;
+
+    if (!prepare_statement (
+            store->db,
+            "SELECT m.sequence_no,p.chart_ordinal,p.presentation_schema,"
+            "p.presentation_spec_id,p.series_id,p.catalog_schema,p.adapter_id,"
+            "p.series_profile_id,p.series_profile_version,p.admission_profile_id,"
+            "p.admission_profile_version,p.reconstruction_profile_id,p.source_chart_schema,"
+            "p.source_chart_spec_id,p.x_coordinate_semantics,p.x_frequency,p.x_unit,"
+            "p.x_dimension,p.subject,p.attribute,p.y_unit,p.y_dimension,p.series_semantics,"
+            "p.missing_policy,p.missing_coordinate,p.missing_reason,p.display_profile_id,"
+            "p.display_profile_version,p.render_contract "
+            "FROM chart_presentations_v4 p "
+            "JOIN messages m ON m.message_id=p.message_id "
+            "WHERE m.conversation_id=?1 "
+            "ORDER BY m.sequence_no ASC,p.chart_ordinal ASC;",
+            &statement,
+            error
+        )) {
+        goto out;
+    }
+    sqlite3_bind_text (statement, 1, conversation_id, -1, SQLITE_TRANSIENT);
+
+    while ((rc = sqlite3_step (statement)) == SQLITE_ROW) {
+        gint64 sequence_no = sqlite3_column_int64 (statement, 0);
+        gint64 chart_ordinal = sqlite3_column_int64 (statement, 1);
+        AtmConversationSnapshotMessage *message =
+            snapshot_message_for_sequence (snapshot, sequence_no);
+        AtmConversationSnapshotChart *chart =
+            snapshot_chart_for_ordinal (message, chart_ordinal);
+        if (chart == NULL || chart->presentation != NULL) {
+            g_set_error_literal (
+                error,
+                ATM_CONVERSATION_STORE_ERROR,
+                ATM_CONVERSATION_STORE_ERROR_INTEGRITY,
+                "V4 presentation sidecar refers to a missing or duplicate chart."
+            );
+            goto out;
+        }
+
+        AtmConversationSnapshotChartPresentation *p =
+            g_new0 (AtmConversationSnapshotChartPresentation, 1);
+        p->presentation_schema = column_text_dup (statement, 2);
+        p->presentation_spec_id = column_text_dup (statement, 3);
+        p->series_id = column_text_dup (statement, 4);
+        p->catalog_schema = column_text_dup (statement, 5);
+        p->adapter_id = column_text_dup (statement, 6);
+        p->series_profile_id = column_text_dup (statement, 7);
+        p->series_profile_version = column_text_dup (statement, 8);
+        p->admission_profile_id = column_text_dup (statement, 9);
+        p->admission_profile_version = column_text_dup (statement, 10);
+        p->reconstruction_profile_id = column_text_dup (statement, 11);
+        p->source_chart_schema = column_text_dup (statement, 12);
+        p->source_chart_spec_id = column_text_dup (statement, 13);
+        p->x_coordinate_semantics = column_text_dup (statement, 14);
+        p->x_frequency = column_text_dup (statement, 15);
+        p->x_unit = column_text_dup (statement, 16);
+        p->x_dimension = column_text_dup (statement, 17);
+        p->subject = column_text_dup (statement, 18);
+        p->attribute = column_text_dup (statement, 19);
+        p->y_unit = column_text_dup (statement, 20);
+        p->y_dimension = column_text_dup (statement, 21);
+        p->series_semantics = column_text_dup (statement, 22);
+        p->missing_policy = column_text_dup (statement, 23);
+        p->missing_coordinate = column_text_dup_nullable (statement, 24);
+        p->missing_reason = column_text_dup_nullable (statement, 25);
+        p->display_profile_id = column_text_dup (statement, 26);
+        p->display_profile_version = column_text_dup (statement, 27);
+        p->render_contract = column_text_dup (statement, 28);
+        chart->presentation = p;
+    }
+    if (rc != SQLITE_DONE) {
+        set_sqlite_error (
+            store->db,
+            error,
+            ATM_CONVERSATION_STORE_ERROR_SQLITE,
+            "Could not read durable v4 chart presentation recipes"
+        );
+        goto out;
+    }
+    sqlite3_finalize (statement);
+    statement = NULL;
+
+    if (!validate_chart_presentation_semantics (store->db, error)) {
+        goto out;
+    }
 
     if (!exec_sql (
             store->db,
@@ -5699,8 +6310,137 @@ SNAPSHOT_CHART_TEXT_ACCESSOR (
     atm_conversation_snapshot_chart_reconstruction_profile_at,
     reconstruction_profile
 )
+SNAPSHOT_CHART_TEXT_ACCESSOR (
+    atm_conversation_snapshot_chart_presentation_schema_at,
+    presentation_schema
+)
 
 #undef SNAPSHOT_CHART_TEXT_ACCESSOR
+
+#define SNAPSHOT_CHART_PRESENTATION_TEXT_ACCESSOR(name, field) \
+const char * \
+name ( \
+    const AtmConversationSnapshot *snapshot, \
+    guint message_index, \
+    guint chart_index \
+) \
+{ \
+    AtmConversationSnapshotChart *chart = \
+        snapshot_chart_at (snapshot, message_index, chart_index); \
+    return chart != NULL && chart->presentation != NULL \
+        ? chart->presentation->field : NULL; \
+}
+
+SNAPSHOT_CHART_PRESENTATION_TEXT_ACCESSOR (
+    atm_conversation_snapshot_chart_presentation_sidecar_schema_at,
+    presentation_schema
+)
+SNAPSHOT_CHART_PRESENTATION_TEXT_ACCESSOR (
+    atm_conversation_snapshot_chart_presentation_spec_id_at,
+    presentation_spec_id
+)
+SNAPSHOT_CHART_PRESENTATION_TEXT_ACCESSOR (
+    atm_conversation_snapshot_chart_presentation_series_id_at,
+    series_id
+)
+SNAPSHOT_CHART_PRESENTATION_TEXT_ACCESSOR (
+    atm_conversation_snapshot_chart_presentation_catalog_schema_at,
+    catalog_schema
+)
+SNAPSHOT_CHART_PRESENTATION_TEXT_ACCESSOR (
+    atm_conversation_snapshot_chart_presentation_adapter_id_at,
+    adapter_id
+)
+SNAPSHOT_CHART_PRESENTATION_TEXT_ACCESSOR (
+    atm_conversation_snapshot_chart_presentation_series_profile_id_at,
+    series_profile_id
+)
+SNAPSHOT_CHART_PRESENTATION_TEXT_ACCESSOR (
+    atm_conversation_snapshot_chart_presentation_series_profile_version_at,
+    series_profile_version
+)
+SNAPSHOT_CHART_PRESENTATION_TEXT_ACCESSOR (
+    atm_conversation_snapshot_chart_presentation_admission_profile_id_at,
+    admission_profile_id
+)
+SNAPSHOT_CHART_PRESENTATION_TEXT_ACCESSOR (
+    atm_conversation_snapshot_chart_presentation_admission_profile_version_at,
+    admission_profile_version
+)
+SNAPSHOT_CHART_PRESENTATION_TEXT_ACCESSOR (
+    atm_conversation_snapshot_chart_presentation_reconstruction_profile_id_at,
+    reconstruction_profile_id
+)
+SNAPSHOT_CHART_PRESENTATION_TEXT_ACCESSOR (
+    atm_conversation_snapshot_chart_presentation_source_chart_schema_at,
+    source_chart_schema
+)
+SNAPSHOT_CHART_PRESENTATION_TEXT_ACCESSOR (
+    atm_conversation_snapshot_chart_presentation_source_chart_spec_id_at,
+    source_chart_spec_id
+)
+SNAPSHOT_CHART_PRESENTATION_TEXT_ACCESSOR (
+    atm_conversation_snapshot_chart_presentation_x_coordinate_semantics_at,
+    x_coordinate_semantics
+)
+SNAPSHOT_CHART_PRESENTATION_TEXT_ACCESSOR (
+    atm_conversation_snapshot_chart_presentation_x_frequency_at,
+    x_frequency
+)
+SNAPSHOT_CHART_PRESENTATION_TEXT_ACCESSOR (
+    atm_conversation_snapshot_chart_presentation_x_unit_at,
+    x_unit
+)
+SNAPSHOT_CHART_PRESENTATION_TEXT_ACCESSOR (
+    atm_conversation_snapshot_chart_presentation_x_dimension_at,
+    x_dimension
+)
+SNAPSHOT_CHART_PRESENTATION_TEXT_ACCESSOR (
+    atm_conversation_snapshot_chart_presentation_subject_at,
+    subject
+)
+SNAPSHOT_CHART_PRESENTATION_TEXT_ACCESSOR (
+    atm_conversation_snapshot_chart_presentation_attribute_at,
+    attribute
+)
+SNAPSHOT_CHART_PRESENTATION_TEXT_ACCESSOR (
+    atm_conversation_snapshot_chart_presentation_y_unit_at,
+    y_unit
+)
+SNAPSHOT_CHART_PRESENTATION_TEXT_ACCESSOR (
+    atm_conversation_snapshot_chart_presentation_y_dimension_at,
+    y_dimension
+)
+SNAPSHOT_CHART_PRESENTATION_TEXT_ACCESSOR (
+    atm_conversation_snapshot_chart_presentation_series_semantics_at,
+    series_semantics
+)
+SNAPSHOT_CHART_PRESENTATION_TEXT_ACCESSOR (
+    atm_conversation_snapshot_chart_presentation_missing_policy_at,
+    missing_policy
+)
+SNAPSHOT_CHART_PRESENTATION_TEXT_ACCESSOR (
+    atm_conversation_snapshot_chart_presentation_missing_coordinate_at,
+    missing_coordinate
+)
+SNAPSHOT_CHART_PRESENTATION_TEXT_ACCESSOR (
+    atm_conversation_snapshot_chart_presentation_missing_reason_at,
+    missing_reason
+)
+SNAPSHOT_CHART_PRESENTATION_TEXT_ACCESSOR (
+    atm_conversation_snapshot_chart_presentation_display_profile_id_at,
+    display_profile_id
+)
+SNAPSHOT_CHART_PRESENTATION_TEXT_ACCESSOR (
+    atm_conversation_snapshot_chart_presentation_display_profile_version_at,
+    display_profile_version
+)
+SNAPSHOT_CHART_PRESENTATION_TEXT_ACCESSOR (
+    atm_conversation_snapshot_chart_presentation_render_contract_at,
+    render_contract
+)
+
+#undef SNAPSHOT_CHART_PRESENTATION_TEXT_ACCESSOR
 
 guint
 atm_conversation_snapshot_chart_series_count_at (
