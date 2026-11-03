@@ -918,12 +918,13 @@ test_v4_render_rejects_same_source_projection_with_wrong_geometry (void)
         atm_chart_spec_v4_id (atm_chart_projection_v4_spec (
             wrong_geometry)), ==,
         atm_chart_spec_v4_id (atm_chart_render_v4_spec (render)));
-    g_assert_cmpfloat (
-        atm_chart_projection_width (foreign_projection), !=,
-        atm_chart_projection_width (render_projection));
-    g_assert_cmpfloat (
-        atm_chart_projection_height (foreign_projection), !=,
-        atm_chart_projection_height (render_projection));
+    g_assert_cmpuint (
+        atm_chart_projection_count (foreign_projection), ==,
+        atm_chart_projection_count (render_projection));
+    g_assert_false (_atm_chart_projection_geometry_matches (
+        foreign_projection, 732.0, 290.0));
+    g_assert_true (_atm_chart_projection_geometry_matches (
+        render_projection, 732.0, 290.0));
 
     /* Valid in isolation is insufficient: geometry is not interchangeable. */
     g_assert_false (_atm_chart_render_v4_test_validate_with_projection (
