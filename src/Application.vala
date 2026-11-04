@@ -3321,10 +3321,9 @@ namespace AskTheModel {
             for (uint i = 0; i < message.charts.length; i++) {
                 ConversationPersistenceChart chart = message.charts[i];
 
-                if (chart.ordinal != (int64) (i + 1) ||
-                    chart.series.length != 1) {
+                if (chart.series.length != 1) {
                     throw new GLib.IOError.INVALID_DATA (
-                        "Persisted chart attachment has invalid ordering or series cardinality."
+                        "Persisted chart attachment has invalid series cardinality."
                     );
                 }
 
@@ -5661,10 +5660,10 @@ namespace AskTheModel {
 
             /*
              * Chart ordinals are per assistant message. BNR remains ordinal 1;
-             * the sidecar-less legacy EI chart is ordinal 2 on turn_no 2.
+             * the sidecar-less legacy EI chart is ordinal 3 on turn_no 2, leaving a gap.
              */
             var legacy_ei = new ConversationPersistenceChart (
-                2, ei.chart_schema, ei.chart_spec_id, ei.chart_kind,
+                3, ei.chart_schema, ei.chart_spec_id, ei.chart_kind,
                 ei.reconstruction_profile, ei.series, null, null
             );
             try {
@@ -5687,7 +5686,7 @@ namespace AskTheModel {
                         chart.chart_schema == "atm-chart-spec/3") {
                         found_bnr_turn_primary = true;
                     }
-                    if (message.turn_no == 2 && chart.ordinal == 2 &&
+                    if (message.turn_no == 2 && chart.ordinal == 3 &&
                         chart.chart_schema == "atm-chart-spec/2" &&
                         chart.chart_spec_id == ei.chart_spec_id &&
                         chart.presentation_schema == null && chart.presentation == null &&
@@ -5702,7 +5701,7 @@ namespace AskTheModel {
             }
             if (persisted_chart_count != 4 || !found_bnr_turn_primary || !found_legacy_ei) {
                 pres09_test_failure =
-                    "Live persistence did not retain three v4 charts plus legacy EI at turn 2 ordinal 2";
+                    "Live persistence did not retain three v4 charts plus legacy EI at turn 2 ordinal 3 with a gap";
                 return false;
             }
 
@@ -5848,7 +5847,7 @@ namespace AskTheModel {
                         if (expect_legacy_migrated) {
                             if (chart.ordinal == 1) {
                                 ei = chart;
-                            } else if (chart.ordinal == 2 && message.turn_no == 2) {
+                            } else if (chart.ordinal == 3 && message.turn_no == 2) {
                                 ei_legacy = chart;
                                 legacy_ei_turn_no = message.turn_no;
                             }
@@ -5875,7 +5874,7 @@ namespace AskTheModel {
                 ei.series.length != 1 || ei_legacy.series.length != 1 ||
                 gistemp.series.length != 1 || bnr.series.length != 1 ||
                 ei.chart_spec_id != expected_ei_id ||
-                ei_legacy.ordinal != 2 || legacy_ei_turn_no != 2 ||
+                ei_legacy.ordinal != 3 || legacy_ei_turn_no != 2 ||
                 ei_legacy.chart_schema != "atm-chart-spec/2" ||
                 ei_legacy.chart_spec_id != expected_ei_id ||
                 ei_legacy.reconstruction_profile !=
