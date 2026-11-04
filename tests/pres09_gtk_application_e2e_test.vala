@@ -3,12 +3,33 @@ using Soup;
 
 namespace AskTheModel {
 
-private const string EI_SNAPSHOT_SHA =
+private const string EWD_INITIAL_SNAPSHOT_SHA =
+    "d9e249339663015f6d1c05752338a955bf64ad0b";
+private const string EWD_CURRENT_SNAPSHOT_SHA =
     "dc710d8e604c0fff713a3acfdb18ab47a1a902bb";
 private const string BNR_SNAPSHOT_SHA =
     "e43eb4e899f123d3b1aa0f6e20b7c8ed35434170";
 private const string TEST_MODEL = "test-model";
 private const string TEST_DIGEST = "test-digest";
+
+[CCode (cname = "atm_pres09_tamper_first_persistent_v4_sidecar", cheader_filename = "pres09_sidecar_tamper.h")]
+private static extern bool atm_pres09_tamper_first_persistent_v4_sidecar (
+    string database_path,
+    string conversation_id
+) throws GLib.Error;
+
+[CCode (cname = "atm_pres09_create_v5_legacy_history_fixture", cheader_filename = "pres09_sidecar_tamper.h")]
+private static extern bool atm_pres09_create_v5_legacy_history_fixture (
+    string source_database_path,
+    string target_database_path,
+    string conversation_id
+) throws GLib.Error;
+
+[CCode (cname = "atm_pres09_verify_migrated_v5_legacy_history", cheader_filename = "pres09_sidecar_tamper.h")]
+private static extern bool atm_pres09_verify_migrated_v5_legacy_history (
+    string database_path,
+    string conversation_id
+) throws GLib.Error;
 
 private static void write_json_response (
     Soup.ServerMessage message,
@@ -206,8 +227,10 @@ private static int run_child_phase (
     }
 }
 
-private static int run_orchestrator (
-    string raw_executable_path
+private static int run_snapshot_scenario (
+    string raw_executable_path,
+    string ewd_snapshot_sha,
+    string? full_ewd_root_override
 ) {
     string executable_path = raw_executable_path;
     if (!GLib.Path.is_absolute (executable_path)) {
@@ -250,7 +273,7 @@ private static int run_orchestrator (
         "Repositories",
         "ewd",
         "snapshots",
-        EI_SNAPSHOT_SHA
+        ewd_snapshot_sha
     );
     string bnr_snapshot_root = GLib.Path.build_filename (
         data_root,
@@ -263,10 +286,27 @@ private static int run_orchestrator (
         state,
         "control-state.sqlite3"
     );
+    string conversation_db = GLib.Path.build_filename (
+        state,
+        "conversations.sqlite3"
+    );
+    string migrated_state = GLib.Path.build_filename (root, "state-v5-migration");
+    string migrated_control_db = GLib.Path.build_filename (
+        migrated_state,
+        "control-state.sqlite3"
+    );
+    string migrated_conversation_db = GLib.Path.build_filename (
+        migrated_state,
+        "conversations.sqlite3"
+    );
     string flatpak_info = GLib.Path.build_filename (
         root,
         "flatpak-info"
     );
+    string seal = "";
+    string bnr_seal = "";
+    int64 generation_id = 0;
+    int64 rmd_generation_id = 0;
 
     try {
         File.new_for_path (home).make_directory_with_parents (null);
@@ -274,8 +314,7 @@ private static int run_orchestrator (
         File.new_for_path (cache).make_directory_with_parents (null);
         File.new_for_path (config).make_directory_with_parents (null);
 
-        string? full_ewd_root =
-            Environment.get_variable ("ATM_PRES09_FULL_EWD_ROOT");
+        string? full_ewd_root = full_ewd_root_override;
         string source_snapshot;
         if (full_ewd_root != null &&
             full_ewd_root.strip ().length > 0) {
@@ -288,7 +327,9 @@ private static int run_orchestrator (
         } else {
             source_snapshot = GLib.Path.build_filename (
                 fixture_env,
-                "ewd-current"
+                ewd_snapshot_sha == EWD_INITIAL_SNAPSHOT_SHA
+                    ? "ewd"
+                    : "ewd-current"
             );
         }
         copy_tree (
@@ -296,10 +337,28 @@ private static int run_orchestrator (
             File.new_for_path (snapshot_root)
         );
 
+        bool overlay_applied = false;
+        if (!RepositoryNative.apply_builtin_compatibility_overlay (
+                snapshot_root,
+                "ewd",
+                ewd_snapshot_sha,
+                out overlay_applied
+            )) {
+            stderr.printf ("PRES-09 could not apply the SHA-bound EWD metadata contract.\n");
+            remove_tree_best_effort (File.new_for_path (root));
+            return 1;
+        }
+        if ((ewd_snapshot_sha == EWD_INITIAL_SNAPSHOT_SHA && !overlay_applied) ||
+            (ewd_snapshot_sha == EWD_CURRENT_SNAPSHOT_SHA && overlay_applied)) {
+            stderr.printf ("PRES-09 EWD metadata overlay admission did not match the exact snapshot pin.\n");
+            remove_tree_best_effort (File.new_for_path (root));
+            return 1;
+        }
+
         string? full_rmd_root =
             Environment.get_variable ("ATM_PRES09_FULL_RMD_ROOT");
         if (full_rmd_root == null || full_rmd_root.strip ().length == 0) {
-            stderr.printf ("ATM_PRES09_FULL_RMD_ROOT is required for the BNR C01 application E2E.\\n");
+            stderr.printf ("ATM_PRES09_FULL_RMD_ROOT is required for the BNR C01 application E2E.\n");
             remove_tree_best_effort (File.new_for_path (root));
             return 1;
         }
@@ -332,7 +391,6 @@ private static int run_orchestrator (
             "runtime-extensions=org.example.Runtime=%s;\n".printf (runtime_extension_commit);
         FileUtils.set_contents (flatpak_info, flatpak_text);
 
-        string seal;
         uint64 file_count;
         uint64 total_bytes;
         if (!RepositoryNative.compute_snapshot_seal (
@@ -341,11 +399,10 @@ private static int run_orchestrator (
                 out file_count,
                 out total_bytes
             )) {
-            stderr.printf ("PRES-09 could not compute fixture EWD snapshot seal.\\n");
+            stderr.printf ("PRES-09 could not compute fixture EWD snapshot seal.\n");
             remove_tree_best_effort (File.new_for_path (root));
             return 1;
         }
-        string bnr_seal;
         uint64 bnr_file_count;
         uint64 bnr_total_bytes;
         if (!RepositoryNative.compute_snapshot_seal (
@@ -354,7 +411,7 @@ private static int run_orchestrator (
                 out bnr_file_count,
                 out bnr_total_bytes
             )) {
-            stderr.printf ("PRES-09 could not compute fixture RMD snapshot seal.\\n");
+            stderr.printf ("PRES-09 could not compute fixture RMD snapshot seal.\n");
             remove_tree_best_effort (File.new_for_path (root));
             return 1;
         }
@@ -364,27 +421,25 @@ private static int run_orchestrator (
                 state_db,
                 out control_store
             ) || control_store == null) {
-            stderr.printf ("PRES-09 could not initialize the isolated Control DB schema.\\n");
+            stderr.printf ("PRES-09 could not initialize the isolated Control DB schema.\n");
             remove_tree_best_effort (File.new_for_path (root));
             return 1;
         }
         ControlStateNative.close_for_test (control_store);
 
-        int64 generation_id = 0;
         if (!ControlStateNative.set_current_values_guarded (
                 state_db,
                 0,
                 "ewd",
-                EI_SNAPSHOT_SHA,
+                ewd_snapshot_sha,
                 "0.1.0",
                 seal,
                 out generation_id
             ) || generation_id <= 0) {
-            stderr.printf ("PRES-09 could not seed the pinned EWD Control DB generation.\\n");
+            stderr.printf ("PRES-09 could not seed the pinned EWD Control DB generation.\n");
             remove_tree_best_effort (File.new_for_path (root));
             return 1;
         }
-        int64 rmd_generation_id = 0;
         if (!ControlStateNative.set_current_values_guarded (
                 state_db,
                 generation_id,
@@ -394,7 +449,7 @@ private static int run_orchestrator (
                 bnr_seal,
                 out rmd_generation_id
             ) || rmd_generation_id <= generation_id) {
-            stderr.printf ("PRES-09 could not seed the pinned RMD Control DB generation.\\n");
+            stderr.printf ("PRES-09 could not seed the pinned RMD Control DB generation.\n");
             remove_tree_best_effort (File.new_for_path (root));
             return 1;
         }
@@ -407,6 +462,11 @@ private static int run_orchestrator (
         return 1;
     }
 
+    Environment.set_variable (
+        "ATM_PRES09_EWD_SNAPSHOT_SHA",
+        ewd_snapshot_sha,
+        true
+    );
     Environment.set_variable ("HOME", home, true);
     Environment.set_variable ("XDG_STATE_HOME", state, true);
     Environment.set_variable ("XDG_CACHE_HOME", cache, true);
@@ -429,11 +489,140 @@ private static int run_orchestrator (
         "intent-rejection",
         "live",
         "history",
+        "history-migrated-v5",
+        "history-tampered-sidecar",
         "history-invalid"
     };
 
     foreach (string phase in phases) {
-        if (run_child_phase (executable_path, phase) != 0) {
+        if (phase == "history-tampered-sidecar") {
+            string conversation_id;
+            size_t conversation_id_length;
+            string conversation_id_path = GLib.Path.build_filename (
+                home,
+                "pres09-conversation-id"
+            );
+            try {
+                if (!GLib.FileUtils.get_contents (
+                        conversation_id_path,
+                        out conversation_id,
+                        out conversation_id_length
+                    )) {
+                    throw new GLib.IOError.FAILED (
+                        "Could not read the archived conversation id before persistent sidecar tampering."
+                    );
+                }
+                conversation_id = conversation_id.strip ();
+                if (conversation_id.length == 0 ||
+                    !atm_pres09_tamper_first_persistent_v4_sidecar (
+                        conversation_db,
+                        conversation_id
+                    )) {
+                    throw new GLib.IOError.FAILED (
+                        "Could not persistently tamper with exactly one v4 presentation sidecar."
+                    );
+                }
+            } catch (GLib.Error error) {
+                stderr.printf (
+                    "PRES-09 persistent sidecar tamper setup failed: %s\n",
+                    error.message
+                );
+                return 1;
+            }
+            stdout.printf (
+                "PRES09-GTK: tampered one persisted EI v4 presentation_spec_id in %s\n",
+                conversation_db
+            );
+        }
+
+        bool migrated_v5_phase = phase == "history-migrated-v5";
+        string migrated_conversation_id = "";
+        if (migrated_v5_phase) {
+            string conversation_id_path = GLib.Path.build_filename (
+                home,
+                "pres09-conversation-id"
+            );
+            try {
+                size_t conversation_id_length;
+                if (!GLib.FileUtils.get_contents (
+                        conversation_id_path,
+                        out migrated_conversation_id,
+                        out conversation_id_length
+                    )) {
+                    throw new GLib.IOError.FAILED (
+                        "Could not read the live archived conversation id for v5 migration."
+                    );
+                }
+                migrated_conversation_id = migrated_conversation_id.strip ();
+                if (migrated_conversation_id.length == 0) {
+                    throw new GLib.IOError.INVALID_DATA (
+                        "The live archived conversation id is empty."
+                    );
+                }
+                File.new_for_path (migrated_state).make_directory_with_parents (null);
+                void* migrated_control_store = null;
+                if (!ControlStateNative.open_for_test (
+                        migrated_control_db,
+                        out migrated_control_store
+                    ) || migrated_control_store == null) {
+                    throw new GLib.IOError.FAILED (
+                        "Could not initialize the isolated migrated-History Control DB."
+                    );
+                }
+                ControlStateNative.close_for_test (migrated_control_store);
+
+                int64 migrated_generation_id = 0;
+                if (!ControlStateNative.set_current_values_guarded (
+                        migrated_control_db,
+                        0,
+                        "ewd",
+                        ewd_snapshot_sha,
+                        "0.1.0",
+                        seal,
+                        out migrated_generation_id
+                    ) || migrated_generation_id != generation_id) {
+                    throw new GLib.IOError.FAILED (
+                        "Migrated-History Control DB did not reproduce the EWD generation identity."
+                    );
+                }
+                int64 migrated_rmd_generation_id = 0;
+                if (!ControlStateNative.set_current_values_guarded (
+                        migrated_control_db,
+                        migrated_generation_id,
+                        "rmd",
+                        BNR_SNAPSHOT_SHA,
+                        "0.3.0",
+                        bnr_seal,
+                        out migrated_rmd_generation_id
+                    ) || migrated_rmd_generation_id != rmd_generation_id) {
+                    throw new GLib.IOError.FAILED (
+                        "Migrated-History Control DB did not reproduce the RMD generation identity."
+                    );
+                }
+                if (!atm_pres09_create_v5_legacy_history_fixture (
+                        conversation_db,
+                        migrated_conversation_db,
+                        migrated_conversation_id
+                    )) {
+                    throw new GLib.IOError.FAILED (
+                        "Could not build a populated v5 store from the exact live History recipes."
+                    );
+                }
+            } catch (GLib.Error error) {
+                stderr.printf (
+                    "PRES-09 populated v5 fixture setup failed: %s\n",
+                    error.message
+                );
+                return 1;
+            }
+            Environment.set_variable ("XDG_STATE_HOME", migrated_state, true);
+        }
+
+        int phase_status = run_child_phase (executable_path, phase);
+        if (migrated_v5_phase) {
+            Environment.set_variable ("XDG_STATE_HOME", state, true);
+        }
+        if (phase_status != 0) {
             stderr.printf (
                 "PRES09 GTK Application E2E stopped at phase '%s'; fixture retained at %s\n",
                 phase,
@@ -441,11 +630,62 @@ private static int run_orchestrator (
             );
             return 1;
         }
+        if (migrated_v5_phase) {
+            try {
+                if (!atm_pres09_verify_migrated_v5_legacy_history (
+                        migrated_conversation_db,
+                        migrated_conversation_id
+                    )) {
+                    throw new GLib.IOError.FAILED (
+                        "The application did not preserve the four legacy recipes in a valid migrated v6 store."
+                    );
+                }
+            } catch (GLib.Error error) {
+                stderr.printf (
+                    "PRES-09 migrated v5 History verification failed: %s\n",
+                    error.message
+                );
+                return 1;
+            }
+            stdout.printf (
+                "PRES09-GTK: fresh process migrated populated v5 store to v6 and reconstructed four legacy charts without sidecars\n"
+            );
+        }
     }
 
     remove_tree_best_effort (File.new_for_path (root));
     stdout.printf (
-        "PASS: PRES-09 drove real GTK live chart requests, Archive, process relaunch, History reconstruction and fail-closed tampered-source behavior.\n"
+        "PASS: PRES-09 completed live/Archive/process-relaunch History and fail-closed EWD/RMD source checks for EWD pin %s.\n",
+        ewd_snapshot_sha
+    );
+    return 0;
+}
+
+private static int run_orchestrator (
+    string raw_executable_path
+) {
+    string? initial_root =
+        Environment.get_variable ("ATM_PRES09_FULL_EWD_INITIAL_ROOT");
+    string? current_root =
+        Environment.get_variable ("ATM_PRES09_FULL_EWD_ROOT");
+
+    if (run_snapshot_scenario (
+            raw_executable_path,
+            EWD_INITIAL_SNAPSHOT_SHA,
+            initial_root
+        ) != 0) {
+        return 1;
+    }
+    if (run_snapshot_scenario (
+            raw_executable_path,
+            EWD_CURRENT_SNAPSHOT_SHA,
+            current_root
+        ) != 0) {
+        return 1;
+    }
+
+    stdout.printf (
+        "PASS: PRES-09 completed the full application persistence matrix for both admitted EWD pins plus the exact RMD BNR C01 pin.\n"
     );
     return 0;
 }
@@ -495,13 +735,23 @@ private static int run_application_phase (
             return 1;
         }
 
+        string? ewd_sha = Environment.get_variable (
+            "ATM_PRES09_EWD_SNAPSHOT_SHA"
+        );
+        if (ewd_sha == null ||
+            (ewd_sha != EWD_INITIAL_SNAPSHOT_SHA &&
+             ewd_sha != EWD_CURRENT_SNAPSHOT_SHA)) {
+            stderr.printf ("PRES-09 EWD snapshot SHA is missing or not admitted.\n");
+            server.disconnect ();
+            return 1;
+        }
         string manifest = GLib.Path.build_filename (
             home,
             "Ask the Model",
             "Repositories",
             "ewd",
             "snapshots",
-            EI_SNAPSHOT_SHA,
+            ewd_sha,
             "science",
             "data",
             "input_manifest.json"

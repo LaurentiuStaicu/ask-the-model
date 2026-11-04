@@ -29,6 +29,8 @@ gboolean atm_chart_projection_validate (const AtmChartProjection *projection, GE
 void atm_chart_projection_free (AtmChartProjection *projection);
 /* Borrowed read-only; invalid index -> NULL. */
 const AtmChartSpec *atm_chart_projection_spec (const AtmChartProjection *projection);
+/* Internal renderer invariant; deliberately not part of the public geometry API. */
+G_GNUC_INTERNAL gboolean _atm_chart_projection_geometry_matches (const AtmChartProjection *projection, double width, double height);
 /* Exact versioned display policy selected for this immutable projection. */
 const char *atm_chart_projection_policy (const AtmChartProjection *projection);
 const AtmChartDisplayDomain *atm_chart_projection_domain (const AtmChartProjection *projection);

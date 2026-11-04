@@ -1,6 +1,7 @@
 #include "chart_render_v4.h"
 
 #include "scientific_canonical.h"
+#include "chart_projection.h"
 
 #include <json-glib/json-glib.h>
 #include <math.h>
@@ -641,6 +642,24 @@ atm_chart_render_v4_validate (const AtmChartRenderV4 *render,
                 "A non-fallback render requires a validated v4 projection.");
         if (!atm_chart_projection_v4_validate (render->projection, error))
             return FALSE;
+        const AtmChartSpecV4 *projection_spec =
+            atm_chart_projection_v4_spec (render->projection);
+        const AtmChartSpec *render_source_spec =
+            atm_chart_spec_v4_source_spec (render->owned_spec);
+        const AtmChartSpec *projection_source_spec =
+            projection_spec != NULL
+                ? atm_chart_spec_v4_source_spec (projection_spec) : NULL;
+        gboolean specification_identity_matches =
+            projection_spec != NULL &&
+            render_source_spec != NULL &&
+            projection_source_spec != NULL &&
+            g_strcmp0 (
+                atm_chart_spec_v4_id (render->owned_spec),
+                atm_chart_spec_v4_id (projection_spec)) == 0 &&
+            g_strcmp0 (
+                atm_chart_spec_id (render_source_spec),
+                atm_chart_spec_id (projection_source_spec)) == 0;
+
         const AtmChartCatalogEntry *entry =
             atm_chart_spec_v4_catalog_entry (render->owned_spec);
         char *expected_policy = entry != NULL
@@ -648,6 +667,7 @@ atm_chart_render_v4_validate (const AtmChartRenderV4 *render,
                                entry->display_profile_version)
             : NULL;
         gboolean projection_identity_matches =
+            specification_identity_matches &&
             entry != NULL &&
             g_strcmp0 (atm_chart_projection_v4_series_id (render->projection),
                        atm_chart_spec_v4_series_id (render->owned_spec)) == 0 &&
@@ -659,9 +679,15 @@ atm_chart_render_v4_validate (const AtmChartRenderV4 *render,
             atm_chart_projection_v4_numeric_observation_count (render->projection) ==
                 atm_chart_spec_v4_numeric_observation_count (render->owned_spec);
         g_free (expected_policy);
-        if (!projection_identity_matches)
+        const AtmChartProjection *source_projection =
+            atm_chart_projection_v4_source_projection (render->projection);
+        gboolean geometry_matches =
+            _atm_chart_projection_geometry_matches (
+                source_projection, (double) render->width - 128.0,
+                (double) render->height - 210.0);
+        if (!projection_identity_matches || !geometry_matches)
             return reject (error, ATM_CHART_RENDER_V4_ERROR_PROJECTION,
-                "The rendered v4 projection differs from catalog identity or coverage.");
+                "The rendered v4 projection differs from catalog identity, specification identity, coverage or expected plot geometry.");
     }
 
     char *expected_id = NULL;
@@ -672,6 +698,25 @@ atm_chart_render_v4_validate (const AtmChartRenderV4 *render,
     return matches || reject (error, ATM_CHART_RENDER_V4_ERROR_IDENTITY,
         "Render v4 identity differs from reconstructed spec, viewport and display policy.");
 }
+
+#ifdef ATM_CHART_RENDER_V4_TESTING
+G_GNUC_INTERNAL gboolean
+_atm_chart_render_v4_test_validate_with_projection (
+    const AtmChartRenderV4 *render,
+    const AtmChartProjectionV4 *projection,
+    GError **error)
+{
+    if (render == NULL)
+        return atm_chart_render_v4_validate (render, error);
+
+    AtmChartRenderV4 *mutable_render = (AtmChartRenderV4 *) render;
+    AtmChartProjectionV4 *saved_projection = mutable_render->projection;
+    mutable_render->projection = (AtmChartProjectionV4 *) projection;
+    gboolean valid = atm_chart_render_v4_validate (render, error);
+    mutable_render->projection = saved_projection;
+    return valid;
+}
+#endif
 
 gboolean
 atm_chart_render_v4_new (const AtmChartSpecV4 *spec,

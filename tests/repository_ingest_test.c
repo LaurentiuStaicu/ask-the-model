@@ -64,29 +64,12 @@ new_temp_root (void)
 }
 
 static void
-write_archive (
+write_archive_entries (
     const char *archive_path,
-    const char *manifest
+    const FixtureEntry *entries,
+    gsize entry_count
 )
 {
-    const FixtureEntry entries[] = {
-        { "repo-sha/", NULL, AE_IFDIR },
-        { "repo-sha/.atm/", NULL, AE_IFDIR },
-        { "repo-sha/.atm/repository.json", manifest, AE_IFREG },
-        {
-            "repo-sha/CITATION.cff",
-            "cff-version: 1.2.0\n"
-            "message: cite this\n"
-            "type: software\n"
-            "title: Test repository\n"
-            "version: 0.1.0\n",
-            AE_IFREG
-        },
-        { "repo-sha/STATUS.md", "# Status\n", AE_IFREG },
-        { "repo-sha/README.md", "# Readme\n", AE_IFREG },
-        { "repo-sha/model/", NULL, AE_IFDIR },
-        { "repo-sha/model/core.json", "{}\n", AE_IFREG }
-    };
     struct archive *writer = archive_write_new ();
 
     g_assert_nonnull (writer);
@@ -106,7 +89,7 @@ write_archive (
         ARCHIVE_OK
     );
 
-    for (gsize i = 0; i < G_N_ELEMENTS (entries); i++) {
+    for (gsize i = 0; i < entry_count; i++) {
         const FixtureEntry *fixture = &entries[i];
         struct archive_entry *entry = archive_entry_new ();
         gsize length =
@@ -153,6 +136,37 @@ write_archive (
         archive_write_free (writer),
         ==,
         ARCHIVE_OK
+    );
+}
+
+static void
+write_archive (
+    const char *archive_path,
+    const char *manifest
+)
+{
+    const FixtureEntry entries[] = {
+        { "repo-sha/", NULL, AE_IFDIR },
+        { "repo-sha/.atm/", NULL, AE_IFDIR },
+        { "repo-sha/.atm/repository.json", manifest, AE_IFREG },
+        {
+            "repo-sha/CITATION.cff",
+            "cff-version: 1.2.0\n"
+            "message: cite this\n"
+            "type: software\n"
+            "title: Test repository\n"
+            "version: 0.1.0\n",
+            AE_IFREG
+        },
+        { "repo-sha/STATUS.md", "# Status\n", AE_IFREG },
+        { "repo-sha/README.md", "# Readme\n", AE_IFREG },
+        { "repo-sha/model/", NULL, AE_IFDIR },
+        { "repo-sha/model/core.json", "{}\n", AE_IFREG }
+    };
+    write_archive_entries (
+        archive_path,
+        entries,
+        G_N_ELEMENTS (entries)
     );
 }
 
@@ -859,6 +873,260 @@ test_async_ingest_cancelled (void)
     g_free (root);
 }
 
+
+static void
+test_builtin_compatibility_overlay_is_sha_bound_and_sealed (void)
+{
+    const char *historical_sha =
+        "d9e249339663015f6d1c05752338a955bf64ad0b";
+    const char *other_sha =
+        "1111111111111111111111111111111111111111";
+    char *root = new_temp_root ();
+    char *historical_root = g_build_filename (root, historical_sha, NULL);
+    char *other_root = g_build_filename (root, other_sha, NULL);
+    GError *error = NULL;
+    gboolean applied = FALSE;
+    char *manifest_path = NULL;
+    char *receipt_path = NULL;
+    char *manifest = NULL;
+    char *receipt = NULL;
+    gsize manifest_length = 0;
+    gsize receipt_length = 0;
+    char *seal_before = NULL;
+    char *seal_after = NULL;
+    guint64 file_count = 0;
+    guint64 total_bytes = 0;
+    guint64 ignored_files = 0;
+    guint64 ignored_bytes = 0;
+
+    g_assert_cmpint (g_mkdir (historical_root, 0700), ==, 0);
+    g_assert_true (atm_repository_apply_builtin_compatibility_overlay (
+        historical_root, "ewd", historical_sha, &applied, &error));
+    g_assert_no_error (error);
+    g_assert_true (applied);
+
+    manifest_path = g_build_filename (
+        historical_root, ".atm", "repository.json", NULL);
+    receipt_path = g_build_filename (
+        historical_root, ".atm", "compatibility-overlay.json", NULL);
+    g_assert_true (g_file_get_contents (
+        manifest_path, &manifest, &manifest_length, &error));
+    g_assert_no_error (error);
+    g_assert_true (g_file_get_contents (
+        receipt_path, &receipt, &receipt_length, &error));
+    g_assert_no_error (error);
+    g_assert_nonnull (strstr (manifest, "\"repository_id\": \"ewd\""));
+    g_assert_nonnull (strstr (receipt, "atm-ewd-d9e249-manifest-overlay/1"));
+    g_assert_nonnull (strstr (receipt, historical_sha));
+    g_assert_nonnull (strstr (receipt, "absent from the upstream commit"));
+    char *manifest_hash = g_compute_checksum_for_data (
+        G_CHECKSUM_SHA256,
+        (const guchar *) manifest,
+        manifest_length
+    );
+    g_assert_nonnull (strstr (receipt, manifest_hash));
+
+    g_assert_true (atm_snapshot_seal_compute (
+        historical_root, &seal_before, &file_count, &total_bytes, &error));
+    g_assert_no_error (error);
+    g_assert_cmpuint (file_count, ==, 2);
+    g_assert_cmpuint (total_bytes, >, 0);
+
+    /* A second call must not rewrite, replace, or "repair" the overlay. */
+    applied = TRUE;
+    g_assert_true (atm_repository_apply_builtin_compatibility_overlay (
+        historical_root, "ewd", historical_sha, &applied, &error));
+    g_assert_no_error (error);
+    g_assert_false (applied);
+    g_assert_true (atm_snapshot_seal_compute (
+        historical_root, &seal_after, &ignored_files, &ignored_bytes, &error));
+    g_assert_no_error (error);
+    g_assert_cmpstr (seal_before, ==, seal_after);
+
+    g_assert_cmpint (g_mkdir (other_root, 0700), ==, 0);
+    applied = TRUE;
+    g_assert_true (atm_repository_apply_builtin_compatibility_overlay (
+        other_root, "ewd", other_sha, &applied, &error));
+    g_assert_no_error (error);
+    g_assert_false (applied);
+    char *other_atm = g_build_filename (other_root, ".atm", NULL);
+    g_assert_false (g_file_test (other_atm, G_FILE_TEST_EXISTS));
+
+    /* The same historical SHA cannot activate the overlay for another repo. */
+    applied = TRUE;
+    g_assert_true (atm_repository_apply_builtin_compatibility_overlay (
+        other_root, "cbd", historical_sha, &applied, &error));
+    g_assert_no_error (error);
+    g_assert_false (applied);
+    g_assert_false (g_file_test (other_atm, G_FILE_TEST_EXISTS));
+
+    /* Existing partial .atm state must fail closed rather than be overlaid. */
+    char *partial_parent = g_build_filename (root, "partial", NULL);
+    char *partial_root = g_build_filename (
+        partial_parent, historical_sha, NULL);
+    char *partial_atm = g_build_filename (partial_root, ".atm", NULL);
+    g_assert_cmpint (g_mkdir_with_parents (partial_atm, 0700), ==, 0);
+    applied = TRUE;
+    g_assert_true (atm_repository_apply_builtin_compatibility_overlay (
+        partial_root, "ewd", historical_sha, &applied, &error));
+    g_assert_no_error (error);
+    g_assert_false (applied);
+    char *partial_manifest = g_build_filename (
+        partial_atm, "repository.json", NULL);
+    g_assert_false (g_file_test (partial_manifest, G_FILE_TEST_EXISTS));
+
+    g_free (partial_manifest);
+    g_free (partial_atm);
+    g_free (partial_root);
+    g_free (partial_parent);
+    g_free (other_atm);
+    g_free (manifest_hash);
+    g_free (seal_after);
+    g_free (seal_before);
+    g_free (receipt);
+    g_free (manifest);
+    g_free (receipt_path);
+    g_free (manifest_path);
+    g_free (other_root);
+    g_free (historical_root);
+    remove_tree_best_effort (root);
+    g_free (root);
+}
+
+static void
+test_historical_ewd_overlay_is_applied_by_ingest (void)
+{
+    const char *historical_sha =
+        "d9e249339663015f6d1c05752338a955bf64ad0b";
+    const FixtureEntry entries[] = {
+        { "repo-sha/", NULL, AE_IFDIR },
+        { "repo-sha/CITATION.cff",
+          "cff-version: 1.2.0\nmessage: cite this\ntype: software\n"
+          "title: Empirical World3 Dynamics\nversion: 0.1.0\n",
+          AE_IFREG },
+        { "repo-sha/STATUS.md", "# Historical EWD status\n", AE_IFREG },
+        { "repo-sha/README.md", "# Historical EWD\n", AE_IFREG },
+        { "repo-sha/science/", NULL, AE_IFDIR },
+        { "repo-sha/science/configs/", NULL, AE_IFDIR },
+        { "repo-sha/science/configs/real_model_structure.json", "{}\n", AE_IFREG },
+        { "repo-sha/science/data/", NULL, AE_IFDIR },
+        { "repo-sha/science/data/registry.csv", "id\n", AE_IFREG },
+        { "repo-sha/science/data/processed/", NULL, AE_IFDIR },
+        { "repo-sha/science/data/experiments/", NULL, AE_IFDIR },
+        { "repo-sha/science/data/forecasts/", NULL, AE_IFDIR },
+        { "repo-sha/science/data/raw/", NULL, AE_IFDIR },
+        { "repo-sha/science/data/raw/source.csv", "raw source\n", AE_IFREG },
+        { "repo-sha/science/vendor/", NULL, AE_IFDIR },
+        { "repo-sha/science/vendor/library.py", "# vendored code\n", AE_IFREG },
+        { "repo-sha/science/src/", NULL, AE_IFDIR },
+        { "repo-sha/science/src/world3_empirical/", NULL, AE_IFDIR },
+        { "repo-sha/science/src/world3_empirical/real_model_contract.py", "# fixture\n", AE_IFREG },
+        { "repo-sha/science/src/world3_empirical/model.py", "# fixture\n", AE_IFREG },
+        { "repo-sha/science/src/world3_empirical/world3_03.py", "# fixture\n", AE_IFREG },
+        { "repo-sha/science/scripts/", NULL, AE_IFDIR },
+        { "repo-sha/data/", NULL, AE_IFDIR },
+        { "repo-sha/data/scenarios/", NULL, AE_IFDIR },
+        { "repo-sha/data/scenarios/bau_hybrid_2026_manifest.json", "{}\n", AE_IFREG },
+        { "repo-sha/data/scenarios/fit_diagnostics.csv", "id\n", AE_IFREG },
+        { "repo-sha/data/scenarios/backtest_2019_latest.csv", "id\n", AE_IFREG },
+        { "repo-sha/data/scenarios/backtest_multi_origin.csv", "id\n", AE_IFREG },
+        { "repo-sha/data/scenarios/parameter_identifiability.csv", "id\n", AE_IFREG },
+        { "repo-sha/data/scenarios/candidate_ranking.csv", "id\n", AE_IFREG },
+        { "repo-sha/data/scenarios/validation_candidate_ranking.csv", "id\n", AE_IFREG }
+    };
+
+    char *root = new_temp_root ();
+    char *data_root = g_build_filename (root, "data", NULL);
+    char *archive_path = g_build_filename (
+        root, "historical-ewd-without-atm.tar.gz", NULL);
+    char *version = NULL;
+    char *snapshot_path = NULL;
+    char *manifest_path = NULL;
+    char *receipt_path = NULL;
+    char *manifest = NULL;
+    char *receipt = NULL;
+    char *seal = NULL;
+    guint64 entries_written = 0;
+    guint64 total_bytes = 0;
+    guint64 sealed_files = 0;
+    guint64 sealed_bytes = 0;
+    GError *error = NULL;
+    gsize manifest_length = 0;
+    gsize receipt_length = 0;
+
+    guint64 source_file_entries = 0;
+    for (gsize i = 0; i < G_N_ELEMENTS (entries); i++) {
+        if (entries[i].filetype == AE_IFREG) {
+            source_file_entries++;
+        }
+    }
+
+    /* This synthetic archive deliberately has no upstream .atm directory.
+     * It exercises the production ingest seam; the separate PRES-09 E2E
+     * uses the complete upstream tree for the same exact historical pin. */
+    write_archive_entries (
+        archive_path,
+        entries,
+        G_N_ELEMENTS (entries)
+    );
+
+    g_assert_true (atm_repository_ingest_archive (
+        data_root,
+        archive_path,
+        "ewd",
+        "EWD",
+        "Empirical World3 Dynamics",
+        historical_sha,
+        &version,
+        &snapshot_path,
+        &entries_written,
+        &total_bytes,
+        &error
+    ));
+    g_assert_no_error (error);
+    g_assert_cmpstr (version, ==, "0.1.0");
+    g_assert_nonnull (snapshot_path);
+    g_assert_true (g_file_test (snapshot_path, G_FILE_TEST_IS_DIR));
+    g_assert_cmpuint (entries_written, ==, G_N_ELEMENTS (entries));
+    g_assert_cmpuint (total_bytes, >, 0);
+
+    manifest_path = g_build_filename (
+        snapshot_path, ".atm", "repository.json", NULL);
+    receipt_path = g_build_filename (
+        snapshot_path, ".atm", "compatibility-overlay.json", NULL);
+    g_assert_true (g_file_get_contents (
+        manifest_path, &manifest, &manifest_length, &error));
+    g_assert_no_error (error);
+    g_assert_true (g_file_get_contents (
+        receipt_path, &receipt, &receipt_length, &error));
+    g_assert_no_error (error);
+    g_assert_nonnull (strstr (manifest, "\"repository_id\": \"ewd\""));
+    g_assert_nonnull (strstr (manifest, "\"science/vendor\""));
+    g_assert_nonnull (strstr (manifest, "\"science/data/raw\""));
+    g_assert_nonnull (strstr (receipt, "atm-ewd-d9e249-manifest-overlay/1"));
+    g_assert_nonnull (strstr (receipt, historical_sha));
+
+    g_assert_true (atm_snapshot_seal_compute (
+        snapshot_path, &seal, &sealed_files, &sealed_bytes, &error));
+    g_assert_no_error (error);
+    /* The local seal contains each source file plus the manifest and receipt. */
+    g_assert_cmpuint (sealed_files, ==, source_file_entries + 2);
+    g_assert_cmpuint (sealed_bytes, >, total_bytes);
+
+    g_free (seal);
+    g_free (receipt);
+    g_free (manifest);
+    g_free (receipt_path);
+    g_free (manifest_path);
+    g_free (snapshot_path);
+    g_free (version);
+    g_free (archive_path);
+    g_free (data_root);
+    remove_tree_best_effort (root);
+    g_free (root);
+}
+
+
 static void
 test_production_limits (void)
 {
@@ -915,6 +1183,14 @@ main (int argc, char **argv)
     g_test_add_func (
         "/ingest/async-cancelled",
         test_async_ingest_cancelled
+    );
+    g_test_add_func (
+        "/ingest/builtin-compatibility-overlay-sha-bound",
+        test_builtin_compatibility_overlay_is_sha_bound_and_sealed
+    );
+    g_test_add_func (
+        "/ingest/historical-ewd-overlay-through-ingest",
+        test_historical_ewd_overlay_is_applied_by_ingest
     );
     g_test_add_func (
         "/ingest/production-limits",

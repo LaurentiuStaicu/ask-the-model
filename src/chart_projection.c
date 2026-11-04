@@ -429,6 +429,11 @@ gboolean atm_chart_projection_validate (const AtmChartProjection *p, GError **er
     atm_chart_projection_free (expected);
     return same || reject (error, "Projection disagrees with reconstructed specification.");
 }
+G_GNUC_INTERNAL gboolean _atm_chart_projection_geometry_matches (const AtmChartProjection *p, double width, double height)
+{
+    return p != NULL && isfinite (width) && isfinite (height) &&
+        p->width == width && p->height == height;
+}
 const AtmChartSpec *atm_chart_projection_spec (const AtmChartProjection *p) { return p ? p->spec : NULL; }
 const char *atm_chart_projection_policy (const AtmChartProjection *p) { return p ? p->policy_id : NULL; }
 const AtmChartDisplayDomain *atm_chart_projection_domain (const AtmChartProjection *p) { return p ? &p->domain : NULL; }

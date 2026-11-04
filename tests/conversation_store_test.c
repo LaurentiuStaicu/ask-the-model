@@ -532,6 +532,70 @@ insert_v3_gistemp_chart_fixture (
     );
 }
 
+
+/* Additional source-profile fixtures for the populated v5->v6 migration.
+ * Keep each repository pin in its own conversation: EWD's GISTEMP and EI
+ * recipes intentionally refer to different immutable snapshots. */
+static void
+insert_v5_ei_and_bnr_chart_fixtures (const char *path)
+{
+    raw_exec (
+        path,
+        "PRAGMA foreign_keys=ON;"
+        "BEGIN IMMEDIATE;"
+        "INSERT INTO conversations(conversation_id,title,created_at_us,updated_at_us,"
+        "model_name,model_digest,repository_generation_id,archived,open_on_startup) "
+        "VALUES('v5-ei-conv','EI v2',3,4,'model-a',NULL,8,1,0);"
+        "INSERT INTO conversation_repositories(conversation_id,repository_id,repository_version,snapshot_sha) "
+        "VALUES('v5-ei-conv','ewd','0.1.0','d9e249339663015f6d1c05752338a955bf64ad0b');"
+        "INSERT INTO messages(message_id,conversation_id,sequence_no,turn_no,role,"
+        "provider_content,display_content,grounded,created_at_us) "
+        "VALUES('v5-ei-user','v5-ei-conv',0,0,'user','q','q',0,3);"
+        "INSERT INTO messages(message_id,conversation_id,sequence_no,turn_no,role,"
+        "provider_content,display_content,grounded,created_at_us) "
+        "VALUES('v5-ei-assistant','v5-ei-conv',1,0,'assistant','a','a',1,4);"
+        "INSERT INTO message_charts(message_id,ordinal,chart_schema,chart_spec_id,chart_kind,reconstruction_profile) "
+        "VALUES('v5-ei-assistant',1,'atm-chart-spec/2',"
+        "'ffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffff',"
+        "'line','atm-chart-reconstruct/energy-institute-tes-complete-annual/1');"
+        "INSERT INTO chart_series(message_id,chart_ordinal,series_ordinal,series_profile,admission_profile,"
+        "scientific_id,qualified_id,repository_id,repository_version,snapshot_sha,source_path) "
+        "VALUES('v5-ei-assistant',1,0,'atm-series/energy-institute-tes-complete-annual/1',"
+        "'atm-energy-institute-pinned-admission/3',"
+        "'dddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddd',"
+        "'eeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeee',"
+        "'ewd','snapshot:d9e249339663015f6d1c05752338a955bf64ad0b',"
+        "'d9e249339663015f6d1c05752338a955bf64ad0b',"
+        "'science/data/processed/energy_institute_global_2026.csv');"
+        "INSERT INTO conversations(conversation_id,title,created_at_us,updated_at_us,"
+        "model_name,model_digest,repository_generation_id,archived,open_on_startup) "
+        "VALUES('v5-bnr-conv','BNR v3',5,6,'model-a',NULL,1,1,0);"
+        "INSERT INTO conversation_repositories(conversation_id,repository_id,repository_version,snapshot_sha) "
+        "VALUES('v5-bnr-conv','rmd','snapshot:e43eb4e899f123d3b1aa0f6e20b7c8ed35434170',"
+        "'e43eb4e899f123d3b1aa0f6e20b7c8ed35434170');"
+        "INSERT INTO messages(message_id,conversation_id,sequence_no,turn_no,role,"
+        "provider_content,display_content,grounded,created_at_us) "
+        "VALUES('v5-bnr-user','v5-bnr-conv',0,0,'user','q','q',0,5);"
+        "INSERT INTO messages(message_id,conversation_id,sequence_no,turn_no,role,"
+        "provider_content,display_content,grounded,created_at_us) "
+        "VALUES('v5-bnr-assistant','v5-bnr-conv',1,0,'assistant','a','a',1,6);"
+        "INSERT INTO message_charts(message_id,ordinal,chart_schema,chart_spec_id,chart_kind,reconstruction_profile) "
+        "VALUES('v5-bnr-assistant',1,'atm-chart-spec/3',"
+        "'1111111111111111111111111111111111111111111111111111111111111111',"
+        "'line','atm-chart-reconstruct/bnr-bls-c01-calendar-quarter/1');"
+        "INSERT INTO chart_series(message_id,chart_ordinal,series_ordinal,series_profile,admission_profile,"
+        "scientific_id,qualified_id,repository_id,repository_version,snapshot_sha,source_path) "
+        "VALUES('v5-bnr-assistant',1,0,'atm-series/bnr-bls-c01-calendar-quarter/1',"
+        "'atm-bnr-bls-canonical-panel-admission/1',"
+        "'bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb',"
+        "'cccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccc',"
+        "'rmd','snapshot:e43eb4e899f123d3b1aa0f6e20b7c8ed35434170',"
+        "'e43eb4e899f123d3b1aa0f6e20b7c8ed35434170',"
+        "'data/processed/bnr_bls_realised_rounds.csv');"
+        "COMMIT;"
+    );
+}
+
 static void
 test_v3_to_v5_migration_preserves_chart_rows (void)
 {
@@ -845,7 +909,7 @@ assert_v5_v6_migration_fixture (
 }
 
 static void
-test_v5_to_v6_migration_rollback (void)
+test_v5_to_v6_migration_rollback_deferred_foreign_key_mismatch (void)
 {
     char *root = new_temp_root ("atm-conversation-v5-v6-rollback-XXXXXX");
     char *path = store_path (root);
@@ -3073,6 +3137,361 @@ test_v4_sidecar_delete_guard_v5_migration (void)
     g_free (root);
 }
 
+
+
+static void
+test_v4_sidecar_insert_failure_rolls_back_chart_attachment (void)
+{
+    char *root = new_temp_root ("atm-v4-sidecar-insert-rollback-XXXXXX");
+    char *path = store_path (root);
+    AtmConversationStore *store = NULL;
+    GError *error = NULL;
+    const char *snapshot_sha = "0123456789abcdef0123456789abcdef01234567";
+    const char *chart_spec_id = "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa";
+
+    g_assert_true (atm_conversation_store_open (path, &store, &error));
+    g_assert_no_error (error);
+
+    AtmConversationRepositoryInput repository = {
+        .repository_id = "ewd",
+        .repository_version = "0.1.0",
+        .snapshot_sha = snapshot_sha
+    };
+    char *conversation_id = NULL;
+    g_assert_true (atm_conversation_store_create_conversation (
+        store, "Sidecar insert rollback", 1, "model-a", NULL, 7,
+        &repository, 1, &conversation_id, &error));
+    g_assert_no_error (error);
+
+    AtmConversationCitationInput citation = {
+        .label = "S1",
+        .repository_id = "ewd",
+        .repository_version = "0.1.0",
+        .snapshot_sha = snapshot_sha,
+        .logical_source_id = "gistemp-global-annual",
+        .source_path = "science/data/processed/nasa_gistemp_global_2026.csv",
+        .locator = "rows 1-146",
+        .title = "GISTEMP global annual",
+        .excerpt = "Qualified annual observations",
+        .immutable_permalink = NULL
+    };
+    gint64 turn_no = -1;
+    g_assert_true (atm_conversation_store_commit_turn (
+        store, conversation_id, "show the series", "answer [S1]", "answer",
+        TRUE, 2, &citation, 1, &turn_no, &error));
+    g_assert_no_error (error);
+
+    AtmConversationChartPresentationInput presentation = {
+        .presentation_schema = "atm-chart-spec/4",
+        .presentation_spec_id = "dddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddd",
+        .series_id = "climate.gistemp.global-temperature-anomaly",
+        .catalog_schema = "atm-chart-catalog/1",
+        .adapter_id = "gistemp-pinned-annual/1",
+        .series_profile_id = "atm-series/gistemp-complete-annual/1",
+        .series_profile_version = "1",
+        .admission_profile_id = "atm-gistemp-pinned-admission/1",
+        .admission_profile_version = "1",
+        .reconstruction_profile_id = "atm-chart-reconstruct/gistemp-complete-annual/1",
+        .source_chart_schema = "atm-chart-spec/1",
+        .source_chart_spec_id = chart_spec_id,
+        .x_coordinate_semantics = "calendar_year",
+        .x_frequency = "annual",
+        .x_unit = "calendar_year",
+        .x_dimension = "time",
+        .subject = "global_surface_temperature",
+        .attribute = "annual_temperature_anomaly",
+        .y_unit = "degree_Celsius_anomaly",
+        .y_dimension = "temperature_difference",
+        .series_semantics = "empirical_annual_observations",
+        .missing_policy = "reject",
+        .missing_coordinate = NULL,
+        .missing_reason = NULL,
+        .display_profile_id = "atm-display/gistemp-linear",
+        .display_profile_version = "1",
+        .render_contract = "atm-retro-mono/1"
+    };
+
+    /* Test-only fault injection at the SQLite boundary. Production code is
+     * unchanged: the trigger rejects the sidecar INSERT after its parent
+     * chart and series rows have already been inserted in the transaction. */
+    raw_exec (path,
+        "CREATE TRIGGER test_reject_v4_sidecar_insert "
+        "BEFORE INSERT ON chart_presentations_v4 "
+        "BEGIN SELECT RAISE(ABORT,'injected sidecar insert failure'); END;");
+
+    g_assert_false (atm_conversation_store_attach_chart_v4_values (
+        store, conversation_id, turn_no, 1,
+        "atm-chart-spec/1", chart_spec_id, "line",
+        "atm-chart-reconstruct/gistemp-complete-annual/1",
+        "atm-series/gistemp-complete-annual/1",
+        "atm-gistemp-pinned-admission/1",
+        "bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb",
+        "cccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccc",
+        "ewd", "0.1.0", snapshot_sha,
+        "science/data/processed/nasa_gistemp_global_2026.csv",
+        &presentation, &error));
+    g_assert_nonnull (error);
+    g_assert_nonnull (strstr (error->message, "injected sidecar insert failure"));
+    g_clear_error (&error);
+
+    /* No partial chart, series, or presentation may survive the rollback. */
+    g_assert_cmpint (raw_int64 (path,
+        "SELECT count(*) FROM message_charts;"), ==, 0);
+    g_assert_cmpint (raw_int64 (path,
+        "SELECT count(*) FROM chart_series;"), ==, 0);
+    g_assert_cmpint (raw_int64 (path,
+        "SELECT count(*) FROM chart_presentations_v4;"), ==, 0);
+    g_assert_cmpint (raw_int64 (path,
+        "SELECT count(*) FROM sqlite_schema WHERE type='trigger' "
+        "AND name='test_reject_v4_sidecar_insert';"), ==, 1);
+    g_assert_true (atm_conversation_store_validate (store, &error));
+    g_assert_no_error (error);
+
+    atm_conversation_store_close (store);
+    g_free (conversation_id);
+    g_free (path);
+    remove_tree_best_effort (root);
+    g_free (root);
+}
+
+static void
+test_v5_to_v6_migration_preserves_populated_chart_rows (void)
+{
+    char *root = new_temp_root ("atm-conversation-v5-v6-preserve-XXXXXX");
+    char *path = store_path (root);
+    create_v5_store (path);
+    insert_v3_gistemp_chart_fixture (path);
+    insert_v5_ei_and_bnr_chart_fixtures (path);
+
+    g_assert_cmpint (raw_int64 (path, "PRAGMA user_version;"), ==, 5);
+    g_assert_cmpint (raw_int64 (path, "SELECT count(*) FROM message_charts;"), ==, 3);
+    g_assert_cmpint (raw_int64 (path, "SELECT count(*) FROM chart_series;"), ==, 3);
+    g_assert_cmpint (raw_int64 (path,
+        "SELECT count(*) FROM message_charts WHERE chart_schema='atm-chart-spec/1' "
+        "AND chart_spec_id='aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa' "
+        "AND chart_kind='line' "
+        "AND reconstruction_profile='atm-chart-reconstruct/gistemp-complete-annual/1';"), ==, 1);
+    g_assert_cmpint (raw_int64 (path,
+        "SELECT count(*) FROM chart_series WHERE message_id='v3-chart-assistant' "
+        "AND chart_ordinal=1 AND series_ordinal=0 "
+        "AND series_profile='atm-series/gistemp-complete-annual/1' "
+        "AND admission_profile='atm-gistemp-pinned-admission/1' "
+        "AND scientific_id='bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb' "
+        "AND qualified_id='cccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccc' "
+        "AND repository_id='ewd' AND repository_version='0.1.0' "
+        "AND snapshot_sha='0123456789abcdef0123456789abcdef01234567' "
+        "AND source_path='science/data/processed/nasa_gistemp_global_2026.csv';"), ==, 1);
+
+    AtmConversationStore *store = NULL;
+    GError *error = NULL;
+    g_assert_true (atm_conversation_store_open (path, &store, &error));
+    g_assert_no_error (error);
+    g_assert_nonnull (store);
+    g_assert_cmpint (atm_conversation_store_schema_version (store), ==, 6);
+    g_assert_true (atm_conversation_store_validate (store, &error));
+    g_assert_no_error (error);
+
+    g_assert_cmpint (raw_int64 (path, "PRAGMA user_version;"), ==, 6);
+    char *schema_id = raw_text (path,
+        "SELECT schema_id FROM installation WHERE singleton_id=1;");
+    g_assert_cmpstr (schema_id, ==, "atm-conversation-store/6");
+    g_free (schema_id);
+
+    g_assert_cmpint (raw_int64 (path,
+        "SELECT count(*) FROM conversations WHERE conversation_id='v3-chart-conv' "
+        "AND title='V3 Chart' AND archived=1 AND open_on_startup=0;"), ==, 1);
+    g_assert_cmpint (raw_int64 (path,
+        "SELECT count(*) FROM conversation_repositories WHERE conversation_id='v3-chart-conv' "
+        "AND repository_id='ewd' AND repository_version='0.1.0' "
+        "AND snapshot_sha='0123456789abcdef0123456789abcdef01234567';"), ==, 1);
+    g_assert_cmpint (raw_int64 (path,
+        "SELECT count(*) FROM messages WHERE message_id='v3-chart-assistant' "
+        "AND conversation_id='v3-chart-conv' AND role='assistant' "
+        "AND provider_content='a' AND display_content='a' AND grounded=1;"), ==, 1);
+    g_assert_cmpint (raw_int64 (path,
+        "SELECT count(*) FROM message_charts WHERE chart_schema='atm-chart-spec/1' "
+        "AND chart_spec_id='aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa' "
+        "AND chart_kind='line' "
+        "AND reconstruction_profile='atm-chart-reconstruct/gistemp-complete-annual/1' "
+        "AND presentation_schema IS NULL;"), ==, 1);
+    g_assert_cmpint (raw_int64 (path,
+        "SELECT count(*) FROM chart_series WHERE message_id='v3-chart-assistant' "
+        "AND chart_ordinal=1 AND series_ordinal=0 "
+        "AND series_profile='atm-series/gistemp-complete-annual/1' "
+        "AND admission_profile='atm-gistemp-pinned-admission/1' "
+        "AND scientific_id='bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb' "
+        "AND qualified_id='cccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccc' "
+        "AND repository_id='ewd' AND repository_version='0.1.0' "
+        "AND snapshot_sha='0123456789abcdef0123456789abcdef01234567' "
+        "AND source_path='science/data/processed/nasa_gistemp_global_2026.csv';"), ==, 1);
+    g_assert_cmpint (raw_int64 (path,
+        "SELECT count(*) FROM chart_presentations_v4;"), ==, 0);
+
+    /* Preserve all admitted legacy profiles: GISTEMP v1, EI v2 and BNR v3. */
+    g_assert_cmpint (raw_int64 (path,
+        "SELECT count(*) FROM message_charts WHERE chart_schema='atm-chart-spec/1' "
+        "AND chart_spec_id='aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa';"), ==, 1);
+    g_assert_cmpint (raw_int64 (path,
+        "SELECT count(*) FROM message_charts WHERE chart_schema='atm-chart-spec/2' "
+        "AND chart_spec_id='ffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffff';"), ==, 1);
+    g_assert_cmpint (raw_int64 (path,
+        "SELECT count(*) FROM message_charts WHERE chart_schema='atm-chart-spec/3' "
+        "AND chart_spec_id='1111111111111111111111111111111111111111111111111111111111111111';"), ==, 1);
+    g_assert_cmpint (raw_int64 (path,
+        "SELECT count(*) FROM chart_series WHERE message_id='v5-ei-assistant' "
+        "AND series_profile='atm-series/energy-institute-tes-complete-annual/1' "
+        "AND admission_profile='atm-energy-institute-pinned-admission/3' "
+        "AND scientific_id='dddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddd' "
+        "AND qualified_id='eeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeee' "
+        "AND repository_id='ewd' "
+        "AND repository_version='snapshot:d9e249339663015f6d1c05752338a955bf64ad0b' "
+        "AND snapshot_sha='d9e249339663015f6d1c05752338a955bf64ad0b' "
+        "AND source_path='science/data/processed/energy_institute_global_2026.csv';"), ==, 1);
+    g_assert_cmpint (raw_int64 (path,
+        "SELECT count(*) FROM chart_series WHERE message_id='v5-bnr-assistant' "
+        "AND series_profile='atm-series/bnr-bls-c01-calendar-quarter/1' "
+        "AND admission_profile='atm-bnr-bls-canonical-panel-admission/1' "
+        "AND scientific_id='bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb' "
+        "AND qualified_id='cccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccc' "
+        "AND repository_id='rmd' "
+        "AND repository_version='snapshot:e43eb4e899f123d3b1aa0f6e20b7c8ed35434170' "
+        "AND snapshot_sha='e43eb4e899f123d3b1aa0f6e20b7c8ed35434170' "
+        "AND source_path='data/processed/bnr_bls_realised_rounds.csv';"), ==, 1);
+    g_assert_cmpint (raw_int64 (path,
+        "SELECT count(*) FROM conversations WHERE conversation_id IN "
+        "('v5-ei-conv','v5-bnr-conv');"), ==, 2);
+    g_assert_cmpint (raw_int64 (path,
+        "SELECT count(*) FROM messages WHERE message_id IN "
+        "('v5-ei-user','v5-ei-assistant','v5-bnr-user','v5-bnr-assistant');"), ==, 4);
+    g_assert_cmpint (raw_int64 (path,
+        "SELECT count(*) FROM pragma_foreign_key_check;"), ==, 0);
+
+    atm_conversation_store_close (store);
+    g_free (path);
+    remove_tree_best_effort (root);
+    g_free (root);
+}
+
+
+static void
+test_v5_to_v6_migration_final_validation_rollback (void)
+{
+    char *root = new_temp_root ("atm-conversation-v5-v6-final-rollback-XXXXXX");
+    char *path = store_path (root);
+    create_v5_store (path);
+    insert_v3_gistemp_chart_fixture (path);
+
+    g_assert_cmpint (raw_int64 (path, "PRAGMA user_version;"), ==, 5);
+    g_setenv ("ATM_TEST_FAIL_V5_TO_V6_FINAL_VALIDATION", "1", TRUE);
+
+    AtmConversationStore *store = NULL;
+    GError *error = NULL;
+    g_assert_false (atm_conversation_store_open (path, &store, &error));
+    g_assert_nonnull (error);
+    g_assert_null (store);
+    g_assert_nonnull (g_strstr_len (error->message, -1,
+        "Injected v5-to-v6 final validation failure."));
+    g_clear_error (&error);
+    g_unsetenv ("ATM_TEST_FAIL_V5_TO_V6_FINAL_VALIDATION");
+
+    /* The injected failure is reached only after the v6 version and
+     * installation identity checks passed inside the still-open transaction.
+     * The failed migration must restore the complete original v5 state. */
+    g_assert_cmpint (raw_int64 (path, "PRAGMA user_version;"), ==, 5);
+    char *schema_id = raw_text (path,
+        "SELECT schema_id FROM installation WHERE singleton_id=1;");
+    g_assert_cmpstr (schema_id, ==, "atm-conversation-store/5");
+    g_free (schema_id);
+
+    g_assert_cmpint (raw_int64 (path,
+        "SELECT count(*) FROM message_charts WHERE chart_schema='atm-chart-spec/1' "
+        "AND chart_spec_id='aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa' "
+        "AND chart_kind='line' "
+        "AND reconstruction_profile='atm-chart-reconstruct/gistemp-complete-annual/1';"),
+        ==, 1);
+    g_assert_cmpint (raw_int64 (path,
+        "SELECT count(*) FROM chart_series WHERE message_id='v3-chart-assistant' "
+        "AND chart_ordinal=1 AND series_ordinal=0 "
+        "AND series_profile='atm-series/gistemp-complete-annual/1' "
+        "AND admission_profile='atm-gistemp-pinned-admission/1' "
+        "AND scientific_id='bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb' "
+        "AND qualified_id='cccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccc' "
+        "AND repository_id='ewd' AND repository_version='0.1.0' "
+        "AND snapshot_sha='0123456789abcdef0123456789abcdef01234567' "
+        "AND source_path='science/data/processed/nasa_gistemp_global_2026.csv';"), ==, 1);
+    g_assert_cmpint (raw_int64 (path,
+        "SELECT count(*) FROM sqlite_schema WHERE type='table' "
+        "AND name IN ('chart_presentations_v4','message_charts_v6',"
+        "'chart_series_v6','installation_v6');"), ==, 0);
+    g_assert_cmpint (raw_int64 (path,
+        "SELECT count(*) FROM pragma_foreign_key_check;"), ==, 0);
+
+    g_free (path);
+    remove_tree_best_effort (root);
+    g_free (root);
+}
+
+static void
+test_v5_to_v6_migration_rollback (void)
+{
+    char *root = new_temp_root ("atm-conversation-v5-v6-rollback-XXXXXX");
+    char *path = store_path (root);
+    create_v5_store (path);
+    insert_v3_gistemp_chart_fixture (path);
+
+    /* Fail late, after v5->v6 has created the v6 tables, copied the chart
+     * rows, replaced the source tables and created the sidecar table/index.
+     * This pre-existing trigger name collides with the first sidecar trigger.
+     * The failed open must roll the entire migration back to the original v5
+     * schema and preserve the legacy chart rows and collision trigger. */
+    raw_exec (path,
+        "CREATE TRIGGER chart_presentations_v4_tuple_insert "
+        "BEFORE INSERT ON messages BEGIN SELECT 1; END;");
+
+    AtmConversationStore *store = NULL;
+    GError *error = NULL;
+    g_assert_false (atm_conversation_store_open (path, &store, &error));
+    g_assert_nonnull (error);
+    g_assert_null (store);
+    g_assert_nonnull (g_strstr_len (error->message, -1,
+        "chart_presentations_v4_tuple_insert"));
+    g_clear_error (&error);
+
+    g_assert_cmpint (raw_int64 (path, "PRAGMA user_version;"), ==, 5);
+    char *schema_id = raw_text (path,
+        "SELECT schema_id FROM installation WHERE singleton_id=1;");
+    g_assert_cmpstr (schema_id, ==, "atm-conversation-store/5");
+    g_free (schema_id);
+
+    g_assert_cmpint (raw_int64 (path,
+        "SELECT count(*) FROM message_charts WHERE chart_schema='atm-chart-spec/1' "
+        "AND chart_spec_id='aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa' "
+        "AND reconstruction_profile='atm-chart-reconstruct/gistemp-complete-annual/1';"),
+        ==, 1);
+    g_assert_cmpint (raw_int64 (path,
+        "SELECT count(*) FROM chart_series WHERE series_profile='atm-series/gistemp-complete-annual/1' "
+        "AND admission_profile='atm-gistemp-pinned-admission/1' "
+        "AND scientific_id='bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb' "
+        "AND qualified_id='cccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccc';"),
+        ==, 1);
+
+    g_assert_cmpint (raw_int64 (path,
+        "SELECT count(*) FROM sqlite_schema WHERE type='table' "
+        "AND name IN ('chart_presentations_v4','message_charts_v6',"
+        "'chart_series_v6','installation_v6');"), ==, 0);
+    g_assert_cmpint (raw_int64 (path,
+        "SELECT count(*) FROM sqlite_schema WHERE type='trigger' "
+        "AND name='chart_presentations_v4_tuple_insert' AND tbl_name='messages';"),
+        ==, 1);
+    g_assert_cmpint (raw_int64 (path,
+        "SELECT count(*) FROM pragma_foreign_key_check;"), ==, 0);
+
+    g_free (path);
+    remove_tree_best_effort (root);
+    g_free (root);
+}
+
+
 static void
 test_chart_binding_write_load (void)
 {
@@ -3741,8 +4160,24 @@ main (int argc, char **argv)
         test_v4_to_v5_migration_rollback
     );
     g_test_add_func (
+        "/conversation-store/v4-sidecar-insert-failure-rolls-back-chart-attachment",
+        test_v4_sidecar_insert_failure_rolls_back_chart_attachment
+    );
+    g_test_add_func (
+        "/conversation-store/v5-to-v6-migration-preserves-populated-chart-rows",
+        test_v5_to_v6_migration_preserves_populated_chart_rows
+    );
+    g_test_add_func (
+        "/conversation-store/v5-to-v6-final-validation-rollback",
+        test_v5_to_v6_migration_final_validation_rollback
+    );
+    g_test_add_func (
         "/conversation-store/v5-to-v6-rollback",
         test_v5_to_v6_migration_rollback
+    );
+    g_test_add_func (
+        "/conversation-store/v5-to-v6-rollback-deferred-foreign-key-mismatch",
+        test_v5_to_v6_migration_rollback_deferred_foreign_key_mismatch
     );
     g_test_add_func (
         "/conversation-store/chart-recipe-semantics",

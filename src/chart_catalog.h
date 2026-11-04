@@ -69,7 +69,6 @@ typedef struct {
     const char *admission_profile_version;
     const char *reconstruction_profile_id;
     const char *chart_spec_schema;
-    const char *history_schema_version;
 
     const char *repository_key;
     const char *repository_full_name;

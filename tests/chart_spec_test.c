@@ -718,16 +718,10 @@ test_v4_identity_ignores_nonsemantic_catalog_metadata (void)
     g_assert_cmpstr (baseline, ==, atm_chart_spec_v4_id (spec));
 
     AtmChartCatalogEntry variant = *entry;
-    variant.history_schema_version = "99";
-    char *id = build_v4_test_identity (&variant, source);
-    g_assert_cmpstr (id, ==, baseline);
-    g_free (id);
-
-    variant = *entry;
     variant.display_name = "Different display copy";
     variant.display_name_ro = "Alt text de afișare";
     variant.description = "Updated explanatory wording only.";
-    id = build_v4_test_identity (&variant, source);
+    char *id = build_v4_test_identity (&variant, source);
     g_assert_cmpstr (id, ==, baseline);
     g_free (id);
 

@@ -38,6 +38,17 @@ namespace AskTheModel.RepositoryNative {
     ) throws GLib.Error;
 
     [CCode (
+        cname = "atm_repository_apply_builtin_compatibility_overlay",
+        cheader_filename = "repository_ingest.h"
+    )]
+    public static extern bool apply_builtin_compatibility_overlay (
+        string snapshot_root,
+        string repository_id,
+        string snapshot_sha,
+        out bool applied
+    ) throws GLib.Error;
+
+    [CCode (
         cname = "atm_repository_ingest_archive_durable",
         cheader_filename = "repository_ingest.h"
     )]

@@ -586,9 +586,3 @@ atm_chart_spec_v4_reconstruction_profile_id (const AtmChartSpecV4 *spec)
 {
     return spec != NULL ? spec->entry->reconstruction_profile_id : NULL;
 }
-
-const char *
-atm_chart_spec_v4_history_schema_version (const AtmChartSpecV4 *spec)
-{
-    return spec != NULL ? spec->entry->history_schema_version : NULL;
-}

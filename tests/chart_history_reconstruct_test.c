@@ -7,6 +7,105 @@
 #include <glib.h>
 #include <glib/gstdio.h>
 
+static void
+assert_exact_chart_data_equal (const AtmChartSpec *expected,
+                               const AtmChartSpec *actual)
+{
+    g_assert_cmpint (atm_chart_spec_version (actual), ==,
+                     atm_chart_spec_version (expected));
+    g_assert_cmpstr (atm_chart_spec_schema (actual), ==,
+                     atm_chart_spec_schema (expected));
+    g_assert_cmpstr (atm_chart_spec_id (actual), ==,
+                     atm_chart_spec_id (expected));
+    g_assert_cmpint (atm_chart_spec_kind (actual), ==,
+                     atm_chart_spec_kind (expected));
+    g_assert_cmpuint (atm_chart_spec_count (actual), ==,
+                      atm_chart_spec_count (expected));
+    g_assert_cmpstr (atm_chart_spec_x_unit (actual), ==,
+                     atm_chart_spec_x_unit (expected));
+    g_assert_cmpstr (atm_chart_spec_x_dimension (actual), ==,
+                     atm_chart_spec_x_dimension (expected));
+    g_assert_cmpstr (atm_chart_spec_y_unit (actual), ==,
+                     atm_chart_spec_y_unit (expected));
+    g_assert_cmpstr (atm_chart_spec_y_dimension (actual), ==,
+                     atm_chart_spec_y_dimension (expected));
+    g_assert_cmpstr (atm_chart_spec_series_profile (actual), ==,
+                     atm_chart_spec_series_profile (expected));
+    g_assert_cmpuint (atm_chart_spec_x_min (actual), ==,
+                      atm_chart_spec_x_min (expected));
+    g_assert_cmpuint (atm_chart_spec_x_max (actual), ==,
+                      atm_chart_spec_x_max (expected));
+    g_assert_cmpstr (atm_chart_spec_calendar_quarter_min (actual), ==,
+                     atm_chart_spec_calendar_quarter_min (expected));
+    g_assert_cmpstr (atm_chart_spec_calendar_quarter_max (actual), ==,
+                     atm_chart_spec_calendar_quarter_max (expected));
+
+    const AtmScientificDecimal *expected_y_min =
+        atm_chart_spec_y_min (expected);
+    const AtmScientificDecimal *actual_y_min =
+        atm_chart_spec_y_min (actual);
+    const AtmScientificDecimal *expected_y_max =
+        atm_chart_spec_y_max (expected);
+    const AtmScientificDecimal *actual_y_max =
+        atm_chart_spec_y_max (actual);
+    g_assert_nonnull (expected_y_min);
+    g_assert_nonnull (actual_y_min);
+    g_assert_nonnull (expected_y_max);
+    g_assert_nonnull (actual_y_max);
+    g_assert_cmpstr (actual_y_min->coefficient, ==,
+                     expected_y_min->coefficient);
+    g_assert_cmpint (actual_y_min->exponent, ==, expected_y_min->exponent);
+    g_assert_cmpstr (actual_y_max->coefficient, ==,
+                     expected_y_max->coefficient);
+    g_assert_cmpint (actual_y_max->exponent, ==, expected_y_max->exponent);
+
+    for (guint series = 0; series < atm_chart_spec_count (expected); series++) {
+        g_assert_cmpstr (atm_chart_spec_series_snapshot_sha (actual, series), ==,
+                         atm_chart_spec_series_snapshot_sha (expected, series));
+        g_assert_cmpstr (atm_chart_spec_series_source_path (actual, series), ==,
+                         atm_chart_spec_series_source_path (expected, series));
+        g_assert_cmpstr (atm_chart_spec_series_repository_id (actual, series), ==,
+                         atm_chart_spec_series_repository_id (expected, series));
+        g_assert_cmpstr (atm_chart_spec_series_scientific_id (actual, series), ==,
+                         atm_chart_spec_series_scientific_id (expected, series));
+        g_assert_cmpstr (atm_chart_spec_series_qualified_id (actual, series), ==,
+                         atm_chart_spec_series_qualified_id (expected, series));
+        g_assert_cmpuint (atm_chart_spec_point_count (actual, series), ==,
+                          atm_chart_spec_point_count (expected, series));
+
+        for (guint point = 0;
+             point < atm_chart_spec_point_count (expected, series); point++) {
+            AtmChartPointView expected_point = { 0 };
+            AtmChartPointView actual_point = { 0 };
+            g_assert_true (atm_chart_spec_point (expected, series, point,
+                                                 &expected_point));
+            g_assert_true (atm_chart_spec_point (actual, series, point,
+                                                 &actual_point));
+            g_assert_cmpuint (actual_point.order, ==, expected_point.order);
+            g_assert_cmpuint (actual_point.calendar_year, ==,
+                              expected_point.calendar_year);
+            g_assert_cmpstr (actual_point.calendar_quarter, ==,
+                             expected_point.calendar_quarter);
+            g_assert_cmpuint (actual_point.source_row, ==,
+                              expected_point.source_row);
+            g_assert_cmpstr (actual_point.missing_reason, ==,
+                             expected_point.missing_reason);
+            g_assert_cmpint (actual_point.y_status, ==, expected_point.y_status);
+            g_assert_cmpstr (actual_point.source_decimal, ==,
+                             expected_point.source_decimal);
+            g_assert_cmpstr (actual_point.coefficient, ==,
+                             expected_point.coefficient);
+            g_assert_cmpint (actual_point.exponent, ==, expected_point.exponent);
+            g_assert_cmpint (actual_point.break_before, ==,
+                             expected_point.break_before);
+            g_assert_cmpuint (actual_point.support->len, ==,
+                              expected_point.support->len);
+            for (guint support = 0; support < expected_point.support->len; support++)
+                g_assert_cmpstr (g_ptr_array_index (actual_point.support, support), ==,
+                                 g_ptr_array_index (expected_point.support, support));
+        }
+    }
+}
 static char *
 fixture_snapshot (void)
 {
@@ -112,6 +211,7 @@ test_reconstruct_and_identity (void)
     g_assert_cmpstr (
         atm_chart_spec_id (spec), ==, atm_chart_spec_id (reference)
     );
+    assert_exact_chart_data_equal (reference, spec);
 
     AtmChartSpec *live = NULL;
     g_assert_true (atm_chart_live_reconstruct_gistemp (
@@ -426,7 +526,34 @@ test_ei_history_reconstructs_pinned_snapshots (void)
         g_assert_cmpstr (atm_chart_spec_series_qualified_id (restored, 0), ==,
                          recipe.qualified_id);
         g_assert_cmpuint (atm_chart_spec_point_count (restored, 0), ==, 61u);
+        assert_exact_chart_data_equal (reference, restored);
         qualified_ids[i] = g_strdup (atm_chart_spec_series_qualified_id (restored, 0));
+
+        /*
+         * Exercise the v4 History sidecar reconstruction on both admitted EI
+         * snapshots, not just the one selected by the GTK Application E2E.
+         */
+        AtmChartSpecV4 *history_v4 = NULL;
+        AtmChartSpecV4 *reopened_v4 = NULL;
+        AtmConversationChartPresentationInput history_presentation = {0};
+        g_assert_true (atm_chart_wrap_qualified_spec_v4 (
+            "energy.energy-institute.global-total-energy-supply",
+            restored, &history_v4, &error));
+        g_assert_no_error (error);
+        g_assert_cmpstr (atm_chart_spec_series_snapshot_sha (
+            atm_chart_spec_v4_source_spec (history_v4), 0), ==, snapshots[i]);
+        g_assert_true (atm_chart_history_presentation_input_from_v4 (
+            history_v4, &history_presentation, &error));
+        g_assert_no_error (error);
+        g_assert_true (atm_chart_history_reconstruct_v4 (
+            "energy.energy-institute.global-total-energy-supply",
+            restored, &history_presentation, &reopened_v4, &error));
+        g_assert_no_error (error);
+        g_assert_nonnull (reopened_v4);
+        g_assert_cmpstr (atm_chart_spec_v4_id (reopened_v4), ==,
+                         atm_chart_spec_v4_id (history_v4));
+        atm_chart_spec_v4_free (reopened_v4);
+        atm_chart_spec_v4_free (history_v4);
 
         /* The persisted recipe may not relabel a source bundle's version,
          * source profile, admission, scientific identity or ChartSpec ID. */
@@ -669,6 +796,7 @@ test_bnr_c01_history_reconstructs_pinned_snapshot (void)
     g_assert_no_error (error);
     g_assert_nonnull (restored);
     g_assert_cmpstr (atm_chart_spec_id (restored), ==, atm_chart_spec_id (live));
+    assert_exact_chart_data_equal (live, restored);
     g_assert_cmpstr (atm_chart_spec_series_scientific_id (restored, 0), ==,
                      atm_chart_spec_series_scientific_id (live, 0));
     g_assert_cmpstr (atm_chart_spec_series_qualified_id (restored, 0), ==,
@@ -752,8 +880,119 @@ test_live_reconstruct_v4_catalog_dispatch (void)
         atm_chart_spec_v4_source_spec (v4), 0), ==, ewd_initial);
     g_assert_cmpstr (atm_chart_spec_series_repository_id (
         atm_chart_spec_v4_source_spec (v4), 0), ==, "ewd");
+
+    AtmConversationChartPresentationInput stored_presentation = {0};
+    g_assert_true (atm_chart_history_presentation_input_from_v4 (
+        v4, &stored_presentation, &error));
+    g_assert_no_error (error);
+    g_assert_cmpstr (stored_presentation.presentation_spec_id, ==,
+                     atm_chart_spec_v4_id (v4));
+    g_assert_cmpstr (stored_presentation.source_chart_schema, ==,
+                     ATM_CHART_SPEC_SCHEMA);
+    g_assert_cmpstr (stored_presentation.source_chart_spec_id, ==,
+                     atm_chart_spec_id (atm_chart_spec_v4_source_spec (v4)));
+
+    AtmChartSpecV4 *reopened_v4 = NULL;
+    g_assert_true (atm_chart_history_reconstruct_v4 (
+        gistemp_id, atm_chart_spec_v4_source_spec (v4),
+        &stored_presentation, &reopened_v4, &error));
+    g_assert_no_error (error);
+    g_assert_cmpstr (atm_chart_spec_v4_id (reopened_v4), ==,
+                     atm_chart_spec_v4_id (v4));
+    atm_chart_spec_v4_free (reopened_v4);
+    reopened_v4 = NULL;
+
+    AtmConversationChartPresentationInput tampered_presentation =
+        stored_presentation;
+    tampered_presentation.presentation_spec_id =
+        "0000000000000000000000000000000000000000000000000000000000000000";
+    g_assert_false (atm_chart_history_reconstruct_v4 (
+        gistemp_id, atm_chart_spec_v4_source_spec (v4),
+        &tampered_presentation, &reopened_v4, &error));
+    g_assert_error (error, ATM_SRA_ERROR, ATM_SRA_ERROR_IDENTITY);
+    g_assert_null (reopened_v4);
+    g_clear_error (&error);
+
+    /*
+     * Every persisted catalog claim must be derived again, not accepted merely
+     * because its value has the right SQL shape. Exercise the entire sidecar.
+     */
+#define ASSERT_REJECTED_PRESENTATION_FIELD(field, bad_value) \
+    G_STMT_START { \
+        AtmConversationChartPresentationInput changed = stored_presentation; \
+        changed.field = (bad_value); \
+        g_assert_false (atm_chart_history_reconstruct_v4 ( \
+            gistemp_id, atm_chart_spec_v4_source_spec (v4), \
+            &changed, &reopened_v4, &error)); \
+        g_assert_error (error, ATM_SRA_ERROR, ATM_SRA_ERROR_IDENTITY); \
+        g_assert_null (reopened_v4); \
+        g_clear_error (&error); \
+    } G_STMT_END
+    ASSERT_REJECTED_PRESENTATION_FIELD (presentation_schema, "atm-chart-spec/99");
+    ASSERT_REJECTED_PRESENTATION_FIELD (presentation_spec_id,
+        "0000000000000000000000000000000000000000000000000000000000000000");
+    ASSERT_REJECTED_PRESENTATION_FIELD (series_id, "forged.series");
+    ASSERT_REJECTED_PRESENTATION_FIELD (catalog_schema, "atm-chart-catalog/99");
+    ASSERT_REJECTED_PRESENTATION_FIELD (adapter_id, "forged-adapter/1");
+    ASSERT_REJECTED_PRESENTATION_FIELD (series_profile_id, "forged-series/1");
+    ASSERT_REJECTED_PRESENTATION_FIELD (series_profile_version, "99");
+    ASSERT_REJECTED_PRESENTATION_FIELD (admission_profile_id, "forged-admission/1");
+    ASSERT_REJECTED_PRESENTATION_FIELD (admission_profile_version, "99");
+    ASSERT_REJECTED_PRESENTATION_FIELD (reconstruction_profile_id, "forged-reconstruction/1");
+    ASSERT_REJECTED_PRESENTATION_FIELD (source_chart_schema, "atm-chart-spec/3");
+    ASSERT_REJECTED_PRESENTATION_FIELD (source_chart_spec_id,
+        "1111111111111111111111111111111111111111111111111111111111111111");
+    ASSERT_REJECTED_PRESENTATION_FIELD (x_coordinate_semantics, "forged-coordinate");
+    ASSERT_REJECTED_PRESENTATION_FIELD (x_frequency, "quarterly");
+    ASSERT_REJECTED_PRESENTATION_FIELD (x_unit, "calendar_quarter");
+    ASSERT_REJECTED_PRESENTATION_FIELD (x_dimension, "space");
+    ASSERT_REJECTED_PRESENTATION_FIELD (subject, "forged-subject");
+    ASSERT_REJECTED_PRESENTATION_FIELD (attribute, "forged-attribute");
+    ASSERT_REJECTED_PRESENTATION_FIELD (y_unit, "percent");
+    ASSERT_REJECTED_PRESENTATION_FIELD (y_dimension, "survey_net_percentage");
+    ASSERT_REJECTED_PRESENTATION_FIELD (series_semantics, "forged-semantics");
+    ASSERT_REJECTED_PRESENTATION_FIELD (missing_policy, "bounded_profile");
+    ASSERT_REJECTED_PRESENTATION_FIELD (missing_coordinate, "2025-Q2");
+    ASSERT_REJECTED_PRESENTATION_FIELD (missing_reason, "source_round_not_retained");
+    ASSERT_REJECTED_PRESENTATION_FIELD (display_profile_id, "atm-display/forged");
+    ASSERT_REJECTED_PRESENTATION_FIELD (display_profile_version, "99");
+    ASSERT_REJECTED_PRESENTATION_FIELD (render_contract, "atm-retro-mono/99");
+#undef ASSERT_REJECTED_PRESENTATION_FIELD
+
     atm_chart_spec_v4_free (v4);
     v4 = NULL;
+
+    /*
+     * Repeat the full v4-sidecar derivation/reconstruction check for the
+     * second catalog-admitted GISTEMP snapshot.
+     */
+    static const char *ewd_current_sha =
+        "dc710d8e604c0fff713a3acfdb18ab47a1a902bb";
+    char *ewd_current = fixture_snapshot_named ("ewd-current");
+    AtmChartSpecV4 *current_v4 = NULL;
+    AtmChartSpecV4 *current_reopened_v4 = NULL;
+    AtmConversationChartPresentationInput current_presentation = {0};
+    g_assert_true (atm_chart_live_reconstruct_v4 (
+        gistemp_id, ewd_current,
+        "LaurentiuStaicu/empirical-world3-dynamics",
+        "main", ewd_current_sha, &current_v4, &error));
+    g_assert_no_error (error);
+    g_assert_nonnull (current_v4);
+    g_assert_cmpstr (atm_chart_spec_series_snapshot_sha (
+        atm_chart_spec_v4_source_spec (current_v4), 0), ==, ewd_current_sha);
+    g_assert_true (atm_chart_history_presentation_input_from_v4 (
+        current_v4, &current_presentation, &error));
+    g_assert_no_error (error);
+    g_assert_true (atm_chart_history_reconstruct_v4 (
+        gistemp_id, atm_chart_spec_v4_source_spec (current_v4),
+        &current_presentation, &current_reopened_v4, &error));
+    g_assert_no_error (error);
+    g_assert_nonnull (current_reopened_v4);
+    g_assert_cmpstr (atm_chart_spec_v4_id (current_reopened_v4), ==,
+                     atm_chart_spec_v4_id (current_v4));
+    atm_chart_spec_v4_free (current_reopened_v4);
+    atm_chart_spec_v4_free (current_v4);
+    g_free (ewd_current);
 
     g_assert_true (atm_chart_live_reconstruct_v4 (
         energy_id, ewd, "LaurentiuStaicu/empirical-world3-dynamics", NULL, ewd_initial, &v4, &error));

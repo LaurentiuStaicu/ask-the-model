@@ -545,6 +545,36 @@ test_chart_binding_domain_export_bridge ()
                 "0123456789abcdef0123456789abcdef01234567",
                 "science/data/processed/nasa_gistemp_global_2026.csv"
             );
+        var presentation =
+            new AskTheModel.ConversationPersistenceChartPresentation (
+                "atm-chart-spec/4",
+                "dddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddd",
+                "climate.gistemp.global-temperature-anomaly",
+                "atm-chart-catalog/1",
+                "gistemp-pinned-annual/1",
+                "atm-series/gistemp-complete-annual/1",
+                "1",
+                "atm-gistemp-pinned-admission/1",
+                "1",
+                "atm-chart-reconstruct/gistemp-complete-annual/1",
+                "atm-chart-spec/1",
+                "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+                "calendar_year",
+                "annual",
+                "calendar_year",
+                "time",
+                "global_surface_temperature",
+                "annual_temperature_anomaly",
+                "degree_Celsius_anomaly",
+                "temperature_difference",
+                "empirical_annual_observations",
+                "reject",
+                null,
+                null,
+                "atm-display/gistemp-linear",
+                "1",
+                "atm-retro-mono/1"
+            );
         var chart =
             new AskTheModel.ConversationPersistenceChart (
                 1,
@@ -553,6 +583,17 @@ test_chart_binding_domain_export_bridge ()
                 "line",
                 "atm-chart-reconstruct/gistemp-complete-annual/1",
                 { series }
+            );
+        var v4_chart =
+            new AskTheModel.ConversationPersistenceChart (
+                2,
+                "atm-chart-spec/1",
+                "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+                "line",
+                "atm-chart-reconstruct/gistemp-complete-annual/1",
+                { series },
+                presentation.presentation_schema,
+                presentation
             );
 
         store.attach_chart (
@@ -575,6 +616,12 @@ test_chart_binding_domain_export_bridge ()
 
         assert (duplicate_rejected);
 
+        store.attach_chart (
+            conversation_id,
+            turn_no,
+            v4_chart
+        );
+
         var snapshot =
             store.load_snapshot (
                 conversation_id
@@ -582,10 +629,12 @@ test_chart_binding_domain_export_bridge ()
 
         assert (snapshot.messages.length == 2);
         assert (snapshot.messages[0].charts.length == 0);
-        assert (snapshot.messages[1].charts.length == 1);
+        assert (snapshot.messages[1].charts.length == 2);
 
         var loaded_chart =
             snapshot.messages[1].charts[0];
+        var loaded_v4_chart =
+            snapshot.messages[1].charts[1];
         assert (loaded_chart.ordinal == 1);
         assert (loaded_chart.chart_schema == "atm-chart-spec/1");
         assert (
@@ -606,6 +655,14 @@ test_chart_binding_domain_export_bridge ()
             loaded_chart.series[0].qualified_id ==
             "cccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccc"
         );
+        assert (loaded_chart.presentation_schema == null);
+        assert (loaded_chart.presentation == null);
+        assert (loaded_v4_chart.presentation_schema == "atm-chart-spec/4");
+        assert (loaded_v4_chart.presentation != null);
+        assert (
+            loaded_v4_chart.presentation.presentation_spec_id ==
+            presentation.presentation_spec_id
+        );
 
         string first =
             store.export_conversation_json (
@@ -625,7 +682,7 @@ test_chart_binding_domain_export_bridge ()
             parser.get_root ().get_object ();
         assert (
             envelope.get_int_member ("schema_version") ==
-            2
+            3
         );
 
         Json.Array messages =
@@ -640,10 +697,15 @@ test_chart_binding_domain_export_bridge ()
         Json.Array charts =
             messages.get_object_element (1)
                 .get_array_member ("charts");
-        assert (charts.get_length () == 1);
+        assert (charts.get_length () == 2);
+
+        Json.Object exported_legacy_chart =
+            charts.get_object_element (0);
+        assert (exported_legacy_chart.get_null_member ("presentation_schema"));
+        assert (exported_legacy_chart.get_null_member ("presentation"));
 
         Json.Object exported_chart =
-            charts.get_object_element (0);
+            charts.get_object_element (1);
         assert (
             exported_chart.get_string_member ("chart_spec_id") ==
             loaded_chart.chart_spec_id
@@ -651,6 +713,114 @@ test_chart_binding_domain_export_bridge ()
         assert (
             exported_chart.get_string_member ("reconstruction_profile") ==
             loaded_chart.reconstruction_profile
+        );
+        assert (
+            exported_chart.get_string_member ("presentation_schema") ==
+            "atm-chart-spec/4"
+        );
+        Json.Object exported_presentation =
+            exported_chart.get_object_member ("presentation");
+        assert (
+            exported_presentation.get_string_member ("presentation_spec_id") ==
+            presentation.presentation_spec_id
+        );
+        assert (
+            exported_presentation.get_string_member ("series_id") ==
+            presentation.series_id
+        );
+        assert (
+            exported_presentation.get_string_member ("catalog_schema") ==
+            presentation.catalog_schema
+        );
+        assert (
+            exported_presentation.get_string_member ("adapter_id") ==
+            presentation.adapter_id
+        );
+        assert (
+            exported_presentation.get_string_member ("series_profile_id") ==
+            presentation.series_profile_id
+        );
+        assert (
+            exported_presentation.get_string_member ("series_profile_version") ==
+            presentation.series_profile_version
+        );
+        assert (
+            exported_presentation.get_string_member ("admission_profile_id") ==
+            presentation.admission_profile_id
+        );
+        assert (
+            exported_presentation.get_string_member ("admission_profile_version") ==
+            presentation.admission_profile_version
+        );
+        assert (
+            exported_presentation.get_string_member ("reconstruction_profile_id") ==
+            presentation.reconstruction_profile_id
+        );
+        assert (
+            exported_presentation.get_string_member ("x_coordinate_semantics") ==
+            presentation.x_coordinate_semantics
+        );
+        assert (
+            exported_presentation.get_string_member ("x_frequency") ==
+            presentation.x_frequency
+        );
+        assert (
+            exported_presentation.get_string_member ("x_unit") ==
+            presentation.x_unit
+        );
+        assert (
+            exported_presentation.get_string_member ("x_dimension") ==
+            presentation.x_dimension
+        );
+        assert (
+            exported_presentation.get_string_member ("subject") ==
+            presentation.subject
+        );
+        assert (
+            exported_presentation.get_string_member ("attribute") ==
+            presentation.attribute
+        );
+        assert (
+            exported_presentation.get_string_member ("y_unit") ==
+            presentation.y_unit
+        );
+        assert (
+            exported_presentation.get_string_member ("y_dimension") ==
+            presentation.y_dimension
+        );
+        assert (
+            exported_presentation.get_string_member ("series_semantics") ==
+            presentation.series_semantics
+        );
+        assert (
+            exported_presentation.get_string_member ("missing_policy") ==
+            presentation.missing_policy
+        );
+        assert (
+            exported_presentation.get_string_member ("display_profile_id") ==
+            presentation.display_profile_id
+        );
+        assert (
+            exported_presentation.get_string_member ("display_profile_version") ==
+            presentation.display_profile_version
+        );
+        assert (
+            exported_presentation.get_string_member ("source_chart_schema") ==
+            loaded_chart.chart_schema
+        );
+        assert (
+            exported_presentation.get_string_member ("source_chart_spec_id") ==
+            loaded_chart.chart_spec_id
+        );
+        assert (
+            exported_presentation.get_string_member ("render_contract") ==
+            presentation.render_contract
+        );
+        assert (
+            exported_presentation.get_null_member ("missing_coordinate")
+        );
+        assert (
+            exported_presentation.get_null_member ("missing_reason")
         );
 
         Json.Array exported_series =

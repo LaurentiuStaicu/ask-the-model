@@ -1324,7 +1324,7 @@ validate_chart_semantics (
     return TRUE;
 }
 
-/* V4 is a live presentation wrapper only; the durable v5 row remains source v1/v2/v3. */
+/* Source chart identity remains v1/v2/v3; v4 presentation claims live in a separately validated sidecar. */
 static gboolean
 validate_chart_presentation_semantics (
     sqlite3 *db,
@@ -2992,6 +2992,21 @@ validate_v6_for_migration (
             "Conversation-store v6 schema identity is invalid for migration.");
         return FALSE;
     }
+#ifdef ATM_CONVERSATION_STORE_TESTING
+    /*
+     * This seam exists only in the dedicated conversation-store test target.
+     * It fires after v6 identity/version checks, while the migration
+     * transaction is still open and before the final integrity/semantic
+     * validation and COMMIT.
+     */
+    if (g_strcmp0 (
+            g_getenv ("ATM_TEST_FAIL_V5_TO_V6_FINAL_VALIDATION"), "1") == 0) {
+        g_set_error_literal (error, ATM_CONVERSATION_STORE_ERROR,
+            ATM_CONVERSATION_STORE_ERROR_SCHEMA,
+            "Injected v5-to-v6 final validation failure.");
+        return FALSE;
+    }
+#endif
     return validate_integrity (db, error) &&
         validate_base_semantics (db, error) &&
         validate_chart_semantics (db, error) &&

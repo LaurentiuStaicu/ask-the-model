@@ -513,15 +513,33 @@ static void test_transcript_anchor_minimum_viewport (void)
     gtk_window_present (window);
     settle ();
 
+    GtkWidget *stack_widget = gtk_widget_get_last_child (GTK_WIDGET (view));
+    g_assert_true (GTK_IS_STACK (stack_widget));
+    g_assert_true (gtk_stack_get_vhomogeneous (GTK_STACK (stack_widget)));
+
     GtkWidget *area = chart_drawing_area (view);
-    g_assert_cmpint (gtk_widget_get_width (area), >=, 480);
-    g_assert_cmpint (gtk_widget_get_height (area), >=, 348);
+    g_assert_cmpint (gtk_widget_get_width (area), >=, 640);
+    g_assert_cmpint (gtk_widget_get_height (area), >=, 370);
 
     int render_width = 0, render_height = 0, render_scale = 0;
     atm_chart_view_test_render_size (view, &render_width, &render_height, &render_scale);
-    g_assert_cmpint (render_width, >=, 480);
-    g_assert_cmpint (render_height, >=, 348);
+    g_assert_cmpint (render_width, ==, gtk_widget_get_width (area));
+    g_assert_cmpint (render_height, ==, gtk_widget_get_height (area));
     g_assert_cmpint (render_scale, >=, 1);
+
+    char *data_before = g_strdup (atm_chart_view_data (view));
+    int initial_window_height = gtk_widget_get_height (GTK_WIDGET (window));
+    gtk_window_set_default_size (window, 300, 420);
+    settle ();
+    g_assert_cmpint (
+        gtk_widget_get_height (GTK_WIDGET (window)), <, initial_window_height);
+    g_assert_cmpint (gtk_widget_get_width (area), >=, 640);
+    g_assert_cmpint (gtk_widget_get_height (area), >=, 370);
+    atm_chart_view_test_render_size (view, &render_width, &render_height, &render_scale);
+    g_assert_cmpint (render_width, ==, gtk_widget_get_width (area));
+    g_assert_cmpint (render_height, ==, gtk_widget_get_height (area));
+    g_assert_cmpstr (atm_chart_view_data (view), ==, data_before);
+    g_free (data_before);
     gtk_window_destroy (window);
     settle ();
     g_object_unref (view);
@@ -557,6 +575,77 @@ static void test_keyboard_window (void)
     gpointer weak = view; g_object_add_weak_pointer (G_OBJECT (view), &weak); g_object_unref (view); g_assert_null (weak);
 }
 typedef AtmChartSpec *(*ChartSpecBuilder) (void);
+
+static void assert_transcript_anchor_resize (AtmChartView *view,
+                                             int minimum_width)
+{
+    GtkWidget *transcript = gtk_text_view_new ();
+    gtk_text_view_set_wrap_mode (
+        GTK_TEXT_VIEW (transcript), GTK_WRAP_WORD_CHAR);
+    GtkTextBuffer *buffer = gtk_text_view_get_buffer (
+        GTK_TEXT_VIEW (transcript));
+    GtkTextIter end;
+    gtk_text_buffer_get_end_iter (buffer, &end);
+    GtkTextChildAnchor *anchor =
+        gtk_text_buffer_create_child_anchor (buffer, &end);
+    gtk_text_view_add_child_at_anchor (
+        GTK_TEXT_VIEW (transcript), GTK_WIDGET (view), anchor);
+
+    GtkWidget *scroller = gtk_scrolled_window_new ();
+    gtk_scrolled_window_set_policy (
+        GTK_SCROLLED_WINDOW (scroller),
+        GTK_POLICY_NEVER,
+        GTK_POLICY_AUTOMATIC);
+    gtk_scrolled_window_set_child (
+        GTK_SCROLLED_WINDOW (scroller), transcript);
+
+    GtkWindow *window = GTK_WINDOW (gtk_window_new ());
+    gtk_window_set_default_size (window, 1000, 760);
+    gtk_window_set_child (window, scroller);
+    gtk_window_present (window);
+    settle ();
+
+    GtkWidget *area = chart_drawing_area (view);
+    g_assert_cmpint (gtk_widget_get_width (area), >=, minimum_width);
+    g_assert_cmpint (gtk_widget_get_height (area), >=, 370);
+    int width = 0, height = 0, scale = 0;
+    atm_chart_view_test_render_size (view, &width, &height, &scale);
+    g_assert_cmpint (width, ==, gtk_widget_get_width (area));
+    g_assert_cmpint (height, ==, gtk_widget_get_height (area));
+    g_assert_cmpint (scale, >=, 1);
+    g_assert_false (atm_chart_view_test_is_fallback (view));
+
+    char *data_before = g_strdup (atm_chart_view_data (view));
+    int initial_window_width = gtk_widget_get_width (GTK_WIDGET (window));
+    int initial_window_height = gtk_widget_get_height (GTK_WIDGET (window));
+
+    gtk_window_set_default_size (window, 300, 420);
+    settle ();
+    g_assert_cmpint (
+        gtk_widget_get_width (GTK_WIDGET (window)), <, initial_window_width);
+    g_assert_cmpint (
+        gtk_widget_get_height (GTK_WIDGET (window)), <, initial_window_height);
+    g_assert_cmpstr (atm_chart_view_data (view), ==, data_before);
+
+    atm_chart_view_test_render_size (view, &width, &height, &scale);
+    g_assert_cmpint (width, ==, gtk_widget_get_width (area));
+    g_assert_cmpint (height, ==, gtk_widget_get_height (area));
+    g_assert_cmpint (scale, >=, 1);
+
+    gtk_window_set_default_size (window, 1000, 760);
+    settle ();
+    g_assert_false (atm_chart_view_test_is_fallback (view));
+    g_assert_cmpint (gtk_widget_get_width (area), >=, minimum_width);
+    g_assert_cmpint (gtk_widget_get_height (area), >=, 370);
+    atm_chart_view_test_render_size (view, &width, &height, &scale);
+    g_assert_cmpint (width, ==, gtk_widget_get_width (area));
+    g_assert_cmpint (height, ==, gtk_widget_get_height (area));
+    g_assert_cmpstr (atm_chart_view_data (view), ==, data_before);
+
+    g_free (data_before);
+    gtk_window_destroy (window);
+    settle ();
+}
 
 static void assert_v4_catalog_view (const char *series_id,
                                     ChartSpecBuilder build_source_spec,
@@ -676,12 +765,21 @@ static void assert_v4_catalog_view (const char *series_id,
     settle ();
 
     if (exercise_resize) {
+        atm_chart_view_show_chart (view);
+        int minimum_width =
+            g_strcmp0 (series_id,
+                "banking.bnr.bls-c01.credit-standards-net-percentage") == 0
+                ? 800 : 640;
+        assert_transcript_anchor_resize (view, minimum_width);
+    }
+
+    if (exercise_resize) {
         char *data_before = g_strdup (atm_chart_view_data (view));
         int width = 0, height = 0, scale = 0;
-        atm_chart_view_test_request_resize (view, 740, 420, 1);
+        atm_chart_view_test_request_resize (view, 820, 420, 1);
         settle ();
         atm_chart_view_test_render_size (view, &width, &height, &scale);
-        g_assert_cmpint (width, ==, 740);
+        g_assert_cmpint (width, ==, 820);
         g_assert_cmpint (height, ==, 420);
         g_assert_cmpint (scale, ==, 1);
         g_assert_false (atm_chart_view_test_is_fallback (view));
@@ -708,10 +806,10 @@ static void assert_v4_catalog_view (const char *series_id,
         g_assert_cmpstr (atm_chart_view_data (view), ==, data_before);
 
         /* Returning to a valid viewport must restore the rendered chart. */
-        atm_chart_view_test_request_resize (view, 740, 420, 1);
+        atm_chart_view_test_request_resize (view, 820, 420, 1);
         settle ();
         atm_chart_view_test_render_size (view, &width, &height, &scale);
-        g_assert_cmpint (width, ==, 740);
+        g_assert_cmpint (width, ==, 820);
         g_assert_cmpint (height, ==, 420);
         g_assert_cmpint (scale, ==, 1);
         g_assert_false (atm_chart_view_test_is_fallback (view));
@@ -738,12 +836,12 @@ static void test_v4_gtk_catalog_profiles (void)
     g_test_message ("CHART-06f Energy Institute v4 GTK Chart/Data adapter");
     assert_v4_catalog_view (
         "energy.energy-institute.global-total-energy-supply",
-        build_ei_spec, "Year: 1965\n", FALSE);
+        build_ei_spec, "Year: 1965\n", TRUE);
 
     g_test_message ("CHART-06f BNR C01 v4 GTK Chart/Data adapter");
     assert_v4_catalog_view (
         "banking.bnr.bls-c01.credit-standards-net-percentage",
-        build_bnr_spec, "Quarter: 2022-Q4\n", FALSE);
+        build_bnr_spec, "Quarter: 2022-Q4\n", TRUE);
 }
 
 static void test_invalid (void)

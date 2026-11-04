@@ -19,7 +19,14 @@ jobs:
     timeout-minutes: 20
     steps:
       - uses: actions/checkout@v4
-      - name: Checkout complete EWD fixture at the admitted immutable snapshot
+      - name: Checkout complete EWD fixture at the historical admitted immutable snapshot
+        uses: actions/checkout@v4
+        with:
+          repository: LaurentiuStaicu/empirical-world3-dynamics
+          ref: d9e249339663015f6d1c05752338a955bf64ad0b
+          path: ewd-initial-full
+          fetch-depth: 1
+      - name: Checkout complete EWD fixture at the current admitted immutable snapshot
         uses: actions/checkout@v4
         with:
           repository: LaurentiuStaicu/empirical-world3-dynamics
@@ -60,6 +67,7 @@ jobs:
       - name: Run live, process-relaunch History, and tampered-source E2E
         env:
           ATM_CHART01_FIXTURE: tests/fixtures/chart01
+          ATM_PRES09_FULL_EWD_INITIAL_ROOT: ewd-initial-full
           ATM_PRES09_FULL_EWD_ROOT: ewd-full
           ATM_PRES09_FULL_RMD_ROOT: rmd-full
           GTK_A11Y: none

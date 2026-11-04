@@ -44,9 +44,6 @@ test_stable_ids_and_profiles (void)
                      "atm-series/energy-institute-tes-complete-annual/1");
     g_assert_cmpstr (bnr->series_profile_id, ==,
                      "atm-series/bnr-bls-c01-calendar-quarter/1");
-    g_assert_cmpstr (gistemp->history_schema_version, ==, "5");
-    g_assert_cmpstr (ei->history_schema_version, ==, "5");
-    g_assert_cmpstr (bnr->history_schema_version, ==, "5");
 }
 
 static void

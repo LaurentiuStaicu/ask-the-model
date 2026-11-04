@@ -2,7 +2,7 @@ namespace AskTheModel {
     public class ConversationExport : Object {
         public const string FORMAT =
             "ask-the-model-conversation-export";
-        public const int64 SCHEMA_VERSION = 2;
+        public const int64 SCHEMA_VERSION = 3;
 
         private static void add_nullable_string (
             Json.Builder builder,
@@ -122,6 +122,72 @@ namespace AskTheModel {
             builder.end_object ();
         }
 
+        private static void add_chart_presentation (
+            Json.Builder builder,
+            ConversationPersistenceChartPresentation presentation
+        ) {
+            builder.begin_object ();
+
+            builder.set_member_name ("presentation_schema");
+            builder.add_string_value (presentation.presentation_schema);
+            builder.set_member_name ("presentation_spec_id");
+            builder.add_string_value (presentation.presentation_spec_id);
+            builder.set_member_name ("series_id");
+            builder.add_string_value (presentation.series_id);
+            builder.set_member_name ("catalog_schema");
+            builder.add_string_value (presentation.catalog_schema);
+            builder.set_member_name ("adapter_id");
+            builder.add_string_value (presentation.adapter_id);
+            builder.set_member_name ("series_profile_id");
+            builder.add_string_value (presentation.series_profile_id);
+            builder.set_member_name ("series_profile_version");
+            builder.add_string_value (presentation.series_profile_version);
+            builder.set_member_name ("admission_profile_id");
+            builder.add_string_value (presentation.admission_profile_id);
+            builder.set_member_name ("admission_profile_version");
+            builder.add_string_value (presentation.admission_profile_version);
+            builder.set_member_name ("reconstruction_profile_id");
+            builder.add_string_value (presentation.reconstruction_profile_id);
+            builder.set_member_name ("source_chart_schema");
+            builder.add_string_value (presentation.source_chart_schema);
+            builder.set_member_name ("source_chart_spec_id");
+            builder.add_string_value (presentation.source_chart_spec_id);
+            builder.set_member_name ("x_coordinate_semantics");
+            builder.add_string_value (presentation.x_coordinate_semantics);
+            builder.set_member_name ("x_frequency");
+            builder.add_string_value (presentation.x_frequency);
+            builder.set_member_name ("x_unit");
+            builder.add_string_value (presentation.x_unit);
+            builder.set_member_name ("x_dimension");
+            builder.add_string_value (presentation.x_dimension);
+            builder.set_member_name ("subject");
+            builder.add_string_value (presentation.subject);
+            builder.set_member_name ("attribute");
+            builder.add_string_value (presentation.attribute);
+            builder.set_member_name ("y_unit");
+            builder.add_string_value (presentation.y_unit);
+            builder.set_member_name ("y_dimension");
+            builder.add_string_value (presentation.y_dimension);
+            builder.set_member_name ("series_semantics");
+            builder.add_string_value (presentation.series_semantics);
+            builder.set_member_name ("missing_policy");
+            builder.add_string_value (presentation.missing_policy);
+            add_nullable_string (
+                builder, "missing_coordinate", presentation.missing_coordinate
+            );
+            add_nullable_string (
+                builder, "missing_reason", presentation.missing_reason
+            );
+            builder.set_member_name ("display_profile_id");
+            builder.add_string_value (presentation.display_profile_id);
+            builder.set_member_name ("display_profile_version");
+            builder.add_string_value (presentation.display_profile_version);
+            builder.set_member_name ("render_contract");
+            builder.add_string_value (presentation.render_contract);
+
+            builder.end_object ();
+        }
+
         private static void add_chart (
             Json.Builder builder,
             ConversationPersistenceChart chart
@@ -144,6 +210,18 @@ namespace AskTheModel {
             builder.add_string_value (
                 chart.reconstruction_profile
             );
+
+            add_nullable_string (
+                builder,
+                "presentation_schema",
+                chart.presentation_schema
+            );
+            builder.set_member_name ("presentation");
+            if (chart.presentation == null) {
+                builder.add_null_value ();
+            } else {
+                add_chart_presentation (builder, chart.presentation);
+            }
 
             builder.set_member_name ("series");
             builder.begin_array ();

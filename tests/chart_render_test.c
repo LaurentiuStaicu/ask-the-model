@@ -7,6 +7,14 @@
 #include <fontconfig/fontconfig.h>
 #include <stdint.h>
 #include <string.h>
+
+#ifdef ATM_CHART_RENDER_V4_TESTING
+G_GNUC_INTERNAL gboolean
+_atm_chart_render_v4_test_validate_with_projection (
+    const AtmChartRenderV4 *render,
+    const AtmChartProjectionV4 *projection,
+    GError **error);
+#endif
 static const char GISTEMP_SNAPSHOT_INITIAL[] =
     "d9e249339663015f6d1c05752338a955bf64ad0b";
 static const char GISTEMP_SNAPSHOT_CURRENT[] =
@@ -808,6 +816,132 @@ test_v4_render_fallback_keeps_exact_data (void)
     atm_chart_spec_v4_free (spec);
 }
 
+
+static void
+test_v4_render_rejects_projection_from_other_snapshot (void)
+{
+    static const char *const series_id =
+        "climate.gistemp.global-temperature-anomaly";
+    AtmChartSpecV4 *render_spec = render_v4_spec_from_source (
+        series_id, specification_for_snapshot (
+            ATM_CHART_LINE, GISTEMP_SNAPSHOT_CURRENT));
+    AtmChartSpecV4 *foreign_spec = render_v4_spec_from_source (
+        series_id, specification_for_snapshot (
+            ATM_CHART_LINE, GISTEMP_SNAPSHOT_INITIAL));
+    AtmChartRenderV4 *render = render_v4_new_for_test (
+        render_spec, 860, 500, 1);
+    AtmChartProjectionV4 *foreign_projection = NULL;
+    GError *error = NULL;
+
+    /* The render's 860x500 viewport reserves 128x210 for non-plot content. */
+    g_assert_true (atm_chart_projection_v4_new (
+        foreign_spec, 732.0, 290.0, &foreign_projection, &error));
+    g_assert_no_error (error);
+    g_assert_nonnull (foreign_projection);
+    g_assert_true (atm_chart_projection_v4_validate (
+        foreign_projection, &error));
+    g_assert_no_error (error);
+
+    const AtmChartSpecV4 *render_owned_spec =
+        atm_chart_render_v4_spec (render);
+    const AtmChartSpecV4 *projection_owned_spec =
+        atm_chart_projection_v4_spec (foreign_projection);
+    g_assert_cmpstr (
+        atm_chart_spec_v4_series_id (render_owned_spec), ==, series_id);
+    g_assert_cmpstr (
+        atm_chart_spec_v4_series_id (projection_owned_spec), ==, series_id);
+    g_assert_cmpstr (
+        atm_chart_spec_v4_id (render_owned_spec), !=,
+        atm_chart_spec_v4_id (projection_owned_spec));
+    g_assert_cmpstr (
+        atm_chart_spec_id (atm_chart_spec_v4_source_spec (render_owned_spec)),
+        !=,
+        atm_chart_spec_id (atm_chart_spec_v4_source_spec (projection_owned_spec)));
+    g_assert_cmpuint (
+        atm_chart_spec_v4_coordinate_count (render_owned_spec), ==,
+        atm_chart_spec_v4_coordinate_count (projection_owned_spec));
+    g_assert_cmpuint (
+        atm_chart_spec_v4_numeric_observation_count (render_owned_spec), ==,
+        atm_chart_spec_v4_numeric_observation_count (projection_owned_spec));
+    g_assert_cmpstr (
+        atm_chart_projection_v4_policy (foreign_projection), ==,
+        atm_chart_projection_v4_policy (
+            atm_chart_render_v4_projection (render)));
+
+    /* The projection is valid on its own, but must not validate against this render. */
+    g_assert_false (_atm_chart_render_v4_test_validate_with_projection (
+        render, foreign_projection, &error));
+    g_assert_error (error, ATM_CHART_RENDER_V4_ERROR,
+                    ATM_CHART_RENDER_V4_ERROR_PROJECTION);
+    g_clear_error (&error);
+
+    /* The seam must restore the original owned projection even on rejection. */
+    g_assert_true (atm_chart_render_v4_validate (render, &error));
+    g_assert_no_error (error);
+
+    atm_chart_projection_v4_free (foreign_projection);
+    atm_chart_render_v4_free (render);
+    atm_chart_spec_v4_free (foreign_spec);
+    atm_chart_spec_v4_free (render_spec);
+}
+
+static void
+test_v4_render_rejects_same_source_projection_with_wrong_geometry (void)
+{
+    static const char *const series_id =
+        "climate.gistemp.global-temperature-anomaly";
+    AtmChartSpecV4 *spec = render_v4_spec_from_source (
+        series_id, specification_for_snapshot (
+            ATM_CHART_LINE, GISTEMP_SNAPSHOT_CURRENT));
+    AtmChartRenderV4 *render = render_v4_new_for_test (
+        spec, 860, 500, 1);
+    AtmChartProjectionV4 *wrong_geometry = NULL;
+    GError *error = NULL;
+
+    /* Same admitted source/profile, but a different plot rectangle. */
+    g_assert_true (atm_chart_projection_v4_new (
+        spec, 600.0, 240.0, &wrong_geometry, &error));
+    g_assert_no_error (error);
+    g_assert_nonnull (wrong_geometry);
+    g_assert_true (atm_chart_projection_v4_validate (
+        wrong_geometry, &error));
+    g_assert_no_error (error);
+
+    const AtmChartProjection *render_projection =
+        atm_chart_projection_v4_source_projection (
+            atm_chart_render_v4_projection (render));
+    const AtmChartProjection *foreign_projection =
+        atm_chart_projection_v4_source_projection (wrong_geometry);
+    g_assert_nonnull (render_projection);
+    g_assert_nonnull (foreign_projection);
+    g_assert_cmpstr (
+        atm_chart_spec_v4_id (atm_chart_projection_v4_spec (
+            wrong_geometry)), ==,
+        atm_chart_spec_v4_id (atm_chart_render_v4_spec (render)));
+    g_assert_cmpuint (
+        atm_chart_projection_count (foreign_projection), ==,
+        atm_chart_projection_count (render_projection));
+    g_assert_false (_atm_chart_projection_geometry_matches (
+        foreign_projection, 732.0, 290.0));
+    g_assert_true (_atm_chart_projection_geometry_matches (
+        render_projection, 732.0, 290.0));
+
+    /* Valid in isolation is insufficient: geometry is not interchangeable. */
+    g_assert_false (_atm_chart_render_v4_test_validate_with_projection (
+        render, wrong_geometry, &error));
+    g_assert_error (error, ATM_CHART_RENDER_V4_ERROR,
+                    ATM_CHART_RENDER_V4_ERROR_PROJECTION);
+    g_clear_error (&error);
+
+    /* Rejection must not corrupt or replace the renderer's owned projection. */
+    g_assert_true (atm_chart_render_v4_validate (render, &error));
+    g_assert_no_error (error);
+
+    atm_chart_projection_v4_free (wrong_geometry);
+    atm_chart_render_v4_free (render);
+    atm_chart_spec_v4_free (spec);
+}
+
 static void
 test_v4_render_rejections_and_tampering (void)
 {
@@ -887,6 +1021,8 @@ int main (int argc, char **argv)
     g_test_add_func ("/chart-render-v4/generic-painter-and-exact-data", test_v4_generic_painter_profiles_and_exact_data);
     g_test_add_func ("/chart-render-v4/gistemp-data-qualified-snapshot", test_v4_gistemp_data_view_uses_qualified_snapshot);
     g_test_add_func ("/chart-render-v4/fallback-data", test_v4_render_fallback_keeps_exact_data);
+    g_test_add_func ("/chart-render-v4/rejects-foreign-snapshot-projection", test_v4_render_rejects_projection_from_other_snapshot);
+    g_test_add_func ("/chart-render-v4/rejects-same-source-wrong-geometry", test_v4_render_rejects_same_source_projection_with_wrong_geometry);
     g_test_add_func ("/chart-render-v4/rejections-tampering", test_v4_render_rejections_and_tampering);
     int result = g_test_run ();
     /* Release process-wide Cairo/Fontconfig test caches after every object is

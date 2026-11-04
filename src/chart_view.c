@@ -521,19 +521,32 @@ static gboolean atm_chart_view_new_internal (const AtmChartSpec *spec,
                                       GError **error)
 {
     if (!out || *out) return reject (error, "Invalid chart widget output.");
+    const AtmChartSpec *initial_source_spec = spec != NULL
+        ? spec
+        : (spec_v4 != NULL
+            ? atm_chart_spec_v4_source_spec (spec_v4)
+            : NULL);
+    int initial_width =
+        g_strcmp0 (chart_source_profile (initial_source_spec), "bnr") == 0
+            ? 800 : 640;
+    const int initial_height = 380;
     AtmChartRender *initial = NULL;
     AtmChartRenderV4 *initial_v4 = NULL;
     if (spec_v4 != NULL) {
-        if (!atm_chart_render_v4_new (spec_v4, 860, 500, 1, &initial_v4, error))
+        if (!atm_chart_render_v4_new (
+                spec_v4, (guint) initial_width, initial_height, 1,
+                &initial_v4, error))
             return FALSE;
-    } else if (!atm_chart_render_new (spec, 860, 500, 1, &initial, error)) {
+    } else if (!atm_chart_render_new (
+            spec, (guint) initial_width, initial_height, 1,
+            &initial, error)) {
         return FALSE;
     }
     AtmChartView *self = g_object_ref_sink (g_object_new (ATM_TYPE_CHART_VIEW, "accessible-role", GTK_ACCESSIBLE_ROLE_GROUP, NULL));
     self->render = initial;
     self->render_v4 = initial_v4;
-    self->requested_width = self->render_width = 860;
-    self->requested_height = self->render_height = 500;
+    self->requested_width = self->render_width = initial_width;
+    self->requested_height = self->render_height = initial_height;
     self->requested_scale = self->render_scale = 1;
     self->data = g_strdup (view_data (self));
     self->rows = gtk_string_list_new (NULL);
@@ -566,12 +579,17 @@ static gboolean atm_chart_view_new_internal (const AtmChartSpec *spec,
     gtk_label_set_xalign (self->status, 0); gtk_widget_set_visible (GTK_WIDGET (self->status), FALSE);
     gtk_box_append (GTK_BOX (chart), GTK_WIDGET (self->status));
     self->area = GTK_DRAWING_AREA (gtk_drawing_area_new ());
-    /* The view is embedded at a GtkTextView child anchor. Reserve enough
-     * natural width for the longest qualified renderer footer. At 432 logical
-     * pixels EI meets the projection minimum but falls back because the footer
-     * does not fit; 480 leaves 448px for its label and the 32px side margins. */
-    gtk_drawing_area_set_content_width (self->area, 480);
-    gtk_drawing_area_set_content_height (self->area, 348);
+    /*
+     * GtkTextView child anchors allocate embedded widgets at their minimum
+     * size, not their natural size. A 480px minimum therefore remains 480px
+     * even in a wide window; it does not create responsive shrink/recovery and
+     * causes qualified labels to fall back at ordinary window sizes. Reserve
+     * the selected profile's actual renderer width instead. The transcript
+     * scroller handles a narrower window; renderer fallback/recovery is tested
+     * independently with real component allocations.
+     */
+    gtk_drawing_area_set_content_width (self->area, initial_width);
+    gtk_drawing_area_set_content_height (self->area, initial_height);
     gtk_widget_set_hexpand (GTK_WIDGET (self->area), TRUE); gtk_widget_set_vexpand (GTK_WIDGET (self->area), TRUE);
     gtk_widget_set_focusable (GTK_WIDGET (self->area), TRUE);
     accessible (GTK_WIDGET (self->area),
@@ -697,22 +715,5 @@ void atm_chart_view_test_area_size (AtmChartView *self, int *width, int *height)
 gboolean atm_chart_view_test_is_fallback (AtmChartView *self)
 {
     return view_is_fallback (self);
-}
-void atm_chart_view_test_set_canvas_minimum (
-    AtmChartView *self, int width, int height
-)
-{
-    if (self == NULL || self->area == NULL || width < 1 || height < 1)
-        return;
-    gtk_drawing_area_set_content_width (self->area, width);
-    gtk_drawing_area_set_content_height (self->area, height);
-    gtk_widget_set_vexpand (GTK_WIDGET (self->stack), height >= 348);
-    if (height < 348) {
-        gtk_scrolled_window_set_min_content_height (self->data_scroll, 1);
-        gtk_scrolled_window_set_min_content_height (self->details_scroll, 1);
-     } else {
-        gtk_scrolled_window_set_min_content_height (self->data_scroll, 180);
-        gtk_scrolled_window_set_min_content_height (self->details_scroll, 140);
-     }
 }
 #endif
