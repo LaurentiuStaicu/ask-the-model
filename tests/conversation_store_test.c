@@ -238,7 +238,8 @@ raw_schema_structure_snapshot (
 {
     static const char *tables[] = {
         "installation", "conversations", "conversation_repositories",
-        "messages", "citations", "message_charts", "chart_series"
+        "messages", "citations", "message_charts", "chart_series",
+        "chart_presentations_v4"
     };
     sqlite3 *db = NULL;
     g_assert_cmpint (
@@ -354,6 +355,14 @@ raw_table_data_snapshot (
     );
     for (gsize i = 0; i < G_N_ELEMENTS (data_queries); i++)
         append_raw_query_snapshot (db, data_queries[i], snapshot);
+    if (sqlite3_exec (db, "SELECT 1 FROM chart_presentations_v4 LIMIT 0;",
+                      NULL, NULL, NULL) == SQLITE_OK)
+        append_raw_query_snapshot (
+            db,
+            "SELECT * FROM chart_presentations_v4 "
+            "ORDER BY message_id,chart_ordinal;",
+            snapshot
+        );
     sqlite3_close (db);
     return g_string_free (snapshot, FALSE);
 }
@@ -863,6 +872,33 @@ create_v5_store (
         "PRAGMA application_id=%u;"
         "PRAGMA user_version=5;"
         "COMMIT;",
+        schema,
+        (guint) ATM_CONVERSATION_STORE_APPLICATION_ID
+    );
+    raw_exec (path, sql);
+    g_free (sql);
+    g_free (schema);
+    g_bytes_unref (bytes);
+}
+
+static void
+create_v6_store_direct (
+    const char *path
+)
+{
+    GError *error = NULL;
+    GBytes *bytes = g_resources_lookup_data (
+        "/io/github/laurentiustaicu/ask_the_model/schemas/conversation-store-v6.sql",
+        G_RESOURCE_LOOKUP_FLAGS_NONE,
+        &error
+    );
+    g_assert_no_error (error);
+    g_assert_nonnull (bytes);
+    gsize size = 0;
+    const char *data = g_bytes_get_data (bytes, &size);
+    char *schema = g_strndup (data, size);
+    char *sql = g_strdup_printf (
+        "%sPRAGMA application_id=%u;PRAGMA user_version=6;",
         schema,
         (guint) ATM_CONVERSATION_STORE_APPLICATION_ID
     );
@@ -1535,6 +1571,10 @@ test_v5_canonical_ddl_resource_hashes (void)
         {
             "/io/github/laurentiustaicu/ask_the_model/schemas/conversation-store-v4-to-v5.sql",
             "ec955b45e8b0b47d2d0c4380a2e64a049400ecb7394374e2b7aa93fea70ac033"
+        },
+        {
+            "/io/github/laurentiustaicu/ask_the_model/schemas/conversation-store-v6.sql",
+            "69112facb8980760eeebbdc63233ff71eedd27db314480b83401a7f32f35e070"
         }
     };
 
@@ -1558,6 +1598,147 @@ test_v5_canonical_ddl_resource_hashes (void)
         g_free (digest);
         g_bytes_unref (bytes);
     }
+}
+
+static void
+test_v6_direct_ddl_opens_without_migration (void)
+{
+    char *root = new_temp_root ("atm-conversation-v6-direct-ddl-XXXXXX");
+    char *path = store_path (root);
+    create_v6_store_direct (path);
+    populate_v5_representative_data (path);
+    char *before = raw_logical_state_snapshot (path);
+
+    AtmConversationStore *store = NULL;
+    GError *error = NULL;
+    g_assert_true (atm_conversation_store_open (path, &store, &error));
+    g_assert_no_error (error);
+    g_assert_nonnull (store);
+    g_assert_cmpint (atm_conversation_store_schema_version (store), ==, 6);
+    g_assert_true (atm_conversation_store_validate (store, &error));
+    g_assert_no_error (error);
+    g_assert_cmpint (raw_int64 (path, "PRAGMA application_id;"), ==,
+                     ATM_CONVERSATION_STORE_APPLICATION_ID);
+    g_assert_cmpint (raw_int64 (path, "PRAGMA user_version;"), ==, 6);
+    char *schema_id = raw_text (
+        path,
+        "SELECT schema_id FROM installation WHERE singleton_id=1;"
+    );
+    g_assert_cmpstr (schema_id, ==, ATM_CONVERSATION_STORE_SCHEMA_ID);
+    g_free (schema_id);
+    char *integrity = raw_text (path, "PRAGMA integrity_check;");
+    g_assert_cmpstr (integrity, ==, "ok");
+    g_free (integrity);
+    g_assert_cmpint (
+        raw_int64 (path, "SELECT count(*) FROM pragma_foreign_key_check;"),
+        ==,
+        0
+    );
+    char *after = raw_logical_state_snapshot (path);
+    g_assert_cmpstr (after, ==, before);
+    g_free (after);
+    g_free (before);
+
+    atm_conversation_store_close (store);
+    g_free (path);
+    remove_tree_best_effort (root);
+    g_free (root);
+}
+
+static void
+assert_v6_direct_ddl_rejected_without_changes (
+    const char *test_name,
+    const char *ddl
+)
+{
+    char *root = new_temp_root (test_name);
+    char *path = store_path (root);
+    create_v6_store_direct (path);
+    populate_v5_representative_data (path);
+    raw_exec (path, ddl);
+
+    char *before = raw_logical_state_snapshot (path);
+    gint64 application_id_before = raw_int64 (
+        path,
+        "PRAGMA application_id;"
+    );
+    gint64 user_version_before = raw_int64 (
+        path,
+        "PRAGMA user_version;"
+    );
+    gint64 schema_version_before = raw_int64 (
+        path,
+        "PRAGMA schema_version;"
+    );
+
+    AtmConversationStore *store = NULL;
+    GError *error = NULL;
+    g_assert_false (atm_conversation_store_open (path, &store, &error));
+    g_assert_null (store);
+    g_assert_nonnull (error);
+    g_clear_error (&error);
+
+    char *after = raw_logical_state_snapshot (path);
+    g_assert_cmpstr (after, ==, before);
+    g_assert_cmpint (
+        raw_int64 (path, "PRAGMA application_id;"),
+        ==,
+        application_id_before
+    );
+    g_assert_cmpint (
+        raw_int64 (path, "PRAGMA user_version;"),
+        ==,
+        user_version_before
+    );
+    g_assert_cmpint (
+        raw_int64 (path, "PRAGMA schema_version;"),
+        ==,
+        schema_version_before
+    );
+    g_assert_cmpint (user_version_before, ==, 6);
+    g_assert_cmpint (
+        raw_int64 (
+            path,
+            "SELECT count(*) FROM installation "
+            "WHERE singleton_id=1 AND schema_id='atm-conversation-store/6';"
+        ),
+        ==,
+        1
+    );
+    char *integrity = raw_text (path, "PRAGMA integrity_check;");
+    g_assert_cmpstr (integrity, ==, "ok");
+    g_free (integrity);
+    g_assert_cmpint (
+        raw_int64 (path, "SELECT count(*) FROM pragma_foreign_key_check;"),
+        ==,
+        0
+    );
+
+    g_free (before);
+    g_free (after);
+    g_free (path);
+    remove_tree_best_effort (root);
+    g_free (root);
+}
+
+static void
+test_v6_direct_ddl_extra_index_rejected_without_changes (void)
+{
+    assert_v6_direct_ddl_rejected_without_changes (
+        "atm-v6-direct-extra-index-XXXXXX",
+        "CREATE INDEX user_extra_message_role ON messages(role);"
+    );
+}
+
+static void
+test_v6_direct_ddl_modified_index_rejected_without_changes (void)
+{
+    assert_v6_direct_ddl_rejected_without_changes (
+        "atm-v6-direct-modified-index-XXXXXX",
+        "DROP INDEX idx_messages_conversation_sequence;"
+        "CREATE INDEX idx_messages_conversation_sequence "
+        "ON messages(conversation_id,turn_no,role);"
+    );
 }
 
 static void
@@ -4675,6 +4856,18 @@ main (int argc, char **argv)
     g_test_add_func (
         "/conversation-store/v5-canonical-ddl-resource-hashes",
         test_v5_canonical_ddl_resource_hashes
+    );
+    g_test_add_func (
+        "/conversation-store/v6-direct-ddl-opens-without-migration",
+        test_v6_direct_ddl_opens_without_migration
+    );
+    g_test_add_func (
+        "/conversation-store/v6-direct-extra-index-rejected-without-changes",
+        test_v6_direct_ddl_extra_index_rejected_without_changes
+    );
+    g_test_add_func (
+        "/conversation-store/v6-direct-modified-index-rejected-without-changes",
+        test_v6_direct_ddl_modified_index_rejected_without_changes
     );
     g_test_add_func (
         "/conversation-store/v5-auxiliary-index-rejected",

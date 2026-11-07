@@ -14,6 +14,8 @@
     "/io/github/laurentiustaicu/ask_the_model/schemas/conversation-store-v4-to-v5.sql"
 #define ATM_CONVERSATION_STORE_MIGRATION_V5_V6_RESOURCE \
     "/io/github/laurentiustaicu/ask_the_model/schemas/conversation-store-v5-to-v6.sql"
+#define ATM_CONVERSATION_STORE_SCHEMA_V6_RESOURCE \
+    "/io/github/laurentiustaicu/ask_the_model/schemas/conversation-store-v6.sql"
 #define ATM_CONVERSATION_STORE_SCHEMA_V4_RESOURCE \
     "/io/github/laurentiustaicu/ask_the_model/schemas/conversation-store-v4.sql"
 #define ATM_CONVERSATION_STORE_MIGRATION_V1_V2_RESOURCE \
@@ -526,6 +528,20 @@ load_schema_v4_sql (
     );
 }
 
+static gboolean
+load_schema_v6_sql (
+    char **out_sql,
+    GError **error
+)
+{
+    return load_sql_resource (
+        ATM_CONVERSATION_STORE_SCHEMA_V6_RESOURCE,
+        "v6 schema",
+        out_sql,
+        error
+    );
+}
+
 static void
 append_fingerprint_value (
     GString *fingerprint,
@@ -857,6 +873,7 @@ static gboolean
 create_canonical_schema_db (
     gint version,
     gboolean migrate_from_v4,
+    gboolean bootstrap_direct_v6,
     sqlite3 **out_db,
     GError **error
 )
@@ -883,7 +900,11 @@ create_canonical_schema_db (
     if (!exec_sql (db, "PRAGMA foreign_keys=ON;", error))
         goto out;
 
-    if (migrate_from_v4) {
+    if (bootstrap_direct_v6) {
+        if (!load_schema_v6_sql (&schema_sql, error) ||
+            !exec_sql (db, schema_sql, error))
+            goto out;
+    } else if (migrate_from_v4) {
         if (!load_schema_v4_sql (&schema_sql, error) ||
             !load_migration_v4_v5_sql (&migration_sql, error) ||
             !exec_sql (db, schema_sql, error) ||
@@ -899,7 +920,8 @@ create_canonical_schema_db (
     g_free (schema_sql);
     schema_sql = NULL;
 
-    if (version == ATM_CONVERSATION_STORE_SCHEMA_V6_VERSION) {
+    if (version == ATM_CONVERSATION_STORE_SCHEMA_V6_VERSION &&
+        !bootstrap_direct_v6) {
         if (!load_migration_v5_v6_sql (&migration_sql, error) ||
             !exec_sql (db, migration_sql, error))
             goto out;
@@ -935,6 +957,7 @@ static gboolean
 create_canonical_schema_fingerprint (
     gint version,
     gboolean migrate_from_v4,
+    gboolean bootstrap_direct_v6,
     char **out_fingerprint,
     GError **error
 )
@@ -943,6 +966,7 @@ create_canonical_schema_fingerprint (
     if (!create_canonical_schema_db (
             version,
             migrate_from_v4,
+            bootstrap_direct_v6,
             &db,
             error
         ))
@@ -969,14 +993,16 @@ static gboolean
 get_canonical_fingerprint (
     gint version,
     gboolean migrate_from_v4,
+    gboolean bootstrap_direct_v6,
     const char **out_fingerprint,
     GError **error
 )
 {
     char *key = g_strdup_printf (
-        "%d:%d",
+        "%d:%d:%d",
         version,
-        migrate_from_v4 ? 1 : 0
+        migrate_from_v4 ? 1 : 0,
+        bootstrap_direct_v6 ? 1 : 0
     );
     g_mutex_lock (&canonical_fingerprint_mutex);
     if (canonical_fingerprint_cache == NULL)
@@ -994,6 +1020,7 @@ get_canonical_fingerprint (
         if (!create_canonical_schema_fingerprint (
                 version,
                 migrate_from_v4,
+                bootstrap_direct_v6,
                 &fingerprint,
                 error
             )) {
@@ -1232,14 +1259,22 @@ report_schema_inventory_mismatch (
         }
     }
 
-    sqlite3 *canonical[2] = { NULL, NULL };
-    if (!create_canonical_schema_db (version, FALSE, &canonical[0], error) ||
-        !create_canonical_schema_db (version, TRUE, &canonical[1], error)) {
-        if (canonical[0] != NULL)
-            sqlite3_close (canonical[0]);
-        if (canonical[1] != NULL)
-            sqlite3_close (canonical[1]);
-        return FALSE;
+    sqlite3 *canonical[3] = { NULL, NULL, NULL };
+    guint canonical_count =
+        version == ATM_CONVERSATION_STORE_SCHEMA_V6_VERSION ? 3 : 2;
+    for (guint variant = 0; variant < canonical_count; variant++) {
+        if (!create_canonical_schema_db (
+                version,
+                variant == 1,
+                variant == 2,
+                &canonical[variant],
+                error
+            )) {
+            for (guint i = 0; i < canonical_count; i++)
+                if (canonical[i] != NULL)
+                    sqlite3_close (canonical[i]);
+            return FALSE;
+        }
     }
 
     rc = sqlite3_prepare_v2 (
@@ -1257,7 +1292,7 @@ report_schema_inventory_mismatch (
             const char *table = (const char *) sqlite3_column_text (statement, 2);
             const char *sql = (const char *) sqlite3_column_text (statement, 3);
             gboolean matches_variant = FALSE;
-            for (guint i = 0; i < G_N_ELEMENTS (canonical); i++) {
+            for (guint i = 0; i < canonical_count; i++) {
                 sqlite3_stmt *expected = NULL;
                 int expected_rc = sqlite3_prepare_v2 (
                     canonical[i],
@@ -1309,15 +1344,15 @@ report_schema_inventory_mismatch (
                     table != NULL ? table : "unknown"
                 );
                 sqlite3_finalize (statement);
-                sqlite3_close (canonical[0]);
-                sqlite3_close (canonical[1]);
+                for (guint i = 0; i < canonical_count; i++)
+                    sqlite3_close (canonical[i]);
                 return FALSE;
             }
         }
     }
     sqlite3_finalize (statement);
-    sqlite3_close (canonical[0]);
-    sqlite3_close (canonical[1]);
+    for (guint i = 0; i < canonical_count; i++)
+        sqlite3_close (canonical[i]);
     if (rc != SQLITE_DONE) {
         set_sqlite_error (
             db,
@@ -1354,13 +1389,14 @@ validate_schema_inventory (
 
     gboolean matches = FALSE;
     guint variant_count = version == ATM_CONVERSATION_STORE_SCHEMA_V6_VERSION
-        ? 2
+        ? 3
         : 2;
     for (guint variant = 0; variant < variant_count; variant++) {
         const char *expected = NULL;
         if (!get_canonical_fingerprint (
                 version,
                 variant == 1,
+                variant == 2,
                 &expected,
                 error
             )) {
