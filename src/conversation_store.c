@@ -12,6 +12,12 @@
     "/io/github/laurentiustaicu/ask_the_model/schemas/conversation-store-v3-to-v4.sql"
 #define ATM_CONVERSATION_STORE_MIGRATION_V4_V5_RESOURCE \
     "/io/github/laurentiustaicu/ask_the_model/schemas/conversation-store-v4-to-v5.sql"
+#define ATM_CONVERSATION_STORE_MIGRATION_V5_V6_RESOURCE \
+    "/io/github/laurentiustaicu/ask_the_model/schemas/conversation-store-v5-to-v6.sql"
+#define ATM_CONVERSATION_STORE_SCHEMA_V6_RESOURCE \
+    "/io/github/laurentiustaicu/ask_the_model/schemas/conversation-store-v6.sql"
+#define ATM_CONVERSATION_STORE_SCHEMA_V4_RESOURCE \
+    "/io/github/laurentiustaicu/ask_the_model/schemas/conversation-store-v4.sql"
 #define ATM_CONVERSATION_STORE_MIGRATION_V1_V2_RESOURCE \
     "/io/github/laurentiustaicu/ask_the_model/schemas/conversation-store-v1-to-v2.sql"
 #define ATM_CONVERSATION_STORE_MIGRATION_V2_V3_RESOURCE \
@@ -24,6 +30,10 @@
 #define ATM_CONVERSATION_STORE_SCHEMA_V3_VERSION 3
 #define ATM_CONVERSATION_STORE_SCHEMA_V4_ID "atm-conversation-store/4"
 #define ATM_CONVERSATION_STORE_SCHEMA_V4_VERSION 4
+#define ATM_CONVERSATION_STORE_SCHEMA_V5_ID "atm-conversation-store/5"
+#define ATM_CONVERSATION_STORE_SCHEMA_V5_VERSION 5
+#define ATM_CONVERSATION_STORE_SCHEMA_V6_ID "atm-conversation-store/6"
+#define ATM_CONVERSATION_STORE_SCHEMA_V6_VERSION 6
 
 struct AtmConversationStore {
     sqlite3 *db;
@@ -44,6 +54,42 @@ typedef struct {
 struct AtmConversationList {
     GPtrArray *entries;
 };
+
+static gboolean validate_v6_for_migration (sqlite3 *db, GError **error);
+static gboolean validate_v6_presentation_semantics (
+    sqlite3 *db,
+    GError **error
+);
+#ifdef ATM_CONVERSATION_STORE_TESTING
+static guint fail_v5_v6_after_statement;
+static gboolean fail_v5_v6_after_sql_resource;
+static void (*v5_v6_lock_hook) (gpointer user_data);
+static gpointer v5_v6_lock_hook_data;
+
+void
+atm_conversation_store_test_fail_v5_v6_after_statement (
+    guint statement_number
+)
+{
+    fail_v5_v6_after_statement = statement_number;
+}
+
+void
+atm_conversation_store_test_fail_v5_v6_after_sql_resource (void)
+{
+    fail_v5_v6_after_sql_resource = TRUE;
+}
+
+void
+atm_conversation_store_test_set_v5_v6_lock_hook (
+    void (*hook) (gpointer user_data),
+    gpointer user_data
+)
+{
+    v5_v6_lock_hook = hook;
+    v5_v6_lock_hook_data = user_data;
+}
+#endif
 
 typedef struct {
     char *repository_id;
@@ -455,6 +501,920 @@ load_migration_v4_v5_sql (
 }
 
 static gboolean
+load_migration_v5_v6_sql (
+    char **out_sql,
+    GError **error
+)
+{
+    return load_sql_resource (
+        ATM_CONVERSATION_STORE_MIGRATION_V5_V6_RESOURCE,
+        "v5-to-v6 migration",
+        out_sql,
+        error
+    );
+}
+
+static gboolean
+load_schema_v4_sql (
+    char **out_sql,
+    GError **error
+)
+{
+    return load_sql_resource (
+        ATM_CONVERSATION_STORE_SCHEMA_V4_RESOURCE,
+        "v4 schema",
+        out_sql,
+        error
+    );
+}
+
+static gboolean
+load_schema_v6_sql (
+    char **out_sql,
+    GError **error
+)
+{
+    return load_sql_resource (
+        ATM_CONVERSATION_STORE_SCHEMA_V6_RESOURCE,
+        "v6 schema",
+        out_sql,
+        error
+    );
+}
+
+static void
+append_fingerprint_value (
+    GString *fingerprint,
+    sqlite3_stmt *statement,
+    int column
+)
+{
+    int type = sqlite3_column_type (statement, column);
+    g_string_append_printf (fingerprint, "%d:", type);
+    if (type == SQLITE_INTEGER) {
+        gint64 value = (gint64) sqlite3_column_int64 (statement, column);
+        g_string_append_printf (
+            fingerprint,
+            "%" G_GINT64_FORMAT,
+            value
+        );
+    } else if (type == SQLITE_FLOAT) {
+        g_string_append_printf (
+            fingerprint,
+            "%.17g",
+            sqlite3_column_double (statement, column)
+        );
+    } else if (type == SQLITE_TEXT || type == SQLITE_BLOB) {
+        const void *value = type == SQLITE_TEXT
+            ? (const void *) sqlite3_column_text (statement, column)
+            : sqlite3_column_blob (statement, column);
+        int length = sqlite3_column_bytes (statement, column);
+        g_string_append_printf (fingerprint, "%d:", length);
+        if (length > 0)
+            g_string_append_len (fingerprint, value, length);
+    }
+    g_string_append_c (fingerprint, ';');
+}
+
+static gboolean
+append_query_fingerprint (
+    sqlite3 *db,
+    const char *sql,
+    GString *fingerprint,
+    GError **error
+)
+{
+    sqlite3_stmt *statement = NULL;
+    int rc = sqlite3_prepare_v2 (db, sql, -1, &statement, NULL);
+    if (rc != SQLITE_OK) {
+        set_sqlite_error (
+            db,
+            error,
+            ATM_CONVERSATION_STORE_ERROR_SQLITE,
+            "Could not prepare schema fingerprint query"
+        );
+        return FALSE;
+    }
+
+    while ((rc = sqlite3_step (statement)) == SQLITE_ROW) {
+        g_string_append_c (fingerprint, '[');
+        for (int column = 0;
+             column < sqlite3_column_count (statement);
+             column++)
+            append_fingerprint_value (fingerprint, statement, column);
+        g_string_append_c (fingerprint, ']');
+    }
+    sqlite3_finalize (statement);
+    if (rc != SQLITE_DONE) {
+        set_sqlite_error (
+            db,
+            error,
+            ATM_CONVERSATION_STORE_ERROR_SQLITE,
+            "Could not read schema fingerprint query"
+        );
+        return FALSE;
+    }
+    return TRUE;
+}
+
+static char *
+normalize_schema_sql (
+    const char *sql
+)
+{
+    GString *normalized = g_string_new (NULL);
+    gsize length = strlen (sql);
+    gboolean pending_space = FALSE;
+    for (gsize i = 0; i < length;) {
+        char ch = sql[i];
+        if (g_ascii_isspace (ch)) {
+            pending_space = TRUE;
+            i++;
+            continue;
+        }
+        if (ch == '-' && i + 1 < length && sql[i + 1] == '-') {
+            pending_space = TRUE;
+            i += 2;
+            while (i < length && sql[i] != '\n')
+                i++;
+            continue;
+        }
+        if (ch == '/' && i + 1 < length && sql[i + 1] == '*') {
+            pending_space = TRUE;
+            i += 2;
+            while (i + 1 < length &&
+                   !(sql[i] == '*' && sql[i + 1] == '/'))
+                i++;
+            i = MIN (i + 2, length);
+            continue;
+        }
+        char previous = normalized->len > 0
+            ? normalized->str[normalized->len - 1]
+            : '\0';
+        if (pending_space && normalized->len > 0 &&
+            previous != '(' && previous != ',' &&
+            ch != ',' && ch != ')')
+            g_string_append_c (normalized, ' ');
+        pending_space = FALSE;
+        if (ch == '\'' || ch == '"' || ch == '`' || ch == '[') {
+            char close = ch == '[' ? ']' : ch;
+            g_string_append_c (normalized, ch);
+            i++;
+            while (i < length) {
+                char quoted = sql[i++];
+                g_string_append_c (normalized, quoted);
+                if (quoted == close) {
+                    if (i < length && sql[i] == close &&
+                        close != ']') {
+                        g_string_append_c (normalized, sql[i++]);
+                    } else {
+                        break;
+                    }
+                }
+            }
+            continue;
+        }
+        g_string_append_c (normalized, ch);
+        i++;
+    }
+    char *result = g_string_free (normalized, FALSE);
+    return result;
+}
+
+static gboolean
+append_normalized_schema_sql_fingerprint (
+    sqlite3 *db,
+    GString *fingerprint,
+    GError **error
+)
+{
+    sqlite3_stmt *statement = NULL;
+    int rc = sqlite3_prepare_v2 (
+        db,
+        "SELECT type,name,tbl_name,sql FROM main.sqlite_schema "
+        "WHERE sql IS NOT NULL ORDER BY type,name,tbl_name;",
+        -1,
+        &statement,
+        NULL
+    );
+    if (rc != SQLITE_OK) {
+        set_sqlite_error (
+            db,
+            error,
+            ATM_CONVERSATION_STORE_ERROR_SQLITE,
+            "Could not prepare normalized schema SQL fingerprint query"
+        );
+        return FALSE;
+    }
+    while ((rc = sqlite3_step (statement)) == SQLITE_ROW) {
+        for (int column = 0; column < 3; column++)
+            append_fingerprint_value (fingerprint, statement, column);
+        const char *sql = (const char *) sqlite3_column_text (statement, 3);
+        char *normalized = normalize_schema_sql (sql != NULL ? sql : "");
+        g_string_append_printf (
+            fingerprint,
+            "sql:%" G_GSIZE_FORMAT ":",
+            strlen (normalized)
+        );
+        g_string_append (fingerprint, normalized);
+        g_string_append_c (fingerprint, ';');
+        g_free (normalized);
+    }
+    sqlite3_finalize (statement);
+    if (rc != SQLITE_DONE) {
+        set_sqlite_error (
+            db,
+            error,
+            ATM_CONVERSATION_STORE_ERROR_SQLITE,
+            "Could not read normalized schema SQL fingerprint"
+        );
+        return FALSE;
+    }
+    return TRUE;
+}
+
+static gboolean
+append_schema_fingerprint (
+    sqlite3 *db,
+    gint version,
+    GString *fingerprint,
+    GError **error
+)
+{
+    static const char *v5_tables[] = {
+        "installation", "conversations", "conversation_repositories",
+        "messages", "citations", "message_charts", "chart_series"
+    };
+    static const char *v6_tables[] = {
+        "installation", "conversations", "conversation_repositories",
+        "messages", "citations", "message_charts", "chart_series",
+        "chart_presentations_v4"
+    };
+    const char **tables = version == ATM_CONVERSATION_STORE_SCHEMA_V6_VERSION
+        ? v6_tables
+        : v5_tables;
+    gsize table_count = version == ATM_CONVERSATION_STORE_SCHEMA_V6_VERSION
+        ? G_N_ELEMENTS (v6_tables)
+        : G_N_ELEMENTS (v5_tables);
+
+    if (!append_normalized_schema_sql_fingerprint (db, fingerprint, error) ||
+        !append_query_fingerprint (
+            db,
+            "SELECT schema,name,type,ncol,wr,strict "
+            "FROM pragma_table_list ORDER BY schema,name;",
+            fingerprint,
+            error
+        ) ||
+        !append_query_fingerprint (
+            db,
+            "PRAGMA encoding;",
+            fingerprint,
+            error
+        ))
+        return FALSE;
+
+    for (gsize i = 0; i < table_count; i++) {
+        char *quoted_table = sqlite3_mprintf ("%Q", tables[i]);
+        char *sql = sqlite3_mprintf (
+            "PRAGMA main.table_xinfo(%s);",
+            quoted_table
+        );
+        sqlite3_free (quoted_table);
+        gboolean ok = append_query_fingerprint (db, sql, fingerprint, error);
+        sqlite3_free (sql);
+        if (!ok)
+            return FALSE;
+
+        quoted_table = sqlite3_mprintf ("%Q", tables[i]);
+        sql = sqlite3_mprintf (
+            "PRAGMA main.foreign_key_list(%s);",
+            quoted_table
+        );
+        sqlite3_free (quoted_table);
+        ok = append_query_fingerprint (db, sql, fingerprint, error);
+        sqlite3_free (sql);
+        if (!ok)
+            return FALSE;
+
+        quoted_table = sqlite3_mprintf ("%Q", tables[i]);
+        sql = sqlite3_mprintf (
+            "SELECT seq,name,"
+            "\"unique\",origin,partial FROM pragma_index_list(%s) ORDER BY seq;",
+            quoted_table
+        );
+        sqlite3_free (quoted_table);
+        sqlite3_stmt *indexes = NULL;
+        int rc = sqlite3_prepare_v2 (db, sql, -1, &indexes, NULL);
+        sqlite3_free (sql);
+        if (rc != SQLITE_OK) {
+            set_sqlite_error (
+                db,
+                error,
+                ATM_CONVERSATION_STORE_ERROR_SQLITE,
+                "Could not prepare schema index fingerprint query"
+            );
+            return FALSE;
+        }
+        while ((rc = sqlite3_step (indexes)) == SQLITE_ROW) {
+            const char *index_name = (const char *) sqlite3_column_text (
+                indexes,
+                1
+            );
+            gboolean generated = sqlite3_column_text (indexes, 3) != NULL &&
+                (!g_str_equal (
+                    (const char *) sqlite3_column_text (indexes, 3),
+                    "c"
+                ));
+            append_fingerprint_value (fingerprint, indexes, 0);
+            if (generated) {
+                g_string_append (fingerprint, "constraint-autoindex;");
+            } else {
+                append_fingerprint_value (fingerprint, indexes, 1);
+            }
+            for (int column = 2;
+                 column < sqlite3_column_count (indexes);
+                 column++)
+                append_fingerprint_value (fingerprint, indexes, column);
+
+            char *quoted_index = sqlite3_mprintf ("%Q", index_name);
+            char *index_sql = sqlite3_mprintf (
+                "SELECT seqno,cid,name,\"desc\",coll,\"key\" "
+                "FROM pragma_index_xinfo(%s) ORDER BY seqno;",
+                quoted_index
+            );
+            sqlite3_free (quoted_index);
+            gboolean index_ok = append_query_fingerprint (
+                db,
+                index_sql,
+                fingerprint,
+                error
+            );
+            sqlite3_free (index_sql);
+            if (!index_ok) {
+                sqlite3_finalize (indexes);
+                return FALSE;
+            }
+        }
+        sqlite3_finalize (indexes);
+        if (rc != SQLITE_DONE) {
+            set_sqlite_error (
+                db,
+                error,
+                ATM_CONVERSATION_STORE_ERROR_SQLITE,
+                "Could not read schema index fingerprint query"
+            );
+            return FALSE;
+        }
+    }
+    return TRUE;
+}
+
+static gboolean
+create_canonical_schema_db (
+    gint version,
+    gboolean migrate_from_v4,
+    gboolean bootstrap_direct_v6,
+    sqlite3 **out_db,
+    GError **error
+)
+{
+    *out_db = NULL;
+    sqlite3 *db = NULL;
+    int rc = sqlite3_open_v2 (":memory:", &db, SQLITE_OPEN_READWRITE |
+        SQLITE_OPEN_CREATE | SQLITE_OPEN_MEMORY, NULL);
+    if (rc != SQLITE_OK) {
+        set_sqlite_error (
+            db,
+            error,
+            ATM_CONVERSATION_STORE_ERROR_SQLITE,
+            "Could not create in-memory canonical schema"
+        );
+        if (db != NULL)
+            sqlite3_close (db);
+        return FALSE;
+    }
+
+    gboolean ok = FALSE;
+    char *schema_sql = NULL;
+    char *migration_sql = NULL;
+    if (!exec_sql (db, "PRAGMA foreign_keys=ON;", error))
+        goto out;
+
+    if (bootstrap_direct_v6) {
+        if (!load_schema_v6_sql (&schema_sql, error) ||
+            !exec_sql (db, schema_sql, error))
+            goto out;
+    } else if (migrate_from_v4) {
+        if (!load_schema_v4_sql (&schema_sql, error) ||
+            !load_migration_v4_v5_sql (&migration_sql, error) ||
+            !exec_sql (db, schema_sql, error) ||
+            !exec_sql (db, migration_sql, error))
+            goto out;
+        g_free (migration_sql);
+        migration_sql = NULL;
+    } else {
+        if (!load_schema_sql (&schema_sql, error) ||
+            !exec_sql (db, schema_sql, error))
+            goto out;
+    }
+    g_free (schema_sql);
+    schema_sql = NULL;
+
+    if (version == ATM_CONVERSATION_STORE_SCHEMA_V6_VERSION &&
+        !bootstrap_direct_v6) {
+        if (!load_migration_v5_v6_sql (&migration_sql, error) ||
+            !exec_sql (db, migration_sql, error))
+            goto out;
+    }
+    char *identity_sql = g_strdup_printf (
+        "PRAGMA application_id=%u;",
+        (guint) ATM_CONVERSATION_STORE_APPLICATION_ID
+    );
+    gboolean identity_ok = exec_sql (
+        db,
+        version == ATM_CONVERSATION_STORE_SCHEMA_V6_VERSION
+            ? "PRAGMA user_version=6;"
+            : "PRAGMA user_version=5;",
+        error
+    ) && exec_sql (db, identity_sql, error);
+    g_free (identity_sql);
+    if (!identity_ok)
+        goto out;
+
+    *out_db = db;
+    db = NULL;
+    ok = TRUE;
+
+out:
+    g_free (schema_sql);
+    g_free (migration_sql);
+    if (db != NULL)
+        sqlite3_close (db);
+    return ok;
+}
+
+static gboolean
+create_canonical_schema_fingerprint (
+    gint version,
+    gboolean migrate_from_v4,
+    gboolean bootstrap_direct_v6,
+    char **out_fingerprint,
+    GError **error
+)
+{
+    sqlite3 *db = NULL;
+    if (!create_canonical_schema_db (
+            version,
+            migrate_from_v4,
+            bootstrap_direct_v6,
+            &db,
+            error
+        ))
+        return FALSE;
+    GString *fingerprint = g_string_new (NULL);
+    gboolean ok = append_schema_fingerprint (
+        db,
+        version,
+        fingerprint,
+        error
+    );
+    if (ok)
+        *out_fingerprint = g_string_free (fingerprint, FALSE);
+    else
+        g_string_free (fingerprint, TRUE);
+    sqlite3_close (db);
+    return ok;
+}
+
+static GMutex canonical_fingerprint_mutex;
+static GHashTable *canonical_fingerprint_cache;
+
+static gboolean
+get_canonical_fingerprint (
+    gint version,
+    gboolean migrate_from_v4,
+    gboolean bootstrap_direct_v6,
+    const char **out_fingerprint,
+    GError **error
+)
+{
+    char *key = g_strdup_printf (
+        "%d:%d:%d",
+        version,
+        migrate_from_v4 ? 1 : 0,
+        bootstrap_direct_v6 ? 1 : 0
+    );
+    g_mutex_lock (&canonical_fingerprint_mutex);
+    if (canonical_fingerprint_cache == NULL)
+        canonical_fingerprint_cache = g_hash_table_new_full (
+            g_str_hash,
+            g_str_equal,
+            g_free,
+            g_free
+        );
+    char *fingerprint = g_hash_table_lookup (
+        canonical_fingerprint_cache,
+        key
+    );
+    if (fingerprint == NULL) {
+        if (!create_canonical_schema_fingerprint (
+                version,
+                migrate_from_v4,
+                bootstrap_direct_v6,
+                &fingerprint,
+                error
+            )) {
+            g_mutex_unlock (&canonical_fingerprint_mutex);
+            g_free (key);
+            return FALSE;
+        }
+        g_hash_table_insert (
+            canonical_fingerprint_cache,
+            g_strdup (key),
+            fingerprint
+        );
+    }
+    *out_fingerprint = fingerprint;
+    g_mutex_unlock (&canonical_fingerprint_mutex);
+    g_free (key);
+    return TRUE;
+}
+
+static gboolean
+canonical_object_name (
+    gint version,
+    const char *type,
+    const char *name
+)
+{
+    static const char *table_names[] = {
+        "installation", "conversations", "conversation_repositories",
+        "messages", "citations", "message_charts", "chart_series",
+        "chart_presentations_v4"
+    };
+    static const char *index_names[] = {
+        "idx_messages_conversation_sequence",
+        "idx_citations_repository_snapshot",
+        "idx_chart_series_repository_snapshot",
+        "idx_chart_presentations_series_id"
+    };
+    static const char *trigger_names[] = {
+        "chart_series_tuple_insert",
+        "chart_series_tuple_update",
+        "message_charts_tuple_update",
+        "chart_presentations_v4_tuple_insert",
+        "chart_presentations_v4_tuple_update",
+        "chart_presentations_v4_delete_guard",
+        "message_charts_presentation_update"
+    };
+    if (g_str_equal (type, "table")) {
+        gsize count = version == ATM_CONVERSATION_STORE_SCHEMA_V6_VERSION
+            ? G_N_ELEMENTS (table_names)
+            : G_N_ELEMENTS (table_names) - 1;
+        for (gsize i = 0; i < count; i++)
+            if (g_str_equal (name, table_names[i]))
+                return TRUE;
+    } else if (g_str_equal (type, "index")) {
+        gsize count = version == ATM_CONVERSATION_STORE_SCHEMA_V6_VERSION
+            ? G_N_ELEMENTS (index_names)
+            : G_N_ELEMENTS (index_names) - 1;
+        for (gsize i = 0; i < count; i++)
+            if (g_str_equal (name, index_names[i]))
+                return TRUE;
+    } else if (g_str_equal (type, "trigger")) {
+        gsize count = version == ATM_CONVERSATION_STORE_SCHEMA_V6_VERSION
+            ? G_N_ELEMENTS (trigger_names)
+            : 3;
+        for (gsize i = 0; i < count; i++)
+            if (g_str_equal (name, trigger_names[i]))
+                return TRUE;
+    }
+    return FALSE;
+}
+
+static const char *
+canonical_object_table (
+    const char *name
+)
+{
+    if (g_str_equal (name, "idx_messages_conversation_sequence"))
+        return "messages";
+    if (g_str_equal (name, "idx_citations_repository_snapshot"))
+        return "citations";
+    if (g_str_equal (name, "idx_chart_series_repository_snapshot"))
+        return "chart_series";
+    if (g_str_equal (name, "idx_chart_presentations_series_id"))
+        return "chart_presentations_v4";
+    if (g_str_has_prefix (name, "chart_series_tuple_"))
+        return "chart_series";
+    if (g_str_equal (name, "message_charts_tuple_update") ||
+        g_str_equal (name, "message_charts_presentation_update"))
+        return "message_charts";
+    if (g_str_has_prefix (name, "chart_presentations_v4_"))
+        return "chart_presentations_v4";
+    return name;
+}
+
+static gboolean
+report_schema_inventory_mismatch (
+    sqlite3 *db,
+    gint version,
+    GError **error
+)
+{
+    sqlite3_stmt *statement = NULL;
+    int rc = sqlite3_prepare_v2 (
+        db,
+        "SELECT type,name,tbl_name,sql FROM main.sqlite_schema "
+        "ORDER BY type,name;",
+        -1,
+        &statement,
+        NULL
+    );
+    if (rc != SQLITE_OK) {
+        set_sqlite_error (
+            db,
+            error,
+            ATM_CONVERSATION_STORE_ERROR_SQLITE,
+            "Could not inspect conversation-store schema objects"
+        );
+        return FALSE;
+    }
+
+    while ((rc = sqlite3_step (statement)) == SQLITE_ROW) {
+        const char *type = (const char *) sqlite3_column_text (statement, 0);
+        const char *name = (const char *) sqlite3_column_text (statement, 1);
+        const char *table = (const char *) sqlite3_column_text (statement, 2);
+        gboolean generated_autoindex =
+            type != NULL &&
+            name != NULL &&
+            g_str_equal (type, "index") &&
+            sqlite3_column_type (statement, 3) == SQLITE_NULL &&
+            g_str_has_prefix (name, "sqlite_autoindex_");
+        if (generated_autoindex)
+            continue;
+        if (!canonical_object_name (version, type, name)) {
+            g_set_error (
+                error,
+                ATM_CONVERSATION_STORE_ERROR,
+                ATM_CONVERSATION_STORE_ERROR_SCHEMA,
+                "Conversation-store migration refused: object_type=%s; "
+                "object_name=%s; table_name=%s; reason=noncanonical-object.",
+                type != NULL ? type : "unknown",
+                name != NULL ? name : "unknown",
+                table != NULL ? table : "unknown"
+            );
+            sqlite3_finalize (statement);
+            return FALSE;
+        }
+    }
+    sqlite3_finalize (statement);
+    if (rc != SQLITE_DONE) {
+        set_sqlite_error (
+            db,
+            error,
+            ATM_CONVERSATION_STORE_ERROR_SQLITE,
+            "Could not enumerate conversation-store schema objects"
+        );
+        return FALSE;
+    }
+
+    typedef struct {
+        const char *type;
+        const char *name;
+    } SchemaObject;
+    static const SchemaObject required_v5[] = {
+        { "table", "installation" },
+        { "table", "conversations" },
+        { "table", "conversation_repositories" },
+        { "table", "messages" },
+        { "table", "citations" },
+        { "table", "message_charts" },
+        { "table", "chart_series" },
+        { "index", "idx_messages_conversation_sequence" },
+        { "index", "idx_citations_repository_snapshot" },
+        { "index", "idx_chart_series_repository_snapshot" },
+        { "trigger", "chart_series_tuple_insert" },
+        { "trigger", "chart_series_tuple_update" },
+        { "trigger", "message_charts_tuple_update" }
+    };
+    static const SchemaObject required_v6[] = {
+        { "table", "installation" },
+        { "table", "conversations" },
+        { "table", "conversation_repositories" },
+        { "table", "messages" },
+        { "table", "citations" },
+        { "table", "message_charts" },
+        { "table", "chart_series" },
+        { "table", "chart_presentations_v4" },
+        { "index", "idx_messages_conversation_sequence" },
+        { "index", "idx_citations_repository_snapshot" },
+        { "index", "idx_chart_series_repository_snapshot" },
+        { "index", "idx_chart_presentations_series_id" },
+        { "trigger", "chart_series_tuple_insert" },
+        { "trigger", "chart_series_tuple_update" },
+        { "trigger", "message_charts_tuple_update" },
+        { "trigger", "chart_presentations_v4_tuple_insert" },
+        { "trigger", "chart_presentations_v4_tuple_update" },
+        { "trigger", "chart_presentations_v4_delete_guard" },
+        { "trigger", "message_charts_presentation_update" }
+    };
+    gsize required_count = version == ATM_CONVERSATION_STORE_SCHEMA_V6_VERSION
+        ? G_N_ELEMENTS (required_v6)
+        : G_N_ELEMENTS (required_v5);
+    for (gsize i = 0; i < required_count; i++) {
+        const SchemaObject *item =
+            version == ATM_CONVERSATION_STORE_SCHEMA_V6_VERSION
+                ? &required_v6[i]
+                : &required_v5[i];
+        const char *type = item->type;
+        const char *name = item->name;
+        sqlite3_stmt *lookup = NULL;
+        rc = sqlite3_prepare_v2 (
+            db,
+            "SELECT 1 FROM main.sqlite_schema WHERE type=?1 AND name=?2;",
+            -1,
+            &lookup,
+            NULL
+        );
+        if (rc == SQLITE_OK) {
+            sqlite3_bind_text (lookup, 1, type, -1, SQLITE_STATIC);
+            sqlite3_bind_text (lookup, 2, name, -1, SQLITE_STATIC);
+            rc = sqlite3_step (lookup);
+        }
+        gboolean exists = rc == SQLITE_ROW;
+        sqlite3_finalize (lookup);
+        if (!exists) {
+            g_set_error (
+                error,
+                ATM_CONVERSATION_STORE_ERROR,
+                ATM_CONVERSATION_STORE_ERROR_SCHEMA,
+                "Conversation-store migration refused: object_type=%s; "
+                "object_name=%s; table_name=%s; reason=missing-canonical-object.",
+                type,
+                name,
+                canonical_object_table (name)
+            );
+            return FALSE;
+        }
+    }
+
+    sqlite3 *canonical[3] = { NULL, NULL, NULL };
+    guint canonical_count =
+        version == ATM_CONVERSATION_STORE_SCHEMA_V6_VERSION ? 3 : 2;
+    for (guint variant = 0; variant < canonical_count; variant++) {
+        if (!create_canonical_schema_db (
+                version,
+                variant == 1,
+                variant == 2,
+                &canonical[variant],
+                error
+            )) {
+            for (guint i = 0; i < canonical_count; i++)
+                if (canonical[i] != NULL)
+                    sqlite3_close (canonical[i]);
+            return FALSE;
+        }
+    }
+
+    rc = sqlite3_prepare_v2 (
+        db,
+        "SELECT type,name,tbl_name,sql FROM main.sqlite_schema "
+        "WHERE sql IS NOT NULL ORDER BY type,name;",
+        -1,
+        &statement,
+        NULL
+    );
+    if (rc == SQLITE_OK) {
+        while ((rc = sqlite3_step (statement)) == SQLITE_ROW) {
+            const char *type = (const char *) sqlite3_column_text (statement, 0);
+            const char *name = (const char *) sqlite3_column_text (statement, 1);
+            const char *table = (const char *) sqlite3_column_text (statement, 2);
+            const char *sql = (const char *) sqlite3_column_text (statement, 3);
+            gboolean matches_variant = FALSE;
+            for (guint i = 0; i < canonical_count; i++) {
+                sqlite3_stmt *expected = NULL;
+                int expected_rc = sqlite3_prepare_v2 (
+                    canonical[i],
+                    "SELECT tbl_name,sql FROM main.sqlite_schema "
+                    "WHERE type=?1 AND name=?2;",
+                    -1,
+                    &expected,
+                    NULL
+                );
+                if (expected_rc == SQLITE_OK) {
+                    sqlite3_bind_text (expected, 1, type, -1, SQLITE_TRANSIENT);
+                    sqlite3_bind_text (expected, 2, name, -1, SQLITE_TRANSIENT);
+                    expected_rc = sqlite3_step (expected);
+                }
+                if (expected_rc == SQLITE_ROW) {
+                    const char *expected_table =
+                        (const char *) sqlite3_column_text (expected, 0);
+                    const char *expected_sql =
+                        (const char *) sqlite3_column_text (expected, 1);
+                    char *normalized_sql = normalize_schema_sql (
+                        sql != NULL ? sql : ""
+                    );
+                    char *normalized_expected_sql = normalize_schema_sql (
+                        expected_sql != NULL ? expected_sql : ""
+                    );
+                    matches_variant =
+                        g_strcmp0 (table, expected_table) == 0 &&
+                        g_strcmp0 (
+                            normalized_sql,
+                            normalized_expected_sql
+                        ) == 0;
+                    g_free (normalized_sql);
+                    g_free (normalized_expected_sql);
+                }
+                sqlite3_finalize (expected);
+                if (matches_variant)
+                    break;
+            }
+            if (!matches_variant) {
+                g_set_error (
+                    error,
+                    ATM_CONVERSATION_STORE_ERROR,
+                    ATM_CONVERSATION_STORE_ERROR_SCHEMA,
+                    "Conversation-store migration refused: object_type=%s; "
+                    "object_name=%s; table_name=%s; "
+                    "reason=canonical-definition-mismatch.",
+                    type != NULL ? type : "unknown",
+                    name != NULL ? name : "unknown",
+                    table != NULL ? table : "unknown"
+                );
+                sqlite3_finalize (statement);
+                for (guint i = 0; i < canonical_count; i++)
+                    sqlite3_close (canonical[i]);
+                return FALSE;
+            }
+        }
+    }
+    sqlite3_finalize (statement);
+    for (guint i = 0; i < canonical_count; i++)
+        sqlite3_close (canonical[i]);
+    if (rc != SQLITE_DONE) {
+        set_sqlite_error (
+            db,
+            error,
+            ATM_CONVERSATION_STORE_ERROR_SQLITE,
+            "Could not compare canonical conversation-store definitions"
+        );
+        return FALSE;
+    }
+
+    g_set_error_literal (
+        error,
+        ATM_CONVERSATION_STORE_ERROR,
+        ATM_CONVERSATION_STORE_ERROR_SCHEMA,
+        "Conversation-store migration refused: object_type=database; "
+        "object_name=main; table_name=unknown; "
+        "reason=canonical-pragma-or-encoding-mismatch."
+    );
+    return FALSE;
+}
+
+static gboolean
+validate_schema_inventory (
+    sqlite3 *db,
+    gint version,
+    GError **error
+)
+{
+    GString *actual = g_string_new (NULL);
+    if (!append_schema_fingerprint (db, version, actual, error)) {
+        g_string_free (actual, TRUE);
+        return FALSE;
+    }
+
+    gboolean matches = FALSE;
+    guint variant_count = version == ATM_CONVERSATION_STORE_SCHEMA_V6_VERSION
+        ? 3
+        : 2;
+    for (guint variant = 0; variant < variant_count; variant++) {
+        const char *expected = NULL;
+        if (!get_canonical_fingerprint (
+                version,
+                variant == 1,
+                variant == 2,
+                &expected,
+                error
+            )) {
+            g_string_free (actual, TRUE);
+            return FALSE;
+        }
+        if (g_str_equal (actual->str, expected)) {
+            matches = TRUE;
+            break;
+        }
+    }
+    g_string_free (actual, TRUE);
+    if (matches)
+        return TRUE;
+    return report_schema_inventory_mismatch (db, version, error);
+}
+
+static gboolean
 configure_db_flag (
     sqlite3 *db,
     int option,
@@ -808,43 +1768,40 @@ bootstrap_schema (
 )
 {
     char *schema_sql = NULL;
+    char *migration_sql = NULL;
 
-    if (!load_schema_sql (
-            &schema_sql,
-            error
-        )) {
+    if (!load_schema_sql (&schema_sql, error) ||
+        !load_migration_v5_v6_sql (&migration_sql, error)) {
+        g_free (schema_sql);
+        g_free (migration_sql);
         return FALSE;
     }
 
-    char *bootstrap = g_strdup_printf (
-        "BEGIN IMMEDIATE;"
-        "%s"
-        "PRAGMA application_id=%u;"
-        "PRAGMA user_version=%d;"
-        "COMMIT;",
-        schema_sql,
+    gboolean ok = exec_sql (db, "BEGIN IMMEDIATE;", error) &&
+        exec_sql (db, schema_sql, error);
+    char *identity_sql = g_strdup_printf (
+        "PRAGMA application_id=%u;PRAGMA user_version=%d;",
         (guint) ATM_CONVERSATION_STORE_APPLICATION_ID,
-        ATM_CONVERSATION_STORE_SCHEMA_VERSION
+        ATM_CONVERSATION_STORE_SCHEMA_V5_VERSION
     );
+    if (ok)
+        ok = exec_sql (db, identity_sql, error) &&
+            exec_sql (db, migration_sql, error);
+    g_free (identity_sql);
+    if (ok)
+        ok = exec_sql (
+                db,
+                "PRAGMA user_version=6;",
+                error
+            ) &&
+            validate_v6_for_migration (db, error);
+    if (ok)
+        ok = exec_sql (db, "COMMIT;", error);
+    if (!ok)
+        sqlite3_exec (db, "ROLLBACK;", NULL, NULL, NULL);
 
-    gboolean ok = exec_sql (
-        db,
-        bootstrap,
-        error
-    );
-
-    if (!ok) {
-        sqlite3_exec (
-            db,
-            "ROLLBACK;",
-            NULL,
-            NULL,
-            NULL
-        );
-    }
-
-    g_free (bootstrap);
     g_free (schema_sql);
+    g_free (migration_sql);
     return ok;
 }
 
@@ -2347,7 +3304,8 @@ atm_conversation_store_validate (
         "messages",
         "citations",
         "message_charts",
-        "chart_series"
+        "chart_series",
+        "chart_presentations_v4"
     };
 
     if (store == NULL ||
@@ -2419,6 +3377,15 @@ atm_conversation_store_validate (
         ) &&
         validate_chart_semantics (
             store->db,
+            error
+        ) &&
+        validate_v6_presentation_semantics (
+            store->db,
+            error
+        ) &&
+        validate_schema_inventory (
+            store->db,
+            ATM_CONVERSATION_STORE_SCHEMA_V6_VERSION,
             error
         );
 }
@@ -2695,6 +3662,173 @@ validate_v4_for_migration (
         validate_chart_semantics (db, error);
 }
 
+static gboolean
+validate_v5_for_migration (
+    sqlite3 *db,
+    GError **error
+)
+{
+    static const char *required_tables[] = {
+        "installation", "conversations", "conversation_repositories",
+        "messages", "citations", "message_charts", "chart_series"
+    };
+    gint64 application_id = 0;
+    gint64 user_version = 0;
+    for (gsize i = 0; i < G_N_ELEMENTS (required_tables); i++) {
+        if (!required_table_exists (db, required_tables[i], error))
+            return FALSE;
+    }
+    if (!query_single_int64 (db, "PRAGMA application_id;", &application_id, error) ||
+        !query_single_int64 (db, "PRAGMA user_version;", &user_version, error))
+        return FALSE;
+    if (application_id != (gint64) ATM_CONVERSATION_STORE_APPLICATION_ID ||
+        user_version != ATM_CONVERSATION_STORE_SCHEMA_V5_VERSION) {
+        g_set_error_literal (
+            error,
+            ATM_CONVERSATION_STORE_ERROR,
+            ATM_CONVERSATION_STORE_ERROR_SCHEMA,
+            "Conversation-store v5 identity/version is invalid for migration."
+        );
+        return FALSE;
+    }
+
+    char *schema_id = NULL;
+    if (!query_single_text (
+            db,
+            "SELECT schema_id FROM installation WHERE singleton_id=1;",
+            &schema_id,
+            error
+        ))
+        return FALSE;
+    gboolean schema_ok = g_strcmp0 (
+        schema_id,
+        ATM_CONVERSATION_STORE_SCHEMA_V5_ID
+    ) == 0;
+    g_free (schema_id);
+    if (!schema_ok) {
+        g_set_error_literal (
+            error,
+            ATM_CONVERSATION_STORE_ERROR,
+            ATM_CONVERSATION_STORE_ERROR_SCHEMA,
+            "Conversation-store v5 schema identity is invalid for migration."
+        );
+        return FALSE;
+    }
+    return validate_integrity (db, error) &&
+        validate_base_semantics (db, error) &&
+        validate_chart_semantics (db, error) &&
+        validate_schema_inventory (
+            db,
+            ATM_CONVERSATION_STORE_SCHEMA_V5_VERSION,
+            error
+        );
+}
+
+static gboolean
+validate_v6_presentation_semantics (
+    sqlite3 *db,
+    GError **error
+)
+{
+    gint64 invalid_presentations = 0;
+    if (!query_single_int64 (
+            db,
+            "SELECT count(*) FROM message_charts c "
+            "LEFT JOIN chart_presentations_v4 p "
+            "ON p.message_id=c.message_id AND p.chart_ordinal=c.ordinal "
+            "WHERE (c.presentation_schema IS NULL AND p.message_id IS NOT NULL) "
+            "OR (c.presentation_schema='atm-chart-spec/4' AND p.message_id IS NULL) "
+            "OR (p.message_id IS NOT NULL AND NOT EXISTS ("
+            "SELECT 1 FROM chart_series s "
+            "WHERE s.message_id=c.message_id AND s.chart_ordinal=c.ordinal "
+            "AND s.series_ordinal=0 "
+            "AND p.presentation_schema=c.presentation_schema "
+            "AND p.source_chart_schema=c.chart_schema "
+            "AND p.source_chart_spec_id=c.chart_spec_id "
+            "AND p.reconstruction_profile_id=c.reconstruction_profile "
+            "AND p.series_profile_id=s.series_profile "
+            "AND p.admission_profile_id=s.admission_profile"
+            "));",
+            &invalid_presentations,
+            error
+        ))
+        return FALSE;
+    if (invalid_presentations != 0) {
+        g_set_error_literal (
+            error,
+            ATM_CONVERSATION_STORE_ERROR,
+            ATM_CONVERSATION_STORE_ERROR_INTEGRITY,
+            "Conversation-store v4 presentation sidecar does not match its source chart."
+        );
+        return FALSE;
+    }
+    return TRUE;
+}
+
+static gboolean
+validate_v6_for_migration (
+    sqlite3 *db,
+    GError **error
+)
+{
+    static const char *required_tables[] = {
+        "installation", "conversations", "conversation_repositories",
+        "messages", "citations", "message_charts", "chart_series",
+        "chart_presentations_v4"
+    };
+    gint64 application_id = 0;
+    gint64 user_version = 0;
+    for (gsize i = 0; i < G_N_ELEMENTS (required_tables); i++) {
+        if (!required_table_exists (db, required_tables[i], error))
+            return FALSE;
+    }
+    if (!query_single_int64 (db, "PRAGMA application_id;", &application_id, error) ||
+        !query_single_int64 (db, "PRAGMA user_version;", &user_version, error))
+        return FALSE;
+    if (application_id != (gint64) ATM_CONVERSATION_STORE_APPLICATION_ID ||
+        user_version != ATM_CONVERSATION_STORE_SCHEMA_V6_VERSION) {
+        g_set_error_literal (
+            error,
+            ATM_CONVERSATION_STORE_ERROR,
+            ATM_CONVERSATION_STORE_ERROR_SCHEMA,
+            "Conversation-store v6 identity/version is invalid."
+        );
+        return FALSE;
+    }
+
+    char *schema_id = NULL;
+    if (!query_single_text (
+            db,
+            "SELECT schema_id FROM installation WHERE singleton_id=1;",
+            &schema_id,
+            error
+        ))
+        return FALSE;
+    gboolean schema_ok = g_strcmp0 (
+        schema_id,
+        ATM_CONVERSATION_STORE_SCHEMA_V6_ID
+    ) == 0;
+    g_free (schema_id);
+    if (!schema_ok) {
+        g_set_error_literal (
+            error,
+            ATM_CONVERSATION_STORE_ERROR,
+            ATM_CONVERSATION_STORE_ERROR_SCHEMA,
+            "Conversation-store v6 schema identity is invalid."
+        );
+        return FALSE;
+    }
+    return validate_integrity (db, error) &&
+        validate_base_semantics (db, error) &&
+        validate_chart_semantics (db, error) &&
+        validate_v6_presentation_semantics (db, error) &&
+        validate_schema_inventory (
+            db,
+            ATM_CONVERSATION_STORE_SCHEMA_V6_VERSION,
+            error
+        );
+}
+
 
 static gboolean
 migrate_v1_to_v3 (
@@ -2889,9 +4023,6 @@ migrate_v4_to_v5 (
             "Conversation-store schema migration requires an open store.");
         return FALSE;
     }
-    if (!validate_v4_for_migration (store->db, error))
-        return FALSE;
-
     char *migration_sql = NULL;
     if (!load_migration_v4_v5_sql (&migration_sql, error))
         return FALSE;
@@ -2901,20 +4032,146 @@ migrate_v4_to_v5 (
     }
 
     gboolean ok = FALSE;
+    if (!validate_v4_for_migration (store->db, error))
+        goto rollback;
     if (!exec_sql (store->db, migration_sql, error))
         goto rollback;
 
     char *version_sql = g_strdup_printf ("PRAGMA user_version=%d;",
-        ATM_CONVERSATION_STORE_SCHEMA_VERSION);
+        ATM_CONVERSATION_STORE_SCHEMA_V5_VERSION);
     if (!exec_sql (store->db, version_sql, error)) {
         g_free (version_sql);
         goto rollback;
     }
     g_free (version_sql);
 
-    if (!atm_conversation_store_validate (store, error))
+    if (!validate_v5_for_migration (store->db, error))
         goto rollback;
     if (!exec_sql (store->db, "COMMIT;", error))
+        goto rollback;
+
+    ok = TRUE;
+rollback:
+    if (!ok)
+        sqlite3_exec (store->db, "ROLLBACK;", NULL, NULL, NULL);
+    g_free (migration_sql);
+    return ok;
+}
+
+static gboolean
+exec_v5_v6_migration_sql (
+    sqlite3 *db,
+    const char *sql,
+    GError **error
+)
+{
+    const char *cursor = sql;
+    guint statement_number = 0;
+    while (cursor != NULL && *cursor != '\0') {
+        sqlite3_stmt *statement = NULL;
+        const char *tail = NULL;
+        int rc = sqlite3_prepare_v2 (
+            db,
+            cursor,
+            -1,
+            &statement,
+            &tail
+        );
+        if (rc != SQLITE_OK) {
+            set_sqlite_error (
+                db,
+                error,
+                ATM_CONVERSATION_STORE_ERROR_SQLITE,
+                "Could not prepare v5-to-v6 migration statement"
+            );
+            sqlite3_finalize (statement);
+            return FALSE;
+        }
+        if (tail == cursor) {
+            sqlite3_finalize (statement);
+            break;
+        }
+        cursor = tail;
+        if (statement == NULL)
+            continue;
+        while ((rc = sqlite3_step (statement)) == SQLITE_ROW) {
+        }
+        sqlite3_finalize (statement);
+        if (rc != SQLITE_DONE) {
+            set_sqlite_error (
+                db,
+                error,
+                ATM_CONVERSATION_STORE_ERROR_SQLITE,
+                "Could not execute v5-to-v6 migration statement"
+            );
+            return FALSE;
+        }
+        statement_number++;
+#ifdef ATM_CONVERSATION_STORE_TESTING
+        if (fail_v5_v6_after_statement == statement_number) {
+            fail_v5_v6_after_statement = 0;
+            g_set_error (
+                error,
+                ATM_CONVERSATION_STORE_ERROR,
+                ATM_CONVERSATION_STORE_ERROR_SQLITE,
+                "Injected v5-to-v6 migration failure after statement %u.",
+                statement_number
+            );
+            return FALSE;
+        }
+#endif
+    }
+    return TRUE;
+}
+
+static gboolean
+migrate_v5_to_v6 (
+    AtmConversationStore *store,
+    GError **error
+)
+{
+    if (store == NULL || store->db == NULL) {
+        g_set_error_literal (
+            error,
+            ATM_CONVERSATION_STORE_ERROR,
+            ATM_CONVERSATION_STORE_ERROR_ARGUMENT,
+            "Conversation-store schema migration requires an open store."
+        );
+        return FALSE;
+    }
+
+    char *migration_sql = NULL;
+    if (!load_migration_v5_v6_sql (&migration_sql, error))
+        return FALSE;
+    if (!exec_sql (store->db, "BEGIN IMMEDIATE;", error)) {
+        g_free (migration_sql);
+        return FALSE;
+    }
+
+#ifdef ATM_CONVERSATION_STORE_TESTING
+    if (v5_v6_lock_hook != NULL)
+        v5_v6_lock_hook (v5_v6_lock_hook_data);
+#endif
+
+    gboolean ok = FALSE;
+    if (!validate_v5_for_migration (store->db, error) ||
+        !exec_v5_v6_migration_sql (store->db, migration_sql, error))
+        goto rollback;
+#ifdef ATM_CONVERSATION_STORE_TESTING
+    if (fail_v5_v6_after_sql_resource) {
+        fail_v5_v6_after_sql_resource = FALSE;
+        g_set_error_literal (
+            error,
+            ATM_CONVERSATION_STORE_ERROR,
+            ATM_CONVERSATION_STORE_ERROR_SQLITE,
+            "Injected v5-to-v6 migration failure after SQL resource execution."
+        );
+        goto rollback;
+    }
+#endif
+    if (!exec_sql (store->db, "PRAGMA user_version=6;", error) ||
+        !validate_v6_for_migration (store->db, error) ||
+        !exec_sql (store->db, "COMMIT;", error))
         goto rollback;
 
     ok = TRUE;
@@ -3076,7 +4333,8 @@ atm_conversation_store_open (
     ) {
         if (!migrate_v1_to_v3 (store, error) ||
             !migrate_v3_to_v4 (store, error) ||
-            !migrate_v4_to_v5 (store, error)) {
+            !migrate_v4_to_v5 (store, error) ||
+            !migrate_v5_to_v6 (store, error)) {
             atm_conversation_store_close (store);
             return FALSE;
         }
@@ -3086,7 +4344,8 @@ atm_conversation_store_open (
     ) {
         if (!migrate_v2_to_v3 (store, error) ||
             !migrate_v3_to_v4 (store, error) ||
-            !migrate_v4_to_v5 (store, error)) {
+            !migrate_v4_to_v5 (store, error) ||
+            !migrate_v5_to_v6 (store, error)) {
             atm_conversation_store_close (store);
             return FALSE;
         }
@@ -3094,14 +4353,23 @@ atm_conversation_store_open (
         user_version == ATM_CONVERSATION_STORE_SCHEMA_V3_VERSION
     ) {
         if (!migrate_v3_to_v4 (store, error) ||
-            !migrate_v4_to_v5 (store, error)) {
+            !migrate_v4_to_v5 (store, error) ||
+            !migrate_v5_to_v6 (store, error)) {
             atm_conversation_store_close (store);
             return FALSE;
         }
     } else if (
         user_version == ATM_CONVERSATION_STORE_SCHEMA_V4_VERSION
     ) {
-        if (!migrate_v4_to_v5 (store, error)) {
+        if (!migrate_v4_to_v5 (store, error) ||
+            !migrate_v5_to_v6 (store, error)) {
+            atm_conversation_store_close (store);
+            return FALSE;
+        }
+    } else if (
+        user_version == ATM_CONVERSATION_STORE_SCHEMA_V5_VERSION
+    ) {
+        if (!migrate_v5_to_v6 (store, error)) {
             atm_conversation_store_close (store);
             return FALSE;
         }
