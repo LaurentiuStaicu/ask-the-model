@@ -8,6 +8,14 @@ on:
       - 'data/schemas/conversation-store-*.sql'
       - 'data/io.github.laurentiustaicu.ask_the_model.gresource.xml'
       - '.github/workflows/chart05-persistence.yml'
+      # Release metadata candidates must run these qualification gates on the exact candidate head.
+      - 'meson.build'
+      - 'CITATION.cff'
+      - 'STATUS.md'
+      - 'CHANGELOG.md'
+      - '.github/release_metadata_contract.json'
+      - 'data/io.github.laurentiustaicu.ask_the_model.metainfo.xml'
+      - 'releases/**'
   workflow_dispatch:
 
 permissions:

@@ -4,17 +4,30 @@ All notable public releases of Ask the Model are recorded here.
 
 ## Unreleased
 
-The entries below describe post-v0.7.1 development on `main`; they are not part of the immutable public v0.7.1 Flatpak artifact.
+The entries below describe changes after the v0.8.0 release; they are not part of the v0.8.0 artifact.
 
-### BNR BLS C01 source-specific chart route (integrated in development main; not released)
+## 0.8.0 - 2026-10-15
 
-- Integrated PRs #471–#479 in dependency order. The final integration commit is `91093e7c96be56703052a3eb30565d1c84c351e5`. The public v0.7.1 artifact remains unchanged.
-- Adds the bounded `/chart bnr-bls-c01` route and narrowly admitted English/Romanian visualization requests. Natural-language routing rejects generic measure wording, recognized comparisons/additional-indicator cues and derived-series requests rather than silently drawing only C01.
-- The route admits only RMD snapshot `e43eb4e899f123d3b1aa0f6e20b7c8ed35434170`, the five-file source authority chain and ChartSpec v3. It preserves twelve quarter coordinates from 2022-Q4 through 2025-Q3, eleven numeric observations, and the authorized 2025-Q2 `MISSING` point with reason `source_round_not_retained`. No numeric value, fabricated physical source row, missing marker or line bridge is created; the Data display uses `none` for the missing physical row.
-- Conversation-store schema v5 persists only the reconstruction recipe and identity/provenance tuple. History rebuilds the chart from pinned RMD files and fails closed after source or identity tampering.
-- All exact-head workflow runs inspected for PRs #471–#479 completed successfully before merge, including native sanitizer, GTK/resize, History persistence, PRES-09 Application E2E, ChartIntent, Invariant Registry and Flatpak checks. This is pre-merge CI evidence; release qualification still requires the final metadata-bearing candidate and explicit on-device acceptance of that exact artifact.
-- The route is integrated development code, not a v0.7.1 capability or a v0.8.0 release declaration. Broader CHART-01 qualification remains open in issue #343. Arbitrary sources, multi-series charts, derived series and generalized missing/discontinuity/event semantics remain unqualified; M4 stays dormant and Optimizations remain session-only/default OFF.
+Bounded source-qualified BNR BLS C01 quarterly chart route.
 
+### Changes
+
+- Add the source-qualified BNR BLS C01 quarterly chart route alongside GISTEMP v1 and Energy Institute TES v2, using only the exact pinned RMD snapshot.
+- Preserve all 12 quarter coordinates, 11 numeric observations and one authority-qualified missing coordinate at 2025-Q2. It has reason `source_round_not_retained` but no physical CSV row or numeric zero; Data displays `none`, and the line renderer does not bridge the gap.
+- Keep History recipe-only: reopening reconstructs chart/Data presentation from the exact pinned source and fails closed if source identity or qualification changes.
+- Keep ChartIntent restricted to explicit `/chart bnr-bls-c01` and unambiguous C01-specific natural-language intent.
+- Clarify that mandatory B0/B2 coordination remains active in Optimizations OFF and ON modes; optional qualified optimization paths remain switch-gated.
+
+### Scope and qualification boundaries
+
+- GISTEMP v1 and Energy Institute TES v2 contracts remain unchanged.
+- This release does not introduce generic chart discovery, arbitrary sources, multi-series/derived charts, generalized missing/event/discontinuity semantics, upstream Energy Institute raw-to-processed reproduction or M4 activation.
+- Broader CHART-01 qualification remains open in issue #343. Optimizations remain session-only and default OFF.
+
+### Verification boundaries
+
+- PRs #471–#479 passed their exact-head checks; those results qualify their development slices, not the final metadata-bearing release artifact.
+- Publication must wait for full exact-head validation of the metadata-bearing candidate and manual acceptance of that exact generated `AskTheModel.flatpak` on elementary OS 8. Issue #481 tracks the tested artifact digest, direct tag and publication checks.
 ## 0.7.1 - 2026-10-14
 
 Correct chart presentation after v0.7.0 acceptance.
