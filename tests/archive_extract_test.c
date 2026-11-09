@@ -455,6 +455,25 @@ test_total_size_limit (void)
 }
 
 static void
+test_file_larger_than_total_limit (void)
+{
+    FixtureEntry entries[] = {
+        { "repo-sha/", AE_IFDIR, NULL, NULL, NULL },
+        { "repo-sha/a.txt", AE_IFREG, "01234567890", NULL, NULL }
+    };
+    AtmArchiveLimits limits = default_limits ();
+    limits.max_file_bytes = 1000;
+    limits.max_total_bytes = 10;
+
+    assert_archive_rejected (
+        entries,
+        G_N_ELEMENTS (entries),
+        limits,
+        ATM_ARCHIVE_ERROR_LIMIT
+    );
+}
+
+static void
 test_inspect_valid_archive (void)
 {
     char *root = new_temp_root ();
@@ -627,6 +646,25 @@ assert_inspection_rejected (
 }
 
 static void
+test_inspect_file_larger_than_total_limit_rejected (void)
+{
+    FixtureEntry entries[] = {
+        { "repo-sha/", AE_IFDIR, NULL, NULL, NULL },
+        { "repo-sha/a.txt", AE_IFREG, "01234567890", NULL, NULL }
+    };
+    AtmArchiveLimits limits = default_limits ();
+    limits.max_file_bytes = 1000;
+    limits.max_total_bytes = 10;
+
+    assert_inspection_rejected (
+        entries,
+        G_N_ELEMENTS (entries),
+        limits,
+        ATM_ARCHIVE_ERROR_LIMIT
+    );
+}
+
+static void
 test_inspect_duplicate_file_rejected (void)
 {
     FixtureEntry entries[] = {
@@ -733,6 +771,14 @@ main (int argc, char **argv)
     g_test_add_func (
         "/archive/inspect-total-limit-rejected",
         test_inspect_total_limit_rejected
+    );
+    g_test_add_func (
+        "/archive/file-larger-than-total-limit",
+        test_file_larger_than_total_limit
+    );
+    g_test_add_func (
+        "/archive/inspect-file-larger-than-total-limit-rejected",
+        test_inspect_file_larger_than_total_limit_rejected
     );
 
     return g_test_run ();
