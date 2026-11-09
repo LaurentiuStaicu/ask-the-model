@@ -47,6 +47,52 @@ jobs:
         shell: bash
         run: bash scripts/validate_release_workflow.sh
 
+      - name: Report sanitizer-relevant environment
+        shell: bash
+        run: |
+          set -u
+
+          kernel_release="$(uname -r 2>/dev/null || true)"
+          [ -n "${kernel_release}" ] || kernel_release="unavailable"
+
+          if [ -r /proc/sys/vm/mmap_rnd_bits ]; then
+            mmap_rnd_bits="$(cat /proc/sys/vm/mmap_rnd_bits 2>/dev/null || true)"
+            [ -n "${mmap_rnd_bits}" ] || mmap_rnd_bits="unreadable"
+          else
+            mmap_rnd_bits="unavailable"
+          fi
+
+          if command -v gcc >/dev/null 2>&1; then
+            gcc_version="$(gcc --version 2>/dev/null | head -n 1 || true)"
+            [ -n "${gcc_version}" ] || gcc_version="unavailable"
+          else
+            gcc_version="unavailable"
+          fi
+
+          if command -v ldd >/dev/null 2>&1; then
+            ldd_version="$(ldd --version 2>/dev/null | head -n 1 || true)"
+            [ -n "${ldd_version}" ] || ldd_version="unavailable"
+          else
+            ldd_version="unavailable"
+          fi
+
+          echo "kernel_release=${kernel_release}"
+          echo "vm.mmap_rnd_bits=${mmap_rnd_bits}"
+          echo "gcc_version=${gcc_version}"
+          echo "ldd_version=${ldd_version}"
+
+          {
+            echo "### Sanitizer-relevant environment (pre-build)"
+            echo ""
+            echo "| key | value |"
+            echo "| --- | --- |"
+            echo "| kernel_release | `\${kernel_release}` |"
+            echo "| vm.mmap_rnd_bits | `\${mmap_rnd_bits}` |"
+            echo "| gcc_version | `\${gcc_version}` |"
+            echo "| ldd_version | `\${ldd_version}` |"
+          } >> "${GITHUB_STEP_SUMMARY:-/dev/null}"
+
+
       - name: Build Flatpak
         uses: flatpak/flatpak-github-actions/flatpak-builder@79327416609af08178ad73b352877e51450790b3 # v6
         with:
