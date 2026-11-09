@@ -543,6 +543,8 @@ atm_archive_inspect_snapshot (
             if (declared_size < 0 ||
                 (guint64) declared_size >
                     limits->max_file_bytes ||
+                (guint64) declared_size >
+                    limits->max_total_bytes ||
                 inspection.logical_regular_bytes >
                     limits->max_total_bytes -
                     (guint64) declared_size) {
@@ -836,6 +838,7 @@ atm_archive_extract_snapshot_cancellable (
 
             if (declared_size < 0 ||
                 (guint64) declared_size > limits->max_file_bytes ||
+                (guint64) declared_size > limits->max_total_bytes ||
                 total_bytes >
                     limits->max_total_bytes -
                     (guint64) declared_size) {
