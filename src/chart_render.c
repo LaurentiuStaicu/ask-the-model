@@ -143,10 +143,12 @@ static char *data_view (const AtmChartSpec *spec)
     g_string_append_printf (s, "# unit\t%s\n# reference_period\t%s\n# chart_spec_id\t%s\n",
         atm_verified_series_unit (atm_chart_spec_series (spec, 0)),
         atm_verified_series_reference_period (atm_chart_spec_series (spec, 0)), atm_chart_spec_id (spec));
-    g_string_append (s, "# source_repository\tLaurentiuStaicu/empirical-world3-dynamics\n"
-        "# source_snapshot\td9e249339663015f6d1c05752338a955bf64ad0b\n"
-        "# source_path\tscience/data/processed/nasa_gistemp_global_2026.csv\n"
-        "# access_vintage\t2026-08-31\n"
+    g_string_append_printf (s,
+        "# source_repository\t%s\n# source_snapshot\t%s\n# source_path\t%s\n",
+        atm_chart_spec_series_repository_id (spec, 0),
+        atm_chart_spec_series_snapshot_sha (spec, 0),
+        atm_chart_spec_series_source_path (spec, 0));
+    g_string_append (s, "# access_vintage\t2026-08-31\n"
         "series\tyear\tsource_decimal\tcoefficient\texponent\tsource_row\tqualified_series_id\tsupport_ids\n");
     for (guint i = 0; i < atm_chart_spec_count (spec); i++) {
         const AtmVerifiedSeries *series = atm_chart_spec_series (spec, i);

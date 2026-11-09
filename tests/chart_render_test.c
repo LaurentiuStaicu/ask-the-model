@@ -6,10 +6,22 @@
 #include <fontconfig/fontconfig.h>
 #include <stdint.h>
 #include <string.h>
-static AtmGistempAdmission *admit (void)
+static const char GISTEMP_SNAPSHOT_INITIAL[] =
+    "d9e249339663015f6d1c05752338a955bf64ad0b";
+static const char GISTEMP_SNAPSHOT_CURRENT[] =
+    "dc710d8e604c0fff713a3acfdb18ab47a1a902bb";
+
+static AtmGistempAdmission *admit_for_snapshot (const char *snapshot)
 {
     const char *root = g_getenv ("ATM_CHART01_FIXTURE");
     g_assert_nonnull (root);
+    const char *fixture_tree = NULL;
+    if (g_strcmp0 (snapshot, GISTEMP_SNAPSHOT_INITIAL) == 0)
+        fixture_tree = "ewd";
+    else if (g_strcmp0 (snapshot, GISTEMP_SNAPSHOT_CURRENT) == 0)
+        fixture_tree = "ewd-current";
+    else
+        g_assert_not_reached ();
     const char *paths[] = {
         "science/data/processed/nasa_gistemp_global_2026.csv",
         "science/data/processed/nasa_gistemp_global_2026.provenance.json",
@@ -17,7 +29,7 @@ static AtmGistempAdmission *admit (void)
     };
     GBytes *sources[4];
     for (guint i = 0; i < 4; i++) {
-        char *path = g_build_filename (root, "ewd", paths[i], NULL);
+        char *path = g_build_filename (root, fixture_tree, paths[i], NULL);
         char *bytes; gsize length;
         g_assert_true (g_file_get_contents (path, &bytes, &length, NULL));
         sources[i] = g_bytes_new_take (bytes, length);
@@ -25,13 +37,13 @@ static AtmGistempAdmission *admit (void)
     }
     AtmGistempAdmission *a = NULL;
     g_assert_true (atm_gistemp_admission_new ("LaurentiuStaicu/empirical-world3-dynamics",
-        "d9e249339663015f6d1c05752338a955bf64ad0b", sources, &a, NULL));
+        snapshot, sources, &a, NULL));
     for (guint i = 0; i < 4; i++) g_bytes_unref (sources[i]);
     return a;
 }
-static AtmVerifiedSeries *build (void)
+static AtmVerifiedSeries *build_for_snapshot (const char *snapshot)
 {
-    AtmGistempAdmission *a = admit ();
+    AtmGistempAdmission *a = admit_for_snapshot (snapshot);
     AtmVerifiedSeries *s = NULL;
     GError *error = NULL;
     g_assert_true (atm_verified_series_from_gistemp (a, &s, &error));
@@ -41,13 +53,19 @@ static AtmVerifiedSeries *build (void)
 }
 
 
-static AtmChartSpec *specification (AtmChartKind kind)
+static AtmChartSpec *specification_for_snapshot (AtmChartKind kind,
+    const char *snapshot)
 {
-    AtmVerifiedSeries *s = build ();
+    AtmVerifiedSeries *s = build_for_snapshot (snapshot);
     const AtmVerifiedSeries *inputs[] = {s};
     AtmChartSpec *spec = NULL;
     g_assert_true (atm_chart_spec_new (kind, inputs, 1, &spec, NULL));
     atm_verified_series_free (s); return spec;
+}
+
+static AtmChartSpec *specification (AtmChartKind kind)
+{
+    return specification_for_snapshot (kind, GISTEMP_SNAPSHOT_INITIAL);
 }
 
 static AtmChartSpec *
@@ -312,6 +330,33 @@ static void save_preview (AtmChartRender *r, const char *name, gboolean data)
         g_assert_true (g_file_set_contents (path, atm_chart_render_data (r), -1, NULL)); g_free (path);
     }
 }
+static void test_gistemp_data_view_uses_qualified_snapshot (void)
+{
+    const char *snapshots[] = {
+        GISTEMP_SNAPSHOT_INITIAL,
+        GISTEMP_SNAPSHOT_CURRENT
+    };
+    for (guint i = 0; i < G_N_ELEMENTS (snapshots); i++) {
+        AtmChartSpec *spec = specification_for_snapshot (ATM_CHART_LINE, snapshots[i]);
+        AtmChartRender *rendered = render (spec, 860, 500, 1);
+        const AtmChartSpec *rendered_spec = atm_chart_render_spec (rendered);
+        const char *qualified_snapshot =
+            atm_chart_spec_series_snapshot_sha (rendered_spec, 0);
+        g_assert_cmpstr (qualified_snapshot, ==, snapshots[i]);
+        const char *qualified_repository =
+            atm_chart_spec_series_repository_id (rendered_spec, 0);
+        const char *qualified_path =
+            atm_chart_spec_series_source_path (rendered_spec, 0);
+        char *expected_header = g_strdup_printf (
+            "# source_repository\t%s\n# source_snapshot\t%s\n# source_path\t%s\n",
+            qualified_repository, qualified_snapshot, qualified_path);
+        g_assert_nonnull (strstr (atm_chart_render_data (rendered), expected_header));
+        g_free (expected_header);
+        atm_chart_render_free (rendered);
+        atm_chart_spec_free (spec);
+    }
+}
+
 static void test_line_data_ownership (void)
 {
     AtmChartSpec *spec = specification (ATM_CHART_LINE);
@@ -454,6 +499,8 @@ static void test_fallback_arguments (void)
 int main (int argc, char **argv)
 {
     g_test_init (&argc, &argv, NULL);
+    g_test_add_func ("/chart-render/gistemp-data-qualified-snapshot",
+        test_gistemp_data_view_uses_qualified_snapshot);
     g_test_add_func ("/chart-render/line-data-ownership", test_line_data_ownership);
     g_test_add_func ("/chart-render/scatter-scale", test_scatter_scale);
     g_test_add_func ("/chart-render/resize-transactional", test_resize_transactional);
