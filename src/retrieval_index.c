@@ -231,7 +231,7 @@ atm_retrieval_index_validate_fts_canonical_consistency (
         "FROM search_fts WHERE evidence_kind='dataset_row') "
         "UNION ALL SELECT 1 FROM ("
         "SELECT evidence_kind,evidence_id FROM search_fts "
-        "GROUP BY evidence_kind,evidence_id HAVING count(*) > 1) "
+        "GROUP BY evidence_kind,CAST(evidence_id AS TEXT) HAVING count(*) > 1) "
         "LIMIT 1;"
     };
 
