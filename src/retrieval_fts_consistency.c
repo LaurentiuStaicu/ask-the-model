@@ -3,6 +3,14 @@
 
 #include <string.h>
 
+/*
+ * Keep the index error domain stable without linking this shared validator
+ * against retrieval_index.c (some focused query tests compile it alone).
+ */
+#undef ATM_RETRIEVAL_INDEX_ERROR
+#define ATM_RETRIEVAL_INDEX_ERROR \
+    (g_quark_from_static_string ("atm-retrieval-index-error-quark"))
+
 gboolean
 atm_retrieval_index_validate_fts_canonical_consistency (
     sqlite3 *db,
