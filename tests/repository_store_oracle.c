@@ -1932,16 +1932,6 @@ check_fts_canonical_consistency (sqlite3 *db, GError **error)
     sqlite3_stmt *statement = NULL;
     int rc;
 
-    if (!sqlite_single_int (
-            db,
-            "SELECT count(*) FROM sqlite_master "
-            "WHERE type='table' AND name='search_fts' "
-            "AND upper(sql) LIKE 'CREATE VIRTUAL TABLE%USING FTS5%';",
-            &(gint64){0}, error
-        )) {
-        return FALSE;
-    }
-
     gint64 value = 0;
     if (!sqlite_single_int (
             db,
@@ -2069,7 +2059,7 @@ check_fts_canonical_consistency (sqlite3 *db, GError **error)
             break;
         }
 
-        char *key = g_strdup_printf ("%s:%s", kind, evidence_id);
+        char *key = g_strdup_printf ("%zu:%s%s", strlen (kind), kind, evidence_id);
         if (g_hash_table_contains (seen, key)) {
             g_free (key);
             g_set_error_literal (
