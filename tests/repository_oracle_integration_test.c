@@ -779,6 +779,44 @@ test_production_ready_then_perturbed (void)
     g_assert_cmpint (sqlite3_close (fts_db), ==, SQLITE_OK);
     assert_oracle (FALSE, oracle_path, data_root, cache_root, state_root);
 
+    /*
+     * Fault 5: remove the required FTS5 virtual table entirely.
+     */
+    g_assert_cmpint (
+        sqlite3_open_v2 (
+            index_path, &fts_db, SQLITE_OPEN_READWRITE, NULL
+        ),
+        ==, SQLITE_OK
+    );
+    g_assert_cmpint (
+        sqlite3_exec (fts_db, "DROP TABLE search_fts;", NULL, NULL, NULL),
+        ==, SQLITE_OK
+    );
+    g_assert_cmpint (sqlite3_close (fts_db), ==, SQLITE_OK);
+    assert_oracle (FALSE, oracle_path, data_root, cache_root, state_root);
+
+    /*
+     * Fault 6: a same-named ordinary table is not an FTS5 implementation.
+     */
+    g_assert_cmpint (
+        sqlite3_open_v2 (
+            index_path, &fts_db, SQLITE_OPEN_READWRITE, NULL
+        ),
+        ==, SQLITE_OK
+    );
+    g_assert_cmpint (
+        sqlite3_exec (
+            fts_db,
+            "CREATE TABLE search_fts("
+            "evidence_kind TEXT,evidence_id TEXT,logical_source_id TEXT,"
+            "title TEXT,body TEXT);",
+            NULL, NULL, NULL
+        ),
+        ==, SQLITE_OK
+    );
+    g_assert_cmpint (sqlite3_close (fts_db), ==, SQLITE_OK);
+    assert_oracle (FALSE, oracle_path, data_root, cache_root, state_root);
+
     g_free (external);
     g_free (core);
     g_free (status);
