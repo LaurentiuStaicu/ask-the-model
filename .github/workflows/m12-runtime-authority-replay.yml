@@ -25,6 +25,8 @@ on:
       - 'tests/fault_injection_support.h'
       - 'scripts/run_m12_runtime_authority_replay.sh'
       - '.github/workflows/m12-runtime-authority-replay.yml'
+      - 'src/retrieval_fts_consistency.c'
+      - 'src/retrieval_fts_consistency.h'
       - 'meson.build'
   push:
     branches:
@@ -51,6 +53,8 @@ on:
       - 'tests/fault_injection_support.h'
       - 'scripts/run_m12_runtime_authority_replay.sh'
       - '.github/workflows/m12-runtime-authority-replay.yml'
+      - 'src/retrieval_fts_consistency.c'
+      - 'src/retrieval_fts_consistency.h'
       - 'meson.build'
 
 permissions:
