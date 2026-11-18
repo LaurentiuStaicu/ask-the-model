@@ -1920,6 +1920,50 @@ sqlite_single_int (
 }
 
 static gboolean
+sqlite_columns_equal_by_type_and_bytes (
+    sqlite3_stmt *left,
+    int left_column,
+    sqlite3_stmt *right,
+    int right_column
+)
+{
+    int left_type = sqlite3_column_type (left, left_column);
+    int right_type = sqlite3_column_type (right, right_column);
+
+    if (left_type != right_type)
+        return FALSE;
+
+    switch (left_type) {
+    case SQLITE_NULL:
+        return TRUE;
+    case SQLITE_INTEGER:
+        return sqlite3_column_int64 (left, left_column) ==
+            sqlite3_column_int64 (right, right_column);
+    case SQLITE_FLOAT:
+        return sqlite3_column_double (left, left_column) ==
+            sqlite3_column_double (right, right_column);
+    case SQLITE_TEXT:
+    case SQLITE_BLOB: {
+        const void *left_value = left_type == SQLITE_TEXT
+            ? (const void *) sqlite3_column_text (left, left_column)
+            : sqlite3_column_blob (left, left_column);
+        const void *right_value = right_type == SQLITE_TEXT
+            ? (const void *) sqlite3_column_text (right, right_column)
+            : sqlite3_column_blob (right, right_column);
+        int left_bytes = sqlite3_column_bytes (left, left_column);
+        int right_bytes = sqlite3_column_bytes (right, right_column);
+
+        return left_bytes == right_bytes &&
+            (left_bytes == 0 ||
+             (left_value != NULL && right_value != NULL &&
+              memcmp (left_value, right_value, (gsize) left_bytes) == 0));
+    }
+    default:
+        return FALSE;
+    }
+}
+
+static gboolean
 check_fts_canonical_consistency (sqlite3 *db, GError **error)
 {
     static const char *expected_columns[] = {
@@ -2127,13 +2171,6 @@ check_fts_canonical_consistency (sqlite3 *db, GError **error)
 
         while ((rc = sqlite3_step (canonical)) == SQLITE_ROW) {
             sqlite3_int64 id = sqlite3_column_int64 (canonical, 0);
-            const char *logical_id =
-                (const char *) sqlite3_column_text (canonical, 1);
-            const char *title =
-                (const char *) sqlite3_column_text (canonical, 2);
-            const char *body =
-                (const char *) sqlite3_column_text (canonical, 3);
-
             sqlite3_stmt *lookup = NULL;
             if (sqlite3_prepare_v2 (
                     db,
@@ -2158,16 +2195,15 @@ check_fts_canonical_consistency (sqlite3 *db, GError **error)
 
             int lookup_rc = sqlite3_step (lookup);
             gboolean matches = lookup_rc == SQLITE_ROW &&
-                g_strcmp0 (
-                    (const char *) sqlite3_column_text (lookup, 0),
-                    logical_id
-                ) == 0 &&
-                ((title == NULL && sqlite3_column_type (lookup, 1) == SQLITE_NULL) ||
-                 (title != NULL && sqlite3_column_type (lookup, 1) != SQLITE_NULL &&
-                  g_strcmp0 (title, (const char *) sqlite3_column_text (lookup, 1)) == 0)) &&
-                ((body == NULL && sqlite3_column_type (lookup, 2) == SQLITE_NULL) ||
-                 (body != NULL && sqlite3_column_type (lookup, 2) != SQLITE_NULL &&
-                  g_strcmp0 (body, (const char *) sqlite3_column_text (lookup, 2)) == 0));
+                sqlite_columns_equal_by_type_and_bytes (
+                    canonical, 1, lookup, 0
+                ) &&
+                sqlite_columns_equal_by_type_and_bytes (
+                    canonical, 2, lookup, 1
+                ) &&
+                sqlite_columns_equal_by_type_and_bytes (
+                    canonical, 3, lookup, 2
+                );
             int lookup_end_rc = matches ? sqlite3_step (lookup) : SQLITE_ERROR;
 
             if (!matches || lookup_end_rc != SQLITE_DONE) {
