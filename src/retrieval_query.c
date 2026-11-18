@@ -11,8 +11,9 @@ validate_query_fts_consistency (sqlite3 *db, GError **error)
     GError *index_error = NULL;
     if (atm_retrieval_index_validate_fts_canonical_consistency (
             db, &index_error
-        ))
+        )) {
         return TRUE;
+    }
 
     g_set_error (
         error,
