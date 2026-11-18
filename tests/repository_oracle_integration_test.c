@@ -756,7 +756,51 @@ test_production_ready_then_perturbed (void)
     g_free (original_hash);
 
     /*
-     * Fault 4: alter an FTS reference while preserving SQLite structure.
+     * Fault 4: canonical TEXT changed to BLOB without changing its bytes.
+     * The independent oracle must compare SQLite storage classes, not only
+     * the text conversion of the values.
+     */
+    sqlite3 *canonical_db = NULL;
+    g_assert_cmpint (
+        sqlite3_open_v2 (
+            index_path, &canonical_db, SQLITE_OPEN_READWRITE, NULL
+        ),
+        ==, SQLITE_OK
+    );
+    g_assert_cmpint (
+        sqlite3_exec (
+            canonical_db,
+            "UPDATE document_sections SET body=CAST(body AS BLOB) "
+            "WHERE id=(SELECT id FROM document_sections ORDER BY id LIMIT 1);",
+            NULL, NULL, NULL
+        ),
+        ==, SQLITE_OK
+    );
+    g_assert_cmpint (sqlite3_changes (canonical_db), ==, 1);
+    g_assert_cmpint (sqlite3_close (canonical_db), ==, SQLITE_OK);
+    assert_oracle (FALSE, oracle_path, data_root, cache_root, state_root);
+
+    g_assert_cmpint (
+        sqlite3_open_v2 (
+            index_path, &canonical_db, SQLITE_OPEN_READWRITE, NULL
+        ),
+        ==, SQLITE_OK
+    );
+    g_assert_cmpint (
+        sqlite3_exec (
+            canonical_db,
+            "UPDATE document_sections SET body=CAST(body AS TEXT) "
+            "WHERE id=(SELECT id FROM document_sections ORDER BY id LIMIT 1);",
+            NULL, NULL, NULL
+        ),
+        ==, SQLITE_OK
+    );
+    g_assert_cmpint (sqlite3_changes (canonical_db), ==, 1);
+    g_assert_cmpint (sqlite3_close (canonical_db), ==, SQLITE_OK);
+    assert_oracle (TRUE, oracle_path, data_root, cache_root, state_root);
+
+    /*
+     * Fault 5: alter an FTS reference while preserving SQLite structure.
      */
     sqlite3 *fts_db = NULL;
     g_assert_cmpint (
@@ -780,7 +824,7 @@ test_production_ready_then_perturbed (void)
     assert_oracle (FALSE, oracle_path, data_root, cache_root, state_root);
 
     /*
-     * Fault 5: remove the required FTS5 virtual table entirely.
+     * Fault 6: remove the required FTS5 virtual table entirely.
      */
     g_assert_cmpint (
         sqlite3_open_v2 (
@@ -796,7 +840,7 @@ test_production_ready_then_perturbed (void)
     assert_oracle (FALSE, oracle_path, data_root, cache_root, state_root);
 
     /*
-     * Fault 6: a same-named ordinary table is not an FTS5 implementation.
+     * Fault 7: a same-named ordinary table is not an FTS5 implementation.
      */
     g_assert_cmpint (
         sqlite3_open_v2 (
