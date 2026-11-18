@@ -4,6 +4,7 @@
 
 #include <glib.h>
 #include <glib/gstdio.h>
+#include <sqlite3.h>
 
 #include <sys/stat.h>
 #include <math.h>
@@ -1139,6 +1140,61 @@ test_invalid_arguments_rejected (void)
     g_clear_error (&error);
 }
 
+static void
+test_fts_canonical_consistency_precedes_all_routes (void)
+{
+    char *snapshot_root = new_snapshot ();
+    char *cache_root = new_temp_root ("atm-fts-consistency-cache-XXXXXX");
+    char *index_path = build_index (snapshot_root, cache_root);
+    sqlite3 *db = NULL;
+    GPtrArray *results = NULL;
+    GError *error = NULL;
+
+    g_assert_cmpint (
+        sqlite3_open_v2 (index_path, &db, SQLITE_OPEN_READWRITE, NULL),
+        ==, SQLITE_OK
+    );
+    g_assert_cmpint (
+        sqlite3_exec (
+            db,
+            "UPDATE search_fts SET evidence_id='-1' WHERE rowid=("
+            "SELECT rowid FROM search_fts WHERE evidence_kind='section' "
+            "ORDER BY rowid LIMIT 1);",
+            NULL, NULL, NULL
+        ),
+        ==, SQLITE_OK
+    );
+    g_assert_cmpint (sqlite3_changes (db), ==, 1);
+    g_assert_cmpint (sqlite3_close (db), ==, SQLITE_OK);
+
+    g_assert_false (atm_retrieval_lookup_exact (
+        index_path, "food_per_capita", 10, &results, &error
+    ));
+    g_assert_error (error, ATM_RETRIEVAL_QUERY_ERROR, ATM_RETRIEVAL_QUERY_ERROR_SQLITE);
+    g_assert_null (results);
+    g_clear_error (&error);
+
+    g_assert_false (atm_retrieval_search_fts (
+        index_path, "current validation boundary", 10, &results, &error
+    ));
+    g_assert_error (error, ATM_RETRIEVAL_QUERY_ERROR, ATM_RETRIEVAL_QUERY_ERROR_SQLITE);
+    g_assert_null (results);
+    g_clear_error (&error);
+
+    g_assert_false (atm_retrieval_lookup_dataset_rows (
+        index_path, NULL, "2025", 10, &results, &error
+    ));
+    g_assert_error (error, ATM_RETRIEVAL_QUERY_ERROR, ATM_RETRIEVAL_QUERY_ERROR_SQLITE);
+    g_assert_null (results);
+    g_clear_error (&error);
+
+    g_free (index_path);
+    remove_tree_best_effort (snapshot_root);
+    g_free (snapshot_root);
+    remove_tree_best_effort (cache_root);
+    g_free (cache_root);
+}
+
 int
 main (int argc, char **argv)
 {
@@ -1195,6 +1251,10 @@ main (int argc, char **argv)
     g_test_add_func (
         "/retrieval-query/semantic-metadata-consistent",
         test_semantic_metadata_consistent_across_routes
+    );
+    g_test_add_func (
+        "/retrieval-query/fts-canonical-consistency-all-routes",
+        test_fts_canonical_consistency_precedes_all_routes
     );
     g_test_add_func (
         "/retrieval-query/invalid-arguments",
