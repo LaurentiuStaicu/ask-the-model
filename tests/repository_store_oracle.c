@@ -2035,7 +2035,7 @@ check_fts_canonical_consistency (sqlite3 *db, GError **error)
     if (!sqlite_single_int (
             db,
             "SELECT count(*) FROM (SELECT evidence_kind,evidence_id "
-            "FROM search_fts GROUP BY evidence_kind,evidence_id "
+            "FROM search_fts GROUP BY evidence_kind,CAST(evidence_id AS TEXT) "
             "HAVING count(*)>1);",
             &value, error
         ) || value != 0) {
