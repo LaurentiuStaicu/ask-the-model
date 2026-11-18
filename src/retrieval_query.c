@@ -1,8 +1,29 @@
 #include "retrieval_query.h"
+#include "retrieval_index.h"
 
 #include <sqlite3.h>
 
 #include <string.h>
+
+static gboolean
+validate_query_fts_consistency (sqlite3 *db, GError **error)
+{
+    GError *index_error = NULL;
+    if (atm_retrieval_index_validate_fts_canonical_consistency (
+            db, &index_error
+        ))
+        return TRUE;
+
+    g_set_error (
+        error,
+        ATM_RETRIEVAL_QUERY_ERROR,
+        ATM_RETRIEVAL_QUERY_ERROR_SQLITE,
+        "Retrieval index failed FTS consistency validation: %s",
+        index_error != NULL ? index_error->message : "unknown integrity error"
+    );
+    g_clear_error (&index_error);
+    return FALSE;
+}
 
 GQuark
 atm_retrieval_query_error_quark (void)
@@ -527,6 +548,10 @@ atm_retrieval_lookup_exact (
         goto out;
     }
 
+    if (!validate_query_fts_consistency (db, error)) {
+        goto out;
+    }
+
     if (sqlite3_prepare_v2 (
             db,
             "SELECT role FROM source_roles "
@@ -979,6 +1004,10 @@ atm_retrieval_search_fts (
         goto out;
     }
 
+    if (!validate_query_fts_consistency (db, error)) {
+        goto out;
+    }
+
     if (sqlite3_prepare_v2 (
             db,
             "SELECT evidence_kind, evidence_id, logical_source_id, "
@@ -1304,6 +1333,10 @@ atm_retrieval_lookup_dataset_rows (
             &provenance,
             error
         )) {
+        goto out;
+    }
+
+    if (!validate_query_fts_consistency (db, error)) {
         goto out;
     }
 
