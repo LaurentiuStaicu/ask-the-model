@@ -1,7 +1,6 @@
 #pragma once
 
 #include <glib.h>
-#include <sqlite3.h>
 #include "repository_sources.h"
 
 G_BEGIN_DECLS
@@ -32,11 +31,6 @@ typedef struct {
 } AtmRetrievalIndexMetadata;
 
 GQuark atm_retrieval_index_error_quark (void);
-
-gboolean atm_retrieval_index_validate_fts_canonical_consistency (
-    sqlite3 *db,
-    GError **error
-);
 
 char *atm_retrieval_index_path (
     const char *cache_root,
