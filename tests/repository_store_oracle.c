@@ -1920,6 +1920,129 @@ sqlite_single_int (
 }
 
 static gboolean
+check_fts_canonical_consistency (sqlite3 *db, GError **error)
+{
+    gint64 value = 0;
+
+    if (!sqlite_single_int (
+            db,
+            "SELECT count(*) FROM sqlite_master "
+            "WHERE type='table' AND name='search_fts' "
+            "AND upper(sql) LIKE 'CREATE VIRTUAL TABLE%USING FTS5%';",
+            &value, error
+        ) || value != 1) {
+        if (error != NULL && *error == NULL)
+            g_set_error_literal (
+                error, ORACLE_ERROR, ORACLE_ERROR_INTEGRITY,
+                "The retrieval index is missing its FTS5 virtual table."
+            );
+        return FALSE;
+    }
+
+    if (!sqlite_single_int (
+            db,
+            "SELECT count(*) FROM search_fts f WHERE "
+            "f.evidence_kind IS NULL OR f.evidence_id IS NULL OR "
+            "f.logical_source_id IS NULL OR "
+            "(f.evidence_kind='section' AND NOT EXISTS ("
+            "SELECT 1 FROM document_sections d WHERE "
+            "CAST(d.id AS TEXT)=f.evidence_id "
+            "AND d.logical_source_id IS f.logical_source_id "
+            "AND d.title IS f.title AND d.body IS f.body)) OR "
+            "(f.evidence_kind='entity' AND NOT EXISTS ("
+            "SELECT 1 FROM structured_entities e WHERE "
+            "CAST(e.id AS TEXT)=f.evidence_id "
+            "AND e.logical_source_id IS f.logical_source_id "
+            "AND COALESCE(e.label,e.native_id) IS f.title "
+            "AND e.payload_json IS f.body)) OR "
+            "(f.evidence_kind='relation' AND NOT EXISTS ("
+            "SELECT 1 FROM structured_relations r WHERE "
+            "CAST(r.id AS TEXT)=f.evidence_id "
+            "AND r.logical_source_id IS f.logical_source_id "
+            "AND COALESCE(r.native_id,r.relation_type) IS f.title "
+            "AND r.payload_json IS f.body)) OR "
+            "(f.evidence_kind='dataset_row' AND NOT EXISTS ("
+            "SELECT 1 FROM dataset_rows r "
+            "JOIN datasets d ON d.id=r.dataset_id "
+            "JOIN source_files s ON s.id=d.source_id "
+            "JOIN snapshot_metadata m ON m.id=1 "
+            "WHERE CAST(r.id AS TEXT)=f.evidence_id "
+            "AND printf('%s:dataset-row:%s:%d',m.repository_id,s.path,r.ordinal) "
+            "IS f.logical_source_id AND s.path IS f.title "
+            "AND r.search_text IS f.body)) OR "
+            "f.evidence_kind NOT IN ('section','entity','relation','dataset_row');",
+            &value, error
+        ) || value != 0) {
+        if (error != NULL && *error == NULL)
+            g_set_error_literal (
+                error, ORACLE_ERROR, ORACLE_ERROR_INTEGRITY,
+                "FTS evidence does not match its canonical retrieval record."
+            );
+        return FALSE;
+    }
+
+    if (!sqlite_single_int (
+            db,
+            "SELECT count(*) FROM ("
+            "SELECT 1 FROM document_sections d WHERE NOT EXISTS ("
+            "SELECT 1 FROM search_fts f WHERE f.evidence_kind='section' "
+            "AND f.evidence_id=CAST(d.id AS TEXT) "
+            "AND f.logical_source_id IS d.logical_source_id "
+            "AND f.title IS d.title AND f.body IS d.body) "
+            "UNION ALL "
+            "SELECT 1 FROM structured_entities e WHERE NOT EXISTS ("
+            "SELECT 1 FROM search_fts f WHERE f.evidence_kind='entity' "
+            "AND f.evidence_id=CAST(e.id AS TEXT) "
+            "AND f.logical_source_id IS e.logical_source_id "
+            "AND f.title IS COALESCE(e.label,e.native_id) "
+            "AND f.body IS e.payload_json) "
+            "UNION ALL "
+            "SELECT 1 FROM structured_relations r WHERE NOT EXISTS ("
+            "SELECT 1 FROM search_fts f WHERE f.evidence_kind='relation' "
+            "AND f.evidence_id=CAST(r.id AS TEXT) "
+            "AND f.logical_source_id IS r.logical_source_id "
+            "AND f.title IS COALESCE(r.native_id,r.relation_type) "
+            "AND f.body IS r.payload_json) "
+            "UNION ALL "
+            "SELECT 1 FROM dataset_rows r "
+            "JOIN datasets d ON d.id=r.dataset_id "
+            "JOIN source_files s ON s.id=d.source_id "
+            "JOIN snapshot_metadata m ON m.id=1 "
+            "WHERE NOT EXISTS (SELECT 1 FROM search_fts f "
+            "WHERE f.evidence_kind='dataset_row' "
+            "AND f.evidence_id=CAST(r.id AS TEXT) "
+            "AND f.logical_source_id IS printf("
+            "'%s:dataset-row:%s:%d',m.repository_id,s.path,r.ordinal) "
+            "AND f.title IS s.path AND f.body IS r.search_text)"
+            ");",
+            &value, error
+        ) || value != 0) {
+        if (error != NULL && *error == NULL)
+            g_set_error_literal (
+                error, ORACLE_ERROR, ORACLE_ERROR_INTEGRITY,
+                "A canonical retrieval record is missing its FTS evidence row."
+            );
+        return FALSE;
+    }
+
+    if (!sqlite_single_int (
+            db,
+            "SELECT count(*) FROM (SELECT evidence_kind,evidence_id "
+            "FROM search_fts GROUP BY evidence_kind,evidence_id "
+            "HAVING count(*)>1);",
+            &value, error
+        ) || value != 0) {
+        if (error != NULL && *error == NULL)
+            g_set_error_literal (
+                error, ORACLE_ERROR, ORACLE_ERROR_INTEGRITY,
+                "The FTS index contains duplicate evidence references."
+            );
+        return FALSE;
+    }
+    return TRUE;
+}
+
+static gboolean
 check_sqlite_integrity (sqlite3 *db, GError **error)
 {
     sqlite3_stmt *statement = NULL;
@@ -2342,7 +2465,8 @@ check_index (
         goto out;
     }
 
-    if (!check_sqlite_integrity (db, error)) {
+    if (!check_sqlite_integrity (db, error) ||
+        !check_fts_canonical_consistency (db, error)) {
         goto out;
     }
 
@@ -2848,7 +2972,26 @@ create_fixture_index (
         "source_id INTEGER NOT NULL REFERENCES source_files(id) ON DELETE CASCADE,"
         "role TEXT NOT NULL,"
         "PRIMARY KEY(source_id,role)"
-        ");";
+        ");"
+        "CREATE TABLE document_sections("
+        "id INTEGER PRIMARY KEY, logical_source_id TEXT NOT NULL,"
+        "title TEXT, body TEXT NOT NULL);"
+        "CREATE TABLE structured_entities("
+        "id INTEGER PRIMARY KEY, logical_source_id TEXT NOT NULL,"
+        "label TEXT, native_id TEXT, payload_json TEXT NOT NULL);"
+        "CREATE TABLE structured_relations("
+        "id INTEGER PRIMARY KEY, logical_source_id TEXT NOT NULL,"
+        "native_id TEXT, relation_type TEXT NOT NULL, payload_json TEXT NOT NULL);"
+        "CREATE TABLE datasets("
+        "id INTEGER PRIMARY KEY, source_id INTEGER NOT NULL REFERENCES source_files(id),"
+        "logical_source_id TEXT NOT NULL);"
+        "CREATE TABLE dataset_rows("
+        "id INTEGER PRIMARY KEY, dataset_id INTEGER NOT NULL REFERENCES datasets(id),"
+        "ordinal INTEGER NOT NULL, search_text TEXT);"
+        "CREATE VIRTUAL TABLE search_fts USING fts5("
+        "evidence_kind UNINDEXED, evidence_id UNINDEXED, "
+        "logical_source_id UNINDEXED, title, body, "
+        "tokenize='unicode61 remove_diacritics 2');";
 
     if (sqlite3_exec (
             db,
