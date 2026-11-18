@@ -2139,7 +2139,7 @@ check_fts_canonical_consistency (sqlite3 *db, GError **error)
                     db,
                     "SELECT logical_source_id, title, body "
                     "FROM search_fts WHERE evidence_kind=?1 "
-                    "AND CAST(evidence_id AS TEXT)=?2;",
+                    "AND CAST(evidence_id AS TEXT)=?2 COLLATE BINARY;",
                     -1, &lookup, NULL
                 ) != SQLITE_OK) {
                 sqlite3_finalize (canonical);
@@ -2168,15 +2168,26 @@ check_fts_canonical_consistency (sqlite3 *db, GError **error)
                 ((body == NULL && sqlite3_column_type (lookup, 2) == SQLITE_NULL) ||
                  (body != NULL && sqlite3_column_type (lookup, 2) != SQLITE_NULL &&
                   g_strcmp0 (body, (const char *) sqlite3_column_text (lookup, 2)) == 0));
+            int lookup_end_rc = matches ? sqlite3_step (lookup) : SQLITE_ERROR;
 
-            if (!matches || sqlite3_step (lookup) != SQLITE_DONE) {
+            if (!matches || lookup_end_rc != SQLITE_DONE) {
+                gboolean lookup_failed = lookup_rc != SQLITE_ROW &&
+                    lookup_rc != SQLITE_DONE;
                 sqlite3_finalize (lookup);
                 sqlite3_finalize (canonical);
-                g_set_error (
-                    error, ORACLE_ERROR, ORACLE_ERROR_INTEGRITY,
-                    "Canonical %s record is missing or differs from FTS.",
-                    canonical_sets[family].kind
-                );
+                if (lookup_failed || (matches && lookup_end_rc != SQLITE_DONE)) {
+                    g_set_error (
+                        error, ORACLE_ERROR, ORACLE_ERROR_INDEX,
+                        "Could not complete canonical %s FTS lookup: %s",
+                        canonical_sets[family].kind, sqlite3_errmsg (db)
+                    );
+                } else {
+                    g_set_error (
+                        error, ORACLE_ERROR, ORACLE_ERROR_INTEGRITY,
+                        "Canonical %s record is missing or differs from FTS.",
+                        canonical_sets[family].kind
+                    );
+                }
                 return FALSE;
             }
             sqlite3_finalize (lookup);
