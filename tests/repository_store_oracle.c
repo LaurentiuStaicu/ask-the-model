@@ -1940,8 +1940,7 @@ check_fts_canonical_consistency (sqlite3 *db, GError **error)
     }
 
     static const char *fts_column_sql =
-        "SELECT count(*) FROM pragma_table_info('search_fts') "
-        "WHERE name IN ('evidence_kind','evidence_id','logical_source_id','title','body');";
+        "SELECT count(*) FROM pragma_table_info('search_fts');";
     if (!sqlite_single_int (db, fts_column_sql, &value, error) || value != 5) {
         if (error != NULL && *error == NULL)
             g_set_error_literal (
@@ -1996,23 +1995,24 @@ check_fts_canonical_consistency (sqlite3 *db, GError **error)
     if (!sqlite_single_int (
             db,
             "SELECT count(*) FROM ("
+            "SELECT 1 FROM ("
             "SELECT 'section',CAST(d.id AS TEXT),d.logical_source_id,d.title,d.body "
             "FROM document_sections d EXCEPT "
             "SELECT evidence_kind,evidence_id,logical_source_id,title,body "
-            "FROM search_fts WHERE evidence_kind='section' "
-            "UNION ALL "
+            "FROM search_fts WHERE evidence_kind='section') "
+            "UNION ALL SELECT 1 FROM ("
             "SELECT 'entity',CAST(e.id AS TEXT),e.logical_source_id,"
             "COALESCE(e.label,e.native_id),e.payload_json "
             "FROM structured_entities e EXCEPT "
             "SELECT evidence_kind,evidence_id,logical_source_id,title,body "
-            "FROM search_fts WHERE evidence_kind='entity' "
-            "UNION ALL "
+            "FROM search_fts WHERE evidence_kind='entity') "
+            "UNION ALL SELECT 1 FROM ("
             "SELECT 'relation',CAST(r.id AS TEXT),r.logical_source_id,"
             "COALESCE(r.native_id,r.relation_type),r.payload_json "
             "FROM structured_relations r EXCEPT "
             "SELECT evidence_kind,evidence_id,logical_source_id,title,body "
-            "FROM search_fts WHERE evidence_kind='relation' "
-            "UNION ALL "
+            "FROM search_fts WHERE evidence_kind='relation') "
+            "UNION ALL SELECT 1 FROM ("
             "SELECT 'dataset_row',CAST(r.id AS TEXT),"
             "printf('%s:dataset-row:%s:%d',m.repository_id,s.path,r.ordinal),"
             "s.path,r.search_text FROM dataset_rows r "
@@ -2020,7 +2020,7 @@ check_fts_canonical_consistency (sqlite3 *db, GError **error)
             "JOIN source_files s ON s.id=d.source_id "
             "JOIN snapshot_metadata m ON m.id=1 EXCEPT "
             "SELECT evidence_kind,evidence_id,logical_source_id,title,body "
-            "FROM search_fts WHERE evidence_kind='dataset_row'"
+            "FROM search_fts WHERE evidence_kind='dataset_row')"
             ");",
             &value, error
         ) || value != 0) {
