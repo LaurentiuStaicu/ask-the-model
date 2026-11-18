@@ -1251,9 +1251,25 @@ test_non_fts5_search_table_is_rejected (void)
         ==, SQLITE_OK
     );
     g_assert_cmpint (
+        sqlite3_exec (db, "DROP TABLE search_fts;", NULL, NULL, NULL),
+        ==, SQLITE_OK
+    );
+    g_assert_cmpint (sqlite3_close (db), ==, SQLITE_OK);
+
+    g_assert_false (atm_retrieval_lookup_exact (
+        index_path, "food_per_capita", 10, &results, &error
+    ));
+    g_assert_error (error, ATM_RETRIEVAL_QUERY_ERROR, ATM_RETRIEVAL_QUERY_ERROR_SQLITE);
+    g_assert_null (results);
+    g_clear_error (&error);
+
+    g_assert_cmpint (
+        sqlite3_open_v2 (index_path, &db, SQLITE_OPEN_READWRITE, NULL),
+        ==, SQLITE_OK
+    );
+    g_assert_cmpint (
         sqlite3_exec (
             db,
-            "DROP TABLE search_fts;"
             "CREATE TABLE search_fts("
             "evidence_kind TEXT,evidence_id TEXT,logical_source_id TEXT,"
             "title TEXT,body TEXT);",
