@@ -1195,6 +1195,88 @@ test_fts_canonical_consistency_precedes_all_routes (void)
     g_free (cache_root);
 }
 
+static void
+test_missing_canonical_fts_row_is_rejected (void)
+{
+    char *snapshot_root = new_snapshot ();
+    char *cache_root = new_temp_root ("atm-fts-missing-cache-XXXXXX");
+    char *index_path = build_index (snapshot_root, cache_root);
+    sqlite3 *db = NULL;
+    GPtrArray *results = NULL;
+    GError *error = NULL;
+
+    g_assert_cmpint (
+        sqlite3_open_v2 (index_path, &db, SQLITE_OPEN_READWRITE, NULL),
+        ==, SQLITE_OK
+    );
+    g_assert_cmpint (
+        sqlite3_exec (
+            db,
+            "DELETE FROM search_fts WHERE rowid=("
+            "SELECT rowid FROM search_fts WHERE evidence_kind='section' "
+            "ORDER BY rowid LIMIT 1);",
+            NULL, NULL, NULL
+        ),
+        ==, SQLITE_OK
+    );
+    g_assert_cmpint (sqlite3_changes (db), ==, 1);
+    g_assert_cmpint (sqlite3_close (db), ==, SQLITE_OK);
+
+    g_assert_false (atm_retrieval_lookup_exact (
+        index_path, "food_per_capita", 10, &results, &error
+    ));
+    g_assert_error (error, ATM_RETRIEVAL_QUERY_ERROR, ATM_RETRIEVAL_QUERY_ERROR_SQLITE);
+    g_assert_null (results);
+    g_clear_error (&error);
+
+    g_free (index_path);
+    remove_tree_best_effort (snapshot_root);
+    g_free (snapshot_root);
+    remove_tree_best_effort (cache_root);
+    g_free (cache_root);
+}
+
+static void
+test_non_fts5_search_table_is_rejected (void)
+{
+    char *snapshot_root = new_snapshot ();
+    char *cache_root = new_temp_root ("atm-fts-type-cache-XXXXXX");
+    char *index_path = build_index (snapshot_root, cache_root);
+    sqlite3 *db = NULL;
+    GPtrArray *results = NULL;
+    GError *error = NULL;
+
+    g_assert_cmpint (
+        sqlite3_open_v2 (index_path, &db, SQLITE_OPEN_READWRITE, NULL),
+        ==, SQLITE_OK
+    );
+    g_assert_cmpint (
+        sqlite3_exec (
+            db,
+            "DROP TABLE search_fts;"
+            "CREATE TABLE search_fts("
+            "evidence_kind TEXT,evidence_id TEXT,logical_source_id TEXT,"
+            "title TEXT,body TEXT);",
+            NULL, NULL, NULL
+        ),
+        ==, SQLITE_OK
+    );
+    g_assert_cmpint (sqlite3_close (db), ==, SQLITE_OK);
+
+    g_assert_false (atm_retrieval_lookup_exact (
+        index_path, "food_per_capita", 10, &results, &error
+    ));
+    g_assert_error (error, ATM_RETRIEVAL_QUERY_ERROR, ATM_RETRIEVAL_QUERY_ERROR_SQLITE);
+    g_assert_null (results);
+    g_clear_error (&error);
+
+    g_free (index_path);
+    remove_tree_best_effort (snapshot_root);
+    g_free (snapshot_root);
+    remove_tree_best_effort (cache_root);
+    g_free (cache_root);
+}
+
 int
 main (int argc, char **argv)
 {
@@ -1255,6 +1337,14 @@ main (int argc, char **argv)
     g_test_add_func (
         "/retrieval-query/fts-canonical-consistency-all-routes",
         test_fts_canonical_consistency_precedes_all_routes
+    );
+    g_test_add_func (
+        "/retrieval-query/fts-canonical-missing-row",
+        test_missing_canonical_fts_row_is_rejected
+    );
+    g_test_add_func (
+        "/retrieval-query/fts-non-fts5-table",
+        test_non_fts5_search_table_is_rejected
     );
     g_test_add_func (
         "/retrieval-query/invalid-arguments",
