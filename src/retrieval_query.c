@@ -1,5 +1,4 @@
 #include "retrieval_query.h"
-#include "retrieval_index.h"
 #include "retrieval_fts_consistency.h"
 
 #include <sqlite3.h>
