@@ -126,6 +126,53 @@ atm_retrieval_index_validate_fts_canonical_consistency (
     statement = NULL;
     g_free (upper_schema_sql);
 
+    static const char *expected_columns[] = {
+        "evidence_kind",
+        "evidence_id",
+        "logical_source_id",
+        "title",
+        "body"
+    };
+    rc = sqlite3_prepare_v2 (
+        db,
+        "PRAGMA table_info(search_fts);",
+        -1,
+        &statement,
+        NULL
+    );
+    if (rc != SQLITE_OK) {
+        g_set_error (
+            error, ATM_RETRIEVAL_INDEX_ERROR, ATM_RETRIEVAL_INDEX_ERROR_SQLITE,
+            "Could not inspect FTS columns: %s", sqlite3_errmsg (db)
+        );
+        return FALSE;
+    }
+    for (gsize i = 0; i < G_N_ELEMENTS (expected_columns); i++) {
+        rc = sqlite3_step (statement);
+        if (rc != SQLITE_ROW ||
+            g_strcmp0 (
+                (const char *) sqlite3_column_text (statement, 1),
+                expected_columns[i]
+            ) != 0) {
+            sqlite3_finalize (statement);
+            g_set_error_literal (
+                error, ATM_RETRIEVAL_INDEX_ERROR, ATM_RETRIEVAL_INDEX_ERROR_INTEGRITY,
+                "FTS5 columns do not match the retrieval-index v2 contract."
+            );
+            return FALSE;
+        }
+    }
+    rc = sqlite3_step (statement);
+    sqlite3_finalize (statement);
+    statement = NULL;
+    if (rc != SQLITE_DONE) {
+        g_set_error_literal (
+            error, ATM_RETRIEVAL_INDEX_ERROR, ATM_RETRIEVAL_INDEX_ERROR_INTEGRITY,
+            "FTS5 columns do not match the retrieval-index v2 contract."
+        );
+        return FALSE;
+    }
+
     const char *queries[] = {
         "SELECT 1 FROM search_fts f WHERE "
         "f.evidence_kind IS NULL OR f.evidence_id IS NULL OR "
@@ -158,39 +205,34 @@ atm_retrieval_index_validate_fts_canonical_consistency (
         "AND r.search_text IS f.body)) OR "
         "f.evidence_kind NOT IN ('section','entity','relation','dataset_row');",
 
-        "SELECT 1 FROM document_sections d WHERE NOT EXISTS ("
-        "SELECT 1 FROM search_fts f WHERE f.evidence_kind = 'section' "
-        "AND f.evidence_id = CAST(d.id AS TEXT) "
-        "AND f.logical_source_id IS d.logical_source_id "
-        "AND f.title IS d.title AND f.body IS d.body) "
-        "UNION ALL "
-        "SELECT 1 FROM structured_entities e WHERE NOT EXISTS ("
-        "SELECT 1 FROM search_fts f WHERE f.evidence_kind = 'entity' "
-        "AND f.evidence_id = CAST(e.id AS TEXT) "
-        "AND f.logical_source_id IS e.logical_source_id "
-        "AND f.title IS COALESCE(e.label,e.native_id) "
-        "AND f.body IS e.payload_json) "
-        "UNION ALL "
-        "SELECT 1 FROM structured_relations r WHERE NOT EXISTS ("
-        "SELECT 1 FROM search_fts f WHERE f.evidence_kind = 'relation' "
-        "AND f.evidence_id = CAST(r.id AS TEXT) "
-        "AND f.logical_source_id IS r.logical_source_id "
-        "AND f.title IS COALESCE(r.native_id,r.relation_type) "
-        "AND f.body IS r.payload_json) "
-        "UNION ALL "
-        "SELECT 1 FROM dataset_rows r "
-        "JOIN datasets d ON d.id = r.dataset_id "
-        "JOIN source_files s ON s.id = d.source_id "
-        "JOIN snapshot_metadata m ON m.id = 1 "
-        "WHERE NOT EXISTS (SELECT 1 FROM search_fts f "
-        "WHERE f.evidence_kind = 'dataset_row' "
-        "AND f.evidence_id = CAST(r.id AS TEXT) "
-        "AND f.logical_source_id IS printf("
-        "'%s:dataset-row:%s:%d',m.repository_id,s.path,r.ordinal) "
-        "AND f.title IS s.path AND f.body IS r.search_text) "
-        "UNION ALL "
-        "SELECT 1 FROM search_fts GROUP BY evidence_kind,evidence_id "
-        "HAVING count(*) > 1 LIMIT 1;"
+        "SELECT 1 FROM ("
+        "SELECT 'section', CAST(d.id AS TEXT), d.logical_source_id, d.title, d.body "
+        "FROM document_sections d "
+        "EXCEPT SELECT evidence_kind, evidence_id, logical_source_id, title, body "
+        "FROM search_fts WHERE evidence_kind = 'section') "
+        "UNION ALL SELECT 1 FROM ("
+        "SELECT 'entity', CAST(e.id AS TEXT), e.logical_source_id, "
+        "COALESCE(e.label,e.native_id), e.payload_json FROM structured_entities e "
+        "EXCEPT SELECT evidence_kind, evidence_id, logical_source_id, title, body "
+        "FROM search_fts WHERE evidence_kind = 'entity') "
+        "UNION ALL SELECT 1 FROM ("
+        "SELECT 'relation', CAST(r.id AS TEXT), r.logical_source_id, "
+        "COALESCE(r.native_id,r.relation_type), r.payload_json FROM structured_relations r "
+        "EXCEPT SELECT evidence_kind, evidence_id, logical_source_id, title, body "
+        "FROM search_fts WHERE evidence_kind = 'relation') "
+        "UNION ALL SELECT 1 FROM ("
+        "SELECT 'dataset_row', CAST(r.id AS TEXT), "
+        "printf('%s:dataset-row:%s:%d',m.repository_id,s.path,r.ordinal), "
+        "s.path, r.search_text FROM dataset_rows r "
+        "JOIN datasets d ON d.id=r.dataset_id "
+        "JOIN source_files s ON s.id=d.source_id "
+        "JOIN snapshot_metadata m ON m.id=1 "
+        "EXCEPT SELECT evidence_kind,evidence_id,logical_source_id,title,body "
+        "FROM search_fts WHERE evidence_kind='dataset_row') "
+        "UNION ALL SELECT 1 FROM ("
+        "SELECT evidence_kind,evidence_id FROM search_fts "
+        "GROUP BY evidence_kind,evidence_id HAVING count(*) > 1) "
+        "LIMIT 1;"
     };
 
     for (gsize i = 0; i < G_N_ELEMENTS (queries); i++) {
