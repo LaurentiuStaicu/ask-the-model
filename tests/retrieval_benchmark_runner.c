@@ -1568,44 +1568,103 @@ run_validator_branch_diagnostics (
                 goto repository_error;
             }
             rc = sqlite3_step (lean);
-            if (rc != SQLITE_DONE) {
+            if (rc == SQLITE_ROW) {
+                static const char *mismatch_sql =
+                    "SELECT quote(f.evidence_id), typeof(f.evidence_id), "
+                    "quote(CAST(f.evidence_id AS TEXT)), quote(r.id), "
+                    "quote(CAST(r.id AS TEXT)), typeof(r.id), "
+                    "quote(f.logical_source_id), "
+                    "quote(printf('%s:dataset-row:%s:%d',m.repository_id,s.path,r.ordinal)), "
+                    "quote(f.title), quote(s.path), quote(f.body), quote(r.search_text) "
+                    "FROM search_fts f "
+                    "LEFT JOIN dataset_rows r ON r.id=f.evidence_id "
+                    "LEFT JOIN datasets d ON d.id=r.dataset_id "
+                    "LEFT JOIN source_files s ON s.id=d.source_id "
+                    "JOIN snapshot_metadata m ON m.id=1 "
+                    "WHERE f.evidence_kind='dataset_row' AND "
+                    "(f.evidence_id IS NULL OR f.logical_source_id IS NULL OR "
+                    "NOT EXISTS (SELECT 1 FROM dataset_rows x "
+                    "JOIN datasets xd ON xd.id=x.dataset_id "
+                    "JOIN source_files xs ON xs.id=xd.source_id "
+                    "JOIN snapshot_metadata xm ON xm.id=1 "
+                    "WHERE CAST(x.id AS TEXT)=f.evidence_id "
+                    "AND printf('%s:dataset-row:%s:%d',xm.repository_id,xs.path,x.ordinal) "
+                    "IS f.logical_source_id AND xs.path IS f.title "
+                    "AND x.search_text IS f.body)) LIMIT 1;";
+                sqlite3_stmt *mismatch = NULL;
+                int mismatch_rc = sqlite3_prepare_v2 (
+                    db, mismatch_sql, -1, &mismatch, NULL
+                );
+                if (mismatch_rc == SQLITE_OK &&
+                    sqlite3_step (mismatch) == SQLITE_ROW) {
+                    GString *details = g_string_new (NULL);
+                    for (int column = 0; column < 12; column++) {
+                        if (column > 0) g_string_append_c (details, '|');
+                        const char *value = (const char *) sqlite3_column_text (
+                            mismatch, column
+                        );
+                        g_string_append (details, value != NULL ? value : "NULL");
+                    }
+                    g_print (
+                        "ATM_RETRIEVAL_VALIDATOR_LEAN_MISMATCH repo=%s "
+                        "fields=evidence_id,evidence_type,evidence_text,canonical_id,"
+                        "canonical_text,canonical_type,fts_source,canonical_source,"
+                        "fts_title,canonical_title,fts_body,canonical_body values=%s\\n",
+                        repository->repository_id, details->str
+                    );
+                    g_string_free (details, TRUE);
+                } else {
+                    g_print (
+                        "ATM_RETRIEVAL_VALIDATOR_LEAN_MISMATCH repo=%s "
+                        "details=unable-to-fetch-first-mismatch sqlite_error=%s\\n",
+                        repository->repository_id, sqlite3_errmsg (db)
+                    );
+                }
+                if (mismatch != NULL) sqlite3_finalize (mismatch);
+                g_print (
+                    "ATM_RETRIEVAL_VALIDATOR_LEAN_CANDIDATE repo=%s "
+                    "status=rejected-not-equivalent\\n",
+                    repository->repository_id
+                );
+            } else if (rc == SQLITE_DONE) {
+                sqlite3_reset (lean);
+                gint64 lean_samples[9] = { 0 };
+                for (guint round = 0; round < G_N_ELEMENTS (lean_samples); round++) {
+                    gint64 started = g_get_monotonic_time ();
+                    rc = sqlite3_step (lean);
+                    lean_samples[round] = g_get_monotonic_time () - started;
+                    if (rc != SQLITE_DONE) {
+                        sqlite3_finalize (lean);
+                        g_set_error (
+                            error, G_IO_ERROR, G_IO_ERROR_INVALID_DATA,
+                            "Lean dataset-row candidate failed during measurement in %s: %s",
+                            repository->repository_id, sqlite3_errmsg (db)
+                        );
+                        goto repository_error;
+                    }
+                    sqlite3_reset (lean);
+                }
+                qsort (
+                    lean_samples, G_N_ELEMENTS (lean_samples),
+                    sizeof (lean_samples[0]), compare_int64
+                );
+                g_print (
+                    "ATM_RETRIEVAL_VALIDATOR_LEAN_CANDIDATE repo=%s kind=dataset_row "
+                    "rows=%" G_GUINT64_FORMAT " samples=9 min_us=%" G_GINT64_FORMAT
+                    " median_us=%" G_GINT64_FORMAT " max_us=%" G_GINT64_FORMAT
+                    " status=equivalent-on-pinned-valid-index\\n",
+                    repository->repository_id, measurements[3].rows,
+                    lean_samples[0], lean_samples[4], lean_samples[8]
+                );
+            } else {
                 sqlite3_finalize (lean);
                 g_set_error (
-                    error, G_IO_ERROR, G_IO_ERROR_INVALID_DATA,
-                    "Lean dataset-row candidate found an inconsistent row in %s: %s",
+                    error, G_IO_ERROR, G_IO_ERROR_FAILED,
+                    "Lean dataset-row candidate query failed in %s: %s",
                     repository->repository_id, sqlite3_errmsg (db)
                 );
                 goto repository_error;
             }
-            sqlite3_reset (lean);
-            gint64 lean_samples[9] = { 0 };
-            for (guint round = 0; round < G_N_ELEMENTS (lean_samples); round++) {
-                gint64 started = g_get_monotonic_time ();
-                rc = sqlite3_step (lean);
-                lean_samples[round] = g_get_monotonic_time () - started;
-                if (rc != SQLITE_DONE) {
-                    sqlite3_finalize (lean);
-                    g_set_error (
-                        error, G_IO_ERROR, G_IO_ERROR_INVALID_DATA,
-                        "Lean dataset-row candidate failed during measurement in %s: %s",
-                        repository->repository_id, sqlite3_errmsg (db)
-                    );
-                    goto repository_error;
-                }
-                sqlite3_reset (lean);
-            }
-            qsort (
-                lean_samples, G_N_ELEMENTS (lean_samples),
-                sizeof (lean_samples[0]), compare_int64
-            );
-            g_print (
-                "ATM_RETRIEVAL_VALIDATOR_LEAN_CANDIDATE repo=%s kind=dataset_row "
-                "rows=%" G_GUINT64_FORMAT " samples=9 min_us=%" G_GINT64_FORMAT
-                " median_us=%" G_GINT64_FORMAT " max_us=%" G_GINT64_FORMAT
-                " status=equivalent-on-pinned-valid-index\\n",
-                repository->repository_id, measurements[3].rows,
-                lean_samples[0], lean_samples[4], lean_samples[8]
-            );
             sqlite3_finalize (lean);
         }
 
