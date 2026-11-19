@@ -1149,6 +1149,77 @@ test_query_session_reuses_validated_snapshot (void)
 }
 
 static void
+test_query_session_refresh_revalidates_external_in_place_mutation (void)
+{
+    char *snapshot_root = new_snapshot ();
+    char *cache_root = new_temp_root ("atm-query-session-refresh-cache-XXXXXX");
+    char *index_path = build_index (snapshot_root, cache_root);
+    AtmRetrievalQuerySession *session = NULL;
+    sqlite3 *db = NULL;
+    GPtrArray *results = NULL;
+    GError *error = NULL;
+
+    /* WAL permits the writer to commit while the session holds a read snapshot. */
+    g_assert_cmpint (
+        sqlite3_open_v2 (index_path, &db, SQLITE_OPEN_READWRITE, NULL),
+        ==, SQLITE_OK
+    );
+    g_assert_cmpint (
+        sqlite3_exec (db, "PRAGMA journal_mode=WAL;", NULL, NULL, NULL),
+        ==, SQLITE_OK
+    );
+    g_assert_cmpint (sqlite3_close (db), ==, SQLITE_OK);
+    db = NULL;
+
+    session = atm_retrieval_query_session_open (index_path, &error);
+    g_assert_no_error (error);
+    g_assert_nonnull (session);
+
+    g_assert_true (atm_retrieval_query_session_search_fts (
+        session, "current validation boundary", 10, &results, &error
+    ));
+    g_assert_no_error (error);
+    g_assert_nonnull (results);
+    g_ptr_array_unref (results);
+    results = NULL;
+
+    g_assert_cmpint (
+        sqlite3_open_v2 (index_path, &db, SQLITE_OPEN_READWRITE, NULL),
+        ==, SQLITE_OK
+    );
+    g_assert_cmpint (
+        sqlite3_exec (
+            db,
+            "UPDATE search_fts SET body=COALESCE(body,'') || ' tampered' "
+            "WHERE rowid=(SELECT rowid FROM search_fts ORDER BY rowid LIMIT 1);",
+            NULL, NULL, NULL
+        ),
+        ==, SQLITE_OK
+    );
+    g_assert_cmpint (sqlite3_changes (db), ==, 1);
+    g_assert_cmpint (sqlite3_close (db), ==, SQLITE_OK);
+    db = NULL;
+
+    /* The old transaction must be discarded; the fresh one must reject corruption. */
+    g_assert_false (
+        atm_retrieval_query_session_refresh (session, &error)
+    );
+    g_assert_error (
+        error, ATM_RETRIEVAL_QUERY_ERROR, ATM_RETRIEVAL_QUERY_ERROR_SQLITE
+    );
+    g_assert_null (results);
+    g_clear_error (&error);
+
+    atm_retrieval_query_session_close (session);
+    g_free (index_path);
+    remove_tree_best_effort (snapshot_root);
+    g_free (snapshot_root);
+    remove_tree_best_effort (cache_root);
+    g_free (cache_root);
+}
+
+
+static void
 test_invalid_arguments_rejected (void)
 {
     GPtrArray *results = NULL;
@@ -2141,6 +2212,10 @@ main (int argc, char **argv)
     g_test_add_func (
         "/retrieval-query/validation-file-identity-invalidation",
         test_validation_file_identity_invalidates_on_mutation_and_replacement
+    );
+    g_test_add_func (
+        "/retrieval-query/session-refresh-revalidates-mutation",
+        test_query_session_refresh_revalidates_external_in_place_mutation
     );
     g_test_add_func (
         "/retrieval-query/invalid-arguments",
