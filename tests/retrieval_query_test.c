@@ -2149,7 +2149,7 @@ test_fts_contains_marker (sqlite3 *db, const char *marker)
 
     g_assert_nonnull (sql);
     g_assert_cmpint (sqlite3_prepare_v2 (db, sql, -1, &statement, NULL), ==, SQLITE_OK);
-    g_free (sql);
+    sqlite3_free (sql);
 
     int rc = sqlite3_step (statement);
     g_assert_true (rc == SQLITE_ROW || rc == SQLITE_DONE);
