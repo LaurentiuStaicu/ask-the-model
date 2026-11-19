@@ -6,6 +6,7 @@ on:
     paths:
       - 'benchmarks/retrieval-v1/**'
       - 'scripts/evaluate_retrieval_benchmark.py'
+      - 'scripts/compare_retrieval_performance.py'
       - 'scripts/summarize_retrieval_policy_sweep.py'
       - 'src/cff_version.c'
       - 'src/cff_version.h'
@@ -18,6 +19,8 @@ on:
       - 'src/structured_json.c'
       - 'src/structured_json.h'
       - 'src/retrieval_index.c'
+      - 'src/retrieval_fts_consistency.c'
+      - 'src/retrieval_fts_consistency.h'
       - 'src/retrieval_index.h'
       - 'src/coordination_lease.c'
       - 'src/coordination_lease.h'
@@ -57,6 +60,8 @@ on:
       - 'src/csv_table.c'
       - 'src/structured_json.c'
       - 'src/retrieval_index.c'
+      - 'src/retrieval_fts_consistency.c'
+      - 'src/retrieval_fts_consistency.h'
       - 'src/retrieval_index_lifecycle.c'
       - 'src/retrieval_query.c'
       - 'src/retrieval_rank.c'
@@ -211,6 +216,7 @@ jobs:
             src/csv_table.c \
             src/structured_json.c \
             src/retrieval_index.c \
+            src/retrieval_fts_consistency.c \
             src/coordination_lease.c \
             src/retrieval_index_lifecycle.c \
             src/retrieval_query.c \
@@ -229,6 +235,79 @@ jobs:
               sqlite3 \
               yaml-0.1) \
             -o /tmp/atm-retrieval-benchmark-runner
+
+      - name: Compile main-branch baseline benchmark runner
+        if: github.event_name == 'pull_request'
+        shell: bash
+        env:
+          BASELINE_SHA: ${{ github.event.pull_request.base.sha }}
+        run: |
+          set -euo pipefail
+
+          git fetch --no-tags origin "$BASELINE_SHA"
+          git worktree add --detach /tmp/atm-r5-main "$BASELINE_SHA"
+          root=/tmp/atm-r5-main
+          output=/tmp/atm-r5-main-runner
+
+          glib-compile-resources \
+            "$root/data/io.github.laurentiustaicu.ask_the_model.gresource.xml" \
+            --sourcedir="$root/data" \
+            --generate-source \
+            --target="${output}-resources.c"
+
+          cc \
+            -std=c11 \
+            -D_GNU_SOURCE \
+            -O2 \
+            -Wall \
+            -Wextra \
+            -Werror \
+            -I"$root/src" \
+            $(pkg-config --cflags glib-2.0 gio-2.0 json-glib-1.0) \
+            -c "$root/tests/retrieval_benchmark_runner.c" \
+            -o "${output}-runner.o"
+
+          sources=(
+            src/cff_version.c
+            src/repository_sources.c
+            src/markdown_sections.c
+            src/csv_table.c
+            src/structured_json.c
+            src/retrieval_index.c
+            src/coordination_lease.c
+            src/retrieval_index_lifecycle.c
+            src/retrieval_query.c
+            src/retrieval_rank.c
+            src/retrieval_scope.c
+            src/retrieval_normalize.c
+            src/retrieval_router.c
+            src/retrieval_conversation.c
+            src/grounding_context.c
+          )
+
+          if [[ -f "$root/src/retrieval_fts_consistency.c" ]]; then
+            sources+=(src/retrieval_fts_consistency.c)
+          fi
+
+          source_paths=()
+          for source in "${sources[@]}"; do
+            source_paths+=("$root/$source")
+          done
+
+          cc \
+            -std=c11 \
+            -D_GNU_SOURCE \
+            -O2 \
+            -Wall \
+            -Wextra \
+            -I"$root/src" \
+            "${source_paths[@]}" \
+            "${output}-runner.o" \
+            "${output}-resources.c" \
+            $(pkg-config --cflags --libs glib-2.0 gio-2.0 json-glib-1.0 sqlite3 yaml-0.1) \
+            -o "${output}"
+
+          echo "Compiled baseline runner from $BASELINE_SHA"
 
       - name: Execute frozen benchmark
         shell: bash
@@ -380,6 +459,76 @@ jobs:
               > "${stem}-evaluation.json"
           done
 
+      - name: Run paired main-versus-PR retrieval comparison
+        if: github.event_name == 'pull_request'
+        shell: bash
+        env:
+          BASELINE_SHA: ${{ github.event.pull_request.base.sha }}
+          CANDIDATE_SHA: ${{ github.event.pull_request.head.sha }}
+        run: |
+          set -euo pipefail
+
+          run_one() {
+            local binary="$1"
+            local label="$2"
+            local sample="$3"
+            local stem="/tmp/atm-r5-${label}-${sample}"
+
+            "$binary" \
+              benchmarks/retrieval-v1/benchmark.json \
+              "${stem}-run.json" \
+              "paired-${label}-${sample}-${GITHUB_RUN_ID}" \
+              production
+
+            python3 scripts/evaluate_retrieval_benchmark.py \
+              benchmarks/retrieval-v1/benchmark.json \
+              "${stem}-run.json" \
+              --pretty \
+              > "${stem}-evaluation.json"
+          }
+
+          for sample in 1 2 3 4 5; do
+            if (( sample % 2 == 1 )); then
+              run_one /tmp/atm-r5-main-runner main "$sample"
+              run_one /tmp/atm-retrieval-benchmark-runner pr "$sample"
+            else
+              run_one /tmp/atm-retrieval-benchmark-runner pr "$sample"
+              run_one /tmp/atm-r5-main-runner main "$sample"
+            fi
+          done
+
+          python3 scripts/compare_retrieval_performance.py \
+            --benchmark benchmarks/retrieval-v1/benchmark.json \
+            --baseline-run-pattern '/tmp/atm-r5-main-{sample}-run.json' \
+            --candidate-run-pattern '/tmp/atm-r5-pr-{sample}-run.json' \
+            --baseline-evaluation-pattern '/tmp/atm-r5-main-{sample}-evaluation.json' \
+            --candidate-evaluation-pattern '/tmp/atm-r5-pr-{sample}-evaluation.json' \
+            --baseline-revision "$BASELINE_SHA" \
+            --candidate-revision "$CANDIDATE_SHA" \
+            --samples 5 \
+            --output /tmp/atm-r5-main-vs-pr-comparison.json
+
+      - name: Measure candidate FTS validator costs (diagnostic only)
+        if: github.event_name == 'pull_request'
+        shell: bash
+        env:
+          ATM_RETRIEVAL_VALIDATOR_TIMING: '1'
+          ATM_RETRIEVAL_VALIDATOR_EXPLAIN: '1'
+          ATM_RETRIEVAL_VALIDATOR_BRANCH_TIMING: '1'
+          ATM_RETRIEVAL_VALIDATOR_DISTINCT_TIMING: '1'
+        run: |
+          set -euo pipefail
+
+          /tmp/atm-retrieval-benchmark-runner \
+            benchmarks/retrieval-v1/benchmark.json \
+            /tmp/atm-r5-validator-diagnostic-run.json \
+            "validator-diagnostic-${GITHUB_RUN_ID}-${GITHUB_RUN_ATTEMPT}" \
+            production
+
+          python3 -m json.tool \
+            /tmp/atm-r5-validator-diagnostic-run.json \
+            >/dev/null
+
       - name: Assemble D0 control-relative sweep artifact
         shell: bash
         env:
@@ -440,5 +589,7 @@ jobs:
             /tmp/atm-retrieval-candidate-*-run.json
             /tmp/atm-retrieval-candidate-*-evaluation.json
             /tmp/atm-retrieval-policy-sweep-summary.json
+            /tmp/atm-r5-main-vs-pr-comparison.json
+            /tmp/atm-r5-validator-diagnostic-run.json
           if-no-files-found: warn
           retention-days: 14

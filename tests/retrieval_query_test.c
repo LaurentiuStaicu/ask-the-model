@@ -4,6 +4,7 @@
 
 #include <glib.h>
 #include <glib/gstdio.h>
+#include <sqlite3.h>
 
 #include <sys/stat.h>
 #include <math.h>
@@ -1096,6 +1097,53 @@ test_semantic_metadata_consistent_across_routes (void)
     g_free (cache_root);
 }
 
+
+static void
+test_query_session_reuses_validated_snapshot (void)
+{
+    char *snapshot_root = new_snapshot ();
+    char *cache_root = new_temp_root ("atm-query-session-cache-XXXXXX");
+    char *index_path = build_index (snapshot_root, cache_root);
+    AtmRetrievalQuerySession *session = NULL;
+    GPtrArray *exact = NULL;
+    GPtrArray *lexical = NULL;
+    GPtrArray *tabular = NULL;
+    GError *error = NULL;
+
+    session = atm_retrieval_query_session_open (index_path, &error);
+    g_assert_no_error (error);
+    g_assert_nonnull (session);
+
+    g_assert_true (atm_retrieval_query_session_lookup_exact (
+        session, "food_per_capita", 10, &exact, &error
+    ));
+    g_assert_no_error (error);
+    g_assert_cmpuint (exact->len, ==, 1);
+
+    g_assert_true (atm_retrieval_query_session_search_fts (
+        session, "food_per_capita", 10, &lexical, &error
+    ));
+    g_assert_no_error (error);
+    g_assert_cmpuint (lexical->len, >, 0);
+
+    g_assert_true (atm_retrieval_query_session_lookup_dataset_rows (
+        session, NULL, "2025", 10, &tabular, &error
+    ));
+    g_assert_no_error (error);
+    g_assert_cmpuint (tabular->len, ==, 1);
+
+    g_ptr_array_unref (tabular);
+    g_ptr_array_unref (lexical);
+    g_ptr_array_unref (exact);
+    atm_retrieval_query_session_close (session);
+
+    g_free (index_path);
+    remove_tree_best_effort (snapshot_root);
+    g_free (snapshot_root);
+    remove_tree_best_effort (cache_root);
+    g_free (cache_root);
+}
+
 static void
 test_invalid_arguments_rejected (void)
 {
@@ -1137,6 +1185,701 @@ test_invalid_arguments_rejected (void)
     g_assert_null (results);
 
     g_clear_error (&error);
+}
+
+static void
+test_fts_canonical_consistency_precedes_all_routes (void)
+{
+    char *snapshot_root = new_snapshot ();
+    char *cache_root = new_temp_root ("atm-fts-consistency-cache-XXXXXX");
+    char *index_path = build_index (snapshot_root, cache_root);
+    sqlite3 *db = NULL;
+    GPtrArray *results = NULL;
+    GError *error = NULL;
+
+    g_assert_cmpint (
+        sqlite3_open_v2 (index_path, &db, SQLITE_OPEN_READWRITE, NULL),
+        ==, SQLITE_OK
+    );
+    g_assert_cmpint (
+        sqlite3_exec (
+            db,
+            "UPDATE search_fts SET evidence_id='-1' WHERE rowid=("
+            "SELECT rowid FROM search_fts WHERE evidence_kind='section' "
+            "ORDER BY rowid LIMIT 1);",
+            NULL, NULL, NULL
+        ),
+        ==, SQLITE_OK
+    );
+    g_assert_cmpint (sqlite3_changes (db), ==, 1);
+    g_assert_cmpint (sqlite3_close (db), ==, SQLITE_OK);
+
+    g_assert_false (atm_retrieval_lookup_exact (
+        index_path, "food_per_capita", 10, &results, &error
+    ));
+    g_assert_error (error, ATM_RETRIEVAL_QUERY_ERROR, ATM_RETRIEVAL_QUERY_ERROR_SQLITE);
+    g_assert_null (results);
+    g_clear_error (&error);
+
+    g_assert_false (atm_retrieval_search_fts (
+        index_path, "current validation boundary", 10, &results, &error
+    ));
+    g_assert_error (error, ATM_RETRIEVAL_QUERY_ERROR, ATM_RETRIEVAL_QUERY_ERROR_SQLITE);
+    g_assert_null (results);
+    g_clear_error (&error);
+
+    g_assert_false (atm_retrieval_lookup_dataset_rows (
+        index_path, NULL, "2025", 10, &results, &error
+    ));
+    g_assert_error (error, ATM_RETRIEVAL_QUERY_ERROR, ATM_RETRIEVAL_QUERY_ERROR_SQLITE);
+    g_assert_null (results);
+    g_clear_error (&error);
+
+    g_free (index_path);
+    remove_tree_best_effort (snapshot_root);
+    g_free (snapshot_root);
+    remove_tree_best_effort (cache_root);
+    g_free (cache_root);
+}
+
+/*
+ * Compare the production NOT EXISTS predicate with the diagnostic LEFT JOIN
+ * alternative on both valid and deliberately corrupted FTS populations.
+ * This qualifies only the FTS-to-canonical pass; duplicate detection and
+ * reverse-coverage checks remain separate proof obligations.
+ */
+static gboolean
+fts_to_canonical_query_reports_mismatch (sqlite3 *db, const char *sql)
+{
+    sqlite3_stmt *statement = NULL;
+    int rc = sqlite3_prepare_v2 (db, sql, -1, &statement, NULL);
+    g_assert_cmpint (rc, ==, SQLITE_OK);
+
+    rc = sqlite3_step (statement);
+    gboolean mismatch = rc == SQLITE_ROW;
+    g_assert_true (rc == SQLITE_ROW || rc == SQLITE_DONE);
+    sqlite3_finalize (statement);
+    return mismatch;
+}
+
+static void
+test_fts_to_canonical_left_join_alternative_is_equivalent (void)
+{
+    static const char *production_sql =
+        "SELECT 1 FROM search_fts f WHERE "
+        "f.evidence_kind IS NULL OR f.evidence_id IS NULL OR "
+        "typeof(f.evidence_id) <> 'integer' OR "
+        "f.logical_source_id IS NULL OR "
+        "(f.evidence_kind = 'section' AND NOT EXISTS ("
+        "SELECT 1 FROM document_sections d WHERE "
+        "d.id = f.evidence_id "
+        "AND d.logical_source_id IS f.logical_source_id "
+        "AND d.title IS f.title AND d.body IS f.body)) OR "
+        "(f.evidence_kind = 'entity' AND NOT EXISTS ("
+        "SELECT 1 FROM structured_entities e WHERE "
+        "e.id = f.evidence_id "
+        "AND e.logical_source_id IS f.logical_source_id "
+        "AND COALESCE(e.label, e.native_id) IS f.title "
+        "AND e.payload_json IS f.body)) OR "
+        "(f.evidence_kind = 'relation' AND NOT EXISTS ("
+        "SELECT 1 FROM structured_relations r WHERE "
+        "r.id = f.evidence_id "
+        "AND r.logical_source_id IS f.logical_source_id "
+        "AND COALESCE(r.native_id, r.relation_type) IS f.title "
+        "AND r.payload_json IS f.body)) OR "
+        "(f.evidence_kind = 'dataset_row' AND NOT EXISTS ("
+        "SELECT 1 FROM dataset_rows r "
+        "JOIN datasets d ON d.id = r.dataset_id "
+        "JOIN source_files s ON s.id = d.source_id "
+        "JOIN snapshot_metadata m ON m.id = 1 "
+        "WHERE r.id = f.evidence_id "
+        "AND printf('%s:dataset-row:%s:%d', m.repository_id, s.path, r.ordinal) "
+        "IS f.logical_source_id AND s.path IS f.title "
+        "AND r.search_text IS f.body)) OR "
+        "f.evidence_kind NOT IN ('section','entity','relation','dataset_row');";
+    static const char *left_join_sql =
+        "SELECT 1 FROM search_fts f "
+        "LEFT JOIN dataset_rows dr ON "
+        "f.evidence_kind = 'dataset_row' AND dr.id = f.evidence_id "
+        "LEFT JOIN datasets dd ON dd.id = dr.dataset_id "
+        "LEFT JOIN source_files ds ON ds.id = dd.source_id "
+        "LEFT JOIN snapshot_metadata dm ON dm.id = 1 "
+        "WHERE f.evidence_kind IS NULL OR f.evidence_id IS NULL OR "
+        "typeof(f.evidence_id) <> 'integer' OR "
+        "f.logical_source_id IS NULL OR "
+        "(f.evidence_kind = 'section' AND NOT EXISTS ("
+        "SELECT 1 FROM document_sections d WHERE "
+        "d.id = f.evidence_id "
+        "AND d.logical_source_id IS f.logical_source_id "
+        "AND d.title IS f.title AND d.body IS f.body)) OR "
+        "(f.evidence_kind = 'entity' AND NOT EXISTS ("
+        "SELECT 1 FROM structured_entities e WHERE "
+        "e.id = f.evidence_id "
+        "AND e.logical_source_id IS f.logical_source_id "
+        "AND COALESCE(e.label, e.native_id) IS f.title "
+        "AND e.payload_json IS f.body)) OR "
+        "(f.evidence_kind = 'relation' AND NOT EXISTS ("
+        "SELECT 1 FROM structured_relations r WHERE "
+        "r.id = f.evidence_id "
+        "AND r.logical_source_id IS f.logical_source_id "
+        "AND COALESCE(r.native_id, r.relation_type) IS f.title "
+        "AND r.payload_json IS f.body)) OR "
+        "(f.evidence_kind = 'dataset_row' AND ("
+        "dr.id IS NULL OR dd.id IS NULL OR ds.id IS NULL OR dm.id IS NULL OR "
+        "printf('%s:dataset-row:%s:%d', dm.repository_id, ds.path, dr.ordinal) "
+        "IS NOT f.logical_source_id OR ds.path IS NOT f.title OR "
+        "dr.search_text IS NOT f.body)) OR "
+        "f.evidence_kind NOT IN ('section','entity','relation','dataset_row');";
+    static const struct {
+        const char *name;
+        const char *sql;
+    } corruptions[] = {
+        { "section logical source",
+          "UPDATE search_fts SET logical_source_id='tampered' WHERE rowid=("
+          "SELECT rowid FROM search_fts WHERE evidence_kind='section' LIMIT 1);" },
+        { "section title",
+          "UPDATE search_fts SET title='tampered' WHERE rowid=("
+          "SELECT rowid FROM search_fts WHERE evidence_kind='section' LIMIT 1);" },
+        { "section body",
+          "UPDATE search_fts SET body='tampered' WHERE rowid=("
+          "SELECT rowid FROM search_fts WHERE evidence_kind='section' LIMIT 1);" },
+        { "text evidence id",
+          "UPDATE search_fts SET evidence_id='-1' WHERE rowid=("
+          "SELECT rowid FROM search_fts WHERE evidence_kind='section' LIMIT 1);" },
+        { "blob evidence id",
+          "UPDATE search_fts SET evidence_id=CAST(x'31' AS BLOB) WHERE rowid=("
+          "SELECT rowid FROM search_fts WHERE evidence_kind='section' LIMIT 1);" },
+        { "null evidence id",
+          "UPDATE search_fts SET evidence_id=NULL WHERE rowid=("
+          "SELECT rowid FROM search_fts WHERE evidence_kind='section' LIMIT 1);" },
+        { "missing integer evidence id",
+          "UPDATE search_fts SET evidence_id=9223372036854775807 WHERE rowid=("
+          "SELECT rowid FROM search_fts WHERE evidence_kind='section' LIMIT 1);" },
+        { "null evidence kind",
+          "UPDATE search_fts SET evidence_kind=NULL WHERE rowid=("
+          "SELECT rowid FROM search_fts WHERE evidence_kind='section' LIMIT 1);" },
+        { "unknown evidence kind",
+          "UPDATE search_fts SET evidence_kind='unknown' WHERE rowid=("
+          "SELECT rowid FROM search_fts WHERE evidence_kind='section' LIMIT 1);" },
+        { "null logical source",
+          "UPDATE search_fts SET logical_source_id=NULL WHERE rowid=("
+          "SELECT rowid FROM search_fts WHERE evidence_kind='section' LIMIT 1);" },
+        { "dataset row logical source",
+          "UPDATE search_fts SET logical_source_id='tampered' WHERE rowid=("
+          "SELECT rowid FROM search_fts WHERE evidence_kind='dataset_row' LIMIT 1);" },
+        { "dataset row title",
+          "UPDATE search_fts SET title='tampered' WHERE rowid=("
+          "SELECT rowid FROM search_fts WHERE evidence_kind='dataset_row' LIMIT 1);" },
+        { "dataset row body",
+          "UPDATE search_fts SET body='tampered' WHERE rowid=("
+          "SELECT rowid FROM search_fts WHERE evidence_kind='dataset_row' LIMIT 1);" }
+    };
+
+    char *snapshot_root = new_snapshot ();
+    char *cache_root = new_temp_root ("atm-fts-left-join-equivalence-XXXXXX");
+    char *index_path = build_index (snapshot_root, cache_root);
+    sqlite3 *db = NULL;
+
+    g_assert_cmpint (
+        sqlite3_open_v2 (index_path, &db, SQLITE_OPEN_READWRITE, NULL),
+        ==, SQLITE_OK
+    );
+    g_assert_false (fts_to_canonical_query_reports_mismatch (db, production_sql));
+    g_assert_false (fts_to_canonical_query_reports_mismatch (db, left_join_sql));
+    g_assert_cmpint (sqlite3_close (db), ==, SQLITE_OK);
+    g_free (index_path);
+    remove_tree_best_effort (snapshot_root);
+    g_free (snapshot_root);
+    remove_tree_best_effort (cache_root);
+    g_free (cache_root);
+
+    for (gsize i = 0; i < G_N_ELEMENTS (corruptions); i++) {
+        snapshot_root = new_snapshot ();
+        cache_root = new_temp_root ("atm-fts-left-join-case-XXXXXX");
+        index_path = build_index (snapshot_root, cache_root);
+        db = NULL;
+        g_assert_cmpint (
+            sqlite3_open_v2 (index_path, &db, SQLITE_OPEN_READWRITE, NULL),
+            ==, SQLITE_OK
+        );
+        g_assert_cmpint (
+            sqlite3_exec (db, corruptions[i].sql, NULL, NULL, NULL),
+            ==, SQLITE_OK
+        );
+        g_assert_cmpint (sqlite3_changes (db), ==, 1);
+
+        g_test_message ("Comparing validator predicates for %s", corruptions[i].name);
+        g_assert_true (fts_to_canonical_query_reports_mismatch (db, production_sql));
+        g_assert_true (fts_to_canonical_query_reports_mismatch (db, left_join_sql));
+
+        g_assert_cmpint (sqlite3_close (db), ==, SQLITE_OK);
+        g_free (index_path);
+        remove_tree_best_effort (snapshot_root);
+        g_free (snapshot_root);
+        remove_tree_best_effort (cache_root);
+        g_free (cache_root);
+    }
+}
+
+static void
+test_fts_canonical_metadata_mismatch_is_rejected_by_all_routes (void)
+{
+    static const struct {
+        const char *field;
+        const char *update_sql;
+    } corruptions[] = {
+        {
+            "logical_source_id",
+            "UPDATE search_fts SET logical_source_id='tampered-source' "
+            "WHERE rowid=(SELECT rowid FROM search_fts "
+            "WHERE evidence_kind='section' ORDER BY rowid LIMIT 1);"
+        },
+        {
+            "title",
+            "UPDATE search_fts SET title='tampered-title' "
+            "WHERE rowid=(SELECT rowid FROM search_fts "
+            "WHERE evidence_kind='section' ORDER BY rowid LIMIT 1);"
+        },
+        {
+            "body",
+            "UPDATE search_fts SET body='tampered-body' "
+            "WHERE rowid=(SELECT rowid FROM search_fts "
+            "WHERE evidence_kind='section' ORDER BY rowid LIMIT 1);"
+        }
+    };
+
+    for (gsize i = 0; i < G_N_ELEMENTS (corruptions); i++) {
+        char *snapshot_root = new_snapshot ();
+        char *cache_root = new_temp_root ("atm-fts-metadata-cache-XXXXXX");
+        char *index_path = build_index (snapshot_root, cache_root);
+        sqlite3 *db = NULL;
+        GPtrArray *results = NULL;
+        GError *error = NULL;
+
+        g_assert_cmpint (
+            sqlite3_open_v2 (index_path, &db, SQLITE_OPEN_READWRITE, NULL),
+            ==, SQLITE_OK
+        );
+        g_assert_cmpint (
+            sqlite3_exec (db, corruptions[i].update_sql, NULL, NULL, NULL),
+            ==, SQLITE_OK
+        );
+        g_assert_cmpint (sqlite3_changes (db), ==, 1);
+        g_assert_cmpint (sqlite3_close (db), ==, SQLITE_OK);
+
+        g_test_message (
+            "Checking canonical %s mismatch across retrieval routes",
+            corruptions[i].field
+        );
+
+        g_assert_false (atm_retrieval_lookup_exact (
+            index_path, "food_per_capita", 10, &results, &error
+        ));
+        g_assert_error (
+            error, ATM_RETRIEVAL_QUERY_ERROR, ATM_RETRIEVAL_QUERY_ERROR_SQLITE
+        );
+        g_assert_null (results);
+        g_clear_error (&error);
+
+        g_assert_false (atm_retrieval_search_fts (
+            index_path, "current validation boundary", 10, &results, &error
+        ));
+        g_assert_error (
+            error, ATM_RETRIEVAL_QUERY_ERROR, ATM_RETRIEVAL_QUERY_ERROR_SQLITE
+        );
+        g_assert_null (results);
+        g_clear_error (&error);
+
+        g_assert_false (atm_retrieval_lookup_dataset_rows (
+            index_path, NULL, "2025", 10, &results, &error
+        ));
+        g_assert_error (
+            error, ATM_RETRIEVAL_QUERY_ERROR, ATM_RETRIEVAL_QUERY_ERROR_SQLITE
+        );
+        g_assert_null (results);
+        g_clear_error (&error);
+
+        g_free (index_path);
+        remove_tree_best_effort (snapshot_root);
+        g_free (snapshot_root);
+        remove_tree_best_effort (cache_root);
+        g_free (cache_root);
+    }
+}
+
+static void
+test_foreign_key_violation_is_rejected_by_all_routes (void)
+{
+    char *snapshot_root = new_snapshot ();
+    char *cache_root = new_temp_root ("atm-fts-fk-cache-XXXXXX");
+    char *index_path = build_index (snapshot_root, cache_root);
+    sqlite3 *db = NULL;
+    sqlite3_stmt *statement = NULL;
+    GPtrArray *results = NULL;
+    GError *error = NULL;
+
+    g_assert_cmpint (
+        sqlite3_open_v2 (index_path, &db, SQLITE_OPEN_READWRITE, NULL),
+        ==, SQLITE_OK
+    );
+    /*
+     * Simulate an index written by a connection that had FK enforcement
+     * disabled. Re-enabling it later does not retroactively validate rows.
+     */
+    g_assert_cmpint (
+        sqlite3_exec (
+            db,
+            "PRAGMA foreign_keys=OFF;"
+            "INSERT INTO dataset_rows "
+            "(dataset_id,ordinal,row_key,locator,payload_json,search_text) "
+            "VALUES (9223372036854770000,999999,'orphan','lines:0-0','{}','orphan');",
+            NULL, NULL, NULL
+        ),
+        ==, SQLITE_OK
+    );
+    g_assert_cmpint (
+        sqlite3_exec (db, "PRAGMA foreign_keys=ON;", NULL, NULL, NULL),
+        ==, SQLITE_OK
+    );
+    g_assert_cmpint (
+        sqlite3_prepare_v2 (db, "PRAGMA foreign_key_check;", -1, &statement, NULL),
+        ==, SQLITE_OK
+    );
+    g_assert_cmpint (sqlite3_step (statement), ==, SQLITE_ROW);
+    sqlite3_finalize (statement);
+    g_assert_cmpint (sqlite3_close (db), ==, SQLITE_OK);
+
+    g_assert_false (atm_retrieval_lookup_exact (
+        index_path, "food_per_capita", 10, &results, &error
+    ));
+    g_assert_error (
+        error, ATM_RETRIEVAL_QUERY_ERROR, ATM_RETRIEVAL_QUERY_ERROR_SQLITE
+    );
+    g_assert_null (results);
+    g_clear_error (&error);
+
+    g_assert_false (atm_retrieval_search_fts (
+        index_path, "current validation boundary", 10, &results, &error
+    ));
+    g_assert_error (
+        error, ATM_RETRIEVAL_QUERY_ERROR, ATM_RETRIEVAL_QUERY_ERROR_SQLITE
+    );
+    g_assert_null (results);
+    g_clear_error (&error);
+
+    g_assert_false (atm_retrieval_lookup_dataset_rows (
+        index_path, NULL, "2025", 10, &results, &error
+    ));
+    g_assert_error (
+        error, ATM_RETRIEVAL_QUERY_ERROR, ATM_RETRIEVAL_QUERY_ERROR_SQLITE
+    );
+    g_assert_null (results);
+    g_clear_error (&error);
+
+    g_free (index_path);
+    remove_tree_best_effort (snapshot_root);
+    g_free (snapshot_root);
+    remove_tree_best_effort (cache_root);
+    g_free (cache_root);
+}
+
+
+static void
+test_text_fts_evidence_id_is_rejected_by_all_routes (void)
+{
+    char *snapshot_root = new_snapshot ();
+    char *cache_root = new_temp_root ("atm-fts-text-cache-XXXXXX");
+    char *index_path = build_index (snapshot_root, cache_root);
+    sqlite3 *db = NULL;
+    sqlite3_stmt *statement = NULL;
+    GPtrArray *results = NULL;
+    GError *error = NULL;
+
+    g_assert_cmpint (
+        sqlite3_open_v2 (index_path, &db, SQLITE_OPEN_READWRITE, NULL),
+        ==, SQLITE_OK
+    );
+    g_assert_cmpint (
+        sqlite3_exec (
+            db,
+            "UPDATE search_fts SET evidence_id=CAST(evidence_id AS TEXT) "
+            "WHERE rowid=(SELECT rowid FROM search_fts "
+            "WHERE evidence_kind='section' ORDER BY rowid LIMIT 1);",
+            NULL, NULL, NULL
+        ),
+        ==, SQLITE_OK
+    );
+    g_assert_cmpint (sqlite3_changes (db), ==, 1);
+    g_assert_cmpint (
+        sqlite3_prepare_v2 (
+            db,
+            "SELECT typeof(evidence_id) FROM search_fts "
+            "WHERE evidence_kind='section' ORDER BY rowid LIMIT 1;",
+            -1, &statement, NULL
+        ),
+        ==, SQLITE_OK
+    );
+    g_assert_cmpint (sqlite3_step (statement), ==, SQLITE_ROW);
+    g_assert_cmpstr (
+        (const char *) sqlite3_column_text (statement, 0), ==, "text"
+    );
+    sqlite3_finalize (statement);
+    g_assert_cmpint (sqlite3_close (db), ==, SQLITE_OK);
+
+    g_assert_false (atm_retrieval_lookup_exact (
+        index_path, "food_per_capita", 10, &results, &error
+    ));
+    g_assert_error (
+        error, ATM_RETRIEVAL_QUERY_ERROR, ATM_RETRIEVAL_QUERY_ERROR_SQLITE
+    );
+    g_assert_null (results);
+    g_clear_error (&error);
+
+    g_assert_false (atm_retrieval_search_fts (
+        index_path, "current validation boundary", 10, &results, &error
+    ));
+    g_assert_error (
+        error, ATM_RETRIEVAL_QUERY_ERROR, ATM_RETRIEVAL_QUERY_ERROR_SQLITE
+    );
+    g_assert_null (results);
+    g_clear_error (&error);
+
+    g_assert_false (atm_retrieval_lookup_dataset_rows (
+        index_path, NULL, "2025", 10, &results, &error
+    ));
+    g_assert_error (
+        error, ATM_RETRIEVAL_QUERY_ERROR, ATM_RETRIEVAL_QUERY_ERROR_SQLITE
+    );
+    g_assert_null (results);
+    g_clear_error (&error);
+
+    g_free (index_path);
+    remove_tree_best_effort (snapshot_root);
+    g_free (snapshot_root);
+    remove_tree_best_effort (cache_root);
+    g_free (cache_root);
+}
+
+
+static void
+test_blob_fts_evidence_id_is_rejected_by_all_routes (void)
+{
+    char *snapshot_root = new_snapshot ();
+    char *cache_root = new_temp_root ("atm-fts-blob-cache-XXXXXX");
+    char *index_path = build_index (snapshot_root, cache_root);
+    sqlite3 *db = NULL;
+    sqlite3_stmt *statement = NULL;
+    GPtrArray *results = NULL;
+    GError *error = NULL;
+
+    g_assert_cmpint (
+        sqlite3_open_v2 (index_path, &db, SQLITE_OPEN_READWRITE, NULL),
+        ==, SQLITE_OK
+    );
+    g_assert_cmpint (
+        sqlite3_exec (
+            db,
+            "UPDATE search_fts SET evidence_id=CAST(x'31' AS BLOB) "
+            "WHERE rowid=(SELECT rowid FROM search_fts "
+            "WHERE evidence_kind='section' ORDER BY rowid LIMIT 1);",
+            NULL, NULL, NULL
+        ),
+        ==, SQLITE_OK
+    );
+    g_assert_cmpint (sqlite3_changes (db), ==, 1);
+    g_assert_cmpint (
+        sqlite3_prepare_v2 (
+            db,
+            "SELECT typeof(evidence_id) FROM search_fts "
+            "WHERE evidence_kind='section' ORDER BY rowid LIMIT 1;",
+            -1, &statement, NULL
+        ),
+        ==, SQLITE_OK
+    );
+    g_assert_cmpint (sqlite3_step (statement), ==, SQLITE_ROW);
+    g_assert_cmpstr (
+        (const char *) sqlite3_column_text (statement, 0), ==, "blob"
+    );
+    sqlite3_finalize (statement);
+    g_assert_cmpint (sqlite3_close (db), ==, SQLITE_OK);
+
+    /*
+     * The paired-cast-only identity predicate would accept BLOB x'31'
+     * because CAST(BLOB AS TEXT) yields "1". The production predicate
+     * also requires numeric identity and must reject this malformed value.
+     */
+    g_assert_false (atm_retrieval_lookup_exact (
+        index_path, "food_per_capita", 10, &results, &error
+    ));
+    g_assert_error (
+        error, ATM_RETRIEVAL_QUERY_ERROR, ATM_RETRIEVAL_QUERY_ERROR_SQLITE
+    );
+    g_assert_null (results);
+    g_clear_error (&error);
+
+    g_assert_false (atm_retrieval_search_fts (
+        index_path, "current validation boundary", 10, &results, &error
+    ));
+    g_assert_error (
+        error, ATM_RETRIEVAL_QUERY_ERROR, ATM_RETRIEVAL_QUERY_ERROR_SQLITE
+    );
+    g_assert_null (results);
+    g_clear_error (&error);
+
+    g_assert_false (atm_retrieval_lookup_dataset_rows (
+        index_path, NULL, "2025", 10, &results, &error
+    ));
+    g_assert_error (
+        error, ATM_RETRIEVAL_QUERY_ERROR, ATM_RETRIEVAL_QUERY_ERROR_SQLITE
+    );
+    g_assert_null (results);
+    g_clear_error (&error);
+
+    g_free (index_path);
+    remove_tree_best_effort (snapshot_root);
+    g_free (snapshot_root);
+    remove_tree_best_effort (cache_root);
+    g_free (cache_root);
+}
+
+static void
+test_duplicate_fts_identity_is_rejected (void)
+{
+    char *snapshot_root = new_snapshot ();
+    char *cache_root = new_temp_root ("atm-fts-duplicate-cache-XXXXXX");
+    char *index_path = build_index (snapshot_root, cache_root);
+    sqlite3 *db = NULL;
+    GPtrArray *results = NULL;
+    GError *error = NULL;
+
+    g_assert_cmpint (
+        sqlite3_open_v2 (index_path, &db, SQLITE_OPEN_READWRITE, NULL),
+        ==, SQLITE_OK
+    );
+    g_assert_cmpint (
+        sqlite3_exec (
+            db,
+            "INSERT INTO search_fts(evidence_kind,evidence_id,logical_source_id,title,body) "
+            "SELECT evidence_kind,evidence_id,logical_source_id,title,body "
+            "FROM search_fts WHERE evidence_kind='section' LIMIT 1;",
+            NULL, NULL, NULL
+        ),
+        ==, SQLITE_OK
+    );
+    g_assert_cmpint (sqlite3_close (db), ==, SQLITE_OK);
+
+    g_assert_false (atm_retrieval_lookup_exact (
+        index_path, "food_per_capita", 10, &results, &error
+    ));
+    g_assert_error (
+        error, ATM_RETRIEVAL_QUERY_ERROR, ATM_RETRIEVAL_QUERY_ERROR_SQLITE
+    );
+    g_assert_null (results);
+    g_clear_error (&error);
+
+    g_free (index_path);
+    remove_tree_best_effort (snapshot_root);
+    g_free (snapshot_root);
+    remove_tree_best_effort (cache_root);
+    g_free (cache_root);
+}
+
+static void
+test_missing_canonical_fts_row_is_rejected (void)
+{
+    char *snapshot_root = new_snapshot ();
+    char *cache_root = new_temp_root ("atm-fts-missing-cache-XXXXXX");
+    char *index_path = build_index (snapshot_root, cache_root);
+    sqlite3 *db = NULL;
+    GPtrArray *results = NULL;
+    GError *error = NULL;
+
+    g_assert_cmpint (
+        sqlite3_open_v2 (index_path, &db, SQLITE_OPEN_READWRITE, NULL),
+        ==, SQLITE_OK
+    );
+    g_assert_cmpint (
+        sqlite3_exec (
+            db,
+            "DELETE FROM search_fts WHERE rowid=("
+            "SELECT rowid FROM search_fts WHERE evidence_kind='section' "
+            "ORDER BY rowid LIMIT 1);",
+            NULL, NULL, NULL
+        ),
+        ==, SQLITE_OK
+    );
+    g_assert_cmpint (sqlite3_changes (db), ==, 1);
+    g_assert_cmpint (sqlite3_close (db), ==, SQLITE_OK);
+
+    g_assert_false (atm_retrieval_lookup_exact (
+        index_path, "food_per_capita", 10, &results, &error
+    ));
+    g_assert_error (error, ATM_RETRIEVAL_QUERY_ERROR, ATM_RETRIEVAL_QUERY_ERROR_SQLITE);
+    g_assert_null (results);
+    g_clear_error (&error);
+
+    g_free (index_path);
+    remove_tree_best_effort (snapshot_root);
+    g_free (snapshot_root);
+    remove_tree_best_effort (cache_root);
+    g_free (cache_root);
+}
+
+static void
+test_non_fts5_search_table_is_rejected (void)
+{
+    char *snapshot_root = new_snapshot ();
+    char *cache_root = new_temp_root ("atm-fts-type-cache-XXXXXX");
+    char *index_path = build_index (snapshot_root, cache_root);
+    sqlite3 *db = NULL;
+    GPtrArray *results = NULL;
+    GError *error = NULL;
+
+    g_assert_cmpint (
+        sqlite3_open_v2 (index_path, &db, SQLITE_OPEN_READWRITE, NULL),
+        ==, SQLITE_OK
+    );
+    g_assert_cmpint (
+        sqlite3_exec (db, "DROP TABLE search_fts;", NULL, NULL, NULL),
+        ==, SQLITE_OK
+    );
+    g_assert_cmpint (sqlite3_close (db), ==, SQLITE_OK);
+
+    g_assert_false (atm_retrieval_lookup_exact (
+        index_path, "food_per_capita", 10, &results, &error
+    ));
+    g_assert_error (error, ATM_RETRIEVAL_QUERY_ERROR, ATM_RETRIEVAL_QUERY_ERROR_SQLITE);
+    g_assert_null (results);
+    g_clear_error (&error);
+
+    g_assert_cmpint (
+        sqlite3_open_v2 (index_path, &db, SQLITE_OPEN_READWRITE, NULL),
+        ==, SQLITE_OK
+    );
+    g_assert_cmpint (
+        sqlite3_exec (
+            db,
+            "CREATE TABLE search_fts("
+            "evidence_kind TEXT,evidence_id TEXT,logical_source_id TEXT,"
+            "title TEXT,body TEXT);",
+            NULL, NULL, NULL
+        ),
+        ==, SQLITE_OK
+    );
+    g_assert_cmpint (sqlite3_close (db), ==, SQLITE_OK);
+
+    g_assert_false (atm_retrieval_lookup_exact (
+        index_path, "food_per_capita", 10, &results, &error
+    ));
+    g_assert_error (error, ATM_RETRIEVAL_QUERY_ERROR, ATM_RETRIEVAL_QUERY_ERROR_SQLITE);
+    g_assert_null (results);
+    g_clear_error (&error);
+
+    g_free (index_path);
+    remove_tree_best_effort (snapshot_root);
+    g_free (snapshot_root);
+    remove_tree_best_effort (cache_root);
+    g_free (cache_root);
 }
 
 int
@@ -1195,6 +1938,46 @@ main (int argc, char **argv)
     g_test_add_func (
         "/retrieval-query/semantic-metadata-consistent",
         test_semantic_metadata_consistent_across_routes
+    );
+    g_test_add_func (
+        "/retrieval-query/session-reuses-validated-snapshot",
+        test_query_session_reuses_validated_snapshot
+    );
+    g_test_add_func (
+        "/retrieval-query/fts-canonical-consistency-all-routes",
+        test_fts_canonical_consistency_precedes_all_routes
+    );
+    g_test_add_func (
+        "/retrieval-query/fts-to-canonical-left-join-equivalence",
+        test_fts_to_canonical_left_join_alternative_is_equivalent
+    );
+    g_test_add_func (
+        "/retrieval-query/fts-canonical-metadata-mismatch-all-routes",
+        test_fts_canonical_metadata_mismatch_is_rejected_by_all_routes
+    );
+    g_test_add_func (
+        "/retrieval-query/fts-foreign-key-violation-all-routes",
+        test_foreign_key_violation_is_rejected_by_all_routes
+    );
+    g_test_add_func (
+        "/retrieval-query/fts-text-evidence-id-all-routes",
+        test_text_fts_evidence_id_is_rejected_by_all_routes
+    );
+    g_test_add_func (
+        "/retrieval-query/fts-blob-evidence-id-all-routes",
+        test_blob_fts_evidence_id_is_rejected_by_all_routes
+    );
+    g_test_add_func (
+        "/retrieval-query/fts-duplicate-identity",
+        test_duplicate_fts_identity_is_rejected
+    );
+    g_test_add_func (
+        "/retrieval-query/fts-canonical-missing-row",
+        test_missing_canonical_fts_row_is_rejected
+    );
+    g_test_add_func (
+        "/retrieval-query/fts-non-fts5-table",
+        test_non_fts5_search_table_is_rejected
     );
     g_test_add_func (
         "/retrieval-query/invalid-arguments",

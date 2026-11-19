@@ -388,6 +388,7 @@ collect_repository_evidence (
     AtmRepositoryEvidenceSet *set = NULL;
     GPtrArray *collected = NULL;
     GPtrArray *partial = NULL;
+    AtmRetrievalQuerySession *session = NULL;
     guint candidate_limit = MIN (
         ATM_RETRIEVAL_MAX_EXACT_RESULTS,
         MAX (max_results * 4, max_results)
@@ -397,6 +398,18 @@ collect_repository_evidence (
     g_return_val_if_fail (normalized != NULL, FALSE);
     g_return_val_if_fail (out_set != NULL, FALSE);
     g_return_val_if_fail (*out_set == NULL, FALSE);
+
+    if (g_getenv ("ATM_RETRIEVAL_VALIDATOR_TIMING") != NULL) {
+        g_printerr (
+            "ATM_RETRIEVAL_VALIDATOR_REPOSITORY repo=%s\n",
+            scope->repository_id
+        );
+    }
+
+    session = atm_retrieval_query_session_open (scope->index_path, error);
+    if (session == NULL) {
+        goto out;
+    }
 
     collected = g_ptr_array_new_with_free_func (
         (GDestroyNotify) atm_evidence_record_free
@@ -408,8 +421,8 @@ collect_repository_evidence (
             i
         );
 
-        if (!atm_retrieval_lookup_exact (
-                scope->index_path,
+        if (!atm_retrieval_query_session_lookup_exact (
+                session,
                 candidate,
                 candidate_limit,
                 &partial,
@@ -429,8 +442,8 @@ collect_repository_evidence (
         );
 
         if (dataset_candidates->len == 0) {
-            if (!atm_retrieval_lookup_dataset_rows (
-                    scope->index_path,
+            if (!atm_retrieval_query_session_lookup_dataset_rows (
+                    session,
                     NULL,
                     row_key,
                     candidate_limit,
@@ -454,8 +467,8 @@ collect_repository_evidence (
                     dataset_index
                 );
 
-            if (!atm_retrieval_lookup_dataset_rows (
-                    scope->index_path,
+            if (!atm_retrieval_query_session_lookup_dataset_rows (
+                    session,
                     dataset_identifier,
                     row_key,
                     candidate_limit,
@@ -470,8 +483,8 @@ collect_repository_evidence (
         }
     }
 
-    if (!atm_retrieval_search_fts (
-            scope->index_path,
+    if (!atm_retrieval_query_session_search_fts (
+            session,
             normalized->expanded_text,
             candidate_limit,
             &partial,
@@ -521,9 +534,11 @@ collect_repository_evidence (
     set->evidence = g_steal_pointer (&collected);
 
     *out_set = g_steal_pointer (&set);
+    atm_retrieval_query_session_close (session);
     return TRUE;
 
 out:
+    atm_retrieval_query_session_close (session);
     g_clear_pointer (&partial, g_ptr_array_unref);
     g_clear_pointer (&collected, g_ptr_array_unref);
     g_clear_pointer (&set, atm_repository_evidence_set_free);

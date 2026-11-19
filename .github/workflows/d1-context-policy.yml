@@ -4,6 +4,10 @@ on:
   pull_request:
     paths:
       - 'src/retrieval_policy.h'
+      - 'src/retrieval_index.c'
+      - 'src/retrieval_index.h'
+      - 'src/retrieval_fts_consistency.c'
+      - 'src/retrieval_fts_consistency.h'
       - 'src/conversation_grounding.c'
       - 'src/conversation_grounding.h'
       - 'src/ConversationGrounding.vala'
@@ -73,6 +77,7 @@ jobs:
             src/csv_table.c \
             src/structured_json.c \
             src/retrieval_index.c \
+            src/retrieval_fts_consistency.c \
             src/coordination_lease.c \
             src/retrieval_index_lifecycle.c \
             src/retrieval_query.c \

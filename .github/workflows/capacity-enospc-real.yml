@@ -26,6 +26,8 @@ on:
       - 'src/snapshot_namespace_durability.c'
       - 'src/snapshot_namespace_durability.h'
       - 'src/retrieval_index.c'
+      - 'src/retrieval_fts_consistency.c'
+      - 'src/retrieval_fts_consistency.h'
       - 'src/retrieval_index.h'
       - 'src/markdown_sections.c'
       - 'src/markdown_sections.h'
@@ -116,6 +118,7 @@ jobs:
             src/csv_table.c \
             src/structured_json.c \
             src/retrieval_index.c \
+            src/retrieval_fts_consistency.c \
             src/control_state.c \
             /tmp/capacity-enospc-runner.o \
             /tmp/atm-resources.c \

@@ -1,4 +1,5 @@
 #include "retrieval_index.h"
+#include "retrieval_fts_consistency.h"
 #include "fault_injection_test_hook.h"
 #include "markdown_sections.h"
 #include "csv_table.h"
@@ -75,6 +76,8 @@ sqlite_exec_checked (
     return TRUE;
 }
 
+
+
 static gboolean
 validate_integrity_writable (sqlite3 *db, GError **error)
 {
@@ -141,7 +144,8 @@ validate_integrity_writable (sqlite3 *db, GError **error)
             "INSERT INTO search_fts(search_fts) "
             "VALUES('integrity-check');",
             error
-        )) {
+        ) ||
+        !atm_retrieval_index_validate_fts_canonical_consistency (db, error)) {
         return FALSE;
     }
 
@@ -2494,6 +2498,13 @@ atm_retrieval_index_validate_identity (
             ATM_RETRIEVAL_INDEX_ERROR_INTEGRITY,
             "Read-only retrieval-index foreign-key check failed."
         );
+        goto out;
+    }
+
+    sqlite3_finalize (statement);
+    statement = NULL;
+
+    if (!atm_retrieval_index_validate_fts_canonical_consistency (db, error)) {
         goto out;
     }
 

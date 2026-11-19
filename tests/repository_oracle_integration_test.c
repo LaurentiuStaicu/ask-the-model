@@ -754,6 +754,185 @@ test_production_ready_then_perturbed (void)
     );
 
     g_free (original_hash);
+
+    /*
+     * Fault 4: canonical TEXT changed to BLOB without changing its bytes.
+     * The independent oracle must compare SQLite storage classes, not only
+     * the text conversion of the values.
+     */
+    sqlite3 *canonical_db = NULL;
+    g_assert_cmpint (
+        sqlite3_open_v2 (
+            index_path, &canonical_db, SQLITE_OPEN_READWRITE, NULL
+        ),
+        ==, SQLITE_OK
+    );
+    g_assert_cmpint (
+        sqlite3_exec (
+            canonical_db,
+            "UPDATE document_sections SET body=CAST(body AS BLOB) "
+            "WHERE id=(SELECT id FROM document_sections ORDER BY id LIMIT 1);",
+            NULL, NULL, NULL
+        ),
+        ==, SQLITE_OK
+    );
+    g_assert_cmpint (sqlite3_changes (canonical_db), ==, 1);
+    g_assert_cmpint (sqlite3_close (canonical_db), ==, SQLITE_OK);
+    assert_oracle (FALSE, oracle_path, data_root, cache_root, state_root);
+
+    g_assert_cmpint (
+        sqlite3_open_v2 (
+            index_path, &canonical_db, SQLITE_OPEN_READWRITE, NULL
+        ),
+        ==, SQLITE_OK
+    );
+    g_assert_cmpint (
+        sqlite3_exec (
+            canonical_db,
+            "UPDATE document_sections SET body=CAST(body AS TEXT) "
+            "WHERE id=(SELECT id FROM document_sections ORDER BY id LIMIT 1);",
+            NULL, NULL, NULL
+        ),
+        ==, SQLITE_OK
+    );
+    g_assert_cmpint (sqlite3_changes (canonical_db), ==, 1);
+    g_assert_cmpint (sqlite3_close (canonical_db), ==, SQLITE_OK);
+    assert_oracle (TRUE, oracle_path, data_root, cache_root, state_root);
+
+    /*
+     * Fault 5: alter an FTS reference while preserving SQLite structure.
+     */
+    sqlite3 *fts_db = NULL;
+    g_assert_cmpint (
+        sqlite3_open_v2 (
+            index_path, &fts_db, SQLITE_OPEN_READWRITE, NULL
+        ),
+        ==, SQLITE_OK
+    );
+    g_assert_cmpint (
+        sqlite3_exec (
+            fts_db,
+            "UPDATE search_fts SET evidence_id='-1' WHERE rowid=("
+            "SELECT rowid FROM search_fts WHERE evidence_kind='section' "
+            "ORDER BY rowid LIMIT 1);",
+            NULL, NULL, NULL
+        ),
+        ==, SQLITE_OK
+    );
+    g_assert_cmpint (sqlite3_changes (fts_db), ==, 1);
+    g_assert_cmpint (sqlite3_close (fts_db), ==, SQLITE_OK);
+    assert_oracle (FALSE, oracle_path, data_root, cache_root, state_root);
+
+    /*
+     * Restore the canonical reference before testing its storage class.
+     * Fault 5 deliberately leaves the altered reference in place.
+     */
+    g_assert_cmpint (
+        sqlite3_open_v2 (
+            index_path, &fts_db, SQLITE_OPEN_READWRITE, NULL
+        ),
+        ==, SQLITE_OK
+    );
+    g_assert_cmpint (
+        sqlite3_exec (
+            fts_db,
+            "UPDATE search_fts SET evidence_id=CAST(("
+            "SELECT id FROM document_sections ORDER BY id LIMIT 1"
+            ") AS INTEGER) WHERE rowid=("
+            "SELECT rowid FROM search_fts WHERE evidence_kind='section' "
+            "ORDER BY rowid LIMIT 1);",
+            NULL, NULL, NULL
+        ),
+        ==, SQLITE_OK
+    );
+    g_assert_cmpint (sqlite3_changes (fts_db), ==, 1);
+    g_assert_cmpint (sqlite3_close (fts_db), ==, SQLITE_OK);
+    assert_oracle (TRUE, oracle_path, data_root, cache_root, state_root);
+
+    /*
+     * Fault 6: preserve the evidence_id bytes but change its SQLite storage
+     * class from INTEGER to BLOB. The independent oracle must reject this
+     * instead of normalizing x'31' to the canonical identifier "1".
+     */
+    sqlite3 *identity_db = NULL;
+    g_assert_cmpint (
+        sqlite3_open_v2 (
+            index_path, &identity_db, SQLITE_OPEN_READWRITE, NULL
+        ),
+        ==, SQLITE_OK
+    );
+    g_assert_cmpint (
+        sqlite3_exec (
+            identity_db,
+            "UPDATE search_fts SET evidence_id=CAST(evidence_id AS BLOB) "
+            "WHERE rowid=(SELECT rowid FROM search_fts "
+            "WHERE evidence_kind='section' ORDER BY rowid LIMIT 1);",
+            NULL, NULL, NULL
+        ),
+        ==, SQLITE_OK
+    );
+    g_assert_cmpint (sqlite3_changes (identity_db), ==, 1);
+    g_assert_cmpint (sqlite3_close (identity_db), ==, SQLITE_OK);
+    assert_oracle (FALSE, oracle_path, data_root, cache_root, state_root);
+
+    g_assert_cmpint (
+        sqlite3_open_v2 (
+            index_path, &identity_db, SQLITE_OPEN_READWRITE, NULL
+        ),
+        ==, SQLITE_OK
+    );
+    g_assert_cmpint (
+        sqlite3_exec (
+            identity_db,
+            "UPDATE search_fts SET evidence_id=CAST(evidence_id AS INTEGER) "
+            "WHERE rowid=(SELECT rowid FROM search_fts "
+            "WHERE evidence_kind='section' ORDER BY rowid LIMIT 1);",
+            NULL, NULL, NULL
+        ),
+        ==, SQLITE_OK
+    );
+    g_assert_cmpint (sqlite3_changes (identity_db), ==, 1);
+    g_assert_cmpint (sqlite3_close (identity_db), ==, SQLITE_OK);
+    assert_oracle (TRUE, oracle_path, data_root, cache_root, state_root);
+
+    /*
+     * Fault 7: remove the required FTS5 virtual table entirely.
+     */
+    g_assert_cmpint (
+        sqlite3_open_v2 (
+            index_path, &fts_db, SQLITE_OPEN_READWRITE, NULL
+        ),
+        ==, SQLITE_OK
+    );
+    g_assert_cmpint (
+        sqlite3_exec (fts_db, "DROP TABLE search_fts;", NULL, NULL, NULL),
+        ==, SQLITE_OK
+    );
+    g_assert_cmpint (sqlite3_close (fts_db), ==, SQLITE_OK);
+    assert_oracle (FALSE, oracle_path, data_root, cache_root, state_root);
+
+    /*
+     * Fault 8: a same-named ordinary table is not an FTS5 implementation.
+     */
+    g_assert_cmpint (
+        sqlite3_open_v2 (
+            index_path, &fts_db, SQLITE_OPEN_READWRITE, NULL
+        ),
+        ==, SQLITE_OK
+    );
+    g_assert_cmpint (
+        sqlite3_exec (
+            fts_db,
+            "CREATE TABLE search_fts("
+            "evidence_kind TEXT,evidence_id TEXT,logical_source_id TEXT,"
+            "title TEXT,body TEXT);",
+            NULL, NULL, NULL
+        ),
+        ==, SQLITE_OK
+    );
+    g_assert_cmpint (sqlite3_close (fts_db), ==, SQLITE_OK);
+    assert_oracle (FALSE, oracle_path, data_root, cache_root, state_root);
+
     g_free (external);
     g_free (core);
     g_free (status);

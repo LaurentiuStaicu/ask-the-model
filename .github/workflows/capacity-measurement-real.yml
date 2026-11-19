@@ -32,6 +32,8 @@ on:
       - 'src/structured_json.c'
       - 'src/structured_json.h'
       - 'src/retrieval_index.c'
+      - 'src/retrieval_fts_consistency.c'
+      - 'src/retrieval_fts_consistency.h'
       - 'src/retrieval_index.h'
       - 'data/schemas/retrieval-index-v2.sql'
       - 'data/io.github.laurentiustaicu.ask_the_model.gresource.xml'
@@ -117,6 +119,7 @@ jobs:
             src/csv_table.c \
             src/structured_json.c \
             src/retrieval_index.c \
+            src/retrieval_fts_consistency.c \
             /tmp/capacity-measurement-real-runner.o \
             /tmp/atm-resources.c \
             $(pkg-config --cflags --libs \

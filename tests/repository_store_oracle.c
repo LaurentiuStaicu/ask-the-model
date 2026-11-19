@@ -1920,6 +1920,368 @@ sqlite_single_int (
 }
 
 static gboolean
+sqlite_columns_equal_by_type_and_bytes (
+    sqlite3_stmt *left,
+    int left_column,
+    sqlite3_stmt *right,
+    int right_column
+)
+{
+    int left_type = sqlite3_column_type (left, left_column);
+    int right_type = sqlite3_column_type (right, right_column);
+
+    if (left_type != right_type)
+        return FALSE;
+
+    switch (left_type) {
+    case SQLITE_NULL:
+        return TRUE;
+    case SQLITE_INTEGER:
+        return sqlite3_column_int64 (left, left_column) ==
+            sqlite3_column_int64 (right, right_column);
+    case SQLITE_FLOAT:
+        return sqlite3_column_double (left, left_column) ==
+            sqlite3_column_double (right, right_column);
+    case SQLITE_TEXT:
+    case SQLITE_BLOB: {
+        const void *left_value = left_type == SQLITE_TEXT
+            ? (const void *) sqlite3_column_text (left, left_column)
+            : sqlite3_column_blob (left, left_column);
+        const void *right_value = right_type == SQLITE_TEXT
+            ? (const void *) sqlite3_column_text (right, right_column)
+            : sqlite3_column_blob (right, right_column);
+        int left_bytes = sqlite3_column_bytes (left, left_column);
+        int right_bytes = sqlite3_column_bytes (right, right_column);
+
+        return left_bytes == right_bytes &&
+            (left_bytes == 0 ||
+             (left_value != NULL && right_value != NULL &&
+              memcmp (left_value, right_value, (gsize) left_bytes) == 0));
+    }
+    default:
+        return FALSE;
+    }
+}
+
+static gboolean
+check_fts_canonical_consistency (sqlite3 *db, GError **error)
+{
+    static const char *expected_columns[] = {
+        "evidence_kind",
+        "evidence_id",
+        "logical_source_id",
+        "title",
+        "body"
+    };
+    sqlite3_stmt *statement = NULL;
+    int rc;
+
+    gint64 value = 0;
+    if (!sqlite_single_int (
+            db,
+            "SELECT count(*) FROM sqlite_master "
+            "WHERE type='table' AND name='search_fts' "
+            "AND upper(sql) LIKE 'CREATE VIRTUAL TABLE%USING FTS5%';",
+            &value, error
+        ) || value != 1) {
+        if (error != NULL && *error == NULL)
+            g_set_error_literal (
+                error, ORACLE_ERROR, ORACLE_ERROR_INTEGRITY,
+                "The retrieval index is missing its FTS5 virtual table."
+            );
+        return FALSE;
+    }
+
+    if (sqlite3_prepare_v2 (
+            db, "PRAGMA table_info(search_fts);", -1, &statement, NULL
+        ) != SQLITE_OK) {
+        g_set_error (
+            error, ORACLE_ERROR, ORACLE_ERROR_INDEX,
+            "Could not inspect independent-oracle FTS columns: %s",
+            sqlite3_errmsg (db)
+        );
+        return FALSE;
+    }
+
+    for (gsize i = 0; i < G_N_ELEMENTS (expected_columns); i++) {
+        rc = sqlite3_step (statement);
+        if (rc != SQLITE_ROW ||
+            g_strcmp0 (
+                (const char *) sqlite3_column_text (statement, 1),
+                expected_columns[i]
+            ) != 0) {
+            sqlite3_finalize (statement);
+            g_set_error_literal (
+                error, ORACLE_ERROR, ORACLE_ERROR_INTEGRITY,
+                "FTS5 columns do not match the retrieval-index v2 contract."
+            );
+            return FALSE;
+        }
+    }
+
+    rc = sqlite3_step (statement);
+    sqlite3_finalize (statement);
+    statement = NULL;
+    if (rc != SQLITE_DONE) {
+        g_set_error_literal (
+            error, ORACLE_ERROR, ORACLE_ERROR_INTEGRITY,
+            "FTS5 has unexpected or unreadable columns."
+        );
+        return FALSE;
+    }
+
+    /*
+     * Oracle deliberately uses row-wise C iteration rather than the
+     * production validator's set-oriented EXCEPT/NOT EXISTS SQL.  This
+     * keeps the second check structurally independent.
+     */
+    static const struct {
+        const char *kind;
+        const char *canonical_sql;
+    } canonical_sets[] = {
+        {
+            "section",
+            "SELECT id, logical_source_id, title, body "
+            "FROM document_sections ORDER BY id;"
+        },
+        {
+            "entity",
+            "SELECT id, logical_source_id, COALESCE(label,native_id), payload_json "
+            "FROM structured_entities ORDER BY id;"
+        },
+        {
+            "relation",
+            "SELECT id, logical_source_id, "
+            "COALESCE(native_id,relation_type), payload_json "
+            "FROM structured_relations ORDER BY id;"
+        },
+        {
+            "dataset_row",
+            "SELECT r.id, "
+            "printf('%s:dataset-row:%s:%d',m.repository_id,s.path,r.ordinal), "
+            "s.path, r.search_text "
+            "FROM dataset_rows r "
+            "JOIN datasets d ON d.id=r.dataset_id "
+            "JOIN source_files s ON s.id=d.source_id "
+            "JOIN snapshot_metadata m ON m.id=1 "
+            "ORDER BY r.id;"
+        }
+    };
+
+    if (sqlite3_prepare_v2 (
+            db,
+            "SELECT evidence_kind, evidence_id, logical_source_id, title, body "
+            "FROM search_fts ORDER BY evidence_kind, CAST(evidence_id AS TEXT);",
+            -1, &statement, NULL
+        ) != SQLITE_OK) {
+        g_set_error (
+            error, ORACLE_ERROR, ORACLE_ERROR_INDEX,
+            "Could not enumerate independent-oracle FTS rows: %s",
+            sqlite3_errmsg (db)
+        );
+        return FALSE;
+    }
+
+    GHashTable *seen = g_hash_table_new_full (
+        g_str_hash, g_str_equal, g_free, NULL
+    );
+    gboolean ok = TRUE;
+    guint64 fts_count = 0;
+
+    while ((rc = sqlite3_step (statement)) == SQLITE_ROW) {
+        const char *kind = (const char *) sqlite3_column_text (statement, 0);
+        const char *logical_source_id =
+            (const char *) sqlite3_column_text (statement, 2);
+
+        /*
+         * Canonical evidence identifiers are INTEGER PRIMARY KEY values,
+         * and the index builder binds them with sqlite3_bind_int64().
+         * Reject BLOB/TEXT substitutions before sqlite3_column_text()
+         * can normalize them to the same printable identifier.
+         */
+        if (sqlite3_column_type (statement, 1) != SQLITE_INTEGER) {
+            g_set_error_literal (
+                error, ORACLE_ERROR, ORACLE_ERROR_INTEGRITY,
+                "FTS evidence_id is not stored as INTEGER."
+            );
+            ok = FALSE;
+            break;
+        }
+
+        const char *evidence_id =
+            (const char *) sqlite3_column_text (statement, 1);
+
+        if (kind == NULL || evidence_id == NULL || logical_source_id == NULL) {
+            g_set_error_literal (
+                error, ORACLE_ERROR, ORACLE_ERROR_INTEGRITY,
+                "FTS contains a NULL evidence identity."
+            );
+            ok = FALSE;
+            break;
+        }
+
+        char *key = g_strdup_printf ("%zu:%s%s", strlen (kind), kind, evidence_id);
+        if (g_hash_table_contains (seen, key)) {
+            g_free (key);
+            g_set_error_literal (
+                error, ORACLE_ERROR, ORACLE_ERROR_INTEGRITY,
+                "FTS contains a duplicate evidence identity."
+            );
+            ok = FALSE;
+            break;
+        }
+        g_hash_table_add (seen, key);
+
+        fts_count++;
+        gboolean known_kind = FALSE;
+        for (gsize i = 0; i < G_N_ELEMENTS (canonical_sets); i++) {
+            if (g_strcmp0 (kind, canonical_sets[i].kind) == 0) {
+                known_kind = TRUE;
+                break;
+            }
+        }
+        if (!known_kind) {
+            g_set_error_literal (
+                error, ORACLE_ERROR, ORACLE_ERROR_INTEGRITY,
+                "FTS contains an unknown evidence kind."
+            );
+            ok = FALSE;
+            break;
+        }
+    }
+
+    if (ok && rc != SQLITE_DONE) {
+        g_set_error (
+            error, ORACLE_ERROR, ORACLE_ERROR_INDEX,
+            "Could not read independent-oracle FTS rows: %s",
+            sqlite3_errmsg (db)
+        );
+        ok = FALSE;
+    }
+    sqlite3_finalize (statement);
+    statement = NULL;
+    g_hash_table_unref (seen);
+
+    if (!ok)
+        return FALSE;
+
+    /*
+     * Enumerate each canonical family and locate its corresponding FTS
+     * record with a parameterized query.  Compare SQLite values by type
+     * and bytes; do not share the production SQL comparison strategy.
+     */
+    for (gsize family = 0;
+         family < G_N_ELEMENTS (canonical_sets);
+         family++) {
+        sqlite3_stmt *canonical = NULL;
+        if (sqlite3_prepare_v2 (
+                db, canonical_sets[family].canonical_sql, -1,
+                &canonical, NULL
+            ) != SQLITE_OK) {
+            g_set_error (
+                error, ORACLE_ERROR, ORACLE_ERROR_INDEX,
+                "Could not enumerate canonical %s records: %s",
+                canonical_sets[family].kind, sqlite3_errmsg (db)
+            );
+            return FALSE;
+        }
+
+        while ((rc = sqlite3_step (canonical)) == SQLITE_ROW) {
+            sqlite3_int64 id = sqlite3_column_int64 (canonical, 0);
+            sqlite3_stmt *lookup = NULL;
+            if (sqlite3_prepare_v2 (
+                    db,
+                    "SELECT logical_source_id, title, body "
+                    "FROM search_fts WHERE evidence_kind=?1 "
+                    "AND CAST(evidence_id AS TEXT)=?2 COLLATE BINARY;",
+                    -1, &lookup, NULL
+                ) != SQLITE_OK) {
+                sqlite3_finalize (canonical);
+                g_set_error (
+                    error, ORACLE_ERROR, ORACLE_ERROR_INDEX,
+                    "Could not locate canonical %s evidence: %s",
+                    canonical_sets[family].kind, sqlite3_errmsg (db)
+                );
+                return FALSE;
+            }
+
+            char *id_text = g_strdup_printf ("%" G_GINT64_FORMAT, id);
+            sqlite3_bind_text (lookup, 1, canonical_sets[family].kind, -1, SQLITE_STATIC);
+            sqlite3_bind_text (lookup, 2, id_text, -1, SQLITE_TRANSIENT);
+            g_free (id_text);
+
+            int lookup_rc = sqlite3_step (lookup);
+            gboolean matches = lookup_rc == SQLITE_ROW &&
+                sqlite_columns_equal_by_type_and_bytes (
+                    canonical, 1, lookup, 0
+                ) &&
+                sqlite_columns_equal_by_type_and_bytes (
+                    canonical, 2, lookup, 1
+                ) &&
+                sqlite_columns_equal_by_type_and_bytes (
+                    canonical, 3, lookup, 2
+                );
+            int lookup_end_rc = matches ? sqlite3_step (lookup) : SQLITE_ERROR;
+
+            if (!matches || lookup_end_rc != SQLITE_DONE) {
+                gboolean lookup_failed = lookup_rc != SQLITE_ROW &&
+                    lookup_rc != SQLITE_DONE;
+                sqlite3_finalize (lookup);
+                sqlite3_finalize (canonical);
+                if (lookup_failed || (matches && lookup_end_rc != SQLITE_DONE)) {
+                    g_set_error (
+                        error, ORACLE_ERROR, ORACLE_ERROR_INDEX,
+                        "Could not complete canonical %s FTS lookup: %s",
+                        canonical_sets[family].kind, sqlite3_errmsg (db)
+                    );
+                } else {
+                    g_set_error (
+                        error, ORACLE_ERROR, ORACLE_ERROR_INTEGRITY,
+                        "Canonical %s record is missing or differs from FTS.",
+                        canonical_sets[family].kind
+                    );
+                }
+                return FALSE;
+            }
+            sqlite3_finalize (lookup);
+        }
+
+        sqlite3_finalize (canonical);
+        if (rc != SQLITE_DONE) {
+            g_set_error (
+                error, ORACLE_ERROR, ORACLE_ERROR_INDEX,
+                "Could not finish canonical %s enumeration: %s",
+                canonical_sets[family].kind, sqlite3_errmsg (db)
+            );
+            return FALSE;
+        }
+    }
+
+    /*
+     * The duplicate/known-kind pass plus canonical enumeration ensures
+     * the FTS and canonical populations have identical cardinality.
+     */
+    gint64 canonical_count = 0;
+    if (!sqlite_single_int (
+            db,
+            "SELECT "
+            "(SELECT count(*) FROM document_sections) + "
+            "(SELECT count(*) FROM structured_entities) + "
+            "(SELECT count(*) FROM structured_relations) + "
+            "(SELECT count(*) FROM dataset_rows);",
+            &canonical_count, error
+        ) || (guint64) canonical_count != fts_count) {
+        if (error != NULL && *error == NULL)
+            g_set_error_literal (
+                error, ORACLE_ERROR, ORACLE_ERROR_INTEGRITY,
+                "FTS and canonical evidence populations differ."
+            );
+        return FALSE;
+    }
+
+    return TRUE;
+}
+static gboolean
 check_sqlite_integrity (sqlite3 *db, GError **error)
 {
     sqlite3_stmt *statement = NULL;
@@ -2342,7 +2704,8 @@ check_index (
         goto out;
     }
 
-    if (!check_sqlite_integrity (db, error)) {
+    if (!check_sqlite_integrity (db, error) ||
+        !check_fts_canonical_consistency (db, error)) {
         goto out;
     }
 
@@ -2848,7 +3211,26 @@ create_fixture_index (
         "source_id INTEGER NOT NULL REFERENCES source_files(id) ON DELETE CASCADE,"
         "role TEXT NOT NULL,"
         "PRIMARY KEY(source_id,role)"
-        ");";
+        ");"
+        "CREATE TABLE document_sections("
+        "id INTEGER PRIMARY KEY, logical_source_id TEXT NOT NULL,"
+        "title TEXT, body TEXT NOT NULL);"
+        "CREATE TABLE structured_entities("
+        "id INTEGER PRIMARY KEY, logical_source_id TEXT NOT NULL,"
+        "label TEXT, native_id TEXT, payload_json TEXT NOT NULL);"
+        "CREATE TABLE structured_relations("
+        "id INTEGER PRIMARY KEY, logical_source_id TEXT NOT NULL,"
+        "native_id TEXT, relation_type TEXT NOT NULL, payload_json TEXT NOT NULL);"
+        "CREATE TABLE datasets("
+        "id INTEGER PRIMARY KEY, source_id INTEGER NOT NULL REFERENCES source_files(id),"
+        "logical_source_id TEXT NOT NULL);"
+        "CREATE TABLE dataset_rows("
+        "id INTEGER PRIMARY KEY, dataset_id INTEGER NOT NULL REFERENCES datasets(id),"
+        "ordinal INTEGER NOT NULL, search_text TEXT);"
+        "CREATE VIRTUAL TABLE search_fts USING fts5("
+        "evidence_kind UNINDEXED, evidence_id UNINDEXED, "
+        "logical_source_id UNINDEXED, title, body, "
+        "tokenize='unicode61 remove_diacritics 2');";
 
     if (sqlite3_exec (
             db,
