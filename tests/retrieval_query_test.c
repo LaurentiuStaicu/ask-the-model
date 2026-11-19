@@ -1334,7 +1334,7 @@ test_fts_to_canonical_left_join_alternative_is_equivalent (void)
         const char *name;
         const char *sql;
     } corruptions[] = {
-        { "section logical source", 
+        { "section logical source",
           "UPDATE search_fts SET logical_source_id='tampered' WHERE rowid=("
           "SELECT rowid FROM search_fts WHERE evidence_kind='section' LIMIT 1);" },
         { "section title",
@@ -1404,12 +1404,6 @@ test_fts_to_canonical_left_join_alternative_is_equivalent (void)
         remove_tree_best_effort (cache_root);
         g_free (cache_root);
     }
-
-    g_free (index_path);
-    remove_tree_best_effort (snapshot_root);
-    g_free (snapshot_root);
-    remove_tree_best_effort (cache_root);
-    g_free (cache_root);
 }
 
 static void
