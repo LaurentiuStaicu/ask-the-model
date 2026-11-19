@@ -1312,6 +1312,7 @@ measure_validation_session_reuse_probe (
         atm_retrieval_query_session_close (reused_session);
 
         /* B: keep the connection, but start and validate a fresh read txn per request. */
+        gint64 fresh_txn_started = g_get_monotonic_time ();
         AtmRetrievalQuerySession *fresh_txn_session =
             atm_retrieval_query_session_open (repository->index_path, error);
 
@@ -1319,13 +1320,14 @@ measure_validation_session_reuse_probe (
             return FALSE;
         }
 
-        gint64 fresh_txn_started = g_get_monotonic_time ();
         for (guint iteration = 0; iteration < iterations; iteration++) {
             GPtrArray *results = NULL;
-            gboolean refreshed = atm_retrieval_query_session_refresh (
-                fresh_txn_session, error
-            );
-            if (!refreshed) {
+
+            /* The initial open validates request one; later requests refresh. */
+            if (iteration > 0 &&
+                !atm_retrieval_query_session_refresh (
+                    fresh_txn_session, error
+                )) {
                 atm_retrieval_query_session_close (fresh_txn_session);
                 return FALSE;
             }
