@@ -6,6 +6,9 @@
 
 G_BEGIN_DECLS
 
+typedef struct _AtmRetrievalQuerySession AtmRetrievalQuerySession;
+
+
 #define ATM_RETRIEVAL_MAX_EXACT_RESULTS 100
 #define ATM_RETRIEVAL_MAX_IDENTIFIER_BYTES 1024
 
@@ -48,6 +51,39 @@ typedef struct {
 } AtmEvidenceRecord;
 
 GQuark atm_retrieval_query_error_quark (void);
+
+
+AtmRetrievalQuerySession *atm_retrieval_query_session_open (
+    const char *index_path,
+    GError **error
+);
+void atm_retrieval_query_session_close (
+    AtmRetrievalQuerySession *session
+);
+gboolean atm_retrieval_query_session_lookup_exact (
+    AtmRetrievalQuerySession *session,
+    const char *identifier,
+    guint max_results,
+    GPtrArray **out_results,
+    GError **error
+);
+gboolean atm_retrieval_query_session_search_fts (
+    AtmRetrievalQuerySession *session,
+    const char *query,
+    guint max_results,
+    GPtrArray **out_results,
+    GError **error
+);
+gboolean atm_retrieval_query_session_lookup_dataset_rows (
+    AtmRetrievalQuerySession *session,
+    const char *dataset_identifier,
+    const char *row_key,
+    guint max_results,
+    GPtrArray **out_results,
+    GError **error
+);
+
+
 
 gboolean atm_retrieval_lookup_exact (
     const char *index_path,

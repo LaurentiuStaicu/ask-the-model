@@ -66,6 +66,12 @@ typedef struct {
     char *snapshot_sha;
 } AtmSnapshotProvenance;
 
+struct _AtmRetrievalQuerySession {
+    sqlite3 *db;
+    AtmSnapshotProvenance provenance;
+};
+
+
 static void
 snapshot_provenance_clear (AtmSnapshotProvenance *provenance)
 {
@@ -197,6 +203,92 @@ source_role_bit_from_name (const char *role)
     }
 
     return 0;
+}
+
+
+AtmRetrievalQuerySession *
+atm_retrieval_query_session_open (
+    const char *index_path,
+    GError **error
+)
+{
+    AtmRetrievalQuerySession *session;
+    int rc;
+
+    g_return_val_if_fail (index_path != NULL, NULL);
+
+    session = g_new0 (AtmRetrievalQuerySession, 1);
+    rc = sqlite3_open_v2 (
+        index_path,
+        &session->db,
+        SQLITE_OPEN_READONLY,
+        NULL
+    );
+
+    if (rc != SQLITE_OK) {
+        g_set_error (
+            error,
+            ATM_RETRIEVAL_QUERY_ERROR,
+            ATM_RETRIEVAL_QUERY_ERROR_SQLITE,
+            "Could not open retrieval index read-only: %s",
+            session->db != NULL
+                ? sqlite3_errmsg (session->db)
+                : "unknown SQLite error"
+        );
+        atm_retrieval_query_session_close (session);
+        return NULL;
+    }
+
+    if (sqlite3_exec (
+            session->db,
+            "PRAGMA trusted_schema = OFF;"
+            "PRAGMA query_only = ON;"
+            "PRAGMA foreign_keys = ON;"
+            "BEGIN;",
+            NULL,
+            NULL,
+            NULL
+        ) != SQLITE_OK) {
+        g_set_error (
+            error,
+            ATM_RETRIEVAL_QUERY_ERROR,
+            ATM_RETRIEVAL_QUERY_ERROR_SQLITE,
+            "Could not configure read-only retrieval session: %s",
+            sqlite3_errmsg (session->db)
+        );
+        atm_retrieval_query_session_close (session);
+        return NULL;
+    }
+
+    if (!load_snapshot_provenance (
+            session->db,
+            &session->provenance,
+            error
+        ) ||
+        !validate_query_fts_consistency (session->db, error)) {
+        atm_retrieval_query_session_close (session);
+        return NULL;
+    }
+
+    return session;
+}
+
+void
+atm_retrieval_query_session_close (
+    AtmRetrievalQuerySession *session
+)
+{
+    if (session == NULL) {
+        return;
+    }
+
+    if (session->db != NULL) {
+        sqlite3_exec (session->db, "ROLLBACK;", NULL, NULL, NULL);
+        sqlite3_close (session->db);
+    }
+
+    snapshot_provenance_clear (&session->provenance);
+    g_free (session);
 }
 
 static gboolean
@@ -422,8 +514,8 @@ append_exact_rows (
 }
 
 gboolean
-atm_retrieval_lookup_exact (
-    const char *index_path,
+atm_retrieval_query_session_lookup_exact (
+    AtmRetrievalQuerySession *session,
     const char *identifier,
     guint max_results,
     GPtrArray **out_results,
@@ -476,14 +568,12 @@ atm_retrieval_lookup_exact (
         "ORDER BY s.path COLLATE BINARY, d.locator COLLATE BINARY "
         "LIMIT ?2;";
 
-    sqlite3 *db = NULL;
     sqlite3_stmt *role_statement = NULL;
     GPtrArray *results = NULL;
-    AtmSnapshotProvenance provenance = { 0 };
     gboolean ok = FALSE;
     int rc;
 
-    g_return_val_if_fail (index_path != NULL, FALSE);
+    g_return_val_if_fail (session != NULL, FALSE);
     g_return_val_if_fail (identifier != NULL, FALSE);
     g_return_val_if_fail (out_results != NULL, FALSE);
     g_return_val_if_fail (*out_results == NULL, FALSE);
@@ -504,54 +594,9 @@ atm_retrieval_lookup_exact (
         return FALSE;
     }
 
-    rc = sqlite3_open_v2 (
-        index_path,
-        &db,
-        SQLITE_OPEN_READONLY,
-        NULL
-    );
+    sqlite3 *db = session->db;
+    const AtmSnapshotProvenance *provenance = &session->provenance;
 
-    if (rc != SQLITE_OK) {
-        g_set_error (
-            error,
-            ATM_RETRIEVAL_QUERY_ERROR,
-            ATM_RETRIEVAL_QUERY_ERROR_SQLITE,
-            "Could not open retrieval index read-only: %s",
-            db != NULL ? sqlite3_errmsg (db) : "unknown SQLite error"
-        );
-        goto out;
-    }
-
-    if (sqlite3_exec (
-            db,
-            "PRAGMA trusted_schema = OFF;"
-            "PRAGMA query_only = ON;"
-            "PRAGMA foreign_keys = ON;",
-            NULL,
-            NULL,
-            NULL
-        ) != SQLITE_OK) {
-        g_set_error (
-            error,
-            ATM_RETRIEVAL_QUERY_ERROR,
-            ATM_RETRIEVAL_QUERY_ERROR_SQLITE,
-            "Could not configure read-only retrieval connection: %s",
-            sqlite3_errmsg (db)
-        );
-        goto out;
-    }
-
-    if (!load_snapshot_provenance (
-            db,
-            &provenance,
-            error
-        )) {
-        goto out;
-    }
-
-    if (!validate_query_fts_consistency (db, error)) {
-        goto out;
-    }
 
     if (sqlite3_prepare_v2 (
             db,
@@ -598,7 +643,7 @@ atm_retrieval_lookup_exact (
                 queries[i].sql,
                 identifier,
                 queries[i].kind,
-                &provenance,
+                provenance,
                 remaining,
                 results,
                 error
@@ -612,15 +657,12 @@ atm_retrieval_lookup_exact (
 
 out:
     g_clear_pointer (&results, g_ptr_array_unref);
-    snapshot_provenance_clear (&provenance);
+    
 
     if (role_statement != NULL) {
         sqlite3_finalize (role_statement);
     }
 
-    if (db != NULL) {
-        sqlite3_close (db);
-    }
 
     return ok;
 }
@@ -914,15 +956,14 @@ load_fts_provenance (
 }
 
 gboolean
-atm_retrieval_search_fts (
-    const char *index_path,
+atm_retrieval_query_session_search_fts (
+    AtmRetrievalQuerySession *session,
     const char *query,
     guint max_results,
     GPtrArray **out_results,
     GError **error
 )
 {
-    sqlite3 *db = NULL;
     sqlite3_stmt *search_statement = NULL;
     sqlite3_stmt *role_statement = NULL;
     sqlite3_stmt *section_statement = NULL;
@@ -931,11 +972,10 @@ atm_retrieval_search_fts (
     sqlite3_stmt *row_statement = NULL;
     GPtrArray *results = NULL;
     char *fts_query = NULL;
-    AtmSnapshotProvenance provenance = { 0 };
     gboolean ok = FALSE;
     int rc;
 
-    g_return_val_if_fail (index_path != NULL, FALSE);
+    g_return_val_if_fail (session != NULL, FALSE);
     g_return_val_if_fail (query != NULL, FALSE);
     g_return_val_if_fail (out_results != NULL, FALSE);
     g_return_val_if_fail (*out_results == NULL, FALSE);
@@ -960,54 +1000,9 @@ atm_retrieval_search_fts (
         return FALSE;
     }
 
-    rc = sqlite3_open_v2 (
-        index_path,
-        &db,
-        SQLITE_OPEN_READONLY,
-        NULL
-    );
+    sqlite3 *db = session->db;
+    const AtmSnapshotProvenance *provenance = &session->provenance;
 
-    if (rc != SQLITE_OK) {
-        g_set_error (
-            error,
-            ATM_RETRIEVAL_QUERY_ERROR,
-            ATM_RETRIEVAL_QUERY_ERROR_SQLITE,
-            "Could not open retrieval index read-only: %s",
-            db != NULL ? sqlite3_errmsg (db) : "unknown SQLite error"
-        );
-        goto out;
-    }
-
-    if (sqlite3_exec (
-            db,
-            "PRAGMA trusted_schema = OFF;"
-            "PRAGMA query_only = ON;"
-            "PRAGMA foreign_keys = ON;",
-            NULL,
-            NULL,
-            NULL
-        ) != SQLITE_OK) {
-        g_set_error (
-            error,
-            ATM_RETRIEVAL_QUERY_ERROR,
-            ATM_RETRIEVAL_QUERY_ERROR_SQLITE,
-            "Could not configure read-only FTS connection: %s",
-            sqlite3_errmsg (db)
-        );
-        goto out;
-    }
-
-    if (!load_snapshot_provenance (
-            db,
-            &provenance,
-            error
-        )) {
-        goto out;
-    }
-
-    if (!validate_query_fts_consistency (db, error)) {
-        goto out;
-    }
 
     if (sqlite3_prepare_v2 (
             db,
@@ -1118,7 +1113,7 @@ atm_retrieval_search_fts (
 
         record->evidence_kind = g_strdup (kind);
         record->match_kind = ATM_EVIDENCE_MATCH_LEXICAL;
-        apply_snapshot_provenance (record, &provenance);
+        apply_snapshot_provenance (record, provenance);
         record->evidence_id = evidence_id;
         record->logical_source_id = g_strdup (
             (const char *) sqlite3_column_text (
@@ -1199,7 +1194,7 @@ atm_retrieval_search_fts (
 out:
     g_clear_pointer (&results, g_ptr_array_unref);
     g_clear_pointer (&fts_query, g_free);
-    snapshot_provenance_clear (&provenance);
+    
 
     if (row_statement != NULL) {
         sqlite3_finalize (row_statement);
@@ -1225,17 +1220,14 @@ out:
         sqlite3_finalize (search_statement);
     }
 
-    if (db != NULL) {
-        sqlite3_close (db);
-    }
 
     return ok;
 }
 
 
 gboolean
-atm_retrieval_lookup_dataset_rows (
-    const char *index_path,
+atm_retrieval_query_session_lookup_dataset_rows (
+    AtmRetrievalQuerySession *session,
     const char *dataset_identifier,
     const char *row_key,
     guint max_results,
@@ -1243,15 +1235,13 @@ atm_retrieval_lookup_dataset_rows (
     GError **error
 )
 {
-    sqlite3 *db = NULL;
     sqlite3_stmt *statement = NULL;
     sqlite3_stmt *role_statement = NULL;
     GPtrArray *results = NULL;
-    AtmSnapshotProvenance provenance = { 0 };
     gboolean ok = FALSE;
     int rc;
 
-    g_return_val_if_fail (index_path != NULL, FALSE);
+    g_return_val_if_fail (session != NULL, FALSE);
     g_return_val_if_fail (row_key != NULL, FALSE);
     g_return_val_if_fail (out_results != NULL, FALSE);
     g_return_val_if_fail (*out_results == NULL, FALSE);
@@ -1292,54 +1282,9 @@ atm_retrieval_lookup_dataset_rows (
         }
     }
 
-    rc = sqlite3_open_v2 (
-        index_path,
-        &db,
-        SQLITE_OPEN_READONLY,
-        NULL
-    );
+    sqlite3 *db = session->db;
+    const AtmSnapshotProvenance *provenance = &session->provenance;
 
-    if (rc != SQLITE_OK) {
-        g_set_error (
-            error,
-            ATM_RETRIEVAL_QUERY_ERROR,
-            ATM_RETRIEVAL_QUERY_ERROR_SQLITE,
-            "Could not open retrieval index read-only: %s",
-            db != NULL ? sqlite3_errmsg (db) : "unknown SQLite error"
-        );
-        goto out;
-    }
-
-    if (sqlite3_exec (
-            db,
-            "PRAGMA trusted_schema = OFF;"
-            "PRAGMA query_only = ON;"
-            "PRAGMA foreign_keys = ON;",
-            NULL,
-            NULL,
-            NULL
-        ) != SQLITE_OK) {
-        g_set_error (
-            error,
-            ATM_RETRIEVAL_QUERY_ERROR,
-            ATM_RETRIEVAL_QUERY_ERROR_SQLITE,
-            "Could not configure read-only tabular retrieval: %s",
-            sqlite3_errmsg (db)
-        );
-        goto out;
-    }
-
-    if (!load_snapshot_provenance (
-            db,
-            &provenance,
-            error
-        )) {
-        goto out;
-    }
-
-    if (!validate_query_fts_consistency (db, error)) {
-        goto out;
-    }
 
     if (sqlite3_prepare_v2 (
             db,
@@ -1443,7 +1388,7 @@ atm_retrieval_lookup_dataset_rows (
 
         record->evidence_kind = g_strdup ("dataset_row");
         record->match_kind = ATM_EVIDENCE_MATCH_TABULAR;
-        apply_snapshot_provenance (record, &provenance);
+        apply_snapshot_provenance (record, provenance);
         record->evidence_id = sqlite3_column_int64 (
             statement,
             0
@@ -1512,7 +1457,7 @@ atm_retrieval_lookup_dataset_rows (
 
 out:
     g_clear_pointer (&results, g_ptr_array_unref);
-    snapshot_provenance_clear (&provenance);
+    
 
     if (role_statement != NULL) {
         sqlite3_finalize (role_statement);
@@ -1522,9 +1467,136 @@ out:
         sqlite3_finalize (statement);
     }
 
-    if (db != NULL) {
-        sqlite3_close (db);
-    }
 
     return ok;
+}
+
+
+gboolean
+atm_retrieval_lookup_exact (
+    const char *index_path,
+    const char *identifier,
+    guint max_results,
+    GPtrArray **out_results,
+    GError **error
+)
+{
+    AtmRetrievalQuerySession *session;
+    gboolean ok;
+    gsize length;
+
+    g_return_val_if_fail (index_path != NULL, FALSE);
+    g_return_val_if_fail (identifier != NULL, FALSE);
+    g_return_val_if_fail (out_results != NULL, FALSE);
+    g_return_val_if_fail (*out_results == NULL, FALSE);
+
+    length = strlen (identifier);
+    if (length == 0 ||
+        length > ATM_RETRIEVAL_MAX_IDENTIFIER_BYTES ||
+        max_results == 0 ||
+        max_results > ATM_RETRIEVAL_MAX_EXACT_RESULTS ||
+        !g_utf8_validate (identifier, length, NULL)) {
+        g_set_error_literal (error, ATM_RETRIEVAL_QUERY_ERROR,
+            ATM_RETRIEVAL_QUERY_ERROR_ARGUMENT,
+            "Exact retrieval arguments are invalid.");
+        return FALSE;
+    }
+
+    session = atm_retrieval_query_session_open (index_path, error);
+    if (session == NULL) return FALSE;
+    ok = atm_retrieval_query_session_lookup_exact (
+        session, identifier, max_results, out_results, error
+    );
+    atm_retrieval_query_session_close (session);
+    return ok;
+}
+
+gboolean
+atm_retrieval_search_fts (
+    const char *index_path,
+    const char *query,
+    guint max_results,
+    GPtrArray **out_results,
+    GError **error
+)
+{
+    AtmRetrievalQuerySession *session;
+    char *validated_query;
+    gboolean ok;
+
+    g_return_val_if_fail (index_path != NULL, FALSE);
+    g_return_val_if_fail (query != NULL, FALSE);
+    g_return_val_if_fail (out_results != NULL, FALSE);
+    g_return_val_if_fail (*out_results == NULL, FALSE);
+
+    if (max_results == 0 || max_results > ATM_RETRIEVAL_MAX_EXACT_RESULTS) {
+        g_set_error_literal (error, ATM_RETRIEVAL_QUERY_ERROR,
+            ATM_RETRIEVAL_QUERY_ERROR_ARGUMENT, "FTS result limit is invalid.");
+        return FALSE;
+    }
+
+    validated_query = safe_fts_query (query, error);
+    if (validated_query == NULL) return FALSE;
+    g_free (validated_query);
+
+    session = atm_retrieval_query_session_open (index_path, error);
+    if (session == NULL) return FALSE;
+    ok = atm_retrieval_query_session_search_fts (
+        session, query, max_results, out_results, error
+    );
+    atm_retrieval_query_session_close (session);
+    return ok;
+}
+
+gboolean
+atm_retrieval_lookup_dataset_rows (
+    const char *index_path,
+    const char *dataset_identifier,
+    const char *row_key,
+    guint max_results,
+    GPtrArray **out_results,
+    GError **error
+)
+{
+    AtmRetrievalQuerySession *session;
+    gsize length;
+
+    g_return_val_if_fail (index_path != NULL, FALSE);
+    g_return_val_if_fail (row_key != NULL, FALSE);
+    g_return_val_if_fail (out_results != NULL, FALSE);
+    g_return_val_if_fail (*out_results == NULL, FALSE);
+
+    length = strlen (row_key);
+    if (length == 0 ||
+        length > ATM_RETRIEVAL_MAX_IDENTIFIER_BYTES ||
+        !g_utf8_validate (row_key, length, NULL) ||
+        max_results == 0 ||
+        max_results > ATM_RETRIEVAL_MAX_EXACT_RESULTS) {
+        g_set_error_literal (error, ATM_RETRIEVAL_QUERY_ERROR,
+            ATM_RETRIEVAL_QUERY_ERROR_ARGUMENT,
+            "Tabular row lookup arguments are invalid.");
+        return FALSE;
+    }
+
+    if (dataset_identifier != NULL) {
+        gsize dataset_length = strlen (dataset_identifier);
+        if (dataset_length == 0 ||
+            dataset_length > ATM_RETRIEVAL_MAX_IDENTIFIER_BYTES ||
+            !g_utf8_validate (dataset_identifier, dataset_length, NULL)) {
+            g_set_error_literal (error, ATM_RETRIEVAL_QUERY_ERROR,
+                ATM_RETRIEVAL_QUERY_ERROR_ARGUMENT,
+                "Dataset identifier is invalid.");
+            return FALSE;
+        }
+    }
+
+    session = atm_retrieval_query_session_open (index_path, error);
+    if (session == NULL) return FALSE;
+    {
+        gboolean ok = atm_retrieval_query_session_lookup_dataset_rows (
+            session, dataset_identifier, row_key, max_results, out_results, error
+        );
+        atm_retrieval_query_session_close (session);
+        return ok;
+    }
 }

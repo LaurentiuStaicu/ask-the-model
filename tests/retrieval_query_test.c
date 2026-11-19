@@ -1097,6 +1097,53 @@ test_semantic_metadata_consistent_across_routes (void)
     g_free (cache_root);
 }
 
+
+static void
+test_query_session_reuses_validated_snapshot (void)
+{
+    char *snapshot_root = new_snapshot ();
+    char *cache_root = new_temp_root ("atm-query-session-cache-XXXXXX");
+    char *index_path = build_index (snapshot_root, cache_root);
+    AtmRetrievalQuerySession *session = NULL;
+    GPtrArray *exact = NULL;
+    GPtrArray *lexical = NULL;
+    GPtrArray *tabular = NULL;
+    GError *error = NULL;
+
+    session = atm_retrieval_query_session_open (index_path, &error);
+    g_assert_no_error (error);
+    g_assert_nonnull (session);
+
+    g_assert_true (atm_retrieval_query_session_lookup_exact (
+        session, "food_per_capita", 10, &exact, &error
+    ));
+    g_assert_no_error (error);
+    g_assert_cmpuint (exact->len, ==, 1);
+
+    g_assert_true (atm_retrieval_query_session_search_fts (
+        session, "food_per_capita", 10, &lexical, &error
+    ));
+    g_assert_no_error (error);
+    g_assert_cmpuint (lexical->len, >, 0);
+
+    g_assert_true (atm_retrieval_query_session_lookup_dataset_rows (
+        session, NULL, "2025", 10, &tabular, &error
+    ));
+    g_assert_no_error (error);
+    g_assert_cmpuint (tabular->len, ==, 1);
+
+    g_ptr_array_unref (tabular);
+    g_ptr_array_unref (lexical);
+    g_ptr_array_unref (exact);
+    atm_retrieval_query_session_close (session);
+
+    g_free (index_path);
+    remove_tree_best_effort (snapshot_root);
+    g_free (snapshot_root);
+    remove_tree_best_effort (cache_root);
+    g_free (cache_root);
+}
+
 static void
 test_invalid_arguments_rejected (void)
 {
@@ -1425,6 +1472,10 @@ main (int argc, char **argv)
     g_test_add_func (
         "/retrieval-query/semantic-metadata-consistent",
         test_semantic_metadata_consistent_across_routes
+    );
+    g_test_add_func (
+        "/retrieval-query/session-reuses-validated-snapshot",
+        test_query_session_reuses_validated_snapshot
     );
     g_test_add_func (
         "/retrieval-query/fts-canonical-consistency-all-routes",
