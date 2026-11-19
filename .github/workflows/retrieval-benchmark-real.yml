@@ -463,8 +463,6 @@ jobs:
         if: github.event_name == 'pull_request'
         shell: bash
         env:
-          ATM_RETRIEVAL_VALIDATOR_TIMING: '1'
-          ATM_RETRIEVAL_VALIDATOR_EXPLAIN: '1'
           BASELINE_SHA: ${{ github.event.pull_request.base.sha }}
           CANDIDATE_SHA: ${{ github.event.pull_request.head.sha }}
         run: |
@@ -509,6 +507,25 @@ jobs:
             --candidate-revision "$CANDIDATE_SHA" \
             --samples 5 \
             --output /tmp/atm-r5-main-vs-pr-comparison.json
+
+      - name: Measure candidate FTS validator costs (diagnostic only)
+        if: github.event_name == 'pull_request'
+        shell: bash
+        env:
+          ATM_RETRIEVAL_VALIDATOR_TIMING: '1'
+          ATM_RETRIEVAL_VALIDATOR_EXPLAIN: '1'
+        run: |
+          set -euo pipefail
+
+          /tmp/atm-retrieval-benchmark-runner \
+            benchmarks/retrieval-v1/benchmark.json \
+            /tmp/atm-r5-validator-diagnostic-run.json \
+            "validator-diagnostic-${GITHUB_RUN_ID}-${GITHUB_RUN_ATTEMPT}" \
+            production
+
+          python3 -m json.tool \
+            /tmp/atm-r5-validator-diagnostic-run.json \
+            >/dev/null
 
       - name: Assemble D0 control-relative sweep artifact
         shell: bash
@@ -571,5 +588,6 @@ jobs:
             /tmp/atm-retrieval-candidate-*-evaluation.json
             /tmp/atm-retrieval-policy-sweep-summary.json
             /tmp/atm-r5-main-vs-pr-comparison.json
+            /tmp/atm-r5-validator-diagnostic-run.json
           if-no-files-found: warn
           retention-days: 14
