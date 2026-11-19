@@ -1352,9 +1352,24 @@ test_fts_to_canonical_left_join_alternative_is_equivalent (void)
         { "null evidence id",
           "UPDATE search_fts SET evidence_id=NULL WHERE rowid=("
           "SELECT rowid FROM search_fts WHERE evidence_kind='section' LIMIT 1);" },
+        { "missing integer evidence id",
+          "UPDATE search_fts SET evidence_id=9223372036854775807 WHERE rowid=("
+          "SELECT rowid FROM search_fts WHERE evidence_kind='section' LIMIT 1);" },
+        { "null evidence kind",
+          "UPDATE search_fts SET evidence_kind=NULL WHERE rowid=("
+          "SELECT rowid FROM search_fts WHERE evidence_kind='section' LIMIT 1);" },
         { "unknown evidence kind",
           "UPDATE search_fts SET evidence_kind='unknown' WHERE rowid=("
           "SELECT rowid FROM search_fts WHERE evidence_kind='section' LIMIT 1);" },
+        { "null logical source",
+          "UPDATE search_fts SET logical_source_id=NULL WHERE rowid=("
+          "SELECT rowid FROM search_fts WHERE evidence_kind='section' LIMIT 1);" },
+        { "dataset row logical source",
+          "UPDATE search_fts SET logical_source_id='tampered' WHERE rowid=("
+          "SELECT rowid FROM search_fts WHERE evidence_kind='dataset_row' LIMIT 1);" },
+        { "dataset row title",
+          "UPDATE search_fts SET title='tampered' WHERE rowid=("
+          "SELECT rowid FROM search_fts WHERE evidence_kind='dataset_row' LIMIT 1);" },
         { "dataset row body",
           "UPDATE search_fts SET body='tampered' WHERE rowid=("
           "SELECT rowid FROM search_fts WHERE evidence_kind='dataset_row' LIMIT 1);" }
