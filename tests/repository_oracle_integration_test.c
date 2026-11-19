@@ -824,6 +824,32 @@ test_production_ready_then_perturbed (void)
     assert_oracle (FALSE, oracle_path, data_root, cache_root, state_root);
 
     /*
+     * Restore the canonical reference before testing its storage class.
+     * Fault 5 deliberately leaves the altered reference in place.
+     */
+    g_assert_cmpint (
+        sqlite3_open_v2 (
+            index_path, &fts_db, SQLITE_OPEN_READWRITE, NULL
+        ),
+        ==, SQLITE_OK
+    );
+    g_assert_cmpint (
+        sqlite3_exec (
+            fts_db,
+            "UPDATE search_fts SET evidence_id=CAST(("
+            "SELECT id FROM document_sections ORDER BY id LIMIT 1"
+            ") AS TEXT) WHERE rowid=("
+            "SELECT rowid FROM search_fts WHERE evidence_kind='section' "
+            "ORDER BY rowid LIMIT 1);",
+            NULL, NULL, NULL
+        ),
+        ==, SQLITE_OK
+    );
+    g_assert_cmpint (sqlite3_changes (fts_db), ==, 1);
+    g_assert_cmpint (sqlite3_close (fts_db), ==, SQLITE_OK);
+    assert_oracle (TRUE, oracle_path, data_root, cache_root, state_root);
+
+    /*
      * Fault 6: preserve the evidence_id bytes but change its SQLite storage
      * class from TEXT to BLOB.  The independent oracle must reject this
      * instead of normalizing x'31' to the canonical identifier "1".
