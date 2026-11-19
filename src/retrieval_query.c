@@ -243,8 +243,7 @@ atm_retrieval_query_session_open (
             session->db,
             "PRAGMA trusted_schema = OFF;"
             "PRAGMA query_only = ON;"
-            "PRAGMA foreign_keys = ON;"
-            "BEGIN;",
+            "PRAGMA foreign_keys = ON;",
             NULL,
             NULL,
             NULL
@@ -260,17 +259,63 @@ atm_retrieval_query_session_open (
         return NULL;
     }
 
+    if (!atm_retrieval_query_session_refresh (session, error)) {
+        atm_retrieval_query_session_close (session);
+        return NULL;
+    }
+
+    return session;
+}
+
+gboolean
+atm_retrieval_query_session_refresh (
+    AtmRetrievalQuerySession *session,
+    GError **error
+)
+{
+    g_return_val_if_fail (session != NULL, FALSE);
+
+    if (!sqlite3_get_autocommit (session->db) &&
+        sqlite3_exec (
+            session->db, "ROLLBACK;", NULL, NULL, NULL
+        ) != SQLITE_OK) {
+        g_set_error (
+            error,
+            ATM_RETRIEVAL_QUERY_ERROR,
+            ATM_RETRIEVAL_QUERY_ERROR_SQLITE,
+            "Could not end previous retrieval read transaction: %s",
+            sqlite3_errmsg (session->db)
+        );
+        return FALSE;
+    }
+
+    snapshot_provenance_clear (&session->provenance);
+
+    if (sqlite3_exec (
+            session->db, "BEGIN;", NULL, NULL, NULL
+        ) != SQLITE_OK) {
+        g_set_error (
+            error,
+            ATM_RETRIEVAL_QUERY_ERROR,
+            ATM_RETRIEVAL_QUERY_ERROR_SQLITE,
+            "Could not begin fresh retrieval read transaction: %s",
+            sqlite3_errmsg (session->db)
+        );
+        return FALSE;
+    }
+
     if (!load_snapshot_provenance (
             session->db,
             &session->provenance,
             error
         ) ||
         !validate_query_fts_consistency (session->db, error)) {
-        atm_retrieval_query_session_close (session);
-        return NULL;
+        sqlite3_exec (session->db, "ROLLBACK;", NULL, NULL, NULL);
+        snapshot_provenance_clear (&session->provenance);
+        return FALSE;
     }
 
-    return session;
+    return TRUE;
 }
 
 void

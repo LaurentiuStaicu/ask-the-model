@@ -60,6 +60,12 @@ AtmRetrievalQuerySession *atm_retrieval_query_session_open (
 void atm_retrieval_query_session_close (
     AtmRetrievalQuerySession *session
 );
+/* Starts a fresh read transaction and repeats snapshot and FTS validation
+ * on the existing read-only SQLite connection. */
+gboolean atm_retrieval_query_session_refresh (
+    AtmRetrievalQuerySession *session,
+    GError **error
+);
 gboolean atm_retrieval_query_session_lookup_exact (
     AtmRetrievalQuerySession *session,
     const char *identifier,

@@ -555,11 +555,16 @@ jobs:
           benchmark_path = "benchmarks/retrieval-v1/benchmark.json"
           log_path = "/tmp/atm-r5-session-reuse-probe.log"
           output_path = "/tmp/atm-r5-session-reuse-summary.json"
-          pattern = re.compile(
+          reuse_pattern = re.compile(
               r"ATM_RETRIEVAL_VALIDATOR_REUSE_PROBE "
               r"repository=(\S+) iterations=(\d+) "
               r"reopen_total_us=(\d+) reuse_total_us=(\d+) "
               r"reopen_per_call_us=([0-9.]+) reuse_per_call_us=([0-9.]+)"
+          )
+          fresh_txn_pattern = re.compile(
+              r"ATM_RETRIEVAL_VALIDATOR_FRESH_TXN_PROBE "
+              r"repository=(\S+) iterations=(\d+) "
+              r"fresh_txn_total_us=(\d+) fresh_txn_per_call_us=([0-9.]+)"
           )
 
           with open(benchmark_path, encoding="utf-8") as handle:
@@ -567,48 +572,93 @@ jobs:
           expected = {item["repository_id"] for item in benchmark["corpus"]}
 
           with open(log_path, encoding="utf-8") as handle:
-              matches = [pattern.fullmatch(line.strip()) for line in handle]
+              lines = [line.strip() for line in handle]
 
-          records = []
-          for match in matches:
-              if match is None:
+          upper_bound_records = []
+          fresh_transaction_records = []
+          for line in lines:
+              match = reuse_pattern.fullmatch(line)
+              if match is not None:
+                  repository, iterations, reopen_total, reuse_total, reopen_avg, reuse_avg = match.groups()
+                  iterations = int(iterations)
+                  reopen_total = int(reopen_total)
+                  reuse_total = int(reuse_total)
+                  if iterations != 25 or reopen_total <= 0 or reuse_total <= 0:
+                      raise SystemExit(f"Invalid upper-bound measurement for {repository}")
+                  upper_bound_records.append({
+                      "repository_id": repository,
+                      "iterations": iterations,
+                      "reopen_total_us": reopen_total,
+                      "reuse_total_us": reuse_total,
+                      "reopen_per_call_us": float(reopen_avg),
+                      "reuse_per_call_us": float(reuse_avg),
+                      "speedup_ratio": round(reopen_total / reuse_total, 4),
+                      "time_reduction_percent": round(
+                          (1 - reuse_total / reopen_total) * 100, 2
+                      ),
+                  })
                   continue
-              repository, iterations, reopen_total, reuse_total, reopen_avg, reuse_avg = match.groups()
-              iterations = int(iterations)
-              reopen_total = int(reopen_total)
-              reuse_total = int(reuse_total)
-              if iterations != 25 or reopen_total <= 0 or reuse_total <= 0:
-                  raise SystemExit(f"Invalid measurement for {repository}")
-              records.append({
-                  "repository_id": repository,
-                  "iterations": iterations,
-                  "reopen_total_us": reopen_total,
-                  "reuse_total_us": reuse_total,
-                  "reopen_per_call_us": float(reopen_avg),
-                  "reuse_per_call_us": float(reuse_avg),
-                  "speedup_ratio": round(reopen_total / reuse_total, 4),
-                  "time_reduction_percent": round(
-                      (1 - reuse_total / reopen_total) * 100, 2
-                  ),
-              })
 
-          observed = {item["repository_id"] for item in records}
-          if len(records) != len(expected) or observed != expected:
-              raise SystemExit(
-                  f"Expected one complete measurement for each repository "
-                  f"{sorted(expected)}, observed {sorted(observed)}"
-              )
+              match = fresh_txn_pattern.fullmatch(line)
+              if match is not None:
+                  repository, iterations, fresh_total, fresh_avg = match.groups()
+                  iterations = int(iterations)
+                  fresh_total = int(fresh_total)
+                  if iterations != 25 or fresh_total <= 0:
+                      raise SystemExit(f"Invalid fresh-transaction measurement for {repository}")
+                  fresh_transaction_records.append({
+                      "repository_id": repository,
+                      "iterations": iterations,
+                      "fresh_transaction_total_us": fresh_total,
+                      "fresh_transaction_per_call_us": float(fresh_avg),
+                  })
+
+          for label, records in (
+              ("upper-bound", upper_bound_records),
+              ("persistent-fresh-transaction", fresh_transaction_records),
+          ):
+              observed = [item["repository_id"] for item in records]
+              if len(records) != len(expected) or set(observed) != expected or len(set(observed)) != len(observed):
+                  raise SystemExit(
+                      f"Expected exactly one {label} measurement for each repository "
+                      f"{sorted(expected)}, observed {sorted(observed)}"
+                  )
 
           summary = {
-              "schema_version": 1,
-              "experiment": "validated-session-reuse-upper-bound",
+              "schema_version": 2,
+              "experiment": "validated-session-reuse-transaction-boundary",
               "iterations_per_repository_per_variant": 25,
-              "measurement_scope": (
-                  "fresh validated session per call versus one persistent "
-                  "read-only session with a single open read transaction"
-              ),
+              "variants": {
+                  "fresh_session_per_call": {
+                      "description": "open read-only connection, begin transaction, validate, search, close",
+                      "measurements": [
+                          {
+                              "repository_id": item["repository_id"],
+                              "iterations": item["iterations"],
+                              "total_us": item["reopen_total_us"],
+                              "per_call_us": item["reopen_per_call_us"],
+                          }
+                          for item in upper_bound_records
+                      ],
+                  },
+                  "persistent_session_single_transaction": {
+                      "description": "one validated read-only connection and one read transaction across all searches; diagnostic upper bound only",
+                      "measurements": [
+                          {
+                              "repository_id": item["repository_id"],
+                              "iterations": item["iterations"],
+                              "total_us": item["reuse_total_us"],
+                              "per_call_us": item["reuse_per_call_us"],
+                          }
+                          for item in upper_bound_records
+                      ],
+                  },
+                  "persistent_session_fresh_transaction": {
+                      "description": "one read-only connection; rollback and begin a fresh transaction, reload provenance, fully validate, then search for each request",
+                      "measurements": fresh_transaction_records,
+                  },
+              },
               "production_cache_safety_proven": False,
-              "repositories": records,
           }
           with open(output_path, "w", encoding="utf-8") as handle:
               json.dump(summary, handle, indent=2)
