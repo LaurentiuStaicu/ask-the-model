@@ -557,8 +557,8 @@ jobs:
           output_path = "/tmp/atm-r5-session-reuse-summary.json"
           pattern = re.compile(
               r"ATM_RETRIEVAL_VALIDATOR_REUSE_PROBE "
-              r"repository=(\\S+) iterations=(\\d+) "
-              r"reopen_total_us=(\\d+) reuse_total_us=(\\d+) "
+              r"repository=(\S+) iterations=(\d+) "
+              r"reopen_total_us=(\d+) reuse_total_us=(\d+) "
               r"reopen_per_call_us=([0-9.]+) reuse_per_call_us=([0-9.]+)"
           )
 
@@ -612,7 +612,7 @@ jobs:
           }
           with open(output_path, "w", encoding="utf-8") as handle:
               json.dump(summary, handle, indent=2)
-              handle.write("\\n")
+              handle.write("\n")
           print(json.dumps(summary, indent=2))
           PY
 
