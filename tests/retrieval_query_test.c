@@ -1372,6 +1372,11 @@ test_fts_to_canonical_left_join_alternative_is_equivalent (void)
     g_assert_false (fts_to_canonical_query_reports_mismatch (db, production_sql));
     g_assert_false (fts_to_canonical_query_reports_mismatch (db, left_join_sql));
     g_assert_cmpint (sqlite3_close (db), ==, SQLITE_OK);
+    g_free (index_path);
+    remove_tree_best_effort (snapshot_root);
+    g_free (snapshot_root);
+    remove_tree_best_effort (cache_root);
+    g_free (cache_root);
 
     for (gsize i = 0; i < G_N_ELEMENTS (corruptions); i++) {
         snapshot_root = new_snapshot ();
