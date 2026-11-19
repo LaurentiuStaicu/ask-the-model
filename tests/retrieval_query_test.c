@@ -1242,6 +1242,171 @@ test_fts_canonical_consistency_precedes_all_routes (void)
     g_free (cache_root);
 }
 
+/*
+ * Compare the production NOT EXISTS predicate with the diagnostic LEFT JOIN
+ * alternative on both valid and deliberately corrupted FTS populations.
+ * This qualifies only the FTS-to-canonical pass; duplicate detection and
+ * reverse-coverage checks remain separate proof obligations.
+ */
+static gboolean
+fts_to_canonical_query_reports_mismatch (sqlite3 *db, const char *sql)
+{
+    sqlite3_stmt *statement = NULL;
+    int rc = sqlite3_prepare_v2 (db, sql, -1, &statement, NULL);
+    g_assert_cmpint (rc, ==, SQLITE_OK);
+
+    rc = sqlite3_step (statement);
+    gboolean mismatch = rc == SQLITE_ROW;
+    g_assert_true (rc == SQLITE_ROW || rc == SQLITE_DONE);
+    sqlite3_finalize (statement);
+    return mismatch;
+}
+
+static void
+test_fts_to_canonical_left_join_alternative_is_equivalent (void)
+{
+    static const char *production_sql =
+        "SELECT 1 FROM search_fts f WHERE "
+        "f.evidence_kind IS NULL OR f.evidence_id IS NULL OR "
+        "typeof(f.evidence_id) <> 'integer' OR "
+        "f.logical_source_id IS NULL OR "
+        "(f.evidence_kind = 'section' AND NOT EXISTS ("
+        "SELECT 1 FROM document_sections d WHERE "
+        "d.id = f.evidence_id "
+        "AND d.logical_source_id IS f.logical_source_id "
+        "AND d.title IS f.title AND d.body IS f.body)) OR "
+        "(f.evidence_kind = 'entity' AND NOT EXISTS ("
+        "SELECT 1 FROM structured_entities e WHERE "
+        "e.id = f.evidence_id "
+        "AND e.logical_source_id IS f.logical_source_id "
+        "AND COALESCE(e.label, e.native_id) IS f.title "
+        "AND e.payload_json IS f.body)) OR "
+        "(f.evidence_kind = 'relation' AND NOT EXISTS ("
+        "SELECT 1 FROM structured_relations r WHERE "
+        "r.id = f.evidence_id "
+        "AND r.logical_source_id IS f.logical_source_id "
+        "AND COALESCE(r.native_id, r.relation_type) IS f.title "
+        "AND r.payload_json IS f.body)) OR "
+        "(f.evidence_kind = 'dataset_row' AND NOT EXISTS ("
+        "SELECT 1 FROM dataset_rows r "
+        "JOIN datasets d ON d.id = r.dataset_id "
+        "JOIN source_files s ON s.id = d.source_id "
+        "JOIN snapshot_metadata m ON m.id = 1 "
+        "WHERE r.id = f.evidence_id "
+        "AND printf('%s:dataset-row:%s:%d', m.repository_id, s.path, r.ordinal) "
+        "IS f.logical_source_id AND s.path IS f.title "
+        "AND r.search_text IS f.body)) OR "
+        "f.evidence_kind NOT IN ('section','entity','relation','dataset_row');";
+    static const char *left_join_sql =
+        "SELECT 1 FROM search_fts f "
+        "LEFT JOIN dataset_rows dr ON "
+        "f.evidence_kind = 'dataset_row' AND dr.id = f.evidence_id "
+        "LEFT JOIN datasets dd ON dd.id = dr.dataset_id "
+        "LEFT JOIN source_files ds ON ds.id = dd.source_id "
+        "LEFT JOIN snapshot_metadata dm ON dm.id = 1 "
+        "WHERE f.evidence_kind IS NULL OR f.evidence_id IS NULL OR "
+        "typeof(f.evidence_id) <> 'integer' OR "
+        "f.logical_source_id IS NULL OR "
+        "(f.evidence_kind = 'section' AND NOT EXISTS ("
+        "SELECT 1 FROM document_sections d WHERE "
+        "d.id = f.evidence_id "
+        "AND d.logical_source_id IS f.logical_source_id "
+        "AND d.title IS f.title AND d.body IS f.body)) OR "
+        "(f.evidence_kind = 'entity' AND NOT EXISTS ("
+        "SELECT 1 FROM structured_entities e WHERE "
+        "e.id = f.evidence_id "
+        "AND e.logical_source_id IS f.logical_source_id "
+        "AND COALESCE(e.label, e.native_id) IS f.title "
+        "AND e.payload_json IS f.body)) OR "
+        "(f.evidence_kind = 'relation' AND NOT EXISTS ("
+        "SELECT 1 FROM structured_relations r WHERE "
+        "r.id = f.evidence_id "
+        "AND r.logical_source_id IS f.logical_source_id "
+        "AND COALESCE(r.native_id, r.relation_type) IS f.title "
+        "AND r.payload_json IS f.body)) OR "
+        "(f.evidence_kind = 'dataset_row' AND ("
+        "dr.id IS NULL OR dd.id IS NULL OR ds.id IS NULL OR dm.id IS NULL OR "
+        "printf('%s:dataset-row:%s:%d', dm.repository_id, ds.path, dr.ordinal) "
+        "IS NOT f.logical_source_id OR ds.path IS NOT f.title OR "
+        "dr.search_text IS NOT f.body)) OR "
+        "f.evidence_kind NOT IN ('section','entity','relation','dataset_row');";
+    static const struct {
+        const char *name;
+        const char *sql;
+    } corruptions[] = {
+        { "section logical source", 
+          "UPDATE search_fts SET logical_source_id='tampered' WHERE rowid=("
+          "SELECT rowid FROM search_fts WHERE evidence_kind='section' LIMIT 1);" },
+        { "section title",
+          "UPDATE search_fts SET title='tampered' WHERE rowid=("
+          "SELECT rowid FROM search_fts WHERE evidence_kind='section' LIMIT 1);" },
+        { "section body",
+          "UPDATE search_fts SET body='tampered' WHERE rowid=("
+          "SELECT rowid FROM search_fts WHERE evidence_kind='section' LIMIT 1);" },
+        { "text evidence id",
+          "UPDATE search_fts SET evidence_id='-1' WHERE rowid=("
+          "SELECT rowid FROM search_fts WHERE evidence_kind='section' LIMIT 1);" },
+        { "blob evidence id",
+          "UPDATE search_fts SET evidence_id=CAST(x'31' AS BLOB) WHERE rowid=("
+          "SELECT rowid FROM search_fts WHERE evidence_kind='section' LIMIT 1);" },
+        { "null evidence id",
+          "UPDATE search_fts SET evidence_id=NULL WHERE rowid=("
+          "SELECT rowid FROM search_fts WHERE evidence_kind='section' LIMIT 1);" },
+        { "unknown evidence kind",
+          "UPDATE search_fts SET evidence_kind='unknown' WHERE rowid=("
+          "SELECT rowid FROM search_fts WHERE evidence_kind='section' LIMIT 1);" },
+        { "dataset row body",
+          "UPDATE search_fts SET body='tampered' WHERE rowid=("
+          "SELECT rowid FROM search_fts WHERE evidence_kind='dataset_row' LIMIT 1);" }
+    };
+
+    char *snapshot_root = new_snapshot ();
+    char *cache_root = new_temp_root ("atm-fts-left-join-equivalence-XXXXXX");
+    char *index_path = build_index (snapshot_root, cache_root);
+    sqlite3 *db = NULL;
+
+    g_assert_cmpint (
+        sqlite3_open_v2 (index_path, &db, SQLITE_OPEN_READWRITE, NULL),
+        ==, SQLITE_OK
+    );
+    g_assert_false (fts_to_canonical_query_reports_mismatch (db, production_sql));
+    g_assert_false (fts_to_canonical_query_reports_mismatch (db, left_join_sql));
+    g_assert_cmpint (sqlite3_close (db), ==, SQLITE_OK);
+
+    for (gsize i = 0; i < G_N_ELEMENTS (corruptions); i++) {
+        snapshot_root = new_snapshot ();
+        cache_root = new_temp_root ("atm-fts-left-join-case-XXXXXX");
+        index_path = build_index (snapshot_root, cache_root);
+        db = NULL;
+        g_assert_cmpint (
+            sqlite3_open_v2 (index_path, &db, SQLITE_OPEN_READWRITE, NULL),
+            ==, SQLITE_OK
+        );
+        g_assert_cmpint (
+            sqlite3_exec (db, corruptions[i].sql, NULL, NULL, NULL),
+            ==, SQLITE_OK
+        );
+        g_assert_cmpint (sqlite3_changes (db), ==, 1);
+
+        g_test_message ("Comparing validator predicates for %s", corruptions[i].name);
+        g_assert_true (fts_to_canonical_query_reports_mismatch (db, production_sql));
+        g_assert_true (fts_to_canonical_query_reports_mismatch (db, left_join_sql));
+
+        g_assert_cmpint (sqlite3_close (db), ==, SQLITE_OK);
+        g_free (index_path);
+        remove_tree_best_effort (snapshot_root);
+        g_free (snapshot_root);
+        remove_tree_best_effort (cache_root);
+        g_free (cache_root);
+    }
+
+    g_free (index_path);
+    remove_tree_best_effort (snapshot_root);
+    g_free (snapshot_root);
+    remove_tree_best_effort (cache_root);
+    g_free (cache_root);
+}
+
 static void
 test_fts_canonical_metadata_mismatch_is_rejected_by_all_routes (void)
 {
@@ -1767,6 +1932,10 @@ main (int argc, char **argv)
     g_test_add_func (
         "/retrieval-query/fts-canonical-consistency-all-routes",
         test_fts_canonical_consistency_precedes_all_routes
+    );
+    g_test_add_func (
+        "/retrieval-query/fts-to-canonical-left-join-equivalence",
+        test_fts_to_canonical_left_join_alternative_is_equivalent
     );
     g_test_add_func (
         "/retrieval-query/fts-canonical-metadata-mismatch-all-routes",
