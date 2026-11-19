@@ -516,7 +516,6 @@ jobs:
           ATM_RETRIEVAL_VALIDATOR_EXPLAIN: '1'
           ATM_RETRIEVAL_VALIDATOR_BRANCH_TIMING: '1'
           ATM_RETRIEVAL_VALIDATOR_DISTINCT_TIMING: '1'
-          ATM_RETRIEVAL_VALIDATOR_REUSE_PROBE: '1'
         run: |
           set -euo pipefail
 
@@ -528,6 +527,24 @@ jobs:
 
           python3 -m json.tool \
             /tmp/atm-r5-validator-diagnostic-run.json \
+            >/dev/null
+
+      - name: Measure session reuse upper bound (diagnostic only)
+        if: github.event_name == 'pull_request'
+        shell: bash
+        env:
+          ATM_RETRIEVAL_VALIDATOR_REUSE_PROBE: '1'
+        run: |
+          set -euo pipefail
+
+          /tmp/atm-retrieval-benchmark-runner \
+            benchmarks/retrieval-v1/benchmark.json \
+            /tmp/atm-r5-session-reuse-probe-run.json \
+            "session-reuse-probe-${GITHUB_RUN_ID}-${GITHUB_RUN_ATTEMPT}" \
+            production
+
+          python3 -m json.tool \
+            /tmp/atm-r5-session-reuse-probe-run.json \
             >/dev/null
 
       - name: Assemble D0 control-relative sweep artifact
