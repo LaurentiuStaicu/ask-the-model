@@ -1420,6 +1420,126 @@ run_validator_branch_diagnostics (
             );
         }
 
+        /*
+         * Diagnostic-only alternative: materialize the canonical dataset-row
+         * projection once, then compare the FTS population against it. This is
+         * intentionally benchmark-only; production validation is unchanged.
+         */
+        static const char *materialized_dataset_sql =
+            "WITH canonical_dataset_rows AS MATERIALIZED ("
+            "SELECT r.id, CAST(r.id AS TEXT) AS id_text, "
+            "printf('%s:dataset-row:%s:%d',m.repository_id,s.path,r.ordinal) "
+            "AS logical_source_id, s.path AS title, r.search_text AS body "
+            "FROM dataset_rows r JOIN datasets d ON d.id=r.dataset_id "
+            "JOIN source_files s ON s.id=d.source_id "
+            "JOIN snapshot_metadata m ON m.id=1) "
+            "SELECT 1 FROM search_fts f "
+            "LEFT JOIN canonical_dataset_rows c "
+            "ON c.id=f.evidence_id AND c.id_text=CAST(f.evidence_id AS TEXT) "
+            "WHERE f.evidence_kind='dataset_row' AND "
+            "(f.evidence_id IS NULL OR f.logical_source_id IS NULL OR "
+            "c.id IS NULL OR c.logical_source_id IS NOT f.logical_source_id OR "
+            "c.title IS NOT f.title OR c.body IS NOT f.body) LIMIT 1;";
+
+        if (sqlite3_libversion_number () < 3035000) {
+            g_print (
+                "ATM_RETRIEVAL_VALIDATOR_CANDIDATE repo=%s kind=dataset_row "
+                "status=skipped sqlite=%s requires>=3.35.0\\n",
+                repository->repository_id, sqlite3_libversion ()
+            );
+        } else {
+            sqlite3_stmt *candidate = NULL;
+            rc = sqlite3_prepare_v2 (
+                db, materialized_dataset_sql, -1, &candidate, NULL
+            );
+            if (rc != SQLITE_OK) {
+                g_set_error (
+                    error, G_IO_ERROR, G_IO_ERROR_FAILED,
+                    "Could not prepare materialized dataset-row candidate in %s: %s",
+                    repository->repository_id, sqlite3_errmsg (db)
+                );
+                goto repository_error;
+            }
+
+            /* Print the candidate plan to make planner behavior auditable. */
+            char *explain_sql = sqlite3_mprintf (
+                "EXPLAIN QUERY PLAN %s", materialized_dataset_sql
+            );
+            sqlite3_stmt *plan = NULL;
+            rc = sqlite3_prepare_v2 (db, explain_sql, -1, &plan, NULL);
+            sqlite3_free (explain_sql);
+            if (rc != SQLITE_OK) {
+                sqlite3_finalize (candidate);
+                g_set_error (
+                    error, G_IO_ERROR, G_IO_ERROR_FAILED,
+                    "Could not prepare candidate query plan in %s: %s",
+                    repository->repository_id, sqlite3_errmsg (db)
+                );
+                goto repository_error;
+            }
+            while ((rc = sqlite3_step (plan)) == SQLITE_ROW) {
+                g_print (
+                    "ATM_RETRIEVAL_VALIDATOR_CANDIDATE_PLAN repo=%s detail=%s\\n",
+                    repository->repository_id,
+                    (const char *) sqlite3_column_text (plan, 3)
+                );
+            }
+            sqlite3_finalize (plan);
+            if (rc != SQLITE_DONE) {
+                sqlite3_finalize (candidate);
+                g_set_error (
+                    error, G_IO_ERROR, G_IO_ERROR_FAILED,
+                    "Could not read candidate query plan in %s: %s",
+                    repository->repository_id, sqlite3_errmsg (db)
+                );
+                goto repository_error;
+            }
+
+            rc = sqlite3_step (candidate);
+            if (rc != SQLITE_DONE) {
+                sqlite3_finalize (candidate);
+                g_set_error (
+                    error, G_IO_ERROR, G_IO_ERROR_INVALID_DATA,
+                    "Materialized dataset-row candidate found an inconsistent row in %s: %s",
+                    repository->repository_id, sqlite3_errmsg (db)
+                );
+                goto repository_error;
+            }
+            sqlite3_reset (candidate);
+
+            gint64 candidate_samples[9] = { 0 };
+            for (guint round = 0; round < G_N_ELEMENTS (candidate_samples); round++) {
+                gint64 started = g_get_monotonic_time ();
+                rc = sqlite3_step (candidate);
+                candidate_samples[round] = g_get_monotonic_time () - started;
+                if (rc != SQLITE_DONE) {
+                    sqlite3_finalize (candidate);
+                    g_set_error (
+                        error, G_IO_ERROR, G_IO_ERROR_INVALID_DATA,
+                        "Materialized dataset-row candidate failed during measurement in %s: %s",
+                        repository->repository_id, sqlite3_errmsg (db)
+                    );
+                    goto repository_error;
+                }
+                sqlite3_reset (candidate);
+            }
+            qsort (
+                candidate_samples, G_N_ELEMENTS (candidate_samples),
+                sizeof (candidate_samples[0]), compare_int64
+            );
+            g_print (
+                "ATM_RETRIEVAL_VALIDATOR_CANDIDATE repo=%s kind=dataset_row "
+                "rows=%" G_GUINT64_FORMAT " samples=9 min_us=%" G_GINT64_FORMAT
+                " median_us=%" G_GINT64_FORMAT " max_us=%" G_GINT64_FORMAT
+                " sqlite=%s status=equivalent-on-pinned-valid-index\\n",
+                repository->repository_id,
+                measurements[3].rows,
+                candidate_samples[0], candidate_samples[4],
+                candidate_samples[8], sqlite3_libversion ()
+            );
+            sqlite3_finalize (candidate);
+        }
+
         for (guint i = 0; i < G_N_ELEMENTS (statements); i++)
             sqlite3_finalize (statements[i]);
         sqlite3_close (db);
