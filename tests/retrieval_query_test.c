@@ -2029,6 +2029,7 @@ test_validation_file_identity_invalidates_on_mutation_and_replacement (void)
     g_ptr_array_unref (results);
 
     g_free (replacement_path);
+    g_free (replacement_source);
     g_free (index_path);
     remove_tree_best_effort (snapshot_root);
     g_free (snapshot_root);
