@@ -1196,6 +1196,82 @@ test_fts_canonical_consistency_precedes_all_routes (void)
 }
 
 static void
+test_foreign_key_violation_is_rejected_by_all_routes (void)
+{
+    char *snapshot_root = new_snapshot ();
+    char *cache_root = new_temp_root ("atm-fts-fk-cache-XXXXXX");
+    char *index_path = build_index (snapshot_root, cache_root);
+    sqlite3 *db = NULL;
+    sqlite3_stmt *statement = NULL;
+    GPtrArray *results = NULL;
+    GError *error = NULL;
+
+    g_assert_cmpint (
+        sqlite3_open_v2 (index_path, &db, SQLITE_OPEN_READWRITE, NULL),
+        ==, SQLITE_OK
+    );
+    /*
+     * Simulate an index written by a connection that had FK enforcement
+     * disabled. Re-enabling it later does not retroactively validate rows.
+     */
+    g_assert_cmpint (
+        sqlite3_exec (
+            db,
+            "PRAGMA foreign_keys=OFF;"
+            "INSERT INTO dataset_rows "
+            "(dataset_id,ordinal,row_key,locator,payload_json,search_text) "
+            "VALUES (9223372036854770000,999999,'orphan','lines:0-0','{}','orphan');",
+            NULL, NULL, NULL
+        ),
+        ==, SQLITE_OK
+    );
+    g_assert_cmpint (
+        sqlite3_exec (db, "PRAGMA foreign_keys=ON;", NULL, NULL, NULL),
+        ==, SQLITE_OK
+    );
+    g_assert_cmpint (
+        sqlite3_prepare_v2 (db, "PRAGMA foreign_key_check;", -1, &statement, NULL),
+        ==, SQLITE_OK
+    );
+    g_assert_cmpint (sqlite3_step (statement), ==, SQLITE_ROW);
+    sqlite3_finalize (statement);
+    g_assert_cmpint (sqlite3_close (db), ==, SQLITE_OK);
+
+    g_assert_false (atm_retrieval_lookup_exact (
+        index_path, "food_per_capita", 10, &results, &error
+    ));
+    g_assert_error (
+        error, ATM_RETRIEVAL_QUERY_ERROR, ATM_RETRIEVAL_QUERY_ERROR_SQLITE
+    );
+    g_assert_null (results);
+    g_clear_error (&error);
+
+    g_assert_false (atm_retrieval_search_fts (
+        index_path, "current validation boundary", 10, &results, &error
+    ));
+    g_assert_error (
+        error, ATM_RETRIEVAL_QUERY_ERROR, ATM_RETRIEVAL_QUERY_ERROR_SQLITE
+    );
+    g_assert_null (results);
+    g_clear_error (&error);
+
+    g_assert_false (atm_retrieval_lookup_dataset_rows (
+        index_path, NULL, "2025", 10, &results, &error
+    ));
+    g_assert_error (
+        error, ATM_RETRIEVAL_QUERY_ERROR, ATM_RETRIEVAL_QUERY_ERROR_SQLITE
+    );
+    g_assert_null (results);
+    g_clear_error (&error);
+
+    g_free (index_path);
+    remove_tree_best_effort (snapshot_root);
+    g_free (snapshot_root);
+    remove_tree_best_effort (cache_root);
+    g_free (cache_root);
+}
+
+static void
 test_missing_canonical_fts_row_is_rejected (void)
 {
     char *snapshot_root = new_snapshot ();
@@ -1353,6 +1429,10 @@ main (int argc, char **argv)
     g_test_add_func (
         "/retrieval-query/fts-canonical-consistency-all-routes",
         test_fts_canonical_consistency_precedes_all_routes
+    );
+    g_test_add_func (
+        "/retrieval-query/fts-foreign-key-violation-all-routes",
+        test_foreign_key_violation_is_rejected_by_all_routes
     );
     g_test_add_func (
         "/retrieval-query/fts-canonical-missing-row",
