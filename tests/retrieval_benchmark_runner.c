@@ -8,7 +8,9 @@
 #include <glib.h>
 #include <glib/gstdio.h>
 #include <json-glib/json-glib.h>
+#include <sqlite3.h>
 
+#include <stdlib.h>
 #include <string.h>
 #include <sys/stat.h>
 
@@ -1241,18 +1243,216 @@ append_topic_run (
     return TRUE;
 }
 
+
+typedef struct {
+    const char *kind;
+    const char *sql;
+    guint64 rows;
+    gint64 samples[9];
+} ValidatorBranchMeasurement;
+
+static gint
+compare_int64 (gconstpointer left, gconstpointer right)
+{
+    const gint64 a = *(const gint64 *) left;
+    const gint64 b = *(const gint64 *) right;
+    return (a > b) - (a < b);
+}
+
+static gboolean
+run_validator_branch_diagnostics (
+    GPtrArray *repositories,
+    GError **error
+)
+{
+    static const char *kinds[] = {
+        "section", "entity", "relation", "dataset_row"
+    };
+    static const char *branch_sql[] = {
+        "SELECT 1 FROM search_fts f WHERE f.evidence_kind='section' AND "
+        "(f.evidence_id IS NULL OR f.logical_source_id IS NULL OR NOT EXISTS ("
+        "SELECT 1 FROM document_sections d WHERE d.id=f.evidence_id "
+        "AND CAST(d.id AS TEXT)=CAST(f.evidence_id AS TEXT) "
+        "AND d.logical_source_id IS f.logical_source_id "
+        "AND d.title IS f.title AND d.body IS f.body)) LIMIT 1;",
+        "SELECT 1 FROM search_fts f WHERE f.evidence_kind='entity' AND "
+        "(f.evidence_id IS NULL OR f.logical_source_id IS NULL OR NOT EXISTS ("
+        "SELECT 1 FROM structured_entities e WHERE e.id=f.evidence_id "
+        "AND CAST(e.id AS TEXT)=CAST(f.evidence_id AS TEXT) "
+        "AND e.logical_source_id IS f.logical_source_id "
+        "AND COALESCE(e.label,e.native_id) IS f.title "
+        "AND e.payload_json IS f.body)) LIMIT 1;",
+        "SELECT 1 FROM search_fts f WHERE f.evidence_kind='relation' AND "
+        "(f.evidence_id IS NULL OR f.logical_source_id IS NULL OR NOT EXISTS ("
+        "SELECT 1 FROM structured_relations r WHERE r.id=f.evidence_id "
+        "AND CAST(r.id AS TEXT)=CAST(f.evidence_id AS TEXT) "
+        "AND r.logical_source_id IS f.logical_source_id "
+        "AND COALESCE(r.native_id,r.relation_type) IS f.title "
+        "AND r.payload_json IS f.body)) LIMIT 1;",
+        "SELECT 1 FROM search_fts f WHERE f.evidence_kind='dataset_row' AND "
+        "(f.evidence_id IS NULL OR f.logical_source_id IS NULL OR NOT EXISTS ("
+        "SELECT 1 FROM dataset_rows r JOIN datasets d ON d.id=r.dataset_id "
+        "JOIN source_files s ON s.id=d.source_id "
+        "JOIN snapshot_metadata m ON m.id=1 "
+        "WHERE r.id=f.evidence_id "
+        "AND CAST(r.id AS TEXT)=CAST(f.evidence_id AS TEXT) "
+        "AND printf('%s:dataset-row:%s:%d',m.repository_id,s.path,r.ordinal) "
+        "IS f.logical_source_id AND s.path IS f.title "
+        "AND r.search_text IS f.body)) LIMIT 1;"
+    };
+
+    for (guint repository_index = 0;
+         repository_index < repositories->len;
+         repository_index++) {
+        BenchmarkRepository *repository = g_ptr_array_index (
+            repositories, repository_index
+        );
+        sqlite3 *db = NULL;
+        sqlite3_stmt *statements[4] = { NULL, NULL, NULL, NULL };
+        ValidatorBranchMeasurement measurements[4] = { 0 };
+        int rc = sqlite3_open_v2 (
+            repository->index_path, &db, SQLITE_OPEN_READONLY, NULL
+        );
+
+        if (rc != SQLITE_OK) {
+            g_set_error (
+                error, G_IO_ERROR, G_IO_ERROR_FAILED,
+                "Could not open %s retrieval index for branch diagnostics: %s",
+                repository->repository_id,
+                db != NULL ? sqlite3_errmsg (db) : "unknown SQLite error"
+            );
+            if (db != NULL) sqlite3_close (db);
+            return FALSE;
+        }
+
+        for (guint i = 0; i < G_N_ELEMENTS (measurements); i++) {
+            sqlite3_stmt *count_statement = NULL;
+            char *count_sql = g_strdup_printf (
+                "SELECT count(*) FROM search_fts WHERE evidence_kind='%s';",
+                kinds[i]
+            );
+            rc = sqlite3_prepare_v2 (
+                db, count_sql, -1, &count_statement, NULL
+            );
+            g_free (count_sql);
+
+            if (rc != SQLITE_OK ||
+                sqlite3_step (count_statement) != SQLITE_ROW) {
+                g_set_error (
+                    error, G_IO_ERROR, G_IO_ERROR_FAILED,
+                    "Could not count %s FTS rows in %s: %s",
+                    kinds[i], repository->repository_id, sqlite3_errmsg (db)
+                );
+                if (count_statement != NULL) sqlite3_finalize (count_statement);
+                goto repository_error;
+            }
+
+            measurements[i].kind = kinds[i];
+            measurements[i].sql = branch_sql[i];
+            measurements[i].rows = (guint64) sqlite3_column_int64 (
+                count_statement, 0
+            );
+            sqlite3_finalize (count_statement);
+
+            rc = sqlite3_prepare_v2 (
+                db, branch_sql[i], -1, &statements[i], NULL
+            );
+            if (rc != SQLITE_OK) {
+                g_set_error (
+                    error, G_IO_ERROR, G_IO_ERROR_FAILED,
+                    "Could not prepare %s validator branch in %s: %s",
+                    kinds[i], repository->repository_id, sqlite3_errmsg (db)
+                );
+                goto repository_error;
+            }
+
+            rc = sqlite3_step (statements[i]);
+            if (rc != SQLITE_DONE) {
+                g_set_error (
+                    error, G_IO_ERROR, G_IO_ERROR_INVALID_DATA,
+                    "%s validator branch found an inconsistent row in %s: %s",
+                    kinds[i], repository->repository_id, sqlite3_errmsg (db)
+                );
+                goto repository_error;
+            }
+            sqlite3_reset (statements[i]);
+        }
+
+        /* Nine interleaved rounds rotate the first branch to reduce order bias. */
+        for (guint round = 0; round < 9; round++) {
+            for (guint offset = 0; offset < G_N_ELEMENTS (measurements); offset++) {
+                guint i = (round + offset) % G_N_ELEMENTS (measurements);
+                gint64 started = g_get_monotonic_time ();
+                rc = sqlite3_step (statements[i]);
+                measurements[i].samples[round] =
+                    g_get_monotonic_time () - started;
+
+                if (rc != SQLITE_DONE) {
+                    g_set_error (
+                        error, G_IO_ERROR, G_IO_ERROR_INVALID_DATA,
+                        "%s validator branch failed during measurement in %s: %s",
+                        kinds[i], repository->repository_id, sqlite3_errmsg (db)
+                    );
+                    goto repository_error;
+                }
+                sqlite3_reset (statements[i]);
+            }
+        }
+
+        for (guint i = 0; i < G_N_ELEMENTS (measurements); i++) {
+            qsort (
+                measurements[i].samples,
+                G_N_ELEMENTS (measurements[i].samples),
+                sizeof (measurements[i].samples[0]),
+                compare_int64
+            );
+            g_print (
+                "ATM_RETRIEVAL_VALIDATOR_BRANCH repo=%s kind=%s rows=%" G_GUINT64_FORMAT
+                " samples=9 min_us=%" G_GINT64_FORMAT
+                " median_us=%" G_GINT64_FORMAT
+                " max_us=%" G_GINT64_FORMAT "\\n",
+                repository->repository_id,
+                measurements[i].kind,
+                measurements[i].rows,
+                measurements[i].samples[0],
+                measurements[i].samples[4],
+                measurements[i].samples[8]
+            );
+        }
+
+        for (guint i = 0; i < G_N_ELEMENTS (statements); i++)
+            sqlite3_finalize (statements[i]);
+        sqlite3_close (db);
+        continue;
+
+repository_error:
+        for (guint i = 0; i < G_N_ELEMENTS (statements); i++)
+            sqlite3_finalize (statements[i]);
+        sqlite3_close (db);
+        return FALSE;
+    }
+
+    return TRUE;
+}
+
 int
 main (int argc, char **argv)
 {
-    if (argc != 4 && argc != 5) {
+    if (argc != 4 && argc != 5 && argc != 6) {
         g_printerr (
             "Usage: %s BENCHMARK_JSON OUTPUT_JSON RUN_ID "
             "[frozen|production|candidate-results5|candidate-sources8|"
             "candidate-sources7|candidate-sources6|candidate-sources5|"
             "candidate-sources4|candidate-sources3|candidate-bytes16k|"
-            "candidate-compact]\n",
+            "candidate-compact] [validator-diagnostics]\\n",
             argv[0]
         );
+        return 2;
+    }
+    gboolean diagnostics_only = argc == 6 &&
+        g_strcmp0 (argv[5], "validator-diagnostics") == 0;
+    if (argc == 6 && !diagnostics_only) {
+        g_printerr ("Unknown benchmark mode '%s'.\\n", argv[5]);
         return 2;
     }
 
@@ -1260,7 +1460,7 @@ main (int argc, char **argv)
     const char *output_path = argv[2];
     const char *run_id = argv[3];
     const char *policy_name =
-        argc == 5 ? argv[4] : "frozen";
+        argc >= 5 ? argv[4] : "frozen";
     const BenchmarkPolicy *policy = NULL;
 
     if (g_strcmp0 (policy_name, "frozen") == 0) {
@@ -1383,6 +1583,18 @@ main (int argc, char **argv)
             &repositories,
             &error
         )) {
+        goto out;
+    }
+
+    if (diagnostics_only) {
+        if (!run_validator_branch_diagnostics (repositories, &error)) {
+            goto out;
+        }
+        g_print (
+            "PASS: validator branch diagnostics completed for %u pinned repositories.\\n",
+            repositories->len
+        );
+        exit_code = 0;
         goto out;
     }
 
