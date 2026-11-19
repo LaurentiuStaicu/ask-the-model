@@ -143,8 +143,6 @@ def compare(args: argparse.Namespace) -> dict[str, Any]:
                 raise ComparisonError(f"{label} sample {sample}: benchmark ID mismatch.")
             if evaluation.get("benchmark_id") != benchmark["benchmark_id"]:
                 raise ComparisonError(f"{label} sample {sample}: evaluation ID mismatch.")
-            if run.get("policy") != baseline_runs[0].get("policy") if baseline_runs else False:
-                raise ComparisonError(f"{label} sample {sample}: policy differs between samples.")
             if run.get("policy", {}).get("name") != "production":
                 raise ComparisonError(f"{label} sample {sample}: expected production policy.")
 
@@ -166,9 +164,10 @@ def compare(args: argparse.Namespace) -> dict[str, Any]:
         candidate_maps.append(candidate_topics)
 
     baseline_policy = baseline_runs[0]["policy"]
-    for sample, run in enumerate(candidate_runs, start=1):
-        if run.get("policy") != baseline_policy:
-            raise ComparisonError(f"candidate sample {sample}: policy differs from baseline.")
+    for label, runs in (("baseline", baseline_runs), ("candidate", candidate_runs)):
+        for sample, run in enumerate(runs, start=1):
+            if run.get("policy") != baseline_policy:
+                raise ComparisonError(f"{label} sample {sample}: policy differs from baseline.")
 
     latency: dict[str, Any] = {}
     for label, field in LATENCY_FIELDS.items():
