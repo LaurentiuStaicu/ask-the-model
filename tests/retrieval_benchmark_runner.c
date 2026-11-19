@@ -1538,6 +1538,75 @@ run_validator_branch_diagnostics (
                 candidate_samples[8], sqlite3_libversion ()
             );
             sqlite3_finalize (candidate);
+
+            /*
+             * Candidate 2 keeps the indexed canonical-row lookup but removes
+             * the redundant integer comparison and CAST on the FTS value.
+             * FTS evidence_id is TEXT; the canonical INTEGER id is converted
+             * to its canonical decimal TEXT representation for exact identity.
+             */
+            static const char *lean_dataset_sql =
+                "SELECT 1 FROM search_fts f WHERE "
+                "f.evidence_kind='dataset_row' AND "
+                "(f.evidence_id IS NULL OR f.logical_source_id IS NULL OR "
+                "NOT EXISTS (SELECT 1 FROM dataset_rows r "
+                "JOIN datasets d ON d.id=r.dataset_id "
+                "JOIN source_files s ON s.id=d.source_id "
+                "JOIN snapshot_metadata m ON m.id=1 "
+                "WHERE CAST(r.id AS TEXT)=f.evidence_id "
+                "AND printf('%s:dataset-row:%s:%d',m.repository_id,s.path,r.ordinal) "
+                "IS f.logical_source_id AND s.path IS f.title "
+                "AND r.search_text IS f.body)) LIMIT 1;";
+            sqlite3_stmt *lean = NULL;
+            rc = sqlite3_prepare_v2 (db, lean_dataset_sql, -1, &lean, NULL);
+            if (rc != SQLITE_OK) {
+                g_set_error (
+                    error, G_IO_ERROR, G_IO_ERROR_FAILED,
+                    "Could not prepare lean dataset-row candidate in %s: %s",
+                    repository->repository_id, sqlite3_errmsg (db)
+                );
+                goto repository_error;
+            }
+            rc = sqlite3_step (lean);
+            if (rc != SQLITE_DONE) {
+                sqlite3_finalize (lean);
+                g_set_error (
+                    error, G_IO_ERROR, G_IO_ERROR_INVALID_DATA,
+                    "Lean dataset-row candidate found an inconsistent row in %s: %s",
+                    repository->repository_id, sqlite3_errmsg (db)
+                );
+                goto repository_error;
+            }
+            sqlite3_reset (lean);
+            gint64 lean_samples[9] = { 0 };
+            for (guint round = 0; round < G_N_ELEMENTS (lean_samples); round++) {
+                gint64 started = g_get_monotonic_time ();
+                rc = sqlite3_step (lean);
+                lean_samples[round] = g_get_monotonic_time () - started;
+                if (rc != SQLITE_DONE) {
+                    sqlite3_finalize (lean);
+                    g_set_error (
+                        error, G_IO_ERROR, G_IO_ERROR_INVALID_DATA,
+                        "Lean dataset-row candidate failed during measurement in %s: %s",
+                        repository->repository_id, sqlite3_errmsg (db)
+                    );
+                    goto repository_error;
+                }
+                sqlite3_reset (lean);
+            }
+            qsort (
+                lean_samples, G_N_ELEMENTS (lean_samples),
+                sizeof (lean_samples[0]), compare_int64
+            );
+            g_print (
+                "ATM_RETRIEVAL_VALIDATOR_LEAN_CANDIDATE repo=%s kind=dataset_row "
+                "rows=%" G_GUINT64_FORMAT " samples=9 min_us=%" G_GINT64_FORMAT
+                " median_us=%" G_GINT64_FORMAT " max_us=%" G_GINT64_FORMAT
+                " status=equivalent-on-pinned-valid-index\\n",
+                repository->repository_id, measurements[3].rows,
+                lean_samples[0], lean_samples[4], lean_samples[8]
+            );
+            sqlite3_finalize (lean);
         }
 
         for (guint i = 0; i < G_N_ELEMENTS (statements); i++)
