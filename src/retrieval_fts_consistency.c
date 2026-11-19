@@ -255,7 +255,7 @@ atm_retrieval_index_validate_fts_canonical_consistency (
             "ATM_RETRIEVAL_VALIDATOR_TIMING fk_us=%" G_GINT64_FORMAT
             " canonical0_us=%" G_GINT64_FORMAT
             " canonical1_us=%" G_GINT64_FORMAT
-            " total_us=%" G_GINT64_FORMAT "\\n",
+            " total_us=%" G_GINT64_FORMAT "\n",
             foreign_key_check_us,
             canonical_query_us[0],
             canonical_query_us[1],
