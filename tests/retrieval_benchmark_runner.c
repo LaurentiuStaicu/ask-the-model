@@ -1266,6 +1266,9 @@ run_validator_identity_type_diagnostics (GError **error)
         "integer-1", "text-1", "text-01", "text-1.0",
         "real-1", "blob-1", "null", "integer-2", "text-2"
     };
+    static const gboolean expected_equivalent[] = {
+        TRUE, TRUE, TRUE, TRUE, TRUE, FALSE, TRUE, TRUE, TRUE
+    };
     static const char *insert_sql =
         "INSERT INTO search_fts(evidence_id) VALUES(?1);";
     static const char *compare_sql =
@@ -1394,8 +1397,20 @@ run_validator_identity_type_diagnostics (GError **error)
                 original_invalid, paired_cast_invalid,
                 original_invalid == paired_cast_invalid ? "yes" : "no"
             );
-            if (g_strcmp0(cases[i], "blob-1") == 0 &&
-                original_invalid != paired_cast_invalid)
+            gboolean equivalent = original_invalid == paired_cast_invalid;
+            if (equivalent != expected_equivalent[i]) {
+                g_set_error(error, G_IO_ERROR, G_IO_ERROR_INVALID_DATA,
+                            "Unexpected predicate equivalence for %s: expected %s, got %s",
+                            cases[i],
+                            expected_equivalent[i] ? "equivalent" : "different",
+                            equivalent ? "equivalent" : "different");
+                sqlite3_finalize(type_stmt);
+                sqlite3_finalize(insert);
+                sqlite3_finalize(compare);
+                sqlite3_close(db);
+                return FALSE;
+            }
+            if (g_strcmp0(cases[i], "blob-1") == 0 && !equivalent)
                 saw_blob_divergence = TRUE;
         } else {
             g_set_error(error, G_IO_ERROR, G_IO_ERROR_FAILED,
