@@ -1318,6 +1318,49 @@ test_foreign_key_violation_is_rejected_by_all_routes (void)
     g_free (cache_root);
 }
 
+
+static void
+test_duplicate_fts_identity_is_rejected (void)
+{
+    char *snapshot_root = new_snapshot ();
+    char *cache_root = new_temp_root ("atm-fts-duplicate-cache-XXXXXX");
+    char *index_path = build_index (snapshot_root, cache_root);
+    sqlite3 *db = NULL;
+    GPtrArray *results = NULL;
+    GError *error = NULL;
+
+    g_assert_cmpint (
+        sqlite3_open_v2 (index_path, &db, SQLITE_OPEN_READWRITE, NULL),
+        ==, SQLITE_OK
+    );
+    g_assert_cmpint (
+        sqlite3_exec (
+            db,
+            "INSERT INTO search_fts(evidence_kind,evidence_id,logical_source_id,title,body) "
+            "SELECT evidence_kind,evidence_id,logical_source_id,title,body "
+            "FROM search_fts WHERE evidence_kind='section' LIMIT 1;",
+            NULL, NULL, NULL
+        ),
+        ==, SQLITE_OK
+    );
+    g_assert_cmpint (sqlite3_close (db), ==, SQLITE_OK);
+
+    g_assert_false (atm_retrieval_lookup_exact (
+        index_path, "food_per_capita", 10, &results, &error
+    ));
+    g_assert_error (
+        error, ATM_RETRIEVAL_QUERY_ERROR, ATM_RETRIEVAL_QUERY_ERROR_SQLITE
+    );
+    g_assert_null (results);
+    g_clear_error (&error);
+
+    g_free (index_path);
+    remove_tree_best_effort (snapshot_root);
+    g_free (snapshot_root);
+    remove_tree_best_effort (cache_root);
+    g_free (cache_root);
+}
+
 static void
 test_missing_canonical_fts_row_is_rejected (void)
 {
@@ -1484,6 +1527,10 @@ main (int argc, char **argv)
     g_test_add_func (
         "/retrieval-query/fts-foreign-key-violation-all-routes",
         test_foreign_key_violation_is_rejected_by_all_routes
+    );
+    g_test_add_func (
+        "/retrieval-query/fts-duplicate-identity",
+        test_duplicate_fts_identity_is_rejected
     );
     g_test_add_func (
         "/retrieval-query/fts-canonical-missing-row",

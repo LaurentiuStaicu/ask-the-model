@@ -11,6 +11,100 @@
 #define ATM_RETRIEVAL_INDEX_ERROR \
     (g_quark_from_static_string ("atm-retrieval-index-error-quark"))
 
+
+static gboolean
+validate_canonical_coverage_counts (sqlite3 *db, GError **error)
+{
+    static const char *fts_counts_sql =
+        "SELECT evidence_kind, SUM(identity_count), SUM(identity_count - 1) "
+        "FROM ("
+        "SELECT evidence_kind, CAST(evidence_id AS TEXT), COUNT(*) AS identity_count "
+        "FROM search_fts GROUP BY evidence_kind, CAST(evidence_id AS TEXT)"
+        ") GROUP BY evidence_kind;";
+    static const char *canonical_counts_sql =
+        "SELECT (SELECT count(*) FROM document_sections), "
+        "(SELECT count(*) FROM structured_entities), "
+        "(SELECT count(*) FROM structured_relations), "
+        "(SELECT count(*) FROM dataset_rows);";
+    guint64 fts_counts[4] = { 0, 0, 0, 0 };
+    sqlite3_stmt *statement = NULL;
+    int rc = sqlite3_prepare_v2 (db, fts_counts_sql, -1, &statement, NULL);
+
+    if (rc != SQLITE_OK) {
+        g_set_error (error, ATM_RETRIEVAL_INDEX_ERROR,
+            ATM_RETRIEVAL_INDEX_ERROR_SQLITE,
+            "Could not prepare FTS identity counts: %s", sqlite3_errmsg (db));
+        return FALSE;
+    }
+
+    while ((rc = sqlite3_step (statement)) == SQLITE_ROW) {
+        const char *kind = (const char *) sqlite3_column_text (statement, 0);
+        gint index = -1;
+        if (g_strcmp0 (kind, "section") == 0) index = 0;
+        else if (g_strcmp0 (kind, "entity") == 0) index = 1;
+        else if (g_strcmp0 (kind, "relation") == 0) index = 2;
+        else if (g_strcmp0 (kind, "dataset_row") == 0) index = 3;
+
+        if (index < 0) {
+            sqlite3_finalize (statement);
+            g_set_error_literal (error, ATM_RETRIEVAL_INDEX_ERROR,
+                ATM_RETRIEVAL_INDEX_ERROR_INTEGRITY,
+                "FTS contains an unknown evidence kind.");
+            return FALSE;
+        }
+
+        fts_counts[index] = (guint64) sqlite3_column_int64 (statement, 1);
+        if (sqlite3_column_int64 (statement, 2) != 0) {
+            sqlite3_finalize (statement);
+            g_set_error_literal (error, ATM_RETRIEVAL_INDEX_ERROR,
+                ATM_RETRIEVAL_INDEX_ERROR_INTEGRITY,
+                "FTS contains duplicate evidence identities.");
+            return FALSE;
+        }
+    }
+
+    sqlite3_finalize (statement);
+    statement = NULL;
+    if (rc != SQLITE_DONE) {
+        g_set_error (error, ATM_RETRIEVAL_INDEX_ERROR,
+            ATM_RETRIEVAL_INDEX_ERROR_SQLITE,
+            "Could not read FTS identity counts: %s", sqlite3_errmsg (db));
+        return FALSE;
+    }
+
+    rc = sqlite3_prepare_v2 (db, canonical_counts_sql, -1, &statement, NULL);
+    if (rc != SQLITE_OK) {
+        g_set_error (error, ATM_RETRIEVAL_INDEX_ERROR,
+            ATM_RETRIEVAL_INDEX_ERROR_SQLITE,
+            "Could not prepare canonical evidence counts: %s", sqlite3_errmsg (db));
+        return FALSE;
+    }
+
+    rc = sqlite3_step (statement);
+    if (rc != SQLITE_ROW) {
+        sqlite3_finalize (statement);
+        g_set_error (error, ATM_RETRIEVAL_INDEX_ERROR,
+            ATM_RETRIEVAL_INDEX_ERROR_SQLITE,
+            "Could not read canonical evidence counts: %s", sqlite3_errmsg (db));
+        return FALSE;
+    }
+
+    for (guint i = 0; i < G_N_ELEMENTS (fts_counts); i++) {
+        guint64 canonical_count =
+            (guint64) sqlite3_column_int64 (statement, (int) i);
+        if (canonical_count != fts_counts[i]) {
+            sqlite3_finalize (statement);
+            g_set_error_literal (error, ATM_RETRIEVAL_INDEX_ERROR,
+                ATM_RETRIEVAL_INDEX_ERROR_INTEGRITY,
+                "FTS and canonical evidence populations differ.");
+            return FALSE;
+        }
+    }
+
+    sqlite3_finalize (statement);
+    return TRUE;
+}
+
 gboolean
 atm_retrieval_index_validate_fts_canonical_consistency (
     sqlite3 *db,
@@ -154,6 +248,7 @@ atm_retrieval_index_validate_fts_canonical_consistency (
         return FALSE;
     }
 
+
     const char *queries[] = {
         "SELECT 1 FROM search_fts f WHERE "
         "f.evidence_kind IS NULL OR f.evidence_id IS NULL OR "
@@ -184,71 +279,41 @@ atm_retrieval_index_validate_fts_canonical_consistency (
         "AND printf('%s:dataset-row:%s:%d', m.repository_id, s.path, r.ordinal) "
         "IS f.logical_source_id AND s.path IS f.title "
         "AND r.search_text IS f.body)) OR "
-        "f.evidence_kind NOT IN ('section','entity','relation','dataset_row');",
-
-        "SELECT 1 FROM ("
-        "SELECT 'section', CAST(d.id AS TEXT), d.logical_source_id, d.title, d.body "
-        "FROM document_sections d "
-        "EXCEPT SELECT evidence_kind, CAST(evidence_id AS TEXT), logical_source_id, title, body "
-        "FROM search_fts WHERE evidence_kind = 'section') "
-        "UNION ALL SELECT 1 FROM ("
-        "SELECT 'entity', CAST(e.id AS TEXT), e.logical_source_id, "
-        "COALESCE(e.label,e.native_id), e.payload_json FROM structured_entities e "
-        "EXCEPT SELECT evidence_kind, CAST(evidence_id AS TEXT), logical_source_id, title, body "
-        "FROM search_fts WHERE evidence_kind = 'entity') "
-        "UNION ALL SELECT 1 FROM ("
-        "SELECT 'relation', CAST(r.id AS TEXT), r.logical_source_id, "
-        "COALESCE(r.native_id,r.relation_type), r.payload_json FROM structured_relations r "
-        "EXCEPT SELECT evidence_kind, CAST(evidence_id AS TEXT), logical_source_id, title, body "
-        "FROM search_fts WHERE evidence_kind = 'relation') "
-        "UNION ALL SELECT 1 FROM ("
-        "SELECT 'dataset_row', CAST(r.id AS TEXT), "
-        "printf('%s:dataset-row:%s:%d',m.repository_id,s.path,r.ordinal), "
-        "s.path, r.search_text FROM dataset_rows r "
-        "JOIN datasets d ON d.id=r.dataset_id "
-        "JOIN source_files s ON s.id=d.source_id "
-        "JOIN snapshot_metadata m ON m.id=1 "
-        "EXCEPT SELECT evidence_kind,CAST(evidence_id AS TEXT),logical_source_id,title,body "
-        "FROM search_fts WHERE evidence_kind='dataset_row') "
-        "UNION ALL SELECT 1 FROM ("
-        "SELECT evidence_kind,evidence_id FROM search_fts "
-        "GROUP BY evidence_kind,CAST(evidence_id AS TEXT) HAVING count(*) > 1) "
-        "LIMIT 1;"
+        "f.evidence_kind NOT IN ('section','entity','relation','dataset_row');"
     };
 
-    for (gsize i = 0; i < G_N_ELEMENTS (queries); i++) {
-        gint64 query_started_us = g_get_monotonic_time ();
-        rc = sqlite3_prepare_v2 (db, queries[i], -1, &statement, NULL);
-        if (rc != SQLITE_OK) {
-            g_set_error (
-                error, ATM_RETRIEVAL_INDEX_ERROR, ATM_RETRIEVAL_INDEX_ERROR_SQLITE,
-                "Could not prepare FTS canonical-consistency query: %s",
-                sqlite3_errmsg (db)
-            );
-            return FALSE;
-        }
 
-        rc = sqlite3_step (statement);
-        sqlite3_finalize (statement);
-        statement = NULL;
-
-        if (rc == SQLITE_ROW) {
-            g_set_error_literal (
-                error, ATM_RETRIEVAL_INDEX_ERROR, ATM_RETRIEVAL_INDEX_ERROR_INTEGRITY,
-                "FTS evidence and canonical retrieval records are inconsistent."
-            );
-            return FALSE;
-        }
-        canonical_query_us[i] = g_get_monotonic_time () - query_started_us;
-        if (rc != SQLITE_DONE) {
-            g_set_error (
-                error, ATM_RETRIEVAL_INDEX_ERROR, ATM_RETRIEVAL_INDEX_ERROR_SQLITE,
-                "Could not execute FTS canonical-consistency query: %s",
-                sqlite3_errmsg (db)
-            );
-            return FALSE;
-        }
+    gint64 query_started_us = g_get_monotonic_time ();
+    rc = sqlite3_prepare_v2 (db, queries[0], -1, &statement, NULL);
+    if (rc != SQLITE_OK) {
+        g_set_error (error, ATM_RETRIEVAL_INDEX_ERROR,
+            ATM_RETRIEVAL_INDEX_ERROR_SQLITE,
+            "Could not prepare FTS canonical-consistency query: %s",
+            sqlite3_errmsg (db));
+        return FALSE;
     }
+
+    rc = sqlite3_step (statement);
+    sqlite3_finalize (statement);
+    statement = NULL;
+    if (rc == SQLITE_ROW) {
+        g_set_error_literal (error, ATM_RETRIEVAL_INDEX_ERROR,
+            ATM_RETRIEVAL_INDEX_ERROR_INTEGRITY,
+            "FTS evidence and canonical retrieval records are inconsistent.");
+        return FALSE;
+    }
+    canonical_query_us[0] = g_get_monotonic_time () - query_started_us;
+    if (rc != SQLITE_DONE) {
+        g_set_error (error, ATM_RETRIEVAL_INDEX_ERROR,
+            ATM_RETRIEVAL_INDEX_ERROR_SQLITE,
+            "Could not execute FTS canonical-consistency query: %s",
+            sqlite3_errmsg (db));
+        return FALSE;
+    }
+
+    query_started_us = g_get_monotonic_time ();
+    if (!validate_canonical_coverage_counts (db, error)) return FALSE;
+    canonical_query_us[1] = g_get_monotonic_time () - query_started_us;
 
     if (g_getenv ("ATM_RETRIEVAL_VALIDATOR_TIMING") != NULL) {
         g_printerr (
