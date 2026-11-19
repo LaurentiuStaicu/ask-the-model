@@ -463,6 +463,7 @@ jobs:
         if: github.event_name == 'pull_request'
         shell: bash
         env:
+          ATM_RETRIEVAL_VALIDATOR_TIMING: '1'
           BASELINE_SHA: ${{ github.event.pull_request.base.sha }}
           CANDIDATE_SHA: ${{ github.event.pull_request.head.sha }}
         run: |
