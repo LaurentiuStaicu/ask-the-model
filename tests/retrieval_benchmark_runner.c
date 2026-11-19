@@ -1260,11 +1260,175 @@ compare_int64 (gconstpointer left, gconstpointer right)
 }
 
 static gboolean
+run_validator_identity_type_diagnostics (GError **error)
+{
+    static const char *cases[] = {
+        "integer-1", "text-1", "text-01", "text-1.0",
+        "real-1", "blob-1", "null", "integer-2", "text-2"
+    };
+    static const char *insert_sql =
+        "INSERT INTO search_fts(evidence_id) VALUES(?1);";
+    static const char *compare_sql =
+        "SELECT "
+        "EXISTS(SELECT 1 FROM search_fts f WHERE f.evidence_id IS NULL OR "
+        "NOT EXISTS(SELECT 1 FROM canonical r WHERE r.id=f.evidence_id "
+        "AND CAST(r.id AS TEXT)=CAST(f.evidence_id AS TEXT))),"
+        "EXISTS(SELECT 1 FROM search_fts f WHERE f.evidence_id IS NULL OR "
+        "NOT EXISTS(SELECT 1 FROM canonical r WHERE "
+        "CAST(r.id AS TEXT)=CAST(f.evidence_id AS TEXT)));";
+    sqlite3 *db = NULL;
+    sqlite3_stmt *insert = NULL;
+    sqlite3_stmt *compare = NULL;
+    int rc = sqlite3_open(":memory:", &db);
+    if (rc != SQLITE_OK) {
+        g_set_error(error, G_IO_ERROR, G_IO_ERROR_FAILED,
+                    "Could not open SQLite identity diagnostic: %s",
+                    db != NULL ? sqlite3_errmsg(db) : "out of memory");
+        if (db != NULL) sqlite3_close(db);
+        return FALSE;
+    }
+
+    const char *schema_sql =
+        "CREATE TABLE canonical(id INTEGER PRIMARY KEY);"
+        "INSERT INTO canonical(id) VALUES(1);"
+        "CREATE VIRTUAL TABLE search_fts USING fts5(evidence_id UNINDEXED);";
+    rc = sqlite3_exec(db, schema_sql, NULL, NULL, NULL);
+    if (rc != SQLITE_OK) {
+        g_set_error(error, G_IO_ERROR, G_IO_ERROR_FAILED,
+                    "Could not create SQLite identity diagnostic schema: %s",
+                    sqlite3_errmsg(db));
+        sqlite3_close(db);
+        return FALSE;
+    }
+
+    rc = sqlite3_prepare_v2(db, insert_sql, -1, &insert, NULL);
+    if (rc == SQLITE_OK)
+        rc = sqlite3_prepare_v2(db, compare_sql, -1, &compare, NULL);
+    if (rc != SQLITE_OK) {
+        g_set_error(error, G_IO_ERROR, G_IO_ERROR_FAILED,
+                    "Could not prepare SQLite identity diagnostic: %s",
+                    sqlite3_errmsg(db));
+        sqlite3_finalize(insert);
+        sqlite3_finalize(compare);
+        sqlite3_close(db);
+        return FALSE;
+    }
+
+    gboolean saw_blob_divergence = FALSE;
+    for (guint i = 0; i < G_N_ELEMENTS(cases); i++) {
+        sqlite3_exec(db, "DELETE FROM search_fts;", NULL, NULL, NULL);
+        sqlite3_reset(insert);
+        sqlite3_clear_bindings(insert);
+
+        switch (i) {
+        case 0:
+            sqlite3_bind_int64(insert, 1, 1);
+            break;
+        case 1:
+            sqlite3_bind_text(insert, 1, "1", -1, SQLITE_STATIC);
+            break;
+        case 2:
+            sqlite3_bind_text(insert, 1, "01", -1, SQLITE_STATIC);
+            break;
+        case 3:
+            sqlite3_bind_text(insert, 1, "1.0", -1, SQLITE_STATIC);
+            break;
+        case 4:
+            sqlite3_bind_double(insert, 1, 1.0);
+            break;
+        case 5: {
+            static const unsigned char blob_value[] = { '1' };
+            sqlite3_bind_blob(insert, 1, blob_value, sizeof(blob_value),
+                              SQLITE_STATIC);
+            break;
+        }
+        case 6:
+            sqlite3_bind_null(insert, 1);
+            break;
+        case 7:
+            sqlite3_bind_int64(insert, 1, 2);
+            break;
+        case 8:
+            sqlite3_bind_text(insert, 1, "2", -1, SQLITE_STATIC);
+            break;
+        default:
+            g_assert_not_reached();
+        }
+
+        rc = sqlite3_step(insert);
+        if (rc != SQLITE_DONE) {
+            g_set_error(error, G_IO_ERROR, G_IO_ERROR_FAILED,
+                        "Could not insert %s into FTS5 diagnostic: %s",
+                        cases[i], sqlite3_errmsg(db));
+            sqlite3_finalize(insert);
+            sqlite3_finalize(compare);
+            sqlite3_close(db);
+            return FALSE;
+        }
+
+        sqlite3_reset(compare);
+        rc = sqlite3_step(compare);
+        if (rc != SQLITE_ROW) {
+            g_set_error(error, G_IO_ERROR, G_IO_ERROR_FAILED,
+                        "Could not compare %s identity predicates: %s",
+                        cases[i], sqlite3_errmsg(db));
+            sqlite3_finalize(insert);
+            sqlite3_finalize(compare);
+            sqlite3_close(db);
+            return FALSE;
+        }
+
+        int original_invalid = sqlite3_column_int(compare, 0);
+        int paired_cast_invalid = sqlite3_column_int(compare, 1);
+        const char *storage_type = "unknown";
+        sqlite3_stmt *type_stmt = NULL;
+        if (sqlite3_prepare_v2(db,
+            "SELECT typeof(evidence_id) FROM search_fts;",
+            -1, &type_stmt, NULL) == SQLITE_OK &&
+            sqlite3_step(type_stmt) == SQLITE_ROW) {
+            storage_type = (const char *)sqlite3_column_text(type_stmt, 0);
+            g_print(
+                "ATM_RETRIEVAL_IDENTITY_TYPE case=%s storage=%s "
+                "original_invalid=%d paired_cast_invalid=%d equivalent=%s\\n",
+                cases[i], storage_type != NULL ? storage_type : "unknown",
+                original_invalid, paired_cast_invalid,
+                original_invalid == paired_cast_invalid ? "yes" : "no"
+            );
+            if (g_strcmp0(cases[i], "blob-1") == 0 &&
+                original_invalid != paired_cast_invalid)
+                saw_blob_divergence = TRUE;
+        } else {
+            g_set_error(error, G_IO_ERROR, G_IO_ERROR_FAILED,
+                        "Could not inspect %s FTS5 storage class: %s",
+                        cases[i], sqlite3_errmsg(db));
+            sqlite3_finalize(type_stmt);
+            sqlite3_finalize(insert);
+            sqlite3_finalize(compare);
+            sqlite3_close(db);
+            return FALSE;
+        }
+        sqlite3_finalize(type_stmt);
+    }
+
+    g_print(
+        "ATM_RETRIEVAL_IDENTITY_TYPE_SUMMARY blob_divergence=%s\\n",
+        saw_blob_divergence ? "observed" : "not-observed"
+    );
+    sqlite3_finalize(insert);
+    sqlite3_finalize(compare);
+    sqlite3_close(db);
+    return TRUE;
+}
+
+static gboolean
 run_validator_branch_diagnostics (
     GPtrArray *repositories,
     GError **error
 )
 {
+    if (!run_validator_identity_type_diagnostics(error))
+        return FALSE;
+
     static const char *kinds[] = {
         "section", "entity", "relation", "dataset_row"
     };
