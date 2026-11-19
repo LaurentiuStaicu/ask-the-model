@@ -164,6 +164,110 @@ validate_canonical_coverage_counts (sqlite3 *db, GError **error)
     return TRUE;
 }
 
+
+/*
+ * Measurement-only decomposition of the FTS-to-canonical pass.
+ * This is deliberately opt-in and does not participate in validation results.
+ * Each query walks one evidence-kind population and counts mismatches, so the
+ * diagnostic cannot stop at the first valid row as the production probe does.
+ */
+static void
+measure_validator_branch_timings (sqlite3 *db)
+{
+    static const struct {
+        const char *kind;
+        const char *sql;
+    } probes[] = {
+        {
+            "section",
+            "SELECT count(*), COALESCE(sum(CASE WHEN "
+            "f.evidence_id IS NULL OR typeof(f.evidence_id) <> 'integer' OR "
+            "f.logical_source_id IS NULL OR NOT EXISTS ("
+            "SELECT 1 FROM document_sections d WHERE d.id = f.evidence_id "
+            "AND d.logical_source_id IS f.logical_source_id "
+            "AND d.title IS f.title AND d.body IS f.body) "
+            "THEN 1 ELSE 0 END), 0) "
+            "FROM search_fts f WHERE f.evidence_kind = 'section';"
+        },
+        {
+            "entity",
+            "SELECT count(*), COALESCE(sum(CASE WHEN "
+            "f.evidence_id IS NULL OR typeof(f.evidence_id) <> 'integer' OR "
+            "f.logical_source_id IS NULL OR NOT EXISTS ("
+            "SELECT 1 FROM structured_entities e WHERE e.id = f.evidence_id "
+            "AND e.logical_source_id IS f.logical_source_id "
+            "AND COALESCE(e.label, e.native_id) IS f.title "
+            "AND e.payload_json IS f.body) "
+            "THEN 1 ELSE 0 END), 0) "
+            "FROM search_fts f WHERE f.evidence_kind = 'entity';"
+        },
+        {
+            "relation",
+            "SELECT count(*), COALESCE(sum(CASE WHEN "
+            "f.evidence_id IS NULL OR typeof(f.evidence_id) <> 'integer' OR "
+            "f.logical_source_id IS NULL OR NOT EXISTS ("
+            "SELECT 1 FROM structured_relations r WHERE r.id = f.evidence_id "
+            "AND r.logical_source_id IS f.logical_source_id "
+            "AND COALESCE(r.native_id, r.relation_type) IS f.title "
+            "AND r.payload_json IS f.body) "
+            "THEN 1 ELSE 0 END), 0) "
+            "FROM search_fts f WHERE f.evidence_kind = 'relation';"
+        },
+        {
+            "dataset_row",
+            "SELECT count(*), COALESCE(sum(CASE WHEN "
+            "f.evidence_id IS NULL OR typeof(f.evidence_id) <> 'integer' OR "
+            "f.logical_source_id IS NULL OR NOT EXISTS ("
+            "SELECT 1 FROM dataset_rows r "
+            "JOIN datasets d ON d.id = r.dataset_id "
+            "JOIN source_files s ON s.id = d.source_id "
+            "JOIN snapshot_metadata m ON m.id = 1 "
+            "WHERE r.id = f.evidence_id "
+            "AND printf('%s:dataset-row:%s:%d', m.repository_id, s.path, r.ordinal) "
+            "IS f.logical_source_id AND s.path IS f.title "
+            "AND r.search_text IS f.body) "
+            "THEN 1 ELSE 0 END), 0) "
+            "FROM search_fts f WHERE f.evidence_kind = 'dataset_row';"
+        }
+    };
+
+    if (g_getenv ("ATM_RETRIEVAL_VALIDATOR_BRANCH_TIMING") == NULL) {
+        return;
+    }
+
+    for (gsize i = 0; i < G_N_ELEMENTS (probes); i++) {
+        sqlite3_stmt *statement = NULL;
+        gint64 started_us = g_get_monotonic_time ();
+        int rc = sqlite3_prepare_v2 (
+            db, probes[i].sql, -1, &statement, NULL
+        );
+        if (rc == SQLITE_OK) {
+            rc = sqlite3_step (statement);
+        }
+
+        if (rc == SQLITE_ROW) {
+            gint64 rows = sqlite3_column_int64 (statement, 0);
+            gint64 mismatches = sqlite3_column_int64 (statement, 1);
+            g_printerr (
+                "ATM_RETRIEVAL_VALIDATOR_BRANCH kind=%s rows=%" G_GINT64_FORMAT
+                " mismatches=%" G_GINT64_FORMAT " elapsed_us=%" G_GINT64_FORMAT "\n",
+                probes[i].kind,
+                rows,
+                mismatches,
+                g_get_monotonic_time () - started_us
+            );
+        } else {
+            g_printerr (
+                "ATM_RETRIEVAL_VALIDATOR_BRANCH_ERROR kind=%s error=%s\n",
+                probes[i].kind,
+                sqlite3_errmsg (db)
+            );
+        }
+
+        sqlite3_finalize (statement);
+    }
+}
+
 gboolean
 atm_retrieval_index_validate_fts_canonical_consistency (
     sqlite3 *db,
@@ -372,6 +476,8 @@ atm_retrieval_index_validate_fts_canonical_consistency (
             sqlite3_errmsg (db));
         return FALSE;
     }
+
+    measure_validator_branch_timings (db);
 
     query_started_us = g_get_monotonic_time ();
     if (!validate_canonical_coverage_counts (db, error)) return FALSE;
