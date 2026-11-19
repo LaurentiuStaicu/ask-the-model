@@ -1,3 +1,7 @@
+#ifndef _GNU_SOURCE
+#define _GNU_SOURCE
+#endif
+
 #include "retrieval_query.h"
 #include "retrieval_index.h"
 #include "repository_sources.h"
@@ -1882,6 +1886,160 @@ test_non_fts5_search_table_is_rejected (void)
     g_free (cache_root);
 }
 
+
+typedef struct {
+    guint64 device;
+    guint64 inode;
+    guint64 size;
+    gint64 mtime_ns;
+    gint64 ctime_ns;
+} TestRetrievalFileIdentity;
+
+static gboolean
+test_retrieval_file_identity_read (
+    const char *path,
+    TestRetrievalFileIdentity *identity
+)
+{
+    struct stat stat_buffer;
+
+    if (path == NULL || identity == NULL ||
+        g_stat (path, &stat_buffer) != 0 ||
+        !S_ISREG (stat_buffer.st_mode)) {
+        return FALSE;
+    }
+
+    identity->device = (guint64) stat_buffer.st_dev;
+    identity->inode = (guint64) stat_buffer.st_ino;
+    identity->size = (guint64) stat_buffer.st_size;
+    identity->mtime_ns =
+        ((gint64) stat_buffer.st_mtim.tv_sec * G_GINT64_CONSTANT (1000000000)) +
+        stat_buffer.st_mtim.tv_nsec;
+    identity->ctime_ns =
+        ((gint64) stat_buffer.st_ctim.tv_sec * G_GINT64_CONSTANT (1000000000)) +
+        stat_buffer.st_ctim.tv_nsec;
+    return TRUE;
+}
+
+static gboolean
+test_retrieval_file_identity_equal (
+    const TestRetrievalFileIdentity *left,
+    const TestRetrievalFileIdentity *right
+)
+{
+    return left->device == right->device &&
+        left->inode == right->inode &&
+        left->size == right->size &&
+        left->mtime_ns == right->mtime_ns &&
+        left->ctime_ns == right->ctime_ns;
+}
+
+static void
+test_validation_file_identity_invalidates_on_mutation_and_replacement (void)
+{
+    char *snapshot_root = new_snapshot ();
+    char *cache_root = new_temp_root ("atm-fts-identity-cache-XXXXXX");
+    char *replacement_snapshot_root = new_snapshot ();
+    char *replacement_cache_root =
+        new_temp_root ("atm-fts-identity-replacement-cache-XXXXXX");
+    char *index_path = build_index (snapshot_root, cache_root);
+    char *replacement_source =
+        build_index (replacement_snapshot_root, replacement_cache_root);
+    char *replacement_path = g_strdup_printf ("%s.replacement", index_path);
+    TestRetrievalFileIdentity original_identity = { 0 };
+    TestRetrievalFileIdentity mutated_identity = { 0 };
+    TestRetrievalFileIdentity replaced_identity = { 0 };
+    sqlite3 *db = NULL;
+    GPtrArray *results = NULL;
+    GError *error = NULL;
+    char *replacement_contents = NULL;
+    gsize replacement_length = 0;
+
+    g_assert_true (test_retrieval_file_identity_read (
+        index_path, &original_identity
+    ));
+
+    g_assert_cmpint (
+        sqlite3_open_v2 (index_path, &db, SQLITE_OPEN_READWRITE, NULL),
+        ==, SQLITE_OK
+    );
+    g_assert_cmpint (
+        sqlite3_exec (
+            db,
+            "UPDATE search_fts SET body=COALESCE(body,'') || ' tampered' "
+            "WHERE rowid=(SELECT rowid FROM search_fts ORDER BY rowid LIMIT 1);",
+            NULL, NULL, NULL
+        ),
+        ==, SQLITE_OK
+    );
+    g_assert_cmpint (sqlite3_changes (db), ==, 1);
+    g_assert_cmpint (sqlite3_close (db), ==, SQLITE_OK);
+    db = NULL;
+
+    g_assert_true (test_retrieval_file_identity_read (
+        index_path, &mutated_identity
+    ));
+    g_assert_false (test_retrieval_file_identity_equal (
+        &original_identity, &mutated_identity
+    ));
+
+    /* A fresh open must validate the modified database, not trust its old identity. */
+    g_assert_false (atm_retrieval_lookup_exact (
+        index_path, "food_per_capita", 10, &results, &error
+    ));
+    g_assert_error (
+        error, ATM_RETRIEVAL_QUERY_ERROR, ATM_RETRIEVAL_QUERY_ERROR_SQLITE
+    );
+    g_assert_null (results);
+    g_clear_error (&error);
+
+    g_assert_true (g_file_get_contents (
+        replacement_source,
+        &replacement_contents,
+        &replacement_length,
+        &error
+    ));
+    g_assert_no_error (error);
+    g_assert_true (g_file_set_contents (
+        replacement_path,
+        replacement_contents,
+        (gssize) replacement_length,
+        &error
+    ));
+    g_assert_no_error (error);
+    g_clear_pointer (&replacement_contents, g_free);
+
+    /* Replacing the path with another inode must invalidate the identity. */
+    g_assert_cmpint (g_rename (replacement_path, index_path), ==, 0);
+    g_assert_true (test_retrieval_file_identity_read (
+        index_path, &replaced_identity
+    ));
+    g_assert_false (test_retrieval_file_identity_equal (
+        &mutated_identity, &replaced_identity
+    ));
+    g_assert_cmpuint (
+        replaced_identity.inode, !=, mutated_identity.inode
+    );
+
+    g_assert_true (atm_retrieval_lookup_exact (
+        index_path, "food_per_capita", 10, &results, &error
+    ));
+    g_assert_no_error (error);
+    g_assert_nonnull (results);
+    g_ptr_array_unref (results);
+
+    g_free (replacement_path);
+    g_free (index_path);
+    remove_tree_best_effort (snapshot_root);
+    g_free (snapshot_root);
+    remove_tree_best_effort (cache_root);
+    g_free (cache_root);
+    remove_tree_best_effort (replacement_snapshot_root);
+    g_free (replacement_snapshot_root);
+    remove_tree_best_effort (replacement_cache_root);
+    g_free (replacement_cache_root);
+}
+
 int
 main (int argc, char **argv)
 {
@@ -1978,6 +2136,10 @@ main (int argc, char **argv)
     g_test_add_func (
         "/retrieval-query/fts-non-fts5-table",
         test_non_fts5_search_table_is_rejected
+    );
+    g_test_add_func (
+        "/retrieval-query/validation-file-identity-invalidation",
+        test_validation_file_identity_invalidates_on_mutation_and_replacement
     );
     g_test_add_func (
         "/retrieval-query/invalid-arguments",
