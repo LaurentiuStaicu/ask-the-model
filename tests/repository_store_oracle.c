@@ -2094,14 +2094,15 @@ check_fts_canonical_consistency (sqlite3 *db, GError **error)
             (const char *) sqlite3_column_text (statement, 2);
 
         /*
-         * FTS5 can preserve a BLOB value in an UNINDEXED identity column.
-         * Do not let sqlite3_column_text() normalize it into the same byte
-         * sequence as the canonical TEXT identifier (for example x'31').
+         * Canonical evidence identifiers are INTEGER PRIMARY KEY values,
+         * and the index builder binds them with sqlite3_bind_int64().
+         * Reject BLOB/TEXT substitutions before sqlite3_column_text()
+         * can normalize them to the same printable identifier.
          */
-        if (sqlite3_column_type (statement, 1) != SQLITE_TEXT) {
+        if (sqlite3_column_type (statement, 1) != SQLITE_INTEGER) {
             g_set_error_literal (
                 error, ORACLE_ERROR, ORACLE_ERROR_INTEGRITY,
-                "FTS evidence_id is not stored as TEXT."
+                "FTS evidence_id is not stored as INTEGER."
             );
             ok = FALSE;
             break;
