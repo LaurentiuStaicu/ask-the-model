@@ -514,6 +514,7 @@ jobs:
         env:
           ATM_RETRIEVAL_VALIDATOR_TIMING: '1'
           ATM_RETRIEVAL_VALIDATOR_EXPLAIN: '1'
+          ATM_RETRIEVAL_VALIDATOR_BRANCH_TIMING: '1'
         run: |
           set -euo pipefail
 
