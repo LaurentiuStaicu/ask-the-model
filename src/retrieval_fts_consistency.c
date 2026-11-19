@@ -109,6 +109,46 @@ atm_retrieval_index_validate_fts_canonical_consistency (
         return FALSE;
     }
 
+    /*
+     * PRAGMA foreign_keys=ON only governs writes on the current connection;
+     * it does not validate rows already persisted with enforcement disabled.
+     * Check the stored index explicitly before deriving canonical FTS coverage.
+     */
+    rc = sqlite3_prepare_v2 (
+        db,
+        "PRAGMA foreign_key_check;",
+        -1,
+        &statement,
+        NULL
+    );
+    if (rc != SQLITE_OK) {
+        g_set_error (
+            error, ATM_RETRIEVAL_INDEX_ERROR, ATM_RETRIEVAL_INDEX_ERROR_SQLITE,
+            "Could not prepare retrieval-index foreign-key check: %s",
+            sqlite3_errmsg (db)
+        );
+        return FALSE;
+    }
+
+    rc = sqlite3_step (statement);
+    sqlite3_finalize (statement);
+    statement = NULL;
+    if (rc == SQLITE_ROW) {
+        g_set_error_literal (
+            error, ATM_RETRIEVAL_INDEX_ERROR, ATM_RETRIEVAL_INDEX_ERROR_INTEGRITY,
+            "Retrieval index contains foreign-key violations."
+        );
+        return FALSE;
+    }
+    if (rc != SQLITE_DONE) {
+        g_set_error (
+            error, ATM_RETRIEVAL_INDEX_ERROR, ATM_RETRIEVAL_INDEX_ERROR_SQLITE,
+            "Could not execute retrieval-index foreign-key check: %s",
+            sqlite3_errmsg (db)
+        );
+        return FALSE;
+    }
+
     const char *queries[] = {
         "SELECT 1 FROM search_fts f WHERE "
         "f.evidence_kind IS NULL OR f.evidence_id IS NULL OR "
