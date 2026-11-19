@@ -21,6 +21,9 @@ atm_retrieval_index_validate_fts_canonical_consistency (
     const char *schema_sql = NULL;
     char *upper_schema_sql = NULL;
     int rc;
+    gint64 validation_started_us = g_get_monotonic_time ();
+    gint64 foreign_key_check_us = 0;
+    gint64 canonical_query_us[2] = { 0, 0 };
 
     rc = sqlite3_prepare_v2 (
         db,
@@ -130,7 +133,9 @@ atm_retrieval_index_validate_fts_canonical_consistency (
         return FALSE;
     }
 
+    gint64 foreign_key_started_us = g_get_monotonic_time ();
     rc = sqlite3_step (statement);
+    foreign_key_check_us = g_get_monotonic_time () - foreign_key_started_us;
     sqlite3_finalize (statement);
     statement = NULL;
     if (rc == SQLITE_ROW) {
@@ -212,6 +217,7 @@ atm_retrieval_index_validate_fts_canonical_consistency (
     };
 
     for (gsize i = 0; i < G_N_ELEMENTS (queries); i++) {
+        gint64 query_started_us = g_get_monotonic_time ();
         rc = sqlite3_prepare_v2 (db, queries[i], -1, &statement, NULL);
         if (rc != SQLITE_OK) {
             g_set_error (
@@ -233,6 +239,7 @@ atm_retrieval_index_validate_fts_canonical_consistency (
             );
             return FALSE;
         }
+        canonical_query_us[i] = g_get_monotonic_time () - query_started_us;
         if (rc != SQLITE_DONE) {
             g_set_error (
                 error, ATM_RETRIEVAL_INDEX_ERROR, ATM_RETRIEVAL_INDEX_ERROR_SQLITE,
@@ -241,6 +248,19 @@ atm_retrieval_index_validate_fts_canonical_consistency (
             );
             return FALSE;
         }
+    }
+
+    if (g_getenv ("ATM_RETRIEVAL_VALIDATOR_TIMING") != NULL) {
+        g_printerr (
+            "ATM_RETRIEVAL_VALIDATOR_TIMING fk_us=%" G_GINT64_FORMAT
+            " canonical0_us=%" G_GINT64_FORMAT
+            " canonical1_us=%" G_GINT64_FORMAT
+            " total_us=%" G_GINT64_FORMAT "\\n",
+            foreign_key_check_us,
+            canonical_query_us[0],
+            canonical_query_us[1],
+            g_get_monotonic_time () - validation_started_us
+        );
     }
     return TRUE;
 }
