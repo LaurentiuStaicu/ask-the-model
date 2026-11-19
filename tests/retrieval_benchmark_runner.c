@@ -3,6 +3,7 @@
 #include "retrieval_index_lifecycle.h"
 #include "retrieval_policy.h"
 #include "retrieval_scope.h"
+#include "retrieval_query.h"
 
 #include <gio/gio.h>
 #include <glib.h>
@@ -1241,6 +1242,89 @@ append_topic_run (
     return TRUE;
 }
 
+
+/*
+ * Diagnostic-only upper-bound experiment for reusing a validated read-only
+ * SQLite session across repeated retrieval calls. The reused case deliberately
+ * keeps one read transaction open; it is not a production cache design and
+ * does not model request-boundary invalidation.
+ */
+static gboolean
+measure_validation_session_reuse_probe (
+    const GPtrArray *repositories,
+    GError **error
+)
+{
+    const guint iterations = 25;
+
+    for (guint repository_index = 0;
+         repository_index < repositories->len;
+         repository_index++) {
+        const BenchmarkRepository *repository =
+            g_ptr_array_index ((GPtrArray *) repositories, repository_index);
+        gint64 reopen_started = g_get_monotonic_time ();
+
+        for (guint iteration = 0; iteration < iterations; iteration++) {
+            AtmRetrievalQuerySession *session =
+                atm_retrieval_query_session_open (repository->index_path, error);
+            GPtrArray *results = NULL;
+
+            if (session == NULL) {
+                return FALSE;
+            }
+
+            gboolean searched = atm_retrieval_query_session_search_fts (
+                session, "energy emissions", 10, &results, error
+            );
+            g_clear_pointer (&results, g_ptr_array_unref);
+            atm_retrieval_query_session_close (session);
+
+            if (!searched) {
+                return FALSE;
+            }
+        }
+
+        gint64 reopen_elapsed = g_get_monotonic_time () - reopen_started;
+        AtmRetrievalQuerySession *reused_session =
+            atm_retrieval_query_session_open (repository->index_path, error);
+
+        if (reused_session == NULL) {
+            return FALSE;
+        }
+
+        gint64 reuse_started = g_get_monotonic_time ();
+        for (guint iteration = 0; iteration < iterations; iteration++) {
+            GPtrArray *results = NULL;
+            gboolean searched = atm_retrieval_query_session_search_fts (
+                reused_session, "energy emissions", 10, &results, error
+            );
+            g_clear_pointer (&results, g_ptr_array_unref);
+
+            if (!searched) {
+                atm_retrieval_query_session_close (reused_session);
+                return FALSE;
+            }
+        }
+        gint64 reuse_elapsed = g_get_monotonic_time () - reuse_started;
+        atm_retrieval_query_session_close (reused_session);
+
+        g_printerr (
+            "ATM_RETRIEVAL_VALIDATOR_REUSE_PROBE repository=%s "
+            "iterations=%u reopen_total_us=%" G_GINT64_FORMAT
+            " reuse_total_us=%" G_GINT64_FORMAT
+            " reopen_per_call_us=%.2f reuse_per_call_us=%.2f\n",
+            repository->repository_id,
+            iterations,
+            reopen_elapsed,
+            reuse_elapsed,
+            (double) reopen_elapsed / iterations,
+            (double) reuse_elapsed / iterations
+        );
+    }
+
+    return TRUE;
+}
+
 int
 main (int argc, char **argv)
 {
@@ -1383,6 +1467,11 @@ main (int argc, char **argv)
             &repositories,
             &error
         )) {
+        goto out;
+    }
+
+    if (g_getenv ("ATM_RETRIEVAL_VALIDATOR_REUSE_PROBE") != NULL &&
+        !measure_validation_session_reuse_probe (repositories, &error)) {
         goto out;
     }
 
