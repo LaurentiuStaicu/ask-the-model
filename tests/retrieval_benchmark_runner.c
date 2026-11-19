@@ -1666,6 +1666,85 @@ run_validator_branch_diagnostics (
                 goto repository_error;
             }
             sqlite3_finalize (lean);
+
+            /*
+             * Candidate 3 preserves textual identity on both operands while
+             * removing the additional numeric equality predicate. This is
+             * diagnostic-only and must prove equivalence before timing.
+             */
+            static const char *paired_cast_dataset_sql =
+                "SELECT 1 FROM search_fts f WHERE "
+                "f.evidence_kind='dataset_row' AND "
+                "(f.evidence_id IS NULL OR f.logical_source_id IS NULL OR "
+                "NOT EXISTS (SELECT 1 FROM dataset_rows r "
+                "JOIN datasets d ON d.id=r.dataset_id "
+                "JOIN source_files s ON s.id=d.source_id "
+                "JOIN snapshot_metadata m ON m.id=1 "
+                "WHERE CAST(r.id AS TEXT)=CAST(f.evidence_id AS TEXT) "
+                "AND printf('%s:dataset-row:%s:%d',m.repository_id,s.path,r.ordinal) "
+                "IS f.logical_source_id AND s.path IS f.title "
+                "AND r.search_text IS f.body)) LIMIT 1;";
+            sqlite3_stmt *paired_cast = NULL;
+            rc = sqlite3_prepare_v2 (
+                db, paired_cast_dataset_sql, -1, &paired_cast, NULL
+            );
+            if (rc != SQLITE_OK) {
+                g_set_error (
+                    error, G_IO_ERROR, G_IO_ERROR_FAILED,
+                    "Could not prepare paired-cast dataset-row candidate in %s: %s",
+                    repository->repository_id, sqlite3_errmsg (db)
+                );
+                goto repository_error;
+            }
+
+            rc = sqlite3_step (paired_cast);
+            if (rc == SQLITE_ROW) {
+                g_print (
+                    "ATM_RETRIEVAL_VALIDATOR_PAIRED_CAST repo=%s "
+                    "status=rejected-not-equivalent\\n",
+                    repository->repository_id
+                );
+            } else if (rc == SQLITE_DONE) {
+                sqlite3_reset (paired_cast);
+                gint64 paired_cast_samples[9] = { 0 };
+                for (guint round = 0; round < G_N_ELEMENTS (paired_cast_samples); round++) {
+                    gint64 started = g_get_monotonic_time ();
+                    rc = sqlite3_step (paired_cast);
+                    paired_cast_samples[round] = g_get_monotonic_time () - started;
+                    if (rc != SQLITE_DONE) {
+                        sqlite3_finalize (paired_cast);
+                        g_set_error (
+                            error, G_IO_ERROR, G_IO_ERROR_INVALID_DATA,
+                            "Paired-cast dataset-row candidate failed during measurement in %s: %s",
+                            repository->repository_id, sqlite3_errmsg (db)
+                        );
+                        goto repository_error;
+                    }
+                    sqlite3_reset (paired_cast);
+                }
+                qsort (
+                    paired_cast_samples, G_N_ELEMENTS (paired_cast_samples),
+                    sizeof (paired_cast_samples[0]), compare_int64
+                );
+                g_print (
+                    "ATM_RETRIEVAL_VALIDATOR_PAIRED_CAST repo=%s "
+                    "rows=%" G_GUINT64_FORMAT " samples=9 min_us=%" G_GINT64_FORMAT
+                    " median_us=%" G_GINT64_FORMAT " max_us=%" G_GINT64_FORMAT
+                    " status=equivalent-on-pinned-valid-index\\n",
+                    repository->repository_id, measurements[3].rows,
+                    paired_cast_samples[0], paired_cast_samples[4],
+                    paired_cast_samples[8]
+                );
+            } else {
+                sqlite3_finalize (paired_cast);
+                g_set_error (
+                    error, G_IO_ERROR, G_IO_ERROR_FAILED,
+                    "Paired-cast dataset-row candidate query failed in %s: %s",
+                    repository->repository_id, sqlite3_errmsg (db)
+                );
+                goto repository_error;
+            }
+            sqlite3_finalize (paired_cast);
         }
 
         for (guint i = 0; i < G_N_ELEMENTS (statements); i++)
