@@ -12,6 +12,65 @@
     (g_quark_from_static_string ("atm-retrieval-index-error-quark"))
 
 
+static void
+log_validator_query_plan (
+    sqlite3 *db,
+    const char *label,
+    const char *sql
+)
+{
+    if (g_getenv ("ATM_RETRIEVAL_VALIDATOR_EXPLAIN") == NULL) {
+        return;
+    }
+
+    char *explain_sql = sqlite3_mprintf (
+        "EXPLAIN QUERY PLAN %s",
+        sql
+    );
+    sqlite3_stmt *statement = NULL;
+    int rc = sqlite3_prepare_v2 (
+        db,
+        explain_sql,
+        -1,
+        &statement,
+        NULL
+    );
+    sqlite3_free (explain_sql);
+
+    if (rc != SQLITE_OK) {
+        g_printerr (
+            "ATM_RETRIEVAL_VALIDATOR_PLAN_ERROR label=%s error=%s\\n",
+            label,
+            sqlite3_errmsg (db)
+        );
+        return;
+    }
+
+    while ((rc = sqlite3_step (statement)) == SQLITE_ROW) {
+        const char *detail = (const char *) sqlite3_column_text (
+            statement,
+            3
+        );
+        g_printerr (
+            "ATM_RETRIEVAL_VALIDATOR_PLAN label=%s id=%d parent=%d detail=%s\\n",
+            label,
+            sqlite3_column_int (statement, 0),
+            sqlite3_column_int (statement, 1),
+            detail != NULL ? detail : "(null)"
+        );
+    }
+
+    if (rc != SQLITE_DONE) {
+        g_printerr (
+            "ATM_RETRIEVAL_VALIDATOR_PLAN_ERROR label=%s error=%s\\n",
+            label,
+            sqlite3_errmsg (db)
+        );
+    }
+
+    sqlite3_finalize (statement);
+}
+
 static gboolean
 validate_canonical_coverage_counts (sqlite3 *db, GError **error)
 {
@@ -282,6 +341,8 @@ atm_retrieval_index_validate_fts_canonical_consistency (
         "f.evidence_kind NOT IN ('section','entity','relation','dataset_row');"
     };
 
+
+    log_validator_query_plan (db, "fts_to_canonical", queries[0]);
 
     gint64 query_started_us = g_get_monotonic_time ();
     rc = sqlite3_prepare_v2 (db, queries[0], -1, &statement, NULL);
