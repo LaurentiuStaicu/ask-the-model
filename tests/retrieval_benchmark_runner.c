@@ -1264,6 +1264,7 @@ measure_validation_session_reuse_probe (
             g_ptr_array_index ((GPtrArray *) repositories, repository_index);
         gint64 reopen_started = g_get_monotonic_time ();
 
+        /* A: open, validate, search and close for every request. */
         for (guint iteration = 0; iteration < iterations; iteration++) {
             AtmRetrievalQuerySession *session =
                 atm_retrieval_query_session_open (repository->index_path, error);
@@ -1285,6 +1286,8 @@ measure_validation_session_reuse_probe (
         }
 
         gint64 reopen_elapsed = g_get_monotonic_time () - reopen_started;
+
+        /* Upper bound retained from PR #528: one transaction for all searches. */
         AtmRetrievalQuerySession *reused_session =
             atm_retrieval_query_session_open (repository->index_path, error);
 
@@ -1308,6 +1311,39 @@ measure_validation_session_reuse_probe (
         gint64 reuse_elapsed = g_get_monotonic_time () - reuse_started;
         atm_retrieval_query_session_close (reused_session);
 
+        /* B: keep the connection, but start and validate a fresh read txn per request. */
+        AtmRetrievalQuerySession *fresh_txn_session =
+            atm_retrieval_query_session_open (repository->index_path, error);
+
+        if (fresh_txn_session == NULL) {
+            return FALSE;
+        }
+
+        gint64 fresh_txn_started = g_get_monotonic_time ();
+        for (guint iteration = 0; iteration < iterations; iteration++) {
+            GPtrArray *results = NULL;
+            gboolean refreshed = atm_retrieval_query_session_refresh (
+                fresh_txn_session, error
+            );
+            if (!refreshed) {
+                atm_retrieval_query_session_close (fresh_txn_session);
+                return FALSE;
+            }
+
+            gboolean searched = atm_retrieval_query_session_search_fts (
+                fresh_txn_session, "energy emissions", 10, &results, error
+            );
+            g_clear_pointer (&results, g_ptr_array_unref);
+
+            if (!searched) {
+                atm_retrieval_query_session_close (fresh_txn_session);
+                return FALSE;
+            }
+        }
+        gint64 fresh_txn_elapsed =
+            g_get_monotonic_time () - fresh_txn_started;
+        atm_retrieval_query_session_close (fresh_txn_session);
+
         g_printerr (
             "ATM_RETRIEVAL_VALIDATOR_REUSE_PROBE repository=%s "
             "iterations=%u reopen_total_us=%" G_GINT64_FORMAT
@@ -1319,6 +1355,15 @@ measure_validation_session_reuse_probe (
             reuse_elapsed,
             (double) reopen_elapsed / iterations,
             (double) reuse_elapsed / iterations
+        );
+        g_printerr (
+            "ATM_RETRIEVAL_VALIDATOR_FRESH_TXN_PROBE repository=%s "
+            "iterations=%u fresh_txn_total_us=%" G_GINT64_FORMAT
+            " fresh_txn_per_call_us=%.2f\n",
+            repository->repository_id,
+            iterations,
+            fresh_txn_elapsed,
+            (double) fresh_txn_elapsed / iterations
         );
     }
 
