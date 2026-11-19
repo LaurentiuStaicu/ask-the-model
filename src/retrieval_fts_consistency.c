@@ -335,7 +335,7 @@ atm_retrieval_index_validate_fts_canonical_consistency (
         "JOIN datasets d ON d.id = r.dataset_id "
         "JOIN source_files s ON s.id = d.source_id "
         "JOIN snapshot_metadata m ON m.id = 1 "
-        "WHERE r.id = f.evidence_id AND CAST(r.id AS TEXT) = CAST(f.evidence_id AS TEXT) "
+        "WHERE r.id = f.evidence_id "
         "AND printf('%s:dataset-row:%s:%d', m.repository_id, s.path, r.ordinal) "
         "IS f.logical_source_id AND s.path IS f.title "
         "AND r.search_text IS f.body)) OR "
