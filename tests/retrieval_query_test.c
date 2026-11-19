@@ -10,6 +10,8 @@
 #include <glib/gstdio.h>
 #include <sqlite3.h>
 
+#include <string.h>
+
 #include <sys/stat.h>
 #include <math.h>
 
