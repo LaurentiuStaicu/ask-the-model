@@ -464,6 +464,7 @@ jobs:
         shell: bash
         env:
           ATM_RETRIEVAL_VALIDATOR_TIMING: '1'
+          ATM_RETRIEVAL_VALIDATOR_EXPLAIN: '1'
           BASELINE_SHA: ${{ github.event.pull_request.base.sha }}
           CANDIDATE_SHA: ${{ github.event.pull_request.head.sha }}
         run: |
