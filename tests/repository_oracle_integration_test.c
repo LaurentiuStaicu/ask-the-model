@@ -838,7 +838,7 @@ test_production_ready_then_perturbed (void)
             fts_db,
             "UPDATE search_fts SET evidence_id=CAST(("
             "SELECT id FROM document_sections ORDER BY id LIMIT 1"
-            ") AS TEXT) WHERE rowid=("
+            ") AS INTEGER) WHERE rowid=("
             "SELECT rowid FROM search_fts WHERE evidence_kind='section' "
             "ORDER BY rowid LIMIT 1);",
             NULL, NULL, NULL
@@ -851,7 +851,7 @@ test_production_ready_then_perturbed (void)
 
     /*
      * Fault 6: preserve the evidence_id bytes but change its SQLite storage
-     * class from TEXT to BLOB.  The independent oracle must reject this
+     * class from INTEGER to BLOB. The independent oracle must reject this
      * instead of normalizing x'31' to the canonical identifier "1".
      */
     sqlite3 *identity_db = NULL;
@@ -884,7 +884,7 @@ test_production_ready_then_perturbed (void)
     g_assert_cmpint (
         sqlite3_exec (
             identity_db,
-            "UPDATE search_fts SET evidence_id=CAST(evidence_id AS TEXT) "
+            "UPDATE search_fts SET evidence_id=CAST(evidence_id AS INTEGER) "
             "WHERE rowid=(SELECT rowid FROM search_fts "
             "WHERE evidence_kind='section' ORDER BY rowid LIMIT 1);",
             NULL, NULL, NULL
