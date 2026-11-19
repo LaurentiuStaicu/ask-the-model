@@ -1966,6 +1966,136 @@ typedef struct {
     gint64 ctime_ns;
 } TestRetrievalFileIdentity;
 
+static gint
+test_sqlite_data_version (sqlite3 *db)
+{
+    sqlite3_stmt *statement = NULL;
+    gint version = -1;
+
+    g_assert_cmpint (
+        sqlite3_prepare_v2 (db, "PRAGMA data_version;", -1, &statement, NULL),
+        ==, SQLITE_OK
+    );
+    g_assert_cmpint (sqlite3_step (statement), ==, SQLITE_ROW);
+    version = sqlite3_column_int (statement, 0);
+    g_assert_cmpint (sqlite3_finalize (statement), ==, SQLITE_OK);
+    return version;
+}
+
+static char *
+test_first_fts_body (sqlite3 *db)
+{
+    sqlite3_stmt *statement = NULL;
+    char *body = NULL;
+
+    g_assert_cmpint (
+        sqlite3_prepare_v2 (
+            db, "SELECT body FROM search_fts ORDER BY rowid LIMIT 1;",
+            -1, &statement, NULL
+        ),
+        ==, SQLITE_OK
+    );
+    g_assert_cmpint (sqlite3_step (statement), ==, SQLITE_ROW);
+    body = g_strdup ((const char *) sqlite3_column_text (statement, 0));
+    g_assert_cmpint (sqlite3_finalize (statement), ==, SQLITE_OK);
+    return body;
+}
+
+/*
+ * Characterize SQLite's connection-local data_version signal. The first read
+ * pins a WAL snapshot; a writer then commits an in-place FTS mutation. The
+ * existing transaction must continue to see its old snapshot, while a fresh
+ * transaction must observe both the new contents and a changed data_version.
+ */
+static void
+test_data_version_tracks_external_commit_across_transactions (void)
+{
+    char *snapshot_root = new_snapshot ();
+    char *cache_root = new_temp_root ("atm-data-version-cache-XXXXXX");
+    char *index_path = build_index (snapshot_root, cache_root);
+    sqlite3 *reader = NULL;
+    sqlite3 *writer = NULL;
+    char *old_body = NULL;
+    char *pinned_body = NULL;
+    char *fresh_body = NULL;
+    gint version_before = -1;
+    gint version_during_old_snapshot = -1;
+    gint version_after_commit = -1;
+
+    g_assert_cmpint (
+        sqlite3_open_v2 (index_path, &writer, SQLITE_OPEN_READWRITE, NULL),
+        ==, SQLITE_OK
+    );
+    g_assert_cmpint (
+        sqlite3_exec (writer, "PRAGMA journal_mode=WAL;", NULL, NULL, NULL),
+        ==, SQLITE_OK
+    );
+    g_assert_cmpint (sqlite3_close (writer), ==, SQLITE_OK);
+    writer = NULL;
+
+    g_assert_cmpint (
+        sqlite3_open_v2 (index_path, &reader, SQLITE_OPEN_READONLY, NULL),
+        ==, SQLITE_OK
+    );
+    g_assert_cmpint (
+        sqlite3_exec (reader, "PRAGMA query_only=ON; BEGIN;", NULL, NULL, NULL),
+        ==, SQLITE_OK
+    );
+
+    old_body = test_first_fts_body (reader);
+    version_before = test_sqlite_data_version (reader);
+
+    g_assert_cmpint (
+        sqlite3_open_v2 (index_path, &writer, SQLITE_OPEN_READWRITE, NULL),
+        ==, SQLITE_OK
+    );
+    g_assert_cmpint (
+        sqlite3_exec (
+            writer,
+            "UPDATE search_fts SET body=COALESCE(body,'') || ' generation_probe' "
+            "WHERE rowid=(SELECT rowid FROM search_fts ORDER BY rowid LIMIT 1);",
+            NULL, NULL, NULL
+        ),
+        ==, SQLITE_OK
+    );
+    g_assert_cmpint (sqlite3_changes (writer), ==, 1);
+    g_assert_cmpint (sqlite3_close (writer), ==, SQLITE_OK);
+    writer = NULL;
+
+    version_during_old_snapshot = test_sqlite_data_version (reader);
+    pinned_body = test_first_fts_body (reader);
+    g_assert_cmpstr (pinned_body, ==, old_body);
+
+    g_assert_cmpint (
+        sqlite3_exec (reader, "COMMIT; BEGIN;", NULL, NULL, NULL),
+        ==, SQLITE_OK
+    );
+    fresh_body = test_first_fts_body (reader);
+    version_after_commit = test_sqlite_data_version (reader);
+
+    g_assert_cmpstr (fresh_body, !=, old_body);
+    g_assert_nonnull (strstr (fresh_body, "generation_probe"));
+    g_assert_cmpint (version_after_commit, !=, version_before);
+
+    g_test_message (
+        "data_version before=%d during_old_snapshot=%d after_fresh_snapshot=%d",
+        version_before,
+        version_during_old_snapshot,
+        version_after_commit
+    );
+
+    g_free (old_body);
+    g_free (pinned_body);
+    g_free (fresh_body);
+    sqlite3_close (reader);
+    g_free (index_path);
+    remove_tree_best_effort (snapshot_root);
+    g_free (snapshot_root);
+    remove_tree_best_effort (cache_root);
+    g_free (cache_root);
+}
+
+
 static gboolean
 test_retrieval_file_identity_read (
     const char *path,
@@ -2208,6 +2338,10 @@ main (int argc, char **argv)
     g_test_add_func (
         "/retrieval-query/fts-non-fts5-table",
         test_non_fts5_search_table_is_rejected
+    );
+    g_test_add_func (
+        "/retrieval-query/data-version-external-commit",
+        test_data_version_tracks_external_commit_across_transactions
     );
     g_test_add_func (
         "/retrieval-query/validation-file-identity-invalidation",
