@@ -2137,6 +2137,123 @@ test_retrieval_file_identity_equal (
         left->ctime_ns == right->ctime_ns;
 }
 
+static gboolean
+test_fts_contains_marker (sqlite3 *db, const char *marker)
+{
+    sqlite3_stmt *statement = NULL;
+    gboolean found = FALSE;
+    char *sql = sqlite3_mprintf (
+        "SELECT 1 FROM search_fts WHERE body LIKE '%%%q%%' LIMIT 1;",
+        marker
+    );
+
+    g_assert_nonnull (sql);
+    g_assert_cmpint (sqlite3_prepare_v2 (db, sql, -1, &statement, NULL), ==, SQLITE_OK);
+    g_free (sql);
+
+    int rc = sqlite3_step (statement);
+    g_assert_true (rc == SQLITE_ROW || rc == SQLITE_DONE);
+    found = rc == SQLITE_ROW;
+    g_assert_cmpint (sqlite3_finalize (statement), ==, SQLITE_OK);
+    return found;
+}
+
+/*
+ * An open SQLite connection stays attached to the old inode after atomic
+ * replacement of its pathname. data_version on that connection cannot signal
+ * the new path generation; path identity must be checked independently.
+ */
+static void
+test_data_version_does_not_detect_atomic_path_replacement (void)
+{
+    const char *replacement_marker = "replacement_generation_marker";
+    char *snapshot_root = new_snapshot ();
+    char *cache_root = new_temp_root ("atm-path-generation-cache-XXXXXX");
+    char *replacement_snapshot_root = new_snapshot ();
+    char *replacement_cache_root =
+        new_temp_root ("atm-path-generation-replacement-cache-XXXXXX");
+    char *index_path = build_index (snapshot_root, cache_root);
+    char *replacement_source = NULL;
+    char *replacement_path = g_strdup_printf ("%s.replacement", index_path);
+    char *replacement_status = g_strdup_printf (
+        "# Replacement generation\n%s\n", replacement_marker
+    );
+    sqlite3 *reader = NULL;
+    sqlite3 *fresh_reader = NULL;
+    TestRetrievalFileIdentity original_identity = { 0 };
+    TestRetrievalFileIdentity replacement_identity = { 0 };
+    gint original_data_version = -1;
+    gint after_replace_data_version = -1;
+    GError *error = NULL;
+
+    write_text (replacement_snapshot_root, "STATUS.md", replacement_status);
+    replacement_source = build_index (
+        replacement_snapshot_root, replacement_cache_root
+    );
+
+    g_assert_true (test_retrieval_file_identity_read (
+        index_path, &original_identity
+    ));
+    g_assert_cmpint (
+        sqlite3_open_v2 (index_path, &reader, SQLITE_OPEN_READONLY, NULL),
+        ==, SQLITE_OK
+    );
+    g_assert_cmpint (
+        sqlite3_exec (reader, "PRAGMA query_only=ON; BEGIN;", NULL, NULL, NULL),
+        ==, SQLITE_OK
+    );
+    g_assert_false (test_fts_contains_marker (reader, replacement_marker));
+    original_data_version = test_sqlite_data_version (reader);
+
+    g_assert_cmpint (g_rename (replacement_source, index_path), ==, 0);
+    g_assert_true (test_retrieval_file_identity_read (
+        index_path, &replacement_identity
+    ));
+    g_assert_cmpuint (
+        original_identity.inode, !=, replacement_identity.inode
+    );
+
+    after_replace_data_version = test_sqlite_data_version (reader);
+    g_assert_cmpint (
+        after_replace_data_version, ==, original_data_version
+    );
+    g_assert_false (test_fts_contains_marker (reader, replacement_marker));
+
+    g_assert_cmpint (
+        sqlite3_open_v2 (
+            index_path, &fresh_reader, SQLITE_OPEN_READONLY, NULL
+        ),
+        ==, SQLITE_OK
+    );
+    g_assert_true (test_fts_contains_marker (
+        fresh_reader, replacement_marker
+    ));
+
+    g_test_message (
+        "atomic replacement preserved old connection data_version=%d; "
+        "path inode changed from %" G_GUINT64_FORMAT " to %" G_GUINT64_FORMAT,
+        original_data_version,
+        original_identity.inode,
+        replacement_identity.inode
+    );
+
+    sqlite3_close (fresh_reader);
+    sqlite3_close (reader);
+    g_free (replacement_status);
+    g_free (replacement_path);
+    g_free (replacement_source);
+    g_free (index_path);
+    remove_tree_best_effort (snapshot_root);
+    g_free (snapshot_root);
+    remove_tree_best_effort (cache_root);
+    g_free (cache_root);
+    remove_tree_best_effort (replacement_snapshot_root);
+    g_free (replacement_snapshot_root);
+    remove_tree_best_effort (replacement_cache_root);
+    g_free (replacement_cache_root);
+}
+
+
 static void
 test_validation_file_identity_invalidates_on_mutation_and_replacement (void)
 {
@@ -2344,6 +2461,10 @@ main (int argc, char **argv)
     g_test_add_func (
         "/retrieval-query/data-version-external-commit",
         test_data_version_tracks_external_commit_across_transactions
+    );
+    g_test_add_func (
+        "/retrieval-query/data-version-atomic-replacement-boundary",
+        test_data_version_does_not_detect_atomic_path_replacement
     );
     g_test_add_func (
         "/retrieval-query/validation-file-identity-invalidation",
