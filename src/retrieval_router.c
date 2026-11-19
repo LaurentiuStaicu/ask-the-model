@@ -398,6 +398,13 @@ collect_repository_evidence (
     g_return_val_if_fail (out_set != NULL, FALSE);
     g_return_val_if_fail (*out_set == NULL, FALSE);
 
+    if (g_getenv ("ATM_RETRIEVAL_VALIDATOR_TIMING") != NULL) {
+        g_printerr (
+            "ATM_RETRIEVAL_VALIDATOR_REPOSITORY repo=%s\\n",
+            scope->repository_id
+        );
+    }
+
     collected = g_ptr_array_new_with_free_func (
         (GDestroyNotify) atm_evidence_record_free
     );
