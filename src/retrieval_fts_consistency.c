@@ -285,6 +285,73 @@ measure_validator_branch_timings (sqlite3 *db)
     }
 }
 
+/*
+ * Compare the complete canonical-consistency pass with a joined dataset-row
+ * branch. This is diagnostic-only: production continues to use the query
+ * above until equivalence and end-to-end performance are established.
+ */
+static void
+measure_joined_dataset_validator_timing (sqlite3 *db)
+{
+    static const char *sql =
+        "SELECT 1 FROM search_fts f "
+        "LEFT JOIN dataset_rows dr ON "
+        "f.evidence_kind = 'dataset_row' AND dr.id = f.evidence_id "
+        "LEFT JOIN datasets dd ON dd.id = dr.dataset_id "
+        "LEFT JOIN source_files ds ON ds.id = dd.source_id "
+        "LEFT JOIN snapshot_metadata dm ON dm.id = 1 "
+        "WHERE f.evidence_kind IS NULL OR f.evidence_id IS NULL OR "
+        "typeof(f.evidence_id) <> 'integer' OR "
+        "f.logical_source_id IS NULL OR "
+        "(f.evidence_kind = 'section' AND NOT EXISTS ("
+        "SELECT 1 FROM document_sections d WHERE "
+        "d.id = f.evidence_id "
+        "AND d.logical_source_id IS f.logical_source_id "
+        "AND d.title IS f.title AND d.body IS f.body)) OR "
+        "(f.evidence_kind = 'entity' AND NOT EXISTS ("
+        "SELECT 1 FROM structured_entities e WHERE "
+        "e.id = f.evidence_id "
+        "AND e.logical_source_id IS f.logical_source_id "
+        "AND COALESCE(e.label, e.native_id) IS f.title "
+        "AND e.payload_json IS f.body)) OR "
+        "(f.evidence_kind = 'relation' AND NOT EXISTS ("
+        "SELECT 1 FROM structured_relations r WHERE "
+        "r.id = f.evidence_id "
+        "AND r.logical_source_id IS f.logical_source_id "
+        "AND COALESCE(r.native_id, r.relation_type) IS f.title "
+        "AND r.payload_json IS f.body)) OR "
+        "(f.evidence_kind = 'dataset_row' AND ("
+        "dr.id IS NULL OR dd.id IS NULL OR ds.id IS NULL OR dm.id IS NULL OR "
+        "printf('%s:dataset-row:%s:%d', dm.repository_id, ds.path, dr.ordinal) "
+        "IS NOT f.logical_source_id OR ds.path IS NOT f.title OR "
+        "dr.search_text IS NOT f.body)) OR "
+        "f.evidence_kind NOT IN ('section','entity','relation','dataset_row');";
+
+    log_validator_query_plan (db, "fts_to_canonical_joined_dataset", sql);
+
+    sqlite3_stmt *statement = NULL;
+    gint64 started_us = g_get_monotonic_time ();
+    int rc = sqlite3_prepare_v2 (db, sql, -1, &statement, NULL);
+    if (rc == SQLITE_OK) {
+        rc = sqlite3_step (statement);
+    }
+
+    const char *result =
+        rc == SQLITE_DONE ? "valid" :
+        rc == SQLITE_ROW ? "mismatch" : "error";
+    g_printerr (
+        "ATM_RETRIEVAL_VALIDATOR_JOINED_DATASET result=%s elapsed_us=%"
+        G_GINT64_FORMAT,
+        result,
+        g_get_monotonic_time () - started_us
+    );
+    if (rc != SQLITE_DONE && rc != SQLITE_ROW) {
+        g_printerr (" error=%s", sqlite3_errmsg (db));
+    }
+    g_printerr ("\n");
+    sqlite3_finalize (statement);
+}
+
 gboolean
 atm_retrieval_index_validate_fts_canonical_consistency (
     sqlite3 *db,
@@ -495,6 +562,9 @@ atm_retrieval_index_validate_fts_canonical_consistency (
     }
 
     measure_validator_branch_timings (db);
+    if (g_getenv ("ATM_RETRIEVAL_VALIDATOR_BRANCH_TIMING") != NULL) {
+        measure_joined_dataset_validator_timing (db);
+    }
 
     query_started_us = g_get_monotonic_time ();
     if (!validate_canonical_coverage_counts (db, error)) return FALSE;
