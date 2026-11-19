@@ -1408,6 +1408,7 @@ run_validator_identity_type_diagnostics (GError **error)
             return FALSE;
         }
         sqlite3_finalize(type_stmt);
+        sqlite3_reset(compare);
     }
 
     g_print(
