@@ -87,7 +87,7 @@ validate_canonical_coverage_counts (sqlite3 *db, GError **error)
         "(SELECT count(*) FROM dataset_rows);";
     guint64 fts_counts[4] = { 0, 0, 0, 0 };
     sqlite3_stmt *statement = NULL;
-    gint64 coverage_started_us = g_get_monotonic_time ();
+    gint64 coverage_started_us;
     gint64 fts_identity_us = 0;
     gint64 canonical_population_us = 0;
 
@@ -96,6 +96,7 @@ validate_canonical_coverage_counts (sqlite3 *db, GError **error)
         log_validator_query_plan (db, "canonical_population_counts", canonical_counts_sql);
     }
 
+    coverage_started_us = g_get_monotonic_time ();
     int rc = sqlite3_prepare_v2 (db, fts_counts_sql, -1, &statement, NULL);
 
     if (rc != SQLITE_OK) {
@@ -178,7 +179,7 @@ validate_canonical_coverage_counts (sqlite3 *db, GError **error)
         g_printerr (
             "ATM_RETRIEVAL_VALIDATOR_COVERAGE fts_identity_us=%" G_GINT64_FORMAT
             " canonical_population_us=%" G_GINT64_FORMAT
-            " total_us=%" G_GINT64_FORMAT "\\n",
+            " total_us=%" G_GINT64_FORMAT "\n",
             fts_identity_us,
             canonical_population_us,
             g_get_monotonic_time () - coverage_started_us
