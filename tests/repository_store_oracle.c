@@ -2090,9 +2090,25 @@ check_fts_canonical_consistency (sqlite3 *db, GError **error)
 
     while ((rc = sqlite3_step (statement)) == SQLITE_ROW) {
         const char *kind = (const char *) sqlite3_column_text (statement, 0);
-        const char *evidence_id = (const char *) sqlite3_column_text (statement, 1);
         const char *logical_source_id =
             (const char *) sqlite3_column_text (statement, 2);
+
+        /*
+         * FTS5 can preserve a BLOB value in an UNINDEXED identity column.
+         * Do not let sqlite3_column_text() normalize it into the same byte
+         * sequence as the canonical TEXT identifier (for example x'31').
+         */
+        if (sqlite3_column_type (statement, 1) != SQLITE_TEXT) {
+            g_set_error_literal (
+                error, ORACLE_ERROR, ORACLE_ERROR_INTEGRITY,
+                "FTS evidence_id is not stored as TEXT."
+            );
+            ok = FALSE;
+            break;
+        }
+
+        const char *evidence_id =
+            (const char *) sqlite3_column_text (statement, 1);
 
         if (kind == NULL || evidence_id == NULL || logical_source_id == NULL) {
             g_set_error_literal (
