@@ -39,7 +39,7 @@ log_validator_query_plan (
 
     if (rc != SQLITE_OK) {
         g_printerr (
-            "ATM_RETRIEVAL_VALIDATOR_PLAN_ERROR label=%s error=%s\\n",
+            "ATM_RETRIEVAL_VALIDATOR_PLAN_ERROR label=%s error=%s\n",
             label,
             sqlite3_errmsg (db)
         );
@@ -52,7 +52,7 @@ log_validator_query_plan (
             3
         );
         g_printerr (
-            "ATM_RETRIEVAL_VALIDATOR_PLAN label=%s id=%d parent=%d detail=%s\\n",
+            "ATM_RETRIEVAL_VALIDATOR_PLAN label=%s id=%d parent=%d detail=%s\n",
             label,
             sqlite3_column_int (statement, 0),
             sqlite3_column_int (statement, 1),
@@ -62,7 +62,7 @@ log_validator_query_plan (
 
     if (rc != SQLITE_DONE) {
         g_printerr (
-            "ATM_RETRIEVAL_VALIDATOR_PLAN_ERROR label=%s error=%s\\n",
+            "ATM_RETRIEVAL_VALIDATOR_PLAN_ERROR label=%s error=%s\n",
             label,
             sqlite3_errmsg (db)
         );
