@@ -510,6 +510,21 @@ jobs:
             --samples 5 \
             --output /tmp/atm-r5-main-vs-pr-comparison.json
 
+      - name: Measure FTS validator branches independently
+        if: github.event_name == 'pull_request'
+        shell: bash
+        run: |
+          set -euo pipefail
+
+          /tmp/atm-retrieval-benchmark-runner \
+            benchmarks/retrieval-v1/benchmark.json \
+            /tmp/atm-r5-validator-branch-diagnostics.json \
+            "validator-branches-${GITHUB_RUN_ID}-${GITHUB_RUN_ATTEMPT}" \
+            production \
+            validator-diagnostics \
+            | tee /tmp/atm-r5-validator-branch-diagnostics.log
+
+
       - name: Assemble D0 control-relative sweep artifact
         shell: bash
         env:
@@ -571,5 +586,6 @@ jobs:
             /tmp/atm-retrieval-candidate-*-evaluation.json
             /tmp/atm-retrieval-policy-sweep-summary.json
             /tmp/atm-r5-main-vs-pr-comparison.json
+            /tmp/atm-r5-validator-branch-diagnostics.log
           if-no-files-found: warn
           retention-days: 14

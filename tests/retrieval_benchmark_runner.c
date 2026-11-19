@@ -8,7 +8,9 @@
 #include <glib.h>
 #include <glib/gstdio.h>
 #include <json-glib/json-glib.h>
+#include <sqlite3.h>
 
+#include <stdlib.h>
 #include <string.h>
 #include <sys/stat.h>
 
@@ -1241,18 +1243,723 @@ append_topic_run (
     return TRUE;
 }
 
+
+typedef struct {
+    const char *kind;
+    const char *sql;
+    guint64 rows;
+    gint64 samples[9];
+} ValidatorBranchMeasurement;
+
+static gint
+compare_int64 (gconstpointer left, gconstpointer right)
+{
+    const gint64 a = *(const gint64 *) left;
+    const gint64 b = *(const gint64 *) right;
+    return (a > b) - (a < b);
+}
+
+static gboolean
+run_validator_identity_type_diagnostics (GError **error)
+{
+    static const char *cases[] = {
+        "integer-1", "text-1", "text-01", "text-1.0",
+        "real-1", "blob-1", "null", "integer-2", "text-2"
+    };
+    static const gboolean expected_equivalent[] = {
+        TRUE, TRUE, TRUE, TRUE, TRUE, FALSE, TRUE, TRUE, TRUE
+    };
+    static const char *insert_sql =
+        "INSERT INTO search_fts(evidence_id) VALUES(?1);";
+    static const char *compare_sql =
+        "SELECT "
+        "EXISTS(SELECT 1 FROM search_fts f WHERE f.evidence_id IS NULL OR "
+        "NOT EXISTS(SELECT 1 FROM canonical r WHERE r.id=f.evidence_id "
+        "AND CAST(r.id AS TEXT)=CAST(f.evidence_id AS TEXT))),"
+        "EXISTS(SELECT 1 FROM search_fts f WHERE f.evidence_id IS NULL OR "
+        "NOT EXISTS(SELECT 1 FROM canonical r WHERE "
+        "CAST(r.id AS TEXT)=CAST(f.evidence_id AS TEXT)));";
+    sqlite3 *db = NULL;
+    sqlite3_stmt *insert = NULL;
+    sqlite3_stmt *compare = NULL;
+    int rc = sqlite3_open(":memory:", &db);
+    if (rc != SQLITE_OK) {
+        g_set_error(error, G_IO_ERROR, G_IO_ERROR_FAILED,
+                    "Could not open SQLite identity diagnostic: %s",
+                    db != NULL ? sqlite3_errmsg(db) : "out of memory");
+        if (db != NULL) sqlite3_close(db);
+        return FALSE;
+    }
+
+    const char *schema_sql =
+        "CREATE TABLE canonical(id INTEGER PRIMARY KEY);"
+        "INSERT INTO canonical(id) VALUES(1);"
+        "CREATE VIRTUAL TABLE search_fts USING fts5(evidence_id UNINDEXED);";
+    rc = sqlite3_exec(db, schema_sql, NULL, NULL, NULL);
+    if (rc != SQLITE_OK) {
+        g_set_error(error, G_IO_ERROR, G_IO_ERROR_FAILED,
+                    "Could not create SQLite identity diagnostic schema: %s",
+                    sqlite3_errmsg(db));
+        sqlite3_close(db);
+        return FALSE;
+    }
+
+    rc = sqlite3_prepare_v2(db, insert_sql, -1, &insert, NULL);
+    if (rc == SQLITE_OK)
+        rc = sqlite3_prepare_v2(db, compare_sql, -1, &compare, NULL);
+    if (rc != SQLITE_OK) {
+        g_set_error(error, G_IO_ERROR, G_IO_ERROR_FAILED,
+                    "Could not prepare SQLite identity diagnostic: %s",
+                    sqlite3_errmsg(db));
+        sqlite3_finalize(insert);
+        sqlite3_finalize(compare);
+        sqlite3_close(db);
+        return FALSE;
+    }
+
+    gboolean saw_blob_divergence = FALSE;
+    for (guint i = 0; i < G_N_ELEMENTS(cases); i++) {
+        sqlite3_exec(db, "DELETE FROM search_fts;", NULL, NULL, NULL);
+        sqlite3_reset(insert);
+        sqlite3_clear_bindings(insert);
+
+        switch (i) {
+        case 0:
+            sqlite3_bind_int64(insert, 1, 1);
+            break;
+        case 1:
+            sqlite3_bind_text(insert, 1, "1", -1, SQLITE_STATIC);
+            break;
+        case 2:
+            sqlite3_bind_text(insert, 1, "01", -1, SQLITE_STATIC);
+            break;
+        case 3:
+            sqlite3_bind_text(insert, 1, "1.0", -1, SQLITE_STATIC);
+            break;
+        case 4:
+            sqlite3_bind_double(insert, 1, 1.0);
+            break;
+        case 5: {
+            static const unsigned char blob_value[] = { '1' };
+            sqlite3_bind_blob(insert, 1, blob_value, sizeof(blob_value),
+                              SQLITE_STATIC);
+            break;
+        }
+        case 6:
+            sqlite3_bind_null(insert, 1);
+            break;
+        case 7:
+            sqlite3_bind_int64(insert, 1, 2);
+            break;
+        case 8:
+            sqlite3_bind_text(insert, 1, "2", -1, SQLITE_STATIC);
+            break;
+        default:
+            g_assert_not_reached();
+        }
+
+        rc = sqlite3_step(insert);
+        if (rc != SQLITE_DONE) {
+            g_set_error(error, G_IO_ERROR, G_IO_ERROR_FAILED,
+                        "Could not insert %s into FTS5 diagnostic: %s",
+                        cases[i], sqlite3_errmsg(db));
+            sqlite3_finalize(insert);
+            sqlite3_finalize(compare);
+            sqlite3_close(db);
+            return FALSE;
+        }
+
+        sqlite3_reset(compare);
+        rc = sqlite3_step(compare);
+        if (rc != SQLITE_ROW) {
+            g_set_error(error, G_IO_ERROR, G_IO_ERROR_FAILED,
+                        "Could not compare %s identity predicates: %s",
+                        cases[i], sqlite3_errmsg(db));
+            sqlite3_finalize(insert);
+            sqlite3_finalize(compare);
+            sqlite3_close(db);
+            return FALSE;
+        }
+
+        int original_invalid = sqlite3_column_int(compare, 0);
+        int paired_cast_invalid = sqlite3_column_int(compare, 1);
+        const char *storage_type = "unknown";
+        sqlite3_stmt *type_stmt = NULL;
+        if (sqlite3_prepare_v2(db,
+            "SELECT typeof(evidence_id) FROM search_fts;",
+            -1, &type_stmt, NULL) == SQLITE_OK &&
+            sqlite3_step(type_stmt) == SQLITE_ROW) {
+            storage_type = (const char *)sqlite3_column_text(type_stmt, 0);
+            g_print(
+                "ATM_RETRIEVAL_IDENTITY_TYPE case=%s storage=%s "
+                "original_invalid=%d paired_cast_invalid=%d equivalent=%s\\n",
+                cases[i], storage_type != NULL ? storage_type : "unknown",
+                original_invalid, paired_cast_invalid,
+                original_invalid == paired_cast_invalid ? "yes" : "no"
+            );
+            gboolean equivalent = original_invalid == paired_cast_invalid;
+            if (equivalent != expected_equivalent[i]) {
+                g_set_error(error, G_IO_ERROR, G_IO_ERROR_INVALID_DATA,
+                            "Unexpected predicate equivalence for %s: expected %s, got %s",
+                            cases[i],
+                            expected_equivalent[i] ? "equivalent" : "different",
+                            equivalent ? "equivalent" : "different");
+                sqlite3_finalize(type_stmt);
+                sqlite3_finalize(insert);
+                sqlite3_finalize(compare);
+                sqlite3_close(db);
+                return FALSE;
+            }
+            if (g_strcmp0(cases[i], "blob-1") == 0 && !equivalent)
+                saw_blob_divergence = TRUE;
+        } else {
+            g_set_error(error, G_IO_ERROR, G_IO_ERROR_FAILED,
+                        "Could not inspect %s FTS5 storage class: %s",
+                        cases[i], sqlite3_errmsg(db));
+            sqlite3_finalize(type_stmt);
+            sqlite3_finalize(insert);
+            sqlite3_finalize(compare);
+            sqlite3_close(db);
+            return FALSE;
+        }
+        sqlite3_finalize(type_stmt);
+        sqlite3_reset(compare);
+    }
+
+    g_print(
+        "ATM_RETRIEVAL_IDENTITY_TYPE_SUMMARY blob_divergence=%s\\n",
+        saw_blob_divergence ? "observed" : "not-observed"
+    );
+    sqlite3_finalize(insert);
+    sqlite3_finalize(compare);
+    sqlite3_close(db);
+    return TRUE;
+}
+
+static gboolean
+run_validator_branch_diagnostics (
+    GPtrArray *repositories,
+    GError **error
+)
+{
+    if (!run_validator_identity_type_diagnostics(error))
+        return FALSE;
+
+    static const char *kinds[] = {
+        "section", "entity", "relation", "dataset_row"
+    };
+    static const char *branch_sql[] = {
+        "SELECT 1 FROM search_fts f WHERE f.evidence_kind='section' AND "
+        "(f.evidence_id IS NULL OR f.logical_source_id IS NULL OR NOT EXISTS ("
+        "SELECT 1 FROM document_sections d WHERE d.id=f.evidence_id "
+        "AND CAST(d.id AS TEXT)=CAST(f.evidence_id AS TEXT) "
+        "AND d.logical_source_id IS f.logical_source_id "
+        "AND d.title IS f.title AND d.body IS f.body)) LIMIT 1;",
+        "SELECT 1 FROM search_fts f WHERE f.evidence_kind='entity' AND "
+        "(f.evidence_id IS NULL OR f.logical_source_id IS NULL OR NOT EXISTS ("
+        "SELECT 1 FROM structured_entities e WHERE e.id=f.evidence_id "
+        "AND CAST(e.id AS TEXT)=CAST(f.evidence_id AS TEXT) "
+        "AND e.logical_source_id IS f.logical_source_id "
+        "AND COALESCE(e.label,e.native_id) IS f.title "
+        "AND e.payload_json IS f.body)) LIMIT 1;",
+        "SELECT 1 FROM search_fts f WHERE f.evidence_kind='relation' AND "
+        "(f.evidence_id IS NULL OR f.logical_source_id IS NULL OR NOT EXISTS ("
+        "SELECT 1 FROM structured_relations r WHERE r.id=f.evidence_id "
+        "AND CAST(r.id AS TEXT)=CAST(f.evidence_id AS TEXT) "
+        "AND r.logical_source_id IS f.logical_source_id "
+        "AND COALESCE(r.native_id,r.relation_type) IS f.title "
+        "AND r.payload_json IS f.body)) LIMIT 1;",
+        "SELECT 1 FROM search_fts f WHERE f.evidence_kind='dataset_row' AND "
+        "(f.evidence_id IS NULL OR f.logical_source_id IS NULL OR NOT EXISTS ("
+        "SELECT 1 FROM dataset_rows r JOIN datasets d ON d.id=r.dataset_id "
+        "JOIN source_files s ON s.id=d.source_id "
+        "JOIN snapshot_metadata m ON m.id=1 "
+        "WHERE r.id=f.evidence_id "
+        "AND CAST(r.id AS TEXT)=CAST(f.evidence_id AS TEXT) "
+        "AND printf('%s:dataset-row:%s:%d',m.repository_id,s.path,r.ordinal) "
+        "IS f.logical_source_id AND s.path IS f.title "
+        "AND r.search_text IS f.body)) LIMIT 1;"
+    };
+
+    for (guint repository_index = 0;
+         repository_index < repositories->len;
+         repository_index++) {
+        BenchmarkRepository *repository = g_ptr_array_index (
+            repositories, repository_index
+        );
+        sqlite3 *db = NULL;
+        sqlite3_stmt *statements[4] = { NULL, NULL, NULL, NULL };
+        ValidatorBranchMeasurement measurements[4] = { 0 };
+        int rc = sqlite3_open_v2 (
+            repository->index_path, &db, SQLITE_OPEN_READONLY, NULL
+        );
+
+        if (rc != SQLITE_OK) {
+            g_set_error (
+                error, G_IO_ERROR, G_IO_ERROR_FAILED,
+                "Could not open %s retrieval index for branch diagnostics: %s",
+                repository->repository_id,
+                db != NULL ? sqlite3_errmsg (db) : "unknown SQLite error"
+            );
+            if (db != NULL) sqlite3_close (db);
+            return FALSE;
+        }
+
+        for (guint i = 0; i < G_N_ELEMENTS (measurements); i++) {
+            sqlite3_stmt *count_statement = NULL;
+            char *count_sql = g_strdup_printf (
+                "SELECT count(*) FROM search_fts WHERE evidence_kind='%s';",
+                kinds[i]
+            );
+            rc = sqlite3_prepare_v2 (
+                db, count_sql, -1, &count_statement, NULL
+            );
+            g_free (count_sql);
+
+            if (rc != SQLITE_OK ||
+                sqlite3_step (count_statement) != SQLITE_ROW) {
+                g_set_error (
+                    error, G_IO_ERROR, G_IO_ERROR_FAILED,
+                    "Could not count %s FTS rows in %s: %s",
+                    kinds[i], repository->repository_id, sqlite3_errmsg (db)
+                );
+                if (count_statement != NULL) sqlite3_finalize (count_statement);
+                goto repository_error;
+            }
+
+            measurements[i].kind = kinds[i];
+            measurements[i].sql = branch_sql[i];
+            measurements[i].rows = (guint64) sqlite3_column_int64 (
+                count_statement, 0
+            );
+            sqlite3_finalize (count_statement);
+
+            rc = sqlite3_prepare_v2 (
+                db, branch_sql[i], -1, &statements[i], NULL
+            );
+            if (rc != SQLITE_OK) {
+                g_set_error (
+                    error, G_IO_ERROR, G_IO_ERROR_FAILED,
+                    "Could not prepare %s validator branch in %s: %s",
+                    kinds[i], repository->repository_id, sqlite3_errmsg (db)
+                );
+                goto repository_error;
+            }
+
+            rc = sqlite3_step (statements[i]);
+            if (rc != SQLITE_DONE) {
+                g_set_error (
+                    error, G_IO_ERROR, G_IO_ERROR_INVALID_DATA,
+                    "%s validator branch found an inconsistent row in %s: %s",
+                    kinds[i], repository->repository_id, sqlite3_errmsg (db)
+                );
+                goto repository_error;
+            }
+            sqlite3_reset (statements[i]);
+        }
+
+        /* Nine interleaved rounds rotate the first branch to reduce order bias. */
+        for (guint round = 0; round < 9; round++) {
+            for (guint offset = 0; offset < G_N_ELEMENTS (measurements); offset++) {
+                guint i = (round + offset) % G_N_ELEMENTS (measurements);
+                gint64 started = g_get_monotonic_time ();
+                rc = sqlite3_step (statements[i]);
+                measurements[i].samples[round] =
+                    g_get_monotonic_time () - started;
+
+                if (rc != SQLITE_DONE) {
+                    g_set_error (
+                        error, G_IO_ERROR, G_IO_ERROR_INVALID_DATA,
+                        "%s validator branch failed during measurement in %s: %s",
+                        kinds[i], repository->repository_id, sqlite3_errmsg (db)
+                    );
+                    goto repository_error;
+                }
+                sqlite3_reset (statements[i]);
+            }
+        }
+
+        for (guint i = 0; i < G_N_ELEMENTS (measurements); i++) {
+            qsort (
+                measurements[i].samples,
+                G_N_ELEMENTS (measurements[i].samples),
+                sizeof (measurements[i].samples[0]),
+                compare_int64
+            );
+            g_print (
+                "ATM_RETRIEVAL_VALIDATOR_BRANCH repo=%s kind=%s rows=%" G_GUINT64_FORMAT
+                " samples=9 min_us=%" G_GINT64_FORMAT
+                " median_us=%" G_GINT64_FORMAT
+                " max_us=%" G_GINT64_FORMAT "\\n",
+                repository->repository_id,
+                measurements[i].kind,
+                measurements[i].rows,
+                measurements[i].samples[0],
+                measurements[i].samples[4],
+                measurements[i].samples[8]
+            );
+        }
+
+        /*
+         * Diagnostic-only alternative: materialize the canonical dataset-row
+         * projection once, then compare the FTS population against it. This is
+         * intentionally benchmark-only; production validation is unchanged.
+         */
+        static const char *materialized_dataset_sql =
+            "WITH canonical_dataset_rows AS MATERIALIZED ("
+            "SELECT r.id, CAST(r.id AS TEXT) AS id_text, "
+            "printf('%s:dataset-row:%s:%d',m.repository_id,s.path,r.ordinal) "
+            "AS logical_source_id, s.path AS title, r.search_text AS body "
+            "FROM dataset_rows r JOIN datasets d ON d.id=r.dataset_id "
+            "JOIN source_files s ON s.id=d.source_id "
+            "JOIN snapshot_metadata m ON m.id=1) "
+            "SELECT 1 FROM search_fts f "
+            "LEFT JOIN canonical_dataset_rows c "
+            "ON c.id=f.evidence_id AND c.id_text=CAST(f.evidence_id AS TEXT) "
+            "WHERE f.evidence_kind='dataset_row' AND "
+            "(f.evidence_id IS NULL OR f.logical_source_id IS NULL OR "
+            "c.id IS NULL OR c.logical_source_id IS NOT f.logical_source_id OR "
+            "c.title IS NOT f.title OR c.body IS NOT f.body) LIMIT 1;";
+
+        if (sqlite3_libversion_number () < 3035000) {
+            g_print (
+                "ATM_RETRIEVAL_VALIDATOR_CANDIDATE repo=%s kind=dataset_row "
+                "status=skipped sqlite=%s requires>=3.35.0\\n",
+                repository->repository_id, sqlite3_libversion ()
+            );
+        } else {
+            sqlite3_stmt *candidate = NULL;
+            rc = sqlite3_prepare_v2 (
+                db, materialized_dataset_sql, -1, &candidate, NULL
+            );
+            if (rc != SQLITE_OK) {
+                g_set_error (
+                    error, G_IO_ERROR, G_IO_ERROR_FAILED,
+                    "Could not prepare materialized dataset-row candidate in %s: %s",
+                    repository->repository_id, sqlite3_errmsg (db)
+                );
+                goto repository_error;
+            }
+
+            /* Print the candidate plan to make planner behavior auditable. */
+            char *explain_sql = sqlite3_mprintf (
+                "EXPLAIN QUERY PLAN %s", materialized_dataset_sql
+            );
+            sqlite3_stmt *plan = NULL;
+            rc = sqlite3_prepare_v2 (db, explain_sql, -1, &plan, NULL);
+            sqlite3_free (explain_sql);
+            if (rc != SQLITE_OK) {
+                sqlite3_finalize (candidate);
+                g_set_error (
+                    error, G_IO_ERROR, G_IO_ERROR_FAILED,
+                    "Could not prepare candidate query plan in %s: %s",
+                    repository->repository_id, sqlite3_errmsg (db)
+                );
+                goto repository_error;
+            }
+            while ((rc = sqlite3_step (plan)) == SQLITE_ROW) {
+                g_print (
+                    "ATM_RETRIEVAL_VALIDATOR_CANDIDATE_PLAN repo=%s detail=%s\\n",
+                    repository->repository_id,
+                    (const char *) sqlite3_column_text (plan, 3)
+                );
+            }
+            sqlite3_finalize (plan);
+            if (rc != SQLITE_DONE) {
+                sqlite3_finalize (candidate);
+                g_set_error (
+                    error, G_IO_ERROR, G_IO_ERROR_FAILED,
+                    "Could not read candidate query plan in %s: %s",
+                    repository->repository_id, sqlite3_errmsg (db)
+                );
+                goto repository_error;
+            }
+
+            rc = sqlite3_step (candidate);
+            if (rc != SQLITE_DONE) {
+                sqlite3_finalize (candidate);
+                g_set_error (
+                    error, G_IO_ERROR, G_IO_ERROR_INVALID_DATA,
+                    "Materialized dataset-row candidate found an inconsistent row in %s: %s",
+                    repository->repository_id, sqlite3_errmsg (db)
+                );
+                goto repository_error;
+            }
+            sqlite3_reset (candidate);
+
+            gint64 candidate_samples[9] = { 0 };
+            for (guint round = 0; round < G_N_ELEMENTS (candidate_samples); round++) {
+                gint64 started = g_get_monotonic_time ();
+                rc = sqlite3_step (candidate);
+                candidate_samples[round] = g_get_monotonic_time () - started;
+                if (rc != SQLITE_DONE) {
+                    sqlite3_finalize (candidate);
+                    g_set_error (
+                        error, G_IO_ERROR, G_IO_ERROR_INVALID_DATA,
+                        "Materialized dataset-row candidate failed during measurement in %s: %s",
+                        repository->repository_id, sqlite3_errmsg (db)
+                    );
+                    goto repository_error;
+                }
+                sqlite3_reset (candidate);
+            }
+            qsort (
+                candidate_samples, G_N_ELEMENTS (candidate_samples),
+                sizeof (candidate_samples[0]), compare_int64
+            );
+            g_print (
+                "ATM_RETRIEVAL_VALIDATOR_CANDIDATE repo=%s kind=dataset_row "
+                "rows=%" G_GUINT64_FORMAT " samples=9 min_us=%" G_GINT64_FORMAT
+                " median_us=%" G_GINT64_FORMAT " max_us=%" G_GINT64_FORMAT
+                " sqlite=%s status=equivalent-on-pinned-valid-index\\n",
+                repository->repository_id,
+                measurements[3].rows,
+                candidate_samples[0], candidate_samples[4],
+                candidate_samples[8], sqlite3_libversion ()
+            );
+            sqlite3_finalize (candidate);
+
+            /*
+             * Candidate 2 keeps the indexed canonical-row lookup but removes
+             * the redundant integer comparison and CAST on the FTS value.
+             * FTS evidence_id is TEXT; the canonical INTEGER id is converted
+             * to its canonical decimal TEXT representation for exact identity.
+             */
+            static const char *lean_dataset_sql =
+                "SELECT 1 FROM search_fts f WHERE "
+                "f.evidence_kind='dataset_row' AND "
+                "(f.evidence_id IS NULL OR f.logical_source_id IS NULL OR "
+                "NOT EXISTS (SELECT 1 FROM dataset_rows r "
+                "JOIN datasets d ON d.id=r.dataset_id "
+                "JOIN source_files s ON s.id=d.source_id "
+                "JOIN snapshot_metadata m ON m.id=1 "
+                "WHERE CAST(r.id AS TEXT)=f.evidence_id "
+                "AND printf('%s:dataset-row:%s:%d',m.repository_id,s.path,r.ordinal) "
+                "IS f.logical_source_id AND s.path IS f.title "
+                "AND r.search_text IS f.body)) LIMIT 1;";
+            sqlite3_stmt *lean = NULL;
+            rc = sqlite3_prepare_v2 (db, lean_dataset_sql, -1, &lean, NULL);
+            if (rc != SQLITE_OK) {
+                g_set_error (
+                    error, G_IO_ERROR, G_IO_ERROR_FAILED,
+                    "Could not prepare lean dataset-row candidate in %s: %s",
+                    repository->repository_id, sqlite3_errmsg (db)
+                );
+                goto repository_error;
+            }
+            rc = sqlite3_step (lean);
+            if (rc == SQLITE_ROW) {
+                static const char *mismatch_sql =
+                    "SELECT quote(f.evidence_id), typeof(f.evidence_id), "
+                    "quote(CAST(f.evidence_id AS TEXT)), quote(r.id), "
+                    "quote(CAST(r.id AS TEXT)), typeof(r.id), "
+                    "quote(f.logical_source_id), "
+                    "quote(printf('%s:dataset-row:%s:%d',m.repository_id,s.path,r.ordinal)), "
+                    "quote(f.title), quote(s.path), quote(f.body), quote(r.search_text) "
+                    "FROM search_fts f "
+                    "LEFT JOIN dataset_rows r ON r.id=f.evidence_id "
+                    "LEFT JOIN datasets d ON d.id=r.dataset_id "
+                    "LEFT JOIN source_files s ON s.id=d.source_id "
+                    "JOIN snapshot_metadata m ON m.id=1 "
+                    "WHERE f.evidence_kind='dataset_row' AND "
+                    "(f.evidence_id IS NULL OR f.logical_source_id IS NULL OR "
+                    "NOT EXISTS (SELECT 1 FROM dataset_rows x "
+                    "JOIN datasets xd ON xd.id=x.dataset_id "
+                    "JOIN source_files xs ON xs.id=xd.source_id "
+                    "JOIN snapshot_metadata xm ON xm.id=1 "
+                    "WHERE CAST(x.id AS TEXT)=f.evidence_id "
+                    "AND printf('%s:dataset-row:%s:%d',xm.repository_id,xs.path,x.ordinal) "
+                    "IS f.logical_source_id AND xs.path IS f.title "
+                    "AND x.search_text IS f.body)) LIMIT 1;";
+                sqlite3_stmt *mismatch = NULL;
+                int mismatch_rc = sqlite3_prepare_v2 (
+                    db, mismatch_sql, -1, &mismatch, NULL
+                );
+                if (mismatch_rc == SQLITE_OK &&
+                    sqlite3_step (mismatch) == SQLITE_ROW) {
+                    GString *details = g_string_new (NULL);
+                    for (int column = 0; column < 12; column++) {
+                        if (column > 0) g_string_append_c (details, '|');
+                        const char *value = (const char *) sqlite3_column_text (
+                            mismatch, column
+                        );
+                        g_string_append (details, value != NULL ? value : "NULL");
+                    }
+                    g_print (
+                        "ATM_RETRIEVAL_VALIDATOR_LEAN_MISMATCH repo=%s "
+                        "fields=evidence_id,evidence_type,evidence_text,canonical_id,"
+                        "canonical_text,canonical_type,fts_source,canonical_source,"
+                        "fts_title,canonical_title,fts_body,canonical_body values=%s\\n",
+                        repository->repository_id, details->str
+                    );
+                    g_string_free (details, TRUE);
+                } else {
+                    g_print (
+                        "ATM_RETRIEVAL_VALIDATOR_LEAN_MISMATCH repo=%s "
+                        "details=unable-to-fetch-first-mismatch sqlite_error=%s\\n",
+                        repository->repository_id, sqlite3_errmsg (db)
+                    );
+                }
+                if (mismatch != NULL) sqlite3_finalize (mismatch);
+                g_print (
+                    "ATM_RETRIEVAL_VALIDATOR_LEAN_CANDIDATE repo=%s "
+                    "status=rejected-not-equivalent\\n",
+                    repository->repository_id
+                );
+            } else if (rc == SQLITE_DONE) {
+                sqlite3_reset (lean);
+                gint64 lean_samples[9] = { 0 };
+                for (guint round = 0; round < G_N_ELEMENTS (lean_samples); round++) {
+                    gint64 started = g_get_monotonic_time ();
+                    rc = sqlite3_step (lean);
+                    lean_samples[round] = g_get_monotonic_time () - started;
+                    if (rc != SQLITE_DONE) {
+                        sqlite3_finalize (lean);
+                        g_set_error (
+                            error, G_IO_ERROR, G_IO_ERROR_INVALID_DATA,
+                            "Lean dataset-row candidate failed during measurement in %s: %s",
+                            repository->repository_id, sqlite3_errmsg (db)
+                        );
+                        goto repository_error;
+                    }
+                    sqlite3_reset (lean);
+                }
+                qsort (
+                    lean_samples, G_N_ELEMENTS (lean_samples),
+                    sizeof (lean_samples[0]), compare_int64
+                );
+                g_print (
+                    "ATM_RETRIEVAL_VALIDATOR_LEAN_CANDIDATE repo=%s kind=dataset_row "
+                    "rows=%" G_GUINT64_FORMAT " samples=9 min_us=%" G_GINT64_FORMAT
+                    " median_us=%" G_GINT64_FORMAT " max_us=%" G_GINT64_FORMAT
+                    " status=equivalent-on-pinned-valid-index\\n",
+                    repository->repository_id, measurements[3].rows,
+                    lean_samples[0], lean_samples[4], lean_samples[8]
+                );
+            } else {
+                sqlite3_finalize (lean);
+                g_set_error (
+                    error, G_IO_ERROR, G_IO_ERROR_FAILED,
+                    "Lean dataset-row candidate query failed in %s: %s",
+                    repository->repository_id, sqlite3_errmsg (db)
+                );
+                goto repository_error;
+            }
+            sqlite3_finalize (lean);
+
+            /*
+             * Candidate 3 preserves textual identity on both operands while
+             * removing the additional numeric equality predicate. This is
+             * diagnostic-only and must prove equivalence before timing.
+             */
+            static const char *paired_cast_dataset_sql =
+                "SELECT 1 FROM search_fts f WHERE "
+                "f.evidence_kind='dataset_row' AND "
+                "(f.evidence_id IS NULL OR f.logical_source_id IS NULL OR "
+                "NOT EXISTS (SELECT 1 FROM dataset_rows r "
+                "JOIN datasets d ON d.id=r.dataset_id "
+                "JOIN source_files s ON s.id=d.source_id "
+                "JOIN snapshot_metadata m ON m.id=1 "
+                "WHERE CAST(r.id AS TEXT)=CAST(f.evidence_id AS TEXT) "
+                "AND printf('%s:dataset-row:%s:%d',m.repository_id,s.path,r.ordinal) "
+                "IS f.logical_source_id AND s.path IS f.title "
+                "AND r.search_text IS f.body)) LIMIT 1;";
+            sqlite3_stmt *paired_cast = NULL;
+            rc = sqlite3_prepare_v2 (
+                db, paired_cast_dataset_sql, -1, &paired_cast, NULL
+            );
+            if (rc != SQLITE_OK) {
+                g_set_error (
+                    error, G_IO_ERROR, G_IO_ERROR_FAILED,
+                    "Could not prepare paired-cast dataset-row candidate in %s: %s",
+                    repository->repository_id, sqlite3_errmsg (db)
+                );
+                goto repository_error;
+            }
+
+            rc = sqlite3_step (paired_cast);
+            if (rc == SQLITE_ROW) {
+                g_print (
+                    "ATM_RETRIEVAL_VALIDATOR_PAIRED_CAST repo=%s "
+                    "status=rejected-not-equivalent\\n",
+                    repository->repository_id
+                );
+            } else if (rc == SQLITE_DONE) {
+                sqlite3_reset (paired_cast);
+                gint64 paired_cast_samples[9] = { 0 };
+                for (guint round = 0; round < G_N_ELEMENTS (paired_cast_samples); round++) {
+                    gint64 started = g_get_monotonic_time ();
+                    rc = sqlite3_step (paired_cast);
+                    paired_cast_samples[round] = g_get_monotonic_time () - started;
+                    if (rc != SQLITE_DONE) {
+                        sqlite3_finalize (paired_cast);
+                        g_set_error (
+                            error, G_IO_ERROR, G_IO_ERROR_INVALID_DATA,
+                            "Paired-cast dataset-row candidate failed during measurement in %s: %s",
+                            repository->repository_id, sqlite3_errmsg (db)
+                        );
+                        goto repository_error;
+                    }
+                    sqlite3_reset (paired_cast);
+                }
+                qsort (
+                    paired_cast_samples, G_N_ELEMENTS (paired_cast_samples),
+                    sizeof (paired_cast_samples[0]), compare_int64
+                );
+                g_print (
+                    "ATM_RETRIEVAL_VALIDATOR_PAIRED_CAST repo=%s "
+                    "rows=%" G_GUINT64_FORMAT " samples=9 min_us=%" G_GINT64_FORMAT
+                    " median_us=%" G_GINT64_FORMAT " max_us=%" G_GINT64_FORMAT
+                    " status=equivalent-on-pinned-valid-index\\n",
+                    repository->repository_id, measurements[3].rows,
+                    paired_cast_samples[0], paired_cast_samples[4],
+                    paired_cast_samples[8]
+                );
+            } else {
+                sqlite3_finalize (paired_cast);
+                g_set_error (
+                    error, G_IO_ERROR, G_IO_ERROR_FAILED,
+                    "Paired-cast dataset-row candidate query failed in %s: %s",
+                    repository->repository_id, sqlite3_errmsg (db)
+                );
+                goto repository_error;
+            }
+            sqlite3_finalize (paired_cast);
+        }
+
+        for (guint i = 0; i < G_N_ELEMENTS (statements); i++)
+            sqlite3_finalize (statements[i]);
+        sqlite3_close (db);
+        continue;
+
+repository_error:
+        for (guint i = 0; i < G_N_ELEMENTS (statements); i++)
+            sqlite3_finalize (statements[i]);
+        sqlite3_close (db);
+        return FALSE;
+    }
+
+    return TRUE;
+}
+
 int
 main (int argc, char **argv)
 {
-    if (argc != 4 && argc != 5) {
+    if (argc != 4 && argc != 5 && argc != 6) {
         g_printerr (
             "Usage: %s BENCHMARK_JSON OUTPUT_JSON RUN_ID "
             "[frozen|production|candidate-results5|candidate-sources8|"
             "candidate-sources7|candidate-sources6|candidate-sources5|"
             "candidate-sources4|candidate-sources3|candidate-bytes16k|"
-            "candidate-compact]\n",
+            "candidate-compact] [validator-diagnostics]\\n",
             argv[0]
         );
+        return 2;
+    }
+    gboolean diagnostics_only = argc == 6 &&
+        g_strcmp0 (argv[5], "validator-diagnostics") == 0;
+    if (argc == 6 && !diagnostics_only) {
+        g_printerr ("Unknown benchmark mode '%s'.\\n", argv[5]);
         return 2;
     }
 
@@ -1260,7 +1967,7 @@ main (int argc, char **argv)
     const char *output_path = argv[2];
     const char *run_id = argv[3];
     const char *policy_name =
-        argc == 5 ? argv[4] : "frozen";
+        argc >= 5 ? argv[4] : "frozen";
     const BenchmarkPolicy *policy = NULL;
 
     if (g_strcmp0 (policy_name, "frozen") == 0) {
@@ -1383,6 +2090,18 @@ main (int argc, char **argv)
             &repositories,
             &error
         )) {
+        goto out;
+    }
+
+    if (diagnostics_only) {
+        if (!run_validator_branch_diagnostics (repositories, &error)) {
+            goto out;
+        }
+        g_print (
+            "PASS: validator branch diagnostics completed for %u pinned repositories.\\n",
+            repositories->len
+        );
+        exit_code = 0;
         goto out;
     }
 
