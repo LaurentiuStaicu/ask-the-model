@@ -400,7 +400,7 @@ collect_repository_evidence (
 
     if (g_getenv ("ATM_RETRIEVAL_VALIDATOR_TIMING") != NULL) {
         g_printerr (
-            "ATM_RETRIEVAL_VALIDATOR_REPOSITORY repo=%s\\n",
+            "ATM_RETRIEVAL_VALIDATOR_REPOSITORY repo=%s\n",
             scope->repository_id
         );
     }
