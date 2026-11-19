@@ -228,6 +228,23 @@ measure_validator_branch_timings (sqlite3 *db)
             "AND r.search_text IS f.body) "
             "THEN 1 ELSE 0 END), 0) "
             "FROM search_fts f WHERE f.evidence_kind = 'dataset_row';"
+        },
+        {
+            "dataset_row_join",
+            "SELECT count(*), COALESCE(sum(CASE WHEN "
+            "f.evidence_id IS NULL OR typeof(f.evidence_id) <> 'integer' OR "
+            "f.logical_source_id IS NULL OR r.id IS NULL OR d.id IS NULL OR "
+            "s.id IS NULL OR m.id IS NULL OR "
+            "printf('%s:dataset-row:%s:%d', m.repository_id, s.path, r.ordinal) "
+            "IS NOT f.logical_source_id OR s.path IS NOT f.title OR "
+            "r.search_text IS NOT f.body "
+            "THEN 1 ELSE 0 END), 0) "
+            "FROM search_fts f "
+            "LEFT JOIN dataset_rows r ON r.id = f.evidence_id "
+            "LEFT JOIN datasets d ON d.id = r.dataset_id "
+            "LEFT JOIN source_files s ON s.id = d.source_id "
+            "LEFT JOIN snapshot_metadata m ON m.id = 1 "
+            "WHERE f.evidence_kind = 'dataset_row';"
         }
     };
 
