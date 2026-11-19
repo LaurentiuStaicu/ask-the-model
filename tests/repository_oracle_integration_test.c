@@ -824,7 +824,53 @@ test_production_ready_then_perturbed (void)
     assert_oracle (FALSE, oracle_path, data_root, cache_root, state_root);
 
     /*
-     * Fault 6: remove the required FTS5 virtual table entirely.
+     * Fault 6: preserve the evidence_id bytes but change its SQLite storage
+     * class from TEXT to BLOB.  The independent oracle must reject this
+     * instead of normalizing x'31' to the canonical identifier "1".
+     */
+    sqlite3 *identity_db = NULL;
+    g_assert_cmpint (
+        sqlite3_open_v2 (
+            index_path, &identity_db, SQLITE_OPEN_READWRITE, NULL
+        ),
+        ==, SQLITE_OK
+    );
+    g_assert_cmpint (
+        sqlite3_exec (
+            identity_db,
+            "UPDATE search_fts SET evidence_id=CAST(evidence_id AS BLOB) "
+            "WHERE rowid=(SELECT rowid FROM search_fts "
+            "WHERE evidence_kind='section' ORDER BY rowid LIMIT 1);",
+            NULL, NULL, NULL
+        ),
+        ==, SQLITE_OK
+    );
+    g_assert_cmpint (sqlite3_changes (identity_db), ==, 1);
+    g_assert_cmpint (sqlite3_close (identity_db), ==, SQLITE_OK);
+    assert_oracle (FALSE, oracle_path, data_root, cache_root, state_root);
+
+    g_assert_cmpint (
+        sqlite3_open_v2 (
+            index_path, &identity_db, SQLITE_OPEN_READWRITE, NULL
+        ),
+        ==, SQLITE_OK
+    );
+    g_assert_cmpint (
+        sqlite3_exec (
+            identity_db,
+            "UPDATE search_fts SET evidence_id=CAST(evidence_id AS TEXT) "
+            "WHERE rowid=(SELECT rowid FROM search_fts "
+            "WHERE evidence_kind='section' ORDER BY rowid LIMIT 1);",
+            NULL, NULL, NULL
+        ),
+        ==, SQLITE_OK
+    );
+    g_assert_cmpint (sqlite3_changes (identity_db), ==, 1);
+    g_assert_cmpint (sqlite3_close (identity_db), ==, SQLITE_OK);
+    assert_oracle (TRUE, oracle_path, data_root, cache_root, state_root);
+
+    /*
+     * Fault 7: remove the required FTS5 virtual table entirely.
      */
     g_assert_cmpint (
         sqlite3_open_v2 (
@@ -840,7 +886,7 @@ test_production_ready_then_perturbed (void)
     assert_oracle (FALSE, oracle_path, data_root, cache_root, state_root);
 
     /*
-     * Fault 7: a same-named ordinary table is not an FTS5 implementation.
+     * Fault 8: a same-named ordinary table is not an FTS5 implementation.
      */
     g_assert_cmpint (
         sqlite3_open_v2 (
