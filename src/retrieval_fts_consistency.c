@@ -71,6 +71,73 @@ log_validator_query_plan (
     sqlite3_finalize (statement);
 }
 
+/*
+ * Measurement-only alternative to the nested GROUP BY identity count.
+ * COUNT(DISTINCT) excludes NULL, so subtract one NULL group when present to
+ * preserve GROUP BY duplicate-count semantics. This probe never decides
+ * whether an index is valid and is disabled unless explicitly requested.
+ */
+static void
+measure_distinct_fts_identity_counts (sqlite3 *db, const guint64 expected_counts[4])
+{
+    static const char *sql =
+        "SELECT evidence_kind, COUNT(DISTINCT evidence_id), "
+        "COUNT(*) - COUNT(DISTINCT evidence_id) - "
+        "CASE WHEN COUNT(evidence_id) < COUNT(*) THEN 1 ELSE 0 END "
+        "FROM search_fts GROUP BY evidence_kind;";
+    guint64 counts[4] = { 0, 0, 0, 0 };
+    guint64 duplicates[4] = { 0, 0, 0, 0 };
+    gboolean equivalent = TRUE;
+    sqlite3_stmt *statement = NULL;
+    gint64 started_us = g_get_monotonic_time ();
+    int rc = sqlite3_prepare_v2 (db, sql, -1, &statement, NULL);
+
+    if (rc == SQLITE_OK) {
+        while ((rc = sqlite3_step (statement)) == SQLITE_ROW) {
+            const char *kind = (const char *) sqlite3_column_text (statement, 0);
+            gint index = -1;
+            if (g_strcmp0 (kind, "section") == 0) index = 0;
+            else if (g_strcmp0 (kind, "entity") == 0) index = 1;
+            else if (g_strcmp0 (kind, "relation") == 0) index = 2;
+            else if (g_strcmp0 (kind, "dataset_row") == 0) index = 3;
+
+            if (index < 0) {
+                equivalent = FALSE;
+                continue;
+            }
+            counts[index] = (guint64) sqlite3_column_int64 (statement, 1);
+            duplicates[index] = (guint64) sqlite3_column_int64 (statement, 2);
+            if (counts[index] != expected_counts[index] ||
+                duplicates[index] != 0) {
+                equivalent = FALSE;
+            }
+        }
+    }
+
+    if (rc != SQLITE_DONE) {
+        equivalent = FALSE;
+    }
+    sqlite3_finalize (statement);
+
+    g_printerr (
+        "ATM_RETRIEVAL_VALIDATOR_DISTINCT result=%s elapsed_us=%"
+        G_GINT64_FORMAT " section=%" G_GUINT64_FORMAT "/%" G_GUINT64_FORMAT
+        " entity=%" G_GUINT64_FORMAT "/%" G_GUINT64_FORMAT
+        " relation=%" G_GUINT64_FORMAT "/%" G_GUINT64_FORMAT
+        " dataset_row=%" G_GUINT64_FORMAT "/%" G_GUINT64_FORMAT,
+        equivalent ? "equivalent" : "different",
+        g_get_monotonic_time () - started_us,
+        counts[0], duplicates[0],
+        counts[1], duplicates[1],
+        counts[2], duplicates[2],
+        counts[3], duplicates[3]
+    );
+    if (rc != SQLITE_DONE) {
+        g_printerr (" error=%s", sqlite3_errmsg (db));
+    }
+    g_printerr ("\n");
+}
+
 static gboolean
 validate_canonical_coverage_counts (sqlite3 *db, GError **error)
 {
@@ -135,6 +202,10 @@ validate_canonical_coverage_counts (sqlite3 *db, GError **error)
     sqlite3_finalize (statement);
     statement = NULL;
     fts_identity_us = g_get_monotonic_time () - coverage_started_us;
+    if (rc == SQLITE_DONE &&
+        g_getenv ("ATM_RETRIEVAL_VALIDATOR_DISTINCT_TIMING") != NULL) {
+        measure_distinct_fts_identity_counts (db, fts_counts);
+    }
     if (rc != SQLITE_DONE) {
         g_set_error (error, ATM_RETRIEVAL_INDEX_ERROR,
             ATM_RETRIEVAL_INDEX_ERROR_SQLITE,
