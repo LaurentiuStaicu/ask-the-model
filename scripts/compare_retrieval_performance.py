@@ -95,6 +95,21 @@ def topic_map(run: dict[str, Any]) -> dict[str, dict[str, Any]]:
     return result
 
 
+def evaluation_topic_map(evaluation: dict[str, Any]) -> dict[str, dict[str, Any]]:
+    diagnostics = evaluation.get("topic_diagnostics")
+    if not isinstance(diagnostics, list):
+        raise ComparisonError("evaluation topic_diagnostics must be an array.")
+    result: dict[str, dict[str, Any]] = {}
+    for item in diagnostics:
+        if not isinstance(item, dict):
+            raise ComparisonError("evaluation topic diagnostics must be objects.")
+        topic_id = item.get("topic_id")
+        if not isinstance(topic_id, str) or not topic_id or topic_id in result:
+            raise ComparisonError("evaluation contains an invalid or duplicate topic_id.")
+        result[topic_id] = item
+    return result
+
+
 def output_signature(topic: dict[str, Any]) -> str:
     fields = (
         "outcome",
@@ -128,6 +143,8 @@ def compare(args: argparse.Namespace) -> dict[str, Any]:
     candidate_evaluations: list[dict[str, Any]] = []
     baseline_maps: list[dict[str, dict[str, Any]]] = []
     candidate_maps: list[dict[str, dict[str, Any]]] = []
+    baseline_diagnostics: list[dict[str, dict[str, Any]]] = []
+    candidate_diagnostics: list[dict[str, dict[str, Any]]] = []
 
     for sample in range(1, args.samples + 1):
         baseline_run = load(Path(args.baseline_run_pattern.format(sample=sample)))
@@ -162,6 +179,12 @@ def compare(args: argparse.Namespace) -> dict[str, Any]:
         candidate_evaluations.append(candidate_eval)
         baseline_maps.append(base_topics)
         candidate_maps.append(candidate_topics)
+        base_diagnostics = evaluation_topic_map(baseline_eval)
+        candidate_topic_diagnostics = evaluation_topic_map(candidate_eval)
+        if set(base_diagnostics) != expected_topics or set(candidate_topic_diagnostics) != expected_topics:
+            raise ComparisonError(f"sample {sample}: evaluation topic set differs from benchmark.")
+        baseline_diagnostics.append(base_diagnostics)
+        candidate_diagnostics.append(candidate_topic_diagnostics)
 
     baseline_policy = baseline_runs[0]["policy"]
     for label, runs in (("baseline", baseline_runs), ("candidate", candidate_runs)):
@@ -228,8 +251,9 @@ def compare(args: argparse.Namespace) -> dict[str, Any]:
 
     changed_topics: set[str] = set()
     per_topic_regressions: list[dict[str, Any]] = []
-    for sample, (base_topics, candidate_topics) in enumerate(
-        zip(baseline_maps, candidate_maps), start=1
+    for sample, (base_topics, candidate_topics, base_eval_topics, candidate_eval_topics) in enumerate(
+        zip(baseline_maps, candidate_maps, baseline_diagnostics, candidate_diagnostics),
+        start=1,
     ):
         for topic_id in sorted(expected_topics):
             base_topic = base_topics[topic_id]
@@ -237,9 +261,11 @@ def compare(args: argparse.Namespace) -> dict[str, Any]:
             if output_signature(base_topic) != output_signature(candidate_topic):
                 changed_topics.add(topic_id)
 
+            base_diagnostic = base_eval_topics[topic_id]
+            candidate_diagnostic = candidate_eval_topics[topic_id]
             for metric in ("exact_id_success_at_1", "ndcg_at_5", "context_required_recall"):
-                base_value = base_topic.get(metric)
-                candidate_value = candidate_topic.get(metric)
+                base_value = base_diagnostic.get(metric)
+                candidate_value = candidate_diagnostic.get(metric)
                 if (
                     isinstance(base_value, (int, float))
                     and isinstance(candidate_value, (int, float))
