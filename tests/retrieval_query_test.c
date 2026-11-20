@@ -2358,6 +2358,112 @@ test_validation_file_identity_invalidates_on_mutation_and_replacement (void)
     g_free (replacement_cache_root);
 }
 
+
+/*
+ * Characterize the query-session API across atomic index publication. Refresh
+ * starts a new transaction and revalidates, but the SQLite connection remains
+ * attached to the inode it originally opened. The session can therefore
+ * validate and search the old generation after the pathname names a new one.
+ */
+static void
+test_query_session_refresh_does_not_follow_atomic_path_replacement (void)
+{
+    const char *replacement_query = "replacement generation marker";
+    char *snapshot_root = new_snapshot ();
+    char *cache_root = new_temp_root ("atm-session-path-cache-XXXXXX");
+    char *replacement_snapshot_root = new_snapshot ();
+    char *replacement_cache_root =
+        new_temp_root ("atm-session-path-replacement-cache-XXXXXX");
+    char *index_path = build_index (snapshot_root, cache_root);
+    char *replacement_source = NULL;
+    char *replacement_status = g_strdup (
+        "# Replacement generation\nreplacement generation marker\n"
+    );
+    AtmRetrievalQuerySession *session = NULL;
+    AtmRetrievalQuerySession *fresh_session = NULL;
+    TestRetrievalFileIdentity original_identity = { 0 };
+    TestRetrievalFileIdentity replacement_identity = { 0 };
+    GPtrArray *old_results = NULL;
+    GPtrArray *replacement_results = NULL;
+    GError *error = NULL;
+
+    write_text (replacement_snapshot_root, "STATUS.md", replacement_status);
+    replacement_source = build_index (
+        replacement_snapshot_root, replacement_cache_root
+    );
+
+    g_assert_true (test_retrieval_file_identity_read (
+        index_path, &original_identity
+    ));
+    session = atm_retrieval_query_session_open (index_path, &error);
+    g_assert_no_error (error);
+    g_assert_nonnull (session);
+
+    g_assert_cmpint (g_rename (replacement_source, index_path), ==, 0);
+    g_assert_true (test_retrieval_file_identity_read (
+        index_path, &replacement_identity
+    ));
+    g_assert_cmpuint (
+        original_identity.inode, !=, replacement_identity.inode
+    );
+
+    /* Refresh validates the old open inode, not the new database at index_path. */
+    g_assert_true (atm_retrieval_query_session_refresh (session, &error));
+    g_assert_no_error (error);
+
+    g_assert_true (atm_retrieval_query_session_search_fts (
+        session, "current validation boundary", 10, &old_results, &error
+    ));
+    g_assert_no_error (error);
+    g_assert_nonnull (old_results);
+    g_assert_cmpuint (old_results->len, >, 0);
+
+    g_assert_true (atm_retrieval_query_session_search_fts (
+        session, replacement_query, 10, &replacement_results, &error
+    ));
+    g_assert_no_error (error);
+    g_assert_nonnull (replacement_results);
+    g_assert_cmpuint (replacement_results->len, ==, 0);
+    g_ptr_array_unref (old_results);
+    g_ptr_array_unref (replacement_results);
+    old_results = NULL;
+    replacement_results = NULL;
+
+    /* A newly opened session follows the pathname and sees the replacement. */
+    fresh_session = atm_retrieval_query_session_open (index_path, &error);
+    g_assert_no_error (error);
+    g_assert_nonnull (fresh_session);
+    g_assert_true (atm_retrieval_query_session_search_fts (
+        fresh_session, replacement_query, 10, &replacement_results, &error
+    ));
+    g_assert_no_error (error);
+    g_assert_nonnull (replacement_results);
+    g_assert_cmpuint (replacement_results->len, >, 0);
+
+    g_test_message (
+        "session refresh retained old inode=%" G_GUINT64_FORMAT
+        " while path moved to inode=%" G_GUINT64_FORMAT,
+        original_identity.inode,
+        replacement_identity.inode
+    );
+
+    g_ptr_array_unref (replacement_results);
+    atm_retrieval_query_session_close (fresh_session);
+    atm_retrieval_query_session_close (session);
+    g_free (replacement_status);
+    g_free (replacement_source);
+    g_free (index_path);
+    remove_tree_best_effort (snapshot_root);
+    g_free (snapshot_root);
+    remove_tree_best_effort (cache_root);
+    g_free (cache_root);
+    remove_tree_best_effort (replacement_snapshot_root);
+    g_free (replacement_snapshot_root);
+    remove_tree_best_effort (replacement_cache_root);
+    g_free (replacement_cache_root);
+}
+
+
 int
 main (int argc, char **argv)
 {
@@ -2470,6 +2576,10 @@ main (int argc, char **argv)
     g_test_add_func (
         "/retrieval-query/session-refresh-revalidates-mutation",
         test_query_session_refresh_revalidates_external_in_place_mutation
+    );
+    g_test_add_func (
+        "/retrieval-query/session-refresh-atomic-path-replacement",
+        test_query_session_refresh_does_not_follow_atomic_path_replacement
     );
     g_test_add_func (
         "/retrieval-query/invalid-arguments",
