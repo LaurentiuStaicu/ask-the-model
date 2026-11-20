@@ -1,0 +1,165 @@
+name: Retrieval query-session latency E2
+
+on:
+  workflow_dispatch:
+  push:
+    branches:
+      - 'experiment/retrieval-query-session-e2'
+  pull_request:
+    paths:
+      - 'tests/retrieval_query_session_benchmark_runner.c'
+      - 'scripts/aggregate_retrieval_query_session_e2.py'
+      - '.github/workflows/retrieval-query-session-e2.yml'
+      - 'src/retrieval_index_lifecycle.c'
+      - 'src/retrieval_index.c'
+      - 'src/retrieval_fts_consistency.c'
+      - 'benchmarks/retrieval-v1/benchmark.json'
+
+permissions:
+  contents: read
+
+concurrency:
+  group: retrieval-query-session-e2-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  measure:
+    name: E2 runner ${{ matrix.runner_id }}
+    runs-on: ubuntu-24.04
+    timeout-minutes: 25
+    strategy:
+      fail-fast: false
+      matrix:
+        runner_id: [1, 2, 3, 4, 5, 6, 7, 8, 9, 10]
+
+    steps:
+      - name: Checkout AtM
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+
+      - name: Install backend build dependencies
+        run: |
+          set -euo pipefail
+          sudo apt-get update
+          sudo apt-get install -y --no-install-recommends \
+            build-essential git pkg-config \
+            libglib2.0-dev libglib2.0-bin libjson-glib-dev \
+            libsqlite3-dev libyaml-dev
+
+      - name: Checkout benchmark-pinned repository snapshots
+        shell: bash
+        run: |
+          set -euo pipefail
+          mkdir -p .integration
+          python3 - <<'PY' >/tmp/atm-e2-corpus.tsv
+          import json
+          with open("benchmarks/retrieval-v1/benchmark.json", encoding="utf-8") as f:
+              benchmark = json.load(f)
+          for item in benchmark["corpus"]:
+              print(item["repository_id"], item["snapshot_sha"], sep="\t")
+          PY
+          while IFS=$'\t' read -r repository_id snapshot_sha; do
+            case "$repository_id" in
+              ewd) remote="https://github.com/LaurentiuStaicu/empirical-world3-dynamics.git"; root_env="ATM_BENCH_EWD_ROOT"; sha_env="ATM_BENCH_EWD_SHA" ;;
+              cbd) remote="https://github.com/LaurentiuStaicu/cognitive-belief-dynamics.git"; root_env="ATM_BENCH_CBD_ROOT"; sha_env="ATM_BENCH_CBD_SHA" ;;
+              rmd) remote="https://github.com/LaurentiuStaicu/romanian-monetary-dynamics.git"; root_env="ATM_BENCH_RMD_ROOT"; sha_env="ATM_BENCH_RMD_SHA" ;;
+              *) echo "Unsupported repository: $repository_id" >&2; exit 1 ;;
+            esac
+            destination="$GITHUB_WORKSPACE/.integration/$repository_id"
+            git init -q "$destination"
+            git -C "$destination" remote add origin "$remote"
+            git -C "$destination" fetch --depth=1 origin "$snapshot_sha"
+            git -C "$destination" checkout -q --detach FETCH_HEAD
+            actual_sha="$(git -C "$destination" rev-parse HEAD)"
+            test "$actual_sha" = "$snapshot_sha"
+            rm -rf "$destination/.git"
+            {
+              echo "$root_env=$destination"
+              echo "$sha_env=$actual_sha"
+            } >> "$GITHUB_ENV"
+          done </tmp/atm-e2-corpus.tsv
+
+      - name: Compile E2 query-session runner
+        shell: bash
+        run: |
+          set -euo pipefail
+          glib-compile-resources \
+            data/io.github.laurentiustaicu.ask_the_model.gresource.xml \
+            --sourcedir=data --generate-source --target=/tmp/atm-resources.c
+          cc -std=c11 -D_GNU_SOURCE -O2 -Wall -Wextra -Werror -Isrc \
+            $(pkg-config --cflags glib-2.0 gio-2.0 json-glib-1.0) \
+            -c tests/retrieval_query_session_benchmark_runner.c \
+            -o /tmp/retrieval-query-session-benchmark-runner.o
+          cc -std=c11 -D_GNU_SOURCE -O2 -Wall -Wextra -Isrc \
+            $(pkg-config --cflags glib-2.0 gio-2.0 json-glib-1.0) \
+            src/cff_version.c src/repository_sources.c src/markdown_sections.c \
+            src/csv_table.c src/structured_json.c src/retrieval_index.c \
+            src/retrieval_fts_consistency.c src/coordination_lease.c \
+            src/retrieval_index_lifecycle.c src/retrieval_query.c \
+            src/retrieval_rank.c src/retrieval_scope.c src/retrieval_normalize.c \
+            src/retrieval_router.c src/retrieval_conversation.c src/grounding_context.c \
+            /tmp/retrieval-query-session-benchmark-runner.o /tmp/atm-resources.c \
+            $(pkg-config --cflags --libs glib-2.0 gio-2.0 json-glib-1.0 sqlite3 yaml-0.1) \
+            -o /tmp/atm-retrieval-query-session-benchmark-runner
+
+      - name: Execute E2 session and query samples
+        shell: bash
+        run: |
+          set -euo pipefail
+          mkdir -p /tmp/atm-e2
+          /tmp/atm-retrieval-query-session-benchmark-runner \
+            benchmarks/retrieval-v1/benchmark.json \
+            /tmp/atm-e2/e2-run.json \
+            "github-${GITHUB_RUN_ID}-${GITHUB_RUN_ATTEMPT}-runner-${{ matrix.runner_id }}"
+          python3 - <<'PY'
+          import hashlib, json, os, pathlib, socket
+          path = pathlib.Path("/tmp/atm-e2/e2-run.json")
+          data = json.loads(path.read_text(encoding="utf-8"))
+          machine_id = pathlib.Path("/etc/machine-id").read_text().strip()
+          identity_material = "\0".join((machine_id, socket.gethostname(), os.environ["RUNNER_NAME"]))
+          data["runner_identity"] = hashlib.sha256(identity_material.encode()).hexdigest()
+          data["runner_name"] = os.environ["RUNNER_NAME"]
+          data["runner_matrix_id"] = int("${{ matrix.runner_id }}")
+          path.write_text(json.dumps(data, indent=2) + "\n", encoding="utf-8")
+          PY
+          python3 -m json.tool /tmp/atm-e2/e2-run.json >/dev/null
+
+      - name: Preserve runner-specific result filename
+        run: cp /tmp/atm-e2/e2-run.json "/tmp/atm-e2/e2-run-${{ matrix.runner_id }}.json"
+
+      - name: Upload E2 runner result
+        uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7.0.1
+        with:
+          name: atm-retrieval-e2-runner-${{ matrix.runner_id }}
+          path: /tmp/atm-e2/e2-run-${{ matrix.runner_id }}.json
+          if-no-files-found: error
+          retention-days: 14
+
+  aggregate:
+    name: Aggregate independent E2 runners
+    needs: measure
+    runs-on: ubuntu-24.04
+    timeout-minutes: 10
+    steps:
+      - name: Checkout AtM
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+      - name: Download E2 runner results
+        uses: actions/download-artifact@634f93cb2916e3fdff6788551b99b062d0335ce0 # v5.0.0
+        with:
+          pattern: atm-retrieval-e2-runner-*
+          path: /tmp/atm-e2-runs
+          merge-multiple: true
+      - name: Validate and aggregate E2 evidence
+        run: |
+          set -euo pipefail
+          python3 scripts/aggregate_retrieval_query_session_e2.py \
+            --input-dir /tmp/atm-e2-runs \
+            --expected-runners 10 \
+            --output /tmp/atm-retrieval-e2-aggregate.json
+          python3 -m json.tool /tmp/atm-retrieval-e2-aggregate.json
+      - name: Upload E2 aggregate
+        uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7.0.1
+        with:
+          name: atm-retrieval-e2-aggregate-${{ github.run_id }}-${{ github.run_attempt }}
+          path: /tmp/atm-retrieval-e2-aggregate.json
+          if-no-files-found: error
+          retention-days: 30
