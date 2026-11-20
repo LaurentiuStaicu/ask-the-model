@@ -113,48 +113,96 @@ jobs:
           ATM_RETRIEVAL_VALIDATOR_DISTINCT_TIMING: '1'
         run: |
           set -euo pipefail
-          /tmp/atm-retrieval-benchmark-runner \
-            benchmarks/retrieval-v1/benchmark.json \
-            /tmp/atm-r5-sqlite-337-run.json \
-            "sqlite-337-${GITHUB_RUN_ID}" production \
-            2>&1 | tee /tmp/atm-r5-sqlite-337.log
+          : > /tmp/atm-r5-sqlite-337.log
+          for block in $(seq 0 9); do
+            export ATM_RETRIEVAL_AB_BLOCK="$block"
+            printf 'ATM_PROCESS_BLOCK id=%s\n' "$block" | tee -a /tmp/atm-r5-sqlite-337.log
+            /tmp/atm-retrieval-benchmark-runner \
+              benchmarks/retrieval-v1/benchmark.json \
+              "/tmp/atm-r5-sqlite-337-block-${block}.json" \
+              "sqlite-337-${GITHUB_RUN_ID}-block-${block}" production \
+              2>&1 | tee -a /tmp/atm-r5-sqlite-337.log
+          done
           python3 - <<'PY'
           import json
+          import math
           import re
+          from collections import Counter
           from pathlib import Path
 
           log = Path("/tmp/atm-r5-sqlite-337.log").read_text(encoding="utf-8")
+          process_blocks = [int(value) for value in re.findall(r"ATM_PROCESS_BLOCK id=(\d+)", log)]
+          if process_blocks != list(range(10)):
+              raise SystemExit(f"Expected ordered process blocks 0-9; got {process_blocks}")
           versions = set(re.findall(r"ATM_RETRIEVAL_VALIDATOR_SQLITE label=\S+ version=(\S+)", log))
           if not versions or not all(version.startswith("3.37.") for version in versions):
               raise SystemExit(f"Unexpected SQLite runtime versions: {sorted(versions)}")
           outcomes = re.findall(r"ATM_RETRIEVAL_VALIDATOR_FTS_PREDICATE_AB result=equivalent outcome=valid samples=9", log)
-          if len(outcomes) < 3:
-              raise SystemExit(f"Expected paired equivalent results for EWD/CBD/RMD; found {len(outcomes)}")
+          if len(outcomes) < 30:
+              raise SystemExit(f"Expected paired equivalent diagnostics across 10 blocks; found {len(outcomes)}")
           for label in ("fts_to_canonical_not_exists_ab", "fts_to_canonical_left_join_ab"):
               if f"label={label}" not in log:
                   raise SystemExit(f"Missing query plan: {label}")
-          print(f"PASS: SQLite {', '.join(sorted(versions))}; {len(outcomes)} paired equivalent diagnostics.")
+
+          def require_three_repositories(records, description):
+              counts = Counter(item[0] for item in records)
+              if len(records) != 30 or counts != Counter({"ewd": 10, "cbd": 10, "rmd": 10}):
+                  raise SystemExit(f"Expected 10 {description} records per EWD/CBD/RMD; got {counts}")
+
           full = re.findall(r"ATM_RETRIEVAL_VALIDATOR_FULL_AB result=equivalent repository=(\S+) snapshot=(\S+) sqlite=(\S+) samples=15 .* diagnostics=disabled", log)
-          expected_prefix = "3.37."
-          if len(full) != 3 or {item[0] for item in full} != {"ewd", "cbd", "rmd"} or not all(item[2].startswith(expected_prefix) for item in full):
-              raise SystemExit(f"Expected clean full-validator A/B for EWD/CBD/RMD; got {full}")
-          print(f"PASS: clean full-validator A/B for {[item[0] for item in full]}.")
+          require_three_repositories(full, "full-validator")
+          if not all(item[2].startswith("3.37.") for item in full):
+              raise SystemExit(f"Unexpected SQLite version in full-validator records: {full}")
           identity = re.findall(r"ATM_RETRIEVAL_IDENTITY_AB result=equivalent repository=(\S+) snapshot=(\S+) sqlite=(\S+) samples=15 .* diagnostics=disabled connection=per-call", log)
-          if len(identity) != 3 or {item[0] for item in identity} != {"ewd", "cbd", "rmd"} or not all(item[2].startswith(expected_prefix) for item in identity):
-              raise SystemExit(f"Expected complete identity-pipeline A/B for EWD/CBD/RMD; got {identity}")
-          print(f"PASS: complete identity-pipeline A/B for {[item[0] for item in identity]}.")
-          snapshot_sources = re.findall(r"ATM_RETRIEVAL_SNAPSHOT_SOURCES_AB result=equivalent repository=(\S+) snapshot=(\S+) sqlite=(\S+) samples=15 .* diagnostics=disabled connection=per-call catalog=per-call", log)
-          if len(snapshot_sources) != 3 or {item[0] for item in snapshot_sources} != {"ewd", "cbd", "rmd"} or not all(item[2].startswith(expected_prefix) for item in snapshot_sources):
-              raise SystemExit(f"Expected complete snapshot-source validation A/B for EWD/CBD/RMD; got {snapshot_sources}")
-          print(f"PASS: complete snapshot-source validation A/B for {[item[0] for item in snapshot_sources]}.")
-          paired = re.findall(r"ATM_RETRIEVAL_SNAPSHOT_SOURCES_AB result=equivalent repository=(\S+) .* paired_candidate_wins=(\d+) paired_original_wins=(\d+) paired_ties=(\d+) exact_sign_p=([0-9.]+)", log)
-          if len(paired) != 3 or {item[0] for item in paired} != {"ewd", "cbd", "rmd"}:
-              raise SystemExit(f"Expected paired sign-test evidence for EWD/CBD/RMD; got {paired}")
-          if any(sum(map(int, item[1:4])) != 15 or not 0.0 <= float(item[4]) <= 1.0 for item in paired):
-              raise SystemExit(f"Invalid paired sign-test counts or p-value: {paired}")
-          print(f"PASS: paired sign-test evidence for {[item[0] for item in paired]}.")
+          require_three_repositories(identity, "identity-pipeline")
+          if not all(item[2].startswith("3.37.") for item in identity):
+              raise SystemExit(f"Unexpected SQLite version in identity records: {identity}")
+
+          snapshot_sources = re.findall(
+              r"ATM_RETRIEVAL_SNAPSHOT_SOURCES_AB result=equivalent repository=(\S+) block=(\d+) snapshot=(\S+) sqlite=(\S+) samples=15 original_median_us=(\d+) candidate_median_us=(\d+) .* paired_candidate_wins=(\d+) paired_original_wins=(\d+) paired_ties=(\d+) diagnostics=disabled connection=per-call catalog=per-call",
+              log
+          )
+          if len(snapshot_sources) != 30:
+              raise SystemExit(f"Expected 30 process-block snapshot records; got {len(snapshot_sources)}")
+          grouped = {}
+          for repo, block, snapshot, sqlite, original, candidate, cw, ow, ties in snapshot_sources:
+              block = int(block)
+              if block not in range(10) or not sqlite.startswith("3.37."):
+                  raise SystemExit(f"Invalid block or SQLite version: {(repo, block, sqlite)}")
+              if int(cw) + int(ow) + int(ties) != 15:
+                  raise SystemExit(f"Invalid within-process pair counts: {(repo, block, cw, ow, ties)}")
+              grouped.setdefault(repo, {})[block] = (snapshot, int(original), int(candidate))
+          if set(grouped) != {"ewd", "cbd", "rmd"} or any(set(rows) != set(range(10)) for rows in grouped.values()):
+              raise SystemExit(f"Expected blocks 0-9 for each repository: { {k: sorted(v) for k,v in grouped.items()} }")
+
+          def exact_two_sided_sign_p(wins, losses):
+              n = wins + losses
+              if n == 0:
+                  return 1.0
+              tail = min(wins, losses)
+              return min(1.0, 2.0 * sum(math.comb(n, k) for k in range(tail + 1)) / (2 ** n))
+
+          summaries = []
+          for repo in ("ewd", "cbd", "rmd"):
+              rows = grouped[repo]
+              snapshots = {row[0] for row in rows.values()}
+              if len(snapshots) != 1:
+                  raise SystemExit(f"Snapshot SHA changed across process blocks for {repo}: {snapshots}")
+              wins = sum(candidate < original for _, original, candidate in rows.values())
+              losses = sum(candidate > original for _, original, candidate in rows.values())
+              ties = 10 - wins - losses
+              p_value = exact_two_sided_sign_p(wins, losses)
+              summary = (repo, wins, losses, ties, p_value)
+              summaries.append(summary)
+              print(
+                  f"ATM_RETRIEVAL_SNAPSHOT_BLOCK_SUMMARY repository={repo} sqlite={sorted(versions)} "
+                  f"blocks=10 candidate_wins={wins} original_wins={losses} ties={ties} exact_sign_p={p_value:.6f}"
+              )
+          print(f"PASS: 10 fresh-process blocks for EWD/CBD/RMD on SQLite 337.")
           PY
-          python3 -m json.tool /tmp/atm-r5-sqlite-337-run.json >/dev/null
+          for block in $(seq 0 9); do
+            python3 -m json.tool "/tmp/atm-r5-sqlite-337-block-${block}.json" >/dev/null
+          done
 
       - name: Upload SQLite compatibility evidence
         if: always()
@@ -256,48 +304,96 @@ jobs:
           ATM_RETRIEVAL_VALIDATOR_DISTINCT_TIMING: '1'
         run: |
           set -euo pipefail
-          /tmp/atm-retrieval-benchmark-runner \
-            benchmarks/retrieval-v1/benchmark.json \
-            /tmp/atm-r5-sqlite-345-run.json \
-            "sqlite-345-${GITHUB_RUN_ID}" production \
-            2>&1 | tee /tmp/atm-r5-sqlite-345.log
+          : > /tmp/atm-r5-sqlite-345.log
+          for block in $(seq 0 9); do
+            export ATM_RETRIEVAL_AB_BLOCK="$block"
+            printf 'ATM_PROCESS_BLOCK id=%s\n' "$block" | tee -a /tmp/atm-r5-sqlite-345.log
+            /tmp/atm-retrieval-benchmark-runner \
+              benchmarks/retrieval-v1/benchmark.json \
+              "/tmp/atm-r5-sqlite-345-block-${block}.json" \
+              "sqlite-345-${GITHUB_RUN_ID}-block-${block}" production \
+              2>&1 | tee -a /tmp/atm-r5-sqlite-345.log
+          done
           python3 - <<'PY'
           import json
+          import math
           import re
+          from collections import Counter
           from pathlib import Path
 
           log = Path("/tmp/atm-r5-sqlite-345.log").read_text(encoding="utf-8")
+          process_blocks = [int(value) for value in re.findall(r"ATM_PROCESS_BLOCK id=(\d+)", log)]
+          if process_blocks != list(range(10)):
+              raise SystemExit(f"Expected ordered process blocks 0-9; got {process_blocks}")
           versions = set(re.findall(r"ATM_RETRIEVAL_VALIDATOR_SQLITE label=\S+ version=(\S+)", log))
           if not versions or not all(version.startswith("3.45.") for version in versions):
               raise SystemExit(f"Unexpected SQLite runtime versions: {sorted(versions)}")
           outcomes = re.findall(r"ATM_RETRIEVAL_VALIDATOR_FTS_PREDICATE_AB result=equivalent outcome=valid samples=9", log)
-          if len(outcomes) < 3:
-              raise SystemExit(f"Expected paired equivalent results for EWD/CBD/RMD; found {len(outcomes)}")
+          if len(outcomes) < 30:
+              raise SystemExit(f"Expected paired equivalent diagnostics across 10 blocks; found {len(outcomes)}")
           for label in ("fts_to_canonical_not_exists_ab", "fts_to_canonical_left_join_ab"):
               if f"label={label}" not in log:
                   raise SystemExit(f"Missing query plan: {label}")
-          print(f"PASS: SQLite {', '.join(sorted(versions))}; {len(outcomes)} paired equivalent diagnostics.")
+
+          def require_three_repositories(records, description):
+              counts = Counter(item[0] for item in records)
+              if len(records) != 30 or counts != Counter({"ewd": 10, "cbd": 10, "rmd": 10}):
+                  raise SystemExit(f"Expected 10 {description} records per EWD/CBD/RMD; got {counts}")
+
           full = re.findall(r"ATM_RETRIEVAL_VALIDATOR_FULL_AB result=equivalent repository=(\S+) snapshot=(\S+) sqlite=(\S+) samples=15 .* diagnostics=disabled", log)
-          expected_prefix = "3.45."
-          if len(full) != 3 or {item[0] for item in full} != {"ewd", "cbd", "rmd"} or not all(item[2].startswith(expected_prefix) for item in full):
-              raise SystemExit(f"Expected clean full-validator A/B for EWD/CBD/RMD; got {full}")
-          print(f"PASS: clean full-validator A/B for {[item[0] for item in full]}.")
+          require_three_repositories(full, "full-validator")
+          if not all(item[2].startswith("3.45.") for item in full):
+              raise SystemExit(f"Unexpected SQLite version in full-validator records: {full}")
           identity = re.findall(r"ATM_RETRIEVAL_IDENTITY_AB result=equivalent repository=(\S+) snapshot=(\S+) sqlite=(\S+) samples=15 .* diagnostics=disabled connection=per-call", log)
-          if len(identity) != 3 or {item[0] for item in identity} != {"ewd", "cbd", "rmd"} or not all(item[2].startswith(expected_prefix) for item in identity):
-              raise SystemExit(f"Expected complete identity-pipeline A/B for EWD/CBD/RMD; got {identity}")
-          print(f"PASS: complete identity-pipeline A/B for {[item[0] for item in identity]}.")
-          snapshot_sources = re.findall(r"ATM_RETRIEVAL_SNAPSHOT_SOURCES_AB result=equivalent repository=(\S+) snapshot=(\S+) sqlite=(\S+) samples=15 .* diagnostics=disabled connection=per-call catalog=per-call", log)
-          if len(snapshot_sources) != 3 or {item[0] for item in snapshot_sources} != {"ewd", "cbd", "rmd"} or not all(item[2].startswith(expected_prefix) for item in snapshot_sources):
-              raise SystemExit(f"Expected complete snapshot-source validation A/B for EWD/CBD/RMD; got {snapshot_sources}")
-          print(f"PASS: complete snapshot-source validation A/B for {[item[0] for item in snapshot_sources]}.")
-          paired = re.findall(r"ATM_RETRIEVAL_SNAPSHOT_SOURCES_AB result=equivalent repository=(\S+) .* paired_candidate_wins=(\d+) paired_original_wins=(\d+) paired_ties=(\d+) exact_sign_p=([0-9.]+)", log)
-          if len(paired) != 3 or {item[0] for item in paired} != {"ewd", "cbd", "rmd"}:
-              raise SystemExit(f"Expected paired sign-test evidence for EWD/CBD/RMD; got {paired}")
-          if any(sum(map(int, item[1:4])) != 15 or not 0.0 <= float(item[4]) <= 1.0 for item in paired):
-              raise SystemExit(f"Invalid paired sign-test counts or p-value: {paired}")
-          print(f"PASS: paired sign-test evidence for {[item[0] for item in paired]}.")
+          require_three_repositories(identity, "identity-pipeline")
+          if not all(item[2].startswith("3.45.") for item in identity):
+              raise SystemExit(f"Unexpected SQLite version in identity records: {identity}")
+
+          snapshot_sources = re.findall(
+              r"ATM_RETRIEVAL_SNAPSHOT_SOURCES_AB result=equivalent repository=(\S+) block=(\d+) snapshot=(\S+) sqlite=(\S+) samples=15 original_median_us=(\d+) candidate_median_us=(\d+) .* paired_candidate_wins=(\d+) paired_original_wins=(\d+) paired_ties=(\d+) diagnostics=disabled connection=per-call catalog=per-call",
+              log
+          )
+          if len(snapshot_sources) != 30:
+              raise SystemExit(f"Expected 30 process-block snapshot records; got {len(snapshot_sources)}")
+          grouped = {}
+          for repo, block, snapshot, sqlite, original, candidate, cw, ow, ties in snapshot_sources:
+              block = int(block)
+              if block not in range(10) or not sqlite.startswith("3.45."):
+                  raise SystemExit(f"Invalid block or SQLite version: {(repo, block, sqlite)}")
+              if int(cw) + int(ow) + int(ties) != 15:
+                  raise SystemExit(f"Invalid within-process pair counts: {(repo, block, cw, ow, ties)}")
+              grouped.setdefault(repo, {})[block] = (snapshot, int(original), int(candidate))
+          if set(grouped) != {"ewd", "cbd", "rmd"} or any(set(rows) != set(range(10)) for rows in grouped.values()):
+              raise SystemExit(f"Expected blocks 0-9 for each repository: { {k: sorted(v) for k,v in grouped.items()} }")
+
+          def exact_two_sided_sign_p(wins, losses):
+              n = wins + losses
+              if n == 0:
+                  return 1.0
+              tail = min(wins, losses)
+              return min(1.0, 2.0 * sum(math.comb(n, k) for k in range(tail + 1)) / (2 ** n))
+
+          summaries = []
+          for repo in ("ewd", "cbd", "rmd"):
+              rows = grouped[repo]
+              snapshots = {row[0] for row in rows.values()}
+              if len(snapshots) != 1:
+                  raise SystemExit(f"Snapshot SHA changed across process blocks for {repo}: {snapshots}")
+              wins = sum(candidate < original for _, original, candidate in rows.values())
+              losses = sum(candidate > original for _, original, candidate in rows.values())
+              ties = 10 - wins - losses
+              p_value = exact_two_sided_sign_p(wins, losses)
+              summary = (repo, wins, losses, ties, p_value)
+              summaries.append(summary)
+              print(
+                  f"ATM_RETRIEVAL_SNAPSHOT_BLOCK_SUMMARY repository={repo} sqlite={sorted(versions)} "
+                  f"blocks=10 candidate_wins={wins} original_wins={losses} ties={ties} exact_sign_p={p_value:.6f}"
+              )
+          print(f"PASS: 10 fresh-process blocks for EWD/CBD/RMD on SQLite 345.")
           PY
-          python3 -m json.tool /tmp/atm-r5-sqlite-345-run.json >/dev/null
+          for block in $(seq 0 9); do
+            python3 -m json.tool "/tmp/atm-r5-sqlite-345-block-${block}.json" >/dev/null
+          done
 
       - name: Upload SQLite compatibility evidence
         if: always()
