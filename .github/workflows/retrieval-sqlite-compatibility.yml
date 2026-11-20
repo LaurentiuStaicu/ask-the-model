@@ -135,8 +135,9 @@ jobs:
                   raise SystemExit(f"Missing query plan: {label}")
           print(f"PASS: SQLite {', '.join(sorted(versions))}; {len(outcomes)} paired equivalent diagnostics.")
           PY
-          full = re.findall(r"ATM_RETRIEVAL_VALIDATOR_FULL_AB result=equivalent repository=(\\S+) snapshot=(\\S+) sqlite=(\\S+) samples=9 .* diagnostics=disabled", log)
-          if len(full) != 3 or {item[0] for item in full} != {"ewd", "cbd", "rmd"}:
+          full = re.findall(r"ATM_RETRIEVAL_VALIDATOR_FULL_AB result=equivalent repository=(\S+) snapshot=(\S+) sqlite=(\S+) samples=9 .* diagnostics=disabled", log)
+          expected_prefix = "3.37." if "sqlite-337" in log else "3.45."
+          if len(full) != 3 or {item[0] for item in full} != {"ewd", "cbd", "rmd"} or not all(item[2].startswith(expected_prefix) for item in full):
               raise SystemExit(f"Expected clean full-validator A/B for EWD/CBD/RMD; got {full}")
           print(f"PASS: clean full-validator A/B for {[item[0] for item in full]}.")
           python3 -m json.tool /tmp/atm-r5-sqlite-337-run.json >/dev/null
@@ -263,8 +264,9 @@ jobs:
                   raise SystemExit(f"Missing query plan: {label}")
           print(f"PASS: SQLite {', '.join(sorted(versions))}; {len(outcomes)} paired equivalent diagnostics.")
           PY
-          full = re.findall(r"ATM_RETRIEVAL_VALIDATOR_FULL_AB result=equivalent repository=(\\S+) snapshot=(\\S+) sqlite=(\\S+) samples=9 .* diagnostics=disabled", log)
-          if len(full) != 3 or {item[0] for item in full} != {"ewd", "cbd", "rmd"}:
+          full = re.findall(r"ATM_RETRIEVAL_VALIDATOR_FULL_AB result=equivalent repository=(\S+) snapshot=(\S+) sqlite=(\S+) samples=9 .* diagnostics=disabled", log)
+          expected_prefix = "3.37." if "sqlite-337" in log else "3.45."
+          if len(full) != 3 or {item[0] for item in full} != {"ewd", "cbd", "rmd"} or not all(item[2].startswith(expected_prefix) for item in full):
               raise SystemExit(f"Expected clean full-validator A/B for EWD/CBD/RMD; got {full}")
           print(f"PASS: clean full-validator A/B for {[item[0] for item in full]}.")
           python3 -m json.tool /tmp/atm-r5-sqlite-345-run.json >/dev/null
