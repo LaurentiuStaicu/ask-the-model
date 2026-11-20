@@ -578,6 +578,134 @@ run_identity_pipeline_ab_for_repository (
     return TRUE;
 }
 
+static gboolean
+run_snapshot_sources_ab_for_repository (
+    BenchmarkRepository *repository,
+    GError **error
+)
+{
+    static const char *diagnostic_variables[] = {
+        "ATM_RETRIEVAL_VALIDATOR_TIMING",
+        "ATM_RETRIEVAL_VALIDATOR_EXPLAIN",
+        "ATM_RETRIEVAL_VALIDATOR_BRANCH_TIMING",
+        "ATM_RETRIEVAL_VALIDATOR_DISTINCT_TIMING"
+    };
+    char *saved_values[G_N_ELEMENTS (diagnostic_variables)] = { NULL };
+    gboolean was_set[G_N_ELEMENTS (diagnostic_variables)] = { FALSE };
+    gint64 original_times[15] = { 0 };
+    gint64 candidate_times[15] = { 0 };
+    gboolean ok = FALSE;
+
+    /*
+     * The earlier diagnostic runs intentionally enable these switches.
+     * This measurement is a separate, instrumentation-free production
+     * snapshot-source validation and must not inherit those settings.
+     */
+    for (guint i = 0; i < G_N_ELEMENTS (diagnostic_variables); i++) {
+        const char *value = g_getenv (diagnostic_variables[i]);
+        if (value != NULL) {
+            was_set[i] = TRUE;
+            saved_values[i] = g_strdup (value);
+        }
+        g_unsetenv (diagnostic_variables[i]);
+    }
+
+    /* Warm both variants before collecting paired observations. */
+    for (guint variant = 0; variant < 2; variant++) {
+        gboolean original = variant == 0;
+        GError *validation_error = NULL;
+        if (!atm_retrieval_index_validate_snapshot_sources_for_test (
+                repository->index_path,
+                repository->snapshot_root,
+                repository->repository_id,
+                repository->snapshot_sha,
+                original,
+                &validation_error
+            )) {
+            g_set_error (
+                error, G_IO_ERROR, G_IO_ERROR_INVALID_DATA,
+                "Snapshot-source A/B warmup failed for %s (%s): %s",
+                repository->repository_id,
+                original ? "NOT EXISTS" : "LEFT JOIN",
+                validation_error != NULL ? validation_error->message : "unknown error"
+            );
+            g_clear_error (&validation_error);
+            goto out;
+        }
+        g_clear_error (&validation_error);
+    }
+
+    for (guint sample = 0; sample < 15; sample++) {
+        gboolean original_first = (sample % 2) == 0;
+        for (guint position = 0; position < 2; position++) {
+            gboolean original = position == 0 ? original_first : !original_first;
+            gint64 started_us = g_get_monotonic_time ();
+            GError *validation_error = NULL;
+            gboolean valid =
+                atm_retrieval_index_validate_snapshot_sources_for_test (
+                    repository->index_path,
+                    repository->snapshot_root,
+                    repository->repository_id,
+                    repository->snapshot_sha,
+                    original,
+                    &validation_error
+                );
+            gint64 elapsed_us = g_get_monotonic_time () - started_us;
+
+            if (!valid) {
+                g_set_error (
+                    error, G_IO_ERROR, G_IO_ERROR_INVALID_DATA,
+                    "Snapshot-source A/B failed for %s sample=%u (%s): %s",
+                    repository->repository_id, sample,
+                    original ? "NOT EXISTS" : "LEFT JOIN",
+                    validation_error != NULL ? validation_error->message : "unknown error"
+                );
+                g_clear_error (&validation_error);
+                goto out;
+            }
+            g_clear_error (&validation_error);
+            if (original) original_times[sample] = elapsed_us;
+            else candidate_times[sample] = elapsed_us;
+        }
+    }
+
+    gint64 original_median = validator_sample_median (original_times);
+    gint64 candidate_median = validator_sample_median (candidate_times);
+    gint64 original_max = original_times[0];
+    gint64 candidate_max = candidate_times[0];
+    for (guint i = 1; i < 15; i++) {
+        original_max = MAX (original_max, original_times[i]);
+        candidate_max = MAX (candidate_max, candidate_times[i]);
+    }
+
+    g_print (
+        "ATM_RETRIEVAL_SNAPSHOT_SOURCES_AB result=equivalent repository=%s "
+        "snapshot=%s sqlite=%s samples=15 original_median_us=%" G_GINT64_FORMAT
+        " candidate_median_us=%" G_GINT64_FORMAT
+        " original_max_us=%" G_GINT64_FORMAT
+        " candidate_max_us=%" G_GINT64_FORMAT
+        " median_delta_percent=%.2f diagnostics=disabled connection=per-call catalog=per-call\n",
+        repository->repository_id, repository->snapshot_sha,
+        sqlite3_libversion (), original_median, candidate_median,
+        original_max, candidate_max,
+        original_median > 0
+            ? ((gdouble) candidate_median / (gdouble) original_median - 1.0) * 100.0
+            : 0.0
+    );
+    ok = TRUE;
+
+out:
+    for (guint i = 0; i < G_N_ELEMENTS (diagnostic_variables); i++) {
+        if (was_set[i]) {
+            g_setenv (diagnostic_variables[i], saved_values[i], TRUE);
+        } else {
+            g_unsetenv (diagnostic_variables[i]);
+        }
+        g_free (saved_values[i]);
+    }
+    return ok;
+}
+
 #endif
 
 static gboolean
@@ -759,6 +887,10 @@ load_benchmark_repositories (
             goto out;
         }
         if (!run_identity_pipeline_ab_for_repository (repository, error)) {
+            benchmark_repository_free (repository);
+            goto out;
+        }
+        if (!run_snapshot_sources_ab_for_repository (repository, error)) {
             benchmark_repository_free (repository);
             goto out;
         }

@@ -2675,12 +2675,13 @@ validate_indexed_source_roles (
     return TRUE;
 }
 
-gboolean
-atm_retrieval_index_validate_snapshot_sources (
+static gboolean
+validate_snapshot_sources_internal (
     const char *index_path,
     const char *snapshot_root,
     const char *expected_repository_id,
     const char *expected_snapshot_sha,
+    gboolean use_original_predicate,
     GError **error
 )
 {
@@ -2696,10 +2697,11 @@ atm_retrieval_index_validate_snapshot_sources (
     g_return_val_if_fail (expected_repository_id != NULL, FALSE);
     g_return_val_if_fail (expected_snapshot_sha != NULL, FALSE);
 
-    if (!atm_retrieval_index_validate_identity (
+    if (!validate_identity_internal (
             index_path,
             expected_repository_id,
             expected_snapshot_sha,
+            use_original_predicate,
             error
         )) {
         return FALSE;
@@ -2909,3 +2911,44 @@ out:
     g_clear_pointer (&catalog, atm_source_catalog_free);
     return ok;
 }
+
+gboolean
+atm_retrieval_index_validate_snapshot_sources (
+    const char *index_path,
+    const char *snapshot_root,
+    const char *expected_repository_id,
+    const char *expected_snapshot_sha,
+    GError **error
+)
+{
+    return validate_snapshot_sources_internal (
+        index_path,
+        snapshot_root,
+        expected_repository_id,
+        expected_snapshot_sha,
+        FALSE,
+        error
+    );
+}
+
+#ifdef ATM_RETRIEVAL_VALIDATOR_TESTING
+gboolean
+atm_retrieval_index_validate_snapshot_sources_for_test (
+    const char *index_path,
+    const char *snapshot_root,
+    const char *expected_repository_id,
+    const char *expected_snapshot_sha,
+    gboolean use_original_predicate,
+    GError **error
+)
+{
+    return validate_snapshot_sources_internal (
+        index_path,
+        snapshot_root,
+        expected_repository_id,
+        expected_snapshot_sha,
+        use_original_predicate,
+        error
+    );
+}
+#endif
