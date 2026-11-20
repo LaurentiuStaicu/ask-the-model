@@ -54,9 +54,9 @@ jobs:
           with open("benchmarks/retrieval-v1/benchmark.json", encoding="utf-8") as f:
               benchmark = json.load(f)
           for item in benchmark["corpus"]:
-              print(item["repository_id"], item["snapshot_sha"], sep="\\t")
+              print(item["repository_id"], item["snapshot_sha"], sep="\t")
           PY
-          while IFS=$'\\t' read -r repository_id snapshot_sha; do
+          while IFS=$'\t' read -r repository_id snapshot_sha; do
             case "$repository_id" in
               ewd) remote="https://github.com/LaurentiuStaicu/empirical-world3-dynamics.git"; root_env="ATM_BENCH_EWD_ROOT"; sha_env="ATM_BENCH_EWD_SHA" ;;
               cbd) remote="https://github.com/LaurentiuStaicu/cognitive-belief-dynamics.git"; root_env="ATM_BENCH_CBD_ROOT"; sha_env="ATM_BENCH_CBD_SHA" ;;
