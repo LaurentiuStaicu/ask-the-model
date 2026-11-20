@@ -1549,6 +1549,31 @@ test_fts_distinct_identity_count_alternative_is_equivalent (void)
             "UPDATE search_fts SET evidence_id=CAST(x'31' AS BLOB) WHERE rowid=("
             "SELECT rowid FROM search_fts WHERE evidence_kind='section' LIMIT 1);",
             1
+        },
+        {
+            "mixed null and duplicate non-null identities in one kind",
+            "UPDATE search_fts SET evidence_id=CASE "
+            "WHEN rowid=(SELECT rowid FROM search_fts WHERE evidence_kind='section' "
+            "ORDER BY rowid LIMIT 1) THEN NULL "
+            "WHEN rowid=(SELECT rowid FROM search_fts WHERE evidence_kind='section' "
+            "ORDER BY rowid LIMIT 1 OFFSET 1) THEN "
+            "(SELECT evidence_id FROM search_fts WHERE evidence_kind='section' "
+            "ORDER BY rowid LIMIT 1 OFFSET 2) END "
+            "WHERE rowid IN (SELECT rowid FROM search_fts WHERE evidence_kind='section' "
+            "ORDER BY rowid LIMIT 2);",
+            2
+        },
+        {
+            "null kind and null identity on the same row",
+            "UPDATE search_fts SET evidence_kind=NULL,evidence_id=NULL WHERE rowid=("
+            "SELECT rowid FROM search_fts WHERE evidence_kind='section' ORDER BY rowid LIMIT 1);",
+            1
+        },
+        {
+            "unknown kind with null identity",
+            "UPDATE search_fts SET evidence_kind='unknown',evidence_id=NULL WHERE rowid=("
+            "SELECT rowid FROM search_fts WHERE evidence_kind='section' ORDER BY rowid LIMIT 1);",
+            1
         }
     };
 
