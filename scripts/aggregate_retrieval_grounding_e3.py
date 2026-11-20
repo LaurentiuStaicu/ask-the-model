@@ -79,7 +79,7 @@ def main() -> int:
     context_samples = {topic_id: [] for topic_id in expected_topics}
 
     for runner_id in range(1, RUNNERS + 1):
-        directory = args.runs_dir / f"runner-{runner_id:02d}"
+        directory = args.runs_dir / f"runner-{runner_id}"
         run_path = directory / "run.json"
         log_path = directory / "runner.log"
         if not run_path.is_file() or not log_path.is_file():
@@ -143,17 +143,26 @@ def main() -> int:
             retrieval_samples[topic_id].append(float(retrieval))
             context_samples[topic_id].append(float(context))
 
-        runner_data.append({"runner_id": runner_id, "semantic_sha256": digest})
+        environment_path = directory / "environment.txt"
+        if not environment_path.is_file():
+            raise SystemExit(f"missing environment metadata for runner {runner_id:02d}")
+        environment = environment_path.read_text(encoding="utf-8").strip()
+        if not environment.startswith("SQLite "):
+            raise SystemExit(f"runner {runner_id:02d}: invalid SQLite version metadata")
+        runner_data.append({"runner_id": runner_id, "semantic_sha256": digest, "sqlite_version": environment.removeprefix("SQLite ")})
 
     if len(semantic_digests) != 1:
         raise SystemExit("semantic output differs across independent runners")
+    sqlite_versions = {item["sqlite_version"] for item in runner_data}
+    if len(sqlite_versions) != 1:
+        raise SystemExit("SQLite versions differ across independent runners")
 
     output = {
         "schema_version": 1,
         "experiment": "E3",
         "benchmark_id": benchmark["benchmark_id"],
         "runner_count": RUNNERS,
-        "sqlite_version": "recorded by E1/E2 runner workflows; see workflow logs",
+        "sqlite_version": next(iter(sqlite_versions)),
         "semantic_equivalence": True,
         "semantic_sha256": next(iter(semantic_digests)),
         "index_prepare_ms": summary([value / 1000.0 for value in index_prepare_samples]),
