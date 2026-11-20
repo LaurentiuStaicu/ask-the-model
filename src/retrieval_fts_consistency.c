@@ -142,11 +142,10 @@ static gboolean
 validate_canonical_coverage_counts (sqlite3 *db, GError **error)
 {
     static const char *fts_counts_sql =
-        "SELECT evidence_kind, SUM(identity_count), SUM(identity_count - 1) "
-        "FROM ("
-        "SELECT evidence_kind, evidence_id, COUNT(*) AS identity_count "
-        "FROM search_fts GROUP BY evidence_kind, evidence_id"
-        ") GROUP BY evidence_kind;";
+        "SELECT evidence_kind, COUNT(*), "
+        "COUNT(*) - COUNT(DISTINCT evidence_id) - "
+        "CASE WHEN COUNT(evidence_id) < COUNT(*) THEN 1 ELSE 0 END "
+        "FROM search_fts GROUP BY evidence_kind;";
     static const char *canonical_counts_sql =
         "SELECT (SELECT count(*) FROM document_sections), "
         "(SELECT count(*) FROM structured_entities), "
