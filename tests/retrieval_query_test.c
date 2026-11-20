@@ -1435,6 +1435,112 @@ test_fts_to_canonical_left_join_alternative_is_equivalent (void)
     }
 }
 
+
+/*
+ * Dataset-row search_text is nullable in the canonical schema. The original
+ * NOT EXISTS uses SQLite's NULL-safe IS comparison; the LEFT JOIN candidate
+ * must preserve that behavior for NULL/NULL and one-sided-NULL pairs.
+ */
+static void
+test_fts_dataset_row_nullable_search_text_equivalence (void)
+{
+    static const char *original_sql =
+        "SELECT 1 FROM search_fts f WHERE f.evidence_kind='dataset_row' "
+        "AND NOT EXISTS (SELECT 1 FROM dataset_rows r "
+        "JOIN datasets d ON d.id=r.dataset_id "
+        "JOIN source_files s ON s.id=d.source_id "
+        "JOIN snapshot_metadata m ON m.id=1 "
+        "WHERE r.id=f.evidence_id AND "
+        "printf('%s:dataset-row:%s:%d',m.repository_id,s.path,r.ordinal) "
+        "IS f.logical_source_id AND s.path IS f.title AND r.search_text IS f.body);";
+    static const char *left_join_sql =
+        "SELECT 1 FROM search_fts f "
+        "LEFT JOIN dataset_rows r ON f.evidence_kind='dataset_row' AND r.id=f.evidence_id "
+        "LEFT JOIN datasets d ON d.id=r.dataset_id "
+        "LEFT JOIN source_files s ON s.id=d.source_id "
+        "LEFT JOIN snapshot_metadata m ON m.id=1 "
+        "WHERE f.evidence_kind='dataset_row' AND "
+        "(r.id IS NULL OR d.id IS NULL OR s.id IS NULL OR m.id IS NULL OR "
+        "printf('%s:dataset-row:%s:%d',m.repository_id,s.path,r.ordinal) "
+        "IS NOT f.logical_source_id OR s.path IS NOT f.title OR r.search_text IS NOT f.body);";
+    char *snapshot_root = new_snapshot ();
+    char *cache_root = new_temp_root ("atm-fts-null-search-text-XXXXXX");
+    char *index_path = build_index (snapshot_root, cache_root);
+    sqlite3 *db = NULL;
+    sqlite3_stmt *statement = NULL;
+    gint64 evidence_id = -1;
+
+    g_assert_cmpint (
+        sqlite3_open_v2 (index_path, &db, SQLITE_OPEN_READWRITE, NULL),
+        ==, SQLITE_OK
+    );
+    g_assert_cmpint (
+        sqlite3_prepare_v2 (
+            db,
+            "SELECT evidence_id FROM search_fts "
+            "WHERE evidence_kind='dataset_row' ORDER BY rowid LIMIT 1;",
+            -1, &statement, NULL
+        ),
+        ==, SQLITE_OK
+    );
+    g_assert_cmpint (sqlite3_step (statement), ==, SQLITE_ROW);
+    evidence_id = sqlite3_column_int64 (statement, 0);
+    g_assert_cmpint (sqlite3_step (statement), ==, SQLITE_DONE);
+    sqlite3_finalize (statement);
+    g_assert_cmpint (evidence_id, >, 0);
+
+    char *set_both_null = sqlite3_mprintf (
+        "UPDATE dataset_rows SET search_text=NULL WHERE id=%" G_GINT64_FORMAT ";"
+        "UPDATE search_fts SET body=NULL WHERE evidence_kind='dataset_row' "
+        "AND evidence_id=%" G_GINT64_FORMAT ";",
+        evidence_id, evidence_id
+    );
+    g_assert_cmpint (sqlite3_exec (db, set_both_null, NULL, NULL, NULL), ==, SQLITE_OK);
+    sqlite3_free (set_both_null);
+
+    g_test_message ("NULL canonical search_text and NULL FTS body are a valid match");
+    g_assert_false (fts_to_canonical_query_reports_mismatch (db, original_sql));
+    g_assert_false (fts_to_canonical_query_reports_mismatch (db, left_join_sql));
+
+    char *fts_non_null = sqlite3_mprintf (
+        "UPDATE search_fts SET body='not-null' WHERE evidence_kind='dataset_row' "
+        "AND evidence_id=%" G_GINT64_FORMAT ";",
+        evidence_id
+    );
+    g_assert_cmpint (sqlite3_exec (db, fts_non_null, NULL, NULL, NULL), ==, SQLITE_OK);
+    sqlite3_free (fts_non_null);
+    g_test_message ("NULL canonical search_text versus non-NULL FTS body is a mismatch");
+    g_assert_true (fts_to_canonical_query_reports_mismatch (db, original_sql));
+    g_assert_true (fts_to_canonical_query_reports_mismatch (db, left_join_sql));
+
+    char *restore_fts_null = sqlite3_mprintf (
+        "UPDATE search_fts SET body=NULL WHERE evidence_kind='dataset_row' "
+        "AND evidence_id=%" G_GINT64_FORMAT ";",
+        evidence_id
+    );
+    g_assert_cmpint (sqlite3_exec (db, restore_fts_null, NULL, NULL, NULL), ==, SQLITE_OK);
+    sqlite3_free (restore_fts_null);
+    char *canonical_non_null = sqlite3_mprintf (
+        "UPDATE dataset_rows SET search_text='not-null' WHERE id=%" G_GINT64_FORMAT ";",
+        evidence_id
+    );
+    g_assert_cmpint (
+        sqlite3_exec (db, canonical_non_null, NULL, NULL, NULL),
+        ==, SQLITE_OK
+    );
+    sqlite3_free (canonical_non_null);
+    g_test_message ("Non-NULL canonical search_text versus NULL FTS body is a mismatch");
+    g_assert_true (fts_to_canonical_query_reports_mismatch (db, original_sql));
+    g_assert_true (fts_to_canonical_query_reports_mismatch (db, left_join_sql));
+
+    g_assert_cmpint (sqlite3_close (db), ==, SQLITE_OK);
+    g_free (index_path);
+    remove_tree_best_effort (snapshot_root);
+    g_free (snapshot_root);
+    remove_tree_best_effort (cache_root);
+    g_free (cache_root);
+}
+
 /*
  * Compare the nested GROUP BY identity-population query with the
  * COUNT(DISTINCT) formulation. The NULL adjustment is required because
@@ -2139,6 +2245,10 @@ main (int argc, char **argv)
     g_test_add_func (
         "/retrieval-query/fts-to-canonical-left-join-equivalence",
         test_fts_to_canonical_left_join_alternative_is_equivalent
+    );
+    g_test_add_func (
+        "/retrieval-query/fts-dataset-row-nullable-search-text-equivalence",
+        test_fts_dataset_row_nullable_search_text_equivalence
     );
     g_test_add_func (
         "/retrieval-query/fts-distinct-identity-count-equivalence",
