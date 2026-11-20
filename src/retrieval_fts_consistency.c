@@ -23,6 +23,13 @@ log_validator_query_plan (
         return;
     }
 
+    g_printerr (
+        "ATM_RETRIEVAL_VALIDATOR_SQLITE label=%s version=%s source_id=%s\n",
+        label,
+        sqlite3_libversion (),
+        sqlite3_sourceid ()
+    );
+
     char *explain_sql = sqlite3_mprintf (
         "EXPLAIN QUERY PLAN %s",
         sql
@@ -604,7 +611,10 @@ measure_fts_canonical_predicate_ab (sqlite3 *db)
     gint candidate_outcome;
 
     log_validator_query_plan (
-        db, "fts_to_canonical_joined_dataset", candidate_sql
+        db, "fts_to_canonical_not_exists_ab", original_sql
+    );
+    log_validator_query_plan (
+        db, "fts_to_canonical_left_join_ab", candidate_sql
     );
 
     /* Warm both query plans and compare their validation outcomes. */
