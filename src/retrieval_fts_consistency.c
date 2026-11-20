@@ -878,7 +878,7 @@ validate_fts_canonical_consistency_impl (
     }
 
 
-    const char *candidate_query =
+    const char *queries[] = {
         "SELECT 1 FROM search_fts f "
         "LEFT JOIN dataset_rows dr ON "
         "f.evidence_kind = 'dataset_row' AND dr.id = f.evidence_id "
@@ -911,8 +911,9 @@ validate_fts_canonical_consistency_impl (
         "printf('%s:dataset-row:%s:%d', dm.repository_id, ds.path, dr.ordinal) "
         "IS NOT f.logical_source_id OR ds.path IS NOT f.title OR "
         "dr.search_text IS NOT f.body)) OR "
-        "f.evidence_kind NOT IN ('section','entity','relation','dataset_row');";
-    const char *canonical_query = candidate_query;
+        "f.evidence_kind NOT IN ('section','entity','relation','dataset_row');"
+    };
+    const char *canonical_query = queries[0];
 #ifdef ATM_RETRIEVAL_VALIDATOR_TESTING
     if (use_original_predicate)
         canonical_query = fts_canonical_original_query;
