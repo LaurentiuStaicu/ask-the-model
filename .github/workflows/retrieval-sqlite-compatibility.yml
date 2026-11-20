@@ -150,8 +150,8 @@ jobs:
 
 
   population-sweep:
-    name: Population sweep / SQLite \${{ matrix.sqlite_line }}
-    runs-on: \${{ matrix.runner }}
+    name: Population sweep / SQLite ${{ matrix.sqlite_line }}
+    runs-on: ${{ matrix.runner }}
     timeout-minutes: 15
     strategy:
       fail-fast: false
@@ -178,7 +178,7 @@ jobs:
       - name: Run paired synthetic population sweep
         shell: bash
         env:
-          EXPECTED_SQLITE_PREFIX: \${{ matrix.expected_prefix }}
+          EXPECTED_SQLITE_PREFIX: ${{ matrix.expected_prefix }}
         run: |
           set -euo pipefail
           python3 tests/retrieval_fts_join_population_sweep.py \
@@ -189,6 +189,6 @@ jobs:
       - name: Upload sweep log
         uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4.6.2
         with:
-          name: fts-join-population-sweep-\${{ matrix.sqlite_line }}
+          name: fts-join-population-sweep-${{ matrix.sqlite_line }}
           path: /tmp/fts-join-population-sweep.log
           if-no-files-found: error
