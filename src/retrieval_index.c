@@ -2355,11 +2355,12 @@ atm_retrieval_index_create_with_content (
     );
 }
 
-gboolean
-atm_retrieval_index_validate_identity (
+static gboolean
+validate_identity_internal (
     const char *index_path,
     const char *expected_repository_id,
     const char *expected_snapshot_sha,
+    gboolean use_original_predicate,
     GError **error
 )
 {
@@ -2504,9 +2505,18 @@ atm_retrieval_index_validate_identity (
     sqlite3_finalize (statement);
     statement = NULL;
 
+#ifdef ATM_RETRIEVAL_VALIDATOR_TESTING
+    if (!atm_retrieval_index_validate_fts_canonical_consistency_for_test (
+            db, use_original_predicate, error
+        )) {
+        goto out;
+    }
+#else
+    (void) use_original_predicate;
     if (!atm_retrieval_index_validate_fts_canonical_consistency (db, error)) {
         goto out;
     }
+#endif
 
     ok = TRUE;
 
@@ -2521,6 +2531,37 @@ out:
 
     return ok;
 }
+
+gboolean
+atm_retrieval_index_validate_identity (
+    const char *index_path,
+    const char *expected_repository_id,
+    const char *expected_snapshot_sha,
+    GError **error
+)
+{
+    return validate_identity_internal (
+        index_path, expected_repository_id, expected_snapshot_sha,
+        FALSE, error
+    );
+}
+
+#ifdef ATM_RETRIEVAL_VALIDATOR_TESTING
+gboolean
+atm_retrieval_index_validate_identity_for_test (
+    const char *index_path,
+    const char *expected_repository_id,
+    const char *expected_snapshot_sha,
+    gboolean use_original_predicate,
+    GError **error
+)
+{
+    return validate_identity_internal (
+        index_path, expected_repository_id, expected_snapshot_sha,
+        use_original_predicate, error
+    );
+}
+#endif
 
 
 static guint
