@@ -339,6 +339,32 @@ find_repository (
 
 
 #ifdef ATM_RETRIEVAL_VALIDATOR_TESTING
+static gdouble
+validator_binomial_coefficient (guint n, guint k)
+{
+    if (k > n) return 0.0;
+    if (k > n - k) k = n - k;
+    gdouble value = 1.0;
+    for (guint i = 1; i <= k; i++) {
+        value *= (gdouble) (n - k + i) / (gdouble) i;
+    }
+    return value;
+}
+
+static gdouble
+validator_exact_sign_test_p (guint candidate_wins, guint original_wins)
+{
+    guint n = candidate_wins + original_wins;
+    if (n == 0) return 1.0;
+    guint tail = MIN (candidate_wins, original_wins);
+    gdouble probability = 0.0;
+    for (guint k = 0; k <= tail; k++) {
+        probability += validator_binomial_coefficient (n, k);
+    }
+    probability *= 2.0 / pow (2.0, (gdouble) n);
+    return MIN (1.0, probability);
+}
+
 static gint64
 validator_sample_median (const gint64 samples[15])
 {
@@ -673,10 +699,19 @@ run_snapshot_sources_ab_for_repository (
     gint64 candidate_median = validator_sample_median (candidate_times);
     gint64 original_max = original_times[0];
     gint64 candidate_max = candidate_times[0];
-    for (guint i = 1; i < 15; i++) {
+    guint candidate_wins = 0;
+    guint original_wins = 0;
+    guint paired_ties = 0;
+    for (guint i = 0; i < 15; i++) {
         original_max = MAX (original_max, original_times[i]);
         candidate_max = MAX (candidate_max, candidate_times[i]);
+        if (candidate_times[i] < original_times[i]) candidate_wins++;
+        else if (candidate_times[i] > original_times[i]) original_wins++;
+        else paired_ties++;
     }
+    gdouble sign_test_p = validator_exact_sign_test_p (
+        candidate_wins, original_wins
+    );
 
     g_print (
         "ATM_RETRIEVAL_SNAPSHOT_SOURCES_AB result=equivalent repository=%s "
@@ -684,13 +719,15 @@ run_snapshot_sources_ab_for_repository (
         " candidate_median_us=%" G_GINT64_FORMAT
         " original_max_us=%" G_GINT64_FORMAT
         " candidate_max_us=%" G_GINT64_FORMAT
-        " median_delta_percent=%.2f diagnostics=disabled connection=per-call catalog=per-call\n",
+        " median_delta_percent=%.2f paired_candidate_wins=%u paired_original_wins=%u paired_ties=%u exact_sign_p=%.6f"
+        " diagnostics=disabled connection=per-call catalog=per-call\\n",
         repository->repository_id, repository->snapshot_sha,
         sqlite3_libversion (), original_median, candidate_median,
         original_max, candidate_max,
         original_median > 0
             ? ((gdouble) candidate_median / (gdouble) original_median - 1.0) * 100.0
-            : 0.0
+            : 0.0,
+        candidate_wins, original_wins, paired_ties, sign_test_p
     );
     ok = TRUE;
 
