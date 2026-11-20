@@ -5,6 +5,7 @@ on:
   pull_request:
     paths:
       - 'src/retrieval_fts_consistency.c'
+      - 'tests/retrieval_fts_join_population_sweep.py'
       - 'src/retrieval_fts_consistency.h'
       - 'src/retrieval_index.c'
       - 'src/retrieval_query.c'
@@ -146,3 +147,48 @@ jobs:
             /tmp/atm-r5-sqlite-337-run.json
           if-no-files-found: warn
           retention-days: 14
+
+
+  population-sweep:
+    name: Population sweep / SQLite ${{ matrix.sqlite_line }}
+    runs-on: ${{ matrix.runner }}
+    timeout-minutes: 15
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - sqlite_line: 3.37.x
+            runner: ubuntu-22.04
+            expected_prefix: '3.37.'
+          - sqlite_line: 3.45.x
+            runner: ubuntu-24.04
+            expected_prefix: '3.45.'
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+
+      - name: Install Python and SQLite
+        shell: bash
+        run: |
+          set -euo pipefail
+          sudo apt-get update
+          sudo apt-get install -y --no-install-recommends python3 libsqlite3-dev
+
+      - name: Run paired synthetic population sweep
+        shell: bash
+        env:
+          EXPECTED_SQLITE_PREFIX: ${{ matrix.expected_prefix }}
+        run: |
+          set -euo pipefail
+          python3 tests/retrieval_fts_join_population_sweep.py \
+            --source src/retrieval_fts_consistency.c \
+            --expected-sqlite-prefix "$EXPECTED_SQLITE_PREFIX" \
+            --samples 9 | tee /tmp/fts-join-population-sweep.log
+
+      - name: Upload sweep log
+        uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4.6.2
+        with:
+          name: fts-join-population-sweep-${{ matrix.sqlite_line }}
+          path: /tmp/fts-join-population-sweep.log
+          if-no-files-found: error
