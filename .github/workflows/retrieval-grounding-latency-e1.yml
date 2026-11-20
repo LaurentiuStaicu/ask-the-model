@@ -123,11 +123,14 @@ jobs:
           PY
           python3 -m json.tool /tmp/atm-e1/e1-run.json >/dev/null
 
+      - name: Preserve runner-specific result filename
+        run: cp /tmp/atm-e1/e1-run.json "/tmp/atm-e1/e1-run-${{ matrix.runner_id }}.json"
+
       - name: Upload E1 runner result
         uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7.0.1
         with:
           name: atm-retrieval-e1-runner-${{ matrix.runner_id }}
-          path: /tmp/atm-e1/e1-run.json
+          path: /tmp/atm-e1/e1-run-${{ matrix.runner_id }}.json
           if-no-files-found: error
           retention-days: 14
 
