@@ -645,9 +645,9 @@ run_snapshot_sources_ab_for_repository (
     }
 
     for (guint sample = 0; sample < 15; sample++) {
-        gboolean original_first = (sample % 2) == 0;
+        gboolean pair_original_first = ((sample + block_index) % 2) == 0;
         for (guint position = 0; position < 2; position++) {
-            gboolean original = position == 0 ? original_first : !original_first;
+            gboolean original = position == 0 ? pair_original_first : !pair_original_first;
             gint64 started_us = g_get_monotonic_time ();
             GError *validation_error = NULL;
             gboolean valid =
@@ -700,7 +700,7 @@ run_snapshot_sources_ab_for_repository (
         " original_max_us=%" G_GINT64_FORMAT
         " candidate_max_us=%" G_GINT64_FORMAT
         " median_delta_percent=%.2f paired_candidate_wins=%u paired_original_wins=%u paired_ties=%u"
-        " diagnostics=disabled connection=per-call catalog=per-call\\n",
+        " diagnostics=disabled connection=per-call catalog=per-call\n",
         repository->repository_id, block_index, repository->snapshot_sha,
         sqlite3_libversion (), original_median, candidate_median,
         original_max, candidate_max,
