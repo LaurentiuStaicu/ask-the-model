@@ -31,11 +31,13 @@ def extract_c_initializer(source: str, marker: str, terminator: str) -> str:
 
 def load_queries(source_path: Path) -> tuple[str, str]:
     source = source_path.read_text(encoding="utf-8")
+    diagnostic_start = source.index("measure_fts_canonical_predicate_ab")
+    diagnostic_source = source[diagnostic_start:]
     original = extract_c_initializer(
-        source, "static const char *original_sql =", '";'
+        diagnostic_source, "static const char *original_sql =", '";'
     )
     candidate = extract_c_initializer(
-        source, "static const char *candidate_sql =", '";'
+        diagnostic_source, "static const char *candidate_sql =", '";'
     )
     production = extract_c_initializer(
         source, "const char *queries[] = {", "};"
