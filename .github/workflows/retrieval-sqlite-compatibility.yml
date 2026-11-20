@@ -123,7 +123,7 @@ jobs:
           from pathlib import Path
 
           log = Path("/tmp/atm-r5-sqlite-337.log").read_text(encoding="utf-8")
-          versions = set(re.findall(r"ATM_RETRIEVAL_VALIDATOR_SQLITE label=\\S+ version=(\\S+)", log))
+          versions = set(re.findall(r"ATM_RETRIEVAL_VALIDATOR_SQLITE label=\S+ version=(\S+)", log))
           if not versions or not all(version.startswith("3.37.") for version in versions):
               raise SystemExit(f"Unexpected SQLite runtime versions: {sorted(versions)}")
           outcomes = re.findall(r"ATM_RETRIEVAL_VALIDATOR_FTS_PREDICATE_AB result=equivalent outcome=valid samples=9", log)
