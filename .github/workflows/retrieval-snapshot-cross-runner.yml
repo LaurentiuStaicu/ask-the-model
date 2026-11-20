@@ -230,8 +230,8 @@ jobs:
                   raise SystemExit(f"Invalid runner replica: {filename}")
               log = Path(filename).read_text(encoding="utf-8")
               env_records = re.findall(
-                  r"ATM_CROSS_RUNNER_ENV sqlite=(337|345) replica=(\\d+) hostname=(\\S+) "
-                  r"runner_name=(.*?) image_os=(\\S+) image_version=(\\S+)",
+                  r"ATM_CROSS_RUNNER_ENV sqlite=(337|345) replica=(\d+) hostname=(\S+) "
+                  r"runner_name=(.*?) image_os=(\S+) image_version=(\S+)",
                   log,
               )
               if len(env_records) != 1:
