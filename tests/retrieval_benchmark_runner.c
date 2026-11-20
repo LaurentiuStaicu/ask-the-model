@@ -463,7 +463,7 @@ run_full_validator_ab_for_repository (
         " candidate_median_us=%" G_GINT64_FORMAT
         " original_max_us=%" G_GINT64_FORMAT
         " candidate_max_us=%" G_GINT64_FORMAT
-        " median_delta_percent=%.2f diagnostics=disabled\\n",
+        " median_delta_percent=%.2f diagnostics=disabled\n",
         repository->repository_id, repository->snapshot_sha,
         sqlite3_libversion (), original_median, candidate_median,
         original_max, candidate_max,
