@@ -192,9 +192,9 @@ jobs:
           EXPECTED_SQLITE_PREFIX: ${{ matrix.expected_prefix }}
         run: |
           set -euo pipefail
-          python3 tests/retrieval_fts_conditional_join_experiment.py \\
-            --source src/retrieval_fts_consistency.c \\
-            --expected-sqlite-prefix "$EXPECTED_SQLITE_PREFIX" \\
+          python3 tests/retrieval_fts_conditional_join_experiment.py \
+            --source src/retrieval_fts_consistency.c \
+            --expected-sqlite-prefix "$EXPECTED_SQLITE_PREFIX" \
             --samples 9 | tee /tmp/fts-conditional-join-experiment.log
           grep -q "SUMMARY cases=49 variants=3 semantic_equivalence=PASS performance_is_diagnostic_only=true" /tmp/fts-conditional-join-experiment.log
 
