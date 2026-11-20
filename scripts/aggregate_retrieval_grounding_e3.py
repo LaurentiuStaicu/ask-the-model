@@ -188,7 +188,7 @@ def main() -> int:
         },
         "runners": runner_data,
         "interpretation": {
-            "pipeline_end_to_end": "append_topic_run wall time, including conversation retrieval, context assembly, and benchmark serialization",
+            "pipeline_end_to_end": "append_topic_run wall time, including conversation retrieval, context assembly, and topic result-record construction",
             "index_prepare": "total repository index ensure phase; per-repository ensure timings are reported separately",
             "retrieval_and_context": "existing R5 stage timers, retained without changing the R5 run schema",
             "scope": "cold-cache full R5 execution per independent runner; host-dependent latency diagnostics, frozen semantic output",
