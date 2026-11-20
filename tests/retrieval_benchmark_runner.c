@@ -1,4 +1,5 @@
 #include "grounding_context.h"
+#include "retrieval_fts_consistency.h"
 #include "retrieval_conversation.h"
 #include "retrieval_index_lifecycle.h"
 #include "retrieval_policy.h"
@@ -11,6 +12,7 @@
 
 #include <string.h>
 #include <sys/stat.h>
+#include <sqlite3.h>
 
 #define FROZEN_R5_MAX_RESULTS_PER_REPOSITORY 10
 #define FROZEN_R5_MAX_CONTEXT_SOURCES 8
@@ -334,6 +336,155 @@ find_repository (
     return NULL;
 }
 
+
+#ifdef ATM_RETRIEVAL_VALIDATOR_TESTING
+static gint64
+validator_sample_median (const gint64 samples[9])
+{
+    gint64 sorted[9];
+    memcpy (sorted, samples, sizeof (sorted));
+    for (guint i = 1; i < G_N_ELEMENTS (sorted); i++) {
+        gint64 value = sorted[i];
+        guint j = i;
+        while (j > 0 && sorted[j - 1] > value) {
+            sorted[j] = sorted[j - 1];
+            j--;
+        }
+        sorted[j] = value;
+    }
+    return sorted[G_N_ELEMENTS (sorted) / 2];
+}
+
+static gboolean
+run_full_validator_ab_for_repository (
+    BenchmarkRepository *repository,
+    GError **error
+)
+{
+    sqlite3 *db = NULL;
+    char *sqlite_error = NULL;
+    gint64 original_times[9] = { 0 };
+    gint64 candidate_times[9] = { 0 };
+
+    int rc = sqlite3_open_v2 (
+        repository->index_path, &db,
+        SQLITE_OPEN_READONLY | SQLITE_OPEN_NOMUTEX, NULL
+    );
+    if (rc != SQLITE_OK) {
+        g_set_error (
+            error, G_IO_ERROR, G_IO_ERROR_FAILED,
+            "Could not open %s for full-validator A/B: %s",
+            repository->repository_id,
+            db != NULL ? sqlite3_errmsg (db) : "SQLite open failed"
+        );
+        goto out;
+    }
+
+    rc = sqlite3_exec (
+        db,
+        "PRAGMA query_only=ON;"
+        "PRAGMA foreign_keys=ON;"
+        "PRAGMA trusted_schema=OFF;"
+        "BEGIN;",
+        NULL, NULL, &sqlite_error
+    );
+    if (rc != SQLITE_OK) {
+        g_set_error (
+            error, G_IO_ERROR, G_IO_ERROR_FAILED,
+            "Could not configure full-validator A/B for %s: %s",
+            repository->repository_id,
+            sqlite_error != NULL ? sqlite_error : sqlite3_errmsg (db)
+        );
+        sqlite3_free (sqlite_error);
+        sqlite_error = NULL;
+        goto out;
+    }
+
+    /* Both variants must accept the same pinned database snapshot. */
+    for (guint variant = 0; variant < 2; variant++) {
+        GError *validation_error = NULL;
+        gboolean original = variant == 0;
+        if (!atm_retrieval_index_validate_fts_canonical_consistency_for_test (
+                db, original, &validation_error)) {
+            g_set_error (
+                error, G_IO_ERROR, G_IO_ERROR_INVALID_DATA,
+                "Full-validator A/B warmup failed for %s (%s): %s",
+                repository->repository_id,
+                original ? "NOT EXISTS" : "LEFT JOIN",
+                validation_error != NULL ? validation_error->message : "unknown error"
+            );
+            g_clear_error (&validation_error);
+            goto out;
+        }
+        g_clear_error (&validation_error);
+    }
+
+    for (guint sample = 0; sample < 9; sample++) {
+        gboolean original_first = (sample % 2) == 0;
+        for (guint position = 0; position < 2; position++) {
+            gboolean original = position == 0 ? original_first : !original_first;
+            gint64 started_us = g_get_monotonic_time ();
+            GError *validation_error = NULL;
+            gboolean valid =
+                atm_retrieval_index_validate_fts_canonical_consistency_for_test (
+                    db, original, &validation_error
+                );
+            gint64 elapsed_us = g_get_monotonic_time () - started_us;
+
+            if (!valid) {
+                g_set_error (
+                    error, G_IO_ERROR, G_IO_ERROR_INVALID_DATA,
+                    "Full-validator A/B failed for %s sample=%u (%s): %s",
+                    repository->repository_id, sample,
+                    original ? "NOT EXISTS" : "LEFT JOIN",
+                    validation_error != NULL ? validation_error->message : "unknown error"
+                );
+                g_clear_error (&validation_error);
+                goto out;
+            }
+            g_clear_error (&validation_error);
+            if (original) original_times[sample] = elapsed_us;
+            else candidate_times[sample] = elapsed_us;
+        }
+    }
+
+    gint64 original_median = validator_sample_median (original_times);
+    gint64 candidate_median = validator_sample_median (candidate_times);
+    gint64 original_max = original_times[0];
+    gint64 candidate_max = candidate_times[0];
+    for (guint i = 1; i < 9; i++) {
+        original_max = MAX (original_max, original_times[i]);
+        candidate_max = MAX (candidate_max, candidate_times[i]);
+    }
+
+    g_print (
+        "ATM_RETRIEVAL_VALIDATOR_FULL_AB result=equivalent repository=%s "
+        "snapshot=%s sqlite=%s samples=9 original_median_us=%" G_GINT64_FORMAT
+        " candidate_median_us=%" G_GINT64_FORMAT
+        " original_max_us=%" G_GINT64_FORMAT
+        " candidate_max_us=%" G_GINT64_FORMAT
+        " median_delta_percent=%.2f diagnostics=disabled\\n",
+        repository->repository_id, repository->snapshot_sha,
+        sqlite3_libversion (), original_median, candidate_median,
+        original_max, candidate_max,
+        original_median > 0
+            ? ((gdouble) candidate_median / (gdouble) original_median - 1.0) * 100.0
+            : 0.0
+    );
+
+    sqlite3_exec (db, "ROLLBACK;", NULL, NULL, NULL);
+    sqlite3_close (db);
+    return TRUE;
+
+out:
+    if (db != NULL) {
+        sqlite3_exec (db, "ROLLBACK;", NULL, NULL, NULL);
+        sqlite3_close (db);
+    }
+    return FALSE;
+}
+#endif
+
 static gboolean
 load_benchmark_repositories (
     JsonObject *benchmark,
@@ -506,6 +657,13 @@ load_benchmark_repositories (
             benchmark_repository_free (repository);
             goto out;
         }
+
+#ifdef ATM_RETRIEVAL_VALIDATOR_TESTING
+        if (!run_full_validator_ab_for_repository (repository, error)) {
+            benchmark_repository_free (repository);
+            goto out;
+        }
+#endif
 
         g_print (
             "R5 corpus: %s version=%s sha=%s ensure=%d\n",
