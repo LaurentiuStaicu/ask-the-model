@@ -1,0 +1,148 @@
+name: SQLite 3.37 compatibility qualification
+
+on:
+  workflow_dispatch:
+  pull_request:
+    paths:
+      - 'src/retrieval_fts_consistency.c'
+      - 'src/retrieval_fts_consistency.h'
+      - 'src/retrieval_index.c'
+      - 'src/retrieval_query.c'
+      - 'src/retrieval_router.c'
+      - 'src/retrieval_benchmark_runner.c'
+      - 'tests/retrieval_benchmark_runner.c'
+      - 'benchmarks/retrieval-v1/**'
+      - 'data/schemas/retrieval-index-v2.sql'
+      - 'data/io.github.laurentiustaicu.ask_the_model.gresource.xml'
+      - '.github/workflows/retrieval-sqlite-compatibility.yml'
+
+permissions:
+  contents: read
+
+concurrency:
+  group: retrieval-sqlite-337-${{ github.event.pull_request.number || github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  sqlite-337:
+    runs-on: ubuntu-22.04
+    timeout-minutes: 20
+    steps:
+      - name: Checkout AtM
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+
+      - name: Install SQLite 3.37 system dependencies
+        shell: bash
+        run: |
+          set -euo pipefail
+          sudo apt-get update
+          sudo apt-get install -y --no-install-recommends \
+            build-essential git pkg-config \
+            libglib2.0-dev libglib2.0-bin \
+            libjson-glib-dev libsqlite3-dev libyaml-dev
+          version="$(pkg-config --modversion sqlite3)"
+          printf 'SQLite pkg-config version: %s\n' "$version"
+          case "$version" in
+            3.37.*) ;;
+            *) echo "Expected SQLite 3.37.x on Ubuntu 22.04; got $version" >&2; exit 1 ;;
+          esac
+
+      - name: Checkout benchmark-pinned repository snapshots
+        shell: bash
+        run: |
+          set -euo pipefail
+          mkdir -p .integration
+          python3 - <<'PY' >/tmp/atm-r5-corpus.tsv
+          import json
+          with open("benchmarks/retrieval-v1/benchmark.json", encoding="utf-8") as handle:
+              benchmark = json.load(handle)
+          for item in benchmark["corpus"]:
+              print(item["repository_id"], item["snapshot_sha"], sep="\t")
+          PY
+          while IFS=$'\t' read -r repository_id snapshot_sha; do
+            case "$repository_id" in
+              ewd) remote="https://github.com/LaurentiuStaicu/empirical-world3-dynamics.git" ;;
+              cbd) remote="https://github.com/LaurentiuStaicu/cognitive-belief-dynamics.git" ;;
+              rmd) remote="https://github.com/LaurentiuStaicu/romanian-monetary-dynamics.git" ;;
+              *) echo "Unsupported repository: $repository_id" >&2; exit 1 ;;
+            esac
+            destination="$GITHUB_WORKSPACE/.integration/$repository_id"
+            git init -q "$destination"
+            git -C "$destination" remote add origin "$remote"
+            git -C "$destination" fetch --depth=1 origin "$snapshot_sha"
+            git -C "$destination" checkout -q --detach FETCH_HEAD
+            test "$(git -C "$destination" rev-parse HEAD)" = "$snapshot_sha"
+            rm -rf "$destination/.git"
+            case "$repository_id" in
+              ewd) echo "ATM_BENCH_EWD_ROOT=$destination" >> "$GITHUB_ENV"; echo "ATM_BENCH_EWD_SHA=$snapshot_sha" >> "$GITHUB_ENV" ;;
+              cbd) echo "ATM_BENCH_CBD_ROOT=$destination" >> "$GITHUB_ENV"; echo "ATM_BENCH_CBD_SHA=$snapshot_sha" >> "$GITHUB_ENV" ;;
+              rmd) echo "ATM_BENCH_RMD_ROOT=$destination" >> "$GITHUB_ENV"; echo "ATM_BENCH_RMD_SHA=$snapshot_sha" >> "$GITHUB_ENV" ;;
+            esac
+            printf 'Pinned %s %s\n' "$repository_id" "$snapshot_sha"
+          done </tmp/atm-r5-corpus.tsv
+
+      - name: Compile deterministic retrieval runner
+        shell: bash
+        run: |
+          set -euo pipefail
+          glib-compile-resources \
+            data/io.github.laurentiustaicu.ask_the_model.gresource.xml \
+            --sourcedir=data --generate-source --target=/tmp/atm-resources.c
+          cc -std=c11 -D_GNU_SOURCE -O2 -Wall -Wextra -Werror -Isrc \
+            $(pkg-config --cflags glib-2.0 gio-2.0 json-glib-1.0) \
+            -c tests/retrieval_benchmark_runner.c -o /tmp/retrieval-benchmark-runner.o
+          cc -std=c11 -D_GNU_SOURCE -O2 -Wall -Wextra -Isrc \
+            src/cff_version.c src/repository_sources.c src/markdown_sections.c \
+            src/csv_table.c src/structured_json.c src/retrieval_index.c \
+            src/retrieval_fts_consistency.c src/coordination_lease.c \
+            src/retrieval_index_lifecycle.c src/retrieval_query.c \
+            src/retrieval_rank.c src/retrieval_scope.c src/retrieval_normalize.c \
+            src/retrieval_router.c src/retrieval_conversation.c \
+            src/grounding_context.c /tmp/retrieval-benchmark-runner.o \
+            /tmp/atm-resources.c \
+            $(pkg-config --cflags --libs glib-2.0 gio-2.0 json-glib-1.0 sqlite3 yaml-0.1) \
+            -o /tmp/atm-retrieval-benchmark-runner
+
+      - name: Run validator and paired predicate diagnostics
+        shell: bash
+        env:
+          ATM_RETRIEVAL_VALIDATOR_TIMING: '1'
+          ATM_RETRIEVAL_VALIDATOR_EXPLAIN: '1'
+          ATM_RETRIEVAL_VALIDATOR_BRANCH_TIMING: '1'
+          ATM_RETRIEVAL_VALIDATOR_DISTINCT_TIMING: '1'
+        run: |
+          set -euo pipefail
+          /tmp/atm-retrieval-benchmark-runner \
+            benchmarks/retrieval-v1/benchmark.json \
+            /tmp/atm-r5-sqlite-337-run.json \
+            "sqlite-337-${GITHUB_RUN_ID}" production \
+            2>&1 | tee /tmp/atm-r5-sqlite-337.log
+          python3 - <<'PY'
+          import json
+          import re
+          from pathlib import Path
+
+          log = Path("/tmp/atm-r5-sqlite-337.log").read_text(encoding="utf-8")
+          versions = set(re.findall(r"ATM_RETRIEVAL_VALIDATOR_SQLITE label=\\S+ version=(\\S+)", log))
+          if not versions or not all(version.startswith("3.37.") for version in versions):
+              raise SystemExit(f"Unexpected SQLite runtime versions: {sorted(versions)}")
+          outcomes = re.findall(r"ATM_RETRIEVAL_VALIDATOR_FTS_PREDICATE_AB result=equivalent outcome=valid samples=9", log)
+          if len(outcomes) < 3:
+              raise SystemExit(f"Expected paired equivalent results for EWD/CBD/RMD; found {len(outcomes)}")
+          for label in ("fts_to_canonical_not_exists_ab", "fts_to_canonical_left_join_ab"):
+              if f"label={label}" not in log:
+                  raise SystemExit(f"Missing query plan: {label}")
+          print(f"PASS: SQLite {', '.join(sorted(versions))}; {len(outcomes)} paired equivalent diagnostics.")
+          PY
+          python3 -m json.tool /tmp/atm-r5-sqlite-337-run.json >/dev/null
+
+      - name: Upload SQLite compatibility evidence
+        if: always()
+        uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7.0.1
+        with:
+          name: atm-retrieval-sqlite-337-${{ github.run_id }}-${{ github.run_attempt }}
+          path: |
+            /tmp/atm-r5-sqlite-337.log
+            /tmp/atm-r5-sqlite-337-run.json
+          if-no-files-found: warn
+          retention-days: 14
