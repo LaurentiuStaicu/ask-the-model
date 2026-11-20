@@ -43,9 +43,9 @@ jobs:
           with open("benchmarks/retrieval-v1/benchmark.json", encoding="utf-8") as f:
               benchmark = json.load(f)
           for item in benchmark["corpus"]:
-              print(item["repository_id"], item["snapshot_sha"], sep="\\t")
+              print(item["repository_id"], item["snapshot_sha"], sep="\t")
           PY
-          while IFS=$'\\t' read -r repository_id snapshot_sha; do
+          while IFS=$'\t' read -r repository_id snapshot_sha; do
             case "$repository_id" in
               ewd) remote="https://github.com/LaurentiuStaicu/empirical-world3-dynamics.git"; root_env="ATM_BENCH_EWD_ROOT"; sha_env="ATM_BENCH_EWD_SHA" ;;
               cbd) remote="https://github.com/LaurentiuStaicu/cognitive-belief-dynamics.git"; root_env="ATM_BENCH_CBD_ROOT"; sha_env="ATM_BENCH_CBD_SHA" ;;
@@ -82,7 +82,9 @@ jobs:
             src/cff_version.c src/repository_sources.c src/markdown_sections.c \
             src/csv_table.c src/structured_json.c src/retrieval_index.c \
             src/retrieval_fts_consistency.c src/coordination_lease.c \
-            src/retrieval_index_lifecycle.c \
+            src/retrieval_index_lifecycle.c src/retrieval_query.c \
+            src/retrieval_rank.c src/retrieval_scope.c src/retrieval_normalize.c \
+            src/retrieval_router.c src/retrieval_conversation.c src/grounding_context.c \
             /tmp/retrieval-lifecycle-benchmark-runner.o /tmp/atm-resources.c \
             $(pkg-config --cflags --libs glib-2.0 gio-2.0 json-glib-1.0 sqlite3 yaml-0.1) \
             -o /tmp/atm-retrieval-lifecycle-benchmark-runner
@@ -101,11 +103,11 @@ jobs:
           path = pathlib.Path("/tmp/atm-e1/e1-run.json")
           data = json.loads(path.read_text(encoding="utf-8"))
           machine_id = pathlib.Path("/etc/machine-id").read_text().strip()
-          identity_material = "\\0".join((machine_id, socket.gethostname(), os.environ["RUNNER_NAME"]))
+          identity_material = "\0".join((machine_id, socket.gethostname(), os.environ["RUNNER_NAME"]))
           data["runner_identity"] = hashlib.sha256(identity_material.encode()).hexdigest()
           data["runner_name"] = os.environ["RUNNER_NAME"]
           data["runner_matrix_id"] = int("${{ matrix.runner_id }}")
-          path.write_text(json.dumps(data, indent=2) + "\\n", encoding="utf-8")
+          path.write_text(json.dumps(data, indent=2) + "\n", encoding="utf-8")
           PY
           python3 -m json.tool /tmp/atm-e1/e1-run.json >/dev/null
 
