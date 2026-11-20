@@ -147,7 +147,7 @@ jobs:
           if len(snapshot_sources) != 3 or {item[0] for item in snapshot_sources} != {"ewd", "cbd", "rmd"} or not all(item[2].startswith(expected_prefix) for item in snapshot_sources):
               raise SystemExit(f"Expected complete snapshot-source validation A/B for EWD/CBD/RMD; got {snapshot_sources}")
           print(f"PASS: complete snapshot-source validation A/B for {[item[0] for item in snapshot_sources]}.")
-          paired = re.findall(r"ATM_RETRIEVAL_SNAPSHOT_SOURCES_AB result=equivalent repository=(\\S+) .* paired_candidate_wins=(\\d+) paired_original_wins=(\\d+) paired_ties=(\\d+) exact_sign_p=([0-9.]+)", log)
+          paired = re.findall(r"ATM_RETRIEVAL_SNAPSHOT_SOURCES_AB result=equivalent repository=(\S+) .* paired_candidate_wins=(\d+) paired_original_wins=(\d+) paired_ties=(\d+) exact_sign_p=([0-9.]+)", log)
           if len(paired) != 3 or {item[0] for item in paired} != {"ewd", "cbd", "rmd"}:
               raise SystemExit(f"Expected paired sign-test evidence for EWD/CBD/RMD; got {paired}")
           if any(sum(map(int, item[1:4])) != 15 or not 0.0 <= float(item[4]) <= 1.0 for item in paired):
@@ -290,7 +290,7 @@ jobs:
           if len(snapshot_sources) != 3 or {item[0] for item in snapshot_sources} != {"ewd", "cbd", "rmd"} or not all(item[2].startswith(expected_prefix) for item in snapshot_sources):
               raise SystemExit(f"Expected complete snapshot-source validation A/B for EWD/CBD/RMD; got {snapshot_sources}")
           print(f"PASS: complete snapshot-source validation A/B for {[item[0] for item in snapshot_sources]}.")
-          paired = re.findall(r"ATM_RETRIEVAL_SNAPSHOT_SOURCES_AB result=equivalent repository=(\\S+) .* paired_candidate_wins=(\\d+) paired_original_wins=(\\d+) paired_ties=(\\d+) exact_sign_p=([0-9.]+)", log)
+          paired = re.findall(r"ATM_RETRIEVAL_SNAPSHOT_SOURCES_AB result=equivalent repository=(\S+) .* paired_candidate_wins=(\d+) paired_original_wins=(\d+) paired_ties=(\d+) exact_sign_p=([0-9.]+)", log)
           if len(paired) != 3 or {item[0] for item in paired} != {"ewd", "cbd", "rmd"}:
               raise SystemExit(f"Expected paired sign-test evidence for EWD/CBD/RMD; got {paired}")
           if any(sum(map(int, item[1:4])) != 15 or not 0.0 <= float(item[4]) <= 1.0 for item in paired):
