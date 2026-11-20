@@ -186,6 +186,25 @@ jobs:
             --expected-sqlite-prefix "$EXPECTED_SQLITE_PREFIX" \
             --samples 9 | tee /tmp/fts-join-population-sweep.log
 
+      - name: Run three-way conditional JOIN diagnostic
+        shell: bash
+        env:
+          EXPECTED_SQLITE_PREFIX: ${{ matrix.expected_prefix }}
+        run: |
+          set -euo pipefail
+          python3 tests/retrieval_fts_conditional_join_experiment.py \\
+            --source src/retrieval_fts_consistency.c \\
+            --expected-sqlite-prefix "$EXPECTED_SQLITE_PREFIX" \\
+            --samples 9 | tee /tmp/fts-conditional-join-experiment.log
+          grep -q "SUMMARY cases=49 variants=3 semantic_equivalence=PASS performance_is_diagnostic_only=true" /tmp/fts-conditional-join-experiment.log
+
+      - name: Upload conditional JOIN experiment log
+        uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4.6.2
+        with:
+          name: fts-conditional-join-experiment-${{ matrix.sqlite_line }}
+          path: /tmp/fts-conditional-join-experiment.log
+          if-no-files-found: error
+
       - name: Upload sweep log
         uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4.6.2
         with:
