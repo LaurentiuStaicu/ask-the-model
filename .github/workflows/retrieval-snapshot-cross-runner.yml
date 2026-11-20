@@ -1,0 +1,292 @@
+name: Retrieval snapshot validator cross-runner replication
+
+on:
+  workflow_dispatch:
+  pull_request:
+    paths:
+      - 'src/retrieval_fts_consistency.c'
+      - 'src/retrieval_fts_consistency.h'
+      - 'src/retrieval_index.c'
+      - 'src/retrieval_index.h'
+      - 'tests/retrieval_benchmark_runner.c'
+      - 'benchmarks/retrieval-v1/**'
+      - 'data/schemas/retrieval-index-v2.sql'
+      - 'data/io.github.laurentiustaicu.ask_the_model.gresource.xml'
+      - '.github/workflows/retrieval-snapshot-cross-runner.yml'
+
+permissions:
+  contents: read
+
+concurrency:
+  group: retrieval-cross-runner-${{ github.event.pull_request.number || github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  benchmark:
+    name: SQLite ${{ matrix.sqlite }} / runner ${{ matrix.replica }}
+    runs-on: ${{ matrix.sqlite == '337' && 'ubuntu-22.04' || 'ubuntu-24.04' }}
+    timeout-minutes: 20
+    strategy:
+      fail-fast: false
+      max-parallel: 10
+      matrix:
+        sqlite: ['337', '345']
+        replica: [0, 1, 2, 3, 4, 5, 6, 7, 8, 9]
+
+    steps:
+      - name: Checkout AtM
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+
+      - name: Record runner environment
+        shell: bash
+        run: |
+          set -euo pipefail
+          printf 'ATM_CROSS_RUNNER_ENV sqlite=%s replica=%s hostname=%s runner_name=%s image_os=%s image_version=%s\n' \
+            '${{ matrix.sqlite }}' '${{ matrix.replica }}' "$(hostname)" "${RUNNER_NAME:-unknown}" \
+            "${ImageOS:-unknown}" "${ImageVersion:-unknown}"
+          uname -a
+          grep -m1 'model name' /proc/cpuinfo || true
+
+      - name: Install SQLite system dependencies
+        shell: bash
+        run: |
+          set -euo pipefail
+          sudo apt-get update
+          sudo apt-get install -y --no-install-recommends \
+            build-essential git pkg-config \
+            libglib2.0-dev libglib2.0-bin \
+            libjson-glib-dev libsqlite3-dev libyaml-dev
+          version="$(pkg-config --modversion sqlite3)"
+          printf 'SQLite pkg-config version: %s\n' "$version"
+          case "${{ matrix.sqlite }}:$version" in
+            337:3.37.*|345:3.45.*) ;;
+            *) echo "Unexpected SQLite runtime for matrix ${{ matrix.sqlite }}: $version" >&2; exit 1 ;;
+          esac
+
+      - name: Checkout benchmark-pinned repository snapshots
+        shell: bash
+        run: |
+          set -euo pipefail
+          mkdir -p .integration
+          python3 - <<'PY' >/tmp/atm-cross-runner-corpus.tsv
+          import json
+          with open("benchmarks/retrieval-v1/benchmark.json", encoding="utf-8") as handle:
+              benchmark = json.load(handle)
+          for item in benchmark["corpus"]:
+              print(item["repository_id"], item["snapshot_sha"], sep="\t")
+          PY
+          while IFS=$'\t' read -r repository_id snapshot_sha; do
+            case "$repository_id" in
+              ewd) remote="https://github.com/LaurentiuStaicu/empirical-world3-dynamics.git" ;;
+              cbd) remote="https://github.com/LaurentiuStaicu/cognitive-belief-dynamics.git" ;;
+              rmd) remote="https://github.com/LaurentiuStaicu/romanian-monetary-dynamics.git" ;;
+              *) echo "Unsupported repository: $repository_id" >&2; exit 1 ;;
+            esac
+            destination="$GITHUB_WORKSPACE/.integration/$repository_id"
+            git init -q "$destination"
+            git -C "$destination" remote add origin "$remote"
+            git -C "$destination" fetch --depth=1 origin "$snapshot_sha"
+            git -C "$destination" checkout -q --detach FETCH_HEAD
+            test "$(git -C "$destination" rev-parse HEAD)" = "$snapshot_sha"
+            rm -rf "$destination/.git"
+            case "$repository_id" in
+              ewd) echo "ATM_BENCH_EWD_ROOT=$destination" >> "$GITHUB_ENV"; echo "ATM_BENCH_EWD_SHA=$snapshot_sha" >> "$GITHUB_ENV" ;;
+              cbd) echo "ATM_BENCH_CBD_ROOT=$destination" >> "$GITHUB_ENV"; echo "ATM_BENCH_CBD_SHA=$snapshot_sha" >> "$GITHUB_ENV" ;;
+              rmd) echo "ATM_BENCH_RMD_ROOT=$destination" >> "$GITHUB_ENV"; echo "ATM_BENCH_RMD_SHA=$snapshot_sha" >> "$GITHUB_ENV" ;;
+            esac
+            printf 'Pinned %s %s\n' "$repository_id" "$snapshot_sha"
+          done </tmp/atm-cross-runner-corpus.tsv
+
+      - name: Compile deterministic retrieval runner
+        shell: bash
+        run: |
+          set -euo pipefail
+          glib-compile-resources \
+            data/io.github.laurentiustaicu.ask_the_model.gresource.xml \
+            --sourcedir=data --generate-source --target=/tmp/atm-resources.c
+          cc -std=c11 -D_GNU_SOURCE -DATM_RETRIEVAL_VALIDATOR_TESTING -O2 -Wall -Wextra -Werror -Isrc \
+            $(pkg-config --cflags glib-2.0 gio-2.0 json-glib-1.0) \
+            -c tests/retrieval_benchmark_runner.c -o /tmp/retrieval-benchmark-runner.o
+          cc -std=c11 -D_GNU_SOURCE -DATM_RETRIEVAL_VALIDATOR_TESTING -O2 -Wall -Wextra -Isrc \
+            src/cff_version.c src/repository_sources.c src/markdown_sections.c \
+            src/csv_table.c src/structured_json.c src/retrieval_index.c \
+            src/retrieval_fts_consistency.c src/coordination_lease.c \
+            src/retrieval_index_lifecycle.c src/retrieval_query.c \
+            src/retrieval_rank.c src/retrieval_scope.c src/retrieval_normalize.c \
+            src/retrieval_router.c src/retrieval_conversation.c \
+            src/grounding_context.c /tmp/retrieval-benchmark-runner.o \
+            /tmp/atm-resources.c \
+            $(pkg-config --cflags --libs glib-2.0 gio-2.0 json-glib-1.0 sqlite3 yaml-0.1) \
+            -o /tmp/atm-retrieval-benchmark-runner
+
+      - name: Run one process-level paired validator benchmark
+        shell: bash
+        env:
+          ATM_RETRIEVAL_VALIDATOR_TIMING: '1'
+          ATM_RETRIEVAL_VALIDATOR_EXPLAIN: '1'
+          ATM_RETRIEVAL_VALIDATOR_BRANCH_TIMING: '1'
+          ATM_RETRIEVAL_VALIDATOR_DISTINCT_TIMING: '1'
+          ATM_RETRIEVAL_AB_BLOCK: ${{ matrix.replica }}
+        run: |
+          set -euo pipefail
+          log="/tmp/atm-cross-runner-${{ matrix.sqlite }}-${{ matrix.replica }}.log"
+          output="/tmp/atm-cross-runner-${{ matrix.sqlite }}-${{ matrix.replica }}.json"
+          /tmp/atm-retrieval-benchmark-runner \
+            benchmarks/retrieval-v1/benchmark.json \
+            "$output" \
+            "cross-runner-${{ matrix.sqlite }}-${{ matrix.replica }}-${GITHUB_RUN_ID}" production \
+            2>&1 | tee "$log"
+
+          python3 - "$log" "$output" "${{ matrix.sqlite }}" "${{ matrix.replica }}" <<'PY'
+          import json
+          import re
+          import sys
+          from collections import Counter
+          from pathlib import Path
+
+          log_path, output_path, sqlite_label, replica_text = sys.argv[1:]
+          replica = int(replica_text)
+          expected_prefix = "3.37." if sqlite_label == "337" else "3.45."
+          log = Path(log_path).read_text(encoding="utf-8")
+          output = json.loads(Path(output_path).read_text(encoding="utf-8"))
+
+          records = re.findall(
+              r"ATM_RETRIEVAL_SNAPSHOT_SOURCES_AB result=equivalent repository=(\\S+) block=(\\d+) "
+              r"snapshot=(\\S+) sqlite=(\\S+) samples=15 original_median_us=(\\d+) "
+              r"candidate_median_us=(\\d+).*?paired_candidate_wins=(\\d+) "
+              r"paired_original_wins=(\\d+) paired_ties=(\\d+) diagnostics=disabled "
+              r"connection=per-call catalog=per-call",
+              log,
+          )
+          if len(records) != 3 or {item[0] for item in records} != {"ewd", "cbd", "rmd"}:
+              raise SystemExit(f"Expected exactly one snapshot-source record for EWD/CBD/RMD; got {records}")
+          for repo, block, snapshot, sqlite, original, candidate, candidate_wins, original_wins, ties in records:
+              if int(block) != replica or not sqlite.startswith(expected_prefix):
+                  raise SystemExit(f"Unexpected replica/SQLite identity: {(repo, block, sqlite)}")
+              if int(candidate_wins) + int(original_wins) + int(ties) != 15:
+                  raise SystemExit(f"Invalid paired sample counts for {repo}")
+          for marker in ("ATM_RETRIEVAL_VALIDATOR_FULL_AB", "ATM_RETRIEVAL_IDENTITY_AB"):
+              count = len(re.findall(marker + r" result=equivalent", log))
+              if count != 3:
+                  raise SystemExit(f"Expected 3 semantic-equivalence records for {marker}; got {count}")
+          if output.get("schema_version") != 1 or len(output.get("topics", [])) == 0:
+              raise SystemExit("Benchmark JSON artifact failed structural validation")
+          print(
+              f"PASS: runner replica={replica} SQLite={expected_prefix.rstrip('.')} "
+              "completed EWD/CBD/RMD snapshot-source validation with 15 pairs each."
+          )
+          PY
+
+      - name: Upload runner evidence
+        if: always()
+        uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4
+        with:
+          name: atm-cross-runner-${{ github.run_id }}-${{ matrix.sqlite }}-${{ matrix.replica }}
+          path: |
+            /tmp/atm-cross-runner-${{ matrix.sqlite }}-${{ matrix.replica }}.log
+            /tmp/atm-cross-runner-${{ matrix.sqlite }}-${{ matrix.replica }}.json
+          if-no-files-found: warn
+          retention-days: 14
+
+  aggregate:
+    name: Aggregate independent runner blocks
+    if: ${{ needs.benchmark.result == 'success' }}
+    needs: benchmark
+    runs-on: ubuntu-latest
+    steps:
+      - name: Download all runner evidence
+        uses: actions/download-artifact@9000827ccba6bdab643e8b6fd33ac0654aef8333 # v8.0.2
+        with:
+          pattern: atm-cross-runner-${{ github.run_id }}-*
+          path: evidence
+          merge-multiple: true
+
+      - name: Validate all runner blocks and summarize effects
+        shell: bash
+        run: |
+          set -euo pipefail
+          python3 - <<'PY'
+          import glob
+          import json
+          import math
+          import re
+          from collections import defaultdict
+          from pathlib import Path
+          from statistics import median
+
+          files = sorted(glob.glob("evidence/atm-cross-runner-*.log"))
+          if len(files) != 20:
+              raise SystemExit(f"Expected 20 independent runner logs; got {len(files)}")
+
+          grouped = defaultdict(dict)
+          for filename in files:
+              match = re.search(r"atm-cross-runner-(337|345)-(\\d+)\\.log$", filename)
+              if not match:
+                  raise SystemExit(f"Unexpected evidence filename: {filename}")
+              sqlite_label, replica_text = match.groups()
+              replica = int(replica_text)
+              if replica not in range(10):
+                  raise SystemExit(f"Invalid runner replica: {filename}")
+              log = Path(filename).read_text(encoding="utf-8")
+              records = re.findall(
+                  r"ATM_RETRIEVAL_SNAPSHOT_SOURCES_AB result=equivalent repository=(\\S+) block=(\\d+) "
+                  r"snapshot=(\\S+) sqlite=(\\S+) samples=15 original_median_us=(\\d+) "
+                  r"candidate_median_us=(\\d+).*?paired_candidate_wins=(\\d+) "
+                  r"paired_original_wins=(\\d+) paired_ties=(\\d+) diagnostics=disabled "
+                  r"connection=per-call catalog=per-call",
+                  log,
+              )
+              if len(records) != 3:
+                  raise SystemExit(f"Expected three snapshot-source records in {filename}; got {len(records)}")
+              expected_prefix = "3.37." if sqlite_label == "337" else "3.45."
+              for repo, block, snapshot, sqlite, original, candidate, cw, ow, ties in records:
+                  if int(block) != replica or not sqlite.startswith(expected_prefix):
+                      raise SystemExit(f"Runner identity mismatch in {filename}: {(repo, block, sqlite)}")
+                  if int(cw) + int(ow) + int(ties) != 15:
+                      raise SystemExit(f"Invalid within-runner paired counts in {filename}: {repo}")
+                  if replica in grouped[(sqlite_label, repo)]:
+                      raise SystemExit(f"Duplicate runner block for SQLite={sqlite_label}, repo={repo}, block={replica}")
+                  grouped[(sqlite_label, repo)][replica] = {
+                      "snapshot": snapshot,
+                      "original": int(original),
+                      "candidate": int(candidate),
+                  }
+
+          def exact_sign_p(wins, losses):
+              n = wins + losses
+              if n == 0:
+                  return 1.0
+              tail = min(wins, losses)
+              return min(1.0, 2.0 * sum(math.comb(n, k) for k in range(tail + 1)) / (2 ** n))
+
+          for sqlite_label in ("337", "345"):
+              for repo in ("ewd", "cbd", "rmd"):
+                  rows = grouped[(sqlite_label, repo)]
+                  if set(rows) != set(range(10)):
+                      raise SystemExit(f"Missing runner blocks for SQLite={sqlite_label}, repo={repo}: {sorted(rows)}")
+                  snapshots = {item["snapshot"] for item in rows.values()}
+                  if len(snapshots) != 1:
+                      raise SystemExit(f"Pinned snapshot changed across runners for {repo}: {snapshots}")
+                  wins = sum(item["candidate"] < item["original"] for item in rows.values())
+                  losses = sum(item["candidate"] > item["original"] for item in rows.values())
+                  ties = 10 - wins - losses
+                  deltas = [
+                      (item["candidate"] / item["original"] - 1.0) * 100.0
+                      for item in rows.values()
+                  ]
+                  original_median = median(item["original"] for item in rows.values())
+                  candidate_median = median(item["candidate"] for item in rows.values())
+                  print(
+                      f"ATM_CROSS_RUNNER_SUMMARY sqlite={sqlite_label} repository={repo} "
+                      f"runners=10 candidate_wins={wins} original_wins={losses} ties={ties} "
+                      f"exact_sign_p={exact_sign_p(wins, losses):.6f} "
+                      f"original_median_of_runner_medians_us={original_median:.1f} "
+                      f"candidate_median_of_runner_medians_us={candidate_median:.1f} "
+                      f"median_runner_delta_percent={median(deltas):.2f} "
+                      f"runner_delta_range_percent={min(deltas):.2f}..{max(deltas):.2f}"
+                  )
+
+          for filename in glob.glob("evidence/atm-cross-runner-*.json"):
+              json.loads(Path(filename).read_text(encoding="utf-8"))
+          print("PASS: 20 separate GitHub-hosted runner jobs; 10 per SQLite version; 60 equivalent repository records.")
+          PY
