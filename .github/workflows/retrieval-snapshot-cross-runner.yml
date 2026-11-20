@@ -131,11 +131,16 @@ jobs:
           set -euo pipefail
           log="/tmp/atm-cross-runner-${{ matrix.sqlite }}-${{ matrix.replica }}.log"
           output="/tmp/atm-cross-runner-${{ matrix.sqlite }}-${{ matrix.replica }}.json"
+          printf 'ATM_CROSS_RUNNER_ENV sqlite=%s replica=%s hostname=%s runner_name=%s image_os=%s image_version=%s\\n' \\
+            '${{ matrix.sqlite }}' '${{ matrix.replica }}' "$(hostname)" "${RUNNER_NAME:-unknown}" \\
+            "${ImageOS:-unknown}" "${ImageVersion:-unknown}" | tee "$log"
+          uname -a | tee -a "$log"
+          grep -m1 'model name' /proc/cpuinfo | tee -a "$log" || true
           /tmp/atm-retrieval-benchmark-runner \
             benchmarks/retrieval-v1/benchmark.json \
             "$output" \
             "cross-runner-${{ matrix.sqlite }}-${{ matrix.replica }}-${GITHUB_RUN_ID}" production \
-            2>&1 | tee "$log"
+            2>&1 | tee -a "$log"
 
           python3 - "$log" "$output" "${{ matrix.sqlite }}" "${{ matrix.replica }}" <<'PY'
           import json
