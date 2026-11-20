@@ -421,9 +421,9 @@ run_full_validator_ab_for_repository (
     }
 
     for (guint sample = 0; sample < 15; sample++) {
-        gboolean pair_original_first = ((sample + block_index) % 2) == 0;
+        gboolean original_first = (sample % 2) == 0;
         for (guint position = 0; position < 2; position++) {
-            gboolean original = position == 0 ? pair_original_first : !pair_original_first;
+            gboolean original = position == 0 ? original_first : !original_first;
             gint64 started_us = g_get_monotonic_time ();
             GError *validation_error = NULL;
             gboolean valid =
