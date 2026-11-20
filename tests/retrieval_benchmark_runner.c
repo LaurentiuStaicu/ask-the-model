@@ -361,7 +361,7 @@ validator_exact_sign_test_p (guint candidate_wins, guint original_wins)
     for (guint k = 0; k <= tail; k++) {
         probability += validator_binomial_coefficient (n, k);
     }
-    probability *= 2.0 / pow (2.0, (gdouble) n);
+    probability *= 2.0 / (gdouble) (1u << n);
     return MIN (1.0, probability);
 }
 
