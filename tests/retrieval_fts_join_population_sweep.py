@@ -20,6 +20,8 @@ from pathlib import Path
 def extract_c_initializer(source: str, marker: str, terminator: str) -> str:
     start = source.index(marker) + len(marker)
     end = source.index(terminator, start)
+    if terminator == '";':
+        end += 1  # retain the closing quote of the final C string literal
     initializer = source[start:end]
     literals = re.findall(r'"(?:\\.|[^"\\])*"', initializer)
     if not literals:
@@ -30,10 +32,10 @@ def extract_c_initializer(source: str, marker: str, terminator: str) -> str:
 def load_queries(source_path: Path) -> tuple[str, str]:
     source = source_path.read_text(encoding="utf-8")
     original = extract_c_initializer(
-        source, "static const char *original_sql =", ";"
+        source, "static const char *original_sql =", '";'
     )
     candidate = extract_c_initializer(
-        source, "static const char *candidate_sql =", ";"
+        source, "static const char *candidate_sql =", '";'
     )
     production = extract_c_initializer(
         source, "const char *queries[] = {", "};"
@@ -263,7 +265,7 @@ def main() -> int:
     parser = argparse.ArgumentParser()
     parser.add_argument("--source", required=True, type=Path)
     parser.add_argument("--expected-sqlite-prefix", required=True)
-    parser.add_argument("--samples", type=int, default= nine_samples())
+    parser.add_argument("--samples", type=int, default=9)
     args = parser.parse_args()
 
     version, source_id = sqlite3.connect(":memory:").execute(
@@ -318,10 +320,6 @@ def main() -> int:
         "performance_is_diagnostic_only=true"
     )
     return 0
-
-
-def nine_samples() -> int:
-    return 9
 
 
 if __name__ == "__main__":
