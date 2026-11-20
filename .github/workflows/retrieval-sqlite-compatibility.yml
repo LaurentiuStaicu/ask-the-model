@@ -116,7 +116,7 @@ jobs:
           : > /tmp/atm-r5-sqlite-337.log
           for block in $(seq 0 9); do
             export ATM_RETRIEVAL_AB_BLOCK="$block"
-            printf 'ATM_PROCESS_BLOCK id=%s\\n' "$block" | tee -a /tmp/atm-r5-sqlite-337.log
+            printf 'ATM_PROCESS_BLOCK id=%s\n' "$block" | tee -a /tmp/atm-r5-sqlite-337.log
             /tmp/atm-retrieval-benchmark-runner \
               benchmarks/retrieval-v1/benchmark.json \
               "/tmp/atm-r5-sqlite-337-block-${block}.json" \
@@ -131,7 +131,7 @@ jobs:
           from pathlib import Path
 
           log = Path("/tmp/atm-r5-sqlite-337.log").read_text(encoding="utf-8")
-          versions = set(re.findall(r"ATM_RETRIEVAL_VALIDATOR_SQLITE label=\\S+ version=(\\S+)", log))
+          versions = set(re.findall(r"ATM_RETRIEVAL_VALIDATOR_SQLITE label=\S+ version=(\S+)", log))
           if not versions or not all(version.startswith("3.37.") for version in versions):
               raise SystemExit(f"Unexpected SQLite runtime versions: {sorted(versions)}")
           outcomes = re.findall(r"ATM_RETRIEVAL_VALIDATOR_FTS_PREDICATE_AB result=equivalent outcome=valid samples=9", log)
@@ -146,17 +146,17 @@ jobs:
               if len(records) != 30 or counts != Counter({"ewd": 10, "cbd": 10, "rmd": 10}):
                   raise SystemExit(f"Expected 10 {description} records per EWD/CBD/RMD; got {counts}")
 
-          full = re.findall(r"ATM_RETRIEVAL_VALIDATOR_FULL_AB result=equivalent repository=(\\S+) snapshot=(\\S+) sqlite=(\\S+) samples=15 .* diagnostics=disabled", log)
+          full = re.findall(r"ATM_RETRIEVAL_VALIDATOR_FULL_AB result=equivalent repository=(\S+) snapshot=(\S+) sqlite=(\S+) samples=15 .* diagnostics=disabled", log)
           require_three_repositories(full, "full-validator")
           if not all(item[2].startswith("3.37.") for item in full):
               raise SystemExit(f"Unexpected SQLite version in full-validator records: {full}")
-          identity = re.findall(r"ATM_RETRIEVAL_IDENTITY_AB result=equivalent repository=(\\S+) snapshot=(\\S+) sqlite=(\\S+) samples=15 .* diagnostics=disabled connection=per-call", log)
+          identity = re.findall(r"ATM_RETRIEVAL_IDENTITY_AB result=equivalent repository=(\S+) snapshot=(\S+) sqlite=(\S+) samples=15 .* diagnostics=disabled connection=per-call", log)
           require_three_repositories(identity, "identity-pipeline")
           if not all(item[2].startswith("3.37.") for item in identity):
               raise SystemExit(f"Unexpected SQLite version in identity records: {identity}")
 
           snapshot_sources = re.findall(
-              r"ATM_RETRIEVAL_SNAPSHOT_SOURCES_AB result=equivalent repository=(\\S+) block=(\\d+) snapshot=(\\S+) sqlite=(\\S+) samples=15 original_median_us=(\\d+) candidate_median_us=(\\d+) .* paired_candidate_wins=(\\d+) paired_original_wins=(\\d+) paired_ties=(\\d+) diagnostics=disabled connection=per-call catalog=per-call",
+              r"ATM_RETRIEVAL_SNAPSHOT_SOURCES_AB result=equivalent repository=(\S+) block=(\d+) snapshot=(\S+) sqlite=(\S+) samples=15 original_median_us=(\d+) candidate_median_us=(\d+) .* paired_candidate_wins=(\d+) paired_original_wins=(\d+) paired_ties=(\d+) diagnostics=disabled connection=per-call catalog=per-call",
               log
           )
           if len(snapshot_sources) != 30:
@@ -302,7 +302,7 @@ jobs:
           : > /tmp/atm-r5-sqlite-345.log
           for block in $(seq 0 9); do
             export ATM_RETRIEVAL_AB_BLOCK="$block"
-            printf 'ATM_PROCESS_BLOCK id=%s\\n' "$block" | tee -a /tmp/atm-r5-sqlite-345.log
+            printf 'ATM_PROCESS_BLOCK id=%s\n' "$block" | tee -a /tmp/atm-r5-sqlite-345.log
             /tmp/atm-retrieval-benchmark-runner \
               benchmarks/retrieval-v1/benchmark.json \
               "/tmp/atm-r5-sqlite-345-block-${block}.json" \
@@ -317,7 +317,7 @@ jobs:
           from pathlib import Path
 
           log = Path("/tmp/atm-r5-sqlite-345.log").read_text(encoding="utf-8")
-          versions = set(re.findall(r"ATM_RETRIEVAL_VALIDATOR_SQLITE label=\\S+ version=(\\S+)", log))
+          versions = set(re.findall(r"ATM_RETRIEVAL_VALIDATOR_SQLITE label=\S+ version=(\S+)", log))
           if not versions or not all(version.startswith("3.45.") for version in versions):
               raise SystemExit(f"Unexpected SQLite runtime versions: {sorted(versions)}")
           outcomes = re.findall(r"ATM_RETRIEVAL_VALIDATOR_FTS_PREDICATE_AB result=equivalent outcome=valid samples=9", log)
@@ -332,17 +332,17 @@ jobs:
               if len(records) != 30 or counts != Counter({"ewd": 10, "cbd": 10, "rmd": 10}):
                   raise SystemExit(f"Expected 10 {description} records per EWD/CBD/RMD; got {counts}")
 
-          full = re.findall(r"ATM_RETRIEVAL_VALIDATOR_FULL_AB result=equivalent repository=(\\S+) snapshot=(\\S+) sqlite=(\\S+) samples=15 .* diagnostics=disabled", log)
+          full = re.findall(r"ATM_RETRIEVAL_VALIDATOR_FULL_AB result=equivalent repository=(\S+) snapshot=(\S+) sqlite=(\S+) samples=15 .* diagnostics=disabled", log)
           require_three_repositories(full, "full-validator")
           if not all(item[2].startswith("3.45.") for item in full):
               raise SystemExit(f"Unexpected SQLite version in full-validator records: {full}")
-          identity = re.findall(r"ATM_RETRIEVAL_IDENTITY_AB result=equivalent repository=(\\S+) snapshot=(\\S+) sqlite=(\\S+) samples=15 .* diagnostics=disabled connection=per-call", log)
+          identity = re.findall(r"ATM_RETRIEVAL_IDENTITY_AB result=equivalent repository=(\S+) snapshot=(\S+) sqlite=(\S+) samples=15 .* diagnostics=disabled connection=per-call", log)
           require_three_repositories(identity, "identity-pipeline")
           if not all(item[2].startswith("3.45.") for item in identity):
               raise SystemExit(f"Unexpected SQLite version in identity records: {identity}")
 
           snapshot_sources = re.findall(
-              r"ATM_RETRIEVAL_SNAPSHOT_SOURCES_AB result=equivalent repository=(\\S+) block=(\\d+) snapshot=(\\S+) sqlite=(\\S+) samples=15 original_median_us=(\\d+) candidate_median_us=(\\d+) .* paired_candidate_wins=(\\d+) paired_original_wins=(\\d+) paired_ties=(\\d+) diagnostics=disabled connection=per-call catalog=per-call",
+              r"ATM_RETRIEVAL_SNAPSHOT_SOURCES_AB result=equivalent repository=(\S+) block=(\d+) snapshot=(\S+) sqlite=(\S+) samples=15 original_median_us=(\d+) candidate_median_us=(\d+) .* paired_candidate_wins=(\d+) paired_original_wins=(\d+) paired_ties=(\d+) diagnostics=disabled connection=per-call catalog=per-call",
               log
           )
           if len(snapshot_sources) != 30:
