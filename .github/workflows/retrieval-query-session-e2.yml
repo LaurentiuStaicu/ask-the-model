@@ -124,13 +124,13 @@ jobs:
           python3 -m json.tool /tmp/atm-e2/e2-run.json >/dev/null
 
       - name: Preserve runner-specific result filename
-        run: cp /tmp/atm-e2/e2-run.json "/tmp/atm-e2/e1-run-${{ matrix.runner_id }}.json"
+        run: cp /tmp/atm-e2/e2-run.json "/tmp/atm-e2/e2-run-${{ matrix.runner_id }}.json"
 
       - name: Upload E2 runner result
         uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7.0.1
         with:
           name: atm-retrieval-e2-runner-${{ matrix.runner_id }}
-          path: /tmp/atm-e2/e1-run-${{ matrix.runner_id }}.json
+          path: /tmp/atm-e2/e2-run-${{ matrix.runner_id }}.json
           if-no-files-found: error
           retention-days: 14
 
@@ -154,12 +154,12 @@ jobs:
           python3 scripts/aggregate_retrieval_query_session_e2.py \
             --input-dir /tmp/atm-e2-runs \
             --expected-runners 10 \
-            --output /tmp/atm-retrieval-e1-aggregate.json
-          python3 -m json.tool /tmp/atm-retrieval-e1-aggregate.json
+            --output /tmp/atm-retrieval-e2-aggregate.json
+          python3 -m json.tool /tmp/atm-retrieval-e2-aggregate.json
       - name: Upload E2 aggregate
         uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7.0.1
         with:
           name: atm-retrieval-e2-aggregate-${{ github.run_id }}-${{ github.run_attempt }}
-          path: /tmp/atm-retrieval-e1-aggregate.json
+          path: /tmp/atm-retrieval-e2-aggregate.json
           if-no-files-found: error
           retention-days: 30
