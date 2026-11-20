@@ -198,8 +198,8 @@ E3 records three nested timing layers:
   validation;
 - conversation retrieval and grounding-context assembly, using the existing
   R5 stage timers;
-- per-topic pipeline wall time around the complete topic execution and run
-  serialization.
+- per-topic pipeline wall time around retrieval, context assembly, and
+  construction of the topic's benchmark result record.
 
 The aggregate validates the exact pinned corpus, all 33 topic identities and
 ordering, one timing record per repository and topic, a common SQLite version,
