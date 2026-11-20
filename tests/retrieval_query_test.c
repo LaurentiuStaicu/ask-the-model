@@ -1574,6 +1574,15 @@ test_fts_distinct_identity_count_alternative_is_equivalent (void)
             "UPDATE search_fts SET evidence_kind='unknown',evidence_id=NULL WHERE rowid=("
             "SELECT rowid FROM search_fts WHERE evidence_kind='section' ORDER BY rowid LIMIT 1);",
             1
+        },
+        {
+            "integer and real identities compare equal",
+            "UPDATE search_fts SET evidence_id=CAST(("
+            "SELECT evidence_id FROM search_fts WHERE evidence_kind='section' "
+            "ORDER BY rowid LIMIT 1) AS REAL) WHERE rowid=("
+            "SELECT rowid FROM search_fts WHERE evidence_kind='section' "
+            "ORDER BY rowid LIMIT 1 OFFSET 1);",
+            1
         }
     };
 
