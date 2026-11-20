@@ -1,4 +1,5 @@
 #include "grounding_context.h"
+#include "retrieval_index.h"
 #include "retrieval_fts_consistency.h"
 #include "retrieval_conversation.h"
 #include "retrieval_index_lifecycle.h"
@@ -483,6 +484,100 @@ out:
     }
     return FALSE;
 }
+
+static gboolean
+run_identity_pipeline_ab_for_repository (
+    BenchmarkRepository *repository,
+    GError **error
+)
+{
+    gint64 original_times[9] = { 0 };
+    gint64 candidate_times[9] = { 0 };
+
+    /* Each call opens and closes its own read-only connection, exactly as
+     * the production identity-validation API does. The pinned index file is
+     * immutable during this benchmark. */
+    for (guint variant = 0; variant < 2; variant++) {
+        gboolean original = variant == 0;
+        GError *validation_error = NULL;
+        if (!atm_retrieval_index_validate_identity_for_test (
+                repository->index_path,
+                repository->repository_id,
+                repository->snapshot_sha,
+                original,
+                &validation_error
+            )) {
+            g_set_error (
+                error, G_IO_ERROR, G_IO_ERROR_INVALID_DATA,
+                "Identity-pipeline A/B warmup failed for %s (%s): %s",
+                repository->repository_id,
+                original ? "NOT EXISTS" : "LEFT JOIN",
+                validation_error != NULL ? validation_error->message : "unknown error"
+            );
+            g_clear_error (&validation_error);
+            return FALSE;
+        }
+        g_clear_error (&validation_error);
+    }
+
+    for (guint sample = 0; sample < 9; sample++) {
+        gboolean original_first = (sample % 2) == 0;
+        for (guint position = 0; position < 2; position++) {
+            gboolean original = position == 0 ? original_first : !original_first;
+            gint64 started_us = g_get_monotonic_time ();
+            GError *validation_error = NULL;
+            gboolean valid = atm_retrieval_index_validate_identity_for_test (
+                repository->index_path,
+                repository->repository_id,
+                repository->snapshot_sha,
+                original,
+                &validation_error
+            );
+            gint64 elapsed_us = g_get_monotonic_time () - started_us;
+
+            if (!valid) {
+                g_set_error (
+                    error, G_IO_ERROR, G_IO_ERROR_INVALID_DATA,
+                    "Identity-pipeline A/B failed for %s sample=%u (%s): %s",
+                    repository->repository_id, sample,
+                    original ? "NOT EXISTS" : "LEFT JOIN",
+                    validation_error != NULL ? validation_error->message : "unknown error"
+                );
+                g_clear_error (&validation_error);
+                return FALSE;
+            }
+            g_clear_error (&validation_error);
+            if (original) original_times[sample] = elapsed_us;
+            else candidate_times[sample] = elapsed_us;
+        }
+    }
+
+    gint64 original_median = validator_sample_median (original_times);
+    gint64 candidate_median = validator_sample_median (candidate_times);
+    gint64 original_max = original_times[0];
+    gint64 candidate_max = candidate_times[0];
+    for (guint i = 1; i < 9; i++) {
+        original_max = MAX (original_max, original_times[i]);
+        candidate_max = MAX (candidate_max, candidate_times[i]);
+    }
+
+    g_print (
+        "ATM_RETRIEVAL_IDENTITY_AB result=equivalent repository=%s "
+        "snapshot=%s sqlite=%s samples=9 original_median_us=%" G_GINT64_FORMAT
+        " candidate_median_us=%" G_GINT64_FORMAT
+        " original_max_us=%" G_GINT64_FORMAT
+        " candidate_max_us=%" G_GINT64_FORMAT
+        " median_delta_percent=%.2f diagnostics=disabled connection=per-call\\n",
+        repository->repository_id, repository->snapshot_sha,
+        sqlite3_libversion (), original_median, candidate_median,
+        original_max, candidate_max,
+        original_median > 0
+            ? ((gdouble) candidate_median / (gdouble) original_median - 1.0) * 100.0
+            : 0.0
+    );
+    return TRUE;
+}
+
 #endif
 
 static gboolean
@@ -660,6 +755,10 @@ load_benchmark_repositories (
 
 #ifdef ATM_RETRIEVAL_VALIDATOR_TESTING
         if (!run_full_validator_ab_for_repository (repository, error)) {
+            benchmark_repository_free (repository);
+            goto out;
+        }
+        if (!run_identity_pipeline_ab_for_repository (repository, error)) {
             benchmark_repository_free (repository);
             goto out;
         }
