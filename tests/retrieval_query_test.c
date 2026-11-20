@@ -1372,7 +1372,21 @@ test_fts_to_canonical_left_join_alternative_is_equivalent (void)
           "SELECT rowid FROM search_fts WHERE evidence_kind='dataset_row' LIMIT 1);" },
         { "dataset row body",
           "UPDATE search_fts SET body='tampered' WHERE rowid=("
-          "SELECT rowid FROM search_fts WHERE evidence_kind='dataset_row' LIMIT 1);" }
+          "SELECT rowid FROM search_fts WHERE evidence_kind='dataset_row' LIMIT 1);" },
+        { "dataset row missing canonical row",
+          "UPDATE search_fts SET evidence_id=9223372036854775807 WHERE rowid=("
+          "SELECT rowid FROM search_fts WHERE evidence_kind='dataset_row' LIMIT 1);" },
+        { "dataset row with missing dataset target",
+          "PRAGMA foreign_keys=OFF;"
+          "UPDATE dataset_rows SET dataset_id=9223372036854775807 WHERE id=("
+          "SELECT evidence_id FROM search_fts WHERE evidence_kind='dataset_row' LIMIT 1);" },
+        { "dataset row with missing source-file target",
+          "PRAGMA foreign_keys=OFF;"
+          "UPDATE datasets SET source_id=9223372036854775807 WHERE id=("
+          "SELECT dataset_id FROM dataset_rows WHERE id=("
+          "SELECT evidence_id FROM search_fts WHERE evidence_kind='dataset_row' LIMIT 1));" },
+        { "dataset row with missing snapshot metadata",
+          "DELETE FROM snapshot_metadata WHERE id=1;" }
     };
 
     char *snapshot_root = new_snapshot ();
