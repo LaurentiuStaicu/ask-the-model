@@ -143,7 +143,7 @@ jobs:
           if len(identity) != 3 or {item[0] for item in identity} != {"ewd", "cbd", "rmd"} or not all(item[2].startswith(expected_prefix) for item in identity):
               raise SystemExit(f"Expected complete identity-pipeline A/B for EWD/CBD/RMD; got {identity}")
           print(f"PASS: complete identity-pipeline A/B for {[item[0] for item in identity]}.")
-          snapshot_sources = re.findall(r"ATM_RETRIEVAL_SNAPSHOT_SOURCES_AB result=equivalent repository=(\\S+) snapshot=(\\S+) sqlite=(\\S+) samples=15 .* diagnostics=disabled connection=per-call catalog=per-call", log)
+          snapshot_sources = re.findall(r"ATM_RETRIEVAL_SNAPSHOT_SOURCES_AB result=equivalent repository=(\S+) snapshot=(\S+) sqlite=(\S+) samples=15 .* diagnostics=disabled connection=per-call catalog=per-call", log)
           if len(snapshot_sources) != 3 or {item[0] for item in snapshot_sources} != {"ewd", "cbd", "rmd"} or not all(item[2].startswith(expected_prefix) for item in snapshot_sources):
               raise SystemExit(f"Expected complete snapshot-source validation A/B for EWD/CBD/RMD; got {snapshot_sources}")
           print(f"PASS: complete snapshot-source validation A/B for {[item[0] for item in snapshot_sources]}.")
@@ -280,7 +280,7 @@ jobs:
           if len(identity) != 3 or {item[0] for item in identity} != {"ewd", "cbd", "rmd"} or not all(item[2].startswith(expected_prefix) for item in identity):
               raise SystemExit(f"Expected complete identity-pipeline A/B for EWD/CBD/RMD; got {identity}")
           print(f"PASS: complete identity-pipeline A/B for {[item[0] for item in identity]}.")
-          snapshot_sources = re.findall(r"ATM_RETRIEVAL_SNAPSHOT_SOURCES_AB result=equivalent repository=(\\S+) snapshot=(\\S+) sqlite=(\\S+) samples=15 .* diagnostics=disabled connection=per-call catalog=per-call", log)
+          snapshot_sources = re.findall(r"ATM_RETRIEVAL_SNAPSHOT_SOURCES_AB result=equivalent repository=(\S+) snapshot=(\S+) sqlite=(\S+) samples=15 .* diagnostics=disabled connection=per-call catalog=per-call", log)
           if len(snapshot_sources) != 3 or {item[0] for item in snapshot_sources} != {"ewd", "cbd", "rmd"} or not all(item[2].startswith(expected_prefix) for item in snapshot_sources):
               raise SystemExit(f"Expected complete snapshot-source validation A/B for EWD/CBD/RMD; got {snapshot_sources}")
           print(f"PASS: complete snapshot-source validation A/B for {[item[0] for item in snapshot_sources]}.")
