@@ -197,7 +197,9 @@ jobs:
               )
           print(f"PASS: 10 fresh-process blocks for EWD/CBD/RMD on SQLite 337.")
           PY
-          python3 -m json.tool /tmp/atm-r5-sqlite-337-run.json >/dev/null
+          for block in $(seq 0 9); do
+            python3 -m json.tool "/tmp/atm-r5-sqlite-337-block-${block}.json" >/dev/null
+          done
 
       - name: Upload SQLite compatibility evidence
         if: always()
@@ -383,7 +385,9 @@ jobs:
               )
           print(f"PASS: 10 fresh-process blocks for EWD/CBD/RMD on SQLite 345.")
           PY
-          python3 -m json.tool /tmp/atm-r5-sqlite-345-run.json >/dev/null
+          for block in $(seq 0 9); do
+            python3 -m json.tool "/tmp/atm-r5-sqlite-345-block-${block}.json" >/dev/null
+          done
 
       - name: Upload SQLite compatibility evidence
         if: always()
