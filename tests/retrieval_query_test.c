@@ -2174,7 +2174,6 @@ test_data_version_does_not_detect_atomic_path_replacement (void)
         new_temp_root ("atm-path-generation-replacement-cache-XXXXXX");
     char *index_path = build_index (snapshot_root, cache_root);
     char *replacement_source = NULL;
-    char *replacement_path = g_strdup_printf ("%s.replacement", index_path);
     char *replacement_status = g_strdup_printf (
         "# Replacement generation\n%s\n", replacement_marker
     );
@@ -2184,7 +2183,6 @@ test_data_version_does_not_detect_atomic_path_replacement (void)
     TestRetrievalFileIdentity replacement_identity = { 0 };
     gint original_data_version = -1;
     gint after_replace_data_version = -1;
-    GError *error = NULL;
 
     write_text (replacement_snapshot_root, "STATUS.md", replacement_status);
     replacement_source = build_index (
@@ -2240,7 +2238,6 @@ test_data_version_does_not_detect_atomic_path_replacement (void)
     sqlite3_close (fresh_reader);
     sqlite3_close (reader);
     g_free (replacement_status);
-    g_free (replacement_path);
     g_free (replacement_source);
     g_free (index_path);
     remove_tree_best_effort (snapshot_root);
