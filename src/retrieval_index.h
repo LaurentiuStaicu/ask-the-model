@@ -102,4 +102,15 @@ gboolean atm_retrieval_index_validate_snapshot_sources (
     GError **error
 );
 
+#ifdef ATM_RETRIEVAL_VALIDATOR_TESTING
+gboolean atm_retrieval_index_validate_snapshot_sources_for_test (
+    const char *index_path,
+    const char *snapshot_root,
+    const char *expected_repository_id,
+    const char *expected_snapshot_sha,
+    gboolean use_original_predicate,
+    GError **error
+);
+#endif
+
 G_END_DECLS
