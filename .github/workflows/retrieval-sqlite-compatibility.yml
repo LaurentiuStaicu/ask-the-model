@@ -169,7 +169,7 @@ jobs:
           printf 'SQLite pkg-config version: %s\n' "$version"
           case "$version" in
             3.45.*) ;;
-            *) echo "Expected SQLite 3.45.x on Ubuntu 22.04; got $version" >&2; exit 1 ;;
+            *) echo "Expected SQLite 3.45.x on Ubuntu 24.04; got $version" >&2; exit 1 ;;
           esac
 
       - name: Checkout benchmark-pinned repository snapshots
