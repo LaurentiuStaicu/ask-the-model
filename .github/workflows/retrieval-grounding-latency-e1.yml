@@ -7,12 +7,12 @@ permissions:
   contents: read
 
 concurrency:
-  group: retrieval-grounding-e1-\${{ github.ref }}
+  group: retrieval-grounding-e1-${{ github.ref }}
   cancel-in-progress: false
 
 jobs:
   measure:
-    name: E1 runner \${{ matrix.runner_id }}
+    name: E1 runner ${{ matrix.runner_id }}
     runs-on: ubuntu-24.04
     timeout-minutes: 25
     strategy:
@@ -28,9 +28,9 @@ jobs:
         run: |
           set -euo pipefail
           sudo apt-get update
-          sudo apt-get install -y --no-install-recommends \\
-            build-essential git pkg-config \\
-            libglib2.0-dev libglib2.0-bin libjson-glib-dev \\
+          sudo apt-get install -y --no-install-recommends \
+            build-essential git pkg-config \
+            libglib2.0-dev libglib2.0-bin libjson-glib-dev \
             libsqlite3-dev libyaml-dev
 
       - name: Checkout benchmark-pinned repository snapshots
@@ -43,9 +43,9 @@ jobs:
           with open("benchmarks/retrieval-v1/benchmark.json", encoding="utf-8") as f:
               benchmark = json.load(f)
           for item in benchmark["corpus"]:
-              print(item["repository_id"], item["snapshot_sha"], sep="\\\\t")
+              print(item["repository_id"], item["snapshot_sha"], sep="\\t")
           PY
-          while IFS=$'\\\\t' read -r repository_id snapshot_sha; do
+          while IFS=$'\\t' read -r repository_id snapshot_sha; do
             case "$repository_id" in
               ewd) remote="https://github.com/LaurentiuStaicu/empirical-world3-dynamics.git"; root_env="ATM_BENCH_EWD_ROOT"; sha_env="ATM_BENCH_EWD_SHA" ;;
               cbd) remote="https://github.com/LaurentiuStaicu/cognitive-belief-dynamics.git"; root_env="ATM_BENCH_CBD_ROOT"; sha_env="ATM_BENCH_CBD_SHA" ;;
@@ -70,21 +70,21 @@ jobs:
         shell: bash
         run: |
           set -euo pipefail
-          glib-compile-resources \\
-            data/io.github.laurentiustaicu.ask_the_model.gresource.xml \\
+          glib-compile-resources \
+            data/io.github.laurentiustaicu.ask_the_model.gresource.xml \
             --sourcedir=data --generate-source --target=/tmp/atm-resources.c
-          cc -std=c11 -D_GNU_SOURCE -O2 -Wall -Wextra -Werror -Isrc \\
-            $(pkg-config --cflags glib-2.0 gio-2.0 json-glib-1.0) \\
-            -c tests/retrieval_lifecycle_benchmark_runner.c \\
+          cc -std=c11 -D_GNU_SOURCE -O2 -Wall -Wextra -Werror -Isrc \
+            $(pkg-config --cflags glib-2.0 gio-2.0 json-glib-1.0) \
+            -c tests/retrieval_lifecycle_benchmark_runner.c \
             -o /tmp/retrieval-lifecycle-benchmark-runner.o
-          cc -std=c11 -D_GNU_SOURCE -O2 -Wall -Wextra -Isrc \\
-            $(pkg-config --cflags glib-2.0 gio-2.0 json-glib-1.0) \\
-            src/cff_version.c src/repository_sources.c src/markdown_sections.c \\
-            src/csv_table.c src/structured_json.c src/retrieval_index.c \\
-            src/retrieval_fts_consistency.c src/coordination_lease.c \\
-            src/retrieval_index_lifecycle.c \\
-            /tmp/retrieval-lifecycle-benchmark-runner.o /tmp/atm-resources.c \\
-            $(pkg-config --cflags --libs glib-2.0 gio-2.0 json-glib-1.0 sqlite3 yaml-0.1) \\
+          cc -std=c11 -D_GNU_SOURCE -O2 -Wall -Wextra -Isrc \
+            $(pkg-config --cflags glib-2.0 gio-2.0 json-glib-1.0) \
+            src/cff_version.c src/repository_sources.c src/markdown_sections.c \
+            src/csv_table.c src/structured_json.c src/retrieval_index.c \
+            src/retrieval_fts_consistency.c src/coordination_lease.c \
+            src/retrieval_index_lifecycle.c \
+            /tmp/retrieval-lifecycle-benchmark-runner.o /tmp/atm-resources.c \
+            $(pkg-config --cflags --libs glib-2.0 gio-2.0 json-glib-1.0 sqlite3 yaml-0.1) \
             -o /tmp/atm-retrieval-lifecycle-benchmark-runner
 
       - name: Execute E1 cold and warm lifecycle samples
@@ -92,27 +92,27 @@ jobs:
         run: |
           set -euo pipefail
           mkdir -p /tmp/atm-e1
-          /tmp/atm-retrieval-lifecycle-benchmark-runner \\
-            benchmarks/retrieval-v1/benchmark.json \\
-            /tmp/atm-e1/e1-run.json \\
-            "github-\${GITHUB_RUN_ID}-\${GITHUB_RUN_ATTEMPT}-runner-\${{ matrix.runner_id }}"
+          /tmp/atm-retrieval-lifecycle-benchmark-runner \
+            benchmarks/retrieval-v1/benchmark.json \
+            /tmp/atm-e1/e1-run.json \
+            "github-${GITHUB_RUN_ID}-${GITHUB_RUN_ATTEMPT}-runner-${{ matrix.runner_id }}"
           python3 - <<'PY'
           import hashlib, json, os, pathlib, socket
           path = pathlib.Path("/tmp/atm-e1/e1-run.json")
           data = json.loads(path.read_text(encoding="utf-8"))
           machine_id = pathlib.Path("/etc/machine-id").read_text().strip()
-          identity_material = "\\\\0".join((machine_id, socket.gethostname(), os.environ["RUNNER_NAME"]))
+          identity_material = "\\0".join((machine_id, socket.gethostname(), os.environ["RUNNER_NAME"]))
           data["runner_identity"] = hashlib.sha256(identity_material.encode()).hexdigest()
           data["runner_name"] = os.environ["RUNNER_NAME"]
-          data["runner_matrix_id"] = int("\${{ matrix.runner_id }}")
-          path.write_text(json.dumps(data, indent=2) + "\\\\n", encoding="utf-8")
+          data["runner_matrix_id"] = int("${{ matrix.runner_id }}")
+          path.write_text(json.dumps(data, indent=2) + "\\n", encoding="utf-8")
           PY
           python3 -m json.tool /tmp/atm-e1/e1-run.json >/dev/null
 
       - name: Upload E1 runner result
         uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7.0.1
         with:
-          name: atm-retrieval-e1-runner-\${{ matrix.runner_id }}
+          name: atm-retrieval-e1-runner-${{ matrix.runner_id }}
           path: /tmp/atm-e1/e1-run.json
           if-no-files-found: error
           retention-days: 14
@@ -134,15 +134,15 @@ jobs:
       - name: Validate and aggregate E1 evidence
         run: |
           set -euo pipefail
-          python3 scripts/aggregate_retrieval_lifecycle_e1.py \\
-            --input-dir /tmp/atm-e1-runs \\
-            --expected-runners 10 \\
+          python3 scripts/aggregate_retrieval_lifecycle_e1.py \
+            --input-dir /tmp/atm-e1-runs \
+            --expected-runners 10 \
             --output /tmp/atm-retrieval-e1-aggregate.json
           python3 -m json.tool /tmp/atm-retrieval-e1-aggregate.json
       - name: Upload E1 aggregate
         uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7.0.1
         with:
-          name: atm-retrieval-e1-aggregate-\${{ github.run_id }}-\${{ github.run_attempt }}
+          name: atm-retrieval-e1-aggregate-${{ github.run_id }}-${{ github.run_attempt }}
           path: /tmp/atm-retrieval-e1-aggregate.json
           if-no-files-found: error
           retention-days: 30
