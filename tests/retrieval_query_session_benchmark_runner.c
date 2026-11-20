@@ -156,56 +156,48 @@ measure_query_pair(JsonBuilder *builder, AtmRetrievalQuerySession *session,
     char *expected_digest = NULL;
 
     for (guint i = 0; i < QUERY_SAMPLES; i++) {
-        GPtrArray *records = NULL;
-        gint64 started = g_get_monotonic_time();
-        gboolean ok = run_session_query(session, kind, query, row_key, &records, error);
-        session_us[i] = g_get_monotonic_time() - started;
-        if (!ok) {
-            g_clear_pointer(&records, g_ptr_array_unref);
-            return FALSE;
-        }
-        if (records == NULL || records->len == 0) {
-            g_set_error(error, G_IO_ERROR, G_IO_ERROR_FAILED,
-                        "%s query returned no evidence.", kind);
-            g_clear_pointer(&records, g_ptr_array_unref);
-            return FALSE;
-        }
-        char *digest = records_digest(records);
-        if (expected_digest == NULL)
-            expected_digest = g_strdup(digest);
-        else if (g_strcmp0(expected_digest, digest) != 0) {
-            g_set_error(error, G_IO_ERROR, G_IO_ERROR_FAILED,
-                        "%s persistent-session query semantics changed.", kind);
-            g_free(digest);
-            g_ptr_array_unref(records);
-            g_free(expected_digest);
-            return FALSE;
-        }
-        g_free(digest);
-        g_ptr_array_unref(records);
-    }
+        for (guint mode = 0; mode < 2; mode++) {
+            gboolean use_session = ((i + mode) % 2) == 0;
+            GPtrArray *records = NULL;
+            gint64 started = g_get_monotonic_time();
+            gboolean ok = use_session
+                ? run_session_query(session, kind, query, row_key, &records, error)
+                : run_one_shot_query(index_path, kind, query, row_key, &records, error);
+            gint64 elapsed = g_get_monotonic_time() - started;
 
-    for (guint i = 0; i < QUERY_SAMPLES; i++) {
-        GPtrArray *records = NULL;
-        gint64 started = g_get_monotonic_time();
-        gboolean ok = run_one_shot_query(index_path, kind, query, row_key, &records, error);
-        one_shot_us[i] = g_get_monotonic_time() - started;
-        if (!ok) {
-            g_clear_pointer(&records, g_ptr_array_unref);
-            g_free(expected_digest);
-            return FALSE;
-        }
-        char *digest = records_digest(records);
-        if (g_strcmp0(expected_digest, digest) != 0) {
-            g_set_error(error, G_IO_ERROR, G_IO_ERROR_FAILED,
-                        "%s one-shot and persistent-session results differ.", kind);
+            if (use_session)
+                session_us[i] = elapsed;
+            else
+                one_shot_us[i] = elapsed;
+
+            if (!ok) {
+                g_clear_pointer(&records, g_ptr_array_unref);
+                g_free(expected_digest);
+                return FALSE;
+            }
+            if (records == NULL || records->len == 0) {
+                g_set_error(error, G_IO_ERROR, G_IO_ERROR_FAILED,
+                            "%s query returned no evidence.", kind);
+                g_clear_pointer(&records, g_ptr_array_unref);
+                g_free(expected_digest);
+                return FALSE;
+            }
+
+            char *digest = records_digest(records);
+            if (expected_digest == NULL)
+                expected_digest = g_strdup(digest);
+            else if (g_strcmp0(expected_digest, digest) != 0) {
+                g_set_error(error, G_IO_ERROR, G_IO_ERROR_FAILED,
+                            "%s query results differ between persistent and one-shot sessions.",
+                            kind);
+                g_free(digest);
+                g_ptr_array_unref(records);
+                g_free(expected_digest);
+                return FALSE;
+            }
             g_free(digest);
             g_ptr_array_unref(records);
-            g_free(expected_digest);
-            return FALSE;
         }
-        g_free(digest);
-        g_ptr_array_unref(records);
     }
 
     json_builder_begin_object(builder);
