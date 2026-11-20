@@ -131,6 +131,9 @@ jobs:
           from pathlib import Path
 
           log = Path("/tmp/atm-r5-sqlite-337.log").read_text(encoding="utf-8")
+          process_blocks = [int(value) for value in re.findall(r"ATM_PROCESS_BLOCK id=(\d+)", log)]
+          if process_blocks != list(range(10)):
+              raise SystemExit(f"Expected ordered process blocks 0-9; got {process_blocks}")
           versions = set(re.findall(r"ATM_RETRIEVAL_VALIDATOR_SQLITE label=\S+ version=(\S+)", log))
           if not versions or not all(version.startswith("3.37.") for version in versions):
               raise SystemExit(f"Unexpected SQLite runtime versions: {sorted(versions)}")
@@ -319,6 +322,9 @@ jobs:
           from pathlib import Path
 
           log = Path("/tmp/atm-r5-sqlite-345.log").read_text(encoding="utf-8")
+          process_blocks = [int(value) for value in re.findall(r"ATM_PROCESS_BLOCK id=(\d+)", log)]
+          if process_blocks != list(range(10)):
+              raise SystemExit(f"Expected ordered process blocks 0-9; got {process_blocks}")
           versions = set(re.findall(r"ATM_RETRIEVAL_VALIDATOR_SQLITE label=\S+ version=(\S+)", log))
           if not versions or not all(version.startswith("3.45.") for version in versions):
               raise SystemExit(f"Unexpected SQLite runtime versions: {sorted(versions)}")
