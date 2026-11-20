@@ -219,6 +219,7 @@ jobs:
               raise SystemExit(f"Expected 20 independent runner logs; got {len(files)}")
 
           grouped = defaultdict(dict)
+          runner_names = set()
           for filename in files:
               match = re.search(r"atm-cross-runner-(337|345)-(\d+)\.log$", filename)
               if not match:
@@ -228,6 +229,19 @@ jobs:
               if replica not in range(10):
                   raise SystemExit(f"Invalid runner replica: {filename}")
               log = Path(filename).read_text(encoding="utf-8")
+              env_records = re.findall(
+                  r"ATM_CROSS_RUNNER_ENV sqlite=(337|345) replica=(\\d+) hostname=(\\S+) "
+                  r"runner_name=(.*?) image_os=(\\S+) image_version=(\\S+)",
+                  log,
+              )
+              if len(env_records) != 1:
+                  raise SystemExit(f"Expected exactly one runner environment record in {filename}; got {env_records}")
+              env_sqlite, env_replica, hostname, runner_name, image_os, image_version = env_records[0]
+              if env_sqlite != sqlite_label or int(env_replica) != replica:
+                  raise SystemExit(f"Runner environment identity mismatch in {filename}: {env_records[0]}")
+              if runner_name in runner_names:
+                  raise SystemExit(f"GitHub runner identity was reused across matrix jobs: {runner_name}")
+              runner_names.add(runner_name)
               records = re.findall(
                   r"ATM_RETRIEVAL_SNAPSHOT_SOURCES_AB result=equivalent repository=(\S+) block=(\d+) "
                   r"snapshot=(\S+) sqlite=(\S+) samples=15 original_median_us=(\d+) "
@@ -286,7 +300,9 @@ jobs:
                       f"runner_delta_range_percent={min(deltas):.2f}..{max(deltas):.2f}"
                   )
 
+          if len(runner_names) != 20:
+              raise SystemExit(f"Expected 20 unique GitHub runner identities; got {len(runner_names)}")
           for filename in glob.glob("evidence/atm-cross-runner-*.json"):
               json.loads(Path(filename).read_text(encoding="utf-8"))
-          print("PASS: 20 separate GitHub-hosted runner jobs; 10 per SQLite version; 60 equivalent repository records.")
+          print("PASS: 20 separate GitHub-hosted runner jobs with 20 unique runner identities; 10 per SQLite version; 60 equivalent repository records.")
           PY
