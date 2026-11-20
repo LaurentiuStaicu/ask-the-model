@@ -500,14 +500,70 @@ measure_validator_branch_timings (sqlite3 *db)
 }
 
 /*
- * Compare the complete canonical-consistency pass with a joined dataset-row
- * branch. This is diagnostic-only: production continues to use the query
- * above until equivalence and end-to-end performance are established.
+ * Measurement-only paired comparison of the production NOT EXISTS predicate
+ * and the equivalent LEFT JOIN form for dataset-row canonical validation.
+ * Both run on the same connection/snapshot, with alternating sample order.
+ * This probe never participates in the validator's pass/fail decision.
  */
-static void
-measure_joined_dataset_validator_timing (sqlite3 *db)
+static gint
+execute_fts_canonical_predicate_probe (
+    sqlite3 *db,
+    const char *sql,
+    gint64 *elapsed_us
+)
 {
-    static const char *sql =
+    sqlite3_stmt *statement = NULL;
+    gint64 started_us = g_get_monotonic_time ();
+    int rc = sqlite3_prepare_v2 (db, sql, -1, &statement, NULL);
+
+    if (rc == SQLITE_OK) {
+        rc = sqlite3_step (statement);
+    }
+
+    sqlite3_finalize (statement);
+    *elapsed_us = g_get_monotonic_time () - started_us;
+
+    if (rc == SQLITE_DONE) return 0;
+    if (rc == SQLITE_ROW) return 1;
+    return -1;
+}
+
+static void
+measure_fts_canonical_predicate_ab (sqlite3 *db)
+{
+    static const char *original_sql =
+        "SELECT 1 FROM search_fts f WHERE "
+        "f.evidence_kind IS NULL OR f.evidence_id IS NULL OR "
+        "typeof(f.evidence_id) <> 'integer' OR "
+        "f.logical_source_id IS NULL OR "
+        "(f.evidence_kind = 'section' AND NOT EXISTS ("
+        "SELECT 1 FROM document_sections d WHERE "
+        "d.id = f.evidence_id "
+        "AND d.logical_source_id IS f.logical_source_id "
+        "AND d.title IS f.title AND d.body IS f.body)) OR "
+        "(f.evidence_kind = 'entity' AND NOT EXISTS ("
+        "SELECT 1 FROM structured_entities e WHERE "
+        "e.id = f.evidence_id "
+        "AND e.logical_source_id IS f.logical_source_id "
+        "AND COALESCE(e.label, e.native_id) IS f.title "
+        "AND e.payload_json IS f.body)) OR "
+        "(f.evidence_kind = 'relation' AND NOT EXISTS ("
+        "SELECT 1 FROM structured_relations r WHERE "
+        "r.id = f.evidence_id "
+        "AND r.logical_source_id IS f.logical_source_id "
+        "AND COALESCE(r.native_id, r.relation_type) IS f.title "
+        "AND r.payload_json IS f.body)) OR "
+        "(f.evidence_kind = 'dataset_row' AND NOT EXISTS ("
+        "SELECT 1 FROM dataset_rows r "
+        "JOIN datasets d ON d.id = r.dataset_id "
+        "JOIN source_files s ON s.id = d.source_id "
+        "JOIN snapshot_metadata m ON m.id = 1 "
+        "WHERE r.id = f.evidence_id "
+        "AND printf('%s:dataset-row:%s:%d', m.repository_id, s.path, r.ordinal) "
+        "IS f.logical_source_id AND s.path IS f.title "
+        "AND r.search_text IS f.body)) OR "
+        "f.evidence_kind NOT IN ('section','entity','relation','dataset_row');";
+    static const char *candidate_sql =
         "SELECT 1 FROM search_fts f "
         "LEFT JOIN dataset_rows dr ON "
         "f.evidence_kind = 'dataset_row' AND dr.id = f.evidence_id "
@@ -540,30 +596,94 @@ measure_joined_dataset_validator_timing (sqlite3 *db)
         "IS NOT f.logical_source_id OR ds.path IS NOT f.title OR "
         "dr.search_text IS NOT f.body)) OR "
         "f.evidence_kind NOT IN ('section','entity','relation','dataset_row');";
+    enum { SAMPLE_COUNT = 9 };
+    gint64 original_times[SAMPLE_COUNT] = { 0 };
+    gint64 candidate_times[SAMPLE_COUNT] = { 0 };
+    gint64 warmup_us = 0;
+    gint original_outcome;
+    gint candidate_outcome;
 
-    log_validator_query_plan (db, "fts_to_canonical_joined_dataset", sql);
-
-    sqlite3_stmt *statement = NULL;
-    gint64 started_us = g_get_monotonic_time ();
-    int rc = sqlite3_prepare_v2 (db, sql, -1, &statement, NULL);
-    if (rc == SQLITE_OK) {
-        rc = sqlite3_step (statement);
-    }
-
-    const char *result =
-        rc == SQLITE_DONE ? "valid" :
-        rc == SQLITE_ROW ? "mismatch" : "error";
-    g_printerr (
-        "ATM_RETRIEVAL_VALIDATOR_JOINED_DATASET result=%s elapsed_us=%"
-        G_GINT64_FORMAT,
-        result,
-        g_get_monotonic_time () - started_us
+    log_validator_query_plan (
+        db, "fts_to_canonical_joined_dataset", candidate_sql
     );
-    if (rc != SQLITE_DONE && rc != SQLITE_ROW) {
-        g_printerr (" error=%s", sqlite3_errmsg (db));
+
+    /* Warm both query plans and compare their validation outcomes. */
+    original_outcome = execute_fts_canonical_predicate_probe (
+        db, original_sql, &warmup_us
+    );
+    candidate_outcome = execute_fts_canonical_predicate_probe (
+        db, candidate_sql, &warmup_us
+    );
+    if (original_outcome < 0 || candidate_outcome < 0 ||
+        original_outcome != candidate_outcome) {
+        g_printerr (
+            "ATM_RETRIEVAL_VALIDATOR_FTS_PREDICATE_AB "
+            "result=warmup_mismatch original=%d candidate=%d error=%s\\n",
+            original_outcome, candidate_outcome, sqlite3_errmsg (db)
+        );
+        return;
     }
-    g_printerr ("\n");
-    sqlite3_finalize (statement);
+
+    for (guint sample = 0; sample < SAMPLE_COUNT; sample++) {
+        if ((sample % 2) == 0) {
+            original_outcome = execute_fts_canonical_predicate_probe (
+                db, original_sql, &original_times[sample]
+            );
+            candidate_outcome = execute_fts_canonical_predicate_probe (
+                db, candidate_sql, &candidate_times[sample]
+            );
+        } else {
+            candidate_outcome = execute_fts_canonical_predicate_probe (
+                db, candidate_sql, &candidate_times[sample]
+            );
+            original_outcome = execute_fts_canonical_predicate_probe (
+                db, original_sql, &original_times[sample]
+            );
+        }
+
+        if (original_outcome < 0 || candidate_outcome < 0 ||
+            original_outcome != candidate_outcome) {
+            g_printerr (
+                "ATM_RETRIEVAL_VALIDATOR_FTS_PREDICATE_AB "
+                "result=different sample=%u original=%d candidate=%d error=%s\\n",
+                sample, original_outcome, candidate_outcome, sqlite3_errmsg (db)
+            );
+            return;
+        }
+    }
+
+    gint64 original_median = median_elapsed_us (
+        original_times, SAMPLE_COUNT
+    );
+    gint64 candidate_median = median_elapsed_us (
+        candidate_times, SAMPLE_COUNT
+    );
+    gint64 original_max = original_times[0];
+    gint64 candidate_max = candidate_times[0];
+
+    for (guint i = 1; i < SAMPLE_COUNT; i++) {
+        original_max = MAX (original_max, original_times[i]);
+        candidate_max = MAX (candidate_max, candidate_times[i]);
+    }
+
+    g_printerr (
+        "ATM_RETRIEVAL_VALIDATOR_FTS_PREDICATE_AB "
+        "result=equivalent outcome=%s samples=%u "
+        "original_median_us=%" G_GINT64_FORMAT
+        " candidate_median_us=%" G_GINT64_FORMAT
+        " original_max_us=%" G_GINT64_FORMAT
+        " candidate_max_us=%" G_GINT64_FORMAT
+        " median_delta_percent=%.2f\\n",
+        original_outcome == 0 ? "valid" : "mismatch",
+        SAMPLE_COUNT,
+        original_median,
+        candidate_median,
+        original_max,
+        candidate_max,
+        original_median > 0
+            ? ((gdouble) candidate_median / (gdouble) original_median - 1.0) * 100.0
+            : 0.0
+    );
 }
 
 gboolean
