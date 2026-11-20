@@ -2,6 +2,9 @@ name: Retrieval grounding latency E1 index lifecycle
 
 on:
   workflow_dispatch:
+  push:
+    branches:
+      - 'experiment/retrieval-grounding-latency-e1'
   pull_request:
     paths:
       - 'tests/retrieval_lifecycle_benchmark_runner.c'
