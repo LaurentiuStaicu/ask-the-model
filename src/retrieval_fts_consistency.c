@@ -831,7 +831,13 @@ atm_retrieval_index_validate_fts_canonical_consistency (
 
 
     const char *queries[] = {
-        "SELECT 1 FROM search_fts f WHERE "
+        "SELECT 1 FROM search_fts f "
+        "LEFT JOIN dataset_rows dr ON "
+        "f.evidence_kind = 'dataset_row' AND dr.id = f.evidence_id "
+        "LEFT JOIN datasets dd ON dd.id = dr.dataset_id "
+        "LEFT JOIN source_files ds ON ds.id = dd.source_id "
+        "LEFT JOIN snapshot_metadata dm ON dm.id = 1 "
+        "WHERE "
         "f.evidence_kind IS NULL OR f.evidence_id IS NULL OR "
         "typeof(f.evidence_id) <> 'integer' OR "
         "f.logical_source_id IS NULL OR "
@@ -852,15 +858,11 @@ atm_retrieval_index_validate_fts_canonical_consistency (
         "AND r.logical_source_id IS f.logical_source_id "
         "AND COALESCE(r.native_id, r.relation_type) IS f.title "
         "AND r.payload_json IS f.body)) OR "
-        "(f.evidence_kind = 'dataset_row' AND NOT EXISTS ("
-        "SELECT 1 FROM dataset_rows r "
-        "JOIN datasets d ON d.id = r.dataset_id "
-        "JOIN source_files s ON s.id = d.source_id "
-        "JOIN snapshot_metadata m ON m.id = 1 "
-        "WHERE r.id = f.evidence_id "
-        "AND printf('%s:dataset-row:%s:%d', m.repository_id, s.path, r.ordinal) "
-        "IS f.logical_source_id AND s.path IS f.title "
-        "AND r.search_text IS f.body)) OR "
+        "(f.evidence_kind = 'dataset_row' AND ("
+        "dr.id IS NULL OR dd.id IS NULL OR ds.id IS NULL OR dm.id IS NULL OR "
+        "printf('%s:dataset-row:%s:%d', dm.repository_id, ds.path, dr.ordinal) "
+        "IS NOT f.logical_source_id OR ds.path IS NOT f.title OR "
+        "dr.search_text IS NOT f.body)) OR "
         "f.evidence_kind NOT IN ('section','entity','relation','dataset_row');"
     };
 
