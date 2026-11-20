@@ -151,10 +151,10 @@ jobs:
           output = json.loads(Path(output_path).read_text(encoding="utf-8"))
 
           records = re.findall(
-              r"ATM_RETRIEVAL_SNAPSHOT_SOURCES_AB result=equivalent repository=(\\S+) block=(\\d+) "
-              r"snapshot=(\\S+) sqlite=(\\S+) samples=15 original_median_us=(\\d+) "
-              r"candidate_median_us=(\\d+).*?paired_candidate_wins=(\\d+) "
-              r"paired_original_wins=(\\d+) paired_ties=(\\d+) diagnostics=disabled "
+              r"ATM_RETRIEVAL_SNAPSHOT_SOURCES_AB result=equivalent repository=(\S+) block=(\d+) "
+              r"snapshot=(\S+) sqlite=(\S+) samples=15 original_median_us=(\d+) "
+              r"candidate_median_us=(\d+).*?paired_candidate_wins=(\d+) "
+              r"paired_original_wins=(\d+) paired_ties=(\d+) diagnostics=disabled "
               r"connection=per-call catalog=per-call",
               log,
           )
@@ -220,7 +220,7 @@ jobs:
 
           grouped = defaultdict(dict)
           for filename in files:
-              match = re.search(r"atm-cross-runner-(337|345)-(\\d+)\\.log$", filename)
+              match = re.search(r"atm-cross-runner-(337|345)-(\d+)\.log$", filename)
               if not match:
                   raise SystemExit(f"Unexpected evidence filename: {filename}")
               sqlite_label, replica_text = match.groups()
@@ -229,10 +229,10 @@ jobs:
                   raise SystemExit(f"Invalid runner replica: {filename}")
               log = Path(filename).read_text(encoding="utf-8")
               records = re.findall(
-                  r"ATM_RETRIEVAL_SNAPSHOT_SOURCES_AB result=equivalent repository=(\\S+) block=(\\d+) "
-                  r"snapshot=(\\S+) sqlite=(\\S+) samples=15 original_median_us=(\\d+) "
-                  r"candidate_median_us=(\\d+).*?paired_candidate_wins=(\\d+) "
-                  r"paired_original_wins=(\\d+) paired_ties=(\\d+) diagnostics=disabled "
+                  r"ATM_RETRIEVAL_SNAPSHOT_SOURCES_AB result=equivalent repository=(\S+) block=(\d+) "
+                  r"snapshot=(\S+) sqlite=(\S+) samples=15 original_median_us=(\d+) "
+                  r"candidate_median_us=(\d+).*?paired_candidate_wins=(\d+) "
+                  r"paired_original_wins=(\d+) paired_ties=(\d+) diagnostics=disabled "
                   r"connection=per-call catalog=per-call",
                   log,
               )
