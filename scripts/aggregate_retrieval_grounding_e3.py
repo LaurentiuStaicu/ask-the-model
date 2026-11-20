@@ -112,6 +112,10 @@ def main() -> int:
         for repository_id, ensure, elapsed in repo_matches:
             if repository_id in seen_repositories:
                 raise SystemExit(f"runner {runner_id:02d}: duplicate index timing")
+            if ensure != "rebuilt":
+                raise SystemExit(f"runner {runner_id:02d}: expected cold rebuild for {repository_id}, got {ensure}")
+            if int(elapsed) <= 0:
+                raise SystemExit(f"runner {runner_id:02d}: non-positive index timing for {repository_id}")
             seen_repositories.add(repository_id)
             index_samples[repository_id].append(int(elapsed))
         if seen_repositories != set(index_samples):
@@ -120,6 +124,8 @@ def main() -> int:
         prep_matches = PREP_RE.findall(log)
         if len(prep_matches) != 1:
             raise SystemExit(f"runner {runner_id:02d}: expected one index-preparation timing")
+        if int(prep_matches[0]) <= 0:
+            raise SystemExit(f"runner {runner_id:02d}: non-positive index preparation timing")
         index_prepare_samples.append(int(prep_matches[0]))
 
         topic_matches = TOPIC_RE.findall(log)
@@ -139,6 +145,8 @@ def main() -> int:
             context = topic.get("context_assembly_latency_ms")
             if not isinstance(retrieval, (int, float)) or not isinstance(context, (int, float)):
                 raise SystemExit(f"runner {runner_id:02d}: missing stage latency for {topic_id}")
+            if topic_timing[topic_id] <= 0:
+                raise SystemExit(f"runner {runner_id:02d}: non-positive pipeline timing for {topic_id}")
             pipeline_samples[topic_id].append(topic_timing[topic_id] / 1000.0)
             retrieval_samples[topic_id].append(float(retrieval))
             context_samples[topic_id].append(float(context))
