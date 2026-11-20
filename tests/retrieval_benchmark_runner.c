@@ -340,9 +340,9 @@ find_repository (
 
 #ifdef ATM_RETRIEVAL_VALIDATOR_TESTING
 static gint64
-validator_sample_median (const gint64 samples[9])
+validator_sample_median (const gint64 samples[15])
 {
-    gint64 sorted[9];
+    gint64 sorted[15];
     memcpy (sorted, samples, sizeof (sorted));
     for (guint i = 1; i < G_N_ELEMENTS (sorted); i++) {
         gint64 value = sorted[i];
@@ -364,8 +364,8 @@ run_full_validator_ab_for_repository (
 {
     sqlite3 *db = NULL;
     char *sqlite_error = NULL;
-    gint64 original_times[9] = { 0 };
-    gint64 candidate_times[9] = { 0 };
+    gint64 original_times[15] = { 0 };
+    gint64 candidate_times[15] = { 0 };
 
     int rc = sqlite3_open_v2 (
         repository->index_path, &db,
@@ -420,7 +420,7 @@ run_full_validator_ab_for_repository (
         g_clear_error (&validation_error);
     }
 
-    for (guint sample = 0; sample < 9; sample++) {
+    for (guint sample = 0; sample < 15; sample++) {
         gboolean original_first = (sample % 2) == 0;
         for (guint position = 0; position < 2; position++) {
             gboolean original = position == 0 ? original_first : !original_first;
@@ -453,14 +453,14 @@ run_full_validator_ab_for_repository (
     gint64 candidate_median = validator_sample_median (candidate_times);
     gint64 original_max = original_times[0];
     gint64 candidate_max = candidate_times[0];
-    for (guint i = 1; i < 9; i++) {
+    for (guint i = 1; i < 15; i++) {
         original_max = MAX (original_max, original_times[i]);
         candidate_max = MAX (candidate_max, candidate_times[i]);
     }
 
     g_print (
         "ATM_RETRIEVAL_VALIDATOR_FULL_AB result=equivalent repository=%s "
-        "snapshot=%s sqlite=%s samples=9 original_median_us=%" G_GINT64_FORMAT
+        "snapshot=%s sqlite=%s samples=15 original_median_us=%" G_GINT64_FORMAT
         " candidate_median_us=%" G_GINT64_FORMAT
         " original_max_us=%" G_GINT64_FORMAT
         " candidate_max_us=%" G_GINT64_FORMAT
@@ -491,8 +491,8 @@ run_identity_pipeline_ab_for_repository (
     GError **error
 )
 {
-    gint64 original_times[9] = { 0 };
-    gint64 candidate_times[9] = { 0 };
+    gint64 original_times[15] = { 0 };
+    gint64 candidate_times[15] = { 0 };
 
     /* Each call opens and closes its own read-only connection, exactly as
      * the production identity-validation API does. The pinned index file is
@@ -520,7 +520,7 @@ run_identity_pipeline_ab_for_repository (
         g_clear_error (&validation_error);
     }
 
-    for (guint sample = 0; sample < 9; sample++) {
+    for (guint sample = 0; sample < 15; sample++) {
         gboolean original_first = (sample % 2) == 0;
         for (guint position = 0; position < 2; position++) {
             gboolean original = position == 0 ? original_first : !original_first;
@@ -556,14 +556,14 @@ run_identity_pipeline_ab_for_repository (
     gint64 candidate_median = validator_sample_median (candidate_times);
     gint64 original_max = original_times[0];
     gint64 candidate_max = candidate_times[0];
-    for (guint i = 1; i < 9; i++) {
+    for (guint i = 1; i < 15; i++) {
         original_max = MAX (original_max, original_times[i]);
         candidate_max = MAX (candidate_max, candidate_times[i]);
     }
 
     g_print (
         "ATM_RETRIEVAL_IDENTITY_AB result=equivalent repository=%s "
-        "snapshot=%s sqlite=%s samples=9 original_median_us=%" G_GINT64_FORMAT
+        "snapshot=%s sqlite=%s samples=15 original_median_us=%" G_GINT64_FORMAT
         " candidate_median_us=%" G_GINT64_FORMAT
         " original_max_us=%" G_GINT64_FORMAT
         " candidate_max_us=%" G_GINT64_FORMAT
