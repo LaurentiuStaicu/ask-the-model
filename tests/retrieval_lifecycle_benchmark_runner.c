@@ -1,4 +1,5 @@
 #include <glib.h>
+#include <gio/gio.h>
 #include <json-glib/json-glib.h>
 #include <sqlite3.h>
 #include <stdio.h>
@@ -103,12 +104,13 @@ run_repository(JsonBuilder *builder, JsonObject *item, GError **error)
 
         if (!ok || result != ATM_RETRIEVAL_ENSURE_REBUILT ||
             g_strcmp0(version, expected_version) != 0) {
+            const char *reason = local_error != NULL ? local_error->message :
+                (!ok ? "index ensure failed" :
+                 (result != ATM_RETRIEVAL_ENSURE_REBUILT ?
+                  "unexpected cache reuse" : "repository version mismatch"));
             g_set_error(error, G_IO_ERROR, G_IO_ERROR_FAILED,
                         "Cold sample %u for %s did not rebuild the expected index: %s",
-                        i, repository_id,
-                        local_error != NULL ? local_error->message :
-                        (result != ATM_RETRIEVAL_ENSURE_REBUILT ?
-                         "unexpected cache reuse" : "repository version mismatch"));
+                        i, repository_id, reason);
             g_clear_error(&local_error);
             g_free(cache_root);
             g_free(index_path);
