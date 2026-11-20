@@ -72,70 +72,190 @@ log_validator_query_plan (
 }
 
 /*
- * Measurement-only alternative to the nested GROUP BY identity count.
- * COUNT(DISTINCT) excludes NULL, so subtract one NULL group when present to
- * preserve GROUP BY duplicate-count semantics. This probe never decides
- * whether an index is valid and is disabled unless explicitly requested.
+ * Measurement-only paired comparison of the original nested GROUP BY
+ * aggregate and the equivalent COUNT(DISTINCT) aggregate. Both variants run
+ * against the same connection and snapshot, in alternating order. This probe
+ * never decides whether an index is valid and is disabled unless explicitly
+ * requested.
  */
-static void
-measure_distinct_fts_identity_counts (sqlite3 *db, const guint64 expected_counts[4])
+typedef struct {
+    guint64 counts[4];
+    guint64 duplicates[4];
+} FtsIdentityCountResult;
+
+static gint
+fts_identity_kind_index (const char *kind)
 {
-    static const char *sql =
-        "SELECT evidence_kind, COUNT(DISTINCT evidence_id), "
-        "COUNT(*) - COUNT(DISTINCT evidence_id) - "
-        "CASE WHEN COUNT(evidence_id) < COUNT(*) THEN 1 ELSE 0 END "
-        "FROM search_fts GROUP BY evidence_kind;";
-    guint64 counts[4] = { 0, 0, 0, 0 };
-    guint64 duplicates[4] = { 0, 0, 0, 0 };
-    gboolean equivalent = TRUE;
+    if (g_strcmp0 (kind, "section") == 0) return 0;
+    if (g_strcmp0 (kind, "entity") == 0) return 1;
+    if (g_strcmp0 (kind, "relation") == 0) return 2;
+    if (g_strcmp0 (kind, "dataset_row") == 0) return 3;
+    return -1;
+}
+
+static gboolean
+execute_fts_identity_count_query (
+    sqlite3 *db,
+    const char *sql,
+    FtsIdentityCountResult *result,
+    gint64 *elapsed_us
+)
+{
     sqlite3_stmt *statement = NULL;
+    gboolean seen[4] = { FALSE, FALSE, FALSE, FALSE };
     gint64 started_us = g_get_monotonic_time ();
     int rc = sqlite3_prepare_v2 (db, sql, -1, &statement, NULL);
 
-    if (rc == SQLITE_OK) {
-        while ((rc = sqlite3_step (statement)) == SQLITE_ROW) {
-            const char *kind = (const char *) sqlite3_column_text (statement, 0);
-            gint index = -1;
-            if (g_strcmp0 (kind, "section") == 0) index = 0;
-            else if (g_strcmp0 (kind, "entity") == 0) index = 1;
-            else if (g_strcmp0 (kind, "relation") == 0) index = 2;
-            else if (g_strcmp0 (kind, "dataset_row") == 0) index = 3;
+    memset (result, 0, sizeof (*result));
+    if (rc != SQLITE_OK) {
+        return FALSE;
+    }
 
-            if (index < 0) {
-                equivalent = FALSE;
-                continue;
-            }
-            counts[index] = (guint64) sqlite3_column_int64 (statement, 1);
-            duplicates[index] = (guint64) sqlite3_column_int64 (statement, 2);
-            if (counts[index] != expected_counts[index] ||
-                duplicates[index] != 0) {
-                equivalent = FALSE;
-            }
+    while ((rc = sqlite3_step (statement)) == SQLITE_ROW) {
+        const char *kind = (const char *) sqlite3_column_text (statement, 0);
+        gint index = fts_identity_kind_index (kind);
+
+        if (index < 0 || seen[index]) {
+            rc = SQLITE_ERROR;
+            break;
+        }
+
+        seen[index] = TRUE;
+        result->counts[index] =
+            (guint64) sqlite3_column_int64 (statement, 1);
+        result->duplicates[index] =
+            (guint64) sqlite3_column_int64 (statement, 2);
+    }
+
+    sqlite3_finalize (statement);
+    *elapsed_us = g_get_monotonic_time () - started_us;
+    return rc == SQLITE_DONE;
+}
+
+static gint64
+median_elapsed_us (const gint64 samples[], guint count)
+{
+    gint64 sorted[9];
+
+    g_return_val_if_fail (count > 0 && count <= G_N_ELEMENTS (sorted), 0);
+    memcpy (sorted, samples, count * sizeof (sorted[0]));
+
+    for (guint i = 1; i < count; i++) {
+        gint64 value = sorted[i];
+        guint j = i;
+        while (j > 0 && sorted[j - 1] > value) {
+            sorted[j] = sorted[j - 1];
+            j--;
+        }
+        sorted[j] = value;
+    }
+
+    return sorted[count / 2];
+}
+
+static void
+measure_fts_identity_aggregate_ab (sqlite3 *db)
+{
+    static const char *original_sql =
+        "SELECT evidence_kind, SUM(identity_count), "
+        "SUM(identity_count - 1) FROM ("
+        "SELECT evidence_kind, evidence_id, COUNT(*) AS identity_count "
+        "FROM search_fts GROUP BY evidence_kind, evidence_id"
+        ") GROUP BY evidence_kind;";
+    static const char *candidate_sql =
+        "SELECT evidence_kind, COUNT(*), "
+        "COUNT(*) - COUNT(DISTINCT evidence_id) - "
+        "CASE WHEN COUNT(evidence_id) < COUNT(*) THEN 1 ELSE 0 END "
+        "FROM search_fts GROUP BY evidence_kind;";
+    enum { SAMPLE_COUNT = 9 };
+    FtsIdentityCountResult original_result;
+    FtsIdentityCountResult candidate_result;
+    gint64 original_times[SAMPLE_COUNT] = { 0 };
+    gint64 candidate_times[SAMPLE_COUNT] = { 0 };
+    gboolean equivalent = TRUE;
+    gint64 warmup_us = 0;
+
+    /* Warm both query plans before collecting paired samples. */
+    if (!execute_fts_identity_count_query (
+            db, original_sql, &original_result, &warmup_us) ||
+        !execute_fts_identity_count_query (
+            db, candidate_sql, &candidate_result, &warmup_us) ||
+        memcmp (&original_result, &candidate_result,
+            sizeof (original_result)) != 0) {
+        g_printerr (
+            "ATM_RETRIEVAL_VALIDATOR_AGGREGATE_AB result=warmup_mismatch "
+            "error=%s\n",
+            sqlite3_errmsg (db)
+        );
+        return;
+    }
+
+    for (guint sample = 0; sample < SAMPLE_COUNT; sample++) {
+        gboolean original_first = (sample % 2) == 0;
+        gboolean original_ok;
+        gboolean candidate_ok;
+
+        if (original_first) {
+            original_ok = execute_fts_identity_count_query (
+                db, original_sql, &original_result,
+                &original_times[sample]);
+            candidate_ok = execute_fts_identity_count_query (
+                db, candidate_sql, &candidate_result,
+                &candidate_times[sample]);
+        } else {
+            candidate_ok = execute_fts_identity_count_query (
+                db, candidate_sql, &candidate_result,
+                &candidate_times[sample]);
+            original_ok = execute_fts_identity_count_query (
+                db, original_sql, &original_result,
+                &original_times[sample]);
+        }
+
+        if (!original_ok || !candidate_ok ||
+            memcmp (&original_result, &candidate_result,
+                sizeof (original_result)) != 0) {
+            equivalent = FALSE;
+            break;
         }
     }
 
-    if (rc != SQLITE_DONE) {
-        equivalent = FALSE;
+    if (!equivalent) {
+        g_printerr (
+            "ATM_RETRIEVAL_VALIDATOR_AGGREGATE_AB result=different "
+            "error=%s\n",
+            sqlite3_errmsg (db)
+        );
+        return;
     }
-    sqlite3_finalize (statement);
+
+    gint64 original_median = median_elapsed_us (
+        original_times, SAMPLE_COUNT);
+    gint64 candidate_median = median_elapsed_us (
+        candidate_times, SAMPLE_COUNT);
+    gint64 original_max = original_times[0];
+    gint64 candidate_max = candidate_times[0];
+
+    for (guint i = 1; i < SAMPLE_COUNT; i++) {
+        original_max = MAX (original_max, original_times[i]);
+        candidate_max = MAX (candidate_max, candidate_times[i]);
+    }
 
     g_printerr (
-        "ATM_RETRIEVAL_VALIDATOR_DISTINCT result=%s elapsed_us=%"
-        G_GINT64_FORMAT " section=%" G_GUINT64_FORMAT "/%" G_GUINT64_FORMAT
-        " entity=%" G_GUINT64_FORMAT "/%" G_GUINT64_FORMAT
-        " relation=%" G_GUINT64_FORMAT "/%" G_GUINT64_FORMAT
-        " dataset_row=%" G_GUINT64_FORMAT "/%" G_GUINT64_FORMAT,
-        equivalent ? "equivalent" : "different",
-        g_get_monotonic_time () - started_us,
-        counts[0], duplicates[0],
-        counts[1], duplicates[1],
-        counts[2], duplicates[2],
-        counts[3], duplicates[3]
+        "ATM_RETRIEVAL_VALIDATOR_AGGREGATE_AB result=equivalent "
+        "samples=%u original_median_us=%" G_GINT64_FORMAT
+        " candidate_median_us=%" G_GINT64_FORMAT
+        " original_max_us=%" G_GINT64_FORMAT
+        " candidate_max_us=%" G_GINT64_FORMAT
+        " median_delta_percent=%.2f\n",
+        SAMPLE_COUNT,
+        original_median,
+        candidate_median,
+        original_max,
+        candidate_max,
+        original_median > 0
+            ? ((gdouble) candidate_median / (gdouble) original_median - 1.0) * 100.0
+            : 0.0
     );
-    if (rc != SQLITE_DONE) {
-        g_printerr (" error=%s", sqlite3_errmsg (db));
-    }
-    g_printerr ("\n");
 }
 
 static gboolean
@@ -203,7 +323,7 @@ validate_canonical_coverage_counts (sqlite3 *db, GError **error)
     fts_identity_us = g_get_monotonic_time () - coverage_started_us;
     if (rc == SQLITE_DONE &&
         g_getenv ("ATM_RETRIEVAL_VALIDATOR_DISTINCT_TIMING") != NULL) {
-        measure_distinct_fts_identity_counts (db, fts_counts);
+        measure_fts_identity_aggregate_ab (db);
     }
     if (rc != SQLITE_DONE) {
         g_set_error (error, ATM_RETRIEVAL_INDEX_ERROR,
