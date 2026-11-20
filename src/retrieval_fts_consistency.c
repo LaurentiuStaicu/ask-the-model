@@ -265,8 +265,44 @@ measure_fts_identity_aggregate_ab (sqlite3 *db)
     );
 }
 
+/* Original predicate is available only in the benchmark/test build. */
+#ifdef ATM_RETRIEVAL_VALIDATOR_TESTING
+static const char *fts_canonical_original_query =
+"SELECT 1 FROM search_fts f WHERE "
+        "f.evidence_kind IS NULL OR f.evidence_id IS NULL OR "
+        "typeof(f.evidence_id) <> 'integer' OR "
+        "f.logical_source_id IS NULL OR "
+        "(f.evidence_kind = 'section' AND NOT EXISTS ("
+        "SELECT 1 FROM document_sections d WHERE "
+        "d.id = f.evidence_id "
+        "AND d.logical_source_id IS f.logical_source_id "
+        "AND d.title IS f.title AND d.body IS f.body)) OR "
+        "(f.evidence_kind = 'entity' AND NOT EXISTS ("
+        "SELECT 1 FROM structured_entities e WHERE "
+        "e.id = f.evidence_id "
+        "AND e.logical_source_id IS f.logical_source_id "
+        "AND COALESCE(e.label, e.native_id) IS f.title "
+        "AND e.payload_json IS f.body)) OR "
+        "(f.evidence_kind = 'relation' AND NOT EXISTS ("
+        "SELECT 1 FROM structured_relations r WHERE "
+        "r.id = f.evidence_id "
+        "AND r.logical_source_id IS f.logical_source_id "
+        "AND COALESCE(r.native_id, r.relation_type) IS f.title "
+        "AND r.payload_json IS f.body)) OR "
+        "(f.evidence_kind = 'dataset_row' AND NOT EXISTS ("
+        "SELECT 1 FROM dataset_rows r "
+        "JOIN datasets d ON d.id = r.dataset_id "
+        "JOIN source_files s ON s.id = d.source_id "
+        "JOIN snapshot_metadata m ON m.id = 1 "
+        "WHERE r.id = f.evidence_id "
+        "AND printf('%s:dataset-row:%s:%d', m.repository_id, s.path, r.ordinal) "
+        "IS f.logical_source_id AND s.path IS f.title "
+        "AND r.search_text IS f.body)) OR "
+        "f.evidence_kind NOT IN ('section','entity','relation','dataset_row');";
+#endif
+
 static gboolean
-validate_canonical_coverage_counts (sqlite3 *db, GError **error)
+validate_canonical_coverage_counts (sqlite3 *db, GError **error, gboolean diagnostics)
 {
     static const char *fts_counts_sql =
         "SELECT evidence_kind, COUNT(*), "
@@ -284,7 +320,7 @@ validate_canonical_coverage_counts (sqlite3 *db, GError **error)
     gint64 fts_identity_us = 0;
     gint64 canonical_population_us = 0;
 
-    if (g_getenv ("ATM_RETRIEVAL_VALIDATOR_EXPLAIN") != NULL) {
+    if (diagnostics && g_getenv ("ATM_RETRIEVAL_VALIDATOR_EXPLAIN") != NULL) {
         log_validator_query_plan (db, "fts_identity_counts", fts_counts_sql);
         log_validator_query_plan (db, "canonical_population_counts", canonical_counts_sql);
     }
@@ -328,7 +364,7 @@ validate_canonical_coverage_counts (sqlite3 *db, GError **error)
     sqlite3_finalize (statement);
     statement = NULL;
     fts_identity_us = g_get_monotonic_time () - coverage_started_us;
-    if (rc == SQLITE_DONE &&
+    if (diagnostics && rc == SQLITE_DONE &&
         g_getenv ("ATM_RETRIEVAL_VALIDATOR_DISTINCT_TIMING") != NULL) {
         measure_fts_identity_aggregate_ab (db);
     }
@@ -372,7 +408,7 @@ validate_canonical_coverage_counts (sqlite3 *db, GError **error)
     sqlite3_finalize (statement);
     canonical_population_us = g_get_monotonic_time () - canonical_started_us;
 
-    if (g_getenv ("ATM_RETRIEVAL_VALIDATOR_TIMING") != NULL) {
+    if (diagnostics && g_getenv ("ATM_RETRIEVAL_VALIDATOR_TIMING") != NULL) {
         g_printerr (
             "ATM_RETRIEVAL_VALIDATOR_COVERAGE fts_identity_us=%" G_GINT64_FORMAT
             " canonical_population_us=%" G_GINT64_FORMAT
@@ -696,10 +732,12 @@ measure_fts_canonical_predicate_ab (sqlite3 *db)
     );
 }
 
-gboolean
-atm_retrieval_index_validate_fts_canonical_consistency (
+static gboolean
+validate_fts_canonical_consistency_impl (
     sqlite3 *db,
-    GError **error
+    GError **error,
+    gboolean use_original_predicate,
+    gboolean diagnostics
 )
 {
     sqlite3_stmt *statement = NULL;
@@ -840,7 +878,7 @@ atm_retrieval_index_validate_fts_canonical_consistency (
     }
 
 
-    const char *queries[] = {
+    const char *candidate_query =
         "SELECT 1 FROM search_fts f "
         "LEFT JOIN dataset_rows dr ON "
         "f.evidence_kind = 'dataset_row' AND dr.id = f.evidence_id "
@@ -874,13 +912,20 @@ atm_retrieval_index_validate_fts_canonical_consistency (
         "IS NOT f.logical_source_id OR ds.path IS NOT f.title OR "
         "dr.search_text IS NOT f.body)) OR "
         "f.evidence_kind NOT IN ('section','entity','relation','dataset_row');"
-    };
+    const char *canonical_query = candidate_query;
+#ifdef ATM_RETRIEVAL_VALIDATOR_TESTING
+    if (use_original_predicate)
+        canonical_query = fts_canonical_original_query;
+#else
+    (void) use_original_predicate;
+#endif
 
 
-    log_validator_query_plan (db, "fts_to_canonical", queries[0]);
+    if (diagnostics)
+        log_validator_query_plan (db, "fts_to_canonical", canonical_query);
 
     gint64 query_started_us = g_get_monotonic_time ();
-    rc = sqlite3_prepare_v2 (db, queries[0], -1, &statement, NULL);
+    rc = sqlite3_prepare_v2 (db, canonical_query, -1, &statement, NULL);
     if (rc != SQLITE_OK) {
         g_set_error (error, ATM_RETRIEVAL_INDEX_ERROR,
             ATM_RETRIEVAL_INDEX_ERROR_SQLITE,
@@ -907,16 +952,16 @@ atm_retrieval_index_validate_fts_canonical_consistency (
         return FALSE;
     }
 
-    measure_validator_branch_timings (db);
-    if (g_getenv ("ATM_RETRIEVAL_VALIDATOR_BRANCH_TIMING") != NULL) {
+    if (diagnostics) measure_validator_branch_timings (db);
+    if (diagnostics && g_getenv ("ATM_RETRIEVAL_VALIDATOR_BRANCH_TIMING") != NULL) {
         measure_fts_canonical_predicate_ab (db);
     }
 
     query_started_us = g_get_monotonic_time ();
-    if (!validate_canonical_coverage_counts (db, error)) return FALSE;
+    if (!validate_canonical_coverage_counts (db, error, diagnostics)) return FALSE;
     canonical_query_us[1] = g_get_monotonic_time () - query_started_us;
 
-    if (g_getenv ("ATM_RETRIEVAL_VALIDATOR_TIMING") != NULL) {
+    if (diagnostics && g_getenv ("ATM_RETRIEVAL_VALIDATOR_TIMING") != NULL) {
         g_printerr (
             "ATM_RETRIEVAL_VALIDATOR_TIMING fk_us=%" G_GINT64_FORMAT
             " canonical0_us=%" G_GINT64_FORMAT
@@ -931,3 +976,27 @@ atm_retrieval_index_validate_fts_canonical_consistency (
     return TRUE;
 }
 
+
+/* Production entry point is deliberately pinned to the LEFT JOIN candidate. */
+gboolean
+atm_retrieval_index_validate_fts_canonical_consistency (
+    sqlite3 *db,
+    GError **error
+)
+{
+    return validate_fts_canonical_consistency_impl (db, error, FALSE, TRUE);
+}
+
+#ifdef ATM_RETRIEVAL_VALIDATOR_TESTING
+gboolean
+atm_retrieval_index_validate_fts_canonical_consistency_for_test (
+    sqlite3 *db,
+    gboolean use_original_predicate,
+    GError **error
+)
+{
+    return validate_fts_canonical_consistency_impl (
+        db, error, use_original_predicate, FALSE
+    );
+}
+#endif
