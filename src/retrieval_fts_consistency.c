@@ -618,7 +618,7 @@ measure_fts_canonical_predicate_ab (sqlite3 *db)
         original_outcome != candidate_outcome) {
         g_printerr (
             "ATM_RETRIEVAL_VALIDATOR_FTS_PREDICATE_AB "
-            "result=warmup_mismatch original=%d candidate=%d error=%s\\n",
+            "result=warmup_mismatch original=%d candidate=%d error=%s\n",
             original_outcome, candidate_outcome, sqlite3_errmsg (db)
         );
         return;
@@ -645,7 +645,7 @@ measure_fts_canonical_predicate_ab (sqlite3 *db)
             original_outcome != candidate_outcome) {
             g_printerr (
                 "ATM_RETRIEVAL_VALIDATOR_FTS_PREDICATE_AB "
-                "result=different sample=%u original=%d candidate=%d error=%s\\n",
+                "result=different sample=%u original=%d candidate=%d error=%s\n",
                 sample, original_outcome, candidate_outcome, sqlite3_errmsg (db)
             );
             return;
@@ -673,7 +673,7 @@ measure_fts_canonical_predicate_ab (sqlite3 *db)
         " candidate_median_us=%" G_GINT64_FORMAT
         " original_max_us=%" G_GINT64_FORMAT
         " candidate_max_us=%" G_GINT64_FORMAT
-        " median_delta_percent=%.2f\\n",
+        " median_delta_percent=%.2f\n",
         original_outcome == 0 ? "valid" : "mismatch",
         SAMPLE_COUNT,
         original_median,
