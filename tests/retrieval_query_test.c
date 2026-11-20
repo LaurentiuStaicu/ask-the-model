@@ -1421,6 +1421,150 @@ test_fts_to_canonical_left_join_alternative_is_equivalent (void)
     }
 }
 
+/*
+ * Compare the nested GROUP BY identity-population query with the
+ * COUNT(DISTINCT) formulation. The NULL adjustment is required because
+ * GROUP BY creates one NULL identity group while COUNT(DISTINCT) ignores NULL.
+ * This is a semantics-only qualification; it does not change production SQL.
+ */
+static gboolean
+fts_identity_count_queries_are_equivalent (sqlite3 *db)
+{
+    static const char *sql =
+        "WITH original AS ("
+        "SELECT evidence_kind, SUM(identity_count) AS identity_count, "
+        "SUM(identity_count - 1) AS duplicate_count FROM ("
+        "SELECT evidence_kind, evidence_id, COUNT(*) AS identity_count "
+        "FROM search_fts GROUP BY evidence_kind, evidence_id"
+        ") GROUP BY evidence_kind"
+        "), candidate AS ("
+        "SELECT evidence_kind, "
+        "COUNT(DISTINCT evidence_id) + "
+        "CASE WHEN COUNT(evidence_id) < COUNT(*) THEN 1 ELSE 0 END "
+        "AS identity_count, "
+        "COUNT(*) - COUNT(DISTINCT evidence_id) - "
+        "CASE WHEN COUNT(evidence_id) < COUNT(*) THEN 1 ELSE 0 END "
+        "AS duplicate_count "
+        "FROM search_fts GROUP BY evidence_kind"
+        ") "
+        "SELECT EXISTS(SELECT * FROM original EXCEPT SELECT * FROM candidate) "
+        "OR EXISTS(SELECT * FROM candidate EXCEPT SELECT * FROM original);";
+    sqlite3_stmt *statement = NULL;
+    int rc = sqlite3_prepare_v2 (db, sql, -1, &statement, NULL);
+    g_assert_cmpint (rc, ==, SQLITE_OK);
+
+    rc = sqlite3_step (statement);
+    g_assert_cmpint (rc, ==, SQLITE_ROW);
+    gboolean equivalent = sqlite3_column_int (statement, 0) == 0;
+    rc = sqlite3_step (statement);
+    g_assert_cmpint (rc, ==, SQLITE_DONE);
+    sqlite3_finalize (statement);
+    return equivalent;
+}
+
+static void
+assert_fts_identity_count_equivalence_case (
+    const char *name,
+    const char *mutation_sql,
+    int expected_changes
+)
+{
+    char *snapshot_root = new_snapshot ();
+    char *cache_root = new_temp_root ("atm-fts-count-equivalence-XXXXXX");
+    char *index_path = build_index (snapshot_root, cache_root);
+    sqlite3 *db = NULL;
+
+    g_assert_cmpint (
+        sqlite3_open_v2 (index_path, &db, SQLITE_OPEN_READWRITE, NULL),
+        ==, SQLITE_OK
+    );
+    if (mutation_sql != NULL) {
+        g_assert_cmpint (
+            sqlite3_exec (db, mutation_sql, NULL, NULL, NULL),
+            ==, SQLITE_OK
+        );
+        g_assert_cmpint (sqlite3_changes (db), ==, expected_changes);
+    }
+
+    g_test_message ("Comparing FTS identity counts for %s", name);
+    g_assert_true (fts_identity_count_queries_are_equivalent (db));
+
+    g_assert_cmpint (sqlite3_close (db), ==, SQLITE_OK);
+    g_free (index_path);
+    remove_tree_best_effort (snapshot_root);
+    g_free (snapshot_root);
+    remove_tree_best_effort (cache_root);
+    g_free (cache_root);
+}
+
+static void
+test_fts_distinct_identity_count_alternative_is_equivalent (void)
+{
+    static const struct {
+        const char *name;
+        const char *mutation_sql;
+        int expected_changes;
+    } cases[] = {
+        {
+            "valid population",
+            NULL,
+            0
+        },
+        {
+            "duplicate non-null identity",
+            "INSERT INTO search_fts(evidence_kind,evidence_id,logical_source_id,title,body) "
+            "SELECT evidence_kind,evidence_id,logical_source_id,title,body "
+            "FROM search_fts WHERE evidence_kind='section' LIMIT 1;",
+            1
+        },
+        {
+            "single null identity group",
+            "UPDATE search_fts SET evidence_id=NULL WHERE rowid=("
+            "SELECT rowid FROM search_fts WHERE evidence_kind='section' LIMIT 1);",
+            1
+        },
+        {
+            "duplicate null identity group",
+            "UPDATE search_fts SET evidence_id=NULL WHERE rowid IN ("
+            "SELECT rowid FROM search_fts WHERE evidence_kind='section' LIMIT 2);",
+            2
+        },
+        {
+            "null evidence kind",
+            "UPDATE search_fts SET evidence_kind=NULL WHERE rowid=("
+            "SELECT rowid FROM search_fts WHERE evidence_kind='section' LIMIT 1);",
+            1
+        },
+        {
+            "unknown evidence kind",
+            "UPDATE search_fts SET evidence_kind='unknown' WHERE rowid=("
+            "SELECT rowid FROM search_fts WHERE evidence_kind='section' LIMIT 1);",
+            1
+        },
+        {
+            "text storage class identity",
+            "UPDATE search_fts SET evidence_id=CAST(evidence_id AS TEXT) WHERE rowid=("
+            "SELECT rowid FROM search_fts WHERE evidence_kind='section' LIMIT 1);",
+            1
+        },
+        {
+            "blob storage class identity",
+            "UPDATE search_fts SET evidence_id=CAST(x'31' AS BLOB) WHERE rowid=("
+            "SELECT rowid FROM search_fts WHERE evidence_kind='section' LIMIT 1);",
+            1
+        }
+    };
+
+    for (gsize i = 0; i < G_N_ELEMENTS (cases); i++) {
+        assert_fts_identity_count_equivalence_case (
+            cases[i].name,
+            cases[i].mutation_sql,
+            cases[i].expected_changes
+        );
+    }
+}
+
+
 static void
 test_fts_canonical_metadata_mismatch_is_rejected_by_all_routes (void)
 {
@@ -1950,6 +2094,10 @@ main (int argc, char **argv)
     g_test_add_func (
         "/retrieval-query/fts-to-canonical-left-join-equivalence",
         test_fts_to_canonical_left_join_alternative_is_equivalent
+    );
+    g_test_add_func (
+        "/retrieval-query/fts-distinct-identity-count-equivalence",
+        test_fts_distinct_identity_count_alternative_is_equivalent
     );
     g_test_add_func (
         "/retrieval-query/fts-canonical-metadata-mismatch-all-routes",
