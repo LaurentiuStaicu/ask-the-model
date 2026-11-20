@@ -897,7 +897,7 @@ atm_retrieval_index_validate_fts_canonical_consistency (
 
     measure_validator_branch_timings (db);
     if (g_getenv ("ATM_RETRIEVAL_VALIDATOR_BRANCH_TIMING") != NULL) {
-        measure_joined_dataset_validator_timing (db);
+        measure_fts_canonical_predicate_ab (db);
     }
 
     query_started_us = g_get_monotonic_time ();
