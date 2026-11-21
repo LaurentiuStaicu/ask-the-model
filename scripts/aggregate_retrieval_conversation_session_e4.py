@@ -22,7 +22,7 @@ SESSION_RE = re.compile(
 )
 CACHE_CLOSE_RE = re.compile(
     r"^ATM_E4_SESSION_CACHE_CLOSE sessions=(\d+) opens=(\d+) "
-    r"reuses=(\d+) invalidations=(\d+)$",
+    r"reuses=(\d+) invalidations=(\d+) elapsed_us=(\d+)$",
     re.MULTILINE,
 )
 INDEX_RE = re.compile(
@@ -222,7 +222,17 @@ def main() -> int:
         "candidate_open": {repository_id: [] for repository_id in REPOSITORIES},
         "candidate_reuse": {repository_id: [] for repository_id in REPOSITORIES},
     }
-    candidate_close_totals = {"sessions": 0, "opens": 0, "reuses": 0, "invalidations": 0}
+    candidate_close_totals = {
+        "sessions": 0,
+        "opens": 0,
+        "reuses": 0,
+        "invalidations": 0,
+        "elapsed_us": 0,
+    }
+    candidate_close_elapsed_ms = []
+    baseline_total_work_ms = []
+    candidate_total_work_including_close_ms = []
+    paired_total_work_delta_percent = []
     candidate_close_rows = 0
     baseline_request_total = 0
     candidate_request_total = 0
@@ -348,18 +358,28 @@ def main() -> int:
                 f"found {len(candidate['close_rows'])}"
             )
 
-        runner_close_totals = {"sessions": 0, "opens": 0, "reuses": 0, "invalidations": 0}
-        for sessions, opens, reuses, invalidations in candidate["close_rows"]:
+        runner_close_totals = {
+            "sessions": 0,
+            "opens": 0,
+            "reuses": 0,
+            "invalidations": 0,
+            "elapsed_us": 0,
+        }
+        for sessions, opens, reuses, invalidations, elapsed_us in candidate["close_rows"]:
             if sessions > 3:
                 raise SystemExit(f"runner {runner_id:02d}: conversation cache exceeded 3 repositories")
             if sessions != opens - invalidations:
                 raise SystemExit(
                     f"runner {runner_id:02d}: cache close count does not reconcile opens and invalidations"
                 )
+            if elapsed_us < 0:
+                raise SystemExit(f"runner {runner_id:02d}: negative cache-close duration")
             runner_close_totals["sessions"] += sessions
             runner_close_totals["opens"] += opens
             runner_close_totals["reuses"] += reuses
             runner_close_totals["invalidations"] += invalidations
+            runner_close_totals["elapsed_us"] += elapsed_us
+            candidate_close_elapsed_ms.append(elapsed_us / 1000.0)
 
         candidate_event_totals = {
             "opens": sum(candidate["events"][i][2] >= 0 for i in range(len(candidate["events"])) if candidate["events"][i][1] == "open"),
@@ -376,6 +396,18 @@ def main() -> int:
         for key, value in runner_close_totals.items():
             candidate_close_totals[key] += value
         candidate_close_rows += len(candidate["close_rows"])
+
+        baseline_total_ms = sum(baseline["pipeline_us"].values())
+        candidate_total_with_close_ms = (
+            sum(candidate["pipeline_us"].values())
+            + runner_close_totals["elapsed_us"] / 1000.0
+        )
+        baseline_total_work_ms.append(baseline_total_ms)
+        candidate_total_work_including_close_ms.append(candidate_total_with_close_ms)
+        paired_total_work_delta_percent.append(
+            (candidate_total_with_close_ms - baseline_total_ms)
+            / baseline_total_ms * 100.0
+        )
 
         for topic_id in expected_topic_ids:
             base_topic = baseline["run"]["topics"][expected_topic_ids.index(topic_id)]
@@ -453,6 +485,14 @@ def main() -> int:
         "candidate_cache_close": {
             "cache_instances_closed": candidate_close_rows,
             "totals": candidate_close_totals,
+            "elapsed_ms_per_cache": summary(candidate_close_elapsed_ms),
+        },
+        "paired_pipeline_plus_session_teardown_ms": {
+            "baseline_turn_local": summary(baseline_total_work_ms),
+            "candidate_conversation_scoped": summary(candidate_total_work_including_close_ms),
+            "paired_delta_percent_candidate_vs_baseline": summary(
+                paired_total_work_delta_percent
+            ),
         },
         "session_open_validation_ms_by_repository": {
             repository_id: {
@@ -522,6 +562,11 @@ def main() -> int:
     args.output.write_text(json.dumps(output, indent=2) + "\n", encoding="utf-8")
     print(f"PASS: E4 aggregate validated {RUNNERS}/{RUNNERS} independent paired runners.")
     print(f"PASS: baseline/candidate semantic SHA-256 {output['semantic_sha256']}")
+    print(
+        "Pipeline + session teardown baseline/candidate median: "
+        f"{output['paired_pipeline_plus_session_teardown_ms']['baseline_turn_local']['median']:.3f}/"
+        f"{output['paired_pipeline_plus_session_teardown_ms']['candidate_conversation_scoped']['median']:.3f} ms"
+    )
     print(
         "Session requests baseline/candidate: "
         f"{baseline_request_total}/{candidate_request_total}"
