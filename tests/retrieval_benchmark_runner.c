@@ -1746,6 +1746,7 @@ main (int argc, char **argv)
     GPtrArray *repositories = NULL;
     GHashTable *conversations = NULL;
     char *cache_root = NULL;
+    gboolean remove_cache_root = TRUE;
     int exit_code = 1;
 
     if (!json_parser_load_from_file (
@@ -1805,10 +1806,30 @@ main (int argc, char **argv)
         goto out;
     }
 
-    cache_root = g_dir_make_tmp (
-        "atm-r5-benchmark-cache-XXXXXX",
-        &error
+    const char *configured_cache_root = g_getenv (
+        "ATM_RETRIEVAL_BENCHMARK_CACHE_ROOT"
     );
+    if (configured_cache_root != NULL) {
+        if (!g_path_is_absolute (configured_cache_root) ||
+            configured_cache_root[0] == '\\0' ||
+            g_mkdir_with_parents (configured_cache_root, 0700) != 0) {
+            g_set_error (
+                &error,
+                G_IO_ERROR,
+                G_IO_ERROR_INVALID_ARGUMENT,
+                "Configured benchmark cache root is invalid or cannot be created: %s",
+                configured_cache_root
+            );
+            goto out;
+        }
+        cache_root = g_strdup (configured_cache_root);
+        remove_cache_root = FALSE;
+    } else {
+        cache_root = g_dir_make_tmp (
+            "atm-r5-benchmark-cache-XXXXXX",
+            &error
+        );
+    }
 
     if (cache_root == NULL) {
         goto out;
@@ -2040,7 +2061,9 @@ out:
     g_clear_object (&builder);
     g_clear_object (&parser);
 
-    remove_tree_best_effort (cache_root);
+    if (remove_cache_root) {
+        remove_tree_best_effort (cache_root);
+    }
     g_free (cache_root);
 
     return exit_code;
