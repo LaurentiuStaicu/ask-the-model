@@ -346,7 +346,7 @@ atm_retrieval_query_session_cache_free (
 
     if (g_getenv ("ATM_RETRIEVAL_GROUNDING_E4_TIMING") != NULL) {
         g_print (
-            "ATM_E4_SESSION_CACHE_CLOSE sessions=%u opens=%u reuses=%u invalidations=%u\\n",
+            "ATM_E4_SESSION_CACHE_CLOSE sessions=%u opens=%u reuses=%u invalidations=%u\n",
             g_hash_table_size (cache->sessions_by_index_path),
             cache->open_count,
             cache->reuse_count,
@@ -377,8 +377,8 @@ atm_retrieval_query_session_cache_get (
     g_return_val_if_fail (repository_id != NULL, NULL);
     g_return_val_if_fail (index_path != NULL, NULL);
 
-    if (repository_id[0] == '\\0' ||
-        index_path[0] == '\\0' ||
+    if (repository_id[0] == '\0' ||
+        index_path[0] == '\0' ||
         !g_utf8_validate (repository_id, -1, NULL) ||
         !g_utf8_validate (index_path, -1, NULL)) {
         g_set_error_literal (
@@ -410,7 +410,7 @@ atm_retrieval_query_session_cache_get (
         cache->reuse_count++;
         if (g_getenv ("ATM_RETRIEVAL_GROUNDING_E4_TIMING") != NULL) {
             g_print (
-                "ATM_E4_SESSION repository=%s event=reuse elapsed_us=%" G_GINT64_FORMAT "\\n",
+                "ATM_E4_SESSION repository=%s event=reuse elapsed_us=%" G_GINT64_FORMAT "\n",
                 repository_id,
                 g_get_monotonic_time () - started_us
             );
@@ -422,7 +422,7 @@ atm_retrieval_query_session_cache_get (
     if (session == NULL) {
         if (g_getenv ("ATM_RETRIEVAL_GROUNDING_E4_TIMING") != NULL) {
             g_print (
-                "ATM_E4_SESSION repository=%s event=open_failed elapsed_us=%" G_GINT64_FORMAT "\\n",
+                "ATM_E4_SESSION repository=%s event=open_failed elapsed_us=%" G_GINT64_FORMAT "\n",
                 repository_id,
                 g_get_monotonic_time () - started_us
             );
@@ -442,7 +442,7 @@ atm_retrieval_query_session_cache_get (
 
     if (g_getenv ("ATM_RETRIEVAL_GROUNDING_E4_TIMING") != NULL) {
         g_print (
-            "ATM_E4_SESSION repository=%s event=open elapsed_us=%" G_GINT64_FORMAT "\\n",
+            "ATM_E4_SESSION repository=%s event=open elapsed_us=%" G_GINT64_FORMAT "\n",
             repository_id,
             g_get_monotonic_time () - started_us
         );
@@ -481,7 +481,7 @@ atm_retrieval_query_session_cache_invalidate (
 
     if (g_getenv ("ATM_RETRIEVAL_GROUNDING_E4_TIMING") != NULL) {
         g_print (
-            "ATM_E4_SESSION repository=%s event=invalidate elapsed_us=0\\n",
+            "ATM_E4_SESSION repository=%s event=invalidate elapsed_us=0\n",
             repository_id
         );
     }
