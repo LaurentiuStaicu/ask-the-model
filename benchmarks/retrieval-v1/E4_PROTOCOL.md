@@ -83,10 +83,8 @@ index paths were frozen at construction.
   is freed.
 - In the GTK application, the repository-generation shared lease must remain
   held until native retrieval state and all cached SQLite sessions have been
-  destroyed. The current `ConversationGrounding` destructor releases its
-  Vala lease before freeing the C state. If E4 introduces retained query
-  sessions into that state, disposal order must be reversed: free the C state
-  first, then release the generation lease.
+  destroyed. The `ConversationGrounding` destructor now frees the C state
+  first, then releases the Vala generation lease; preserve this order.
 - Concurrent turns on the same conversation state remain unsupported unless
   explicitly serialized by the existing conversation-turn guard. E4 must not
   introduce unsynchronized concurrent use of one SQLite connection.
@@ -126,9 +124,13 @@ topics, because those do not amortize a session open across turns.
   conversations, pooled only where repository and query semantics are
   comparable.
 - Connection count and conversation-state lifetime at close.
-- Cache teardown duration measured after all SQLite session destructors have run.
-- Paired total pipeline + teardown time, so candidate close cost is not omitted
-  merely because conversation-owned sessions close after topic execution.
+- Per-cache teardown duration, measured after all SQLite session destructors
+  have run.
+- Destruction time for the four persistent two-turn conversation states in
+  both baseline and candidate.
+- Paired total pipeline + persistent-conversation teardown time. Single-turn
+  temporary-state cleanup already occurs within each per-topic pipeline timer
+  and is not added a second time.
 - Semantic SHA-256 equality for baseline/candidate and across all runners.
 
 Pipeline wall time retains the E3 boundary: it includes retrieval, grounding
