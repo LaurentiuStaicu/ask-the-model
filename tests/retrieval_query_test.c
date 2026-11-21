@@ -1145,6 +1145,172 @@ test_query_session_reuses_validated_snapshot (void)
 }
 
 static void
+test_query_session_cache_reuses_and_invalidates (void)
+{
+    char *snapshot_root = new_snapshot ();
+    char *cache_root = new_temp_root ("atm-query-session-cache-XXXXXX");
+    char *index_path = build_index (snapshot_root, cache_root);
+    AtmRetrievalQuerySessionCache *cache =
+        atm_retrieval_query_session_cache_new ();
+    AtmRetrievalQuerySession *first = NULL;
+    AtmRetrievalQuerySession *reused = NULL;
+    AtmRetrievalQuerySession *reopened = NULL;
+    GPtrArray *exact = NULL;
+    sqlite3 *writer = NULL;
+    GError *error = NULL;
+
+    first = atm_retrieval_query_session_cache_get (
+        cache,
+        "ewd",
+        index_path,
+        &error
+    );
+    g_assert_no_error (error);
+    g_assert_nonnull (first);
+    g_assert_cmpuint (
+        atm_retrieval_query_session_cache_open_count (cache),
+        ==,
+        1
+    );
+    g_assert_cmpuint (
+        atm_retrieval_query_session_cache_size (cache),
+        ==,
+        1
+    );
+
+    reused = atm_retrieval_query_session_cache_get (
+        cache,
+        "ewd",
+        index_path,
+        &error
+    );
+    g_assert_no_error (error);
+    g_assert_true (reused == first);
+    g_assert_cmpuint (
+        atm_retrieval_query_session_cache_reuse_count (cache),
+        ==,
+        1
+    );
+
+    g_assert_true (
+        atm_retrieval_query_session_lookup_exact (
+            reused,
+            "food_per_capita",
+            10,
+            &exact,
+            &error
+        )
+    );
+    g_assert_no_error (error);
+    g_assert_cmpuint (exact->len, ==, 1);
+    assert_snapshot_provenance (result_at (exact, 0));
+    g_ptr_array_unref (exact);
+    exact = NULL;
+
+    g_assert_null (
+        atm_retrieval_query_session_cache_get (
+            cache,
+            "rmd",
+            index_path,
+            &error
+        )
+    );
+    g_assert_error (
+        error,
+        ATM_RETRIEVAL_QUERY_ERROR,
+        ATM_RETRIEVAL_QUERY_ERROR_ARGUMENT
+    );
+    g_clear_error (&error);
+    g_assert_cmpuint (
+        atm_retrieval_query_session_cache_reuse_count (cache),
+        ==,
+        1
+    );
+
+    atm_retrieval_query_session_cache_invalidate (
+        cache,
+        "ewd",
+        index_path
+    );
+    g_assert_cmpuint (
+        atm_retrieval_query_session_cache_size (cache),
+        ==,
+        0
+    );
+    g_assert_cmpuint (
+        atm_retrieval_query_session_cache_invalidation_count (cache),
+        ==,
+        1
+    );
+
+    reopened = atm_retrieval_query_session_cache_get (
+        cache,
+        "ewd",
+        index_path,
+        &error
+    );
+    g_assert_no_error (error);
+    g_assert_nonnull (reopened);
+    g_assert_cmpuint (
+        atm_retrieval_query_session_cache_open_count (cache),
+        ==,
+        2
+    );
+
+    /*
+     * The cached read transaction must hold a shared lock. After cache_free,
+     * the writer must be able to acquire an exclusive lock immediately.
+     */
+    g_assert_cmpint (
+        sqlite3_open_v2 (
+            index_path,
+            &writer,
+            SQLITE_OPEN_READWRITE,
+            NULL
+        ),
+        ==,
+        SQLITE_OK
+    );
+    sqlite3_busy_timeout (writer, 0);
+    g_assert_cmpint (
+        sqlite3_exec (
+            writer,
+            "BEGIN EXCLUSIVE;",
+            NULL,
+            NULL,
+            NULL
+        ),
+        ==,
+        SQLITE_BUSY
+    );
+
+    atm_retrieval_query_session_cache_free (cache);
+    g_assert_cmpint (
+        sqlite3_exec (
+            writer,
+            "BEGIN EXCLUSIVE;",
+            NULL,
+            NULL,
+            NULL
+        ),
+        ==,
+        SQLITE_OK
+    );
+    g_assert_cmpint (
+        sqlite3_exec (writer, "ROLLBACK;", NULL, NULL, NULL),
+        ==,
+        SQLITE_OK
+    );
+    g_assert_cmpint (sqlite3_close (writer), ==, SQLITE_OK);
+
+    g_free (index_path);
+    remove_tree_best_effort (snapshot_root);
+    g_free (snapshot_root);
+    remove_tree_best_effort (cache_root);
+    g_free (cache_root);
+}
+
+static void
 test_invalid_arguments_rejected (void)
 {
     GPtrArray *results = NULL;
@@ -2237,6 +2403,10 @@ main (int argc, char **argv)
     g_test_add_func (
         "/retrieval-query/session-reuses-validated-snapshot",
         test_query_session_reuses_validated_snapshot
+    );
+    g_test_add_func (
+        "/retrieval-query/session-cache-reuses-invalidates",
+        test_query_session_cache_reuses_and_invalidates
     );
     g_test_add_func (
         "/retrieval-query/fts-canonical-consistency-all-routes",

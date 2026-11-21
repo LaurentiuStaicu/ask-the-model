@@ -291,6 +291,254 @@ atm_retrieval_query_session_close (
     g_free (session);
 }
 
+typedef struct {
+    char *repository_id;
+    AtmRetrievalQuerySession *session;
+} AtmRetrievalQuerySessionCacheEntry;
+
+struct _AtmRetrievalQuerySessionCache {
+    GHashTable *sessions_by_index_path;
+    guint open_count;
+    guint reuse_count;
+    guint invalidation_count;
+};
+
+static void
+query_session_cache_entry_free (
+    AtmRetrievalQuerySessionCacheEntry *entry
+)
+{
+    if (entry == NULL) {
+        return;
+    }
+
+    g_free (entry->repository_id);
+    atm_retrieval_query_session_close (entry->session);
+    g_free (entry);
+}
+
+AtmRetrievalQuerySessionCache *
+atm_retrieval_query_session_cache_new (void)
+{
+    AtmRetrievalQuerySessionCache *cache = g_new0 (
+        AtmRetrievalQuerySessionCache,
+        1
+    );
+
+    cache->sessions_by_index_path = g_hash_table_new_full (
+        g_str_hash,
+        g_str_equal,
+        g_free,
+        (GDestroyNotify) query_session_cache_entry_free
+    );
+
+    return cache;
+}
+
+void
+atm_retrieval_query_session_cache_free (
+    AtmRetrievalQuerySessionCache *cache
+)
+{
+    guint sessions = 0;
+    guint opens = 0;
+    guint reuses = 0;
+    guint invalidations = 0;
+    gint64 close_started_us = 0;
+
+    if (cache == NULL) {
+        return;
+    }
+
+    sessions = g_hash_table_size (cache->sessions_by_index_path);
+    opens = cache->open_count;
+    reuses = cache->reuse_count;
+    invalidations = cache->invalidation_count;
+    close_started_us = g_get_monotonic_time ();
+
+    /*
+     * Emit the close record only after the table's value destructors have
+     * closed every SQLite handle owned by this conversation.
+     */
+    g_clear_pointer (
+        &cache->sessions_by_index_path,
+        g_hash_table_unref
+    );
+
+    if (g_getenv ("ATM_RETRIEVAL_GROUNDING_E4_TIMING") != NULL) {
+        g_print (
+            "ATM_E4_SESSION_CACHE_CLOSE sessions=%u opens=%u reuses=%u invalidations=%u elapsed_us=%" G_GINT64_FORMAT "\n",
+            sessions,
+            opens,
+            reuses,
+            invalidations,
+            g_get_monotonic_time () - close_started_us
+        );
+    }
+
+    g_free (cache);
+}
+
+AtmRetrievalQuerySession *
+atm_retrieval_query_session_cache_get (
+    AtmRetrievalQuerySessionCache *cache,
+    const char *repository_id,
+    const char *index_path,
+    GError **error
+)
+{
+    AtmRetrievalQuerySessionCacheEntry *entry = NULL;
+    AtmRetrievalQuerySession *session = NULL;
+    gint64 started_us;
+
+    g_return_val_if_fail (cache != NULL, NULL);
+    g_return_val_if_fail (repository_id != NULL, NULL);
+    g_return_val_if_fail (index_path != NULL, NULL);
+
+    if (repository_id[0] == '\0' ||
+        index_path[0] == '\0' ||
+        !g_utf8_validate (repository_id, -1, NULL) ||
+        !g_utf8_validate (index_path, -1, NULL)) {
+        g_set_error_literal (
+            error,
+            ATM_RETRIEVAL_QUERY_ERROR,
+            ATM_RETRIEVAL_QUERY_ERROR_ARGUMENT,
+            "Query-session cache identity is invalid."
+        );
+        return NULL;
+    }
+
+    started_us = g_get_monotonic_time ();
+    entry = g_hash_table_lookup (
+        cache->sessions_by_index_path,
+        index_path
+    );
+
+    if (entry != NULL) {
+        if (g_strcmp0 (entry->repository_id, repository_id) != 0) {
+            g_set_error_literal (
+                error,
+                ATM_RETRIEVAL_QUERY_ERROR,
+                ATM_RETRIEVAL_QUERY_ERROR_ARGUMENT,
+                "One query-session cache index path was assigned to multiple repositories."
+            );
+            return NULL;
+        }
+
+        cache->reuse_count++;
+        if (g_getenv ("ATM_RETRIEVAL_GROUNDING_E4_TIMING") != NULL) {
+            g_print (
+                "ATM_E4_SESSION repository=%s event=reuse elapsed_us=%" G_GINT64_FORMAT "\n",
+                repository_id,
+                g_get_monotonic_time () - started_us
+            );
+        }
+        return entry->session;
+    }
+
+    session = atm_retrieval_query_session_open (index_path, error);
+    if (session == NULL) {
+        if (g_getenv ("ATM_RETRIEVAL_GROUNDING_E4_TIMING") != NULL) {
+            g_print (
+                "ATM_E4_SESSION repository=%s event=open_failed elapsed_us=%" G_GINT64_FORMAT "\n",
+                repository_id,
+                g_get_monotonic_time () - started_us
+            );
+        }
+        return NULL;
+    }
+
+    entry = g_new0 (AtmRetrievalQuerySessionCacheEntry, 1);
+    entry->repository_id = g_strdup (repository_id);
+    entry->session = session;
+    g_hash_table_insert (
+        cache->sessions_by_index_path,
+        g_strdup (index_path),
+        entry
+    );
+    cache->open_count++;
+
+    if (g_getenv ("ATM_RETRIEVAL_GROUNDING_E4_TIMING") != NULL) {
+        g_print (
+            "ATM_E4_SESSION repository=%s event=open elapsed_us=%" G_GINT64_FORMAT "\n",
+            repository_id,
+            g_get_monotonic_time () - started_us
+        );
+    }
+
+    return session;
+}
+
+void
+atm_retrieval_query_session_cache_invalidate (
+    AtmRetrievalQuerySessionCache *cache,
+    const char *repository_id,
+    const char *index_path
+)
+{
+    AtmRetrievalQuerySessionCacheEntry *entry = NULL;
+
+    g_return_if_fail (cache != NULL);
+    g_return_if_fail (repository_id != NULL);
+    g_return_if_fail (index_path != NULL);
+
+    entry = g_hash_table_lookup (
+        cache->sessions_by_index_path,
+        index_path
+    );
+    if (entry == NULL ||
+        g_strcmp0 (entry->repository_id, repository_id) != 0) {
+        return;
+    }
+
+    g_hash_table_remove (
+        cache->sessions_by_index_path,
+        index_path
+    );
+    cache->invalidation_count++;
+
+    if (g_getenv ("ATM_RETRIEVAL_GROUNDING_E4_TIMING") != NULL) {
+        g_print (
+            "ATM_E4_SESSION repository=%s event=invalidate elapsed_us=0\n",
+            repository_id
+        );
+    }
+}
+
+guint
+atm_retrieval_query_session_cache_open_count (
+    const AtmRetrievalQuerySessionCache *cache
+)
+{
+    return cache != NULL ? cache->open_count : 0;
+}
+
+guint
+atm_retrieval_query_session_cache_reuse_count (
+    const AtmRetrievalQuerySessionCache *cache
+)
+{
+    return cache != NULL ? cache->reuse_count : 0;
+}
+
+guint
+atm_retrieval_query_session_cache_invalidation_count (
+    const AtmRetrievalQuerySessionCache *cache
+)
+{
+    return cache != NULL ? cache->invalidation_count : 0;
+}
+
+guint
+atm_retrieval_query_session_cache_size (
+    const AtmRetrievalQuerySessionCache *cache
+)
+{
+    return cache != NULL
+        ? g_hash_table_size (cache->sessions_by_index_path)
+        : 0;
+}
+
 static gboolean
 load_source_roles (
     sqlite3 *db,

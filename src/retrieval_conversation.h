@@ -7,7 +7,8 @@
 G_BEGIN_DECLS
 
 typedef enum {
-    ATM_RETRIEVAL_CONVERSATION_ERROR_ARGUMENT
+    ATM_RETRIEVAL_CONVERSATION_ERROR_ARGUMENT,
+    ATM_RETRIEVAL_CONVERSATION_ERROR_SESSION_CACHE
 } AtmRetrievalConversationError;
 
 #define ATM_RETRIEVAL_CONVERSATION_ERROR \
@@ -36,6 +37,12 @@ atm_retrieval_conversation_state_new (
 
 void atm_retrieval_conversation_state_free (
     AtmRetrievalConversationState *state
+);
+
+/* Opt in before the first turn; the cache is private to this conversation. */
+gboolean atm_retrieval_conversation_state_enable_query_session_reuse (
+    AtmRetrievalConversationState *state,
+    GError **error
 );
 
 void atm_retrieval_conversation_turn_free (

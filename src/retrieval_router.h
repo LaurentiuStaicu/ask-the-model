@@ -4,6 +4,7 @@
 
 #include "retrieval_normalize.h"
 #include "retrieval_scope.h"
+#include "retrieval_query.h"
 
 G_BEGIN_DECLS
 
@@ -45,6 +46,15 @@ gboolean atm_retrieval_run (
     const char *query,
     const GPtrArray *active_repositories,
     guint max_results_per_repository,
+    AtmRetrievalResultSet **out_results,
+    GError **error
+);
+
+gboolean atm_retrieval_run_with_query_session_cache (
+    const char *query,
+    const GPtrArray *active_repositories,
+    guint max_results_per_repository,
+    AtmRetrievalQuerySessionCache *session_cache,
     AtmRetrievalResultSet **out_results,
     GError **error
 );

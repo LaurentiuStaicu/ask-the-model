@@ -1405,6 +1405,16 @@ append_topic_run (
                 return FALSE;
             }
 
+            if (g_getenv ("ATM_RETRIEVAL_GROUNDING_E4_SESSION_REUSE") != NULL &&
+                !atm_retrieval_conversation_state_enable_query_session_reuse (
+                    conversation->state,
+                    error
+                )) {
+                conversation_run_state_free (conversation);
+                g_ptr_array_unref (active);
+                return FALSE;
+            }
+
             g_hash_table_insert (
                 conversations,
                 g_strdup (conversation_id),
@@ -1453,6 +1463,16 @@ append_topic_run (
             );
 
         if (temporary_state == NULL) {
+            g_ptr_array_unref (active);
+            return FALSE;
+        }
+
+        if (g_getenv ("ATM_RETRIEVAL_GROUNDING_E4_SESSION_REUSE") != NULL &&
+            !atm_retrieval_conversation_state_enable_query_session_reuse (
+                temporary_state,
+                error
+            )) {
+            atm_retrieval_conversation_state_free (temporary_state);
             g_ptr_array_unref (active);
             return FALSE;
         }
@@ -1726,6 +1746,7 @@ main (int argc, char **argv)
     GPtrArray *repositories = NULL;
     GHashTable *conversations = NULL;
     char *cache_root = NULL;
+    gboolean remove_cache_root = TRUE;
     int exit_code = 1;
 
     if (!json_parser_load_from_file (
@@ -1785,10 +1806,30 @@ main (int argc, char **argv)
         goto out;
     }
 
-    cache_root = g_dir_make_tmp (
-        "atm-r5-benchmark-cache-XXXXXX",
-        &error
+    const char *configured_cache_root = g_getenv (
+        "ATM_RETRIEVAL_BENCHMARK_CACHE_ROOT"
     );
+    if (configured_cache_root != NULL) {
+        if (!g_path_is_absolute (configured_cache_root) ||
+            configured_cache_root[0] == '\0' ||
+            g_mkdir_with_parents (configured_cache_root, 0700) != 0) {
+            g_set_error (
+                &error,
+                G_IO_ERROR,
+                G_IO_ERROR_INVALID_ARGUMENT,
+                "Configured benchmark cache root is invalid or cannot be created: %s",
+                configured_cache_root
+            );
+            goto out;
+        }
+        cache_root = g_strdup (configured_cache_root);
+        remove_cache_root = FALSE;
+    } else {
+        cache_root = g_dir_make_tmp (
+            "atm-r5-benchmark-cache-XXXXXX",
+            &error
+        );
+    }
 
     if (cache_root == NULL) {
         goto out;
@@ -1808,6 +1849,15 @@ main (int argc, char **argv)
             "ATM_E3_INDEX_PREPARE elapsed_us=%" G_GINT64_FORMAT "\n",
             g_get_monotonic_time () - e3_index_prepare_started_us
         );
+    }
+
+    if (g_getenv ("ATM_RETRIEVAL_BENCHMARK_PREPARE_ONLY") != NULL) {
+        g_print (
+            "PASS: prepared pinned R5 repository indexes in %s\n",
+            cache_root
+        );
+        exit_code = 0;
+        goto out;
     }
 
     conversations = g_hash_table_new_full (
@@ -2004,10 +2054,25 @@ out:
     }
 
     g_clear_error (&error);
-    g_clear_pointer (
-        &conversations,
-        g_hash_table_unref
-    );
+    if (conversations != NULL &&
+        g_getenv ("ATM_RETRIEVAL_GROUNDING_E4_TIMING") != NULL) {
+        guint conversation_states = g_hash_table_size (conversations);
+        gint64 teardown_started_us = g_get_monotonic_time ();
+
+        g_hash_table_unref (conversations);
+        conversations = NULL;
+
+        g_print (
+            "ATM_E4_CONVERSATION_TEARDOWN caches=%u elapsed_us=%" G_GINT64_FORMAT "\n",
+            conversation_states,
+            g_get_monotonic_time () - teardown_started_us
+        );
+    } else {
+        g_clear_pointer (
+            &conversations,
+            g_hash_table_unref
+        );
+    }
     g_clear_pointer (
         &repositories,
         g_ptr_array_unref
@@ -2020,7 +2085,9 @@ out:
     g_clear_object (&builder);
     g_clear_object (&parser);
 
-    remove_tree_best_effort (cache_root);
+    if (remove_cache_root) {
+        remove_tree_best_effort (cache_root);
+    }
     g_free (cache_root);
 
     return exit_code;

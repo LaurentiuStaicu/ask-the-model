@@ -7,6 +7,7 @@
 G_BEGIN_DECLS
 
 typedef struct _AtmRetrievalQuerySession AtmRetrievalQuerySession;
+typedef struct _AtmRetrievalQuerySessionCache AtmRetrievalQuerySessionCache;
 
 
 #define ATM_RETRIEVAL_MAX_EXACT_RESULTS 100
@@ -59,6 +60,42 @@ AtmRetrievalQuerySession *atm_retrieval_query_session_open (
 );
 void atm_retrieval_query_session_close (
     AtmRetrievalQuerySession *session
+);
+
+/*
+ * A conversation-owned cache of validated, read-only query sessions.
+ * Sessions are keyed by index path and must not be shared between
+ * independently pinned conversations. Returned sessions are borrowed and
+ * remain valid until invalidated or the cache is freed.
+ */
+AtmRetrievalQuerySessionCache *
+atm_retrieval_query_session_cache_new (void);
+void atm_retrieval_query_session_cache_free (
+    AtmRetrievalQuerySessionCache *cache
+);
+AtmRetrievalQuerySession *
+atm_retrieval_query_session_cache_get (
+    AtmRetrievalQuerySessionCache *cache,
+    const char *repository_id,
+    const char *index_path,
+    GError **error
+);
+void atm_retrieval_query_session_cache_invalidate (
+    AtmRetrievalQuerySessionCache *cache,
+    const char *repository_id,
+    const char *index_path
+);
+guint atm_retrieval_query_session_cache_open_count (
+    const AtmRetrievalQuerySessionCache *cache
+);
+guint atm_retrieval_query_session_cache_reuse_count (
+    const AtmRetrievalQuerySessionCache *cache
+);
+guint atm_retrieval_query_session_cache_invalidation_count (
+    const AtmRetrievalQuerySessionCache *cache
+);
+guint atm_retrieval_query_session_cache_size (
+    const AtmRetrievalQuerySessionCache *cache
 );
 gboolean atm_retrieval_query_session_lookup_exact (
     AtmRetrievalQuerySession *session,

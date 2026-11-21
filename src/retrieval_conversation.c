@@ -1,10 +1,13 @@
 #include "retrieval_conversation.h"
 
+#include "retrieval_query.h"
+
 #include <string.h>
 
 struct AtmRetrievalConversationState {
     GPtrArray *frozen_repositories;
     GPtrArray *last_repository_ids;
+    AtmRetrievalQuerySessionCache *query_session_cache;
     char *last_exact_logical_source_id;
     char *last_exact_repository_id;
     guint last_intents;
@@ -46,6 +49,10 @@ atm_retrieval_conversation_state_free (
     }
 
     g_clear_pointer (
+        &state->query_session_cache,
+        atm_retrieval_query_session_cache_free
+    );
+    g_clear_pointer (
         &state->frozen_repositories,
         g_ptr_array_unref
     );
@@ -56,6 +63,30 @@ atm_retrieval_conversation_state_free (
     g_free (state->last_exact_logical_source_id);
     g_free (state->last_exact_repository_id);
     g_free (state);
+}
+
+gboolean
+atm_retrieval_conversation_state_enable_query_session_reuse (
+    AtmRetrievalConversationState *state,
+    GError **error
+)
+{
+    g_return_val_if_fail (state != NULL, FALSE);
+
+    if (state->has_previous_turn ||
+        state->query_session_cache != NULL) {
+        g_set_error_literal (
+            error,
+            ATM_RETRIEVAL_CONVERSATION_ERROR,
+            ATM_RETRIEVAL_CONVERSATION_ERROR_SESSION_CACHE,
+            "Query-session reuse must be enabled once, before the first conversation turn."
+        );
+        return FALSE;
+    }
+
+    state->query_session_cache =
+        atm_retrieval_query_session_cache_new ();
+    return TRUE;
 }
 
 AtmRetrievalConversationState *
@@ -809,10 +840,11 @@ retrieve:
         effective_query->str
     );
 
-    if (!atm_retrieval_run (
+    if (!atm_retrieval_run_with_query_session_cache (
             turn->effective_query,
             effective_scopes,
             max_results_per_repository,
+            state->query_session_cache,
             &turn->retrieval,
             error
         )) {
