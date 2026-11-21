@@ -25,6 +25,11 @@ CACHE_CLOSE_RE = re.compile(
     r"reuses=(\d+) invalidations=(\d+) elapsed_us=(\d+)$",
     re.MULTILINE,
 )
+CONVERSATION_TEARDOWN_RE = re.compile(
+    r"^ATM_E4_CONVERSATION_TEARDOWN caches=(\\d+) elapsed_us=(\\d+)$",
+    re.MULTILINE,
+)
+
 INDEX_RE = re.compile(
     r"^ATM_E3_INDEX repository=(ewd|cbd|rmd) "
     r"ensure=(rebuilt|reused) elapsed_us=(\d+)$",
