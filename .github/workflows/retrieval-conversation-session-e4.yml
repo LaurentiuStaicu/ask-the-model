@@ -1,0 +1,228 @@
+name: Retrieval conversation-scoped SQLite session reuse E4
+
+on:
+  workflow_dispatch:
+  pull_request:
+    paths:
+      - 'src/retrieval_query.c'
+      - 'src/retrieval_query.h'
+      - 'src/retrieval_router.c'
+      - 'src/retrieval_router.h'
+      - 'src/retrieval_conversation.c'
+      - 'src/retrieval_conversation.h'
+      - 'src/ConversationGrounding.vala'
+      - 'tests/retrieval_query_test.c'
+      - 'tests/retrieval_benchmark_runner.c'
+      - 'scripts/aggregate_retrieval_conversation_session_e4.py'
+      - '.github/workflows/retrieval-conversation-session-e4.yml'
+      - 'benchmarks/retrieval-v1/benchmark.json'
+      - 'benchmarks/retrieval-v1/E4_PROTOCOL.md'
+
+permissions:
+  contents: read
+
+concurrency:
+  group: retrieval-conversation-session-e4-${{ github.event.pull_request.number || github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  measure:
+    name: E4 paired runner ${{ matrix.runner_id }}
+    runs-on: ubuntu-24.04
+    timeout-minutes: 30
+    strategy:
+      fail-fast: false
+      matrix:
+        runner_id: [1, 2, 3, 4, 5, 6, 7, 8, 9, 10]
+
+    steps:
+      - name: Checkout AtM
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+
+      - name: Install backend build dependencies
+        shell: bash
+        run: |
+          set -euo pipefail
+          sudo apt-get update
+          sudo apt-get install -y --no-install-recommends \
+            build-essential git pkg-config \
+            libglib2.0-dev libglib2.0-bin libjson-glib-dev \
+            libsqlite3-dev libyaml-dev
+
+      - name: Checkout benchmark-pinned repository snapshots
+        shell: bash
+        run: |
+          set -euo pipefail
+          mkdir -p .integration
+          python3 - <<'PY' >/tmp/atm-e4-corpus.tsv
+          import json
+          with open("benchmarks/retrieval-v1/benchmark.json", encoding="utf-8") as f:
+              benchmark = json.load(f)
+          for item in benchmark["corpus"]:
+              print(item["repository_id"], item["snapshot_sha"], sep="\t")
+          PY
+          while IFS=$'\t' read -r repository_id snapshot_sha; do
+            case "$repository_id" in
+              ewd) remote="https://github.com/LaurentiuStaicu/empirical-world3-dynamics.git"; root_env="ATM_BENCH_EWD_ROOT"; sha_env="ATM_BENCH_EWD_SHA" ;;
+              cbd) remote="https://github.com/LaurentiuStaicu/cognitive-belief-dynamics.git"; root_env="ATM_BENCH_CBD_ROOT"; sha_env="ATM_BENCH_CBD_SHA" ;;
+              rmd) remote="https://github.com/LaurentiuStaicu/romanian-monetary-dynamics.git"; root_env="ATM_BENCH_RMD_ROOT"; sha_env="ATM_BENCH_RMD_SHA" ;;
+              *) echo "Unsupported repository: $repository_id" >&2; exit 1 ;;
+            esac
+            destination="$GITHUB_WORKSPACE/.integration/$repository_id"
+            git init -q "$destination"
+            git -C "$destination" remote add origin "$remote"
+            git -C "$destination" fetch --depth=1 origin "$snapshot_sha"
+            git -C "$destination" checkout -q --detach FETCH_HEAD
+            actual_sha="$(git -C "$destination" rev-parse HEAD)"
+            test "$actual_sha" = "$snapshot_sha"
+            rm -rf "$destination/.git"
+            {
+              echo "$root_env=$destination"
+              echo "$sha_env=$actual_sha"
+            } >> "$GITHUB_ENV"
+          done </tmp/atm-e4-corpus.tsv
+
+      - name: Compile E4-instrumented frozen R5 runner
+        shell: bash
+        run: |
+          set -euo pipefail
+          glib-compile-resources \
+            data/io.github.laurentiustaicu.ask_the_model.gresource.xml \
+            --sourcedir=data --generate-source --target=/tmp/atm-resources.c
+          cc -std=c11 -D_GNU_SOURCE -O2 -Wall -Wextra -Werror -Isrc \
+            $(pkg-config --cflags glib-2.0 gio-2.0 json-glib-1.0) \
+            -c tests/retrieval_benchmark_runner.c \
+            -o /tmp/retrieval-benchmark-runner.o
+          cc -std=c11 -D_GNU_SOURCE -O2 -Wall -Wextra -Isrc \
+            src/cff_version.c src/repository_sources.c src/markdown_sections.c \
+            src/csv_table.c src/structured_json.c src/retrieval_index.c \
+            src/retrieval_fts_consistency.c src/coordination_lease.c \
+            src/retrieval_index_lifecycle.c src/retrieval_query.c \
+            src/retrieval_rank.c src/retrieval_scope.c src/retrieval_normalize.c \
+            src/retrieval_router.c src/retrieval_conversation.c src/grounding_context.c \
+            /tmp/retrieval-benchmark-runner.o /tmp/atm-resources.c \
+            $(pkg-config --cflags --libs glib-2.0 gio-2.0 json-glib-1.0 sqlite3 yaml-0.1) \
+            -o /tmp/atm-retrieval-benchmark-runner
+
+      - name: Prepare one shared pinned index set before both modes
+        shell: bash
+        env:
+          RUNNER_ID: ${{ matrix.runner_id }}
+        run: |
+          set -euo pipefail
+          runner_root="/tmp/atm-e4/runner-$RUNNER_ID"
+          cache_root="$runner_root/shared-index-cache"
+          mkdir -p "$runner_root" "$cache_root"
+          ATM_RETRIEVAL_BENCHMARK_CACHE_ROOT="$cache_root" \
+          ATM_RETRIEVAL_BENCHMARK_PREPARE_ONLY=1 \
+          ATM_RETRIEVAL_GROUNDING_E3_TIMING=1 \
+            /tmp/atm-retrieval-benchmark-runner \
+              benchmarks/retrieval-v1/benchmark.json \
+              "$runner_root/prepared.json" \
+              "e4-runner-$(printf '%02d' "$RUNNER_ID")-prepare" production \
+              | tee "$runner_root/prepare.log"
+          test -s "$runner_root/shared-index-cache"
+
+      - name: Execute paired baseline and candidate in balanced order
+        shell: bash
+        env:
+          RUNNER_ID: ${{ matrix.runner_id }}
+        run: |
+          set -euo pipefail
+          runner_root="/tmp/atm-e4/runner-$RUNNER_ID"
+          cache_root="$runner_root/shared-index-cache"
+          mkdir -p "$runner_root/baseline" "$runner_root/candidate"
+
+          run_mode() {
+            local mode="$1"
+            local run_id="e4-runner-$(printf '%02d' "$RUNNER_ID")-$mode"
+            local output_dir="$runner_root/$mode"
+            if [[ "$mode" == "candidate" ]]; then
+              env \
+                ATM_RETRIEVAL_BENCHMARK_CACHE_ROOT="$cache_root" \
+                ATM_RETRIEVAL_GROUNDING_E3_TIMING=1 \
+                ATM_RETRIEVAL_GROUNDING_E4_TIMING=1 \
+                ATM_RETRIEVAL_GROUNDING_E4_SESSION_REUSE=1 \
+                /tmp/atm-retrieval-benchmark-runner \
+                  benchmarks/retrieval-v1/benchmark.json \
+                  "$output_dir/run.json" \
+                  "$run_id" production \
+                  | tee "$output_dir/runner.log"
+            else
+              env -u ATM_RETRIEVAL_GROUNDING_E4_SESSION_REUSE \
+                ATM_RETRIEVAL_BENCHMARK_CACHE_ROOT="$cache_root" \
+                ATM_RETRIEVAL_GROUNDING_E3_TIMING=1 \
+                ATM_RETRIEVAL_GROUNDING_E4_TIMING=1 \
+                /tmp/atm-retrieval-benchmark-runner \
+                  benchmarks/retrieval-v1/benchmark.json \
+                  "$output_dir/run.json" \
+                  "$run_id" production \
+                  | tee "$output_dir/runner.log"
+            fi
+            python3 -m json.tool "$output_dir/run.json" >/dev/null
+          }
+
+          if (( RUNNER_ID % 2 == 1 )); then
+            execution_order="baseline-first"
+            run_mode baseline
+            run_mode candidate
+          else
+            execution_order="candidate-first"
+            run_mode candidate
+            run_mode baseline
+          fi
+
+          export EXECUTION_ORDER="$execution_order"
+          python3 - <<'PY' >"$runner_root/environment.json"
+          import json
+          import os
+          import platform
+          print(json.dumps({
+              "runner_id": int(os.environ["RUNNER_ID"]),
+              "runner_identity": os.environ.get("RUNNER_NAME", "unknown") + ":" + platform.node(),
+              "runner_os": os.environ.get("RUNNER_OS", "unknown"),
+              "sqlite_version": os.popen("pkg-config --modversion sqlite3").read().strip(),
+              "execution_order": os.environ["EXECUTION_ORDER"],
+          }, indent=2))
+          PY
+
+      - name: Upload E4 paired runner evidence
+        uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7.0.1
+        with:
+          name: runner-${{ matrix.runner_id }}
+          path: /tmp/atm-e4/runner-${{ matrix.runner_id }}
+          if-no-files-found: error
+          retention-days: 14
+
+  aggregate:
+    name: Aggregate paired E4 runners
+    needs: measure
+    runs-on: ubuntu-24.04
+    timeout-minutes: 10
+    steps:
+      - name: Checkout AtM
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+
+      - name: Download E4 runner evidence
+        uses: actions/download-artifact@634f93cb2916e3fdff6788551b99b062d0335ce0 # v5.0.0
+        with:
+          pattern: runner-*
+          path: /tmp/atm-e4-runs
+
+      - name: Validate and aggregate E4 evidence
+        shell: bash
+        run: |
+          set -euo pipefail
+          python3 scripts/aggregate_retrieval_conversation_session_e4.py \
+            --benchmark benchmarks/retrieval-v1/benchmark.json \
+            --runs-dir /tmp/atm-e4-runs \
+            --output /tmp/atm-retrieval-e4-aggregate.json
+          python3 -m json.tool /tmp/atm-retrieval-e4-aggregate.json
+
+      - name: Upload E4 aggregate
+        uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7.0.1
+        with:
+          name: atm-retrieval-e4-aggregate-${{ github.run_id }}-${{ github.run_attempt }}
+          path: /tmp/atm-retrieval-e4-aggregate.json
+          if-no-files-found: error
+          retention-days: 30
