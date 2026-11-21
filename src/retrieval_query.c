@@ -340,24 +340,42 @@ atm_retrieval_query_session_cache_free (
     AtmRetrievalQuerySessionCache *cache
 )
 {
+    guint sessions = 0;
+    guint opens = 0;
+    guint reuses = 0;
+    guint invalidations = 0;
+    gint64 close_started_us = 0;
+
     if (cache == NULL) {
         return;
     }
 
-    if (g_getenv ("ATM_RETRIEVAL_GROUNDING_E4_TIMING") != NULL) {
-        g_print (
-            "ATM_E4_SESSION_CACHE_CLOSE sessions=%u opens=%u reuses=%u invalidations=%u\n",
-            g_hash_table_size (cache->sessions_by_index_path),
-            cache->open_count,
-            cache->reuse_count,
-            cache->invalidation_count
-        );
-    }
+    sessions = g_hash_table_size (cache->sessions_by_index_path);
+    opens = cache->open_count;
+    reuses = cache->reuse_count;
+    invalidations = cache->invalidation_count;
+    close_started_us = g_get_monotonic_time ();
 
+    /*
+     * Emit the close record only after the table's value destructors have
+     * closed every SQLite handle owned by this conversation.
+     */
     g_clear_pointer (
         &cache->sessions_by_index_path,
         g_hash_table_unref
     );
+
+    if (g_getenv ("ATM_RETRIEVAL_GROUNDING_E4_TIMING") != NULL) {
+        g_print (
+            "ATM_E4_SESSION_CACHE_CLOSE sessions=%u opens=%u reuses=%u invalidations=%u elapsed_us=%" G_GINT64_FORMAT "\\n",
+            sessions,
+            opens,
+            reuses,
+            invalidations,
+            g_get_monotonic_time () - close_started_us
+        );
+    }
+
     g_free (cache);
 }
 
