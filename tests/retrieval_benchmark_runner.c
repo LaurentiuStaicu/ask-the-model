@@ -1811,7 +1811,7 @@ main (int argc, char **argv)
     );
     if (configured_cache_root != NULL) {
         if (!g_path_is_absolute (configured_cache_root) ||
-            configured_cache_root[0] == '\\0' ||
+            configured_cache_root[0] == '\0' ||
             g_mkdir_with_parents (configured_cache_root, 0700) != 0) {
             g_set_error (
                 &error,
@@ -1853,7 +1853,7 @@ main (int argc, char **argv)
 
     if (g_getenv ("ATM_RETRIEVAL_BENCHMARK_PREPARE_ONLY") != NULL) {
         g_print (
-            "PASS: prepared pinned R5 repository indexes in %s\\n",
+            "PASS: prepared pinned R5 repository indexes in %s\n",
             cache_root
         );
         exit_code = 0;
