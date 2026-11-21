@@ -555,6 +555,7 @@ collect_repository_evidence (
                     : "(null)",
                 scope->repository_id
             );
+            invalidate_session = TRUE;
             goto out;
         }
     }
