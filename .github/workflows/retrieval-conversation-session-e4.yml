@@ -23,7 +23,7 @@ permissions:
   contents: read
 
 concurrency:
-  group: retrieval-conversation-session-e4-${{ github.event.pull_request.number || github.ref }}
+  group: retrieval-conversation-session-e4-${{ github.sha }}
   cancel-in-progress: true
 
 jobs:
