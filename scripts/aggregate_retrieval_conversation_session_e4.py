@@ -291,18 +291,6 @@ def main() -> int:
                 elif mode == "candidate" and event == "reuse":
                     event_latencies["candidate_reuse"][repository_id].append(elapsed / 1000.0)
 
-        baseline_requests = sum(
-            event_counts["baseline"][repo]["turn_open"]
-            + event_counts["baseline"][repo]["turn_open_failed"]
-            for repo in REPOSITORIES
-        )
-        candidate_requests = sum(
-            event_counts["candidate"][repo]["open"]
-            + event_counts["candidate"][repo]["open_failed"]
-            + event_counts["candidate"][repo]["reuse"]
-            for repo in REPOSITORIES
-        )
-
         if any(
             event_counts["baseline"][repo]["turn_open_failed"] > 0
             for repo in REPOSITORIES
@@ -314,12 +302,37 @@ def main() -> int:
         ):
             raise SystemExit(f"runner {runner_id:02d}: candidate session open failed")
 
-        baseline_requests = sum(
-            1 for repo, event, _ in baseline["events"] if event == "turn_open"
-        )
-        candidate_requests = sum(
-            1 for repo, event, _ in candidate["events"] if event in {"open", "reuse"}
-        )
+        unexpected_baseline = [
+            event for _, event, _ in baseline["events"]
+            if event not in {"turn_open", "turn_open_failed"}
+        ]
+        unexpected_candidate = [
+            event for _, event, _ in candidate["events"]
+            if event not in {"open", "open_failed", "reuse", "invalidate"}
+        ]
+        if unexpected_baseline or unexpected_candidate:
+            raise SystemExit(f"runner {runner_id:02d}: session event appeared in the wrong mode")
+
+        baseline_by_repository = {
+            repository_id: sum(
+                1 for repo, event, _ in baseline["events"]
+                if repo == repository_id and event == "turn_open"
+            )
+            for repository_id in REPOSITORIES
+        }
+        candidate_by_repository = {
+            repository_id: sum(
+                1 for repo, event, _ in candidate["events"]
+                if repo == repository_id and event in {"open", "reuse"}
+            )
+            for repository_id in REPOSITORIES
+        }
+        if baseline_by_repository != candidate_by_repository:
+            raise SystemExit(
+                f"runner {runner_id:02d}: per-repository baseline/candidate request counts differ"
+            )
+        baseline_requests = sum(baseline_by_repository.values())
+        candidate_requests = sum(candidate_by_repository.values())
         if baseline_requests != candidate_requests:
             raise SystemExit(
                 f"runner {runner_id:02d}: baseline/candidate repository-session request counts differ"
@@ -445,7 +458,15 @@ def main() -> int:
             repository_id: {
                 "baseline_turn_open": summary(event_latencies["baseline"][repository_id]),
                 "candidate_first_open": summary(event_latencies["candidate_open"][repository_id]),
+                "candidate_reuse_lookup": summary(event_latencies["candidate_reuse"][repository_id]),
             }
+            for repository_id in sorted(REPOSITORIES)
+        },
+        "estimated_session_open_validation_ms_avoided": {
+            repository_id: (
+                sum(event_latencies["baseline"][repository_id])
+                - sum(event_latencies["candidate_open"][repository_id])
+            )
             for repository_id in sorted(REPOSITORIES)
         },
         "topic_latency_ms": {
