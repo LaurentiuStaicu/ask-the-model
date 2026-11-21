@@ -1405,6 +1405,16 @@ append_topic_run (
                 return FALSE;
             }
 
+            if (g_getenv ("ATM_RETRIEVAL_GROUNDING_E4_SESSION_REUSE") != NULL &&
+                !atm_retrieval_conversation_state_enable_query_session_reuse (
+                    conversation->state,
+                    error
+                )) {
+                conversation_run_state_free (conversation);
+                g_ptr_array_unref (active);
+                return FALSE;
+            }
+
             g_hash_table_insert (
                 conversations,
                 g_strdup (conversation_id),
@@ -1453,6 +1463,16 @@ append_topic_run (
             );
 
         if (temporary_state == NULL) {
+            g_ptr_array_unref (active);
+            return FALSE;
+        }
+
+        if (g_getenv ("ATM_RETRIEVAL_GROUNDING_E4_SESSION_REUSE") != NULL &&
+            !atm_retrieval_conversation_state_enable_query_session_reuse (
+                temporary_state,
+                error
+            )) {
+            atm_retrieval_conversation_state_free (temporary_state);
             g_ptr_array_unref (active);
             return FALSE;
         }
