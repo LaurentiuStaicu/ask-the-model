@@ -367,7 +367,7 @@ atm_retrieval_query_session_cache_free (
 
     if (g_getenv ("ATM_RETRIEVAL_GROUNDING_E4_TIMING") != NULL) {
         g_print (
-            "ATM_E4_SESSION_CACHE_CLOSE sessions=%u opens=%u reuses=%u invalidations=%u elapsed_us=%" G_GINT64_FORMAT "\\n",
+            "ATM_E4_SESSION_CACHE_CLOSE sessions=%u opens=%u reuses=%u invalidations=%u elapsed_us=%" G_GINT64_FORMAT "\n",
             sessions,
             opens,
             reuses,
