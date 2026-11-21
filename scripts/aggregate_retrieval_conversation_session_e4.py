@@ -26,7 +26,7 @@ CACHE_CLOSE_RE = re.compile(
     re.MULTILINE,
 )
 CONVERSATION_TEARDOWN_RE = re.compile(
-    r"^ATM_E4_CONVERSATION_TEARDOWN caches=(\\d+) elapsed_us=(\\d+)$",
+    r"^ATM_E4_CONVERSATION_TEARDOWN caches=(\d+) elapsed_us=(\d+)$",
     re.MULTILINE,
 )
 
@@ -95,7 +95,15 @@ def load_mode(
     expected_topic_ids: list[str],
     expected_corpus: list[dict],
     mode: str,
-) -> tuple[dict, str, str, dict[str, float], list[tuple[str, str, int]], list[tuple[int, int, int, int]]]:
+) -> tuple[
+    dict,
+    str,
+    str,
+    dict[str, float],
+    list[tuple[str, str, int]],
+    list[tuple[int, int, int, int, int]],
+    tuple[int, int],
+]:
     run_path = directory / "run.json"
     log_path = directory / "runner.log"
     if not run_path.is_file() or not log_path.is_file():
@@ -156,7 +164,24 @@ def load_mode(
         tuple(map(int, match))
         for match in CACHE_CLOSE_RE.findall(log)
     ]
-    return run, semantic_digest(semantic_payload(run)), log, pipeline_us, session_events, close_matches
+    teardown_matches = [
+        tuple(map(int, match))
+        for match in CONVERSATION_TEARDOWN_RE.findall(log)
+    ]
+    if len(teardown_matches) != 1:
+        raise SystemExit(
+            f"{mode}: expected one persistent conversation teardown record, "
+            f"found {len(teardown_matches)}"
+        )
+    return (
+        run,
+        semantic_digest(semantic_payload(run)),
+        log,
+        pipeline_us,
+        session_events,
+        close_matches,
+        teardown_matches[0],
+    )
 
 
 def main() -> int:
@@ -236,7 +261,9 @@ def main() -> int:
     }
     candidate_close_elapsed_ms = []
     baseline_total_work_ms = []
-    candidate_total_work_including_close_ms = []
+    candidate_total_work_including_teardown_ms = []
+    baseline_conversation_teardown_ms = []
+    candidate_conversation_teardown_ms = []
     paired_total_work_delta_percent = []
     candidate_close_rows = 0
     baseline_request_total = 0
@@ -269,7 +296,7 @@ def main() -> int:
 
         modes = {}
         for mode in ("baseline", "candidate"):
-            run, digest, log, pipeline_us, events, close_rows = load_mode(
+            run, digest, log, pipeline_us, events, close_rows, conversation_teardown = load_mode(
                 runner_directory / mode,
                 f"e4-runner-{runner_id:02d}-{mode}",
                 expected_topic_ids,
@@ -283,6 +310,7 @@ def main() -> int:
                 "pipeline_us": pipeline_us,
                 "events": events,
                 "close_rows": close_rows,
+                "conversation_teardown": conversation_teardown,
             }
             if mode == "baseline":
                 baseline_digests.add(digest)
@@ -402,16 +430,32 @@ def main() -> int:
             candidate_close_totals[key] += value
         candidate_close_rows += len(candidate["close_rows"])
 
-        baseline_total_ms = sum(baseline["pipeline_us"].values())
-        candidate_total_with_close_ms = (
-            sum(candidate["pipeline_us"].values())
-            + runner_close_totals["elapsed_us"] / 1000.0
+        baseline_teardown_caches, baseline_teardown_us = baseline["conversation_teardown"]
+        candidate_teardown_caches, candidate_teardown_us = candidate["conversation_teardown"]
+        if (
+            baseline_teardown_caches != len(conversation_topics)
+            or candidate_teardown_caches != len(conversation_topics)
+        ):
+            raise SystemExit(
+                f"runner {runner_id:02d}: expected {len(conversation_topics)} persistent conversation states "
+                "to be destroyed in both modes"
+            )
+        baseline_teardown_ms = baseline_teardown_us / 1000.0
+        candidate_teardown_ms = candidate_teardown_us / 1000.0
+        baseline_conversation_teardown_ms.append(baseline_teardown_ms)
+        candidate_conversation_teardown_ms.append(candidate_teardown_ms)
+
+        baseline_total_with_teardown_ms = (
+            sum(baseline["pipeline_us"].values()) + baseline_teardown_ms
         )
-        baseline_total_work_ms.append(baseline_total_ms)
-        candidate_total_work_including_close_ms.append(candidate_total_with_close_ms)
+        candidate_total_with_teardown_ms = (
+            sum(candidate["pipeline_us"].values()) + candidate_teardown_ms
+        )
+        baseline_total_work_ms.append(baseline_total_with_teardown_ms)
+        candidate_total_work_including_teardown_ms.append(candidate_total_with_teardown_ms)
         paired_total_work_delta_percent.append(
-            (candidate_total_with_close_ms - baseline_total_ms)
-            / baseline_total_ms * 100.0
+            (candidate_total_with_teardown_ms - baseline_total_with_teardown_ms)
+            / baseline_total_with_teardown_ms * 100.0
         )
 
         for topic_id in expected_topic_ids:
@@ -492,9 +536,13 @@ def main() -> int:
             "totals": candidate_close_totals,
             "elapsed_ms_per_cache": summary(candidate_close_elapsed_ms),
         },
-        "paired_pipeline_plus_session_teardown_ms": {
-            "baseline_turn_local": summary(baseline_total_work_ms),
-            "candidate_conversation_scoped": summary(candidate_total_work_including_close_ms),
+        "persistent_conversation_state_teardown_ms": {
+            "baseline_turn_local": summary(baseline_conversation_teardown_ms),
+            "candidate_conversation_scoped": summary(candidate_conversation_teardown_ms),
+        },
+        "paired_pipeline_plus_conversation_teardown_ms": {
+            "baseline": summary(baseline_total_work_ms),
+            "candidate": summary(candidate_total_work_including_teardown_ms),
             "paired_delta_percent_candidate_vs_baseline": summary(
                 paired_total_work_delta_percent
             ),
@@ -568,9 +616,9 @@ def main() -> int:
     print(f"PASS: E4 aggregate validated {RUNNERS}/{RUNNERS} independent paired runners.")
     print(f"PASS: baseline/candidate semantic SHA-256 {output['semantic_sha256']}")
     print(
-        "Pipeline + session teardown baseline/candidate median: "
-        f"{output['paired_pipeline_plus_session_teardown_ms']['baseline_turn_local']['median']:.3f}/"
-        f"{output['paired_pipeline_plus_session_teardown_ms']['candidate_conversation_scoped']['median']:.3f} ms"
+        "Pipeline + persistent conversation teardown baseline/candidate median: "
+        f"{output['paired_pipeline_plus_conversation_teardown_ms']['baseline']['median']:.3f}/"
+        f"{output['paired_pipeline_plus_conversation_teardown_ms']['candidate']['median']:.3f} ms"
     )
     print(
         "Session requests baseline/candidate: "
