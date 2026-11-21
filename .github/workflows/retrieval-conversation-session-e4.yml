@@ -12,6 +12,7 @@ on:
       - 'src/retrieval_conversation.h'
       - 'src/ConversationGrounding.vala'
       - 'tests/retrieval_query_test.c'
+      - 'tests/retrieval_conversation_test.c'
       - 'tests/retrieval_benchmark_runner.c'
       - 'scripts/aggregate_retrieval_conversation_session_e4.py'
       - '.github/workflows/retrieval-conversation-session-e4.yml'
