@@ -455,7 +455,7 @@ collect_repository_evidence (
                 error
             )) {
             invalidate_session = TRUE;
-                goto out;
+            goto out;
         }
 
         append_results (collected, partial);
@@ -478,7 +478,7 @@ collect_repository_evidence (
                     error
                 )) {
                 invalidate_session = TRUE;
-                goto out;
+        goto out;
             }
 
             append_results (collected, partial);
