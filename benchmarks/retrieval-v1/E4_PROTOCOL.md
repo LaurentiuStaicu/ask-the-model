@@ -126,6 +126,9 @@ topics, because those do not amortize a session open across turns.
   conversations, pooled only where repository and query semantics are
   comparable.
 - Connection count and conversation-state lifetime at close.
+- Cache teardown duration measured after all SQLite session destructors have run.
+- Paired total pipeline + teardown time, so candidate close cost is not omitted
+  merely because conversation-owned sessions close after topic execution.
 - Semantic SHA-256 equality for baseline/candidate and across all runners.
 
 Pipeline wall time retains the E3 boundary: it includes retrieval, grounding
@@ -145,8 +148,13 @@ E4 is valid only when:
 6. Cache open/reuse/invalidation counts match the expected conversation
    lifecycle; no connection survives its owning state.
 7. Query failures invalidate the affected cached connection.
-8. Disposal tests demonstrate that SQLite handles close before the
-   repository-generation lease is released.
+8. A native lock-probe test demonstrates that the cached read transaction
+   prevents a competing exclusive writer while the cache is alive and that
+   the writer succeeds immediately after cache destruction. The application
+   destructor must free the native grounding state (and therefore its SQLite
+   sessions) before releasing the repository-generation lease. The current
+   test suite proves native handle closure and the source-level Vala owner
+   order; it does not instrument the lease-release callback itself.
 9. The existing R5 evaluator and all quality gates remain unchanged.
 
 A latency improvement is **not** an acceptance gate by itself. If the speed
