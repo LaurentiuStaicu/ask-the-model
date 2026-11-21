@@ -866,6 +866,8 @@ load_benchmark_repositories (
         );
 
         AtmRetrievalEnsureResult ensure_result;
+        gboolean e3_timing = g_getenv ("ATM_RETRIEVAL_GROUNDING_E3_TIMING") != NULL;
+        gint64 e3_index_started_us = g_get_monotonic_time ();
 
         if (!atm_retrieval_index_ensure_for_snapshot (
                 cache_root,
@@ -879,6 +881,15 @@ load_benchmark_repositories (
             )) {
             benchmark_repository_free (repository);
             goto out;
+        }
+
+        if (e3_timing) {
+            g_print (
+                "ATM_E3_INDEX repository=%s ensure=%s elapsed_us=%" G_GINT64_FORMAT "\n",
+                repository->repository_id,
+                ensure_result == ATM_RETRIEVAL_ENSURE_REBUILT ? "rebuilt" : "reused",
+                g_get_monotonic_time () - e3_index_started_us
+            );
         }
 
         if (g_strcmp0 (
@@ -1783,6 +1794,7 @@ main (int argc, char **argv)
         goto out;
     }
 
+    gint64 e3_index_prepare_started_us = g_get_monotonic_time ();
     if (!load_benchmark_repositories (
             benchmark,
             cache_root,
@@ -1790,6 +1802,12 @@ main (int argc, char **argv)
             &error
         )) {
         goto out;
+    }
+    if (g_getenv ("ATM_RETRIEVAL_GROUNDING_E3_TIMING") != NULL) {
+        g_print (
+            "ATM_E3_INDEX_PREPARE elapsed_us=%" G_GINT64_FORMAT "\n",
+            g_get_monotonic_time () - e3_index_prepare_started_us
+        );
     }
 
     conversations = g_hash_table_new_full (
@@ -1915,17 +1933,33 @@ main (int argc, char **argv)
             goto out;
         }
 
+        JsonObject *topic_object = json_node_get_object (topic_node);
+        const char *e3_topic_id = optional_string_member (
+            topic_object,
+            "topic_id",
+            &error
+        );
+        if (error != NULL) {
+            goto out;
+        }
+        gboolean e3_timing = g_getenv ("ATM_RETRIEVAL_GROUNDING_E3_TIMING") != NULL;
+        gint64 e3_topic_started_us = g_get_monotonic_time ();
         if (!append_topic_run (
                 builder,
-                json_node_get_object (
-                    topic_node
-                ),
+                topic_object,
                 repositories,
                 conversations,
                 policy,
                 &error
             )) {
             goto out;
+        }
+        if (e3_timing) {
+            g_print (
+                "ATM_E3_TOPIC topic_id=%s pipeline_us=%" G_GINT64_FORMAT "\n",
+                e3_topic_id != NULL ? e3_topic_id : "unknown",
+                g_get_monotonic_time () - e3_topic_started_us
+            );
         }
     }
 

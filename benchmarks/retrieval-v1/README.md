@@ -184,3 +184,35 @@ chat, that the benchmark can never be expanded, or that the scientific models
 themselves are validated by AtM.
 
 No embeddings or reranker are required by the passing R5 baseline.
+
+## E3 end-to-end retrieval and grounding latency
+
+The E3 experiment reuses this frozen R5 corpus and its production retrieval
+policy without changing the benchmark schema, relevance judgments, or evaluator.
+Ten independent GitHub Actions runners each execute the complete R5 workload
+from a fresh temporary cache root against the exact pinned EWD/CBD/RMD commits.
+
+E3 records three nested timing layers:
+
+- per-repository index ensure time, including cold index construction and
+  validation;
+- conversation retrieval and grounding-context assembly, using the existing
+  R5 stage timers;
+- per-topic pipeline wall time around retrieval, context assembly, and
+  construction of the topic's benchmark result record.
+
+The aggregate validates the exact pinned corpus, all 33 topic identities and
+ordering, one timing record per repository and topic, a common SQLite version,
+and semantic equivalence across all ten runners. Semantic equivalence covers
+the outcome, ordered retrieval evidence, ordered grounding-context sources,
+and evidence byte count for every topic. The aggregate reports median and p95
+latency per stage and topic.
+
+E3 is diagnostic rather than a quality-policy change. Retrieval quality
+continues to be governed by the unchanged R5 evaluator and gates. Pipeline wall
+time includes benchmark-side result-record construction overhead; it does not
+include serialization of the complete run JSON and is not presented as a pure
+application-only measurement. The index-preparation total includes the
+repository ensure phase, while per-repository records expose its composition.
+E1, E2 and E3 answer distinct questions and their timings must not be conflated.
+No production cache or SQLite session policy is changed by this experiment.
