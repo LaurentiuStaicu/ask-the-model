@@ -1851,6 +1851,15 @@ main (int argc, char **argv)
         );
     }
 
+    if (g_getenv ("ATM_RETRIEVAL_BENCHMARK_PREPARE_ONLY") != NULL) {
+        g_print (
+            "PASS: prepared pinned R5 repository indexes in %s\\n",
+            cache_root
+        );
+        exit_code = 0;
+        goto out;
+    }
+
     conversations = g_hash_table_new_full (
         g_str_hash,
         g_str_equal,
