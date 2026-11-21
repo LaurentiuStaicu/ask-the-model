@@ -381,6 +381,7 @@ collect_repository_evidence (
     const GPtrArray *dataset_candidates,
     const GPtrArray *row_key_candidates,
     guint max_results,
+    AtmRetrievalQuerySessionCache *session_cache,
     AtmRepositoryEvidenceSet **out_set,
     GError **error
 )
@@ -389,6 +390,7 @@ collect_repository_evidence (
     GPtrArray *collected = NULL;
     GPtrArray *partial = NULL;
     AtmRetrievalQuerySession *session = NULL;
+    gboolean invalidate_session = FALSE;
     guint candidate_limit = MIN (
         ATM_RETRIEVAL_MAX_EXACT_RESULTS,
         MAX (max_results * 4, max_results)
@@ -406,9 +408,33 @@ collect_repository_evidence (
         );
     }
 
-    session = atm_retrieval_query_session_open (scope->index_path, error);
+    gint64 session_open_started_us = g_get_monotonic_time ();
+    session = session_cache != NULL
+        ? atm_retrieval_query_session_cache_get (
+            session_cache,
+            scope->repository_id,
+            scope->index_path,
+            error
+        )
+        : atm_retrieval_query_session_open (scope->index_path, error);
     if (session == NULL) {
+        if (session_cache == NULL &&
+            g_getenv ("ATM_RETRIEVAL_GROUNDING_E4_TIMING") != NULL) {
+            g_print (
+                "ATM_E4_SESSION repository=%s event=turn_open_failed elapsed_us=%" G_GINT64_FORMAT "\n",
+                scope->repository_id,
+                g_get_monotonic_time () - session_open_started_us
+            );
+        }
         goto out;
+    }
+    if (session_cache == NULL &&
+        g_getenv ("ATM_RETRIEVAL_GROUNDING_E4_TIMING") != NULL) {
+        g_print (
+            "ATM_E4_SESSION repository=%s event=turn_open elapsed_us=%" G_GINT64_FORMAT "\n",
+            scope->repository_id,
+            g_get_monotonic_time () - session_open_started_us
+        );
     }
 
     collected = g_ptr_array_new_with_free_func (
@@ -428,7 +454,8 @@ collect_repository_evidence (
                 &partial,
                 error
             )) {
-            goto out;
+            invalidate_session = TRUE;
+                goto out;
         }
 
         append_results (collected, partial);
@@ -450,6 +477,7 @@ collect_repository_evidence (
                     &partial,
                     error
                 )) {
+                invalidate_session = TRUE;
                 goto out;
             }
 
@@ -475,6 +503,7 @@ collect_repository_evidence (
                     &partial,
                     error
                 )) {
+                invalidate_session = TRUE;
                 goto out;
             }
 
@@ -490,7 +519,8 @@ collect_repository_evidence (
             &partial,
             error
         )) {
-        goto out;
+        invalidate_session = TRUE;
+                goto out;
     }
 
     append_results (collected, partial);
@@ -534,11 +564,23 @@ collect_repository_evidence (
     set->evidence = g_steal_pointer (&collected);
 
     *out_set = g_steal_pointer (&set);
-    atm_retrieval_query_session_close (session);
+    if (session_cache == NULL) {
+        atm_retrieval_query_session_close (session);
+    }
     return TRUE;
 
 out:
-    atm_retrieval_query_session_close (session);
+    if (session_cache != NULL) {
+        if (invalidate_session) {
+            atm_retrieval_query_session_cache_invalidate (
+                session_cache,
+                scope->repository_id,
+                scope->index_path
+            );
+        }
+    } else {
+        atm_retrieval_query_session_close (session);
+    }
     g_clear_pointer (&partial, g_ptr_array_unref);
     g_clear_pointer (&collected, g_ptr_array_unref);
     g_clear_pointer (&set, atm_repository_evidence_set_free);
@@ -546,10 +588,11 @@ out:
 }
 
 gboolean
-atm_retrieval_run (
+atm_retrieval_run_with_query_session_cache (
     const char *query,
     const GPtrArray *active_repositories,
     guint max_results_per_repository,
+    AtmRetrievalQuerySessionCache *session_cache,
     AtmRetrievalResultSet **out_results,
     GError **error
 )
@@ -646,6 +689,7 @@ atm_retrieval_run (
                 dataset_candidates,
                 row_key_candidates,
                 max_results_per_repository,
+                session_cache,
                 &repository_set,
                 error
             )) {
@@ -678,4 +722,23 @@ out:
         atm_retrieval_scope_selection_free
     );
     return FALSE;
+}
+
+gboolean
+atm_retrieval_run (
+    const char *query,
+    const GPtrArray *active_repositories,
+    guint max_results_per_repository,
+    AtmRetrievalResultSet **out_results,
+    GError **error
+)
+{
+    return atm_retrieval_run_with_query_session_cache (
+        query,
+        active_repositories,
+        max_results_per_repository,
+        NULL,
+        out_results,
+        error
+    );
 }
