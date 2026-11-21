@@ -1156,6 +1156,7 @@ test_query_session_cache_reuses_and_invalidates (void)
     AtmRetrievalQuerySession *reused = NULL;
     AtmRetrievalQuerySession *reopened = NULL;
     GPtrArray *exact = NULL;
+    sqlite3 *writer = NULL;
     GError *error = NULL;
 
     first = atm_retrieval_query_session_cache_get (
@@ -1256,7 +1257,52 @@ test_query_session_cache_reuses_and_invalidates (void)
         2
     );
 
+    /*
+     * The cached read transaction must hold a shared lock. After cache_free,
+     * the writer must be able to acquire an exclusive lock immediately.
+     */
+    g_assert_cmpint (
+        sqlite3_open_v2 (
+            index_path,
+            &writer,
+            SQLITE_OPEN_READWRITE,
+            NULL
+        ),
+        ==,
+        SQLITE_OK
+    );
+    sqlite3_busy_timeout (writer, 0);
+    g_assert_cmpint (
+        sqlite3_exec (
+            writer,
+            "BEGIN EXCLUSIVE;",
+            NULL,
+            NULL,
+            NULL
+        ),
+        ==,
+        SQLITE_BUSY
+    );
+
     atm_retrieval_query_session_cache_free (cache);
+    g_assert_cmpint (
+        sqlite3_exec (
+            writer,
+            "BEGIN EXCLUSIVE;",
+            NULL,
+            NULL,
+            NULL
+        ),
+        ==,
+        SQLITE_OK
+    );
+    g_assert_cmpint (
+        sqlite3_exec (writer, "ROLLBACK;", NULL, NULL, NULL),
+        ==,
+        SQLITE_OK
+    );
+    g_assert_cmpint (sqlite3_close (writer), ==, SQLITE_OK);
+
     g_free (index_path);
     remove_tree_best_effort (snapshot_root);
     g_free (snapshot_root);
