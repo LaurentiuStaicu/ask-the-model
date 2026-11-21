@@ -374,6 +374,63 @@ run_turn (
     return turn;
 }
 
+static void
+test_query_session_reuse_is_opt_in_and_conversation_scoped (void)
+{
+    Fixture *fixture = fixture_new ();
+    AtmRetrievalConversationState *state = new_state (fixture);
+    AtmRetrievalConversationTurn *first = NULL;
+    AtmRetrievalConversationTurn *followup = NULL;
+    GError *error = NULL;
+
+    g_assert_true (
+        atm_retrieval_conversation_state_enable_query_session_reuse (
+            state,
+            &error
+        )
+    );
+    g_assert_no_error (error);
+
+    g_assert_false (
+        atm_retrieval_conversation_state_enable_query_session_reuse (
+            state,
+            &error
+        )
+    );
+    g_assert_error (
+        error,
+        ATM_RETRIEVAL_CONVERSATION_ERROR,
+        ATM_RETRIEVAL_CONVERSATION_ERROR_SESSION_CACHE
+    );
+    g_clear_error (&error);
+
+    first = run_turn (state, "food_per_capita EWD");
+    g_assert_false (first->needs_clarification);
+    atm_retrieval_conversation_turn_free (first);
+
+    g_assert_false (
+        atm_retrieval_conversation_state_enable_query_session_reuse (
+            state,
+            &error
+        )
+    );
+    g_assert_error (
+        error,
+        ATM_RETRIEVAL_CONVERSATION_ERROR,
+        ATM_RETRIEVAL_CONVERSATION_ERROR_SESSION_CACHE
+    );
+    g_clear_error (&error);
+
+    followup = run_turn (state, "Dar în 2025?");
+    g_assert_false (followup->needs_clarification);
+    g_assert_true (followup->used_previous_scope);
+    g_assert_true (followup->used_previous_anchor);
+    atm_retrieval_conversation_turn_free (followup);
+
+    atm_retrieval_conversation_state_free (state);
+    fixture_free (fixture);
+}
+
 static AtmRepositoryEvidenceSet *
 find_set (
     AtmRetrievalResultSet *results,
@@ -943,6 +1000,10 @@ main (int argc, char **argv)
     g_test_add_func (
         "/retrieval-conversation/year-anchor",
         test_year_followup_inherits_scope_and_exact_anchor
+    );
+    g_test_add_func (
+        "/retrieval-conversation/query-session-reuse-opt-in",
+        test_query_session_reuse_is_opt_in_and_conversation_scoped
     );
     g_test_add_func (
         "/retrieval-conversation/repository-intent",
