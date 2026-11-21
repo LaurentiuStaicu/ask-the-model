@@ -458,7 +458,11 @@ def main() -> int:
             repository_id: {
                 "baseline_turn_open": summary(event_latencies["baseline"][repository_id]),
                 "candidate_first_open": summary(event_latencies["candidate_open"][repository_id]),
-                "candidate_reuse_lookup": summary(event_latencies["candidate_reuse"][repository_id]),
+                "candidate_reuse_lookup": (
+                    summary(event_latencies["candidate_reuse"][repository_id])
+                    if event_latencies["candidate_reuse"][repository_id]
+                    else None
+                ),
             }
             for repository_id in sorted(REPOSITORIES)
         },
