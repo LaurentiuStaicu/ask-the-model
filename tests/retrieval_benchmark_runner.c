@@ -2054,10 +2054,25 @@ out:
     }
 
     g_clear_error (&error);
-    g_clear_pointer (
-        &conversations,
-        g_hash_table_unref
-    );
+    if (conversations != NULL &&
+        g_getenv ("ATM_RETRIEVAL_GROUNDING_E4_TIMING") != NULL) {
+        guint conversation_states = g_hash_table_size (conversations);
+        gint64 teardown_started_us = g_get_monotonic_time ();
+
+        g_hash_table_unref (conversations);
+        conversations = NULL;
+
+        g_print (
+            "ATM_E4_CONVERSATION_TEARDOWN caches=%u elapsed_us=%" G_GINT64_FORMAT "\n",
+            conversation_states,
+            g_get_monotonic_time () - teardown_started_us
+        );
+    } else {
+        g_clear_pointer (
+            &conversations,
+            g_hash_table_unref
+        );
+    }
     g_clear_pointer (
         &repositories,
         g_ptr_array_unref
