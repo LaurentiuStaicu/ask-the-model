@@ -428,12 +428,17 @@ namespace AskTheModel {
         }
 
         ~ConversationGrounding () {
-            generation_lease = null;
-
+            /*
+             * Native retrieval state may own read-only SQLite sessions. Close
+             * those sessions before releasing the generation lease that keeps
+             * their pinned repository generation alive.
+             */
             if (state != null) {
                 ConversationGroundingNative.state_free (state);
                 state = null;
             }
+
+            generation_lease = null;
         }
 
         internal void hold_generation_lease (
