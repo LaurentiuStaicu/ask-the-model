@@ -210,8 +210,9 @@ latency per stage and topic.
 
 E3 is diagnostic rather than a quality-policy change. Retrieval quality
 continues to be governed by the unchanged R5 evaluator and gates. Pipeline wall
-time includes benchmark-side serialization overhead; it is not presented as a
-pure application-only measurement. The index-preparation total includes the
+time includes benchmark-side result-record construction overhead; it does not
+include serialization of the complete run JSON and is not presented as a pure
+application-only measurement. The index-preparation total includes the
 repository ensure phase, while per-repository records expose its composition.
 E1, E2 and E3 answer distinct questions and their timings must not be conflated.
 No production cache or SQLite session policy is changed by this experiment.
